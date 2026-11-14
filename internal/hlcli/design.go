@@ -27,7 +27,7 @@ const (
 
 func (c *cli) design(args []string) error {
 	if len(args) == 0 {
-		return usageErr("design needs a subcommand: check, code, page, notes, migrate, kit, pack, layouts, engine, timeline, moment, video, list, state, logs, panel, claim, release, who, history, restore")
+		return usageErr("design needs a subcommand: check, code, page, notes, export, migrate, kit, pack, layouts, engine, timeline, moment, video, list, state, logs, panel, claim, release, who, history, restore")
 	}
 	switch args[0] {
 	case "check":
@@ -38,6 +38,8 @@ func (c *cli) design(args []string) error {
 		return c.designPage(args[1:])
 	case "notes", "note":
 		return c.designNotes(args[1:])
+	case "export":
+		return c.designExport(args[1:])
 	case "migrate":
 		return c.designMigrate(args[1:])
 	case "kit":

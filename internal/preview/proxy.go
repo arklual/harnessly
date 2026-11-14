@@ -744,10 +744,8 @@ func (p *Proxy) deliver(w *trackedWriter, r *http.Request, c *Claim, rt *route, 
 	plan := planOf(r, a)
 	html := htmlType.MatchString(a.headers.Get("content-type"))
 	bridge := plan.rewrite && c.ParentOrigin != "" && html && isDocumentRequest(r)
-	basePath := ""
-	if rt.kind == "port" {
-		basePath = c.PathPrefix + rt.basePath
-	}
+	// A slot by path keeps its prefix on every root-relative address, a site's as well as a dev server's.
+	basePath := c.PathPrefix + rt.basePath
 	h := ctx.rewriteResponseHeaders(a.headers, p.cfg.Stands, headerOptions{bodyRewritten: plan.rewrite, basePath: basePath, cookieTag: tag, stand: p.isStandRoute(rt), cookiePath: c.PathPrefix})
 	if d.noStore {
 		h.Set("cache-control", "no-store")

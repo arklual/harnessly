@@ -48,10 +48,11 @@ const Home = ({
 
 const tile = (name: string) => screen.getByText(name).closest('button') as HTMLElement;
 const send = () => document.querySelector('.hx-dl__composer .hx-round[data-variant="accent"]') as HTMLElement;
+const input = () => document.querySelector('.hx-dl__composer textarea');
 const row = () =>
-  [...(document.querySelector('.hx-dl__bar:not([hidden])') as HTMLElement).children]
-    .filter((el) => el.tagName !== 'INPUT')
-    .map((el) => el.className.split(' ')[0]);
+  [...(document.querySelector('.hx-dl__composer .hx-composer__bar') as HTMLElement).children].map(
+    (el) => el.className.split(' ')[0],
+  );
 
 beforeAll(() => {
   vi.stubGlobal(
@@ -75,12 +76,12 @@ afterEach(cleanup);
 describe('the one field of Designly’s start', () => {
   it('stays on the screen when a tile changes the kind: the field and its row are the same', () => {
     render(<Home onCreate={vi.fn()} />);
-    const field = document.querySelector('.hx-dl__input');
+    const field = input();
     const before = row();
     for (const name of ['Slides', 'Video', 'Site mockup']) {
       fireEvent.click(tile(name));
       expect(tile(name).getAttribute('aria-checked')).toBe('true');
-      expect(document.querySelector('.hx-dl__input')).toBe(field);
+      expect(input()).toBe(field);
       expect(row()).toEqual(before);
     }
   });
@@ -145,12 +146,13 @@ describe('the one field of Designly’s start', () => {
     });
   });
 
-  it('sends nothing for an empty brief and takes the person back to the field', () => {
+  it('sends nothing for an empty brief: the chat field offers no send', () => {
     const onCreate = vi.fn();
     render(<Home brief="  " onCreate={onCreate} />);
     fireEvent.click(tile('Video'));
-    fireEvent.click(send());
+    expect(send().hasAttribute('disabled')).toBe(true);
+    fireEvent.keyDown(input() as HTMLElement, { key: 'Enter' });
     expect(onCreate).not.toHaveBeenCalled();
-    expect(document.activeElement).toBe(document.querySelector('.hx-dl__input'));
+    expect(document.activeElement).toBe(input());
   });
 });

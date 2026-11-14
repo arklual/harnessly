@@ -876,21 +876,30 @@ func hasType(entries []*jsvalue.Object, typ string) bool {
 }
 
 // dropDeliveredQueuedPrompts: a waiting prompt goes once the same text shows up as delivered or as its own turn.
+// The key of a message is three regexp passes over its text, so it is made only while a prompt waits: a transcript
+// with none (nearly every one) costs no key at all. Making it for every message was 88% of the time of a read.
 func dropDeliveredQueuedPrompts(entries []*jsvalue.Object, offsets []int64) ([]*jsvalue.Object, []int64) {
 	removed := map[int]bool{}
 	waiting := map[string][]int{}
+	open := 0 // the prompts that wait and are not matched yet
 	for i, e := range entries {
 		if typeOf(e) != "user-message" {
 			continue
 		}
-		key := pendingMatchKey(e.String("text"))
 		if truthy(get(e, "pending")) && truthy(get(e, "queued")) {
+			key := pendingMatchKey(e.String("text"))
 			waiting[key] = append(waiting[key], i)
+			open++
 			continue
 		}
+		if open == 0 {
+			continue
+		}
+		key := pendingMatchKey(e.String("text"))
 		if w := waiting[key]; len(w) > 0 {
 			removed[w[0]] = true
 			waiting[key] = w[1:]
+			open--
 		}
 	}
 	if len(removed) == 0 {

@@ -1,6 +1,6 @@
 // An app's view in a sandboxed frame: shown through a preview slot (so it runs on an origin of its own, never the
 // page's, and the preview's DevTools see it), and talked to only through the bridge (bridge.ts).
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { slotLeases } from '@/next/features/pane/slot-lease';
 import { openPreview } from '@/next/core/net/preview';
 import {
@@ -177,6 +177,13 @@ export interface IAppFrameProps {
   notice?: IViewNotice | null;
   /** The view belongs to the chat whatever its apps (an agent's own widget): it gets the chat without being turned on. */
   inChat?: boolean;
+  /** What stands in the view's place while it starts, in place of its icon and name (a space's own shape). */
+  skeleton?: ReactNode;
+  /**
+   * What the view published (context.publish), with the frame's place on screen, for the page around it: a space's
+   * open board and selection. With it the view may publish before a chat exists: the page reads it.
+   */
+  onPublish?: (data: unknown, frame: DOMRect | null) => void;
   /** A Document API call of the view that went through (the host may do more: a comment also goes to the chat). */
   onSinopiaCall?: (method: string, params: Record<string, unknown>) => void;
   /** Where the app is the main thing: `hl.pane.open('object:<slug>')` opens one of its objects, `object:` its home. */
@@ -223,7 +230,13 @@ const AppFrame = ({
   onSinopiaCall,
   onOpenObject,
   inChat = false,
+  skeleton,
+  onPublish,
 }: IAppFrameProps) => {
+  const publishTo = useRef(onPublish);
+  useEffect(() => {
+    publishTo.current = onPublish;
+  });
   const { resolvedTheme } = useTheme();
   const meState = useMe();
   const person = meState.k === 'ready' ? meState.me : null;
@@ -283,9 +296,28 @@ const AppFrame = ({
   const chat = on ? conversation : null;
   const work = useHostHandlers(machine, conversation, app, on);
 
+  // What the frame was last opened for, and on which slot: a view shown again after waiting out of sight (a kept screen
+  // under Activity) runs the effect below again, and must not open a new session and load the view anew
+  // while the one it shows is still its own.
+  const openedFor = useRef<{ sign: string; slot: number | null } | null>(null);
+  const openedNow = useRef(opened);
+  useEffect(() => {
+    openedNow.current = opened;
+  });
   // Each app holds a slot of its own: a slot is one origin, and two apps on one would share it.
   useEffect(() => {
     let live = true;
+    const sign = [key, view.url, view.path, lease, target, chat, doc, waits].join('|');
+    const was = openedFor.current;
+    if (
+      openedNow.current?.key === key &&
+      openedNow.current.src !== null &&
+      was?.sign === sign &&
+      (was.slot === null || slotLeases.slotOf(lease) === was.slot)
+    )
+      return () => {
+        live = false;
+      };
     const fail = (failure: IFailure) => {
       if (live) send({ k: 'session-failed', failure });
     };
@@ -338,7 +370,9 @@ const AppFrame = ({
       // The nonce is the page's own here: it only ties the bridge to the document this frame was given.
       const pageNonce = (newTrace('n') + newTrace('')).replace(/[^A-Za-z0-9_-]/g, '');
       queueMicrotask(() => {
-        if (live) setOpened({ key, src: withNonce(direct, pageNonce), session: null, nonce: pageNonce });
+        if (!live) return;
+        openedFor.current = { sign, slot: null };
+        setOpened({ key, src: withNonce(direct, pageNonce), session: null, nonce: pageNonce });
       });
       return () => {
         live = false;
@@ -366,13 +400,14 @@ const AppFrame = ({
             slow,
           );
           // The address carries the mount's trace: a gateway in front of the machine logs a refusal with it.
-          if (live)
-            setOpened({
-              key,
-              src: withTraceParam(o.enterUrl, mount.trace),
-              session: made.session,
-              nonce: made.nonce,
-            });
+          if (!live) return;
+          openedFor.current = { sign, slot };
+          setOpened({
+            key,
+            src: withTraceParam(o.enterUrl, mount.trace),
+            session: made.session,
+            nonce: made.nonce,
+          });
         })
         .catch(failError);
     } else failText(t('next.appview.noEntry'));
@@ -556,7 +591,14 @@ const AppFrame = ({
       pageTools: (tools) => (offer ? offer.tools(tools) : noChat()),
       pageToolResult: (id, answer) => offer?.result(id, answer),
       hooks: (on) => (offer ? offer.hooks(on) : noChat()),
-      publish: (data) => (offer ? offer.publish(data) : noChat()),
+      publish: (data) => {
+        const page = publishTo.current;
+        page?.(data, frame.getBoundingClientRect());
+        if (offer) return offer.publish(data);
+        // The page around the view took it: nothing to refuse while there is no chat yet.
+        if (page) return undefined;
+        return noChat();
+      },
       // The runtime reads the app, the target and the chat from the session; none of them is sent again.
       tool: async (name, args) => {
         const sid = await need();
@@ -1005,10 +1047,14 @@ const AppFrame = ({
           aria-hidden={state.k === 'ready'}
           aria-busy={state.k !== 'ready'}
         >
-          <Icon name={app.icon || 'layout-grid'} />
-          <span className="hx-appview__skeleton-name">{skeletonText}</span>
-          <span className="hx-appview__skeleton-bar" />
-          <span className="hx-appview__skeleton-bar" />
+          {skeleton ?? (
+            <>
+              <Icon name={app.icon || 'layout-grid'} />
+              <span className="hx-appview__skeleton-name">{skeletonText}</span>
+              <span className="hx-appview__skeleton-bar" />
+              <span className="hx-appview__skeleton-bar" />
+            </>
+          )}
         </div>
       )}
       {state.k === 'failed' && !retrying && (

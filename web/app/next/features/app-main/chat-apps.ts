@@ -38,6 +38,15 @@ export interface ISidebarApp {
   chat?: string;
 }
 
+/**
+ * An app that opens as its own screen: one of its views is made for the app's page, and it is not turned off. Opening
+ * it goes to that view, full size; what it is and what it may do stay on its page in the catalog.
+ */
+export const opensOwnView = (a: IInstalledApp): boolean =>
+  a.state !== APP_STATE.disabled &&
+  a.targets.includes('app') &&
+  a.views.some((v) => v.targets.includes('app'));
+
 /** An app of the organization's environment that has a page of its own and that the person did not turn off. */
 const envAppForMenu = (a: IInstalledApp): boolean =>
   a.env === true &&

@@ -94,6 +94,9 @@ func (c *conv) do(device string, cmd wire.Command, now time.Time) wire.CmdResult
 		return c.recResult(now)
 	case wire.ConversationPinCmd:
 		c.rec.Pinned = m.Pinned
+		if m.Pinned {
+			c.rec.From = nil // pinned, the chat is the person's own (HRN-1393)
+		}
 		return c.recResult(now)
 	case wire.ConversationTestCmd:
 		c.rec.Test = m.Test
@@ -104,6 +107,7 @@ func (c *conv) do(device string, cmd wire.Command, now time.Time) wire.CmdResult
 		return c.setApps(m.Apps, now)
 	case wire.ConversationMoveCmd:
 		c.rec.ProjectID = m.ProjectID
+		c.rec.From = nil // moved anywhere, even to the recent chats, the chat an app started is the person's (HRN-1393)
 		return c.recResult(now)
 	case wire.ConversationDeleteCmd:
 		if c.rec.State.K == wire.StateWorking && (m.Force == nil || !*m.Force) {

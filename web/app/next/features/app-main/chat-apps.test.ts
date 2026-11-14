@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { activeApps, offeredApps, sidebarApps, withApp } from '@/next/features/app-main/chat-apps';
+import {
+  activeApps,
+  offeredApps,
+  opensOwnView,
+  sidebarApps,
+  withApp,
+} from '@/next/features/app-main/chat-apps';
+import { APP_STATE } from '@/next/features/app-views/api';
 import type { IInstalledApp } from '@/next/features/app-views/api';
 
 const app = (id: string, targets: string[] = ['chat', 'pane']): IInstalledApp => ({
@@ -72,5 +79,20 @@ describe('sidebarApps', () => {
       app('own.app', ['app']),
     ];
     expect(sidebarApps([], installed)).toEqual([]);
+  });
+});
+
+describe('opensOwnView', () => {
+  it('opens on its screen an app with a view for its page; else on its page', () => {
+    const boards = {
+      ...app('harnessly.boards', ['app', 'pane', 'chat']),
+      views: [{ id: 'board', targets: ['app', 'pane'] }],
+    };
+    expect(opensOwnView(boards)).toBe(true);
+    expect(opensOwnView({ ...boards, state: APP_STATE.disabled })).toBe(false);
+    expect(opensOwnView({ ...app('a.pane', ['pane']), views: [{ id: 'side', targets: ['pane'] }] })).toBe(
+      false,
+    );
+    expect(opensOwnView(app('a.tools', ['chat']))).toBe(false);
   });
 });

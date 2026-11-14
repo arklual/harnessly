@@ -365,7 +365,13 @@ func (s *Starter) Start(o Options) (Result, error) {
 	if name == "" {
 		name = agents.DisplayName(o.Provider)
 	}
-	tab, err := s.cfg.Store.AddTab(wsID, panes[0].String("id"), state.TabOptions{Name: name, Cwd: cwd, PanelType: panelType, Command: command, ID: tabID})
+	// An app's mark is on the tab from its first write, so the sidebar never shows the chat outside its folder; the rest of
+	// the metadata (the mode) is merged with the launch below, in the order the layout has always had.
+	var first *jsvalue.Object
+	if f := o.Meta.Object("from"); f != nil {
+		first = jsvalue.NewObject("from", f)
+	}
+	tab, err := s.cfg.Store.AddTab(wsID, panes[0].String("id"), state.TabOptions{Name: name, Cwd: cwd, PanelType: panelType, Command: command, ID: tabID, Meta: first})
 	var se *state.Error
 	if errors.As(err, &se) || err == nil && tab == nil {
 		return fail(500, msgStartFailed.String()), nil

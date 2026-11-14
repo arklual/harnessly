@@ -16,6 +16,7 @@
   "next.peers.kind.session": "Другая сессия",
   "next.peers.kind.subagent": "Фоновый агент",
   "next.peers.byPerson": "написал сам",
+  "next.appTask.from": "Задание от «{app}»",
   "next.peers.delivery.waiting": "Ждёт очереди к агенту",
   "next.peers.delivery.handed": "Агент прочтёт после текущего шага",
   "next.peers.delivery.readMidTurn": "Прочитано агентом в ходе работы",

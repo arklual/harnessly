@@ -304,7 +304,12 @@ const TurnView = ({ item, open, machineName, handlers }: ITurnViewProps) => {
       {flows.map((entry) => (
         <WorkflowCard key={entry.id} entry={entry} />
       ))}
-      {item.answer && <Md md={item.answer.md} />}
+      {/* The answer, measured by the feed: a finished one taller than the screen is read from its start (feed.tsx). */}
+      {item.answer && (
+        <div className="hx-answer" data-final={!live || item.settled || undefined}>
+          <Md md={item.answer.md} />
+        </div>
+      )}
       <DelegationCards startedAt={turn.startedAt} endedAt={turn.endedAt} />
       <Outputs item={item} />
       <TurnEnd item={item} handlers={handlers} />

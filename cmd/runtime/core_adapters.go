@@ -141,6 +141,7 @@ func (t coreTmux) SessionCwd(session string) string { return machine.SessionDir(
 type coreProcs struct{}
 
 func (coreProcs) Children(pid int) []int       { return proc.ChildPIDs(pid) }
+func (coreProcs) Unreadable(pid int) bool      { return proc.Unreadable(pid) }
 func (coreProcs) ListeningPorts(pid int) []int { return proc.TreeListeningPorts(pid) }
 
 type claudeProvider struct {

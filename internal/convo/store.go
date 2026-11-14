@@ -66,10 +66,12 @@ func (s *Store) Fresh() bool {
 
 // convFile is a conversation as it is written.
 type convFile struct {
-	Conv                    wire.Conversation `json:"conv"`
-	Session                 string            `json:"session"`
-	TranscriptPath          string            `json:"transcriptPath"`
-	AgentSessionID          string            `json:"agentSessionId"`
+	Conv           wire.Conversation `json:"conv"`
+	Session        string            `json:"session"`
+	TranscriptPath string            `json:"transcriptPath"`
+	AgentSessionID string            `json:"agentSessionId"`
+	// Person is the conversation's person (wire.Conversation.Person), kept beside the record the page gets.
+	Person                  string            `json:"person,omitempty"`
 	HandoffArtifact         string            `json:"handoffArtifact,omitempty"`
 	HandoffArtifactClientID string            `json:"handoffArtifactClientId,omitempty"`
 	Outbox                  outbox.State      `json:"outbox"`

@@ -262,6 +262,49 @@ func (r *Runtime) ChatDigest(ctx context.Context, id string, budget int) (wire.C
 	return wire.ChatDigest{ConvID: id, Title: rec.Title, Text: text, Path: path, Truncated: truncated}, nil
 }
 
+// The longest text of a message in a glance, in characters.
+const (
+	glanceUserMax  = 600
+	glanceAgentMax = 1200
+)
+
+// ChatGlance gives the newest message of each side of a conversation, cut short, and how many messages the index holds
+// for it. Unlike ChatDigest it writes nothing.
+func (r *Runtime) ChatGlance(ctx context.Context, id string) (wire.ChatGlance, error) {
+	rec, ok := r.liveIDs()[id]
+	if !ok {
+		return wire.ChatGlance{}, ErrNotFound
+	}
+	if r.d.Index == nil {
+		return wire.ChatGlance{}, fmt.Errorf("convo: no glance on this runtime")
+	}
+	if !r.d.Index.Read(id) && rec.TranscriptPath != "" {
+		r.indexChat(rec)
+	}
+	if err := ctx.Err(); err != nil {
+		return wire.ChatGlance{}, err
+	}
+	msgs := r.d.Index.Messages(id)
+	out := wire.ChatGlance{ConvID: id, Messages: len(msgs)}
+	var user, agent *msgindex.Doc
+	for i := range msgs {
+		m := &msgs[i]
+		switch {
+		case m.Role == msgindex.RoleUser && (user == nil || m.At >= user.At):
+			user = m
+		case m.Role != msgindex.RoleUser && (agent == nil || m.At >= agent.At):
+			agent = m
+		}
+	}
+	if user != nil {
+		out.LastUser = &wire.GlanceMessage{At: user.At, Text: cut(user.Text, glanceUserMax)}
+	}
+	if agent != nil {
+		out.LastAgent = &wire.GlanceMessage{At: agent.At, Text: cut(agent.Text, glanceAgentMax)}
+	}
+	return out, nil
+}
+
 func writeExport(path string, rec wire.Conversation, msgs []msgindex.Doc) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# %s\n\n", rec.Title)

@@ -114,6 +114,10 @@ type UsageSessionFact struct {
 	// project path and iid, no text. The hub joins them with the merge requests its source says were merged. Absent from
 	// a machine that does not look for them.
 	MRKeys []string `json:"mrKeys,omitempty"`
+	// Project is the project (repository or folder name) most of the session's prompts were in, and TaskKeys the tracker
+	// task keys the session mentions: names and ids, no text (the hub's statistics). Absent from an older machine.
+	Project  string   `json:"project,omitempty"`
+	TaskKeys []string `json:"taskKeys,omitempty"`
 }
 
 // UsageWindowFact is one measurement of a rate-limit window of an account (provider-limits §3.1).

@@ -199,8 +199,16 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 	case hubproto.OpLinkSubscribe:
 		events, _ := field[[]string](req, "events")
 		l.subscribe(events)
-		if slices.Contains(events, hubproto.EventChatWork) {
-			return empty(), func() { h.sendWork(l) }, nil
+		work, projects := slices.Contains(events, hubproto.EventChatWork), slices.Contains(events, hubproto.EventProjects)
+		if work || projects {
+			return empty(), func() {
+				if work {
+					h.sendWork(l)
+				}
+				if projects {
+					h.sendProjectsFull(l)
+				}
+			}, nil
 		}
 		return empty(), nil, nil
 	case hubproto.OpPreflightRun:

@@ -440,6 +440,20 @@ export class FakeHub {
       return undefined;
     }
     if ((r = m(/^\/api\/me\/identities\/([^/]+)$/)) && method === 'DELETE') return undefined;
+    // the person's own apps (client API): the switch is off in the fake hub, the consent page answers as the hub does
+    if (method === 'GET' && path === '/api/me/tokens') return { on: false, tokens: [] };
+    if (m(/^\/api\/me\/tokens\/([^/]+)$/) && method === 'DELETE') return undefined;
+    if (method === 'GET' && path === '/api/auth/device') {
+      if (!query.get('code')) throw this.err(404, 'code_unknown');
+      return {
+        client: 'Raycast',
+        device: 'MacBook',
+        ip: '192.0.2.10',
+        expiresAt: iso(),
+        scopes: ['read', 'prompt'],
+      };
+    }
+    if (method === 'POST' && path === '/api/auth/device/approve') return undefined;
 
     // invites by token
     if ((r = m(/^\/api\/invites\/([^/]+)$/))) {

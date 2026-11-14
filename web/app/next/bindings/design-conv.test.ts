@@ -87,6 +87,16 @@ describe("the design's current chat", () => {
     expect(result.current.picked).toEqual({ k: DESIGN_CONV.conv, id: 'tab-old' });
   });
 
+  it('lets a stale chat go: a space opens on a new chat, and the one made there is shown (HRN-1391)', () => {
+    bindDesignConv(KEY, { id: 'tab-old', fresh: false });
+    putList([conv('tab-old', 10), conv('tab-made', 20)]);
+    const { result, rerender } = renderHook(() => useDesignConv(M, 'abc', null, undefined, 'tab-old'));
+    expect(result.current.picked).toEqual({ k: DESIGN_CONV.none });
+    act(() => bindDesignConv(KEY, { id: 'tab-made', fresh: false }));
+    rerender();
+    expect(result.current.picked).toEqual({ k: DESIGN_CONV.conv, id: 'tab-made' });
+  });
+
   it("is a new chat without one, not the folder's latest", () => {
     putList([conv('tab-a', 30)]);
     const { result } = renderHook(() => useDesignConv(M, 'abc', null));

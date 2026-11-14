@@ -161,3 +161,75 @@ func TestCoverageCountsTheProjectsTheStoreLacks(t *testing.T) {
 		t.Fatalf("a count nobody made is said: %+v", got)
 	}
 }
+
+// a project recorded on a machine the person may not open (a private one) is not the space's: its team level
+// does not let them in, while the owner and a grant of their own still do.
+func TestLibraryLeavesOutProjectsOfAClosedMachine(t *testing.T) {
+	ctx := context.Background()
+	r := newSpaceRig(t, true)
+	if done, err := r.svc.registerCreated(ctx, r.owner, "team-site", r.ownerU.Email); err != nil || !done {
+		t.Fatalf("registerCreated: %v %v", done, err)
+	}
+	r.svc.UseView(&fakeLibrary{items: []LibraryItem{{ID: "team-site", Title: "Сайт", UpdatedAt: 1000, Kind: "site", Rev: 1}}})
+	listed := func(u store.User, m store.Machine) string {
+		for _, a := range askLibrary(t, r, u, m).Artifacts {
+			if a.ID == "team-site" {
+				return a.Role
+			}
+		}
+		return ""
+	}
+	// An open machine: the team level counts for the space.
+	if role := listed(r.mateU, r.mate); role == "" {
+		t.Fatal("a team project of an open machine is not listed for a mate")
+	}
+	// The owner's machine turns private: only its owner opens it.
+	asked := 0
+	r.svc.opens = func(_ context.Context, userID string, m store.Machine) bool {
+		asked++
+		return m.ID != r.owner.ID || userID == r.ownerU.ID
+	}
+	if role := listed(r.mateU, r.mate); role != "" {
+		t.Fatalf("a private machine's project is listed for a mate with the role %q", role)
+	}
+	if asked != 1 {
+		t.Fatalf("the machine's access was asked %d times for one person's list, want 1", asked)
+	}
+	if role := listed(r.ownerU, r.owner); role != roleOwner {
+		t.Fatalf("the owner's own project: role %q", role)
+	}
+	// A grant of the mate's own opens it again: privacy closes the space's door, not the ones given by name.
+	if err := r.svc.write(ctx, r.owner, func(t *txn) error {
+		return t.grant("team-site", r.ownerU.Email, r.mateU.Email, roleView, ttl{none: true}, false)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if role := listed(r.mateU, r.mate); role != roleView {
+		t.Fatalf("a project granted by name: role %q", role)
+	}
+}
+
+// Sinopia's home in one answer goes on to the machine only for whom hub-design-home is on; for the rest the
+// hub answers 404 home_off and the page asks part by part, as before.
+func TestHomeInOneAnswerIsBehindItsSwitch(t *testing.T) {
+	r := newSpaceRig(t, true)
+	ask := func() (bool, *httptest.ResponseRecorder) {
+		req := httptest.NewRequest(http.MethodGet, "/m/"+r.owner.ID+"/api/platform/design/home?machine="+r.owner.ID, nil)
+		w := httptest.NewRecorder()
+		return r.svc.ServeMachine(w, req, r.ownerU, r.owner), w
+	}
+	if served, w := ask(); !served || w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), "home_off") {
+		t.Fatalf("switch off: served %v, %d %s", served, w.Code, w.Body.String())
+	}
+	var asked string
+	r.svc.homeOn = func(_ context.Context, email, machineID string) bool {
+		asked = email + " " + machineID
+		return true
+	}
+	if served, _ := ask(); served {
+		t.Fatal("switch on: the hub kept the home from the machine")
+	}
+	if asked != normEmail(r.ownerU.Email)+" "+r.owner.ID {
+		t.Fatalf("the switch was asked for %q", asked)
+	}
+}

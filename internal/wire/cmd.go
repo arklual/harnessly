@@ -95,7 +95,10 @@ func (o *OpLog) Run(ctx context.Context, cmd Command, budget time.Duration, run 
 		e = &opEntry{FP: fp, done: make(chan struct{})}
 		o.m[key] = e
 		o.mu.Unlock()
-		safego.Go("wire command", func() { o.finish(key, e, budget, run) })
+		// The command outlives the request (a page that leaves does not cancel it) but keeps what the request carries,
+		// such as whose page session sent it.
+		values := context.WithoutCancel(ctx)
+		safego.Go("wire command", func() { o.finish(values, key, e, budget, run) })
 	} else {
 		o.mu.Unlock()
 	}
@@ -112,8 +115,8 @@ func (o *OpLog) Run(ctx context.Context, cmd Command, budget time.Duration, run 
 	}
 }
 
-func (o *OpLog) finish(key string, e *opEntry, budget time.Duration, run func(context.Context) CmdResult) {
-	ctx, cancel := context.WithTimeout(context.Background(), budget)
+func (o *OpLog) finish(parent context.Context, key string, e *opEntry, budget time.Duration, run func(context.Context) CmdResult) {
+	ctx, cancel := context.WithTimeout(parent, budget)
 	defer cancel()
 	res := run(ctx)
 	o.mu.Lock()

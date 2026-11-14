@@ -8,7 +8,8 @@
 // Of the subagents five rows show at first (the running ones, then the latest) and «Ещё N» opens the rest by height.
 // A stop waits for the runtime: the row says «Останавливаем…» until the task's own event ends it. Each group's name
 // carries its icon, and the person's fold is kept per browser (the commands start folded). Under the recap stand the
-// pictures the agent looked at (shots-strip.tsx).
+// pictures the agent looked at (shots-strip.tsx). Over a change of chat the column stays and changes its content in
+// place (chat-swap.ts).
 import { forwardRef, useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { BackgroundTask, Recap, Shot } from '@/next/protocol/v2';
 import { orderAgents, splitAgents } from '@/next/features/background/agent-order';
@@ -17,6 +18,7 @@ import { openSubagent } from '@/next/features/subagents/open';
 import { toggleGroup, useGroupOpen } from '@/next/features/background/rail-folds';
 import RecapCard from '@/next/features/background/recap-card';
 import ShotsStrip from '@/next/features/background/shots-strip';
+import { useChatSwap, useSwapHeight, type IChatContent } from '@/next/features/background/chat-swap';
 import { effortLabel, shortModelName } from '@/next/features/composer/agents';
 import Icon from '@/next/ui/icon';
 import { SheetGrip, useSheetDrag } from '@/next/ui/sheet';
@@ -45,6 +47,8 @@ const ROW_STATUS = {
 } as const satisfies Record<BackgroundTask['status'], string>;
 
 export interface IBackgroundPanelProps {
+  /** The chat whose column this is: another chat's content replaces this one's with a fade, the column stays. */
+  chat?: string | null;
   tasks: readonly BackgroundTask[];
   recap: Recap | null;
   /** The pictures the agent looked at, newest first; null while the conversation's snapshot has not said. */
@@ -250,9 +254,59 @@ const useBelow = (
   }, [aside, below, on, there]);
 };
 
+/** One chat's blocks of the column, drawn anew for each chat (so a fold or an opened picture is the chat's own). One
+ *  that came by a change of chat fades in as a whole, and its blocks skip their own entrance from nothing; the last
+ *  chat's lies over it meanwhile and fades out. */
+interface IChatContentProps {
+  /** It came by a change of chat. */
+  came: boolean;
+  /** The last chat's, lying over the next one's while it fades out. */
+  leaving?: boolean;
+  children: ReactNode;
+}
+
+const ChatContent = ({ came, leaving = false, children }: IChatContentProps) => {
+  const [cameBySwap] = useState(came);
+  return (
+    <div
+      className="hx-side__chat"
+      data-came={cameBySwap ? 'swap' : undefined}
+      data-leaving={leaving || undefined}
+      aria-hidden={leaving || undefined}
+      inert={leaving || undefined}
+    >
+      {children}
+    </div>
+  );
+};
+
 const BackgroundPanel = forwardRef<HTMLElement, IBackgroundPanelProps>(
-  ({ tasks, recap, shots, shotSrc, shown, now, stopping, onStop, onHide, codes, below }, ref) => {
+  (
+    {
+      chat = null,
+      tasks: nextTasks,
+      recap: nextRecap,
+      shots: nextShots,
+      shotSrc: nextSrc,
+      shown,
+      now,
+      stopping,
+      onStop,
+      onHide,
+      codes,
+      below,
+    },
+    ref,
+  ) => {
     const phone = usePhone();
+    const next: IChatContent = {
+      chat,
+      tasks: nextTasks,
+      recap: nextRecap,
+      shots: nextShots,
+      shotSrc: nextSrc,
+    };
+    const { view, leaving } = useChatSwap(next);
     const [aside, setAside] = useState<HTMLElement | null>(null);
     const belowRef = useRef<HTMLDivElement | null>(null);
     const setRef = useCallback(
@@ -265,29 +319,30 @@ const BackgroundPanel = forwardRef<HTMLElement, IBackgroundPanelProps>(
     );
     useSheetDrag(aside, () => onHide?.(), phone && shown && onHide !== undefined);
     useBelow(aside, belowRef, shown && !phone, Boolean(below));
-    const agents = tasks.filter((x) => x.kind === 'subagent');
-    const flows = orderAgents(tasks.filter((x) => x.kind === 'workflow'));
-    const commands = tasks.filter((x) => x.kind === 'command');
-    const split = splitAgents(agents);
-    const groups = (
-      [
-        { key: GROUP.workflow, label: t('next.bg.workflows'), rows: flows, head: flows, rest: [] },
-        { key: GROUP.subagent, label: t('next.bg.agents'), rows: agents, head: split.head, rest: split.rest },
-        { key: GROUP.command, label: t('next.bg.commands'), rows: commands, head: commands, rest: [] },
-      ] as const
-    ).filter((g) => g.rows.length > 0);
-
-    const row = (task: BackgroundTask) => (
-      <Row key={task.id} task={task} now={now} stopping={stopping.has(task.id)} onStop={() => onStop(task)} />
-    );
-
-    return (
-      <>
-        {onHide && <div className="hx-side__scrim" data-shown={shown} aria-hidden="true" onClick={onHide} />}
-        <aside ref={setRef} className="hx-side" data-shown={shown} aria-label={t('next.header.background')}>
-          <SheetGrip />
+    useSwapHeight(aside, view.chat);
+    const blocks = (content: IChatContent, came: boolean) => {
+      const { tasks, recap, shots, shotSrc } = content;
+      const agents = tasks.filter((x) => x.kind === 'subagent');
+      const flows = orderAgents(tasks.filter((x) => x.kind === 'workflow'));
+      const commands = tasks.filter((x) => x.kind === 'command');
+      const split = splitAgents(agents);
+      const groups = (
+        [
+          { key: GROUP.workflow, label: t('next.bg.workflows'), rows: flows, head: flows, rest: [] },
+          {
+            key: GROUP.subagent,
+            label: t('next.bg.agents'),
+            rows: agents,
+            head: split.head,
+            rest: split.rest,
+          },
+          { key: GROUP.command, label: t('next.bg.commands'), rows: commands, head: commands, rest: [] },
+        ] as const
+      ).filter((g) => g.rows.length > 0);
+      return (
+        <>
           <RecapCard recap={recap} now={now} />
-          <ShotsStrip shots={shots} srcOf={shotSrc} now={now} />
+          <ShotsStrip shots={shots} srcOf={shotSrc} now={now} instant={came} />
           {groups.map((g) => (
             <Group
               key={g.key}
@@ -299,6 +354,27 @@ const BackgroundPanel = forwardRef<HTMLElement, IBackgroundPanelProps>(
               renderRow={row}
             />
           ))}
+        </>
+      );
+    };
+
+    const row = (task: BackgroundTask) => (
+      <Row key={task.id} task={task} now={now} stopping={stopping.has(task.id)} onStop={() => onStop(task)} />
+    );
+
+    return (
+      <>
+        {onHide && <div className="hx-side__scrim" data-shown={shown} aria-hidden="true" onClick={onHide} />}
+        <aside ref={setRef} className="hx-side" data-shown={shown} aria-label={t('next.header.background')}>
+          <SheetGrip />
+          <ChatContent key={view.chat ?? ''} came={leaving !== null}>
+            {blocks(view, leaving !== null)}
+          </ChatContent>
+          {leaving && (
+            <ChatContent key={`leaving:${leaving.chat ?? ''}`} came={false} leaving>
+              {blocks(leaving, false)}
+            </ChatContent>
+          )}
           {codes}
         </aside>
         {below && (

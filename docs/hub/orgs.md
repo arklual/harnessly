@@ -109,6 +109,8 @@ type Org = {
   currency: 'RUB' | 'USD';                    // display currency; money is kept in USD
   createdAt: string;
   appsConsent: 'ask' | 'auto';                // the rule for apps on the machines; absent on an older hub = 'ask'
+  links?: { standDomain?: string; trackerUrl?: string; gitlabHosts?: string[]; artifactsUrl?: string; boardsUrl?: string }; // «Ссылки в чате»: the whole object replaces the held one, {} clears; the hub normalizes (domain without scheme and «*.», origins without path, lowercase hosts)
+  // The links only say which addresses are stands, tasks, merge requests, commits, documents and boards: a machine never sends its own tracker or GitLab tokens to the tracker or GitLab named here (cmd/runtime/hub_links.go).
 };
 
 type Tenant = { id: string; slug: string; name: string; orgId: string; createdAt: string; memberCount: number };
@@ -183,7 +185,7 @@ All need a session; `{org}` is the organization's id or slug.
 | `GET /api/orgs` | any | | `{ orgs: (Org & { role: GrantRole \| 'member' })[], looseSpaces: SpaceRef[] }` — organizations the person has anything in (a grant, a tenant membership). `looseSpaces`: their spaces with no organization (the onboarding step offers to move those they own) |
 | `POST /api/orgs` | any | `{ name, spaceIds: string[], tenantName?: string }` (name 1–60; `spaceIds` may be empty; `tenantName` makes the first tenant, owned by the author: empty string means «Основное», absent means none, as before) | 201 `OrgView` — makes the organization, makes the author its admin, and moves the listed spaces into it: each must be a space the author owns and in no organization, else 403 `forbidden_scope` (`details.spaceId`) and nothing is made. One transaction, journal `org.create` and `tenant.move` per space |
 | `GET /api/orgs/{org}` | anyone with something in it | | `OrgView` — tenants and teams the person can view (a member: their tenant and their teams only) |
-| `PATCH /api/orgs/{org}` | org admin | `{ name?, timezone?, currency?, appsConsent? }` | `{ org: Org }` |
+| `PATCH /api/orgs/{org}` | org admin | `{ name?, timezone?, currency?, appsConsent?, links? }` | `{ org: Org }` |
 | `POST /api/orgs/{org}/tenants` | org admin | `{ name, requestId? }` (name 1–60; `requestId` 8–64 of `A-Za-z0-9_-`, one per press of «Дальше») | 201 `{ tenant: Tenant, space: Space }` — makes the tenant in the organization in one transaction, the author its owner; journal `tenant.create`. The same `requestId` again: 200 with the tenant it made, never a second one; a `requestId` that made a space elsewhere: 409 `conflict` `request_reused`. A failure leaves nothing |
 | `POST /api/orgs/{org}/tenants/move` | org admin who owns the space (or admin of the space's organization too) | `{ spaceId }` | `{ tenant: Tenant }`; journal `tenant.move` in both organizations |
 | `DELETE /api/orgs/{org}/tenants/{spaceId}` | manage of the tenant, which must belong to `{org}` | `?dry_run=true\|1` | `{ dry_run: true, plan }` or `{ deleted: true, plan }`; plan = `{ tenant, blockers: {kind,count}[], removes: {kind,count}[], canDelete }`; 409 `tenant_not_empty` while there are blockers; journal `tenant.delete` |

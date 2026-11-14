@@ -538,7 +538,7 @@ describe('backend profiles', () => {
     expect(() => parsePage.login(bad)).toThrow(ProtocolError);
   });
   it('asks for the cap', () => {
-    expect(v2.CAPS_QUERY).toBe('caps=delegation,workflows,profiles,msgstatus');
+    expect(v2.CAPS_QUERY).toBe('caps=delegation,workflows,profiles,msgstatus,links');
   });
 });
 

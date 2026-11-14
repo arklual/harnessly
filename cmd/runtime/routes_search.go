@@ -22,6 +22,15 @@ import (
 //	                                   502 {error: <bgmodel reason>, message}: the provider failed
 //	                                the person's page: a page session, same origin
 //
+// With `Accept: text/event-stream` the answer comes as it is written (server-sent events):
+//
+//	event: delta   data: {"text": "<a piece, may hold a [2] mark>"}   (as many as the model sends)
+//	event: done    data: {"text": "<the whole answer>", "cited": [<index>]}
+//	event: error   data: {"error": <bgmodel reason>, "message"}        (a failure after the stream began)
+//
+// A bad request, no session and no model are still the plain JSON above, before the stream starts. With no model
+// picked, the first provider of the registry that holds a key and lists a model answers (bgmodel.Runner.Usable).
+//
 // The sources are the person's own, already on their page; nothing is kept and no log line carries them.
 
 const searchAnswerBodyMax = 64 << 10
@@ -50,18 +59,59 @@ func searchRoutes(d deps) []gate.Route {
 			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
 			return
 		}
-		text, cited, used, err := runner.SearchAnswer(r.Context(), b.Query, b.Sources)
-		if !used {
+		noModel := func() {
 			secretJSON(w, http.StatusConflict, map[string]string{"error": "no-model",
 				"message": locale.Pick("No model is picked for answers in the search.", "Для ответов в поиске не выбрана модель.")})
-			return
 		}
-		if err != nil {
+		failMessage := func() string {
 			message := locale.Pick("The model did not answer.", "Модель не ответила.")
 			if last, ok := runner.Last()[bgmodel.FeatureSearchAnswer]; ok && last.Message != "" {
 				message = last.Message
 			}
-			secretJSON(w, http.StatusBadGateway, map[string]string{"error": bgmodel.ReasonOf(err), "message": message})
+			return message
+		}
+		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
+			if !runner.Usable(bgmodel.FeatureSearchAnswer) {
+				noModel()
+				return
+			}
+			flusher, _ := w.(http.Flusher)
+			started := false
+			event := func(name string, v any) {
+				if !started {
+					h := w.Header()
+					h.Set("Content-Type", "text/event-stream")
+					h.Set("Cache-Control", "no-store")
+					h.Set("X-Accel-Buffering", "no")
+					w.WriteHeader(http.StatusOK)
+					started = true
+				}
+				data, _ := json.Marshal(v)
+				_, _ = io.WriteString(w, "event: "+name+"\ndata: "+string(data)+"\n\n")
+				if flusher != nil {
+					flusher.Flush()
+				}
+			}
+			text, cited, used, err := runner.SearchAnswerStream(r.Context(), b.Query, b.Sources, func(piece string) {
+				event("delta", map[string]string{"text": piece})
+			})
+			switch {
+			case !used && !started:
+				noModel()
+			case err != nil:
+				event("error", map[string]string{"error": bgmodel.ReasonOf(err), "message": failMessage()})
+			default:
+				event("done", map[string]any{"text": text, "cited": cited})
+			}
+			return
+		}
+		text, cited, used, err := runner.SearchAnswer(r.Context(), b.Query, b.Sources)
+		if !used {
+			noModel()
+			return
+		}
+		if err != nil {
+			secretJSON(w, http.StatusBadGateway, map[string]string{"error": bgmodel.ReasonOf(err), "message": failMessage()})
 			return
 		}
 		secretJSON(w, http.StatusOK, map[string]any{"text": text, "cited": cited})

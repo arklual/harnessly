@@ -2,6 +2,7 @@ package files
 
 import (
 	"archive/zip"
+	"context"
 	"io"
 	"io/fs"
 	"net/http"
@@ -128,7 +129,7 @@ func (a *Access) ServeZipDownload(w http.ResponseWriter, r *http.Request, items 
 			}
 			continue
 		}
-		if err := a.zipFolder(r, zw, it.Real, top, allow); err != nil {
+		if err := a.zipFolder(r.Context(), zw, it.Real, top, allow); err != nil {
 			panic(http.ErrAbortHandler)
 		}
 	}
@@ -137,10 +138,20 @@ func (a *Access) ServeZipDownload(w http.ResponseWriter, r *http.Request, items 
 	}
 }
 
-func (a *Access) zipFolder(r *http.Request, zw *zip.Writer, root, top string, allow func(real string) bool) error {
+// WriteZip writes one folder as a zip, under its own name inside, by the same rules as a download of it: the secrets
+// are left out, a link is taken only to a file allow lets out.
+func (a *Access) WriteZip(ctx context.Context, w io.Writer, folder DownloadItem, allow func(real string) bool) error {
+	zw := zip.NewWriter(w)
+	if err := a.zipFolder(ctx, zw, folder.Real, folder.Name, allow); err != nil {
+		return err
+	}
+	return zw.Close()
+}
+
+func (a *Access) zipFolder(ctx context.Context, zw *zip.Writer, root, top string, allow func(real string) bool) error {
 	return filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
-		if r.Context().Err() != nil {
-			return r.Context().Err()
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
 		if err != nil {
 			// A folder that cannot be read is left out, as a file that cannot be is.

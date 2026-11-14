@@ -195,15 +195,26 @@ func (c *cli) designPanel(args []string) error {
 	if len(props) > 0 {
 		control["props"] = props
 	}
-	raw, err := c.request("POST", "/api/cli/design", nil, map[string]any{"artifact": id, "control": control})
+	body := map[string]any{"artifact": id, "control": control}
+	// From a chat, the command opens the design in the chat's pane first.
+	if session := c.session(); session != "" {
+		body["session"] = session
+	}
+	raw, err := c.request("POST", "/api/cli/design", nil, body)
 	if err != nil {
 		return err
 	}
 	if !c.json {
 		var b struct {
-			Pages int `json:"pages"`
+			Pages   int    `json:"pages"`
+			Queued  bool   `json:"queued"`
+			Message string `json:"message"`
 		}
 		_ = json.Unmarshal(raw, &b)
+		if b.Queued {
+			c.out("%s\n", b.Message)
+			return nil
+		}
 		c.out("The command reached the open previews: %d\n", b.Pages)
 	}
 	return c.printShown(raw)

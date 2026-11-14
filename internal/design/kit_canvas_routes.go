@@ -124,7 +124,7 @@ func (a *API) KitCanvasList(r *http.Request) Answer {
 	}
 	return JSON(r, http.StatusOK, struct {
 		Kits []KitCard `json:"kits"`
-	}{KitCards(a.L.KitsDir())}, noStore())
+	}{CachedKitCards(a.L.KitsDir())}, noStore())
 }
 
 // newestVersion is the version asked for, or the newest installed one when none is.

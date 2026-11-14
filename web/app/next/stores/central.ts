@@ -8,6 +8,7 @@ import { connectionStore } from '@/next/stores/connection';
 import { convsCachedStore, convsLoadedStore } from '@/next/stores/conversations';
 import { FROM_CENTRAL, mergeConversation, veilConversation } from '@/next/stores/conversation-merge';
 import {
+  CAPS_QUERY,
   parseCentral,
   type CentralChat,
   type CentralList,
@@ -186,7 +187,7 @@ export function loadCentralChat(
   if (before) q.set('before', before);
   const read = () =>
     getPage(
-      gatewayPath(`/history/conversations/${encodeURIComponent(conv)}?${q}`),
+      gatewayPath(`/history/conversations/${encodeURIComponent(conv)}?${q}&${CAPS_QUERY}`),
       parseCentral.chat,
       TIMEOUT_MS,
     );

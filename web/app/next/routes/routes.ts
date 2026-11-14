@@ -24,6 +24,7 @@ export const ROUTE = {
   help: 'help',
   learn: 'learn',
   settings: 'settings',
+  chatgpt: 'chatgpt',
 } as const;
 
 /** The sections of the Settings screen, in the order of its list. */
@@ -65,10 +66,12 @@ export type TRoute =
   | { kind: typeof ROUTE.videoNew }
   /** A design of the library opened: `/designly/:id`, `?chat=` the chat it was opened from (its column shows it),
       `?m=` the machine it lives on (a reload opens it there, not on whichever machine is active),
-      `?edit=1` the editing mode (without it the design is looked at). */
+      `?edit=1` the editing mode (without it the design is looked at), `?page=` the page on screen (its board's path in
+      the project, HRN-1378). */
   | {
       kind: typeof ROUTE.site;
       id: string;
+      page?: string;
       chat?: string;
       machine?: string;
       access?: TAccessFocus;
@@ -108,11 +111,14 @@ export type TRoute =
   /** «Обучение»: the lessons, each a film and a hands-on tour. */
   | { kind: typeof ROUTE.learn }
   /** `connect`: Connections opens with this address already found, to sign in to it (`?connect=`). */
-  | { kind: typeof ROUTE.settings; section: SettingsSection | null; connect?: string };
+  | { kind: typeof ROUTE.settings; section: SettingsSection | null; connect?: string }
+  /** A conversation with ChatGPT (internal/chatgpt): `/chatgpt/:id`, `?m=` the machine it is kept on. */
+  | { kind: typeof ROUTE.chatgpt; id: string; machine?: string };
 
 export const HOME: TRoute = { kind: ROUTE.home };
 
 const CHAT_RE = /^\/c\/([^/]+)\/?$/;
+const CHATGPT_RE = /^\/chatgpt\/([a-f0-9]{18})\/?$/;
 const DESIGNLY_RE = /^\/designly\/?$/;
 const DESIGNLY_NEW_RE = /^\/designly\/new\/slides\/?$/;
 const VIDEO_NEW_RE = /^\/designly\/new\/video\/?$/;
@@ -193,6 +199,11 @@ export const parseRoute = (path: string): TRoute => {
     };
   }
   if (LEARN_RE.test(pathname)) return { kind: ROUTE.learn };
+  const gpt = CHATGPT_RE.exec(pathname);
+  if (gpt?.[1]) {
+    const machine = queryParam(path, 'm');
+    return { kind: ROUTE.chatgpt, id: gpt[1], ...(machine ? { machine } : {}) };
+  }
   const about = APP_ABOUT_RE.exec(pathname);
   if (about?.[1]) return { kind: ROUTE.appAbout, id: about[1] };
   const app = APP_RE.exec(pathname);
@@ -243,9 +254,11 @@ export const parseRoute = (path: string): TRoute => {
     const chat = queryParam(path, 'chat');
     const machine = queryParam(path, 'm');
     const focus = ACCESS_FOCUS.find((x) => x === queryParam(path, 'access'));
+    const page = queryParam(path, 'page');
     return {
       kind: ROUTE.site,
       id: site[1],
+      ...(page ? { page } : {}),
       ...(chat ? { chat } : {}),
       ...(machine ? { machine } : {}),
       ...(focus ? { access: focus } : {}),
@@ -278,6 +291,7 @@ export const routePath = (route: TRoute): string => {
       if (route.machine) query.set('m', route.machine);
       if (route.access) query.set('access', route.access);
       if (route.edit) query.set('edit', '1');
+      if (route.page) query.set('page', route.page);
       return query.size > 0 ? `/designly/${route.id}?${query}` : `/designly/${route.id}`;
     }
     case ROUTE.kit: {
@@ -330,6 +344,10 @@ export const routePath = (route: TRoute): string => {
     }
     case ROUTE.learn:
       return '/learn';
+    case ROUTE.chatgpt:
+      return route.machine
+        ? `/chatgpt/${route.id}?${new URLSearchParams({ m: route.machine })}`
+        : `/chatgpt/${route.id}`;
     case ROUTE.settings:
       if (route.section && route.connect)
         return `/settings/${route.section}?${new URLSearchParams({ connect: route.connect })}`.replace(
@@ -357,7 +375,7 @@ const plainPathname = (path: string): string => {
 /**
  * The place an address is, as one key: two addresses with the same key show the same thing, so a tab
  * strip keeps one tab for them. A chat is `chat:<id>`; a design `design:<id>`, with `+chat:<id>` when it was opened
- * with a chat; an app `app:<id>`, `app:<id>/<object>` with an object open; Designly's library `designly`; every section of Settings `settings`; the start page `home`. Query
+ * with a chat; a design edited with its chat is that chat's place, `chat:<id>` (one tab: features/designly/chat-place); an app `app:<id>`, `app:<id>/<object>` with an object open; Designly's library `designly`; every section of Settings `settings`; the start page `home`. Query
  * (page, board, panes, view), hash, a trailing slash, escapes and the `/design/` spelling do not make a place; an
  * address that is none of ours is its plain pathname.
  */
@@ -367,6 +385,7 @@ export const placeKeyOf = (path: string): string => {
     case ROUTE.chat:
       return `chat:${route.id}`;
     case ROUTE.site:
+      if (route.chat && route.edit) return `chat:${route.chat}`;
       return route.chat ? `design:${route.id}+chat:${route.chat}` : `design:${route.id}`;
     case ROUTE.appDoc:
       return `appdoc:${route.id}`;
@@ -376,6 +395,8 @@ export const placeKeyOf = (path: string): string => {
       return route.object ? `app:${route.id}/${route.object}` : `app:${route.id}`;
     case ROUTE.appAbout:
       return `about:${route.id}`;
+    case ROUTE.chatgpt:
+      return `chatgpt:${route.id}`;
     case ROUTE.review:
       return `review:${route.url ?? ''}+${route.chat ?? ''}`;
     case ROUTE.home: {

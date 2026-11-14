@@ -2,13 +2,16 @@ package analytics
 
 import (
 	"cmp"
+	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/switches"
 )
 
 // statsDays is how far back GET /api/me/stats looks, as the runtime's own report does (usagereport.WindowDays).
@@ -81,9 +84,8 @@ type MeStatsResponse struct {
 	Runtimes []StatsRuntime `json:"runtimes"`
 }
 
-// statsMissing are the blocks of the page the hub cannot fill: the hours of the day a prompt was sent, the project or
-// folder, the task keys of the chats, and the interrupts and refusals of the tools. The page says so in these blocks.
-var statsMissing = []string{"punchcard", "projects", "tasks", "interrupts"}
+// noProjectLabel names the work no machine told a project of.
+const noProjectLabel = "—"
 
 func (s *Service) meStats(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
 	ctx := r.Context()
@@ -112,13 +114,21 @@ func (s *Service) meStats(w http.ResponseWriter, r *http.Request, p *auth.Princi
 	for _, x := range sums {
 		bySession[x.SessionRef] = append(bySession[x.SessionRef], x)
 	}
+	facts, err := st.SessionFactsFor(ctx, refs)
+	if err != nil {
+		return err
+	}
+	subCost, err := st.SubagentCosts(ctx, refs)
+	if err != nil {
+		return err
+	}
 	buckets, err := st.UserCallBuckets(ctx, p.User.ID, from, to)
 	if err != nil {
 		return err
 	}
 
 	rep := &StatsReport{Version: 1, Person: p.User.Email, Machine: "hub", GeneratedAt: httpx.Time(now), Timezone: loc.String(),
-		Days: map[string]StatsDay{}, Usage: [][]any{}, Sessions: []StatsSession{}, HubMissing: statsMissing}
+		Days: map[string]StatsDay{}, Usage: [][]any{}, Sessions: []StatsSession{}, HubMissing: []string{}}
 	for i, x := range ss {
 		met := metricsOf(x.Metrics)
 		dk := time.UnixMilli(x.StartedAt).In(loc).Format(day)
@@ -132,6 +142,16 @@ func (s *Service) meStats(w http.ResponseWriter, r *http.Request, p *auth.Princi
 		d.Tools += met["toolCalls"]
 		d.ToolErrors += met["toolErrors"]
 		d.PRs += met["mrs"]
+		d.Interrupts += met["interrupts"]
+		d.Denials += met["denials"]
+		d.Compactions += met["compactions"]
+		// The machine counts prompts by the UTC hour; the page wants the hour on the person's clock.
+		_, off := time.UnixMilli(x.StartedAt).In(loc).Zone()
+		for h := 0; h < 24; h++ {
+			if n := met[fmt.Sprintf("h%02d", h)]; n > 0 {
+				d.Hours[((h+off/3600)%24+24)%24] += n
+			}
+		}
 		rep.Days[dk] = d
 
 		endMs := x.UpdatedAt
@@ -140,6 +160,14 @@ func (s *Service) meStats(w http.ResponseWriter, r *http.Request, p *auth.Princi
 		}
 		v := StatsSession{ID: x.SessionKey, Provider: x.Provider, Start: float64(x.StartedAt) / 1000, End: float64(endMs) / 1000,
 			Prompts: met["turns"], TurnMs: met["agentMs"], Tasks: []string{}, PRs: []string{}}
+		if f, ok := facts[refs[i]]; ok {
+			if f.Project != "" {
+				p := f.Project
+				v.Project = &p
+			}
+			v.Tasks = append(v.Tasks, f.TaskKeys...)
+		}
+		v.SubagentCost = float64(subCost[refs[i]]) / 1e6
 		models := bySession[refs[i]]
 		slices.SortFunc(models, func(a, b store.SessionCallSum) int {
 			if c := cmp.Compare(b.ListCostMicros, a.ListCostMicros); c != 0 {
@@ -163,12 +191,16 @@ func (s *Service) meStats(w http.ResponseWriter, r *http.Request, p *auth.Princi
 	// Newest first.
 	slices.SortFunc(rep.Sessions, func(a, b StatsSession) int { return cmp.Or(cmp.Compare(b.End, a.End), cmp.Compare(a.ID, b.ID)) })
 
-	type key struct{ day, provider, model string }
+	type key struct{ day, provider, model, project string }
 	type sum struct{ in, out, cr, cw, calls, list int64 }
 	acc := map[key]*sum{}
 	var order []key
 	for _, b := range buckets {
-		k := key{time.UnixMilli(b.Hour).In(loc).Format(day), b.Provider, b.Model}
+		project := b.Project
+		if project == "" {
+			project = noProjectLabel
+		}
+		k := key{time.UnixMilli(b.Hour).In(loc).Format(day), b.Provider, b.Model, project}
 		a := acc[k]
 		if a == nil {
 			a = &sum{}
@@ -178,14 +210,32 @@ func (s *Service) meStats(w http.ResponseWriter, r *http.Request, p *auth.Princi
 		a.in, a.out, a.cr, a.cw, a.calls, a.list = a.in+b.Input, a.out+b.Output, a.cr+b.CacheRead, a.cw+b.CacheWrite, a.calls+b.Calls, a.list+b.ListCostMicros
 	}
 	slices.SortFunc(order, func(a, b key) int {
-		return cmp.Or(cmp.Compare(a.day, b.day), cmp.Compare(a.provider, b.provider), cmp.Compare(a.model, b.model))
+		return cmp.Or(cmp.Compare(a.day, b.day), cmp.Compare(a.provider, b.provider), cmp.Compare(a.model, b.model), cmp.Compare(a.project, b.project))
 	})
 	for _, k := range order {
 		a := acc[k]
-		rep.Usage = append(rep.Usage, []any{k.day, k.provider, k.model, "", a.in, a.out, a.cr, a.cw, float64(a.list) / 1e6, a.calls})
+		rep.Usage = append(rep.Usage, []any{k.day, k.provider, k.model, k.project, a.in, a.out, a.cr, a.cw, float64(a.list) / 1e6, a.calls})
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, MeStatsResponse{Viewer: p.User.Email,
 		Runtimes: []StatsRuntime{{Person: p.User.Email, MachineID: "hub", MachineName: "hub", Report: rep}}})
+	return nil
+}
+
+// MeSwitchesResponse is GET /api/me/switches: which pages of the person read from the hub (rollout switches hub-stats and
+// hub-projects, docs/hub/rollout-switches.md). A page asks once; off, it reads from the machine as before.
+type MeSwitchesResponse struct {
+	Stats    bool `json:"stats"`
+	Projects bool `json:"projects"`
+}
+
+func (s *Service) meSwitches(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+	var out MeSwitchesResponse
+	if s.sw != nil {
+		email := strings.ToLower(p.User.Email)
+		out.Stats = s.sw.On(r.Context(), switches.HubStats, email, "")
+		out.Projects = s.sw.On(r.Context(), switches.HubProjects, email, "")
+	}
+	httpx.WriteJSON(w, http.StatusOK, out)
 	return nil
 }

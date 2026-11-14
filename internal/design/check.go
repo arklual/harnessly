@@ -900,6 +900,15 @@ func (l *Library) checkShotURL(r *CheckReport, file string) string {
 		"&v=" + strconv.FormatInt(r.StartedAt, 10)
 }
 
+// CoverFile is the file of a design's cover (the first shot of its last check); "" when it was never checked.
+func (l *Library) CoverFile(id string) string {
+	_, r := l.ReadCheckReport(id)
+	if r == nil || r.Cover == nil || *r.Cover == "" {
+		return ""
+	}
+	return l.checkShotPath(id, *r.Cover)
+}
+
 // AttachChecks gives each design the cover and the outcome of its last check, if it was ever checked.
 func (l *Library) AttachChecks(artifacts []*Artifact) {
 	for _, a := range artifacts {

@@ -7,6 +7,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/authz"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
 // The JSON of docs/hub/orgs.md, «Types» (web/app/hub-api/orgs.ts).
@@ -25,6 +26,8 @@ type OrgView struct {
 	CreatedAt string `json:"createdAt"`
 	// AppsConsent is the rule for apps on the organization's machines: "ask" (the default) or "auto".
 	AppsConsent string `json:"appsConsent"`
+	// Links are the integrations for the chat's links; every field is empty when not named.
+	Links hubproto.LinkSettings `json:"links"`
 }
 
 type TenantView struct {
@@ -78,7 +81,7 @@ type View struct {
 }
 
 func orgView(o store.Org) OrgView {
-	return OrgView{ID: o.ID, Slug: o.Slug, Name: o.Name, Timezone: o.Timezone, Currency: o.Currency, CreatedAt: httpx.Time(o.CreatedAt), AppsConsent: o.AppsConsent}
+	return OrgView{ID: o.ID, Slug: o.Slug, Name: o.Name, Timezone: o.Timezone, Currency: o.Currency, CreatedAt: httpx.Time(o.CreatedAt), AppsConsent: o.AppsConsent, Links: o.Links}
 }
 
 func grantView(g store.RoleGrant) GrantView {

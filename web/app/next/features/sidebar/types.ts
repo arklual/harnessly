@@ -30,6 +30,8 @@ export interface ISidebarChat {
   pinned: boolean;
   /** An agent made the chat to check something: the sidebar and the search leave it out unless the person shows test chats. */
   test?: boolean;
+  /** An app started the chat for the person: it sits in the app's folder until the person moves or pins it. */
+  from?: { app: string; label: string };
   projectId: string | null;
   /** The chat whose agent delegated this one: it is drawn under that chat. Absent for a chat the person started. */
   parentId?: string;

@@ -509,6 +509,24 @@ func (d *v2Designly) Library(ctx context.Context) (wire.DesignLibrary, error) {
 	touched := d.touched(convs.Conversations)
 	// Without an identity nobody is "me": the owners still show.
 	me, _ := lib.IdentityOf(person)
+	// Whose each chat is: the person it was started for; a chat from before that was recorded is the runtime's.
+	chatPerson := make(map[string]string, len(convs.Conversations))
+	for _, c := range convs.Conversations {
+		chatPerson[c.ID] = c.Person
+	}
+	names := map[string]string{}
+	nameOf := func(address string) string {
+		if n, ok := names[address]; ok {
+			return n
+		}
+		who, err := lib.IdentityOf(address)
+		n := ""
+		if err == nil {
+			n = who.Person
+		}
+		names[address] = n
+		return n
+	}
 	now := time.Now()
 	// A document of a type an app adds is opened in the app's editor, not listed as a site, a deck or a video; one of a
 	// type made of Sinopia's own site is a site with the app's label.
@@ -564,9 +582,39 @@ func (d *v2Designly) Library(ctx context.Context) (wire.DesignLibrary, error) {
 				item.TouchedBy = append(item.TouchedBy, id)
 			}
 		}
+		ownerName := ""
+		if item.Owner != nil {
+			ownerName = item.Owner.Name
+		}
+		item.People = designPeople(ownerName, append(append([]string(nil), item.Convs...), item.TouchedBy...), chatPerson, nameOf)
 		out.Artifacts = append(out.Artifacts, item)
 	}
 	return out, nil
+}
+
+// designPeople names who worked on a design: its owner, then the person of each of its chats, each once and by name —
+// never an address or a chat id. A chat the list does not have is left out.
+func designPeople(owner string, chats []string, personOf map[string]string, nameOf func(address string) string) []string {
+	out := []string{}
+	seen := map[string]bool{}
+	add := func(name string) {
+		name = strings.TrimSpace(name)
+		if name == "" || seen[strings.ToLower(name)] || wire.ValidConvID(name) || strings.Contains(name, "@") || len(out) >= wire.DesignPeopleMax {
+			return
+		}
+		seen[strings.ToLower(name)] = true
+		out = append(out, name)
+	}
+	add(owner)
+	for _, id := range chats {
+		if address, ok := personOf[id]; ok {
+			add(nameOf(address))
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // touched are, by design, the conversations whose transcripts worked on it, the latest activity first.

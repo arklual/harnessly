@@ -6,6 +6,7 @@ import '@/next/dev/chat-gallery-config';
 import '@/next/styles/tokens.css';
 import '@/next/styles/base.css';
 import '@/next/styles/shell.css';
+import '@/next/styles/header.css';
 import '@/next/styles/ui.css';
 import '@/next/styles/icons.css';
 import '@/next/styles/chat.css';
@@ -25,7 +26,7 @@ import { MessagePictures, type IMessagePictures } from '@/next/features/chat/pic
 import { RewindActions, type IRewindActions } from '@/next/features/chat/rewind';
 import { DelegatedChats } from '@/next/features/chat/delegation';
 import type { Conversation } from '@/next/protocol/v2';
-import SelBar, { FeedNotesBar, showFeedNote, useFeedNoteChips } from '@/next/features/chat/selbar';
+import SelBar, { showFeedNote, useFeedNoteChips } from '@/next/features/chat/selbar';
 import type { INoteChipGroup } from '@/next/ui/notes/note-chips';
 import { ChatLinks, type IChatLinks } from '@/next/features/chat/handoff';
 import HandoffSheet, { SHEET_MODE, type TSheetMode } from '@/next/features/chat/handoff-sheet';
@@ -46,7 +47,8 @@ import type {
   TurnItem,
   UserEntry,
 } from '@/next/features/chat/types';
-import type { ConvId } from '@/next/protocol/v2';
+import type { ConvId, MachineId } from '@/next/protocol/v2';
+import { setMetaFetch } from '@/next/features/artifacts/meta-store';
 import Composer, { type IComposerQuote } from '@/next/features/composer/composer';
 import type { IPickerAgent } from '@/next/features/composer/agents';
 import DockBar from '@/next/features/composer/dock-bar';
@@ -83,6 +85,7 @@ let seq = 0;
 const nextId = (prefix: string) => `${prefix}${++seq}`;
 const MIN = 60_000;
 const CONV = 'tab-gallery' as ConvId;
+const GALLERY_MACHINE = 'gallery' as MachineId;
 /** The Workflow call of the workflow scene: its step in the feed draws the sample's run. */
 const WORKFLOW_CALL = 'toolu_gallery_workflow';
 
@@ -392,6 +395,21 @@ const history = (now: Ms): FeedItem[] => [
         title: 'abc-3156.preview.example.com',
         ref: 'https://abc-3156.preview.example.com/',
       },
+      {
+        kind: 'stand',
+        op: 'created',
+        title: 'abc-3157.preview.example.com',
+        ref: 'https://abc-3157.preview.example.com/',
+      },
+      { kind: 'stand', op: 'created', title: 'localhost:4400', ref: 'http://localhost:4400/adminpanel' },
+      { kind: 'task', op: 'created', title: 'ABC-3156', ref: 'https://tracker.example.com/issue/ABC-3156' },
+      {
+        kind: 'commit',
+        op: 'created',
+        title: 'client 8ebd61a7',
+        ref: 'https://gitlab.example.com/ly/client/-/commit/8ebd61a76b6245df',
+      },
+      { kind: 'mr', op: 'created', title: 'checkout #31', ref: 'https://github.com/ly/checkout/pull/31' },
     ],
   }),
   turnOf({
@@ -1191,6 +1209,21 @@ const SCENES: Record<string, { title: string; build: (now: Ms) => IScene }> = {
     title: 'Фоновые агенты закончили',
     build: (now) => ({ items: [...history(now).slice(0, 1), bgAgentsTurn(now)] }),
   },
+  'app-task': {
+    title: 'Задание от приложения',
+    build: (now) => ({
+      items: [
+        turnOf({
+          prompt:
+            '<app-task app="inbox" label="Входящие">\nКарточка «Повторы оплаты падают на таймауте»: найди причину по логам и предложи исправление. Ничего не отправляй людям и не мержи без моего «ок».\n</app-task>',
+          at: now - 20 * MIN,
+          minutes: 6,
+          answer:
+            'Причина в таймауте клиента банка: 5 с при медленном ответе. Исправление готово в ветке, жду «ок».',
+        }),
+      ],
+    }),
+  },
   peers: {
     title: 'Сообщения сессий',
     build: (now) => ({
@@ -1310,6 +1343,70 @@ const SCENES: Record<string, { title: string; build: (now: Ms) => IScene }> = {
         queued('как дела', { k: 'queued', position: 1, reason: 'stalled' }),
         queued('И глянь логи оплаты', { k: 'failed', code: 'unconfirmed', retryable: true, at: now }),
         queued('Потом обнови README', { k: 'queued', position: 2, reason: 'behind' }),
+      ],
+    }),
+  },
+  files: {
+    title: 'Файлы от агента',
+    build: (now) => ({
+      items: [
+        ...history(now),
+        turnOf({
+          prompt: 'Скинь отчёт по оплатам в PDF',
+          at: now - 12 * MIN,
+          minutes: 2,
+          answer: 'Готово: отчёт за неделю, файл уже скачан.',
+          outputs: [
+            {
+              kind: 'delivery',
+              op: 'created',
+              title: 'Оплаты за неделю.pdf',
+              ref: '/w/out/oplaty.pdf',
+              name: 'Оплаты за неделю.pdf',
+              mime: 'application/pdf',
+              size: 284_312,
+              sha256: 'a1',
+            },
+          ],
+        }),
+        turnOf({
+          prompt: 'Дай HTML этой страницы и весь проект zip, и выгрузку заказов в CSV',
+          at: now - 4 * MIN,
+          minutes: 3,
+          answer: 'Три файла: страница одним HTML, проект архивом и заказы таблицей.',
+          outputs: [
+            {
+              kind: 'delivery',
+              op: 'created',
+              title: 'Оплата.html',
+              ref: '/tmp/harnessly-delivered/export-1/Оплата.html',
+              name: 'Оплата.html',
+              mime: 'text/html',
+              size: 1_204_880,
+              sha256: 'b1',
+            },
+            {
+              kind: 'delivery',
+              op: 'created',
+              title: 'checkout-v2.zip',
+              ref: '/tmp/harnessly-delivered/export-2/checkout-v2.zip',
+              name: 'checkout-v2.zip',
+              mime: 'application/zip',
+              size: 18_874_368,
+              sha256: 'b2',
+            },
+            {
+              kind: 'delivery',
+              op: 'created',
+              title: 'Заказы ноябрь.csv',
+              ref: '/w/out/orders.csv',
+              name: 'Заказы ноябрь.csv',
+              mime: 'text/csv',
+              size: 41_002,
+              sha256: 'b3',
+            },
+          ],
+        }),
       ],
     }),
   },
@@ -1659,6 +1756,59 @@ const SCENES: Record<string, { title: string; build: (now: Ms) => IScene }> = {
       },
     }),
   },
+  // The feed and the reader's place: the agent works for 4 s (steps come), then a long answer lands. At the
+  // bottom the feed follows the work and stands at the answer's start; scrolled up, nothing moves, «New message» shows.
+  'answer-lands': {
+    title: 'Длинный итог приходит',
+    build: (now) => {
+      // One history and one turn for the whole scene: the rows keep their keys as the turn grows and ends.
+      const past = history(now);
+      const base = liveTurn(now);
+      return {
+        items: [...past, base],
+        mode: 'working',
+        script: (set) => {
+          const timers: number[] = [];
+          for (let step = 1; step <= 4; step += 1)
+            timers.push(
+              window.setTimeout(() => {
+                const steps = [
+                  ...(base.steps ?? []),
+                  ...Array.from({ length: step * 2 }, (_, i) =>
+                    think(`Шаг ${i + 1}: смотрю, что меняется в ленте при выводе ответа.`, Date.now()),
+                  ),
+                ];
+                set({
+                  items: [...past, { ...base, steps, turn: { ...base.turn, stepCount: steps.length } }],
+                });
+              }, step * 1000),
+            );
+          timers.push(
+            window.setTimeout(() => {
+              const md = Array.from({ length: 6 }, (_, i) => `## Часть ${i + 1}\n\n${ANSWER_MD}`).join(
+                '\n\n',
+              );
+              const answer = say(md, Date.now());
+              const done: TurnItem = {
+                ...base,
+                answer,
+                now: null,
+                turn: {
+                  ...base.turn,
+                  status: 'done',
+                  endedAt: Date.now(),
+                  durationMs: 4 * MIN,
+                  answerEntryId: answer.id,
+                },
+              };
+              set({ items: [...past, done], mode: 'idle' });
+            }, 5000),
+          );
+          return () => timers.forEach((timer) => window.clearTimeout(timer));
+        },
+      };
+    },
+  },
   long: {
     title: 'Лента на 5000 ходов',
     build: (now) => ({
@@ -1701,6 +1851,9 @@ const DICTATION =
   );
 
 // ---- the scene on screen
+
+/** Nothing is attached yet: «+» offers the machine's places (its pickers read the gallery's own page). */
+const GALLERY_ATTACHED: ReadonlySet<string> = new Set();
 
 const SceneView = ({ build }: { build: (now: Ms) => IScene }) => {
   const [startedAt] = useState(() => Date.now());
@@ -1937,7 +2090,6 @@ const SceneView = ({ build }: { build: (now: Ms) => IScene }) => {
 
   const dock = (
     <>
-      <FeedNotesBar conv={CONV} count={feedChips.length} onSend={() => feedSend.current?.()} />
       <QuestionCard
         question={scene.question ?? null}
         device={DEVICE}
@@ -2014,6 +2166,7 @@ const SceneView = ({ build }: { build: (now: Ms) => IScene }) => {
             attachments: (current.attachments ?? []).filter((file) => file.id !== id),
           }))
         }
+        attach={{ scope: { machine: 'local', cwd: null }, attached: GALLERY_ATTACHED, onAttach: () => {} }}
         contexts={[
           { id: 'project', label: 'Проект', icon: 'folder' },
           { id: 'task', label: 'Задача', icon: 'list-checks' },
@@ -2050,6 +2203,7 @@ const SceneView = ({ build }: { build: (now: Ms) => IScene }) => {
             <SelBar conv={CONV} aside />
             <DelegatedChats.Provider value={scene.delegated ?? NO_DELEGATED}>
               <Feed
+                machine={GALLERY_MACHINE}
                 items={scene.items}
                 failed={scene.failed}
                 onRetryLoad={() => setScene((current) => ({ ...current, failed: false }))}
@@ -2084,6 +2238,7 @@ const SceneView = ({ build }: { build: (now: Ms) => IScene }) => {
                 onOpenRef={() => {}}
                 onOpenFile={(path) => toast(path)}
                 onOpenOutput={(output) => toast(`${output.kind}: ${output.ref}`)}
+                downloadUrl={(path) => `data:text/plain,${encodeURIComponent(path)}`}
                 shown={shown}
                 onLoadSteps={(turnId) =>
                   new Promise<boolean>((done) =>
@@ -2154,6 +2309,44 @@ const SceneView = ({ build }: { build: (now: Ms) => IScene }) => {
 type TTheme = 'light' | 'dark';
 type TLang = 'en' | 'ru';
 
+/** What the link previews answer in the gallery: every state a card of a link shows. */
+const LINK_META: Record<string, unknown> = {
+  'https://gitlab.example.com/ly/client/-/merge_requests/412': {
+    kind: 'mr',
+    iid: 412,
+    title: 'Оплата: маппинг order_id',
+    state: 'opened',
+    project: 'ly/client',
+    draft: false,
+    pipeline: { status: 'failed', url: 'https://gitlab.example.com/ly/client/-/pipelines/1' },
+  },
+  'https://abc-3156.preview.example.com/': { kind: 'stand', up: true, title: 'Админка · Аналитика' },
+  'https://abc-3157.preview.example.com/': { kind: 'stand', up: false, title: null },
+  'https://tracker.example.com/issue/ABC-3156': {
+    kind: 'issue',
+    key: 'ABC-3156',
+    title: 'Оплата падает после выката',
+    state: 'In Progress',
+    resolved: false,
+    assignee: { name: 'Анна Смирнова', avatar: null },
+  },
+  'https://gitlab.example.com/ly/client/-/commit/8ebd61a76b6245df': {
+    kind: 'commit',
+    title: 'fix(pay): order_id из заказа, а не из корзины',
+    sha: '8ebd61a7',
+    project: 'ly/client',
+    pipeline: { status: 'success', url: 'https://gitlab.example.com/ly/client/-/pipelines/2' },
+  },
+  'https://github.com/ly/checkout/pull/31': {
+    kind: 'mr',
+    iid: 31,
+    title: 'Чекаут: шаг адреса',
+    state: 'merged',
+    project: 'ly/checkout',
+    draft: false,
+  },
+};
+
 const ChatGallery = () => {
   const router = useRouter();
   const { query } = router;
@@ -2165,6 +2358,14 @@ const ChatGallery = () => {
 
   // The language is read when a text is drawn: it is pinned before the scene renders, and the scene remounts on a change.
   pinLocale(lang);
+  useEffect(() => {
+    setMetaFetch(async (url) => {
+      const asked = decodeURIComponent(url.split('url=')[1]?.split('&')[0] ?? '');
+      const meta = LINK_META[asked];
+      return meta ? new Response(JSON.stringify(meta)) : new Response('', { status: 404 });
+    });
+    return () => setMetaFetch(null);
+  }, []);
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.theme = theme;

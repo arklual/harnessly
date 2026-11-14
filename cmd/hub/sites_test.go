@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 )
 
 const gatewaySecret = "gateway-secret-gateway-secret-1234"
@@ -92,23 +91,19 @@ func TestStandaloneSites(t *testing.T) {
 	done := make(chan error, 1)
 	var logs safeBuffer
 	go func() { done <- serveSites(ctx, cfg, ready, &logs) }()
+	// The start is work, not a wait: every migration of the store, 2 s under the race detector on an idle machine and
+	// over 10 s on a runner with two busy CPUs. So the test waits for the address or for the end of
+	// serveSites, with no clock of its own; a start that hangs is cut by go test, with every goroutine printed.
 	var addr string
 	select {
 	case addr = <-ready:
 	case err := <-done:
 		t.Fatalf("did not start: %v %s", err, logs.String())
-	case <-time.After(10 * time.Second):
-		t.Fatal("did not start")
 	}
 	t.Cleanup(func() {
 		cancel()
-		select {
-		case err := <-done:
-			if err != nil {
-				t.Errorf("stopped with %v", err)
-			}
-		case <-time.After(10 * time.Second):
-			t.Error("did not stop")
+		if err := <-done; err != nil {
+			t.Errorf("stopped with %v", err)
 		}
 	})
 

@@ -20,10 +20,15 @@ const (
 	MadeTask MadeKind = "task"
 	// MadeMR is a merge request (pull request) the chat opened. A page that does not know the kind leaves it out.
 	MadeMR MadeKind = "mr"
+	// MadeStand is a stand or a dev server the chat opened; MadeCommit a commit it pushed (its page on the server);
+	// MadeFile a file it handed to the person (Ref is its path). A page that does not know them leaves them out.
+	MadeStand  MadeKind = "stand"
+	MadeCommit MadeKind = "commit"
+	MadeFile   MadeKind = "file"
 )
 
 // MadeKinds is every MadeKind, in the schema's order.
-var MadeKinds = []MadeKind{MadeDoc, MadeBoard, MadeDesign, MadeTask, MadeMR}
+var MadeKinds = []MadeKind{MadeDoc, MadeBoard, MadeDesign, MadeTask, MadeMR, MadeStand, MadeCommit, MadeFile}
 
 // MadeFromKind says who made a thing the chat inherits: one of its subagents or one of its delegated chats.
 type MadeFromKind string

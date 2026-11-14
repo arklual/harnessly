@@ -1,7 +1,8 @@
-// The agent of the Settings window (the design's .isle): a field at the bottom of the page where the person says in
-// words what to change, and over it what the agent answered — what it changed, from what to what, with the way back —
-// or what it asks before changing.
-import { useState, type FormEvent } from 'react';
+// The agent of the Settings window (the design's .isle): the window's one field at the bottom of the page (the host gives
+// it, bindings/settings-agent), and over it what the agent answers as it comes — its words with links to the window's
+// places, a change it offers with «Поменять / Не надо», and a change made, from what to what, with the way back.
+import { answerParts } from '@/next/features/settings/agent-map';
+import type { ReactNode } from 'react';
 import { t } from '@/next/i18n';
 import { Button } from '@/next/ui/button';
 import Icon from '@/next/ui/icon';
@@ -9,8 +10,9 @@ import Icon from '@/next/ui/icon';
 export const ISLAND = {
   idle: 'idle',
   thinking: 'thinking',
+  /** The words are coming. */
+  answering: 'answering',
   done: 'done',
-  ask: 'ask',
   failed: 'failed',
 } as const;
 export type TIslandPhase = (typeof ISLAND)[keyof typeof ISLAND];
@@ -24,10 +26,20 @@ export interface IIslandChange {
   onUndo: () => void;
 }
 
-export interface IIslandOption {
+/** A change the agent offers; nothing changes until the person says so. */
+export interface IIslandConfirm {
+  title: string;
+  was: string;
+  now: string;
+  busy: boolean;
+  onApply: () => void;
+  onReject: () => void;
+}
+
+/** What the person can do about an answer that could not be given (no model: choose one). */
+export interface IIslandAction {
   label: string;
-  hint: string;
-  onPick: () => void;
+  onClick: () => void;
 }
 
 interface IAgentIslandProps {
@@ -35,39 +47,44 @@ interface IAgentIslandProps {
   /** What the agent said, or why it did not answer. */
   text: string;
   changes: readonly IIslandChange[];
-  options: readonly IIslandOption[];
+  confirm: IIslandConfirm | null;
+  action: IIslandAction | null;
   /** The card over the field is leaving. */
   closing: boolean;
-  suggestions: readonly string[];
-  onSend: (text: string) => void;
+  /** The field: the window's one. */
+  field: ReactNode;
   onDismiss: () => void;
-  /** Opens the agent's chat; absent while there is none. */
-  onOpenChat?: () => void;
+  /** A link of the answer to a place of the window («Настройки → Подключения»): the window goes there. */
+  onGo: (path: string) => void;
 }
+
+/** The answer with its links to the window's places as jumps there. */
+const AnswerText = ({ text, onGo }: { text: string; onGo: (path: string) => void }) => (
+  <div className="hx-isle__text">
+    {answerParts(text).map((part, i) =>
+      part.k === 'link' ? (
+        <button key={i} type="button" className="hx-isle__go" onClick={() => onGo(part.path)}>
+          {part.text}
+          <Icon name="arrow-up-right" size="sm" />
+        </button>
+      ) : (
+        <span key={i}>{part.text}</span>
+      ),
+    )}
+  </div>
+);
 
 const AgentIsland = ({
   phase,
   text,
   changes,
-  options,
+  confirm,
+  action,
   closing,
-  suggestions,
-  onSend,
+  field,
   onDismiss,
-  onOpenChat,
+  onGo,
 }: IAgentIslandProps) => {
-  const [draft, setDraft] = useState('');
-  const busy = phase === ISLAND.thinking;
-  const send = (words: string) => {
-    const said = words.trim();
-    if (said === '' || busy) return;
-    setDraft('');
-    onSend(said);
-  };
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    send(draft);
-  };
   return (
     <div className="hx-isle">
       {phase === ISLAND.thinking && (
@@ -78,9 +95,9 @@ const AgentIsland = ({
           </span>
         </div>
       )}
-      {(phase === ISLAND.done || phase === ISLAND.failed) && (
+      {(phase === ISLAND.answering || phase === ISLAND.done || phase === ISLAND.failed) && (
         <div className="hx-isle__reply" data-state={closing ? 'closing' : undefined} role="status">
-          <div className="hx-isle__text">{text}</div>
+          <AnswerText text={text} onGo={onGo} />
           {changes.map((change) => (
             <div key={change.id} className="hx-isle__diff">
               <span className="hx-isle__diff-title">{change.title}</span>
@@ -92,68 +109,40 @@ const AgentIsland = ({
               </Button>
             </div>
           ))}
-          <div className="hx-isle__acts">
-            <Button size="sm" variant="ghost" onClick={onDismiss}>
-              {t('next.settings.agentIsle.ok')}
-            </Button>
-            {phase === ISLAND.failed && onOpenChat && (
-              <Button size="sm" variant="ghost" onClick={onOpenChat}>
-                {t('next.settings.agentIsle.openChat')}
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-      {phase === ISLAND.ask && (
-        <div className="hx-isle__reply" role="status">
-          <div className="hx-isle__text">{text}</div>
-          {options.length > 0 && (
-            <div className="hx-isle__opts">
-              {options.map((option) => (
-                <button key={option.label} type="button" className="hx-isle__opt" onClick={option.onPick}>
-                  <span className="hx-isle__opt-name">{option.label}</span>
-                  {option.hint !== '' && <span className="hx-isle__opt-hint">{option.hint}</span>}
-                </button>
-              ))}
+          {confirm && (
+            <div className="hx-isle__diff">
+              <span className="hx-isle__diff-title">{confirm.title}</span>
+              <s>{confirm.was}</s>
+              <Icon name="arrow-right" size="sm" />
+              <b>{confirm.now}</b>
             </div>
           )}
-          {options.length === 0 && onOpenChat && (
+          {phase !== ISLAND.answering && (
             <div className="hx-isle__acts">
-              <Button size="sm" variant="ghost" onClick={onOpenChat}>
-                {t('next.settings.agentIsle.openChat')}
-              </Button>
+              {confirm ? (
+                <>
+                  <Button size="sm" variant="primary" busy={confirm.busy} onClick={confirm.onApply}>
+                    {t('next.settings.agentIsle.apply')}
+                  </Button>
+                  <Button size="sm" variant="ghost" disabled={confirm.busy} onClick={confirm.onReject}>
+                    {t('next.settings.agentIsle.reject')}
+                  </Button>
+                </>
+              ) : (
+                <Button size="sm" variant="ghost" onClick={onDismiss}>
+                  {t('next.settings.agentIsle.ok')}
+                </Button>
+              )}
+              {action && (
+                <Button size="sm" variant="ghost" onClick={action.onClick}>
+                  {action.label}
+                </Button>
+              )}
             </div>
           )}
         </div>
       )}
-      <form className="hx-isle__box" onSubmit={submit}>
-        <div className="hx-isle__row">
-          <input
-            className="hx-isle__input"
-            value={draft}
-            placeholder={t('next.settings.agentIsle.placeholder')}
-            aria-label={t('next.settings.agentIsle.placeholder')}
-            onChange={(event) => setDraft(event.target.value)}
-          />
-          <button
-            type="submit"
-            className="hx-isle__send"
-            aria-label={t('next.settings.agentIsle.send')}
-            disabled={busy || draft.trim() === ''}
-          >
-            <Icon name="arrow-up" size="sm" />
-          </button>
-        </div>
-        {phase === ISLAND.idle && draft === '' && suggestions.length > 0 && (
-          <div className="hx-isle__sugg">
-            {suggestions.map((words) => (
-              <button key={words} type="button" onClick={() => send(words)}>
-                {words}
-              </button>
-            ))}
-          </div>
-        )}
-      </form>
+      {field}
     </div>
   );
 };

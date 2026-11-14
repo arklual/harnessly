@@ -69,6 +69,9 @@ func (b *Box) plan(a Agent, head *Record) headPlan {
 // Pump looks at the head of the queue on any change — the agent's state, a new message, the clock — and returns the
 // try to type when the agent can take it. size is the transcript's length now: the message's user entry, if it
 // takes, is written after it. One message is on its way at a time.
+// transcriptWait: how often a message back by its term looks again whether its transcript is read.
+const transcriptWait = 2 * time.Second
+
 func (b *Box) Pump(a Agent, size int64, now time.Time) (*Job, Change) {
 	ch := b.Tick(now)
 	if job := b.clearJob(a, now); job != nil {
@@ -154,6 +157,25 @@ func (b *Box) Pump(a Agent, size int64, now time.Time) (*Job, Change) {
 			b.positions(&ch, p.reason, now)
 			return nil, ch
 		}
+	}
+	if b.HookConfirms && head.Retyped && !b.transcriptRead() && ms(now) < head.TypedAt+2*ConfirmWindow.Milliseconds() {
+		// The transcript is only behind the file (a write the feed reads in a moment) or still looked for: the head
+		// waits a little and is looked at again — the entry or the late hook usually comes in that time.
+		head.NextTry = ms(now) + transcriptWait.Milliseconds()
+		b.positions(&ch, head.Reason, now)
+		return nil, ch
+	}
+	if b.HookConfirms && head.Retyped && !b.transcriptRead() {
+		// Back by its term with no word from the agent, and the transcript that would hold its entry is not read: not
+		// found yet (a new chat's file is written after the hook, and found later) or read behind the file. «No entry»
+		// says nothing then, and the hook may come late on a loaded machine: the box does not type it a second time on
+		// the guess — it stalls, the late hook or entry still accepts it, and otherwise the person decides.
+		if b.log != nil {
+			b.log.Warn("unconfirmed message not typed again: the transcript is not read to check it", "conversationId", b.conv,
+				"clientId", head.Message.ClientID, "send", head.Send)
+		}
+		b.stall(&ch, head, now)
+		return nil, ch
 	}
 	msg := typist.Message{Text: head.Message.Text, Images: head.Images, Steer: p.steer, HandOver: p.steer && a.HandOver && !head.Soft,
 		Agent: head.Agent, Leftovers: b.pasted(), Typed: b.typedTexts(head.Message.ClientID)}

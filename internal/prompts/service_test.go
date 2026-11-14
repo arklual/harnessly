@@ -389,3 +389,55 @@ func TestStepsKeepTheirOrder(t *testing.T) {
 		t.Errorf("got %s", raw)
 	}
 }
+
+// a gone-looking agent whose pane processes cannot be read (a hung NFS folder) is not resumed: the queue
+// waits and looks again, and delivers to the same agent once it reads as running.
+func TestUnreadableAgentIsNotResumed(t *testing.T) {
+	r := newRig(t, "agent@host:~$ ", Tab{HasAgentSession: true})
+	r.agents.running = false
+	r.agents.unreadable = true
+	_, _ = r.svc.Queue().Add("tab-1", "после зависания", nil)
+	r.svc.Schedule("tab-1", 0)
+	r.clock.Advance(0)
+	for range 10 {
+		r.clock.Advance(blockedRetry)
+	}
+	if r.agents.resumed != 0 || len(r.panes.sent()) != 0 {
+		t.Fatalf("resumed %d, sent %v while the agent could not be read", r.agents.resumed, r.panes.sent())
+	}
+	if p := r.clock.pending(); len(p) != 1 {
+		t.Fatalf("the queue stopped looking: %v", p)
+	}
+	r.agents.unreadable = false
+	r.agents.running = true
+	r.panes.setScreen(tui(t, "claude-idle-placeholder.ansi.txt"))
+	r.clock.Advance(blockedRetry)
+	if r.agents.resumed != 0 || !reflect.DeepEqual(r.panes.sent(), []string{"line:после зависания"}) {
+		t.Fatalf("resumed %d, sent %v", r.agents.resumed, r.panes.sent())
+	}
+}
+
+// ten queues waiting on gone agents at once resume resumeBurst of them, the rest in later windows.
+func TestResumesArePacedAcrossTabs(t *testing.T) {
+	r := newRig(t, "agent@host:~$ ", Tab{HasAgentSession: true})
+	r.agents.running = false
+	r.agents.resume = "busy-shell" // keeps each tab retrying without launching anything
+	ids := []string{"tab-1", "tab-2", "tab-3", "tab-4", "tab-5", "tab-6", "tab-7", "tab-8", "tab-9", "tab-10"}
+	for _, id := range ids[1:] {
+		r.tabs.mu.Lock()
+		r.tabs.tabs[id] = Tab{ID: id, Session: "hs-" + id, Provider: ProviderClaude, CliState: StateIdle, HasAgentSession: true}
+		r.tabs.mu.Unlock()
+	}
+	for _, id := range ids {
+		_, _ = r.svc.Queue().Add(id, "первое", nil)
+		r.svc.Schedule(id, 0)
+	}
+	r.clock.Advance(0)
+	if r.agents.resumed != resumeBurst {
+		t.Fatalf("%d resumes at once, want %d", r.agents.resumed, resumeBurst)
+	}
+	r.clock.Advance(resumeWindow)
+	if r.agents.resumed > 2*resumeBurst {
+		t.Fatalf("%d resumes after one window, want at most %d", r.agents.resumed, 2*resumeBurst)
+	}
+}

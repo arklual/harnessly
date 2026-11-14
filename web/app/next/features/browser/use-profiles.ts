@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { loadProfiles, type IProfilesPage } from './profiles-api';
+import { calmPoll } from '@/next/core/net/calm-poll';
 import type { MachineId } from '@/next/protocol/v2';
+
+/** The step while the profiles change, and the longest one while they stay the same. */
+const PROFILES_POLL_MS = 3000;
+const PROFILES_QUIET_MS = 15_000;
 
 /** Reads only the machine on screen; hidden pages leave requests waiting on the runtime. */
 export function useProfiles(machine: MachineId | null, poll = false) {
@@ -11,17 +16,23 @@ export function useProfiles(machine: MachineId | null, poll = false) {
     if (!machine) return;
     let gone = false,
       busy = false;
-    const look = async () => {
-      if (busy || (poll && document.visibilityState !== 'visible')) return;
+    let last: string | null = null;
+    /** One read; true when the profiles changed. */
+    const look = async (): Promise<boolean> => {
+      if (busy) return false;
       busy = true;
       try {
         const data = await loadProfiles(machine);
-        if (!gone) {
-          setRead({ machine, data });
-          setFailure(null);
-        }
+        if (gone) return false;
+        const said = JSON.stringify(data);
+        const moved = said !== last;
+        last = said;
+        if (moved) setRead({ machine, data });
+        setFailure(null);
+        return moved;
       } catch (error) {
         if (!gone) setFailure({ machine, text: String(error instanceof Error ? error.message : error) });
+        return false;
       } finally {
         busy = false;
       }
@@ -29,15 +40,19 @@ export function useProfiles(machine: MachineId | null, poll = false) {
     const changed = (event: Event) => {
       if ((event as CustomEvent).detail === machine) setAttempt((n) => n + 1);
     };
-    void look();
-    const timer = poll ? setInterval(() => void look(), 3000) : undefined;
     window.addEventListener('browser-profiles-changed', changed);
-    document.addEventListener('visibilitychange', look);
+    // Polled while the page is visible, slower while nothing changes; read once otherwise.
+    const stop = poll ? calmPoll({ base: PROFILES_POLL_MS, max: PROFILES_QUIET_MS, look }) : null;
+    if (!poll) void look();
+    const onVisible = () => {
+      if (!poll && document.visibilityState === 'visible') void look();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       gone = true;
-      clearInterval(timer);
+      stop?.();
       window.removeEventListener('browser-profiles-changed', changed);
-      document.removeEventListener('visibilitychange', look);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [machine, poll, attempt]);
   return {

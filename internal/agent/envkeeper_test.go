@@ -254,3 +254,39 @@ func TestEnvKeeperKeepsTheAppsRule(t *testing.T) {
 		t.Fatalf("the rule ask is not kept in the file: %s", raw)
 	}
 }
+
+// The organization's links ride on env.set: the agent keeps them beside the list for the runtime and says the
+// hash of all of it to the hub; the hash is the one the hub computes, and clearing them takes them out of the file.
+func TestEnvKeeperKeepsTheLinks(t *testing.T) {
+	dir := t.TempDir()
+	k := newEnvKeeper(dir)
+	items := envItems()
+	plain := hubproto.EnvHash(items)
+	links := &hubproto.LinkSettings{StandDomain: "preview.example.com", GitLabHosts: []string{"gitlab.example.com"}}
+	if _, err := k.Set(hubproto.EnvSet{Rev: 1, Hash: plain, Items: items, Links: links}); err == nil {
+		t.Fatal("links under the items' hash were taken")
+	}
+	with := hubproto.EnvSetHashWith(plain, "", links)
+	st, err := k.Set(hubproto.EnvSet{Rev: 1, Hash: with, Items: items, Links: links})
+	if err != nil || st.Hash != with {
+		t.Fatalf("set: %+v %v", st, err)
+	}
+	raw, _ := os.ReadFile(filepath.Join(dir, "environment.json"))
+	var file struct {
+		Hash  string                 `json:"hash"`
+		Links *hubproto.LinkSettings `json:"links"`
+	}
+	if err := json.Unmarshal(raw, &file); err != nil || file.Hash != plain || file.Links == nil || file.Links.StandDomain != "preview.example.com" {
+		t.Fatalf("the file keeps the links for the runtime: %s", raw)
+	}
+	if _, hash := newEnvKeeper(dir).Held(); hash != with {
+		t.Fatalf("after a restart the links are held: %q", hash)
+	}
+	if st, err = k.Set(hubproto.EnvSet{Rev: 2, Hash: plain, Items: items}); err != nil || st.Hash != plain {
+		t.Fatalf("links cleared: %+v %v", st, err)
+	}
+	raw, _ = os.ReadFile(filepath.Join(dir, "environment.json"))
+	if strings.Contains(string(raw), "links") {
+		t.Fatalf("no links are kept in the file: %s", raw)
+	}
+}

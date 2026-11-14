@@ -256,14 +256,20 @@ type Logger interface {
 
 // Deps is what a Runtime is built on.
 type Deps struct {
+	// PersonOf is the address of the person a command's context carries (their page session), "" for the runtime's own
+	// person; a new conversation keeps it (wire.Conversation.Person). nil: every chat is the runtime's person's.
+	PersonOf func(context.Context) string
 	// epoch is the runtime's, set by New: a conversation stamps its agent state with it.
 	epoch string
 	// startResumes holds a place for each chat resuming its agent after a start (life.go), set by New.
 	startResumes chan struct{}
 	MachineID    string
 	Publisher    Publisher
-	Machine      Machine
-	Launcher     Launcher
+	// ProjectsChanged is told the machine's whole project list after a project was made or changed; it must
+	// not block. nil: nobody listens.
+	ProjectsChanged func([]wire.Project)
+	Machine         Machine
+	Launcher        Launcher
 	// Input is the structured channel some conversations take their messages through; nil types every message.
 	Input   Input
 	Uploads Uploads

@@ -44,6 +44,11 @@ type txn struct {
 	homes  map[string]string
 	// closed: a project without a row gives nobody a role (Service.closed).
 	closed bool
+	// opens: who may read what a machine holds (Service.opens); nil opens every machine. opened keeps its answers by
+	// machine and person for the txn, machines the machines read.
+	opens    func(ctx context.Context, userID string, m store.Machine) bool
+	opened   map[string]bool
+	machines map[string]store.Machine
 }
 
 // key is the machine whose rows hold a project: this one, or with a shared library the machine of the space that
@@ -78,7 +83,7 @@ func (s *Service) read(ctx context.Context, m store.Machine) (*txn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &txn{ctx: ctx, st: st, q: st.Q(), pg: s.db.Driver() == store.Postgres, m: m, w: w, now: s.now(), seal: s.seal, shared: s.shared, closed: s.closed}, nil
+	return &txn{ctx: ctx, st: st, q: st.Q(), pg: s.db.Driver() == store.Postgres, m: m, w: w, now: s.now(), seal: s.seal, shared: s.shared, closed: s.closed, opens: s.opens}, nil
 }
 
 func (s *Service) write(ctx context.Context, m store.Machine, fn func(t *txn) error) error {
@@ -87,7 +92,7 @@ func (s *Service) write(ctx context.Context, m store.Machine, fn func(t *txn) er
 		if err != nil {
 			return err
 		}
-		return fn(&txn{ctx: ctx, st: st, q: st.Q(), pg: s.db.Driver() == store.Postgres, m: m, w: w, now: s.now(), seal: s.seal, shared: s.shared, closed: s.closed})
+		return fn(&txn{ctx: ctx, st: st, q: st.Q(), pg: s.db.Driver() == store.Postgres, m: m, w: w, now: s.now(), seal: s.seal, shared: s.shared, closed: s.closed, opens: s.opens})
 	})
 	if err == nil {
 		s.kickSpace(ctx, m)
@@ -237,7 +242,47 @@ func (t *txn) fold(p project, email string) (folded, error) {
 	if err != nil {
 		return folded{}, err
 	}
+	if p.TeamLevel != levelNone && !t.homeOpens(p.ID, person.user) {
+		// The team level is the space's door to a project; a machine closed to the person (a private one, or
+		// one whose owner's work their role may not read) keeps it shut, and with it the stewardship it carries. The
+		// owner, the person's own grant and a grant to their team still count.
+		p.TeamLevel = levelNone
+	}
 	return foldAccess(p, m, grants, person, t.w.orgOf(p.HomeTeam), t.now), nil
+}
+
+// homeOpens says whether the person may open the machine a project's rows are under (key).
+func (t *txn) homeOpens(projectID, userID string) bool {
+	if t.opens == nil {
+		return true
+	}
+	home := t.key(projectID)
+	k := home + "\x00" + userID
+	if ok, seen := t.opened[k]; seen {
+		return ok
+	}
+	m, ok := t.machines[home]
+	if !ok {
+		if home == t.m.ID {
+			m = t.m
+		} else {
+			got, err := t.st.MachineByID(t.ctx, home)
+			if err != nil {
+				return false
+			}
+			m = got
+		}
+		if t.machines == nil {
+			t.machines = map[string]store.Machine{}
+		}
+		t.machines[home] = m
+	}
+	open := t.opens(t.ctx, userID, m)
+	if t.opened == nil {
+		t.opened = map[string]bool{}
+	}
+	t.opened[k] = open
+	return open
 }
 
 func (t *txn) writeLog(projectID, actor, action, subject string, details map[string]any) error {
@@ -323,8 +368,8 @@ func (t *txn) insertProject(id, owner, ownerName, level string, legacy bool) (re
 	if home == "" && !legacy {
 		level = levelNone
 	}
-	_, err = t.q.Exec(t.ctx, `INSERT INTO design_projects (machine_id, project_id, owner_email, owner_name, home_team, team_level, editors_can_share, legacy, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, t.key(id), id, owner, ownerName, nullStr(home), level, boolInt(home != ""), boolInt(legacy), ms(t.now), ms(t.now))
+	_, err = t.q.Exec(t.ctx, `INSERT INTO design_projects (machine_id, project_id, owner_email, owner_name, home_team, team_level, editors_can_share, legacy, work_machine_id, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, t.key(id), id, owner, ownerName, nullStr(home), level, boolInt(home != ""), boolInt(legacy), t.m.ID, ms(t.now), ms(t.now))
 	if store.IsUnique(err) {
 		return regExists, nil
 	}

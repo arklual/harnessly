@@ -349,60 +349,9 @@
   cursor: pointer;
 }
 
+/* The field is the chat's own (features/composer/reply-field): it draws itself. */
 .hx-ie__field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   width: 100%;
-  box-sizing: border-box;
-  padding: 8px 8px 8px 18px;
-  border: 1px solid var(--hx-border);
-  border-radius: var(--hx-radius-xl);
-  background: var(--hx-bg-bubble);
-}
-.hx-ie__input {
-  flex: 1;
-  min-width: 0;
-  /* One line that grows with a long hint or text where the browser can (field-sizing); else one line. */
-  field-sizing: content;
-  min-height: 32px;
-  max-height: 96px;
-  resize: none;
-  overflow-y: auto;
-  padding: 6px 0;
-  line-height: 20px;
-  box-sizing: border-box;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--hx-fg-1);
-  font: inherit;
-  font-size: var(--hx-text-md);
-}
-.hx-ie__input::placeholder {
-  color: var(--hx-fg-3);
-}
-.hx-ie__input:disabled {
-  cursor: default;
-}
-.hx-ie__send {
-  flex: none;
-  align-self: flex-end;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: var(--hx-fg-1);
-  color: var(--hx-bg-app);
-  cursor: pointer;
-  transition: opacity 160ms var(--hx-ease-out);
-}
-.hx-ie__send:disabled {
-  opacity: 0.3;
-  cursor: default;
 }
 
 /* A narrow dock (a phone, a phone held sideways, a narrow window): all five tools at once, no scrolling. */
@@ -454,18 +403,6 @@
   .hx-ie__color {
     width: 44px;
     height: 44px;
-  }
-  .hx-ie__input {
-    min-height: 44px;
-    padding: 12px 0;
-    font-size: 16px;
-  }
-  .hx-ie__send {
-    width: 44px;
-    height: 44px;
-  }
-  .hx-ie__field {
-    padding: 4px 4px 4px 18px;
   }
   .hx-ie__thumb {
     width: 48px;

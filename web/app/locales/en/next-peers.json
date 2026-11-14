@@ -16,6 +16,7 @@
   "next.peers.kind.session": "Another session",
   "next.peers.kind.subagent": "Background agent",
   "next.peers.byPerson": "written in person",
+  "next.appTask.from": "Task from {app}",
   "next.peers.delivery.waiting": "Waiting for its turn",
   "next.peers.delivery.handed": "The agent reads it after the current step",
   "next.peers.delivery.readMidTurn": "Read by the agent mid-turn",

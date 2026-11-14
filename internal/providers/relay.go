@@ -141,6 +141,7 @@ func (rl *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set(h, v)
 		}
 	}
+	noRetry(w, res.StatusCode)
 	w.WriteHeader(res.StatusCode)
 	if !strings.Contains(ct, "event-stream") {
 		data, _ := io.ReadAll(res.Body)

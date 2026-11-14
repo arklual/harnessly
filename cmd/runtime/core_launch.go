@@ -12,6 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/agents/claude"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
+	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/coreapi/layoutapi"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/launch"
@@ -229,6 +230,7 @@ func (c *core) launchRoutes(f *gate.Gate, d deps, isMachineAgent func(*http.Requ
 	}
 	l := &layoutapi.Launch{
 		Starter: c.launcher, Inbox: c.inbox, Headlines: &launch.Headlines{File: filepath.Join(c.cfg.DataDir, "headlines.json"), Lines: c.transcripts.Follower("headlines", 0)}, MachineAgent: isMachineAgent,
+		FromApp:        fromAppOK(apps.Open(d.DataDir)),
 		SessionCreated: func(s string) int64 { return c.cfg.Tmux.PaneDetail(s).SessionCreated },
 		CodexArgs: func(ws, resume string, l *agents.Launch) (codex.Start, error) {
 			if c.agents == nil {

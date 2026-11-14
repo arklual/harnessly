@@ -210,7 +210,10 @@
     pointer-events: none;
     transition-delay: 0s, 0s;
   }
-  .hx-header:has(.hx-headmach-card .hx-machine[data-hover='true']) > * {
+  /* Not `.hx-header:has(…) > *`: a :has() subject followed by a child combinator makes every node added anywhere on
+     the page restyle the whole document (~120 ms at CPU ×4, HRN-1429). The header's own parts take the pointer back
+     always: without a rule of their own they would inherit `auto` anyway. */
+  :where(.hx-header) > * {
     pointer-events: auto;
   }
 }

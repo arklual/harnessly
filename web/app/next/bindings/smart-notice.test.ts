@@ -235,6 +235,10 @@ describe('machineDetail', () => {
     if (disk.k !== 'machine') throw new Error(disk.k);
     expect(disk.heavy).toEqual([]);
     expect(disk.level).toBeCloseTo(0.95);
+    // what can be deleted, with the figures and without.
+    expect(disk.hint).toBeTruthy();
+    expect(machineDetail('disk', null)).toMatchObject({ hint: disk.hint });
+    expect(machineDetail('mem', null)).not.toHaveProperty('hint');
   });
 });
 

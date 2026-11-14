@@ -20,6 +20,10 @@ const (
 	retryDelay  = 1500 * time.Millisecond
 	// blockedRetry: a menu or foreign text in the box, or an agent not resumed yet, is looked at again this late.
 	blockedRetry = 5 * time.Second
+	// resumeBurst resumes at most go out within resumeWindow, whatever the number of queues waiting on a gone agent:
+	// the rest wait their turn (ten chats resumed in the same second when a hung NFS folder came back).
+	resumeBurst  = 3
+	resumeWindow = 20 * time.Second
 	// steerHandOver: Claude writes a steered message to its transcript and screen within this long after Enter.
 	steerHandOver = 300 * time.Millisecond
 	// noTabGrace: a tab the keeper does not know, or one without its tmux session, this long has its queue given up.
@@ -86,6 +90,8 @@ type Service struct {
 	tries    map[string]int
 	occupied map[string]time.Time
 	waits    map[string]string
+	// resumes are when the last resumes for queued messages went out, oldest first (resumeBurst within resumeWindow).
+	resumes []time.Time
 }
 
 // New builds a Service and loads the queue. The keeper schedules its deliveries and runs the watchdog over them.
@@ -258,6 +264,26 @@ func (s *Service) waiting(tabID, on string, kv ...any) {
 	}
 }
 
+// resumeTurn takes a resume slot: 0 when one is free now (and it is taken), else how long until the oldest of the
+// window's resumes leaves it.
+func (s *Service) resumeTurn() time.Duration {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.clock.Now()
+	kept := s.resumes[:0]
+	for _, at := range s.resumes {
+		if now.Sub(at) < resumeWindow {
+			kept = append(kept, at)
+		}
+	}
+	s.resumes = kept
+	if len(s.resumes) >= resumeBurst {
+		return max(s.resumes[0].Add(resumeWindow).Sub(now), retryDelay)
+	}
+	s.resumes = append(s.resumes, now)
+	return 0
+}
+
 // failedTry counts a failed try of the message and says how long to wait before the next one; give up: it was the
 // last.
 func (s *Service) failedTry(id string) (next time.Duration, try int, giveUp bool) {
@@ -340,6 +366,13 @@ func (s *Service) deliverHead(tabID string) {
 	delete(s.relaunch, tabID)
 	s.mu.Unlock()
 	running := s.cfg.Agents.Running(tab)
+	if !running && !tab.Launching && s.cfg.Agents.Unreadable(tab) {
+		// "No agent" read from processes that cannot be read is not known: nothing is resumed over an agent that may be
+		// there, waiting on a hung folder. Looked at again later.
+		s.waiting(tabID, "agent-unreadable")
+		s.Schedule(tabID, blockedRetry)
+		return
+	}
 	hasSession := tab.HasAgentSession || s.cfg.Agents.RecoverSession(tab)
 	switch QueueAgentAction(tab.Launching, tab.LaunchFailed && !relaunch, running, hasSession) {
 	case ActionLaunching:
@@ -353,6 +386,11 @@ func (s *Service) deliverHead(tabID string) {
 		s.giveUp(tabID, ReasonNoSession)
 		return
 	case ActionResume:
+		if wait := s.resumeTurn(); wait > 0 {
+			s.waiting(tabID, "resume-paced", "burst", resumeBurst, "window", resumeWindow.String(), "next", wait.String())
+			s.Schedule(tabID, wait)
+			return
+		}
 		switch r := s.cfg.Agents.Resume(tab); r {
 		case ResumeNoSession:
 			s.cfg.Agents.GiveUpLaunch(tabID)

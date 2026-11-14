@@ -53,6 +53,10 @@ type Preset struct {
 	// Custom: a provider the person added by hand (the registry of internal/extproviders, SetCustom). Its key and the
 	// values of SecretEnv come from the machine's safe (Store.Safe), and it may run on a credential of SecretEnv alone.
 	Custom bool
+	// Proxied names the OpenAI-compatible provider (internal/extproviders) a custom profile reaches through the
+	// runtime's proxy (Store.Proxy): Claude Code is pointed at the proxy with the proxy's key, and the proxy turns its
+	// requests into the provider's. "" for every other profile.
+	Proxied string
 	// Backed: the vendor's profile takes its key from an account of the person's providers (SetBacked), not from a key
 	// typed for the profile itself. Its KeyRef is that account's secret in the safe; "" while there is no account.
 	Backed bool

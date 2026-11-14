@@ -58,6 +58,47 @@ type EnvSet struct {
 	Items []EnvItem `json:"items"`
 	// AppsConsent is the organization's rule for apps: AppsConsentAuto, or absent for AppsConsentAsk.
 	AppsConsent string `json:"appsConsent,omitempty"`
+	// Links are the organization's integrations for the chat's links: only a machine whose hello has
+	// FeatureEnvLinks is sent them, and only when the organization named any.
+	Links *LinkSettings `json:"links,omitempty"`
+}
+
+// FeatureEnvLinks is in `hello` when the agent keeps EnvSet.Links and hands them to its runtime.
+const FeatureEnvLinks = "environment.links"
+
+// LinkSettings are the organization's sites that the chat's links are told by: which addresses are feature
+// stands, the tracker, GitLab, the documents and the boards. An administrator sets them in the hub (the organization's
+// settings); a machine's runtime takes them over its own environment (RUNTIME_STAND_DOMAIN, RUNTIME_TRACKER_URL,
+// RUNTIME_GITLAB_HOSTS, RUNTIME_ARTIFACTS_URL, RUNTIME_BOARDS_URL), field by field: an empty field leaves the machine's.
+type LinkSettings struct {
+	// StandDomain: every <name>.<StandDomain> is a feature stand ("preview.example.com").
+	StandDomain string `json:"standDomain,omitempty"`
+	// TrackerURL is the tracker's origin; its tasks are <TrackerURL>/issue/<KEY> ("https://tracker.example.com").
+	TrackerURL string `json:"trackerUrl,omitempty"`
+	// GitLabHosts are the hosts of the organization's GitLab ("gitlab.example.com").
+	GitLabHosts []string `json:"gitlabHosts,omitempty"`
+	// ArtifactsURL serves the documents (/a/<slug>), BoardsURL the boards (/b/<slug>): origins.
+	ArtifactsURL string `json:"artifactsUrl,omitempty"`
+	BoardsURL    string `json:"boardsUrl,omitempty"`
+}
+
+// Empty says the organization named nothing.
+func (l *LinkSettings) Empty() bool {
+	return l == nil || l.StandDomain == "" && l.TrackerURL == "" && len(l.GitLabHosts) == 0 && l.ArtifactsURL == "" &&
+		l.BoardsURL == ""
+}
+
+// EnvSetHashWith is EnvSetHash with the organization's links: none leaves the hash as EnvSetHash makes it, so a machine
+// that never had links holds the same hash as before; any makes another one, so a change of them reaches the machine
+// the way a change of the list does.
+func EnvSetHashWith(itemsHash, appsConsent string, links *LinkSettings) string {
+	h := EnvSetHash(itemsHash, appsConsent)
+	if links.Empty() {
+		return h
+	}
+	raw, _ := json.Marshal(links)
+	sum := sha256.Sum256([]byte(h + "\nlinks=" + string(raw)))
+	return hex.EncodeToString(sum[:])
 }
 
 // EnvSetHash is the hash of a list (itemsHash, its EnvHash) with the organization's rule for apps. The rule ask (or none)

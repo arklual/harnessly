@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { pinLocale } from '@/next/i18n';
 import {
   effortLabel,
+  modelLine,
   modelName,
   modelOf,
   pickerAgents,
@@ -118,5 +119,43 @@ describe('a chat of a vendor whose key was removed', () => {
     expect(removedKeyOf(machine(true), 'claude', 'kimi')).toBeNull();
     expect(removedKeyOf(machine(false), 'claude', null)).toBeNull();
     expect(removedKeyOf(machine(false), 'claude', 'glm')).toBeNull();
+  });
+});
+
+describe('the picker names a model by how it runs (HRN-1434)', () => {
+  const model = (id: string, label: string) => ({ id, label, hint: '', efforts: [], defaultEffort: null });
+  const machine: MachineAgent = {
+    provider: 'claude',
+    version: null,
+    status: 'ready',
+    models: [model('opus', 'Opus')],
+    canSwitchModel: true,
+    profiles: [
+      {
+        id: 'gpt',
+        label: 'GPT · ChatGPT plan',
+        vendor: 'gpt',
+        configured: true,
+        models: [model('g', 'GPT-5')],
+      },
+      { id: 'glm', label: 'GLM · Z.ai', vendor: 'glm', configured: true, models: [model('m', 'GLM 5.3')] },
+      { id: 'kimi', label: 'Kimi · platform', vendor: 'kimi', configured: true, models: [model('k', 'K3')] },
+      { id: 'kimi-code', label: 'Kimi Code', vendor: 'kimi', configured: true, models: [model('k', 'K3')] },
+    ],
+  } as MachineAgent;
+  const all = pickerAgents([machine]);
+  const of = (profile: string | null) => all.find((a) => (a.profile ?? null) === profile)!;
+
+  it('says Claude’s own models by name alone', () => {
+    expect(modelLine(of(null), 'opus')).toBe('Opus');
+  });
+
+  it('says GPT goes through Codex into Claude Code, the others through Claude Code', () => {
+    expect(modelLine(of('gpt'), 'g')).toBe('GPT-5 · Codex via Claude Code');
+    expect(modelLine(of('glm'), 'm')).toBe('GLM 5.3 · via Claude Code');
+  });
+
+  it('names a group’s tab by its vendor unless two would read the same', () => {
+    expect(all.map((a) => a.short)).toEqual(['Claude', 'GPT', 'GLM', 'Kimi', 'Kimi Code']);
   });
 });

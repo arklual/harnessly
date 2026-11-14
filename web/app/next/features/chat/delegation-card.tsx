@@ -1,7 +1,16 @@
 // The card of a chat our agent delegated, under the turn that started it: «Поручено: <title> · <model>», the chat's
-// state as it goes, and the chat opens on a click.
-import { memo, useContext } from 'react';
-import { DelegatedChats, childState, startedIn, type TChildState } from '@/next/features/chat/delegation';
+// state as it goes, and the chat opens on a click. Under it, what the subchat (and the chats it delegated) made —
+// designs, documents and boards, tasks, merge requests — the feed's live cards, folded until asked.
+import { memo, useContext, useMemo, useState } from 'react';
+import { subchatOutputs } from '@/next/bindings/inherited-made';
+import {
+  DelegatedChats,
+  SubchatsMade,
+  childState,
+  startedIn,
+  type TChildState,
+} from '@/next/features/chat/delegation';
+import { OutputList } from '@/next/features/chat/outputs';
 import type { Conversation } from '@/next/protocol/v2';
 import { goTo, ROUTE } from '@/next/routes/routes';
 import Icon from '@/next/ui/icon';
@@ -26,7 +35,7 @@ const modelOf = (c: Conversation): string => {
   return c.model.effort ? `${c.model.id} · ${c.model.effort}` : c.model.id;
 };
 
-export const DelegationCard = memo(({ chat }: { chat: Conversation }) => {
+const DelegationHead = memo(({ chat }: { chat: Conversation }) => {
   const state = childState(chat);
   return (
     <button
@@ -49,6 +58,36 @@ export const DelegationCard = memo(({ chat }: { chat: Conversation }) => {
     </button>
   );
 });
+
+/** The card with what the subchat made under it: a quiet row «Сделано: N» opens the list and folds it back. */
+export const DelegationCard = ({ chat }: { chat: Conversation }) => {
+  const made = useContext(SubchatsMade);
+  const outputs = useMemo(() => subchatOutputs(made, chat.id), [made, chat.id]);
+  const [open, setOpen] = useState(false);
+  // The live cards read their services only once the list was first opened; folded again, they stay as they are.
+  const [shown, setShown] = useState(false);
+  if (outputs.length === 0) return <DelegationHead chat={chat} />;
+  return (
+    <div className="hx-deleg-item">
+      <DelegationHead chat={chat} />
+      <button
+        type="button"
+        className="hx-deleg__made"
+        aria-expanded={open}
+        onClick={() => {
+          setShown(true);
+          setOpen(!open);
+        }}
+      >
+        <Icon name="chevron-right" size="sm" className="hx-deleg__made-ic" />
+        {t('next.delegation.made', { count: outputs.length })}
+      </button>
+      <div className="hx-deleg__list" data-state={open ? 'open' : 'closed'} inert={!open}>
+        <div className="hx-deleg__list-in">{shown && <OutputList outputs={outputs} />}</div>
+      </div>
+    </div>
+  );
+};
 
 /** The cards of the chats a turn delegated, from its start to its end. */
 const DelegationCards = ({ startedAt, endedAt }: { startedAt: number; endedAt: number | null }) => {

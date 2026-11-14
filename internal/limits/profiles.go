@@ -119,7 +119,11 @@ func (c *ProfileCache) Fail(a Account, message string, forget bool, now float64)
 		if prev := entries[a.Key()]; prev != nil && !forget {
 			next = copyObject(prev)
 		}
-		next["error"] = map[string]any{"message": message, "at": now}
+		failure := map[string]any{"message": message, "at": now}
+		if message == keyRefused() {
+			failure["rejected"] = true
+		}
+		next["error"] = failure
 		entries[a.Key()] = next
 	})
 }
@@ -283,7 +287,7 @@ func (p *Profiles) ask(ctx context.Context, a Account, v Vendor, now float64) (D
 	defer res.Body.Close()
 	switch {
 	case res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden:
-		return nil, locale.Pick("the provider did not accept the key", "провайдер не принял ключ")
+		return nil, keyRefused()
 	case res.StatusCode < 200 || res.StatusCode > 299:
 		return nil, "HTTP " + strconv.Itoa(res.StatusCode)
 	}
@@ -296,10 +300,16 @@ func (p *Profiles) ask(ctx context.Context, a Account, v Vendor, now float64) (D
 		return nil, locale.Pick("the answer could not be read", "ответ не удалось прочитать")
 	}
 	if v.Refused != nil && v.Refused(body) {
-		return nil, locale.Pick("the provider did not accept the key", "провайдер не принял ключ")
+		return nil, keyRefused()
 	}
 	if data := v.Parse(body, now); data != nil {
 		return data, ""
 	}
 	return nil, locale.Pick("the answer has no limits", "в ответе нет лимитов")
+}
+
+// keyRefused is the failure of an account whose key the vendor did not accept (401, 403, or its own refusal); the entry
+// notes it apart from the words so the page can offer another key.
+func keyRefused() string {
+	return locale.Pick("the provider did not accept the key", "провайдер не принял ключ")
 }

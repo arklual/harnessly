@@ -92,7 +92,7 @@ func (s *Service) serveWorkspace(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, httpx.ErrNotFound)
 		return
 	}
-	if refuseCrossSite(w, r) {
+	if !s.sandboxStoreFile(r) && refuseCrossSite(w, r) {
 		return
 	}
 	rest := strings.TrimPrefix(r.URL.Path, workspaceBase)
@@ -205,6 +205,16 @@ func (s *Service) workspaceAPI(w http.ResponseWriter, r *http.Request, p *auth.P
 		u := url.URL{Path: rest, RawQuery: q.Encode()}
 		asked.URL = &u
 		asked.RequestURI = ""
+		home := func(ctx context.Context, w http.ResponseWriter) {
+			to := r.Clone(ctx)
+			u := url.URL{Path: workspaceBase + rest, RawQuery: q.Encode()}
+			to.URL = &u
+			to.RequestURI = ""
+			s.forward(w, to, p.User, m)
+		}
+		if s.serveHome(w, asked, p.User, m, home) {
+			return
+		}
 		if s.design.ServeMachine(w, asked, p.User, m) {
 			return
 		}
@@ -423,3 +433,50 @@ func (p *pageRecorder) Write(b []byte) (int, error) {
 }
 
 func (p *pageRecorder) Flush() {}
+
+// storeFilePath is a file of a project in the hub's store (designaccess team.go): <base>/api/<name>/design/store/<id>/f/….
+var storeFilePath = regexp.MustCompile(`^` + workspaceBase + `/api/[A-Za-z0-9_-]+/design/store/[^/]+/f/.`)
+
+// storeKeyedPath is the same file at the board's keyed address (designaccess filekey.go): <id>/k/<key>/f/….
+var storeKeyedPath = regexp.MustCompile(`^` + workspaceBase + `/api/[A-Za-z0-9_-]+/design/store/[^/]+/k/[0-9a-z]+\.[A-Za-z0-9_-]+/f/.`)
+
+// sandboxStoreFile: a board shown from the hub's store loads its own files (support.js, styles, scripts). The board runs
+// sandboxed on an opaque origin, so the browser asks for them as «cross-site», and the cross-site refusal turned every
+// one away with 403: the board drew as raw markup. Such a request reads a file and changes nothing, and its
+// Referer names this host: the store's answers ask for it (Referrer-Policy strict-origin), and a page of another site
+// cannot make its browser send it. The person is still checked as for any other request, and the answer stays inert.
+func (s *Service) sandboxStoreFile(r *http.Request) bool {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return false
+	}
+	if r.Header.Get("Sec-Fetch-Site") != "cross-site" {
+		return false
+	}
+	// A sandboxed board sends no Referer at all (its origin is opaque): its files come at its keyed address, whose key
+	// designaccess checks against the signed-in person before anything is read.
+	if storeKeyedPath.MatchString(r.URL.Path) {
+		return true
+	}
+	if !storeFilePath.MatchString(r.URL.Path) {
+		return false
+	}
+	ref, err := url.Parse(r.Header.Get("Referer"))
+	if err != nil || ref.Host == "" {
+		return false
+	}
+	fwd, _, _ := strings.Cut(r.Header.Get("X-Forwarded-Host"), ",")
+	for _, own := range []string{r.Host, strings.TrimSpace(fwd), hostOf(s.cfg.PublicURL)} {
+		if own != "" && strings.EqualFold(ref.Host, own) {
+			return true
+		}
+	}
+	return false
+}
+
+func hostOf(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	return u.Host
+}

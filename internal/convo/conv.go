@@ -344,9 +344,20 @@ func newConv(d *Deps, rec wire.Conversation) *conv {
 	c.summary = rec.Recap
 	c.box = outbox.New(rec.ID, d.Limits, d.Log)
 	c.box.Transcript = func(offset int64, at wire.Ms, text string) (string, bool) { return c.fd.FindUserText(offset, at, text) }
+	c.box.TranscriptRead = c.transcriptRead
 	c.box.HookConfirms = outbox.ConfirmsByHook(rec.Provider)
 	c.openFeed()
 	return c
+}
+
+// transcriptRead: the conversation's transcript is found and its feed has read the file to its end — a user entry the
+// agent wrote for a typed message would be in it (a new chat's file is found after the hook).
+func (c *conv) transcriptRead() bool {
+	if c.fd == nil || c.rec.TranscriptPath == "" {
+		return false
+	}
+	st, ok := stampFile(c.rec.TranscriptPath)
+	return ok && st.Size <= c.fd.Size()
 }
 
 func (c *conv) openFeed() {
@@ -1006,17 +1017,28 @@ func (c *conv) signal(s feed.Signal, now time.Time) {
 
 // failTerminal stops a turn on a provider failure the CLI cannot make progress on. Ctrl-C is the terminal's SIGINT
 // character, delivered by tmux to the foreground process group. The queue stays paused for a person's target choice.
+//
+// A call the gateway refused (401, 403, 400: terminalfailure.Rejected) ends the turn the same way, with the reason in
+// the feed, but neither pauses the queue nor asks for a target: the next message is the person's own new attempt.
 func (c *conv) failTerminal(turnID, failure, detail string, now time.Time) {
-	if failure != string(terminalfailure.QuotaExhausted) || turnID == "" || c.terminalFailureTurn == turnID {
+	if turnID == "" || c.terminalFailureTurn == turnID {
 		return
 	}
-	c.terminalFailureTurn = turnID
-	marker := wire.TerminalFailure{Kind: wire.FailureQuotaExhausted, At: ms(now), Detail: detail, Terminal: true, NeedsTarget: true}
-	c.rec.TerminalFailure = &marker
-	c.touch()
-	c.emit(wire.QuotaExhaustedEv{Failure: marker})
-	c.change(c.box.Pause(wire.PausedNeedsTarget, now), now)
-	c.input(agentstate.Input{K: agentstate.StopFailure, TurnFailure: wire.TurnFailedRateLimit, TurnDetail: detail}, now)
+	switch failure {
+	case string(terminalfailure.QuotaExhausted):
+		c.terminalFailureTurn = turnID
+		marker := wire.TerminalFailure{Kind: wire.FailureQuotaExhausted, At: ms(now), Detail: detail, Terminal: true, NeedsTarget: true}
+		c.rec.TerminalFailure = &marker
+		c.touch()
+		c.emit(wire.QuotaExhaustedEv{Failure: marker})
+		c.change(c.box.Pause(wire.PausedNeedsTarget, now), now)
+		c.input(agentstate.Input{K: agentstate.StopFailure, TurnFailure: wire.TurnFailedRateLimit, TurnDetail: detail}, now)
+	case string(terminalfailure.Rejected):
+		c.terminalFailureTurn = turnID
+		c.input(agentstate.Input{K: agentstate.StopFailure, TurnFailure: wire.TurnFailedApiError, TurnDetail: detail}, now)
+	default:
+		return
+	}
 	pane := c.d.Machine.Pane(c.rec.Session)
 	if pane == nil {
 		return

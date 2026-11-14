@@ -49,19 +49,49 @@ export interface IUiSlotProps {
   object?: ISlotObject;
   /** An onboarding step calls hl.slot.done(). */
   onDone?: () => void;
+  /** A view of the start page calls hl.slot.greet() to put its own greeting over the field. */
+  onGreet?: (title: string, sub: string) => void;
+  /** The view fills the place it is given (the start page's stage) instead of growing to its own height. */
+  fill?: boolean;
 }
 
-const UiSlot = ({ machine, app, view, target, viewPort, object, onDone }: IUiSlotProps) => {
+const UiSlot = ({
+  machine,
+  app,
+  view,
+  target,
+  viewPort,
+  object,
+  onDone,
+  onGreet,
+  fill = false,
+}: IUiSlotProps) => {
   const [reload, setReload] = useState(0);
   // The bridge is made anew whenever the handlers change, and a new bridge forgets the view's handshake: keep them still.
   const done = useRef(onDone);
+  const greet = useRef(onGreet);
   useEffect(() => {
     done.current = onDone;
+    greet.current = onGreet;
   });
-  const handlers = useMemo<IBridgeHandlers>(() => ({ slotDone: () => done.current?.() }), []);
+  const handlers = useMemo<IBridgeHandlers>(
+    () => ({
+      slotDone: () => done.current?.(),
+      ...(target === 'home'
+        ? { slotGreet: (title: string, sub: string) => greet.current?.(title, sub) }
+        : {}),
+    }),
+    [target],
+  );
   const data = useMemo(() => (object ? { object } : undefined), [object]);
   return (
-    <div className="hx-uislot" data-slot={target} data-app={app.id} data-view={view.id}>
+    <div
+      className="hx-uislot"
+      data-slot={target}
+      data-app={app.id}
+      data-view={view.id}
+      data-fill={fill || undefined}
+    >
       <SlotBoundary onRetry={() => setReload((n) => n + 1)}>
         <AppFrame
           machine={machine}
@@ -73,7 +103,7 @@ const UiSlot = ({ machine, app, view, target, viewPort, object, onDone }: IUiSlo
           data={data}
           handlers={handlers}
           reloadToken={reload}
-          fit
+          fit={!fill}
         />
       </SlotBoundary>
     </div>

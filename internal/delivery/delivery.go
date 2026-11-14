@@ -7,13 +7,16 @@
 package delivery
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -83,7 +86,12 @@ var mimes = map[string]string{
 	"csv": "text/csv", "json": "application/json", "txt": "text/plain", "md": "text/markdown", "markdown": "text/markdown",
 	"html": "text/html", "htm": "text/html", "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
 	"gif": "image/gif", "webp": "image/webp", "svg": "image/svg+xml", "mp4": "video/mp4", "webm": "video/webm",
-	"mov": "video/quicktime", "mp3": "audio/mpeg", "wav": "audio/wav",
+	"mov": "video/quicktime", "mp3": "audio/mpeg", "wav": "audio/wav", "m4a": "audio/mp4", "ogg": "audio/ogg",
+	"flac": "audio/flac", "avif": "image/avif", "heic": "image/heic", "ico": "image/x-icon", "tsv": "text/tab-separated-values",
+	"xml": "application/xml", "yaml": "application/yaml", "yml": "application/yaml", "log": "text/plain", "sql": "text/plain",
+	"css": "text/css", "js": "text/javascript", "ics": "text/calendar", "rtf": "application/rtf", "epub": "application/epub+zip",
+	"odt": "application/vnd.oasis.opendocument.text", "ods": "application/vnd.oasis.opendocument.spreadsheet",
+	"odp": "application/vnd.oasis.opendocument.presentation", "bz2": "application/x-bzip2", "xz": "application/x-xz",
 }
 
 // MimeOf is the type of a file by its extension; application/octet-stream for any other.
@@ -104,7 +112,17 @@ func (r *Refusal) Error() string { return r.Text }
 
 // Describe resolves a file under the access rules (the workspace's folders, no secrets, no links out of them), and reads
 // its size and sha256. title is what the card is called ("" for the file's name).
+//
+// A folder is handed over as one zip of it (named after the folder), written into PackDir by the same rules as a
+// download of the folder: its secrets are left out.
 func Describe(a *files.Access, requested, title string) (Info, *Refusal) {
+	if item, refused := a.ResolveDownload(requested, a.Allowed); refused == nil && item.Dir {
+		packed, err := pack(a, item)
+		if err != nil {
+			return Info{}, &Refusal{Status: 500, Text: "the folder could not be packed into a zip: " + err.Error()}
+		}
+		requested = packed
+	}
 	t := a.Download(requested)
 	if !t.OK {
 		return Info{}, &Refusal{Status: t.Status, Text: t.Text}
@@ -115,6 +133,33 @@ func Describe(a *files.Access, requested, title string) (Info, *Refusal) {
 	}
 	name := path.Base(t.Real)
 	return Info{Path: t.Real, Name: name, Title: strings.TrimSpace(title), Mime: MimeOf(name), Size: t.Size, SHA256: sum}, nil
+}
+
+// PackDir is where a folder handed over is packed; it lies under the machine's temporary folder, which the workspace's
+// access lets out.
+var PackDir = filepath.Join(os.TempDir(), "harnessly-delivered")
+
+// pack writes the folder as <PackDir>/<random>/<folder>.zip and answers its path.
+func pack(a *files.Access, item files.DownloadItem) (string, error) {
+	if err := os.MkdirAll(PackDir, 0o700); err != nil {
+		return "", err
+	}
+	dir, err := os.MkdirTemp(PackDir, "zip-")
+	if err != nil {
+		return "", err
+	}
+	out := filepath.Join(dir, files.ZipName([]files.DownloadItem{item}, ""))
+	f, err := os.OpenFile(out, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return "", err
+	}
+	werr := a.WriteZip(context.Background(), f, item, a.Allowed)
+	cerr := f.Close()
+	if werr != nil || cerr != nil {
+		_ = os.RemoveAll(dir)
+		return "", errors.Join(werr, cerr)
+	}
+	return out, nil
 }
 
 // sumOf is the sha256 of the file's bytes, opened without following a link at its end.

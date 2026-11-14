@@ -49,5 +49,34 @@
   "next.limits.fc.high": "высокая",
   "next.limits.fc.medium": "средняя",
   "next.limits.fc.low": "низкая",
-  "next.limits.fc.profile": "с учётом ваших часов"
+  "next.limits.fc.profile": "с учётом ваших часов",
+  "next.limits.card.resetIn": "сброс через {span}",
+  "next.limits.card.resetAt": "сброс {at}",
+  "next.limits.card.over": "Кончился",
+  "next.limits.card.endsIn": "Кончится через {span}",
+  "next.limits.card.endsAt": "Кончится {at}",
+  "next.limits.card.lasts": "Хватит до сброса",
+  "next.limits.card.balanceDay": "Кончится сегодня",
+  "next.limits.card.balanceDays": {
+    "one": "Хватит примерно на {n} день",
+    "few": "Хватит примерно на {n} дня",
+    "many": "Хватит примерно на {n} дней",
+    "other": "Хватит примерно на {n} дня"
+  },
+  "next.limits.card.balanceWeeks": {
+    "one": "Хватит примерно на {n} неделю",
+    "few": "Хватит примерно на {n} недели",
+    "many": "Хватит примерно на {n} недель",
+    "other": "Хватит примерно на {n} недели"
+  },
+  "next.limits.card.today": "сегодня",
+  "next.limits.card.week": "неделя",
+  "next.limits.card.days7": "7 дней",
+  "next.limits.card.onBalance": "на балансе",
+  "next.limits.card.rejected": "Ключ отклонён",
+  "next.limits.card.replaceKey": "Заменить ключ",
+  "next.limits.card.connect": "Подключить",
+  "next.limits.card.left": "{left}%",
+  "next.limits.card.pace": "Чтобы хватило до сброса, сейчас должно оставаться {pace}%",
+  "next.limits.card.spark": "Траты по дням за неделю"
 }

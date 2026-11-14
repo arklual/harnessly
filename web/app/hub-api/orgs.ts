@@ -18,6 +18,17 @@ export type Org = {
   createdAt: string;
   /** The rule for apps on the organization's machines; absent on an older hub, which means `ask`. */
   appsConsent?: AppsConsent;
+  /** The integrations for the chat's links; a field that is not named is absent. */
+  links?: OrgLinks;
+};
+
+/** The sites the chat's links are told by: stands (`<name>.<standDomain>`), tracker, GitLab, documents and boards. */
+export type OrgLinks = {
+  standDomain?: string;
+  trackerUrl?: string;
+  gitlabHosts?: string[];
+  artifactsUrl?: string;
+  boardsUrl?: string;
 };
 
 /** `ask`: an app's rights wait for the person's click; `auto`: «Не спрашивать разрешений». */

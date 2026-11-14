@@ -59,3 +59,16 @@ type SpaceApp struct {
 	// target.
 	Path string `json:"path,omitempty"`
 }
+
+// AppKind is a document type an app of a space adds to Sinopia, as the hub lists it from the packages of the space's
+// team: the shape of the machine's GET <platform>/apps/kinds.
+type AppKind struct {
+	ID            string `json:"id"`
+	Title         string `json:"title"`
+	Icon          string `json:"icon,omitempty"`
+	App           string `json:"app"`
+	AppName       string `json:"appName"`
+	Editor        string `json:"editor"`
+	SchemaVersion int    `json:"schemaVersion"`
+	Extends       string `json:"extends,omitempty"`
+}

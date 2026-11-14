@@ -318,3 +318,45 @@ func TestWorkspaceDocumentsStayWithTheMachineWhenTheHubKeepsNone(t *testing.T) {
 		t.Errorf("without HUB_DOCS the machine answers: %s", r)
 	}
 }
+
+// A board shown from the hub's store runs sandboxed on an opaque origin: Chrome asks for its support.js and styles with
+// these headers (Sec-Fetch-Site cross-site, no-cors, Referer the hub's origin under the store's strict-origin). They
+// must pass the cross-site refusal, or the board draws as raw markup; the same request from another site, or
+// one that writes, is still refused.
+func TestWorkspaceLetsASandboxedStoreBoardLoadItsFiles(t *testing.T) {
+	w := setupWorkspace(t, fleetOn)
+	own := w.s.URL + "/"
+	file := "/agents/api/platform/design/store/shop/f/support.js?tkv=1"
+	sandbox := func(dest, referer string) []string {
+		return []string{"Sec-Fetch-Site", "cross-site", "Sec-Fetch-Mode", "no-cors", "Sec-Fetch-Dest", dest, "Referer", referer}
+	}
+	for _, dest := range []string{"script", "style"} {
+		if r := w.owner.Do("GET", file, nil, sandbox(dest, own)...); r.Code == 403 {
+			t.Errorf("the board's own %s: %s", dest, r)
+		}
+	}
+	// Chrome sends a sandboxed board's requests without any Referer: they come at the board's keyed address, whose key
+	// designaccess checks once the person is known.
+	keyed := "/agents/api/platform/design/store/shop/k/mz0b1c2.AbC-d_e/f/lib/support.js"
+	for _, dest := range []string{"script", "style", "image"} {
+		if r := w.owner.Do("GET", keyed, nil, "Sec-Fetch-Site", "cross-site", "Sec-Fetch-Mode", "no-cors", "Sec-Fetch-Dest", dest); r.Code == 403 && r.Err() == "cross_site" {
+			t.Errorf("the board's own %s at its keyed address: %s", dest, r)
+		}
+	}
+	for name, c := range map[string]struct {
+		method, path string
+		headers      []string
+	}{
+		"a keyed address that writes": {"POST", keyed, []string{"Sec-Fetch-Site", "cross-site", "Sec-Fetch-Dest", "empty"}},
+		"a key of another shape":      {"GET", "/agents/api/platform/design/store/shop/k/x/f/support.js", []string{"Sec-Fetch-Site", "cross-site", "Sec-Fetch-Dest", "script"}},
+		"another site's page":         {"GET", file, sandbox("script", "https://evil.example.com/")},
+		"no referer":                  {"GET", file, []string{"Sec-Fetch-Site", "cross-site", "Sec-Fetch-Dest", "script"}},
+		"a write":                     {"POST", file, sandbox("empty", own)},
+		"not a file of the store":     {"GET", "/agents/api/platform/bootstrap", sandbox("script", own)},
+		"the store's events":          {"GET", "/agents/api/platform/design/store/shop/events", sandbox("empty", own)},
+	} {
+		if r := w.owner.Do(c.method, c.path, nil, c.headers...); r.Code != 403 || r.Err() != "cross_site" {
+			t.Errorf("%s: %s", name, r)
+		}
+	}
+}

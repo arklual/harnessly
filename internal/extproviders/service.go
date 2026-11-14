@@ -48,7 +48,7 @@ func (s *Service) ViewOf(p Provider) View {
 		models = []Model{}
 	}
 	return View{ID: p.ID, Name: p.Name, BaseURL: p.BaseURL, Host: p.Host(), API: p.API, Preset: p.Preset,
-		HasKey: s.holds(p.KeyRef), Models: models, ModelsAt: p.ModelsAt, ClaudeCLI: p.ClaudeCLI(),
+		HasKey: s.holds(p.KeyRef), Models: models, ModelsAt: p.ModelsAt, ClaudeCLI: p.ClaudeCLI() || p.Proxied(), Proxied: p.Proxied(),
 		Group: p.Group(), Default: p.Default, Managed: p.Origin != "", Env: s.envView(p.Env),
 		CreatedAt: p.CreatedAt, UpdatedAt: p.UpdatedAt}
 }
@@ -368,14 +368,18 @@ func (s *Service) Check(ctx context.Context, id string) (Check, error) {
 			return refuse(ReasonNotFound)
 		}
 		before = body.Providers[i]
-		body.Providers[i].Models, body.Providers[i].ModelsAt = got.Models, s.Store.now()
+		body.Providers[i].Models, body.Providers[i].ModelsAt = MergeModels(body.Providers[i].Models, got.Models), s.Store.now()
 		after = body.Providers[i]
 		return nil
 	})
 	// Other models are a change of the provider like one the person made: what follows the registry (the profiles the
 	// chats start on) hears of it at once.
-	if err == nil && !slices.Equal(before.Models, after.Models) {
+	if err == nil && !slices.EqualFunc(before.Models, after.Models, Model.Equal) {
 		s.changed("updated", &before, &after)
+	}
+	if err == nil {
+		// The page shows what is kept: the provider's list with what the person did to it.
+		got.Models = after.Models
 	}
 	return got, nil
 }

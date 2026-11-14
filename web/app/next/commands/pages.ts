@@ -9,6 +9,7 @@ import { batch } from '@/next/core/store';
 import { applyOlderTurns, applyTurnEntries, entryStore, key, turnStore } from '@/next/stores/conversation';
 import { limitsOf } from '@/next/stores/machines';
 import {
+  CAPS_QUERY,
   parsePage,
   type ConvId,
   type EntryId,
@@ -22,6 +23,7 @@ import {
   type HandoffDraft,
   type HandoffDraftRequest,
   type ChatDigest,
+  type ChatGlance,
   type MessageSearch,
   type OutputPage,
   type RewindPlan,
@@ -52,7 +54,9 @@ export async function loadOlderTurns(
     }
     if (!('ok' in central) && isMachineOff(m)) return central;
   }
-  const url = machineApi(m).http(`/conversations/${enc(conv)}/turns?before=${enc(before)}&limit=${limit}`);
+  const url = machineApi(m).http(
+    `/conversations/${enc(conv)}/turns?before=${enc(before)}&limit=${limit}&${CAPS_QUERY}`,
+  );
   const res = await getPage(url, parsePage.turns, limitsOf(m).cmdTimeoutMs);
   if (!('ok' in res)) return res;
   batch(() => applyOlderTurns(conv, res.value.turns, res.value.entries, res.value.beforeTurnId));
@@ -131,14 +135,14 @@ export const loadRewindPlan = (
 export async function loadRewound(m: MachineId, conv: ConvId, n: number): Promise<PageOutcome<TurnsPage>> {
   if (keepsHistory(m)) {
     const central = await getPage(
-      gatewayPath(`/history/conversations/${enc(conv)}/rewinds/${n}/turns`),
+      gatewayPath(`/history/conversations/${enc(conv)}/rewinds/${n}/turns?${CAPS_QUERY}`),
       parsePage.turns,
       limitsOf(m).cmdTimeoutMs,
     );
     if (('ok' in central && central.value.turns.length > 0) || isMachineOff(m)) return central;
   }
   return getPage(
-    machineApi(m).http(`/conversations/${enc(conv)}/rewinds/${n}/turns`),
+    machineApi(m).http(`/conversations/${enc(conv)}/rewinds/${n}/turns?${CAPS_QUERY}`),
     parsePage.turns,
     limitsOf(m).cmdTimeoutMs,
   );
@@ -222,6 +226,14 @@ export const loadChatDigest = (m: MachineId, conv: ConvId): Promise<PageOutcome<
     machineApi(m).http(`/conversations/${enc(conv)}/digest`),
     parsePage.digest,
     limitsOf(m).cmdTimeoutMs * 3,
+  );
+
+/** What a chat said last, for the search's preview; nothing is written on the machine. */
+export const loadChatGlance = (m: MachineId, conv: ConvId): Promise<PageOutcome<ChatGlance>> =>
+  getPage(
+    machineApi(m).http(`/conversations/${enc(conv)}/glance`),
+    parsePage.glance,
+    limitsOf(m).cmdTimeoutMs,
   );
 
 /** Where a chip or a link of the conversation opens in the right pane: the runtime's rules, the agent's open command's. */

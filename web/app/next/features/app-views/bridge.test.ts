@@ -682,3 +682,29 @@ describe('AppBridge: the Document API of Sinopia', () => {
     expect(r.last()?.error.data.code).toBe('host_unavailable');
   });
 });
+
+describe('AppBridge: harnessly/slot.greet (HRN-1430)', () => {
+  it('hands the greeting of a start-page view to the host', async () => {
+    const slotGreet = vi.fn();
+    const r = rig([], { slotGreet }, { target: 'home' }, undefined, ['home']);
+    await r.start();
+    await r.call('harnessly/slot.greet', { title: 'Добрый день', sub: 'Три дела ждут тебя' }, 2);
+    expect(r.last()?.error).toBeUndefined();
+    expect(slotGreet).toHaveBeenCalledWith('Добрый день', 'Три дела ждут тебя');
+    await r.call('harnessly/slot.greet', {}, 3);
+    expect(slotGreet).toHaveBeenLastCalledWith('', '');
+  });
+
+  it('refuses a greeting that is too long, and a view the host gives no greeting to', async () => {
+    const slotGreet = vi.fn();
+    const r = rig([], { slotGreet }, { target: 'home' }, undefined, ['home']);
+    await r.start();
+    await r.call('harnessly/slot.greet', { title: 'x'.repeat(121) }, 2);
+    expect(r.last()?.error.data.code).toBe('invalid_params');
+    expect(slotGreet).not.toHaveBeenCalled();
+    const pane = rig([], {});
+    await pane.start();
+    await pane.call('harnessly/slot.greet', { title: 'hi' }, 2);
+    expect(pane.last()?.error.data.code).toBe('host_unavailable');
+  });
+});

@@ -517,6 +517,81 @@
         }
       ]
     },
+    "api_tokens": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "token_hash",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "client",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "device",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "scopes",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "last_used_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "expires_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "revoked_at",
+          "type": "bigint"
+        },
+        {
+          "name": "ip",
+          "type": "text",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "api_tokens_user",
+          "columns": [
+            "user_id"
+          ]
+        },
+        {
+          "unique": true,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      ]
+    },
     "audit_events": {
       "columns": [
         {
@@ -1668,6 +1743,30 @@
           "name": "updated_at",
           "type": "bigint",
           "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "text"
+        },
+        {
+          "name": "preview",
+          "type": "text"
+        },
+        {
+          "name": "kit_id",
+          "type": "text"
+        },
+        {
+          "name": "work_machine_id",
+          "type": "text"
+        },
+        {
+          "name": "meta_by",
+          "type": "text"
+        },
+        {
+          "name": "meta_at",
+          "type": "bigint"
         }
       ],
       "primaryKey": [
@@ -4615,6 +4714,39 @@
         }
       ]
     },
+    "machine_projects": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "project_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "directories",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id",
+        "project_id"
+      ]
+    },
     "machine_provider_limits": {
       "columns": [
         {
@@ -5147,6 +5279,79 @@
         "migration"
       ]
     },
+    "notice_items": {
+      "columns": [
+        {
+          "name": "person",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "item_key",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "chat",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "item_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "doc",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "read_at",
+          "type": "bigint"
+        }
+      ],
+      "primaryKey": [
+        "person",
+        "item_key"
+      ],
+      "indexes": [
+        {
+          "name": "notice_items_person_at",
+          "columns": [
+            "person",
+            "item_at"
+          ]
+        }
+      ]
+    },
+    "notice_settings": {
+      "columns": [
+        {
+          "name": "person",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "doc",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "rev",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "person"
+      ]
+    },
     "offline_chats": {
       "columns": [
         {
@@ -5578,6 +5783,10 @@
         },
         {
           "name": "apps_consent",
+          "type": "text"
+        },
+        {
+          "name": "links",
           "type": "text"
         }
       ],
@@ -6545,6 +6754,103 @@
       ],
       "primaryKey": [
         "version"
+      ]
+    },
+    "search_docs": {
+      "columns": [
+        {
+          "name": "space_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "doc_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "parent",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "norm",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "space_id",
+        "kind",
+        "doc_id"
+      ],
+      "indexes": [
+        {
+          "name": "search_docs_parent",
+          "columns": [
+            "space_id",
+            "parent"
+          ]
+        }
+      ]
+    },
+    "session_facts": {
+      "columns": [
+        {
+          "name": "org_key",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "provider",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "session_key",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "project",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "task_keys",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "org_key",
+        "provider",
+        "session_key"
       ]
     },
     "sessions": {

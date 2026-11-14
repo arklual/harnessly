@@ -40,6 +40,7 @@ type fakeDesign struct {
 	mu       sync.Mutex
 	view     map[string]map[string]Grant // machine → project → grant
 	recorded []string
+	metas    []string
 	closed   bool
 }
 
@@ -57,6 +58,14 @@ func (d *fakeDesign) StoreView(_ context.Context, m store.Machine) (map[string]G
 		out[k] = v
 	}
 	return out, nil
+}
+
+// RecordMeta is what the hub's design access does with an entity record.
+func (d *fakeDesign) RecordMeta(_ context.Context, m store.Machine, rec filestore.Record) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.metas = append(d.metas, m.ID+":"+rec.ID+":"+rec.Title+":"+rec.Kind)
+	return nil
 }
 
 func (d *fakeDesign) RecordFromStore(_ context.Context, m store.Machine, project string, file []byte) (bool, error) {
@@ -79,6 +88,12 @@ func (d *fakeDesign) RecordFromStore(_ context.Context, m store.Machine, project
 
 // designStore serves a store over the fake design access and opens a sync client of the design library per machine.
 func designStore(t *testing.T, machines fakeMachines, design *fakeDesign) (*Store, func(machine string) *filesync.Client) {
+	t.Helper()
+	return collectionStore(t, machines, design, filestore.KindDesign)
+}
+
+// collectionStore is designStore with the sync clients on another collection.
+func collectionStore(t *testing.T, machines fakeMachines, design *fakeDesign, kind string) (*Store, func(machine string) *filesync.Client) {
 	t.Helper()
 	ctx := context.Background()
 	dir := t.TempDir()
@@ -117,7 +132,7 @@ func designStore(t *testing.T, machines fakeMachines, design *fakeDesign) (*Stor
 			t.Fatal(err)
 		}
 		tok := s.Token
-		return filesync.NewClient(srv.URL+hubproto.StoreAPIPath, filestore.KindDesign,
+		return filesync.NewClient(srv.URL+hubproto.StoreAPIPath, kind,
 			func(context.Context, bool) (string, error) { return tok, nil }, nil)
 	}
 	return st, client

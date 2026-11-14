@@ -165,3 +165,55 @@ func TestKeptBlobTimeIsMadeOfItsContents(t *testing.T) {
 		t.Fatalf("two hubs keep the same blob with different times: %v", times)
 	}
 }
+
+// the long poll of the library answers at once when the space has a revision past since and holds the ask
+// until the wait ends otherwise.
+func TestWaitLibraryAnswersANewRevision(t *testing.T) {
+	room := newMemRoom()
+	room.commit(map[string]string{"artifact.json": `{"title":"Лендинг"}`})
+	v := New(Options{Rooms: func(context.Context, string) (Room, error) { return room, nil }, Dir: t.TempDir(), Poll: time.Millisecond})
+	head, err := v.WaitLibrary(context.Background(), "s1", 0)
+	if err != nil || head != 1 {
+		t.Fatalf("past since: %d %v", head, err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	if got, err := v.WaitLibrary(ctx, "s1", head); err != nil || got != head {
+		t.Fatalf("nothing new: %d %v", got, err)
+	}
+	room.commit(map[string]string{"artifact.json": `{"title":"Лендинг 2"}`})
+	if got, err := v.WaitLibrary(context.Background(), "s1", head); err != nil || got <= head {
+		t.Fatalf("new revision: %d %v", got, err)
+	}
+	if _, err := v.WaitLibrary(context.Background(), "../x", 0); err == nil {
+		t.Fatal("a bad space was waited on")
+	}
+}
+
+// a library item worked out once is kept in the hub's database; another replica, or the hub after a restart,
+// gives it from there without reading the project's files again.
+func TestLibraryItemIsKeptForEveryReplica(t *testing.T) {
+	room := newMemRoom()
+	room.commit(map[string]string{
+		"artifact.json":        `{"title":"Лендинг"}`,
+		"project/home.dc.html": "<html><body>home</body></html>",
+	})
+	kept := newMemDerived()
+	replica := func() *View {
+		v := New(Options{Rooms: func(context.Context, string) (Room, error) { return room, nil }, Dir: t.TempDir(), Poll: time.Millisecond})
+		v.UseDerived(kept, "b1")
+		return v
+	}
+	first, err := replica().Library(context.Background(), "s1", []string{"land"})
+	if err != nil || len(first) != 1 {
+		t.Fatalf("first: %+v %v", first, err)
+	}
+	reads := room.reads
+	second, err := replica().Library(context.Background(), "s1", []string{"land"})
+	if err != nil || len(second) != 1 || second[0].Title != "Лендинг" || second[0].Rev != first[0].Rev || len(second[0].Boards) != 1 {
+		t.Fatalf("second: %+v %v", second, err)
+	}
+	if room.reads != reads {
+		t.Fatalf("the other replica read the project's files again: %d→%d", reads, room.reads)
+	}
+}

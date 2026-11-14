@@ -44,6 +44,16 @@ func (s *Service) storeRoute(w http.ResponseWriter, r *http.Request, u store.Use
 		return fail("not_found", "Проект не найден")
 	}
 	section, file, _ := strings.Cut(sub, "/")
+	// A board's address with its key (filekey.go): the files under it are read as those of f/.
+	keyed := false
+	if section == "k" {
+		key, after, _ := strings.Cut(file, "/")
+		inner, rest, _ := strings.Cut(after, "/")
+		if inner != "f" || !s.files.check(key, u.ID, project, s.now()) {
+			return fail("not_found", "Файл не найден")
+		}
+		section, file, keyed = "f", rest, true
+	}
 	ctx := r.Context()
 	t, err := s.read(ctx, m)
 	if err != nil {
@@ -80,7 +90,12 @@ func (s *Service) storeRoute(w http.ResponseWriter, r *http.Request, u store.Use
 		}
 		switch section {
 		case "head":
-			writeJSON(w, http.StatusOK, map[string]any{"version": head, "rev": storerev.ID(head)})
+			out := map[string]any{"version": head, "rev": storerev.ID(head)}
+			// The key of the board addresses, for a page that builds them itself (filekey.go).
+			if key := s.files.mint(u.ID, project, s.now()); key != "" {
+				out["key"] = key
+			}
+			writeJSON(w, http.StatusOK, out)
 			return nil
 		case "events":
 			s.streamRevs(w, r, m.SpaceID, project, head)
@@ -89,13 +104,27 @@ func (s *Service) storeRoute(w http.ResponseWriter, r *http.Request, u store.Use
 			if file != "" {
 				return fail("not_found", "Маршрут не найден")
 			}
-			return s.view.Serve(isolated(w), r, m.SpaceID, project, head, nil, nil, false)
+			return s.view.Serve(isolated(w, r), r, m.SpaceID, project, head, nil, nil, false)
 		case "f":
 			segs, ok := segments(file)
 			if !ok || !servedSegment(segs[0]) {
 				return fail("not_found", "Файл не найден")
 			}
-			return s.view.Serve(isolated(w), r, m.SpaceID, project, head, segs, nil, false)
+			// A board opened by its plain address goes to its keyed one, so its own files reach the hub.
+			if !keyed && s.files != nil && storeNavigation(r) {
+				h := w.Header()
+				h.Set("Location", keyedLocation(segs, s.files.mint(u.ID, project, s.now()), r.URL.RawQuery))
+				h.Set("Cache-Control", "no-store")
+				h.Set("Referrer-Policy", "strict-origin")
+				w.WriteHeader(http.StatusFound)
+				return nil
+			}
+			if isStylesheet(segs) && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
+				return serveSheet(isolated(w, r), r, segs, func(w http.ResponseWriter, r *http.Request, segs []string) error {
+					return s.view.Serve(w, r, m.SpaceID, project, head, segs, nil, false)
+				})
+			}
+			return s.view.Serve(isolated(w, r), r, m.SpaceID, project, head, segs, nil, false)
 		}
 		return fail("not_found", "Маршрут не найден")
 	}
@@ -154,11 +183,25 @@ func (s *Service) storeWrite(w http.ResponseWriter, r *http.Request, u store.Use
 // isolated answers a file of the store on the hub's own origin as an inert one: a board's scripts run, if at all, in
 // a sandbox of an opaque origin (no cookies, no storage, no calls with the person's session), and nothing is sniffed
 // into another type.
-func isolated(w http.ResponseWriter) http.ResponseWriter { return &isolatedWriter{ResponseWriter: w} }
+// sandboxCORP lets a sandboxed document load its own files. Its origin is opaque (null), so the browser asks for its
+// support.js and styles as «cross-site», and «same-origin» would block them. Only such a request gets «cross-origin»:
+// a page of another site gets no session cookie (it is SameSite=Lax) and is refused before this, while a page of a
+// sibling host of the same site, which does carry the cookie, asks as «same-site» and keeps «same-origin».
+func sandboxCORP(r *http.Request) string {
+	if r != nil && r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+		return "cross-origin"
+	}
+	return "same-origin"
+}
+
+func isolated(w http.ResponseWriter, r *http.Request) http.ResponseWriter {
+	return &isolatedWriter{ResponseWriter: w, corp: sandboxCORP(r)}
+}
 
 type isolatedWriter struct {
 	http.ResponseWriter
 	done bool
+	corp string
 }
 
 func (i *isolatedWriter) WriteHeader(code int) {
@@ -168,7 +211,10 @@ func (i *isolatedWriter) WriteHeader(code int) {
 		h.Set("Content-Type", safeType(h.Get("Content-Type")))
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Content-Security-Policy", "sandbox allow-scripts allow-popups allow-forms allow-modals; frame-ancestors 'self'")
-		h.Set("Cross-Origin-Resource-Policy", "same-origin")
+		h.Set("Cross-Origin-Resource-Policy", i.corp)
+		// The board's own requests leave its opaque origin as cross-site ones: the origin in their Referer is how the hub
+		// tells them from another site's (proxy sandboxStoreFile).
+		h.Set("Referrer-Policy", "strict-origin")
 		if h.Get("Cache-Control") == "" {
 			h.Set("Cache-Control", "private, no-cache")
 		}

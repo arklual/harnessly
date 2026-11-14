@@ -17,8 +17,9 @@ import (
 // agent, whose tests import the API); the hub's main sets it.
 func Hub(st *storehub.Store, db *store.DB, derived bool, dataDir string, app fs.FS, log *slog.Logger) designaccess.Viewer {
 	v := New(Options{
-		Rooms: func(ctx context.Context, spaceID string) (Room, error) { return st.DesignRoom(ctx, spaceID) },
-		Dir:   filepath.Join(dataDir, "design-view"), GuestApp: app, Log: log,
+		Rooms:  func(ctx context.Context, spaceID string) (Room, error) { return st.DesignRoom(ctx, spaceID) },
+		Covers: func(ctx context.Context, spaceID string) (Room, error) { return st.CoversRoom(ctx, spaceID) },
+		Dir:    filepath.Join(dataDir, "design-view"), GuestApp: app, Log: log,
 	})
 	if v == nil {
 		return nil

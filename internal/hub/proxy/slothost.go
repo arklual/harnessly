@@ -430,7 +430,7 @@ func (s *Service) slotEnter(w http.ResponseWriter, r *http.Request, host, handle
 
 var _ = strconv.Itoa
 
-// slotHosts is GET /api/admin/preview-slot-hosts?email=: the six slot hosts of one account, for an administrator who has
+// slotHosts is GET /api/admin/preview-slot-hosts?email=: the eight slot hosts (ports 1–6, sites 7–8) of one account, for an administrator who has
 // to list them where the domain's certificate is issued per host. The handle is a keyed hash, so nobody can work the
 // hosts out from outside; reading them opens nothing, a host still needs the switch, a ticket and a cookie.
 func (s *Service) slotHosts(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
@@ -445,8 +445,8 @@ func (s *Service) slotHosts(w http.ResponseWriter, r *http.Request, p *auth.Prin
 		return err
 	}
 	handle := s.slotHandle(u.ID)
-	hosts := make([]string, 0, 6)
-	for n := 1; n <= 6; n++ {
+	hosts := make([]string, 0, 8)
+	for n := 1; n <= 8; n++ {
 		hosts = append(hosts, s.cfg.PreviewSlotHost(handle, n))
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"email": u.Email, "hosts": hosts})

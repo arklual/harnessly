@@ -268,7 +268,7 @@ func (s *Service) ImportGateway(ctx context.Context, data GatewayData, opt Impor
 			if err != nil {
 				return err
 			}
-			t := &txn{ctx: ctx, st: st, q: st.Q(), pg: s.db.Driver() == store.Postgres, m: m, w: w, now: s.now(), seal: s.seal, shared: s.shared, closed: s.closed}
+			t := &txn{ctx: ctx, st: st, q: st.Q(), pg: s.db.Driver() == store.Postgres, m: m, w: w, now: s.now(), seal: s.seal, shared: s.shared, closed: s.closed, opens: s.opens}
 			if err := t.importProject(sp.ID, p, teams, moved[normEmail(p.Owner)], opt.By, &pr); err != nil {
 				return err
 			}

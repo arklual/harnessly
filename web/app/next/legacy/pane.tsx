@@ -98,6 +98,9 @@ export interface ILegacyTabInfo {
   pinned: boolean;
   /** The agent opened it behind the tab the person was on, and it was not looked at yet. */
   unread: boolean;
+  /** What the tab shows: its kind and target, as an intent names them (whose tab it is). */
+  kind: string;
+  target: string | null;
 }
 
 export interface ILegacyTool {
@@ -280,6 +283,8 @@ export const useLegacyPane = (conv: Conversation | null, options: ILegacyPaneOpt
         sub: x.target ?? '',
         pinned: x.id === OVERVIEW_TAB_ID,
         unread: !!x.unread,
+        kind: x.kind,
+        target: x.target ?? null,
       };
     }),
     tools: tab

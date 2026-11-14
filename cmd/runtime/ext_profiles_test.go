@@ -35,9 +35,12 @@ func TestExtProfileOfAProvider(t *testing.T) {
 		t.Fatalf("env: %v, secret %v", pr.Env, pr.SecretEnv)
 	}
 
+	// An OpenAI-compatible provider runs through the runtime's proxy: its models by their aliases, no key of its own.
 	p.API = extproviders.APIOpenAI
-	if _, ok := extProfile(p); ok {
-		t.Fatal("Claude Code does not speak the OpenAI API")
+	op, ok := extProfile(p)
+	if !ok || op.Proxied != "corp" || op.KeyRef != "" || len(op.Models) != 1 || op.Models[0].ID != "corp--corp-large" || op.Env["ANTHROPIC_MODEL"] != "corp--corp-large" ||
+		len(op.SecretEnv) != 0 {
+		t.Fatalf("an OpenAI-compatible provider: %+v", op)
 	}
 	long := "a-provider-with-a-very-long-id-0123"
 	if id := extProfileID(long); !wire.ValidProfileID(id) || id == extProfileID(long+"x") {
@@ -58,5 +61,33 @@ func TestAProviderWithASubscriptionsTokenIsNoProfile(t *testing.T) {
 	p.Env = []extproviders.EnvVar{{Name: "MY_TOKEN", Value: "sk-ant-" + "api03-not-a-key-of-anyone"}}
 	if _, ok := extProfile(p); !ok {
 		t.Fatal("a provider with a key of the API is no profile")
+	}
+}
+
+// A model's efforts, typed by the person, are what the picker offers for it; the proxy knows each model of an
+// OpenAI-compatible provider by its alias.
+func TestExtProfileModelsCarryTheirEfforts(t *testing.T) {
+	p := extproviders.Provider{ID: "ds", Name: "DeepSeek", BaseURL: "https://api.deepseek.com/v1", API: extproviders.APIOpenAI,
+		Models: []extproviders.Model{{ID: "deepseek-reasoner", Label: "R1", Efforts: []string{"low", "high"}, DefaultEffort: "high", Window: 131072}, {ID: "deepseek-chat"}}}
+	pr, ok := extProfile(p)
+	if !ok || len(pr.Models) != 2 {
+		t.Fatalf("profile: %+v", pr)
+	}
+	if pr.Models[0].Window != 131072 || pr.ClaudeEnv(pr.Models[0])["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] != "131072" {
+		t.Fatalf("the window does not reach Claude Code: %+v", pr.Models[0])
+	}
+	if _, set := pr.ClaudeEnv(pr.Models[1])["CLAUDE_CODE_MAX_CONTEXT_TOKENS"]; set {
+		t.Fatal("an unknown window is set")
+	}
+	m := pr.AgentModels()[0]
+	if m.ID != "ds--deepseek-reasoner" || m.Label != "R1" || len(m.Efforts) != 2 || m.Efforts[1] != wire.EffortHigh || m.DefaultEffort == nil || *m.DefaultEffort != wire.EffortHigh {
+		t.Fatalf("model: %+v", m)
+	}
+	if n := pr.AgentModels()[1]; len(n.Efforts) != 0 || n.DefaultEffort != nil {
+		t.Fatalf("a model without efforts: %+v", n)
+	}
+	up := extUpstreams([]extproviders.Provider{p, {ID: "an", API: extproviders.APIAnthropic, Models: []extproviders.Model{{ID: "x"}}}})
+	if len(up) != 1 || up[0].ID != "ds" || up[0].Models[0].Name != "deepseek-reasoner" || up[0].Models[0].Alias != "ds--deepseek-reasoner" || len(up[0].Models[0].Efforts) != 2 {
+		t.Fatalf("upstreams: %+v", up)
 	}
 }

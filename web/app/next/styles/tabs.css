@@ -47,7 +47,6 @@
   min-width: 0;
   display: flex;
   align-items: flex-end;
-  gap: 2px;
 }
 .hx-gtabs__list {
   flex: 0 1 auto;
@@ -55,10 +54,16 @@
   height: 100%;
   display: flex;
   align-items: flex-end;
-  padding: 0 10px;
+  /* 10px at the start for the first active tab's foot; at the end only the air to «+» — as far from the last tab's
+     pill as the pills are from each other (6px with the pill's own 3px). A crowded strip scrolls under nothing. */
+  padding: 0 3px 0 10px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
+}
+/* The last tab active: its foot needs the 10px of its side too. */
+.hx-gtabs__list:has(> .hx-gtab:last-child[aria-selected='true']) {
+  padding-right: 10px;
 }
 .hx-gtabs__list::-webkit-scrollbar {
   display: none;
@@ -72,8 +77,10 @@
   height: 34px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 6px 0 12px;
+  gap: 6px;
+  /* The same on both sides: the icon and the cross stand in zones of one size (22px), so each glyph is as far from the
+     edge of the hover's pill as the other. */
+  padding: 0 6px;
   border-radius: 10px 10px 0 0;
   outline: none;
   color: var(--hx-fg-3);
@@ -83,9 +90,10 @@
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+  /* No transition of the background: the active tab's colour and its feet come and go together, at once. A fading
+     background outlived the feet and stood behind the tab that had just been left as a block wider than its pill. */
   transition:
     color 160ms ease,
-    background 160ms ease,
     opacity 160ms ease;
 }
 /* A tab grows in once, when it opens (tab-strip.tsx keeps data-enter until its entrance has run). A tab moved to another
@@ -98,7 +106,7 @@
 .hx-gtab::before {
   content: '';
   position: absolute;
-  inset: 3px 2px 5px;
+  inset: 4px 3px;
   z-index: -1;
   border-radius: 8px;
   background: transparent;
@@ -136,6 +144,8 @@
 }
 .hx-gtab__ic {
   flex: none;
+  /* A zone as wide as the cross's (22px) around the glyph; the glyph is a mask, so the zone is its margin. */
+  margin-inline: 4px;
 }
 .hx-gtab[aria-selected='true'] .hx-gtab__ic {
   color: var(--hx-fg-2);
@@ -155,7 +165,7 @@
 .hx-gtab__dot {
   position: absolute;
   top: 8px;
-  left: 22px;
+  left: 20px;
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -252,12 +262,13 @@
 
 .hx-gtabs__add {
   flex: none;
-  align-self: center;
+  /* On the tabs' axis and of their pill's size. */
+  align-self: flex-end;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  margin-top: 2px;
+  width: 26px;
+  height: 26px;
+  margin: 0 0 4px;
   padding: 0;
   border: 0;
   border-radius: 8px;

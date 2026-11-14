@@ -3,6 +3,7 @@ package wire
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -80,11 +81,54 @@ func (c ChatDigest) Validate() error {
 	return errors.Join(need("convId", c.ConvID), need("path", c.Path))
 }
 
+// GlanceMessage is one message of a chat in its glance: when, and what it said, cut short.
+type GlanceMessage struct {
+	At   Ms     `json:"at"`
+	Text string `json:"text"`
+}
+
+// ChatGlance is the answer of GET /api/v2/conversations/{id}/glance: what a chat said last, for the search's preview.
+// LastUser and LastAgent are the newest message of each side (null when it has none); Messages is how many the
+// search index holds for the chat.
+type ChatGlance struct {
+	ConvID    string         `json:"convId"`
+	LastUser  *GlanceMessage `json:"lastUser"`
+	LastAgent *GlanceMessage `json:"lastAgent"`
+	Messages  int            `json:"messages"`
+}
+
+func (c ChatGlance) Validate() error {
+	if c.Messages < 0 {
+		return fmt.Errorf("messages: negative")
+	}
+	return need("convId", c.ConvID)
+}
+
 // DigestBudgetMax is the largest budget a page may ask for, in characters; DigestBudgetUsual is what it gets without.
 const (
 	DigestBudgetMax   = 60000
 	DigestBudgetUsual = 18000
 )
+
+// glance serves GET /api/v2/conversations/{id}/glance.
+func (s *Server) glance(ctx context.Context, w http.ResponseWriter, r *http.Request, conv string) {
+	if s.Glance == nil {
+		refuse(w, RefuseNotFound)
+		return
+	}
+	out, err := s.Glance(ctx, conv)
+	switch {
+	case err != nil && s.NotFound != nil && s.NotFound(err):
+		refuse(w, RefuseNotFound)
+	case err != nil && ctx.Err() != nil:
+		refuse(w, RefuseTimeout)
+	case err != nil:
+		jsonlog.Log("warn", "v2: glance failed", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: err.Error()})
+		refuse(w, RefuseInternal)
+	default:
+		s.writeChecked(w, r, out)
+	}
+}
 
 // search serves GET /api/v2/search.
 func (s *Server) search(w http.ResponseWriter, r *http.Request) {

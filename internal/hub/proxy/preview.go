@@ -25,7 +25,7 @@ import (
 // hub passes these paths without its session and its cross-site check, carrying only the target's own cookies
 // (`__t_…`) both ways, under the slot's path.
 
-var previewSegment = regexp.MustCompile(`^[1-6]-[0-9a-f]{32}$`)
+var previewSegment = regexp.MustCompile(`^[1-8]-[0-9a-f]{32}$`)
 
 // previewPath says whether path is a slot by path of machine id.
 func previewPath(path, id string) bool {

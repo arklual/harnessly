@@ -59,6 +59,39 @@ func (m *storeMachine) halt() {
 	<-m.done
 }
 
+// sends notes the revision the hub holds of each path and answers a wait until it holds a newer one of every path:
+// an edit the machine makes in between has reached the hub. The wait is cut where the other waits of the test are.
+func (m *storeMachine) sends(t *testing.T, rels ...string) (wait func()) {
+	t.Helper()
+	store := m.link.Client(filestore.KindDesign)
+	rev := func(rel string) int64 {
+		e, err := store.Current(context.Background(), rel)
+		if err != nil {
+			t.Fatalf("%s in the hub: %v", rel, err)
+		}
+		if e == nil {
+			return 0
+		}
+		return e.Rev
+	}
+	was := map[string]int64{}
+	for _, rel := range rels {
+		was[rel] = rev(rel)
+	}
+	return func() {
+		t.Helper()
+		deadline := time.Now().Add(15 * time.Second)
+		for _, rel := range rels {
+			for rev(rel) <= was[rel] {
+				if time.Now().After(deadline) {
+					t.Fatalf("%s did not reach the hub in 15s", rel)
+				}
+				time.Sleep(20 * time.Millisecond)
+			}
+		}
+	}
+}
+
 func writeFile(t *testing.T, root, rel, body string) {
 	t.Helper()
 	p := filepath.Join(root, filepath.FromSlash(rel))
@@ -106,20 +139,24 @@ func TestStoreSyncsTheLibraryOfASpaceAcrossMachines(t *testing.T) {
 	eventually(t, 15*time.Second, mb.lib, "p1/project/Главная.dc.html", "<h1>v1</h1>")
 	t.Logf("an edit on one machine reached the other in %s", time.Since(started).Round(10*time.Millisecond))
 
-	// The first machine goes away; the second edits; the first comes back and catches up.
+	// The first machine goes away; the second edits; the first comes back and catches up. The first is started
+	// when the hub holds the second's edits, not a fixed while later: the order is the point of the next step.
 	ma.halt()
+	sent := mb.sends(t, "p1/project/Главная.dc.html", "p2/artifact.json")
 	writeFile(t, mb.lib, "p1/project/Главная.dc.html", "<h1>v2 while a was off</h1>")
 	writeFile(t, mb.lib, "p2/artifact.json", `{"title":"new"}`)
-	time.Sleep(1500 * time.Millisecond) // the second machine's edit reaches the hub
+	sent()
 	ma = startMachine(t, s, a, filepath.Join(dir, "a"))
 	eventually(t, 15*time.Second, ma.lib, "p1/project/Главная.dc.html", "<h1>v2 while a was off</h1>")
 	eventually(t, 15*time.Second, ma.lib, "p2/artifact.json", `{"title":"new"}`)
 
 	// A conflict: the first machine is off, both edit the same file; the one that comes second keeps its edit aside.
+	// The second machine's edit is in the hub before the first is back: were it not, the first would come first.
 	ma.halt()
+	sent = mb.sends(t, "p1/notes.txt")
 	writeFile(t, mb.lib, "p1/notes.txt", "b wrote this")
 	writeFile(t, ma.lib, "p1/notes.txt", "a wrote this offline")
-	time.Sleep(1500 * time.Millisecond)
+	sent()
 	ma = startMachine(t, s, a, filepath.Join(dir, "a"))
 	eventually(t, 15*time.Second, ma.lib, "p1/notes.txt", "b wrote this")
 	kept := filepath.Join(ma.lib, ".conflicts", "p1")
@@ -146,8 +183,13 @@ func TestStoreSyncsTheLibraryOfASpaceAcrossMachines(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(mc.lib, "p1")); !os.IsNotExist(err) {
 		t.Fatalf("another space's machine got the library: %v", err)
 	}
+	// Its edit is in the hub, and an edit made after it in the first space has reached the first machine: by then
+	// the first machine would hold the other space's project, were it shown to it.
+	sent = mc.sends(t, "own/index.html")
 	writeFile(t, mc.lib, "own/index.html", "beta")
-	time.Sleep(1500 * time.Millisecond)
+	sent()
+	writeFile(t, mb.lib, "p1/after.txt", "after beta")
+	eventually(t, 15*time.Second, ma.lib, "p1/after.txt", "after beta")
 	if _, err := os.Stat(filepath.Join(ma.lib, "own")); !os.IsNotExist(err) {
 		t.Fatalf("a machine got another space's project: %v", err)
 	}

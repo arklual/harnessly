@@ -72,7 +72,15 @@ func spend(t *testing.T) (*hubtest.Stack, *hubtest.Person, *hubtest.Person) {
 	f := &fixture{t: t, st: s.DB.S()}
 	f.account("sub", "subscription", "org", "Claude Max №2", 200)
 	f.account("key", "api_key", "personal", "", 0)
-	f.session(anna.ID, "s1", "", "sub", "org", "live", "2026-10-05T07:00:00Z", `{"turns":23,"mrs":1}`)
+	f.session(anna.ID, "s1", "", "sub", "org", "live", "2026-10-05T07:00:00Z", `{"turns":23,"mrs":1,"interrupts":2,"denials":1,"compactions":3,"h04":5,"h23":2}`)
+	if err := f.st.PutSessionFacts(context.Background(), store.SessionRef{OrgKey: orgKey, Provider: "claude", SessionKey: "s1"},
+		store.SessionFacts{Project: "harnessly", TaskKeys: []string{"HRN-1", "HRN-2"}}, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.st.PutSessionFacts(context.Background(), store.SessionRef{OrgKey: orgKey, Provider: "claude", SessionKey: "s1/a"},
+		store.SessionFacts{Project: "harnessly"}, 1); err != nil {
+		t.Fatal(err)
+	}
 	f.session(anna.ID, "s1/a", "s1", "sub", "org", "live", "2026-10-05T07:10:00Z", `{}`)
 	f.session(anna.ID, "s2", "", "key", "personal", "live", "2026-10-05T22:00:00Z", `{"turns":8}`)
 	f.session(boris.ID, "s3", "", "sub", "org", "live", "2026-10-07T09:00:00Z", `{}`)
@@ -240,25 +248,40 @@ func TestMeStats(t *testing.T) {
 		t.Fatalf("sessions = %+v", rep.Sessions)
 	}
 	s1 := rep.Sessions[1]
-	if s1.Cost != 40 || s1.Prompts != 23 || s1.Model == nil || *s1.Model != "claude-opus-4-6" || s1.Input != 300 || s1.Title != nil || s1.Project != nil {
+	if s1.Cost != 40 || s1.Prompts != 23 || s1.Model == nil || *s1.Model != "claude-opus-4-6" || s1.Input != 300 || s1.Title != nil || s1.Project == nil || *s1.Project != "harnessly" {
 		t.Errorf("s1 = %+v", s1)
+	}
+	if s1.SubagentCost != 10 || len(s1.Tasks) != 2 || s1.Tasks[0] != "HRN-1" {
+		t.Errorf("s1 economics = subagent %v, tasks %v", s1.SubagentCost, s1.Tasks)
+	}
+	if s2 := rep.Sessions[0]; s2.Project != nil || s2.SubagentCost != 0 {
+		t.Errorf("s2 = %+v", s2)
 	}
 	d5, d6 := rep.Days["2026-10-05"], rep.Days["2026-10-06"]
 	if d5.Prompts != 23 || d5.Sessions != 1 || d5.PRs != 1 || len(d5.Hours) != 24 || d6.Prompts != 8 {
 		t.Errorf("days = %+v %+v", d5, d6)
 	}
+	// The hours are the person's own clock (Moscow, +3): 04 UTC is 07, 23 UTC is 02.
+	if d5.Hours[7] != 5 || d5.Hours[2] != 2 || d5.Interrupts != 2 || d5.Denials != 1 || d5.Compactions != 3 {
+		t.Errorf("day 5 = %+v", d5)
+	}
 	var cost float64
+	projects := map[string]float64{}
 	for _, u := range rep.Usage {
-		if len(u) != 10 || u[3] != "" {
+		if len(u) != 10 {
 			t.Fatalf("usage row = %v", u)
 		}
 		cost += u[8].(float64)
+		projects[u[3].(string)] += u[8].(float64)
+	}
+	if projects["harnessly"] != 40 || projects["—"] != 5 {
+		t.Errorf("by project = %v", projects)
 	}
 	if cost != 45 {
 		t.Errorf("usage cost = %v, rows %v", cost, rep.Usage)
 	}
-	if len(rep.HubMissing) == 0 {
-		t.Error("no missing blocks named")
+	if len(rep.HubMissing) != 0 {
+		t.Errorf("the hub still names missing blocks: %v", rep.HubMissing)
 	}
 	// Only one's own.
 	var b analytics.MeStatsResponse

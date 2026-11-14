@@ -452,9 +452,8 @@ func TestVideoRevMovesWithAScene(t *testing.T) {
 		t.Fatal(err)
 	}
 	meta := v.l.sceneMetaFile("admin", page)
-	old(meta, filepath.Dir(meta))
-	// Everything of the deck and the video is old; the rev is what it is.
-	old(v.l.deckFile("admin", VideoSettingsFile))
+	// Everything of the deck and the video is old, the rig's own fresh files too; the rev is what it is.
+	ageTree(t, filepath.Join(v.root, "admin"), past)
 	r0 := v.l.videoRev("admin")
 	if err := os.Chtimes(meta, time.Now(), time.Now()); err != nil {
 		t.Fatal(err)

@@ -12,7 +12,6 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/design"
-	"github.com/ly-solutions/harnessly/internal/designkit"
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/wire"
@@ -130,7 +129,8 @@ func designAPI(d deps) *design.API {
 	designAPIs[d.CLI] = a
 	// The kits' seals are checked once now, behind the start: the first open of the kits' screens after a restart
 	// found them cold and waited for every version's files to be hashed (half a minute and more on a big library).
-	go designkit.List(a.L.KitsDir())
+	// The home's kit cards are read with them: the first home after a start does not wait for them.
+	design.WarmKitCards(a.L.KitsDir())
 	return a
 }
 
@@ -176,6 +176,7 @@ func designRoutes(d deps) []gate.JSONRoute {
 		designRoute(platformAPI+"/design/library/send", a.Send),
 		designRoute("/api/cli/design/pages", a.CLIPages),
 		designRoute("/api/cli/design/notes", a.CLINotes),
+		designRoute("/api/cli/design/export", a.CLIExport),
 		designRoute(platformAPI+"/design/library/releases", a.Releases),
 		designRoute(platformAPI+"/design/access", a.PostAccess),
 		designRoute(platformAPI+"/design/guest-token", a.GuestToken),

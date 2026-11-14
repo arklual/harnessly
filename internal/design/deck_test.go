@@ -95,11 +95,28 @@ func TestDeckStateIsTheDeckAsOneRead(t *testing.T) {
 	}
 }
 
+// ageTree puts the mtime of every file and folder under root to at: a rev is the newest mtime in milliseconds, so a
+// test that waits for it to move starts from a tree that is older than anything it is about to write.
+func ageTree(t *testing.T, root string, at time.Time) {
+	t.Helper()
+	err := filepath.WalkDir(root, func(path string, _ os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		return os.Chtimes(path, at, at)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDeckRevMovesWithEveryDeckFile(t *testing.T) {
 	g := newDeckRig(t)
 	rev := func() int64 { return g.l.deckRev("admin") }
-	r0 := rev()
 	past := time.Now().Add(-time.Hour)
+	// The rig wrote its files just now: a change in the same millisecond would leave the rev where it was.
+	ageTree(t, filepath.Join(g.root, "admin"), past)
+	r0 := rev()
 	old := func(path string) {
 		if err := os.Chtimes(path, past, past); err != nil {
 			t.Fatal(err)

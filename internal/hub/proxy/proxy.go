@@ -30,6 +30,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/link"
 	"github.com/ly-solutions/harnessly/internal/hub/machaccess"
 	"github.com/ly-solutions/harnessly/internal/hub/metrics"
+	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/spaces"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hub/switches"
@@ -94,6 +95,17 @@ type Interceptor interface {
 	ServeMachine(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine) bool
 }
 
+// HomeServer answers Sinopia's home itself, asking the machine through ask and its store at once.
+type HomeServer interface {
+	ServeHome(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine, ask func(ctx context.Context, w http.ResponseWriter)) bool
+}
+
+// serveHome gives Sinopia's home to the design service when it answers it; ask sends r to the machine.
+func (s *Service) serveHome(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine, ask func(ctx context.Context, w http.ResponseWriter)) bool {
+	hs, ok := s.design.(HomeServer)
+	return ok && hs.ServeHome(w, r, u, m, ask)
+}
+
 // Service is the runtime proxy.
 type Service struct {
 	cfg     *config.Config
@@ -108,6 +120,8 @@ type Service struct {
 	design  Interceptor
 	gate    FeatureGate
 	web     fs.FS
+	// clientLim limits the calls of each personal token to the client API.
+	clientLim *ratelimit.Limiter
 	// static keeps the tags and gzipped copies of the workspace page's files.
 	static  webstatic.Cache
 	history bool
@@ -157,7 +171,7 @@ type grantCall struct {
 func New(d Deps) *Service {
 	s := &Service{
 		cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, tickets: d.Tickets, log: d.Log, now: d.Now, design: d.Design, gate: d.Features, web: d.Workspace, history: d.History, voiceTakes: d.VoiceTakes, fleetBus: d.Fleet, switches: d.Switches, slotKey: d.SlotKey,
-		transports: map[string]*http.Transport{}, grants: map[string]grantEntry{}, calls: map[string]*grantCall{},
+		clientLim: ratelimit.New(), transports: map[string]*http.Transport{}, grants: map[string]grantEntry{}, calls: map[string]*grantCall{},
 		authz: map[string]time.Time{}, access: map[string]time.Time{}, trust: map[string]time.Time{}, pages: map[string]workspaceConfig{}, asks: map[string]cardAsk{}, legacy: map[string]time.Time{}, tracked: map[string]map[uint64]context.CancelFunc{},
 	}
 	if s.now == nil {
@@ -178,6 +192,7 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	s.mountFleet(mux)
 	s.mountWorkspace(mux)
 	s.mountLaunch(mux)
+	s.mountClientAPI(mux)
 	if s.slotKeyed() {
 		mux.Handle("POST /api/preview/slot-open", s.auth.Require(s.slotOpen))
 		mux.Handle("GET /api/admin/preview-slot-hosts", s.auth.Require(s.slotHosts))
@@ -399,6 +414,9 @@ func (s *Service) servePath(w http.ResponseWriter, r *http.Request, id string) {
 	if s.serveMachineHub(w, r, p, id) {
 		return
 	}
+	if s.serveHome(w, r, p.User, m, func(ctx context.Context, w http.ResponseWriter) { s.forward(w, r.Clone(ctx), p.User, m) }) {
+		return
+	}
 	if s.design != nil && s.design.ServeMachine(w, r, p.User, m) {
 		return
 	}
@@ -456,6 +474,9 @@ func (s *Service) serveRuntimeHost(w http.ResponseWriter, r *http.Request, id st
 		return
 	}
 	if s.serveMachineHub(w, r, p, id) {
+		return
+	}
+	if s.serveHome(w, r, p.User, m, func(ctx context.Context, w http.ResponseWriter) { s.forward(w, r.Clone(ctx), p.User, m) }) {
 		return
 	}
 	if s.design != nil && s.design.ServeMachine(w, r, p.User, m) {

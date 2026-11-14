@@ -59,6 +59,8 @@ type ProfileLimits struct {
 	Estimate bool `json:"estimate,omitempty"`
 	// Unofficial: the vendor's internal request, not one it documents.
 	Unofficial bool `json:"unofficial,omitempty"`
+	// Rejected: the vendor refused the account's key at the last reading; the page offers to replace it.
+	Rejected bool `json:"rejected,omitempty"`
 }
 
 // Balance is money left on an account.
@@ -128,6 +130,18 @@ func effectiveWindow(raw any, period, now float64) (used, resetsAt float64, ok b
 	return 0, rf + math.Ceil((now-rf)/period)*period, true
 }
 
+// gone says the vendor no longer has the window: it was last measured before its reset, and the provider
+// was measured again after the reset without it, so the file keeps only the copy from before. Rolled over, that copy
+// read as «0 % used» and the chip as «5ч 100%», while Claude (five_hour: null) and Codex Pro Lite (a weekly window
+// alone) had no five hours at all. A window not measured again since its reset still rolls over: the CLI was idle.
+func gone(raw, providerTs any, now float64) bool {
+	r, _ := get(raw, "resets_at")
+	rf, rok := r.(float64)
+	at, aok := getOr(raw, "at").(float64)
+	ts, tok := providerTs.(float64)
+	return rok && aok && tok && rf <= now && at < rf && ts > rf
+}
+
 // passed is a value of the limits file written back as JSON.stringify writes it.
 func passed(v any) json.RawMessage { return json.RawMessage(jsvalue.Stringify(v, "")) }
 
@@ -136,7 +150,7 @@ type samplesFunc func(windowID string) []limits.Sample
 func windowView(raw any, period float64, spec WindowSpec, samples []limits.Sample, providerTs any, hasTs bool, pace any,
 	a *Activity, now float64) *LimitWindow {
 	used, resetsAt, ok := effectiveWindow(raw, period, now)
-	if !ok {
+	if !ok || gone(raw, providerTs, now) {
 		return nil
 	}
 	w := &LimitWindow{UsedPct: Num(used), ResetsAt: Num(resetsAt), Pace: passed(pace), SampledAt: passed(nil), Source: passed(nil)}
@@ -220,6 +234,7 @@ func BuildProfileLimits(raw any, now float64) *ProfileLimits {
 	}
 	if msg, ok := getOr(getOr(raw, "error"), "message").(string); ok {
 		out.Error = &msg
+		out.Rejected = getOr(getOr(raw, "error"), "rejected") == true
 	}
 	out.Estimate = getOr(raw, "estimate") == true
 	out.Unofficial = getOr(raw, "unofficial") == true

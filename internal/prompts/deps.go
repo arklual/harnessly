@@ -73,6 +73,9 @@ const (
 type Agents interface {
 	// Running says whether the tab's agent process runs under its pane.
 	Running(tab Tab) bool
+	// Unreadable: a process under the tab's pane cannot be read now (it waits on a hung file system, or shows an empty
+	// command line), so a false Running decides nothing: the agent may be there.
+	Unreadable(tab Tab) bool
 	// RecoverSession finds a Claude tab's lost session id in its transcript or history and stores it; false when none.
 	RecoverSession(tab Tab) bool
 	// Resume brings a gone agent back with its session (`--resume`); see the Resume* results.

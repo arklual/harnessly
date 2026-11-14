@@ -23,6 +23,8 @@ const (
 	CapProfiles Cap = "profiles"
 	// CapMsgStatus: the page reads a message queued stalled (QueuedStalled) and lists it in the queue (README 65).
 	CapMsgStatus Cap = "msgstatus"
+	// CapLinks: the page reads the output kinds task and commit (README 72).
+	CapLinks Cap = "links"
 )
 
 // Caps is what a page reads.
@@ -31,6 +33,7 @@ type Caps struct {
 	Workflows  bool
 	Profiles   bool
 	MsgStatus  bool
+	Links      bool
 }
 
 // CapsOf reads the caps a page named in its request's address; an unknown one is ignored.
@@ -40,15 +43,17 @@ func CapsOf(r *http.Request) Caps {
 		names = append(names, strings.Split(v, ",")...)
 	}
 	return Caps{Delegation: slices.Contains(names, string(CapDelegation)), Workflows: slices.Contains(names, string(CapWorkflows)),
-		Profiles: slices.Contains(names, string(CapProfiles)), MsgStatus: slices.Contains(names, string(CapMsgStatus))}
+		Profiles: slices.Contains(names, string(CapProfiles)), MsgStatus: slices.Contains(names, string(CapMsgStatus)),
+		Links: slices.Contains(names, string(CapLinks))}
 }
 
 // AllCaps reads every optional part.
-var AllCaps = Caps{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true}
+var AllCaps = Caps{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true}
 
 // olderCaps is every Caps short of AllCaps that a page may have: the forms an event can go out in besides its own.
 // Each cap came with a build of the page that read the ones before it.
-var olderCaps = []Caps{{}, {Delegation: true}, {Delegation: true, Workflows: true}, {Delegation: true, Workflows: true, Profiles: true}}
+var olderCaps = []Caps{{}, {Delegation: true}, {Delegation: true, Workflows: true}, {Delegation: true, Workflows: true, Profiles: true},
+	{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true}}
 
 // eventFor is e as a page with caps gets it, and whether it differs from e.
 func eventFor(e Event, caps Caps) (Event, bool) {
@@ -74,7 +79,71 @@ func eventFor(e Event, caps Caps) (Event, bool) {
 			e, changed = old, true
 		}
 	}
+	if !caps.Links {
+		if old, ok := withoutLinks(e); ok {
+			e, changed = old, true
+		}
+	}
 	return e, changed
+}
+
+// turnWithoutLinks is t without the outputs a page without CapLinks does not read; t's own slice is not changed.
+func turnWithoutLinks(t Turn) (Turn, bool) {
+	if !slices.ContainsFunc(t.Outputs, linkOutput) {
+		return t, false
+	}
+	t.Outputs = slices.DeleteFunc(slices.Clone(t.Outputs), linkOutput)
+	if len(t.Outputs) == 0 {
+		t.Outputs = nil
+	}
+	return t, true
+}
+
+// turnsWithoutLinks is ts with every turn as turnWithoutLinks makes it; ts itself is not changed.
+func turnsWithoutLinks(ts []Turn) ([]Turn, bool) {
+	if !slices.ContainsFunc(ts, func(t Turn) bool { return slices.ContainsFunc(t.Outputs, linkOutput) }) {
+		return ts, false
+	}
+	out := slices.Clone(ts)
+	for i := range out {
+		out[i], _ = turnWithoutLinks(out[i])
+	}
+	return out, true
+}
+
+// withoutLinks is e as a page that does not read the task and commit outputs gets it, and whether it differs from e.
+func withoutLinks(e Event) (Event, bool) {
+	switch e := e.(type) {
+	case TurnStartedEv:
+		if t, ok := turnWithoutLinks(e.Turn); ok {
+			e.Turn = t
+			return e, true
+		}
+	case TurnFinishedEv:
+		if t, ok := turnWithoutLinks(e.Turn); ok {
+			e.Turn = t
+			return e, true
+		}
+	case TurnFailedEv:
+		if t, ok := turnWithoutLinks(e.Turn); ok {
+			e.Turn = t
+			return e, true
+		}
+	case FeedResetEv:
+		if ts, ok := turnsWithoutLinks(e.Turns); ok {
+			e.Turns = ts
+			return e, true
+		}
+	}
+	return e, false
+}
+
+// TurnsPageFor is p as a page with caps reads it.
+func TurnsPageFor(p TurnsPage, caps Caps) TurnsPage {
+	if !caps.Links {
+		p.Turns, _ = turnsWithoutLinks(p.Turns)
+	}
+	return p
 }
 
 // stalledAsFailed is the state a page without CapMsgStatus holds a stalled message in: the unconfirmed failure it
@@ -239,6 +308,13 @@ func snapshotFor(f SnapshotFrame, caps Caps) SnapshotFrame {
 				m.Machine.Agents = agents
 				f.Machine = &m
 			}
+		}
+	}
+	if !caps.Links && f.Conv != nil {
+		if turns, cut := turnsWithoutLinks(f.Conv.Turns); cut {
+			cv := *f.Conv
+			cv.Turns = turns
+			f.Conv = &cv
 		}
 	}
 	if !caps.MsgStatus && f.Conv != nil {

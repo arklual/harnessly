@@ -7,6 +7,7 @@ import {
   machineLabel,
   noteOf,
   shownCard,
+  stopsWork,
   terminalRuns,
   terminalStopText,
 } from '@/next/bindings/shell-model';
@@ -114,6 +115,18 @@ describe("the machine's health", () => {
     // Worse is another key: a banner the person hid comes back.
     const worse = loaded(health({ metric: 'disk', level: 'critical' }, { metric: 'mem', level: 'critical' }));
     expect(alertOf(worse.machine, false)?.key).not.toBe(alertOf(critical.machine, false)?.key);
+  });
+
+  it('a full disk with gigabytes left is a warning; only a disk at nothing or a stall stops the work (HRN-1377)', () => {
+    const GB = 1024 ** 3;
+    const disk = { key: 'k', icon: 'hard-drive', text: '', metric: 'disk' as const };
+    const load = (free: number) => ({ diskFree: free * GB, diskTotal: 120 * GB }) as never;
+    expect(stopsWork(disk, load(9.8))).toBe(false);
+    expect(stopsWork(disk, load(2.6))).toBe(false);
+    expect(stopsWork(disk, load(1.2))).toBe(true);
+    expect(stopsWork(disk, undefined)).toBe(false);
+    expect(stopsWork({ ...disk, metric: 'io' }, undefined)).toBe(true);
+    expect(stopsWork({ ...disk, metric: 'mem' }, load(0))).toBe(false);
   });
 
   it('another machine shows its level on its dot', () => {

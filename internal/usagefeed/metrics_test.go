@@ -32,7 +32,7 @@ func TestSessionMetrics(t *testing.T) {
 		// Call 2 paid 60 again of the 10000 before it; call 3 paid 12020 of the 10060 before it.
 		"carryTokens": 60 + 10060,
 		"firstCtx":    10000,
-		"mrs":         2,
+		"mrs":         2, "denials": 1,
 	}
 	for k, v := range want {
 		if got[k] != v {

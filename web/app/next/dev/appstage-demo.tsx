@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import AppStage from '@/next/features/app-main/app-stage';
 import { firstFloat, SiteChat, SiteIsland, type TSiteMode } from '@/next/features/designly/site-chat';
+import { DemoIslandField } from '@/next/dev/demo-field';
 import type { IFloat, TDock } from '@/next/features/designly/site-drag';
 import type { ISiteStage } from '@/next/features/designly/site-view';
 import '@/next/styles/chat.css';
@@ -121,7 +122,6 @@ export const AppStageDemo = ({
   const [chatW, setChatW] = useState(372);
   const [float, setFloat] = useState<IFloat | null>(null);
   const [home, setHome] = useState(false);
-  const [text, setText] = useState('');
   const onMode = (next: TSiteMode, section: { width: number; height: number }) => {
     if (next === 'float' && !float) setFloat(firstFloat(section));
     setMode(next);
@@ -162,12 +162,8 @@ export const AppStageDemo = ({
     island:
       mode === 'island' || mode === 'notes' ? (
         <SiteIsland
-          value={text}
-          onChange={setText}
-          onSend={() => setText('')}
-          canSend={text.trim() !== ''}
-          placeholder="Что поправить в документе?"
-          sending={false}
+          field={<DemoIslandField />}
+          holding={false}
           status={null}
           last={null}
           onStop={() => undefined}
@@ -177,10 +173,7 @@ export const AppStageDemo = ({
           onMin={() => undefined}
           mode={mode}
           onZone={() => undefined}
-          recording={false}
           notes={0}
-          pick={false}
-          onPick={() => undefined}
         />
       ) : null,
     overlay: null,

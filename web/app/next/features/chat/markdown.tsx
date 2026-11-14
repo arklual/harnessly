@@ -185,13 +185,20 @@ const withPaths = {
 const GFM_HINT = /\||~~|\[[ xX]\]|https?:\/\/|www\./;
 const WITH_GFM = [remarkGfm, remarkRefs];
 const PLAIN = [remarkRefs];
-const KEPT = 400;
+// the texts of a few long chats (answers, messages, the steps' texts) are thousands: 400 kept in the order they
+// came made two long chats push each other out, and every switch between them parsed the whole feed again (~130 ms at
+// CPU ×4). The last used stay (a hit goes to the end).
+const KEPT = 3000;
 const parsed = new Map<string, ReactElement>();
 
 const render = (md: string, paths: boolean): ReactElement => {
   const keyOf = paths ? `paths:${md}` : md;
   const kept = parsed.get(keyOf);
-  if (kept) return kept;
+  if (kept) {
+    parsed.delete(keyOf);
+    parsed.set(keyOf, kept);
+    return kept;
+  }
   const tree = renderTree({
     children: md,
     remarkPlugins: GFM_HINT.test(md) ? WITH_GFM : PLAIN,

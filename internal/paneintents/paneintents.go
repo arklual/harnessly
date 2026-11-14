@@ -13,6 +13,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/panel"
+	"github.com/ly-solutions/harnessly/internal/safego"
 )
 
 const (
@@ -98,7 +99,35 @@ type Store struct {
 	listeners map[int]Listener
 	nextID    int
 	saveTimer *time.Timer
+
+	// up and lifted carry what a delegated chat's pane is asked to the chats above it (SetLift); nil: nothing goes up.
+	up     func(tabID string) (parent Parent, ok bool)
+	lifted func(tabID string)
 }
+
+// Parent is the chat a delegated chat answers to, as the intents know it: its pane's tab, and the subchat as that
+// chat names it (its id and title), so the parent's pane says whose the tab it opens is.
+type Parent struct {
+	TabID         string
+	FromID, Title string
+}
+
+// LiftDepth bounds the chats above a delegated one its pane's requests climb to (a loop of parents stops sooner).
+const LiftDepth = 8
+
+// SetLift makes what a delegated chat's pane is asked open in the pane of every chat above it too, up to its root
+// the person sits in the chat that delegated, not in its subchats. up names a tab's parent; lifted hears
+// of each tab an intent went up to (the sync socket's "pane-intents"). A lifted intent is quiet (auto: behind, with a
+// dot), marked with the subchat it came from, and an address the parent was asked for within LiftRepeat is not asked
+// again; a subchat's own pane is asked as before.
+func (s *Store) SetLift(up func(tabID string) (Parent, bool), lifted func(tabID string)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.up, s.lifted = up, lifted
+}
+
+// LiftRepeat: the same address asked up within this is the parent's already (the rule of `open`).
+const LiftRepeat = 10 * time.Minute
 
 // New keeps intents in file; now is the clock; persist false keeps them in memory only.
 func New(file string, now func() time.Time, persist bool) *Store {
@@ -211,12 +240,79 @@ func (s *Store) changed(tabID string) func() {
 func (s *Store) Add(tabID string, command *jsvalue.Object) *jsvalue.Object {
 	s.mu.Lock()
 	s.load()
+	intent := s.addLocked(tabID, command)
+	notify := s.changed(tabID)
+	up := s.up
+	s.mu.Unlock()
+	notify()
+	if up != nil {
+		// Off the caller: naming the parents reads the conversations, which a caller may be holding.
+		safego.Go("pane intents lift", func() { s.lift(tabID, command, up) })
+	}
+	return intent
+}
+
+func (s *Store) addLocked(tabID string, command *jsvalue.Object) *jsvalue.Object {
 	intent := jsvalue.NewObject("id", panel.UUID(), "command", command, "createdAt", s.now().UnixMilli(), "appliedAt", nil, "appliedOn", nil)
 	s.byTab.Set(tabID, toArray(Prune(append(s.current(tabID), intent), s.now())))
+	return intent
+}
+
+// lift asks the panes of the chats above tabID for an `open` its pane was asked. A `show` (bring the pane out) stays
+// the subchat's: the parent's person is not thrown a pane by a chat they are not in.
+func (s *Store) lift(tabID string, command *jsvalue.Object, up func(string) (Parent, bool)) {
+	if command.String("kind") != "open" {
+		return
+	}
+	// Each chat above names the request by its own child it came through: the root, by its subchat.
+	var chain []Parent
+	visited := map[string]bool{tabID: true}
+	for at := tabID; len(chain) < LiftDepth; {
+		p, ok := up(at)
+		if !ok || p.TabID == "" || visited[p.TabID] {
+			break
+		}
+		visited[p.TabID] = true
+		chain = append(chain, p)
+		at = p.TabID
+	}
+	for _, p := range chain {
+		if p.FromID == "" {
+			continue
+		}
+		lifted := command.Copy()
+		lifted.Set("auto", true)
+		lifted.Set("from", jsvalue.NewObject("id", p.FromID, "title", p.Title))
+		if s.addLifted(p.TabID, lifted) && s.lifted != nil {
+			s.lifted(p.TabID)
+		}
+	}
+}
+
+// addLifted keeps a lifted intent unless the parent was asked for the same address within LiftRepeat (a reload is
+// always kept: the tab that shows the thing reloads).
+func (s *Store) addLifted(tabID string, command *jsvalue.Object) bool {
+	s.mu.Lock()
+	s.load()
+	reload, _ := command.Get("reload")
+	since := float64(s.now().Add(-LiftRepeat).UnixMilli())
+	for _, it := range s.current(tabID) {
+		cmd := it.Object("command")
+		if reload == true || cmd == nil || createdAt(it) < since {
+			continue
+		}
+		r, _ := cmd.Get("reload")
+		if r != true && cmd.String("kind") == "open" && cmd.String("tab") == command.String("tab") &&
+			cmd.String("target") == command.String("target") && cmd.String("place") == command.String("place") {
+			s.mu.Unlock()
+			return false
+		}
+	}
+	s.addLocked(tabID, command)
 	notify := s.changed(tabID)
 	s.mu.Unlock()
 	notify()
-	return intent
+	return true
 }
 
 // List is the conversation's live intents.

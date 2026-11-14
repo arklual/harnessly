@@ -112,6 +112,16 @@ describe('what is left', () => {
     expect(leftAtReset(limits!.claude!.sevenDay!)).toBeNull();
   });
 
+  it('leaves out a window whose reset has passed: an old copy is not what is left now (HRN-1431)', () => {
+    const claude = {
+      fiveHour: { usedPct: 11, resetsAt: 1000, forecast: null },
+      sevenDay: { usedPct: 10, resetsAt: 5000, forecast: null },
+      month: null,
+    } as unknown as Parameters<typeof windowsOf>[0];
+    expect(windowsOf(claude, 2000).map((w) => w.kind)).toEqual([WINDOW.sevenDay]);
+    expect(windowsOf(claude, 500).map((w) => w.kind)).toEqual([WINDOW.fiveHour, WINDOW.sevenDay]);
+  });
+
   it('tells a span in days, hours and minutes', () => {
     expect(span(40 * 60)).toBe('40 min');
     expect(span(3 * 3600 + 10 * 60)).toBe('3 h 10 min');

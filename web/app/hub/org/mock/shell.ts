@@ -1,5 +1,5 @@
 // Fixtures for the shell: the organization «Акме», its tenants and teams, and the three people who look at them.
-import type { AppsConsent } from '../../../hub-api/orgs';
+import type { AppsConsent, OrgLinks } from '../../../hub-api/orgs';
 import type { ShellApi } from '../api/shell';
 import { OrgApiError } from '../api/errors';
 import type { OrgChoice, TeamRef, TenantRef, Viewer } from '../types';
@@ -43,6 +43,7 @@ export const MOCK_FEATURES = [
 ];
 
 let mockAppsConsent: AppsConsent = 'ask';
+let mockLinks: OrgLinks = {};
 
 export const shellMock = (ctx: MockCtx): ShellApi => ({
   appsConsent: async () => later(mockAppsConsent),
@@ -50,6 +51,12 @@ export const shellMock = (ctx: MockCtx): ShellApi => ({
     if (ctx.role !== 'admin') throw new OrgApiError('forbidden', '');
     mockAppsConsent = value;
     return later(mockAppsConsent);
+  },
+  links: async () => later(mockLinks),
+  setLinks: async (_org, value) => {
+    if (ctx.role !== 'admin') throw new OrgApiError('forbidden', '');
+    mockLinks = value;
+    return later(mockLinks);
   },
   shell: async (org, tenant) => {
     const known = ORGS.find((o) => o.slug === org);

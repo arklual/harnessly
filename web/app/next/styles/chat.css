@@ -115,6 +115,18 @@
   animation: hx-msg-in 520ms var(--hx-ease-out) backwards;
   animation-delay: min(calc(var(--hx-ti, 0) * 140ms + 70ms), 560ms);
 }
+/* the entrance plays in the last turns only, the ones on screen. A long history animated off screen too
+   (≈175 animations on a 25-turn chat, their layers ~300 ms at CPU ×4 on every switch). Only entrances: what closes
+   (a rewind's editor, a bubble that leaves) keeps its motion. */
+.hx-stage[data-entering]:not([data-leaving])
+  .hx-turnwrap:nth-last-child(n + 6)
+  :is(.hx-msg, .hx-rewindable__acts),
+.hx-stage[data-entering]:not([data-leaving])
+  .hx-turnwrap:nth-last-child(n + 6)
+  > :not(.hx-msg, .hx-rewindable),
+.hx-turnwrap:nth-last-child(n + 6) :is(.hx-work__head, .hx-turnend, .hx-code__line) {
+  animation: none;
+}
 .hx-msg[data-kind='turn'],
 .hx-msg[data-kind='answers'] {
   --hx-mi: 1;
@@ -318,6 +330,12 @@
 
 /* ── Messages ── */
 .hx-msg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+  min-width: 0;
+}
+.hx-answer {
   display: flex;
   flex-direction: column;
   gap: var(--hx-space-3);
@@ -1727,52 +1745,41 @@ html[data-theme='dark'] .hx-ref[data-type='link'] {
   font-size: var(--hx-text-xs);
   color: var(--hx-fg-3);
 }
-
-/* A file handed over: the card opens it, the icon beside saves it. */
-.hx-file--delivery {
-  padding: 0 var(--hx-space-1) 0 0;
-  gap: 0;
+/* A link's card: its live state is read; until it comes the line rests softly. */
+.hx-file__meta[data-pending] {
+  opacity: 0.6;
 }
-.hx-file__open {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--hx-space-3);
-  padding: var(--hx-space-2) var(--hx-space-2) var(--hx-space-2) var(--hx-space-3);
-  border: 0;
-  border-radius: var(--hx-radius-md);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.hx-file__open:focus-visible,
-.hx-file__save:focus-visible {
-  outline: 2px solid var(--hx-focus);
-  outline-offset: 1px;
-}
-.hx-file--delivery:has(.hx-file__open:hover) {
-  box-shadow:
-    0 0 0 1px var(--hx-border-strong),
-    var(--hx-shadow-sm);
-}
-.hx-file__save {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
+.hx-file__dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 6px 1px 0;
   border-radius: 50%;
-  color: var(--hx-fg-3);
-  transition:
-    background 160ms ease,
-    color 160ms ease;
+  vertical-align: middle;
+  background: var(--hx-fg-3);
 }
-.hx-file__save:hover {
-  background: var(--hx-bg-hover);
-  color: var(--hx-fg-1);
+.hx-file__dot[data-tone='ok'] {
+  background: var(--hx-success);
+}
+.hx-file__dot[data-tone='bad'] {
+  background: var(--hx-danger);
+}
+.hx-file__dot[data-tone='busy'] {
+  background: var(--hx-warning);
+}
+.hx-file__dot[data-tone='rest'] {
+  background: var(--hx-border-strong);
+}
+.hx-file--link {
+  text-decoration: none;
+}
+.hx-file--link .hx-file__open {
+  text-decoration: none;
+}
+
+/* A file handed over: its download icon is the card's one action, so it stays in sight, not only on hover. */
+.hx-file__save {
+  opacity: 1;
 }
 
 /* The turn's end: «Turn interrupted · reason» with Continue / Retry, or «Stopped by you». */

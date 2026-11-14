@@ -12,7 +12,7 @@ func TestPreviewSlotHostTemplate(t *testing.T) {
 		t.Fatalf("round trip: %q %d %v", handle, n, ok)
 	}
 	for _, bad := range []string{
-		"pabcdefghijkl-7.slots.example.net", // slot out of range
+		"pabcdefghijkl-9.slots.example.net", // slot out of range
 		"pabcdefghijkl-0.slots.example.net",
 		"abcdefghijklm-1.slots.example.net", // no p
 		"pabcdefghijkl-1.x.slots.example.net",

@@ -2,7 +2,9 @@
 // next-ui feature. ?theme=light|dark&lang=en|ru pick the look; ?shots=0 (none), loading or a number of
 // pictures (default 7). The recap, the pictures the agent looked at, five subagents (two running, three over), four
 // named teammates (two at work, one waiting for a message, one shut down), a dynamic workflow and a command, as the
-// column draws them. ?pane=flows draws the pane's tab of subagents instead, with the workflow's agents by phase.
+// column draws them. ?switch=1 changes between two chats every two seconds on a real chat stage, the second one's
+// pictures coming 400 ms late the first time (a chat not in memory yet), for a recording of the change of chat;
+// &legacy=1 draws the stage anew for each chat, as the shell did before HRN-1438. ?pane=flows draws the pane's tab of subagents instead, with the workflow's agents by phase.
 // Never part of a production path.
 import '@/next/styles/tokens.css';
 import '@/next/styles/base.css';
@@ -12,7 +14,9 @@ import '@/next/styles/icons.css';
 import '@/next/styles/background.css';
 import '@/next/dev/rail-gallery.css';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import ChatStage from '@/next/features/shell/chat-stage';
+import '@/next/styles/motion.css';
 import { useRouter } from '@/platform/router';
 import { pinLocale } from '@/next/i18n';
 import BackgroundPanel from '@/next/features/background/background-panel';
@@ -160,6 +164,57 @@ const shotsOf = (count: number): Shot[] =>
     };
   });
 
+const OTHER_RECAP = {
+  text: 'Вкладки окна выровнены: равные отступы у иконки и крестика, «+» на оси вкладок. Осталось снять светлую тему.',
+  at: NOW - 6 * MIN,
+};
+const OTHER_TASKS = TASKS.slice(0, 2);
+const OTHER_SHOTS = shotsOf(3);
+// The same arrays on every render, as the stores give them: the column compares what it shows by reference.
+const FIRST_SHOTS = shotsOf(7);
+const SWITCH_MS = 2000;
+const LATE_MS = 400;
+
+/** Two chats in turn on a chat stage: the column's change of chat, for a recording. */
+const SwitchScene = ({ legacy }: { legacy: boolean }) => {
+  const [second, setSecond] = useState(false);
+  const [late, setLate] = useState(true);
+  useEffect(() => {
+    const timer = setInterval(() => setSecond((v) => !v), SWITCH_MS);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (!second || !late) return;
+    const timer = setTimeout(() => setLate(false), LATE_MS);
+    return () => clearTimeout(timer);
+  }, [second, late]);
+  const chat = second ? 'chat-b' : 'chat-a';
+  const side = (
+    <BackgroundPanel
+      chat={chat}
+      tasks={second ? OTHER_TASKS : TASKS}
+      recap={second ? OTHER_RECAP : RECAP}
+      shots={second ? (late ? null : OTHER_SHOTS) : FIRST_SHOTS}
+      shotSrc={srcOf}
+      shown
+      now={NOW}
+      stopping={NO_STOPPING}
+      onStop={() => undefined}
+    />
+  );
+  return (
+    <div className="hx-root hx-rail-gallery hx-rail-gallery--stage" data-play="1">
+      <ChatStage key={legacy ? chat : undefined} chatKey={chat} paneOpen={false} side={side}>
+        <div className="hx-feed">
+          <div className="hx-feed__inner">{chat}</div>
+        </div>
+      </ChatStage>
+    </div>
+  );
+};
+
+const srcOf = (shot: Shot): string => picture(Number(shot.id.slice(5)));
+
 const RailGallery = () => {
   const { query } = useRouter();
   const theme: TTheme = query.theme === 'dark' ? 'dark' : 'light';
@@ -173,6 +228,7 @@ const RailGallery = () => {
     root.classList.toggle('dark', theme === 'dark');
     root.style.colorScheme = theme;
   }, [theme]);
+  if (query.switch === '1') return <SwitchScene legacy={query.legacy === '1'} />;
   if (query.pane === 'flows')
     return (
       <div className="hx-root hx-rail-gallery">

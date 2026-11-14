@@ -479,6 +479,10 @@ func (b *batch) session(ctx context.Context, seq, at int64, x hubproto.UsageSess
 		row.Metrics = string(raw)
 	}
 	changed, err := b.tx.PutSession(ctx, row)
+	if err == nil && changed && (x.Project != "" || len(x.TaskKeys) > 0) {
+		err = b.tx.PutSessionFacts(ctx, store.SessionRef{OrgKey: b.orgKey, Provider: x.Provider, SessionKey: x.SessionKey},
+			store.SessionFacts{Project: clip(x.Project, 200), TaskKeys: cleanTaskKeys(x.TaskKeys)}, at+b.shift)
+	}
 	if err == nil && changed {
 		b.changed = append(b.changed, x.SessionKey)
 		if len(x.MRKeys) > 0 {
@@ -651,4 +655,23 @@ func def(v, d string) string {
 		return d
 	}
 	return v
+}
+
+// clip cuts s to n runes.
+func clip(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n])
+	}
+	return s
+}
+
+// cleanTaskKeys keeps the task keys a machine tells: short, no separators of the stored list.
+func cleanTaskKeys(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, k := range in {
+		if k = strings.TrimSpace(k); k != "" && len(k) <= 32 && !strings.ContainsAny(k, ", \n") && len(out) < 50 {
+			out = append(out, k)
+		}
+	}
+	return out
 }

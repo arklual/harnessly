@@ -35,6 +35,7 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("DELETE /api/me/passkeys/{id}", s.Require(s.deletePasskey))
 	mux.Handle("DELETE /api/me/identities/{provider}", s.Require(s.deleteIdentity))
 	mux.Handle("PUT /api/admin/users/{userId}/disabled", s.Require(s.setDisabled))
+	s.mountTokens(mux)
 }
 
 // emailOn answers 404 on the code sign-in when the hub has it off (HUB_AUTH_EMAIL=off).
@@ -79,6 +80,9 @@ func (s *Service) logout(w http.ResponseWriter, r *http.Request) error {
 func (s *Service) logoutAll(w http.ResponseWriter, r *http.Request, p *Principal) error {
 	ctx := r.Context()
 	if err := s.db.S().DeleteUserSessions(ctx, p.User.ID, ""); err != nil {
+		return err
+	}
+	if err := s.db.S().RevokeUserAPITokens(ctx, p.User.ID, s.now().UTC()); err != nil {
 		return err
 	}
 	s.Audit(ctx, p.User.ID, "logout_all", r, "")

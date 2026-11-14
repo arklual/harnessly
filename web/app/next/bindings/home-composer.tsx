@@ -18,8 +18,10 @@ import { useStartChoice } from '@/next/bindings/use-start-choice';
 import { useSlashSource } from '@/next/bindings/slash-source';
 import { UI_REQUEST, requestUi } from '@/next/stores/ui-requests';
 import type { ISlashActions } from '@/next/features/composer/slash-model';
-import Composer from '@/next/features/composer/composer';
+import ScreenField from '@/next/features/composer/one-field';
 import type { IModelPickerProps } from '@/next/features/composer/model-picker';
+import { createChat as createGptChat } from '@/next/features/chatgpt/api';
+import { carryDraft, gptChatsChanged } from '@/next/features/chatgpt/store';
 import type { Conversation, ConvId, MachineId } from '@/next/protocol/v2';
 import { clearDraft, NEW_CHAT } from '@/next/stores/drafts';
 import { queueChat } from '@/next/commands/queued-chats';
@@ -418,7 +420,7 @@ const HomeComposer = ({
         {above}
         <div className="hx-enter" data-enter="up" data-eb="520" data-ed="700">
           <DockBar notice={voiceNotice ?? (allMachinesOff ? NO_MACHINES : signIn ? SIGN_IN : null)} />
-          <Composer
+          <ScreenField
             enterSends={enterSends}
             value={text}
             onChange={setText}
@@ -433,6 +435,24 @@ const HomeComposer = ({
                 onChange: onPickOne,
                 multi,
                 machine: machines,
+                extra: machine
+                  ? {
+                      label: t('next.chatgpt.pick.label'),
+                      sub: t('next.chatgpt.pick.sub'),
+                      onPick: () => {
+                        const words = text;
+                        createGptChat(machine, '', '').then(
+                          (chat) => {
+                            carryDraft(chat.id, words);
+                            setText('');
+                            gptChatsChanged();
+                            goTo({ kind: ROUTE.chatgpt, id: chat.id, machine });
+                          },
+                          () => goTo({ kind: ROUTE.settings, section: 'accounts' }),
+                        );
+                      },
+                    }
+                  : null,
               }
             }
             slash={slash}

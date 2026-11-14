@@ -1,128 +1,118 @@
 /* Settings → «Провайдеры» → «По API» (features/settings/ext-providers-section.tsx): the list of the providers
    connected with a key, and the card under it that adds one or opens one. */
-.hx-extp__row {
-  width: 100%;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background 160ms var(--hx-ease-out);
+/* Settings → «Провайдеры» → «По API» (features/settings/ext-providers-section.tsx): the provider cards of
+   HRN-1385 (provider-card.css), connected first and then the ones to connect, each folding out its own form. */
+.hx-extp__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
-.hx-extp__row:hover,
-.hx-extp__row[aria-expanded='true'] {
-  background: var(--hx-bg-hover);
+.hx-extp__list > .hx-pcard + .hx-pcard {
+  margin-top: 0;
 }
-.hx-extp__row:first-child {
-  border-radius: 16px 16px 0 0;
+.hx-extp__failed {
+  padding: 12px 16px;
 }
-.hx-extp__row:last-child {
-  border-radius: 0 0 16px 16px;
+
+/* What folds out of a card, and the providers under «Ещё провайдеры»: open and close by their height. */
+.hx-extp__fold {
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: hx-extp-fold-in 240ms var(--hx-ease-out) backwards;
 }
-.hx-extp__row:only-child {
-  border-radius: 16px;
+.hx-extp__fold[data-state='closing'] {
+  pointer-events: none;
+  animation: hx-extp-fold-out 200ms var(--hx-ease-out) forwards;
 }
-.hx-extp__row .hx-set__row-label {
-  font-size: var(--hx-text-md);
-  font-weight: var(--hx-weight-medium);
+.hx-extp__fold-in {
+  min-height: 0;
+  overflow: hidden;
+  /* Room for the focus rings of the fields at the edges. */
+  margin: -3px;
+  padding: 3px;
 }
-.hx-extp__row[data-fresh='true'] {
+@keyframes hx-extp-fold-in {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+@keyframes hx-extp-fold-out {
+  to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+.hx-extp__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 4px;
+}
+.hx-pcard[data-state='off']:has(.hx-extp__fold) {
+  border-style: solid;
+  background: var(--hx-bg-raised);
+  transition: background 200ms var(--hx-ease-out);
+}
+.hx-pcard[data-fresh='true'] {
   animation: hx-extp-fresh 420ms var(--hx-ease-out) backwards;
 }
 @keyframes hx-extp-fresh {
   from {
     opacity: 0;
     transform: translate3d(0, -6px, 0);
-    background: var(--hx-accent-soft);
   }
-}
-.hx-extp__logo {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--hx-border);
-  border-radius: 10px;
-  background: var(--hx-bg-window);
-  color: var(--hx-fg-1);
-  font-size: var(--hx-text-sm);
-  font-weight: var(--hx-weight-semibold);
-}
-.hx-extp__go {
-  flex: none;
-  color: var(--hx-fg-3);
-}
-.hx-extp__failed {
-  padding: 12px 16px;
-}
-.hx-extp__add {
-  margin-top: 12px;
 }
 
-/* The card of a new provider, and of an open one. */
-.hx-extp__card {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  margin-top: 12px;
-  padding: 20px;
-  border: 1px solid var(--hx-border);
-  border-radius: 16px;
-  background: var(--hx-bg-raised);
-  animation: hx-set-in 240ms var(--hx-ease-out) backwards;
+/* «Подключить» on the right of a card; hidden, not removed, while its form is out, so the head does not move. */
+.hx-extp__connect {
+  flex: none;
+  transition: opacity 160ms var(--hx-ease-out);
 }
-.hx-extp__card[data-state='closing'] {
-  animation: hx-extp-out 180ms var(--hx-ease-out) forwards;
+.hx-extp__connect[data-hidden='true'] {
+  visibility: hidden;
+  opacity: 0;
 }
-@keyframes hx-extp-out {
-  to {
-    opacity: 0;
-    transform: translate3d(0, 6px, 0);
-  }
+.hx-extp__more {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  transition: background-color 160ms var(--hx-ease-out);
 }
-.hx-extp__head {
-  display: flex;
+.hx-extp__more:hover,
+.hx-extp__more[data-popup-open] {
+  background: var(--hx-bg-hover);
+}
+.hx-extp__toggle {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.hx-extp__h {
-  margin: 0;
-  color: var(--hx-fg-1);
-  font-size: var(--hx-text-md);
-  font-weight: var(--hx-weight-semibold);
-}
-.hx-extp__presets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.hx-extp__preset {
-  height: 34px;
-  padding: 0 14px;
-  border: 1px solid var(--hx-border-strong);
-  border-radius: var(--hx-radius-full);
-  background: transparent;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 6px 4px;
+  border: 0;
+  background: none;
   color: var(--hx-fg-2);
   font: inherit;
   font-size: var(--hx-text-sm);
   cursor: pointer;
-  transition:
-    background 180ms var(--hx-ease-out),
-    color 180ms,
-    border-color 180ms;
 }
-.hx-extp__preset:hover {
-  background: var(--hx-bg-hover);
+.hx-extp__toggle:hover {
   color: var(--hx-fg-1);
 }
-.hx-extp__preset[aria-checked='true'] {
-  border-color: var(--hx-fg-3);
-  background: var(--hx-bg-active);
-  color: var(--hx-fg-1);
+.hx-extp__toggle .hx-icon {
+  transition: transform 200ms var(--hx-ease-out);
 }
+.hx-extp__toggle[aria-expanded='true'] .hx-icon {
+  transform: rotate(180deg);
+}
+
 .hx-extp__two {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -216,14 +206,11 @@
   .hx-extp__two {
     grid-template-columns: 1fr;
   }
-  .hx-extp__card {
-    padding: 16px;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hx-extp__row[data-fresh='true'],
-  .hx-extp__card,
-  .hx-extp__card[data-state='closing'],
+  .hx-pcard[data-fresh='true'],
+  .hx-extp__fold,
+  .hx-extp__fold[data-state='closing'],
   .hx-extp__checked {
     animation-duration: 1ms;
   }
@@ -272,5 +259,35 @@
   .hx-extp__var-name,
   .hx-extp__var-key {
     grid-column: 1 / -1;
+  }
+}
+
+/* A narrow card (the phone) wraps the name and what the provider gives rather than cutting them. */
+/* «Подключить» is a word on a wide card and a «+» on a narrow one (the phone), so the name keeps its line. */
+.hx-extp__connect .hx-icon[data-i='plus'] {
+  display: none;
+}
+@container hx-pcard (max-width: 440px) {
+  .hx-extp__list .hx-pcard__sub {
+    white-space: normal;
+  }
+  .hx-extp__connect .hx-set__btn {
+    width: 32px;
+    padding: 0;
+    justify-content: center;
+  }
+  .hx-extp__connect .hx-icon[data-i='plus'] {
+    display: inline-block;
+  }
+  .hx-extp__connect .hx-set__btn-label {
+    display: contents;
+  }
+  .hx-extp__connect-txt {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }

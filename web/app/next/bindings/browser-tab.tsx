@@ -2,6 +2,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import BrowserView from '@/next/features/pane/browser-view';
 import { fetchPorts, openPreview, slotNonce, type IListeningPort } from '@/next/core/net/preview';
+import { RuntimeError } from '@/next/core/net/runtime-json';
 import { neighboursOf } from '@/next/features/pane/neighbours';
 import { slotLeases } from '@/next/features/pane/slot-lease';
 import { useTheme } from '@/platform/theme';
@@ -60,6 +61,14 @@ const personOf = (me: MeState): string | null => {
   if (me.k === 'ready') return personKey(me.me);
   return me.k === 'signed-out' ? LOCAL_PERSON : null;
 };
+
+/** The runtime refused the slot itself (its own code, before the pane put it in words). */
+const refusedSlot = (failure: unknown) =>
+  failure instanceof RuntimeError &&
+  typeof failure.body === 'object' &&
+  failure.body !== null &&
+  'error' in failure.body &&
+  failure.body.error === 'invalid slot';
 
 /** One browser tab: the page in its slot, asked for again on every address and reload. */
 /** What a login came to, in words. */
@@ -137,11 +146,26 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
   const [dev, setDev] = useState(false);
   const [devTab, setDevTab] = useState<TDevTab>(DEV_TAB.console);
 
+  // The slot as last opened, for the effect below: a tab shown again after waiting out of sight (kept-frames, under
+  // Activity) runs it again, and must not load the page it still shows.
+  const opened = useRef(slot);
+  useEffect(() => {
+    opened.current = slot;
+  });
   useEffect(() => {
     if (!at || live) return;
     let alive = true;
     const { target } = at;
     const asked = `${at.text}|${reloadKey}`;
+    const was = opened.current;
+    if (
+      was?.key === asked &&
+      was.src !== null &&
+      was.slot !== null &&
+      slotLeases.slotOf(tab.id) === was.slot &&
+      (was.nonce === null || slotNonce(was.slot) === null || slotNonce(was.slot) === was.nonce)
+    )
+      return;
     const failed = (error: string) =>
       setSlot({ key: asked, src: null, error, slot: null, nonce: null, origin: null });
     // Every tab holds a slot of its own: a second tab on the same one would take the first one's page over.
@@ -174,7 +198,12 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
             });
         });
       })
-      .catch((failure: Error) => alive && failed(failure.message));
+      .catch((failure: Error) => {
+        if (!alive) return;
+        // A runtime from before sites by path refuses a stand's slot: the machine's live browser shows it.
+        if (target.kind === 'url' && refusedSlot(failure)) setLiveForced(target.origin);
+        else failed(failure.message);
+      });
     return () => {
       alive = false;
     };
@@ -272,6 +301,11 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
   const bridge = useFrameBridge({
     frame,
     origin: slot?.origin ?? null,
+    // A page that changed asks to be loaded again: the tab does it from its own origin, as «Обновить» does.
+    onReload: () => {
+      if (live && liveControl.current) liveControl.current.reload();
+      else setReloadKey((n) => n + 1);
+    },
     // A click while annotating puts the next mark and opens its comment; picking goes on.
     onPicked: (picked) => {
       const next = addAnnotation(marks, picked);

@@ -4,6 +4,7 @@
 import { platformPath, runtimePath } from '@/next/core/net/machine';
 import { postJson, runtimeJson } from '@/next/core/net/runtime-json';
 import type { MachineId } from '@/next/protocol/v2';
+import { viaHome } from '@/next/features/designly/home';
 
 export interface IKitTheme {
   id: string;
@@ -227,7 +228,14 @@ export interface IKitLink {
 }
 
 export const fetchKitCards = async (m: MachineId, signal?: AbortSignal): Promise<IKitCard[]> =>
-  (await runtimeJson<{ kits: IKitCard[] }>(m, platformPath('/design/kit/canvases'), { signal })).kits;
+  (
+    await viaHome(
+      m,
+      'kits',
+      (v) => v as { kits: IKitCard[] },
+      () => runtimeJson<{ kits: IKitCard[] }>(m, platformPath('/design/kit/canvases'), { signal }),
+    )
+  ).kits;
 
 /** The first open of a theme makes its atlases inside the request, which a busy machine may take a minute over. */
 const KIT_CANVAS_TIMEOUT_MS = 120_000;

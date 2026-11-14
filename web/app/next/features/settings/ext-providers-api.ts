@@ -12,10 +12,27 @@ const CHECK_TIMEOUT_MS = 40_000;
 export const EXT_API = { openai: 'openai', anthropic: 'anthropic' } as const;
 export type TExtApi = (typeof EXT_API)[keyof typeof EXT_API];
 
+/** The levels of reasoning a model may take (extproviders.ModelEfforts), in their order. */
+export const EXT_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] as const;
+export type TExtEffort = (typeof EXT_EFFORTS)[number];
+
 export interface IExtModel {
   id: string;
   label: string;
+  /** The levels of reasoning it takes; none: the model has no choice. */
+  efforts?: readonly TExtEffort[];
+  /** The one a chat starts on; '' is the model's own. */
+  defaultEffort?: TExtEffort | '';
+  /** The context window in tokens; 0 or absent: unknown. */
+  window?: number;
+  /** The person added it; a refresh keeps it. */
+  manual?: boolean;
+  /** The person named it or gave it its levels; a refresh keeps what they gave. */
+  edited?: boolean;
 }
+
+const isEffort = (v: unknown): v is TExtEffort =>
+  typeof v === 'string' && (EXT_EFFORTS as readonly string[]).includes(v);
 
 /** A variable a provider adds to the launch of an agent on it. A secret one comes without its value. */
 export interface IExtEnvVar {
@@ -87,7 +104,18 @@ const readApi = (v: unknown): TExtApi => {
 const readModel = (v: unknown): IExtModel => {
   const o = obj(v, 'model');
   const id = str(o.id, 'model.id');
-  return { id, label: opt(o.label) || id };
+  const efforts = Array.isArray(o.efforts) ? o.efforts.filter(isEffort) : [];
+  const defaultEffort = isEffort(o.defaultEffort) ? o.defaultEffort : '';
+  const window = typeof o.window === 'number' && o.window > 0 ? o.window : 0;
+  return {
+    id,
+    label: opt(o.label) || id,
+    efforts,
+    defaultEffort,
+    window,
+    manual: o.manual === true,
+    edited: o.edited === true,
+  };
 };
 
 const readEnvVar = (v: unknown): IExtEnvVar => {
@@ -171,6 +199,8 @@ export const patchExtProvider = (
   patch: Partial<Pick<IExtDraft, 'name' | 'baseUrl' | 'api' | 'key'>> & {
     default?: true;
     env?: readonly IExtEnvInput[];
+    /** The whole list of models, with what the person did to them. */
+    models?: readonly IExtModel[];
   },
 ) => sendJson(url(machine, of(id)), patch, readOne, TIMEOUT_MS);
 

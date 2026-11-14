@@ -28,7 +28,7 @@ const LimitsLine = ({ limits }: ILimitsLineProps) => {
     return () => window.clearInterval(timer);
   }, []);
 
-  const windows = windowsOf(limits);
+  const windows = windowsOf(limits, now / 1000);
   if (windows.length === 0 && !limits?.balance) return null;
   return (
     <span className="hx-lim-line">

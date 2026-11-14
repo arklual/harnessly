@@ -5,7 +5,9 @@ import type { NetworkPolicy } from './network';
 import type { RolloutSwitch, SwitchKey, SwitchPut } from './switches';
 import type {
   AgentStatus,
+  AppToken,
   CLIStatus,
+  DeviceRequest,
   Config,
   Envelope,
   Invite,
@@ -51,6 +53,8 @@ export type ApiErrorCode =
   | 'machine_offline'
   | 'machine_error'
   | 'machine_timeout'
+  | 'client_api_off'
+  | 'code_unknown'
   | 'internal'
   // Not the hub's: the request never got an answer.
   | 'network';
@@ -117,6 +121,8 @@ const KNOWN_CODES: readonly string[] = [
   'machine_offline',
   'machine_error',
   'machine_timeout',
+  'client_api_off',
+  'code_unknown',
   'internal',
 ];
 
@@ -254,6 +260,14 @@ export const createApi = (fetcher: Fetcher = (input, init) => fetch(input, init)
         post<{ passkey: Passkey }>('/api/me/passkeys/finish', { challengeId, credential, name }),
       removePasskey: (id: string) => del(`/api/me/passkeys/${enc(id)}`),
       removeIdentity: (provider: string) => del(`/api/me/identities/${enc(provider)}`),
+      tokens: () => get<{ on: boolean; tokens: AppToken[] }>('/api/me/tokens'),
+      revokeToken: (id: string) => del(`/api/me/tokens/${enc(id)}`),
+    },
+
+    device: {
+      show: (code: string) => get<DeviceRequest>(`/api/auth/device?code=${enc(code)}`),
+      approve: (code: string, allow: boolean, scopes: string[]) =>
+        post<void>('/api/auth/device/approve', { code, allow, scopes }),
     },
 
     spaces: {

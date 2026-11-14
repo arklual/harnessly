@@ -830,8 +830,13 @@ func TestMeMachineTeamFailedAndOutdated(t *testing.T) {
 		t.Fatal(r)
 	}
 	old.Connect()
+	// The new entry is a new set: the hub sends it to the box behind the answer, and the box answers with its hash.
+	// The state the test sends below must carry that hash, so it waits for it: sent with the hash read before the
+	// box's answer and stored after it, it leaves the box behind the set for good ("not outdated" timed out).
+	before := hash()
 	skill := a.item(t, "skill", "Ревью", map[string]any{"body": "x"})
 	a.entry(t, a.anna, "org", a.org, skill, nil)
+	a.s.Eventually("the new set on the box", func() bool { return hash() != before })
 	var all struct{ Machines []env.MeMachine }
 	a.anna.Do("GET", "/api/me/env/machines?space="+a.tenant, nil).JSON(&all)
 	for _, m := range all.Machines {

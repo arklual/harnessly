@@ -23,6 +23,8 @@ export interface IPickerAgent {
   preferred?: boolean;
   name: string;
   short: string;
+  /** How a profile group's models run, said after the model («Codex через Claude Code»); absent for Claude and Codex. */
+  via?: string;
   models: readonly AgentModel[];
   /** A running chat of this agent takes a new model. */
   canSwitch: boolean;
@@ -78,7 +80,29 @@ const pickerAgent = (agent: MachineAgent): IPickerAgent => ({
 /** Every agent the machine reports, in the protocol's order: the picker's segments; one not ready says why. */
 export const pickerAgents = (agents: readonly MachineAgent[]): IPickerAgent[] => {
   const own = PROVIDERS.flatMap((provider) => agents.filter((a) => a.provider === provider));
-  return [...own.map(pickerAgent), ...own.flatMap((a) => profileAgents(a))];
+  return [...own.map(pickerAgent), ...shortNames(own.flatMap((a) => profileAgents(a)))];
+};
+
+/** The name of a profile group as its tab says it: the vendor alone («GPT» of «GPT · подписка ChatGPT»), unless two
+ *  groups would read the same, which keep their whole names. */
+const shortNames = (groups: IPickerAgent[]): IPickerAgent[] => {
+  const head = (name: string) => name.split(' · ')[0].trim() || name;
+  const count = new Map<string, number>();
+  for (const g of groups) count.set(head(g.name), (count.get(head(g.name)) ?? 0) + 1);
+  return groups.map((g) => (count.get(head(g.name)) === 1 ? { ...g, short: head(g.name) } : g));
+};
+
+/** How a profile's models run: GPT on the ChatGPT plan goes through Codex into Claude Code, the rest through the CLI
+ *  that runs them. */
+const viaOf = (provider: Provider, vendor: Vendor | null | undefined): string => {
+  if (provider === 'claude' && vendor === 'gpt') return t('next.picker.via.codexInClaude');
+  return provider === 'claude' ? t('next.picker.via.claude') : t('next.picker.via.codex');
+};
+
+/** The model as the picker names it in full: «GPT-6.1 Sol · Codex через Claude Code», «Opus» for Claude's own. */
+export const modelLine = (agent: IPickerAgent, model: string | null): string => {
+  const name = modelName(agent, model);
+  return agent.via ? `${name} · ${agent.via}` : name;
 };
 
 /** The groups of the agent's profiles that have a key and models, after Claude and Codex. */
@@ -91,6 +115,7 @@ const profileAgents = (agent: MachineAgent): IPickerAgent[] =>
       vendor: p.vendor,
       name: p.label,
       short: p.label,
+      via: viaOf(agent.provider, p.vendor),
       models: p.models,
       // A running chat takes a model of its own profile only; the runtime says so by the agent's flag.
       canSwitch: agent.canSwitchModel,

@@ -39,6 +39,10 @@ func noteSessionAccount(dataDir string, keys *providers.Store) func(wire.Provide
 		if key, err := keys.Key(profile); err == nil && key != "" {
 			e.Ref = usagefeed.KeyRef(key)
 		}
+		if pr, ok := providers.Find(profile); ok && pr.Proxied != "" {
+			// A chat through the proxy sends the proxy's key; the account is the provider's, named by its key.
+			e.Ref = proxiedKeyRef(dataDir, pr.Proxied)
+		}
 		if home := codexLoginHomeOf(profile); home != "" {
 			// Another sign-in of the Codex CLI: the account is the one its own home is signed in with, named as the
 			// main sign-in's is, and its calls go to the provider's own endpoint.
@@ -72,4 +76,23 @@ func accountOfSession(dataDir string) func(provider, session string) string {
 		e, _ := store.Of(provider, session)
 		return e.Label
 	}
+}
+
+// proxiedKeyRef is the digest of the key of an OpenAI-compatible provider a chat ran on through the proxy; "" when the
+// registry or the key is not there.
+func proxiedKeyRef(dataDir, provider string) string {
+	extProvidersMu.Lock()
+	svc := extProvidersAll[dataDir]
+	extProvidersMu.Unlock()
+	if svc == nil {
+		return ""
+	}
+	p, err := svc.Get(provider)
+	if err != nil {
+		return ""
+	}
+	if key, err := svc.Key(p); err == nil && key != "" {
+		return usagefeed.KeyRef(key)
+	}
+	return ""
 }

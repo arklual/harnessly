@@ -66,6 +66,7 @@ export const METHOD_PERMISSION = {
   'harnessly/keys.press': '',
   'harnessly/keys.hints': '',
   'harnessly/slot.done': '',
+  'harnessly/slot.greet': '',
   'harnessly/sinopia.document': 'sinopia.read',
   'harnessly/sinopia.selection': 'sinopia.read',
   'harnessly/sinopia.node': 'sinopia.read',

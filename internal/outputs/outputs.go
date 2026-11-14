@@ -4,6 +4,7 @@
 package outputs
 
 import (
+	"github.com/ly-solutions/harnessly/internal/gitpush"
 	"net/url"
 	"os"
 	"path"
@@ -25,6 +26,11 @@ type Config struct {
 	// CLI is the name the deployment gives the harnessly command (RUNTIME_CLI_NAME): `<CLI> open <link>` is read as
 	// `harnessly open <link>` is.
 	CLI string
+	// TrackerURL is the tracker's origin (RUNTIME_TRACKER_URL, or the organization's, hub_links.go): its tasks are
+	// <TrackerURL>/issue/<KEY>, and `open <KEY>` shows one.
+	TrackerURL string
+	// TaskKey is a task's key (RUNTIME_TASK_KEY_RE); nil for the tracker's usual PROJECT-123.
+	TaskKey *regexp.Regexp
 }
 
 // FromEnv is the Config the environment names.
@@ -35,6 +41,16 @@ func FromEnv() Config {
 		ReaderHost:  strings.TrimSpace(os.Getenv("RUNTIME_PLATFORM_HOST")),
 		ReaderPath:  strings.TrimSpace(os.Getenv("RUNTIME_DOCS_READER_PATH")),
 		CLI:         strings.TrimSpace(os.Getenv("RUNTIME_CLI_NAME")),
+		TrackerURL:  strings.TrimRight(strings.TrimSpace(os.Getenv("RUNTIME_TRACKER_URL")), "/"),
+	}
+	if cfg.TrackerURL == "" {
+		// The organization's tracker (cmd/runtime/hub_links.go): only where a task's key leads.
+		cfg.TrackerURL = strings.TrimRight(strings.TrimSpace(os.Getenv("RUNTIME_LINK_TRACKER_URL")), "/")
+	}
+	if re := strings.TrimSpace(os.Getenv("RUNTIME_TASK_KEY_RE")); re != "" {
+		if compiled, err := regexp.Compile(re); err == nil {
+			cfg.TaskKey = compiled
+		}
 	}
 	if cfg.ReaderHost != "" && cfg.ReaderPath == "" {
 		cfg.ReaderPath = "/agents/docs/"
@@ -65,6 +81,13 @@ var (
 	standNameRe = regexp.MustCompile(`^[\w-]+$`)
 	// A dev server the agent shows: `harnessly open http://localhost:5173` (or the deployment's name of the command).
 	openCmdRe = regexp.MustCompile(`(?:^|[\s;&|(/])([\w-]+)\s+open\s+['"]?(https?://[^\s'"]+)`)
+	// A task the agent shows by its key: `harnessly open HRN-1426`.
+	openKeyRe = regexp.MustCompile(`(?:^|[\s;&|(/])([\w-]+)\s+open\s+['"]?([A-Z][A-Z0-9]{1,15}-\d{1,7})(?:['"\s;&|)]|$)`)
+	// A task of the tracker by its address: /issue/<KEY>.
+	issuePathRe = regexp.MustCompile(`^/issue/([A-Z][A-Z0-9]{1,15}-\d{1,7})(?:/.*)?$`)
+	// A commit on GitLab (…/-/commit/<sha>) or GitHub (…/commit/<sha>).
+	gitPushRe    = regexp.MustCompile(`(?:^|[\s;&|(])git\s+(?:-\S+\s+\S+\s+)*push\b`)
+	commitLinkRe = regexp.MustCompile(`^https?://[^/]+/(.+?)/(?:-/)?commit/([0-9a-f]{7,40})/?$`)
 	// The slug of a document in the reader's path.
 	readerSlugRe = regexp.MustCompile(`^[\w-]+/?$`)
 	// A file handed to the person: `harnessly deliver <path>`.
@@ -83,7 +106,10 @@ func IsDeliverTool(tool string) bool {
 var linkRe = regexp.MustCompile("https?://[^\\s\"'<>()\\[\\]{}`]+")
 
 func LinksIn(text string) []string {
-	out := []string{}
+	out := gitpush.CommitLinks(text)
+	if out == nil {
+		out = []string{}
+	}
 	for _, l := range linkRe.FindAllString(text, 16) {
 		out = append(out, strings.TrimRight(l, ".,;:!?*"))
 	}
@@ -120,10 +146,21 @@ func Of(cfg Config, c Call, links []string) []wire.TurnOutput {
 		}
 	}
 	var out []wire.TurnOutput
-	if m := openCmdRe.FindStringSubmatch(cmd); m != nil && (m[1] == "harnessly" || (cfg.CLI != "" && m[1] == cfg.CLI)) {
+	// A push names the commits it put on the server (gitpush, in the result's links): each is a commit of the chat.
+	if gitPushRe.MatchString(cmd) {
+		for _, link := range links {
+			if m := commitLinkRe.FindStringSubmatch(link); m != nil {
+				out = append(out, wire.TurnOutput{Kind: wire.OutputCommit, Op: wire.OutputCreated, Ref: link, Title: path.Base(m[1]) + " " + m[2][:min(len(m[2]), 9)]})
+			}
+		}
+	}
+	ours := func(name string) bool { return name == "harnessly" || (cfg.CLI != "" && name == cfg.CLI) }
+	if m := openCmdRe.FindStringSubmatch(cmd); m != nil && ours(m[1]) {
 		if o, ok := opened(cfg, m[2]); ok {
 			out = append(out, o)
 		}
+	} else if m := openKeyRe.FindStringSubmatch(cmd); m != nil && ours(m[1]) && cfg.TrackerURL != "" && cfg.taskKey(m[2]) {
+		out = append(out, wire.TurnOutput{Kind: wire.OutputTask, Op: wire.OutputCreated, Ref: cfg.TrackerURL + "/issue/" + m[2], Title: m[2]})
 	}
 	if !strings.HasPrefix(strings.TrimSpace(cmd), "curl") {
 		if link := first(links, func(l string) bool { return StandLink(cfg, l) }); link != "" {
@@ -167,10 +204,38 @@ func opened(cfg Config, link string) (wire.TurnOutput, bool) {
 		return wire.TurnOutput{Kind: wire.OutputArtifact, Op: wire.OutputCreated, Ref: link, Title: SlugOf(link)}, true
 	case mrLinkRe.MatchString(link):
 		return wire.TurnOutput{Kind: wire.OutputMR, Op: wire.OutputCreated, Ref: link, Title: mrName(link)}, true
+	case commitLinkRe.MatchString(link):
+		m := commitLinkRe.FindStringSubmatch(link)
+		return wire.TurnOutput{Kind: wire.OutputCommit, Op: wire.OutputCreated, Ref: link, Title: path.Base(m[1]) + " " + m[2][:min(len(m[2]), 9)]}, true
+	case cfg.taskLink(link) != "":
+		key := cfg.taskLink(link)
+		return wire.TurnOutput{Kind: wire.OutputTask, Op: wire.OutputCreated, Ref: link, Title: key}, true
 	case StandLink(cfg, link) || localLink(link):
 		return wire.TurnOutput{Kind: wire.OutputStand, Op: wire.OutputCreated, Ref: link, Title: hostOf(link)}, true
 	}
 	return wire.TurnOutput{}, false
+}
+
+// taskKey says whether key is a task's key as the deployment writes them.
+func (cfg Config) taskKey(key string) bool {
+	return cfg.TaskKey == nil || cfg.TaskKey.MatchString(key)
+}
+
+// taskLink is the key of a task of the tracker the link is (<TrackerURL>/issue/<KEY>), "" for any other link.
+func (cfg Config) taskLink(link string) string {
+	if cfg.TrackerURL == "" {
+		return ""
+	}
+	u, err := url.Parse(link)
+	t, terr := url.Parse(cfg.TrackerURL)
+	if err != nil || terr != nil || !strings.EqualFold(u.Host, t.Host) {
+		return ""
+	}
+	m := issuePathRe.FindStringSubmatch(u.Path)
+	if m == nil || !cfg.taskKey(m[1]) {
+		return ""
+	}
+	return m[1]
 }
 
 // localLink is a server of this machine: http(s)://localhost:<port>, 127.0.0.1, 0.0.0.0, [::1].

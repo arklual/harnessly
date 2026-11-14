@@ -245,3 +245,26 @@ func TestAProjectMovesToAnotherFolder(t *testing.T) {
 		t.Fatalf("launched: %+v", r.launcher.launched)
 	}
 }
+
+// The registry the hub keeps is told the whole list after a project is made or changed.
+func TestProjectsChangedIsToldTheWholeList(t *testing.T) {
+	r := newRig(t)
+	var told [][]wire.Project
+	r.rt.d.ProjectsChanged = func(ps []wire.Project) { told = append(told, ps) }
+	folder := filepath.Join(r.dir, "work")
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	res := r.do(wire.ProjectCreateCmd{OpID: "p1", Path: folder})
+	if len(told) != 1 || len(told[0]) != 1 || told[0][0].Name != "work" {
+		t.Fatalf("after create: %+v", told)
+	}
+	r.do(wire.ProjectUpdateCmd{OpID: "p2", ID: *res.ID, Name: "renamed"})
+	if len(told) != 2 || told[1][0].Name != "renamed" {
+		t.Fatalf("after rename: %+v", told)
+	}
+	r.do(wire.ProjectCreateCmd{OpID: "p3", Path: folder})
+	if len(told) != 2 {
+		t.Errorf("a folder that already is a project told again: %d", len(told))
+	}
+}

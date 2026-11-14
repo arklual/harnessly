@@ -36,4 +36,18 @@ const SiteLoader = ({ stage }: { stage: TLoadStage }) => {
   );
 };
 
+/**
+ * The board as it was last saved, while the editing frame opens: the person sees the design at once and reads it; a
+ * thin line says the editing is on its way. It cannot be clicked: the picks belong to the frame that comes.
+ */
+export const SiteHeld = ({ src, title }: { src: string; title: string }) => (
+  <div className="hx-site-held" role="status">
+    <iframe className="hx-site-held__frame" src={src} title={title} tabIndex={-1} aria-hidden="true" />
+    <span className="hx-site-held__line">
+      <span className="hx-site-held__spin" aria-hidden="true" />
+      {t('next.site.loadEdit')}
+    </span>
+  </div>
+);
+
 export default SiteLoader;

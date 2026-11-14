@@ -560,3 +560,23 @@ func TestClassifyAsksTheResolverBeforeTheBrowserOnly(t *testing.T) {
 		t.Errorf("task key went to %q", tab)
 	}
 }
+
+// A board file of the library opens in Sinopia Design on its design, not as a file; any other file stays a file.
+func TestBoardFileOpensDesign(t *testing.T) {
+	withLibrary := targets
+	withLibrary.DesignBoard = func(path string) string {
+		if path == "/lib/landing/project/Main.dc.html" {
+			return "landing"
+		}
+		return ""
+	}
+	c, err := withLibrary.Parse(open("files", "/lib/landing/project/Main.dc.html"))
+	if err != "" || c != (Command{Kind: "open", Tab: "design", Target: "landing"}) {
+		t.Fatalf("board → %+v %q", c, err)
+	}
+	for _, in := range []string{"/w/other.dc.html", "/lib/landing/project/notes.md"} {
+		if c, err := withLibrary.Parse(open("files", in)); err != "" || c.Tab != "files" {
+			t.Errorf("%q → %+v %q", in, c, err)
+		}
+	}
+}

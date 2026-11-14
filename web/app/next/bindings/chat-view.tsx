@@ -30,7 +30,8 @@ import { AttachmentSrc } from '@/next/ui/attachment-thumb';
 import { useFeedItems, withOrigin } from '@/next/bindings/feed-items';
 import { useChatHandoff } from '@/next/bindings/chat-handoff';
 import { useChatMove } from '@/next/bindings/chat-move';
-import { useInheritedMrs } from '@/next/bindings/inherited-mrs';
+import { inheritedMrs } from '@/next/bindings/inherited-mrs';
+import { useInheritedMade } from '@/next/bindings/inherited-made';
 import MovedNote from '@/next/features/chat-move/moved-note';
 import { ChatLinks } from '@/next/features/chat/handoff';
 import { chatUrl, terminalStopText } from '@/next/bindings/shell-model';
@@ -47,7 +48,9 @@ import { hub, useConversationChannel } from '@/next/core/realtime/hub';
 import AppBackground from '@/next/features/app-views/background';
 import type { ConvId, MachineId, TurnOutput } from '@/next/protocol/v2';
 import { useFeedKinds } from '@/next/stores/feed-kinds';
-import { downloadUrl } from '@/next/features/pane/delivered';
+import { downloadUrl, viewUrl } from '@/next/features/pane/delivered';
+import { saveFrom } from '@/next/features/pane/download';
+import { useAutoDownload } from '@/next/features/chat/auto-download';
 import { linkReason, useConnection, useLinkRestored } from '@/next/stores/connection';
 import { useBackground, useFeed, useGates, usePictures, useQueue } from '@/next/stores/conversation';
 import { runsByCall, WorkflowRuns } from '@/next/features/workflows/run';
@@ -61,7 +64,7 @@ import { AskSource, type IAskSource } from '@/next/features/asks/parse';
 import { AppViewHost, type IAppViewHost } from '@/next/features/app-views/host';
 import PostedCards from '@/next/features/app-views/posted';
 import { RewindActions, type IRewindActions } from '@/next/features/chat/rewind';
-import { DelegatedChats } from '@/next/features/chat/delegation';
+import { DelegatedChats, SubchatsMade } from '@/next/features/chat/delegation';
 import { sendPeer } from '@/next/features/peers/api';
 import { goTo, ROUTE } from '@/next/routes/routes';
 import { useMachine } from '@/next/stores/machines';
@@ -75,6 +78,7 @@ import { toast } from '@/next/ui/toast';
 import { useDeadline } from '@/next/ui/use-deadline';
 import { requestContinue } from '@/next/stores/ui-requests';
 import { takeBackMessage } from '@/next/bindings/take-back';
+import { ReplyMachine } from '@/next/features/composer/reply-field';
 
 interface IChatViewProps {
   conv: ConvId;
@@ -163,13 +167,25 @@ const ChatView = ({
   const workflowRuns = useMemo(() => runsByCall(background), [background]);
   const agentState = useAgentState(conv);
   const workingSince = agentState?.k === 'working' ? agentState.since : null;
-  const inherited = useInheritedMrs(machine, conv, agentState !== null && !BUSY.has(agentState.k));
   const terminalStop = record ? terminalStopText(record) : null;
   const limited = record?.limited ?? null;
   const machineClock = useCallback(() => machineNow(machine), [machine]);
   const me = useMe();
   const reveal = useReveal(conv);
   const shown = useFeedKinds();
+  // A file the agent hands over in this chat is saved at once, the card stays to open it.
+  const deliveredHref = useCallback(
+    (output: TurnOutput) => downloadUrl(machine, output.ref, output),
+    [machine],
+  );
+  useAutoDownload({
+    conv,
+    items,
+    subscribedAt: feed?.subscribedAt ?? null,
+    live: feed?.source === 'live' && shown.delivery,
+    hrefOf: deliveredHref,
+    save: saveFrom,
+  });
   // A document file of a turn that is being shared: its card's «Поделиться» opens the dialog here.
   const [sharing, setSharing] = useState<{ path: string; open: boolean } | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -323,6 +339,16 @@ const ChatView = ({
     () => (machineChats ?? []).filter((c) => c.parentId === conv).sort((a, b) => a.createdAt - b.createdAt),
     [machineChats, conv],
   );
+  // What the subchats made: their merge requests under a finished task, the rest under each card «Поручено»; asked
+  // again as the subchats move, so the card fills while they work.
+  const subchatsMoved = `${agentState?.k ?? ''}|${delegated.map((c) => `${c.id}:${c.state.k}:${c.lastActivityAt}`).join(',')}`;
+  const subchatsMade = useInheritedMade(
+    machine,
+    conv,
+    (agentState !== null && !BUSY.has(agentState.k)) || delegated.length > 0,
+    subchatsMoved,
+  );
+  const inherited = useMemo(() => inheritedMrs(subchatsMade), [subchatsMade]);
 
   // Another agent's card: its chat opens here when it is one of the person's, an answer goes back from this chat.
   const peerActions = useMemo<IPeerActions>(
@@ -357,125 +383,131 @@ const ChatView = ({
         <MessagePictures.Provider value={pictures}>
           <ImageHost.Provider value={imageHost}>
             <PeerActions.Provider value={peerActions}>
-              <AskSource.Provider value={askSource}>
-                <AppViewHost value={appViewHost}>
-                  <RewindActions value={rewindActions}>
-                    <DelegatedChats.Provider value={delegated}>
-                      <WorkflowRuns value={workflowRuns}>
-                        <Feed
-                          items={items}
-                          placeKey={conv}
-                          onCopyChatLink={() => copyLink(chatUrl(conv))}
-                          onReloadChat={() => hub.reloadConversation(machine, conv)}
-                          failed={notFound || wait.expired}
-                          failedReason={notFound ? null : failedReason}
-                          onRetryLoad={() => {
-                            onRetryLoad();
-                            wait.restart();
-                          }}
-                          olderFailed={olderFailed}
-                          hasOlder={before !== null}
-                          loadingOlder={loadingOlder}
-                          catchingUp={catchingUp}
-                          onLoadOlder={onLoadOlder}
-                          reveal={reveal}
-                          onRevealed={doneReveal}
-                          density={density}
-                          offline={connection !== undefined && connection.k !== 'live'}
-                          enterAfter={feed?.subscribedAt ?? openedAt}
-                          machineName={machineView?.machine.name ?? machine}
-                          workingSince={workingSince}
-                          terminalStop={terminalStop}
-                          goalReached={goalReached}
-                          limit={
-                            <LimitCard
-                              limited={limited}
-                              clock={machineClock}
-                              controls={machineView?.features.includes('auto-continue') ?? false}
-                              onDecide={(action) => settled(decideLimit(machine, conv, action))}
-                            />
-                          }
-                          terminalFailure={
-                            <>
-                              <PostedCards />
-                              <TerminalFailureCard
-                                failure={record?.terminalFailure ?? null}
-                                onChooseTarget={handoff.handoff ? () => requestContinue(conv) : null}
-                                onRetry={() => {
-                                  const text = retryText(items, queue?.items.length ?? 0);
-                                  if (text) sendMessage(machine, { conversationId: conv, text });
-                                  return settled(resumeQueue(machine, conv));
-                                }}
-                              />
-                              {loginLost && provider && (
-                                <ChatLogin
-                                  key={loginLost.key}
-                                  machine={machine}
-                                  provider={provider}
-                                  onRetry={
-                                    loginLost.prompt ? () => resend(loginLost.prompt?.text ?? '') : null
-                                  }
+              <ReplyMachine.Provider value={machine}>
+                <AskSource.Provider value={askSource}>
+                  <AppViewHost value={appViewHost}>
+                    <RewindActions value={rewindActions}>
+                      <DelegatedChats.Provider value={delegated}>
+                        <SubchatsMade.Provider value={subchatsMade}>
+                          <WorkflowRuns value={workflowRuns}>
+                            <Feed
+                              items={items}
+                              placeKey={conv}
+                              onCopyChatLink={() => copyLink(chatUrl(conv))}
+                              onReloadChat={() => hub.reloadConversation(machine, conv)}
+                              failed={notFound || wait.expired}
+                              failedReason={notFound ? null : failedReason}
+                              onRetryLoad={() => {
+                                onRetryLoad();
+                                wait.restart();
+                              }}
+                              olderFailed={olderFailed}
+                              hasOlder={before !== null}
+                              loadingOlder={loadingOlder}
+                              catchingUp={catchingUp}
+                              onLoadOlder={onLoadOlder}
+                              reveal={reveal}
+                              onRevealed={doneReveal}
+                              density={density}
+                              offline={connection !== undefined && connection.k !== 'live'}
+                              enterAfter={feed?.subscribedAt ?? openedAt}
+                              machineName={machineView?.machine.name ?? machine}
+                              workingSince={workingSince}
+                              terminalStop={terminalStop}
+                              goalReached={goalReached}
+                              limit={
+                                <LimitCard
+                                  limited={limited}
+                                  clock={machineClock}
+                                  controls={machineView?.features.includes('auto-continue') ?? false}
+                                  onDecide={(action) => settled(decideLimit(machine, conv, action))}
                                 />
-                              )}
-                            </>
-                          }
-                          waiting={
-                            waitingAgents.length > 0
-                              ? { agents: waitingAgents, onOpen: onShowBackground }
-                              : null
-                          }
-                          modelLabel={modelLabel}
-                          onOpenFile={onOpenFile}
-                          onOpenOutput={onOpenOutput}
-                          onReviewMr={(url) => goTo({ kind: ROUTE.review, url, chat: conv })}
-                          inheritedMrs={inherited}
-                          onShareFile={(path) => setSharing({ path, open: true })}
-                          shown={shown}
-                          downloadUrl={(path, output) => downloadUrl(machine, path, output)}
-                          onOpenRef={
-                            onOpenFile || onOpenRef
-                              ? (kind, label, href) => {
-                                  if (kind === 'file' && !href) onOpenFile?.(label.replace(/:\d+$/, ''));
-                                  else onOpenRef?.(href ?? label);
-                                }
-                              : undefined
-                          }
-                          onLoadSteps={onLoadSteps}
-                          onContinueTurn={() => resend(t('next.turnEnd.continueText'))}
-                          onRetryTurn={(turnId) =>
-                            resend(turnPrompt.get(turnId) ?? t('next.turnEnd.continueText'))
-                          }
-                          onRetryMessage={(clientId) => settled(retryMessage(clientId))}
-                          onResendMessage={(clientId) => {
-                            resendRefused(clientId);
-                            return Promise.resolve();
-                          }}
-                          onDeleteMessage={(clientId) => {
-                            const m = messagesStore.get(clientId);
-                            if (!m) return Promise.resolve();
-                            return settled(cancelMessage(clientId));
-                          }}
-                          onEditMessage={(clientId) => takeBackMessage(conv, clientId)}
-                          renderGate={renderGate}
-                          onForkTurn={handoff.onForkTurn}
-                          dock={
-                            move.moved ? (
-                              <MovedNote moved={move.moved} onOpen={move.openMoved} />
-                            ) : (
-                              <ChatDock
-                                conv={conv}
-                                machine={machine}
-                                extra={dockExtra}
-                                handoff={handoff.handoff}
-                              />
-                            )
-                          }
-                        />
-                      </WorkflowRuns>
-                    </DelegatedChats.Provider>
-                  </RewindActions>
-                </AppViewHost>
-              </AskSource.Provider>
+                              }
+                              terminalFailure={
+                                <>
+                                  <PostedCards />
+                                  <TerminalFailureCard
+                                    failure={record?.terminalFailure ?? null}
+                                    onChooseTarget={handoff.handoff ? () => requestContinue(conv) : null}
+                                    onRetry={() => {
+                                      const text = retryText(items, queue?.items.length ?? 0);
+                                      if (text) sendMessage(machine, { conversationId: conv, text });
+                                      return settled(resumeQueue(machine, conv));
+                                    }}
+                                  />
+                                  {loginLost && provider && (
+                                    <ChatLogin
+                                      key={loginLost.key}
+                                      machine={machine}
+                                      provider={provider}
+                                      onRetry={
+                                        loginLost.prompt ? () => resend(loginLost.prompt?.text ?? '') : null
+                                      }
+                                    />
+                                  )}
+                                </>
+                              }
+                              waiting={
+                                waitingAgents.length > 0
+                                  ? { agents: waitingAgents, onOpen: onShowBackground }
+                                  : null
+                              }
+                              modelLabel={modelLabel}
+                              onOpenFile={onOpenFile}
+                              onOpenOutput={onOpenOutput}
+                              onReviewMr={(url) => goTo({ kind: ROUTE.review, url, chat: conv })}
+                              inheritedMrs={inherited}
+                              onShareFile={(path) => setSharing({ path, open: true })}
+                              shown={shown}
+                              downloadUrl={(path, output) => downloadUrl(machine, path, output)}
+                              viewUrl={(path, output) => viewUrl(machine, path, output)}
+                              machine={machine}
+                              onOpenRef={
+                                onOpenFile || onOpenRef
+                                  ? (kind, label, href) => {
+                                      if (kind === 'file' && !href) onOpenFile?.(label.replace(/:\d+$/, ''));
+                                      else onOpenRef?.(href ?? label);
+                                    }
+                                  : undefined
+                              }
+                              onLoadSteps={onLoadSteps}
+                              onContinueTurn={() => resend(t('next.turnEnd.continueText'))}
+                              onRetryTurn={(turnId) =>
+                                resend(turnPrompt.get(turnId) ?? t('next.turnEnd.continueText'))
+                              }
+                              onRetryMessage={(clientId) => settled(retryMessage(clientId))}
+                              onResendMessage={(clientId) => {
+                                resendRefused(clientId);
+                                return Promise.resolve();
+                              }}
+                              onDeleteMessage={(clientId) => {
+                                const m = messagesStore.get(clientId);
+                                if (!m) return Promise.resolve();
+                                return settled(cancelMessage(clientId));
+                              }}
+                              onEditMessage={(clientId) => takeBackMessage(conv, clientId)}
+                              renderGate={renderGate}
+                              onForkTurn={handoff.onForkTurn}
+                              dock={
+                                move.moved ? (
+                                  <MovedNote moved={move.moved} onOpen={move.openMoved} />
+                                ) : (
+                                  <ChatDock
+                                    conv={conv}
+                                    machine={machine}
+                                    extra={dockExtra}
+                                    handoff={handoff.handoff}
+                                  />
+                                )
+                              }
+                            />
+                          </WorkflowRuns>
+                        </SubchatsMade.Provider>
+                      </DelegatedChats.Provider>
+                    </RewindActions>
+                  </AppViewHost>
+                </AskSource.Provider>
+              </ReplyMachine.Provider>
             </PeerActions.Provider>
           </ImageHost.Provider>
         </MessagePictures.Provider>

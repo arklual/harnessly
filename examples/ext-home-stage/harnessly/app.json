@@ -1,0 +1,14 @@
+{
+  "id": "example-corp.day",
+  "name": "Example Corp day",
+  "description": "The page of the day on the start page: the whole stage under the field and its own greeting over it",
+  "version": "1.0.0",
+  "harnessly": ">=0.17",
+  "trust": "sandboxed",
+  "targets": ["home"],
+  "permissions": [],
+  "views": [
+    { "id": "day", "title": "Example Corp day", "height": "stage", "entry": "ui/day.html", "targets": ["home"] }
+  ],
+  "kind": "ui"
+}

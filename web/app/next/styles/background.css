@@ -691,3 +691,34 @@ button.hx-bg__main:hover {
     transition-duration: 1ms;
   }
 }
+
+/* One chat's blocks of the column (chat-swap.ts): over a change of chat the column stays; the last chat's blocks lie
+   over the next chat's and fade out lifting a little, the next chat's fade in — a cross-fade, no empty column between.
+   Its recap and pictures do not grow from nothing then: the column's height goes over on its own. Only opacity and
+   transform. */
+.hx-side__chat[data-leaving] {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  left: 4px;
+  pointer-events: none;
+  animation: hx-side-chat-out 180ms var(--hx-ease-out) forwards;
+}
+.hx-side__chat[data-came='swap'] {
+  animation: hx-side-chat-in 180ms var(--hx-ease-out) backwards;
+}
+.hx-side__chat:is([data-came='swap'], [data-leaving]) :is(.hx-recap, .hx-shots) {
+  animation: none;
+}
+@keyframes hx-side-chat-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes hx-side-chat-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}

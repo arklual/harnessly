@@ -45,13 +45,15 @@ const (
 
 // hub is the state of a hub-mode agent.
 type hub struct {
-	a       *Agent
-	machine *MachineFile
-	policy  *PolicyStore
-	audit   *Audit
-	env     *agentnet.EnvDir
-	proxies *agentnet.Proxies
-	budget  *budgetKeeper
+	// projects is the registry of the machine's projects as its runtime last told it (projects.go).
+	projects projectsCache
+	a        *Agent
+	machine  *MachineFile
+	policy   *PolicyStore
+	audit    *Audit
+	env      *agentnet.EnvDir
+	proxies  *agentnet.Proxies
+	budget   *budgetKeeper
 	// environment is the hub's list of skills, MCP servers, repositories and documents (env.set).
 	environment *envKeeper
 	check       *agentnet.Checker
@@ -506,7 +508,7 @@ func (h *hub) hello() hubproto.Hello {
 		features = append(features, hubproto.FeatureUsage)
 	}
 	// The organization's rule for apps rides on env.set; the runtime reads it from the list's file.
-	features = append(features, hubproto.FeatureEnvironment, hubproto.FeatureEnvAppsConsent)
+	features = append(features, hubproto.FeatureEnvironment, hubproto.FeatureEnvAppsConsent, hubproto.FeatureEnvLinks)
 	// The runtime ships in the same release and does the setup; an own link takes it only under the policy's `setup`.
 	offered := h.setupOffered()
 	if offered {
@@ -534,6 +536,9 @@ func (h *hub) hello() hubproto.Hello {
 		features = append(features, hubproto.FeatureHistory)
 	}
 	features = append(features, hubproto.FeatureRepl)
+	if h.projectsServed() {
+		features = append(features, hubproto.FeatureProjects)
+	}
 	if h.docsServed() {
 		features = append(features, hubproto.FeatureDocs)
 	}

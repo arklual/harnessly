@@ -2,7 +2,7 @@
 // provider is «as now»: the chat's own agent decides.
 import { getPage, sendBody } from '@/next/core/net/http';
 import { platformPath, runtimePath } from '@/next/core/net/machine';
-import type { IExtModel } from '@/next/features/settings/ext-providers-api';
+import { EXT_EFFORTS, type IExtModel, type TExtEffort } from '@/next/features/settings/ext-providers-api';
 import { answer, bool, list, num, obj, opt, str } from '@/next/features/settings/platform-answer';
 import type { MachineId } from '@/next/protocol/v2';
 
@@ -12,6 +12,8 @@ const TIMEOUT_MS = 10_000;
 export interface ISmartChoice {
   provider: string;
   model: string;
+  /** The level of reasoning the model is asked for; absent or '': the model's own. */
+  effort?: TExtEffort | '';
 }
 
 export const SMART_OFF = 'off';
@@ -43,10 +45,17 @@ export interface ISmartView {
   providers: readonly ISmartProvider[];
 }
 
+const isEffort = (v: unknown): v is TExtEffort =>
+  typeof v === 'string' && (EXT_EFFORTS as readonly string[]).includes(v);
+
 const readModel = (v: unknown): IExtModel => {
   const o = obj(v, 'model');
   const id = str(o.id, 'model.id');
-  return { id, label: opt(o.label) || id };
+  return {
+    id,
+    label: opt(o.label) || id,
+    efforts: Array.isArray(o.efforts) ? o.efforts.filter(isEffort) : [],
+  };
 };
 
 const readFailure = (v: unknown): string | null => {
@@ -66,7 +75,10 @@ const readFeature = (v: unknown): ISmartFeature => {
     description: str(o.description, 'description'),
     live: bool(o.live, 'live'),
     agents: o.agents === true,
-    choice: provider === '' ? null : { provider, model: opt(o.model) },
+    choice:
+      provider === ''
+        ? null
+        : { provider, model: opt(o.model), ...(isEffort(o.effort) ? { effort: o.effort } : {}) },
     failure: readFailure(o.last),
   };
 };

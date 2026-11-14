@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"io"
 	"math"
 	"net/http"
 	"regexp"
@@ -25,6 +26,7 @@ const (
 	maxAvatar      = 200_000
 	avatarFresh    = 24 * time.Hour
 	serviceTimeout = 8 * time.Second
+	standTimeout   = 5 * time.Second
 	projectsFresh  = time.Hour
 	issueFields    = "idReadable,summary,resolved,customFields(name,value(name,login,fullName,avatarUrl)),parent(issues(idReadable,summary,customFields(name,value(name))))"
 	avatarPrefix   = "/hub/api/rest/avatar/"
@@ -88,6 +90,10 @@ func (t linkTarget) cacheKey() string {
 		return "mr:" + t.host + "/" + t.project + "!" + jscompat.Number(t.iid)
 	case "conn-issue", "conn-page":
 		return t.kind + ":" + t.conn + ":" + t.key
+	case "commit":
+		return "commit:" + t.host + "/" + t.project + "@" + t.key
+	case "stand":
+		return "stand:" + t.url
 	}
 	return "artifact:" + t.url
 }
@@ -95,6 +101,8 @@ func (t linkTarget) cacheKey() string {
 var (
 	issueURLRe   = regexp.MustCompile(`^/(?:youtrack/)?issue/([A-Z][A-Z0-9]{0,15}-\d{1,7})(?:/[^?#]*)?$`)
 	mrURLRe      = regexp.MustCompile(`^/((?:[\w.-]{1,100}/){1,6}[\w.-]{1,100})/-/merge_requests/(\d{1,9})(?:/[\w-]*)?$`)
+	commitURLRe  = regexp.MustCompile(`^/((?:[\w.-]{1,100}/){1,6}[\w.-]{1,100})/-/commit/([0-9a-f]{7,40})/?$`)
+	standNameRe  = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
 	artifactRe   = regexp.MustCompile(`^/(?:a|b)/([\w-]{1,160})/?$`)
 	portalPathRe = regexp.MustCompile(`^/(?:a/([\w-]+)|b/([\w-]+))/?$`)
 	boardKeyRe   = regexp.MustCompile(`^[\w-]{1,64}$`)
@@ -192,7 +200,13 @@ func (s *Service) parseLinkTarget(raw string) *linkTarget {
 		}
 		return nil
 	}
+	if plain && s.isStandHost(u.Host) {
+		return &linkTarget{kind: "stand", url: u.Origin() + path}
+	}
 	if plain && s.isGitlabHost(u.Host) {
+		if c := commitURLRe.FindStringSubmatch(path); c != nil && !strings.Contains(c[1], "..") {
+			return &linkTarget{kind: "commit", host: u.Host, project: c[1], key: c[2]}
+		}
 		m := mrURLRe.FindStringSubmatch(path)
 		if m == nil {
 			return nil
@@ -393,8 +407,84 @@ func (s *Service) fetchMr(ctx context.Context, t *linkTarget) (any, error) {
 	if st, ok := opt(mr, "state").(string); ok && mrStates[st] {
 		state = st
 	}
-	return obj("kind", "mr", "iid", opt(mr, "iid"), "title", opt(mr, "title"), "state", state, "project", t.project,
-		"draft", truthy(opt(mr, "draft"))), nil
+	out := obj("kind", "mr", "iid", opt(mr, "iid"), "title", opt(mr, "title"), "state", state, "project", t.project,
+		"draft", truthy(opt(mr, "draft")))
+	// The pipeline only when there is one: a page that never read it gets the same answer as before.
+	if p := pipelineOf(opt(mr, "head_pipeline")); p != nil {
+		out.Set("pipeline", p)
+	}
+	return out, nil
+}
+
+// fetchCommit is a commit of GitLab: its title and its last pipeline.
+func (s *Service) fetchCommit(ctx context.Context, t *linkTarget) (any, error) {
+	h := http.Header{}
+	if token := s.gitlabToken(t.host); token != "" {
+		h.Set("Private-Token", token)
+	}
+	c, err := s.fetchJSON(ctx, s.gitlabBase(t.host)+"/projects/"+files.EncodeURIComponent(t.project)+"/repository/commits/"+t.key, h)
+	if err != nil || !truthy(c) {
+		return nil, err
+	}
+	return obj("kind", "commit", "title", opt(c, "title"), "sha", opt(c, "short_id"), "project", t.project,
+		"pipeline", pipelineOf(opt(c, "last_pipeline"))), nil
+}
+
+// isStandHost: one name under the stands' domain (RUNTIME_STAND_DOMAIN, or the organization's).
+func (s *Service) isStandHost(host string) bool {
+	domain := strings.ToLower(strings.Trim(s.cfg.StandDomain, ". "))
+	name, ok := strings.CutSuffix(strings.ToLower(host), "."+domain)
+	return domain != "" && ok && standNameRe.MatchString(name)
+}
+
+// fetchStand says whether a feature stand answers, and its page's title. A redirect (its sign-in) is a stand that is
+// up; no answer, or a 5xx, is one that is down: an answer as well, not a miss.
+func (s *Service) fetchStand(ctx context.Context, target string) (any, error) {
+	resp := s.standPage(ctx, target)
+	if resp == nil || resp.status >= 500 {
+		return obj("kind", "stand", "up", false, "title", nil), nil
+	}
+	var title any
+	if resp.ok() && htmlType.MatchString(resp.header.Get("Content-Type")) {
+		if got, _ := parseArtifactHTML(decodeText(resp.body)); got != nil {
+			title = *got
+		}
+	}
+	return obj("kind", "stand", "up", true, "title", title), nil
+}
+
+// standHops is how many redirects a stand's probe follows.
+const standHops = 5
+
+// standPage reads a stand's page following its redirects only while they stay on stands (a sign-in of the same stand,
+// another path): a redirect anywhere else is not followed, the stand answered and that is all the card says. The probe
+// never reaches an address outside the stand domain the organization named. nil when the stand did not answer.
+func (s *Service) standPage(ctx context.Context, target string) *response {
+	ctx, cancel := context.WithTimeout(ctx, standTimeout)
+	defer cancel()
+	for range standHops {
+		req, err := newRequest(ctx, target)
+		if err != nil {
+			return nil
+		}
+		req.Header.Set("Accept", "text/html")
+		resp, err := s.noFollow.Do(req)
+		if err != nil {
+			return nil
+		}
+		if resp.StatusCode < 300 || resp.StatusCode > 399 {
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, maxHTML))
+			_ = resp.Body.Close()
+			return &response{status: resp.StatusCode, header: resp.Header, url: hrefOf(resp.Request.URL), body: body}
+		}
+		_ = resp.Body.Close()
+		loc, err := resp.Request.URL.Parse(resp.Header.Get("Location"))
+		if err != nil || loc.Scheme != "https" || !s.isStandHost(loc.Host) {
+			return &response{status: resp.StatusCode, header: resp.Header}
+		}
+		target = loc.String()
+	}
+	return &response{status: http.StatusFound, header: http.Header{}}
 }
 
 var htmlType = regexp.MustCompile(`text/html`)
@@ -507,6 +597,10 @@ func (s *Service) loadMeta(ctx context.Context, t *linkTarget) (any, error) {
 		return s.fetchMr(ctx, t)
 	case "conn-issue", "conn-page":
 		return s.connMeta(ctx, t)
+	case "commit":
+		return s.fetchCommit(ctx, t)
+	case "stand":
+		return s.fetchStand(ctx, t.url)
 	}
 	return s.fetchArtifact(ctx, t.url)
 }

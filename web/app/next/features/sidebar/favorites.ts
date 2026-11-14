@@ -53,6 +53,15 @@ export const favoritesOf = (chats: readonly ISidebarChat[], layout: ISidebarFavo
 
 export const isFavEmpty = (view: IFavView): boolean => view.groups.length === 0 && view.loose.length === 0;
 
+/**
+ * How many rows the favorites take under their label as a page draws them on a load (every group open): a
+ * group's head, its chats or the note of an empty one, then the loose chats; the hint of empty favorites is one row.
+ */
+export const favRowCount = (view: IFavView): number =>
+  isFavEmpty(view)
+    ? 1
+    : view.groups.reduce((n, group) => n + 1 + Math.max(group.chats.length, 1), 0) + view.loose.length;
+
 /** Where a favorite chat stands: its group's id, or null among the loose; undefined when it is not a favorite. */
 export const groupOfChat = (view: IFavView, id: string): string | null | undefined => {
   for (const group of view.groups) if (group.chats.some((chat) => chat.id === id)) return group.id;
@@ -180,7 +189,10 @@ const chatPlan = (
       return { op: PLAN.move, id: source, projectId: target.id, unpin: chat.pinned };
     case DROP.recent:
       if (chat.pinned) return { op: PLAN.unpin, id: source };
-      return chat.projectId === null ? null : { op: PLAN.move, id: source, projectId: null, unpin: false };
+      // A chat in an app's folder is taken by the move: it leaves the folder for the recent chats.
+      return chat.projectId === null && !chat.from
+        ? null
+        : { op: PLAN.move, id: source, projectId: null, unpin: false };
   }
 };
 

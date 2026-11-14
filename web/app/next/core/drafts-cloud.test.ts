@@ -101,6 +101,22 @@ describe('drafts on the machine', () => {
     expect(writes).toHaveLength(2);
   });
 
+  it('HRN-1402: typing on while its writes come back does not send a write per round trip', async () => {
+    const { rt, writes } = await start();
+    rt.latencyMs = 80;
+    let text = '';
+    // Four seconds of typing, a letter every 60 ms: the echo of each write finds the field moved on.
+    for (let i = 0; i < 66; i += 1) {
+      text += 'а';
+      setDraftText(CONV, text);
+      await vi.advanceTimersByTimeAsync(60);
+    }
+    // Once in CLOUD_EVERY_MS while the typing goes on, not once in a round trip (that was ~40 writes).
+    expect(writes.length).toBeLessThanOrEqual(Math.ceil(4000 / CLOUD_EVERY_MS) + 1);
+    await vi.advanceTimersByTimeAsync(CLOUD_EVERY_MS + 500);
+    expect(writes.at(-1)?.text).toBe(text);
+  });
+
   it('a pristine field takes what another device wrote', async () => {
     const { other } = await start();
     await typing('черновик');
@@ -210,7 +226,9 @@ describe('drafts on the machine', () => {
       await vi.advanceTimersByTimeAsync(400);
     }
     // Four seconds of keys 400 ms apart: two writes, not one per pause of the old 700 ms and not none.
-    expect(writes).toHaveLength(Math.floor((10 * 400) / CLOUD_EVERY_MS));
+    // The write due at the fourth second is on its way (the echo of the first no longer sends one at once).
+    await vi.advanceTimersByTimeAsync(50);
+    expect(writes.map((w) => w.text.length)).toEqual([5, 10]);
     await vi.advanceTimersByTimeAsync(CLOUD_DELAY_MS);
     expect(writes.at(-1)?.text).toBe('а'.repeat(10));
   });

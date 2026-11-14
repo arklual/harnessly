@@ -57,6 +57,7 @@ func serviceConfig(d deps) services.Config {
 		TrackerURL:      os.Getenv("RUNTIME_TRACKER_URL"),
 		TrackerHosts:    splitList(os.Getenv("RUNTIME_TRACKER_HOSTS")),
 		DocsHost:        os.Getenv("RUNTIME_DOCS_HOST"),
+		StandDomain:     strings.TrimSpace(os.Getenv("RUNTIME_STAND_DOMAIN")),
 		PortalOrigins:   portalOrigins(),
 		ReaderHost:      os.Getenv("RUNTIME_PLATFORM_HOST"),
 		ReaderPath:      env("RUNTIME_DOCS_READER_PATH", "/agents/docs/"),
@@ -80,6 +81,14 @@ func serviceConfig(d deps) services.Config {
 		cfg.OrganizerFile = filepath.Join(d.DataDir, cfg.OrganizerFile)
 	}
 	return cfg
+}
+
+// resetServiceHandlers forgets the handlers, so the next call builds them on the links as they are now
+// (hub_links.go): their config is taken once.
+func resetServiceHandlers() {
+	servicesMu.Lock()
+	defer servicesMu.Unlock()
+	clear(servicesFor)
 }
 
 // handlersFor is one set of handlers per runtime, so the JSON and the body routes share their caches.

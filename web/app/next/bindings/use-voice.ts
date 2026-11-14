@@ -338,7 +338,7 @@ export const useVoice = (
     const mimeType = MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type));
     const meter = openMeter(stream);
     const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-    const text = latest.current.text;
+    const text = fieldNow();
     // A host may hand the click's event over as `at`: anything but a number means the end.
     const caretAt =
       typeof at === 'number' && Number.isFinite(at) ? Math.min(Math.max(at, 0), text.length) : text.length;

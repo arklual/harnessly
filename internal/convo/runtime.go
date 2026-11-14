@@ -259,7 +259,7 @@ func (r *Runtime) restore(f convFile) { r.wake(f, false) }
 // actor was let go is asked for again.
 func (r *Runtime) wake(f convFile, parked bool) *actor {
 	rec := f.Conv
-	rec.Session, rec.TranscriptPath, rec.AgentSessionID = f.Session, f.TranscriptPath, f.AgentSessionID
+	rec.Session, rec.TranscriptPath, rec.AgentSessionID, rec.Person = f.Session, f.TranscriptPath, f.AgentSessionID, f.Person
 	// The agent's tasks are read again after a start; what it waited for when the runtime went down says it was at work.
 	bgAtStop := rec.BgAgents
 	rec.BgAgents = 0
@@ -905,7 +905,7 @@ func (c *conv) file() convFile {
 	rec := c.rec
 	rec.NotSavedSince = 0 // says what the disk does now, never what it did before a restart
 	return convFile{Conv: rec, Session: c.rec.Session, TranscriptPath: c.rec.TranscriptPath,
-		AgentSessionID: c.rec.AgentSessionID, HandoffArtifact: c.handoffArtifact,
+		AgentSessionID: c.rec.AgentSessionID, Person: c.rec.Person, HandoffArtifact: c.handoffArtifact,
 		HandoffArtifactClientID: c.handoffArtifactClientID, Outbox: c.box.State(), Questions: c.questions(), Permissions: c.permissions(),
 		DeletedAt: c.deletedAt, Rewinds: c.rewinds, Left: c.left, Rest: c.rest(), LostAtWork: c.lostAtWork}
 }
@@ -1329,8 +1329,12 @@ func (r *Runtime) Do(ctx context.Context, device string, cmd wire.Command) wire.
 		r.opsMu.Unlock()
 		result <- res
 	}
+	person := ""
+	if r.d.PersonOf != nil {
+		person = r.d.PersonOf(ctx)
+	}
 	run := func() {
-		if err := r.route(device, cmd, finish); err != nil {
+		if err := r.route(device, person, cmd, finish); err != nil {
 			finish(wire.Refused(refusal(err)))
 		}
 	}
@@ -1379,10 +1383,11 @@ func (r *Runtime) pruneOps() {
 }
 
 // route sends the command to the actor it is about, or runs it on the runtime; finish takes its answer once.
-func (r *Runtime) route(device string, cmd wire.Command, finish func(wire.CmdResult)) error {
+// person is whose page session sent it ("" for the runtime's own person).
+func (r *Runtime) route(device, person string, cmd wire.Command, finish func(wire.CmdResult)) error {
 	switch m := cmd.(type) {
 	case wire.ConversationCreateCmd:
-		finish(r.create(m))
+		finish(r.create(m, person))
 		return nil
 	case wire.ProjectCreateCmd:
 		finish(r.createProject(m))
@@ -1655,6 +1660,9 @@ func (r *Runtime) updateProject(m wire.ProjectUpdateCmd) wire.CmdResult {
 			r.d.Log.Warn("projects not saved", "err", err)
 		}
 	}
+	if r.d.ProjectsChanged != nil {
+		r.d.ProjectsChanged(saved)
+	}
 	return wire.Accepted(wire.ChannelConvs, seq)
 }
 
@@ -1692,6 +1700,9 @@ func (r *Runtime) addProject(want wire.Project) (wire.Project, int64) {
 			r.d.Log.Warn("projects not saved", "err", err)
 		}
 	}
+	if saved != nil && r.d.ProjectsChanged != nil {
+		r.d.ProjectsChanged(saved)
+	}
 	return p, seq
 }
 
@@ -1705,7 +1716,7 @@ func (r *Runtime) worktree(cwd, name string) (string, error) {
 	return makeWorktree(cwd, name)
 }
 
-func (r *Runtime) create(m wire.ConversationCreateCmd) wire.CmdResult {
+func (r *Runtime) create(m wire.ConversationCreateCmd, person string) wire.CmdResult {
 	cwd := m.Cwd
 	var projectID *string
 	if m.ProjectID != "" {
@@ -1717,10 +1728,13 @@ func (r *Runtime) create(m wire.ConversationCreateCmd) wire.CmdResult {
 	}
 	var parentID *string
 	if m.ParentID != "" {
-		if _, ok := r.Record(m.ParentID); !ok {
+		parent, ok := r.Record(m.ParentID)
+		if !ok {
 			return wire.Refused(wire.RefuseNotFound)
 		}
 		parentID = &m.ParentID
+		// A delegated chat works for the person of the chat that delegated it, whoever's session asked.
+		person = parent.Person
 	}
 	if r.d.Launcher == nil {
 		return wire.Refused(wire.RefuseUnsupported)
@@ -1751,7 +1765,7 @@ func (r *Runtime) create(m wire.ConversationCreateCmd) wire.CmdResult {
 	rec := wire.Conversation{ID: id, MachineID: r.d.MachineID, ProjectID: projectID, Cwd: cwd, Launch: m.Launch,
 		Provider: m.Provider, Model: m.Model, TitleSource: wire.TitleFromFirstMessage, CreatedAt: ms(now),
 		LastActivityAt: ms(now), LastPromptAt: ms(now), SeenAt: ms(now), State: wire.AgentState{K: wire.StateUnknown, Since: ms(now)},
-		ParentID: parentID, Test: m.Test, Rev: 1}
+		ParentID: parentID, Test: m.Test, Rev: 1, Person: person}
 	if r.d.AlwaysApps != nil {
 		if ids := r.d.AlwaysApps(); len(ids) > 0 && (r.d.AppsOK == nil || r.d.AppsOK(ids) == "") {
 			rec.Apps = append([]string(nil), ids...)
@@ -1977,4 +1991,11 @@ func titleOf(text string) string {
 		rs = append(rs[:79], '…')
 	}
 	return string(rs)
+}
+
+// ProjectList is the machine's projects now.
+func (r *Runtime) ProjectList() []wire.Project {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.projects)
 }

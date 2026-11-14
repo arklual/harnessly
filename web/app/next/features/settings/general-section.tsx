@@ -23,6 +23,8 @@ export const FEED_ROWS = [
   'design',
   'doc',
   'mr',
+  'commit',
+  'task',
   'stand',
   'file',
 ] as const satisfies readonly TShownKind[];

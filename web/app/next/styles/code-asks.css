@@ -20,7 +20,8 @@
 }
 .hx-side__sec + .hx-codes,
 .hx-recap + .hx-codes,
-.hx-shots + .hx-codes {
+.hx-shots + .hx-codes,
+.hx-side__chat:not(:empty, [data-leaving]) + .hx-codes {
   margin-top: 2px;
   padding-top: 2px;
   box-shadow: 0 -1px 0 var(--hx-border);

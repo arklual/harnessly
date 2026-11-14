@@ -72,6 +72,30 @@ describe('tabs: open and navigate', () => {
   });
 });
 
+describe('tabs: a design edited with its chat is one tab', () => {
+  it("the design taken into editing absorbs the chat's own tab and stays where the person is", () => {
+    const s0 = activateTab(state('/c/tab-a', '/designly/afisha?page=p.dc.html'), 't2');
+    const s = navigateTab(s0, '/designly/afisha?chat=tab-a&edit=1&page=p.dc.html');
+    expect(paths(s)).toEqual(['/designly/afisha?chat=tab-a&edit=1&page=p.dc.html']);
+    expect(s.active).toBe('t2');
+  });
+
+  it('the chat opened from a menu is the tab of the design with it', () => {
+    const s0 = state('/', '/designly/afisha?chat=tab-a&edit=1');
+    const plan = planOpen(s0, '/c/tab-a');
+    expect(plan.did).toBe(OPEN.focus);
+    expect(plan.state.tabs).toHaveLength(2);
+    expect(plan.state.active).toBe('t2');
+  });
+
+  it('a design only looked at stays a tab of its own beside its chat', () => {
+    const s = navigateTab(state('/c/tab-a'), '/designly/afisha?chat=tab-a');
+    expect(s.tabs).toHaveLength(1);
+    const kept = openTab(state('/c/tab-a'), '/designly/afisha', { id: 'n' });
+    expect(kept.tabs).toHaveLength(2);
+  });
+});
+
 describe('tabs: ⌘W', () => {
   it('closes the chats one by one, then the start page lets the window go', () => {
     let s = activateTab(state('/c/a', '/c/b', '/c/c'), 't2');
@@ -456,5 +480,26 @@ describe('tabs: one tab per place', () => {
     const init = initTabs(saved, '/designly/afisha?page=4');
     expect(init.state.tabs).toHaveLength(2);
     expect(activeTab(init.state).path).toBe('/designly/afisha?page=4');
+  });
+});
+
+describe('navigateTab on the phone (screens kept, HRN-1404)', () => {
+  const keep = { keeps: (path: string) => path.startsWith('/designly/'), max: 3 };
+  it('a design left for another place waits in a tab of its own; back goes to it', () => {
+    const s0 = { tabs: [createTab('/designly/a', 'a')], active: 'a' };
+    const s1 = navigateTab(s0, '/c/chat', keep);
+    expect(s1.tabs.map((t) => t.path)).toEqual(['/designly/a', '/c/chat']);
+    const s2 = navigateTab(s1, '/designly/a', keep);
+    expect(activeTab(s2).id).toBe('a');
+    expect(s2.tabs.map((t) => t.id).at(-1)).toBe('a');
+  });
+  it('a place that holds no frame is written over, as before', () => {
+    const s0 = { tabs: [createTab('/c/one', 'a')], active: 'a' };
+    expect(navigateTab(s0, '/c/two', keep).tabs.map((t) => t.path)).toEqual(['/c/two']);
+  });
+  it('more tabs than max: the least recent goes', () => {
+    let s: ITabsState = { tabs: [createTab('/designly/a', 'a')], active: 'a' };
+    for (const next of ['/designly/b', '/designly/c', '/designly/d']) s = navigateTab(s, next, keep);
+    expect(s.tabs.map((t) => t.path)).toEqual(['/designly/b', '/designly/c', '/designly/d']);
   });
 });

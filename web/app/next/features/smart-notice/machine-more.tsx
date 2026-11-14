@@ -14,6 +14,7 @@ export interface IMachineMoreProps {
 const MachineMore = ({ detail, stopping, onStop }: IMachineMoreProps) => (
   <>
     <p className="hx-ns__what">{detail.text}</p>
+    {detail.hint && <p className="hx-ns__hint">{detail.hint}</p>}
     {detail.heavy.length > 0 && (
       <ul className="hx-ns__heavy" aria-label={t('next.smart.machine.heaviest')}>
         {detail.heavy.map((heavy) => (

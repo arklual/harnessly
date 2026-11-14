@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pagesFound, rowAfter } from '@/next/features/designly/page-pick';
+import { pageFileNote, pagesFound, rowAfter } from '@/next/features/designly/page-pick';
 
 const pages = [
   { path: 'home.html', name: 'Главная' },
@@ -36,5 +36,20 @@ describe('rowAfter', () => {
 
   it('has no row in an empty list', () => {
     expect(rowAfter('ArrowDown', 0, 0)).toBe(-1);
+  });
+});
+
+describe('pageFileNote', () => {
+  it('drops the file that only repeats the name', () => {
+    expect(
+      pageFileNote({ path: 'Инициатива А · Обзор варианта.dc.html', name: 'Инициатива А · Обзор варианта' }),
+    ).toBeNull();
+    expect(pageFileNote({ path: 'home.html', name: 'Home' })).toBeNull();
+  });
+  it('keeps the file that says something else', () => {
+    expect(pageFileNote({ path: 'mobile/Оплата.dc.html', name: 'Оплата · Мобильная' })).toBe(
+      'mobile/Оплата.dc.html',
+    );
+    expect(pageFileNote({ path: 'offer.html', name: 'Выдача' })).toBe('offer.html');
   });
 });

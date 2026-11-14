@@ -77,6 +77,11 @@ type Agent struct {
 	// askRefused: what the store shows this machine changed, so the next full scan offers the refused files again;
 	// asking is that scan running.
 	askRefused, asking bool
+	// scanKnown is what the state knew of every file when the running full scan began, and scanSeen the files that
+	// scan found on the disk; both nil outside ScanAll. a.mu is held for the whole scan, so nothing else writes the
+	// state meanwhile.
+	scanKnown map[string]known
+	scanSeen  map[string]bool
 
 	mu    sync.Mutex // one file operation at a time: a download and a scan of the same path must not interleave
 	users map[uint32]string
@@ -225,6 +230,10 @@ func (a *Agent) scanGone(ctx context.Context, rel string) error {
 		paths = append(paths, rel)
 	}
 	for _, p := range paths {
+		if a.scanSeen[p] {
+			// The full scan running now has just found this file on the disk: it is not gone.
+			continue
+		}
 		if !a.policy.Synced(p) {
 			// The policy stopped syncing this path after it was synced: forget it here, the room keeps its last
 			// revision. The hub refuses the path now, so a delete would only fail forever.
@@ -270,6 +279,9 @@ func (a *Agent) scanDir(ctx context.Context, rel string) error {
 		fi, err := d.Info()
 		if err != nil {
 			return nil
+		}
+		if a.scanSeen != nil {
+			a.scanSeen[p] = true
 		}
 		out, err := a.prepare(p, fi)
 		if err != nil {
@@ -367,6 +379,9 @@ func (a *Agent) scanFileDepth(ctx context.Context, rel string, fi fs.FileInfo, d
 // prepare reads a file and answers what is to be sent of it, nil when nothing is: it is as the agent knows it, or it
 // is set aside.
 func (a *Agent) prepare(rel string, fi fs.FileInfo) (*outgoing, error) {
+	if a.unchangedAtScanStart(rel, fi) {
+		return nil, nil
+	}
 	k, err := a.state.get(rel)
 	if err != nil {
 		return nil, err
@@ -401,6 +416,14 @@ func (a *Agent) prepare(rel string, fi fs.FileInfo) (*outgoing, error) {
 		return nil, err
 	}
 	return &outgoing{rel: rel, fi: fi, data: data, canon: canon, blob: blob, tag: tag, sum: sha(blob), base: base}, nil
+}
+
+// unchangedAtScanStart: a full scan runs and its snapshot of the state already shows this file at this size and mtime,
+// so it is unchanged without a SQLite lookup. Anything else (no snapshot, a new, deleted or refused file, another
+// size or time) is looked up in the state itself, so a row written for this path during the scan is never missed.
+func (a *Agent) unchangedAtScanStart(rel string, fi fs.FileInfo) bool {
+	k, ok := a.scanKnown[rel]
+	return ok && !k.Deleted && k.Size == fi.Size() && k.Mtime == mtime(fi) && !(a.asking && isRefused(&k))
 }
 
 // send commits a prepared file whose contents the store holds.
@@ -1047,6 +1070,12 @@ func (a *Agent) ScanAll(ctx context.Context) error {
 	defer a.mu.Unlock()
 	a.asking, a.askRefused = a.askRefused, false
 	defer func() { a.asking = false }()
+	all, err := a.state.all()
+	if err != nil {
+		return err
+	}
+	a.scanKnown, a.scanSeen = all, make(map[string]bool, len(all))
+	defer func() { a.scanKnown, a.scanSeen = nil, nil }()
 	if err := a.scanDir(ctx, "."); err != nil {
 		return err
 	}

@@ -3,7 +3,8 @@
 import { useCallback, useLayoutEffect, useRef, type RefObject } from 'react';
 import type { IAnnotation } from '@/next/features/pane/annotations';
 import type { AttachmentRef, MessageRef } from '@/next/protocol/v2';
-import { draftText, setDraftText, useDraft, type DraftKey } from '@/next/stores/drafts';
+import { useSlice } from '@/next/core/store';
+import { draftsStore, draftText, setDraftText, useDraft, type DraftKey } from '@/next/stores/drafts';
 
 export interface IDraftField {
   text: string;
@@ -40,3 +41,57 @@ export function useDraftField(key: DraftKey, field?: RefObject<HTMLTextAreaEleme
   }, [key, ref]);
   return { text: draft?.text ?? '', files, refs, notes, setText, read, field: ref };
 }
+
+/** The field without its text: what a big host (the chat's dock) needs on each render, and nothing that changes on a key. */
+export interface IDraftParts {
+  files: AttachmentRef[];
+  refs: MessageRef[];
+  notes: IAnnotation[];
+  /** The field is empty: the starters show under it. */
+  empty: boolean;
+  /** The text begins with «/»: the apps' commands are read for the palette. */
+  slash: boolean;
+}
+
+const sameParts = (a: IDraftParts, b: IDraftParts) =>
+  a.files === b.files &&
+  a.refs === b.refs &&
+  a.notes === b.notes &&
+  a.empty === b.empty &&
+  a.slash === b.slash;
+
+/**
+ * A composer whose host is big: the host re-renders when the files, the places, the marks or the field's
+ * emptiness change, not on every key. The text itself goes to the field through DraftText (or `read` at the send).
+ */
+export function useDraftParts(key: DraftKey, field?: RefObject<HTMLTextAreaElement | null>) {
+  const parts = useSlice(
+    draftsStore,
+    key,
+    (d): IDraftParts => {
+      const text = d?.text ?? '';
+      return {
+        files: d?.attachments ?? NONE_FILES,
+        refs: d?.refs ?? NONE_REFS,
+        notes: d?.annotations ?? NONE_NOTES,
+        empty: text === '',
+        slash: text.trimStart().startsWith('/'),
+      };
+    },
+    sameParts,
+  );
+  const own = useRef<HTMLTextAreaElement | null>(null);
+  const ref = field ?? own;
+  const setText = useCallback((value: string) => setDraftText(key, value), [key]);
+  const read = useCallback(() => draftText(key), [key]);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || el.value === '' || document.activeElement === el) return;
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [key, ref]);
+  return { ...parts, setText, read, field: ref };
+}
+
+/** The field's text alone, for the one component that shows it (null key: none). */
+export const useDraftText = (key: DraftKey | null): string =>
+  useSlice(draftsStore, key, (d) => d?.text ?? '');

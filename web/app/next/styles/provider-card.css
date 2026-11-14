@@ -1,0 +1,282 @@
+/* A provider's card in Settings → «Провайдеры»: the board «Лимиты — карточки провайдеров», variant A
+   «Полоски». Only what runs out is coloured: --hx-warning under 40% left, --hx-danger under 15% or when it ends before
+   the reset. The card is its own container: under 520px the forecast goes under the name and the reset under the bar. */
+
+.hx-pcard {
+  container: hx-pcard / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-lg);
+  background: var(--hx-bg-raised);
+}
+.hx-pcard + .hx-pcard {
+  margin-top: 10px;
+}
+.hx-pcard[data-state='off'] {
+  border-style: dashed;
+  background: none;
+}
+
+.hx-pcard__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.hx-pcard__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.hx-pcard__top > .hx-pcard__head {
+  flex: 1;
+}
+button.hx-pcard__head {
+  cursor: pointer;
+  border-radius: var(--hx-radius-md);
+}
+button.hx-pcard__head:focus-visible {
+  outline: 2px solid var(--hx-fg-2);
+  outline-offset: 4px;
+}
+.hx-pcard__logo {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--hx-bg-hover);
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-pcard__logo .hx-agent {
+  width: 18px;
+  height: 18px;
+}
+.hx-pcard__title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hx-pcard__name {
+  font-size: var(--hx-text-lg);
+  font-weight: var(--hx-weight-semibold);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-pcard__sub {
+  margin-top: 1px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A list of cards in a group of Settings: the cards are the frames, the group draws none */
+.hx-set__card.hx-pcards {
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+/* The forecast: right of the name in one line; under it on a narrow card */
+.hx-pcard__fc,
+.hx-pcard__fcm {
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
+}
+.hx-pcard__fc {
+  flex: none;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-pcard__fcm {
+  display: none;
+  margin-top: -4px;
+}
+.hx-pcard__fc[data-level='warn'],
+.hx-pcard__fcm[data-level='warn'] {
+  color: var(--hx-warning);
+}
+.hx-pcard__fc[data-level='bad'],
+.hx-pcard__fcm[data-level='bad'] {
+  color: var(--hx-danger);
+}
+
+/* An account: its name when the card has several, a row per window, the spend */
+.hx-pcard__acc {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hx-pcard__acc-name {
+  display: flex;
+  gap: 8px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-pcard__acc-name b {
+  color: var(--hx-fg-2);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-pcard__win {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 48px minmax(120px, auto);
+  align-items: center;
+  gap: 12px;
+  font-size: var(--hx-text-sm);
+}
+.hx-pcard__win-label {
+  color: var(--hx-fg-2);
+  white-space: nowrap;
+}
+.hx-pcard__win-left {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.hx-pcard__win-reset {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* The bar: the fill is what is left; the tick is where it should be now to last to the reset */
+.hx-pcard__bar {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--hx-bg-hover);
+}
+.hx-pcard__bar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--left, 0%);
+  border-radius: inherit;
+  background: var(--hx-fg-3);
+  transition: width 500ms var(--hx-ease-out);
+}
+.hx-pcard__win[data-level='warn'] .hx-pcard__bar i {
+  background: var(--hx-warning);
+}
+.hx-pcard__win[data-level='bad'] .hx-pcard__bar i {
+  background: var(--hx-danger);
+}
+.hx-pcard__bar u {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: var(--pace, 0%);
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--hx-fg-3);
+  text-decoration: none;
+}
+
+.hx-pcard__spend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  padding-top: 2px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-pcard__spend b {
+  color: var(--hx-fg-1);
+  font-weight: var(--hx-weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A key paid by the token: the balance and the week by day */
+.hx-pcard__bal {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+.hx-pcard__sum {
+  font-size: 30px;
+  font-weight: var(--hx-weight-semibold);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.hx-pcard__bal-note {
+  padding-bottom: 3px;
+  white-space: nowrap;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-pcard__spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 36px;
+  margin-left: auto;
+}
+.hx-pcard__spark i {
+  width: 8px;
+  height: var(--h, 8%);
+  border-radius: 2px;
+  background: var(--hx-fg-3);
+  opacity: 0.55;
+}
+.hx-pcard__spark i:last-child {
+  background: var(--hx-fg-1);
+  opacity: 1;
+}
+
+/* Not connected, or the key refused: one short line and the way out */
+.hx-pcard__note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+.hx-pcard__note[data-level='bad'] {
+  color: var(--hx-danger);
+}
+.hx-pcard__note .hx-set__btn {
+  flex: none;
+}
+.hx-pcard[data-state='off'] .hx-pcard__note {
+  justify-content: flex-end;
+}
+
+@container hx-pcard (max-width: 440px) {
+  .hx-pcard__fc {
+    display: none;
+  }
+  .hx-pcard__fcm {
+    display: block;
+    white-space: normal;
+  }
+  .hx-pcard__win {
+    grid-template-columns: 58px minmax(0, 1fr) 44px;
+    row-gap: 2px;
+  }
+  .hx-pcard__win-reset {
+    grid-column: 2 / 4;
+    text-align: left;
+  }
+}

@@ -1,7 +1,7 @@
 // The page of an app, /apps/:id/about: an installed app, or one of the team's or the public catalog (not installed yet).
 // «Открыть» goes to the app with the chat it was last on in; «Поставить» is the team's install for an owner, or the
 // install screen of the public catalog. What a waiting install or update reaches is the shared consent component.
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import AppPage, { abilitiesOf } from '@/next/features/app-main/app-page';
 import { EnvSwitch, OwnSwitch } from '@/next/features/app-main/app-switches';
 import { reasonOf, waitsConsent } from '@/next/features/app-main/apps-list';
@@ -10,6 +10,7 @@ import AccessList, { type IRevoke } from '@/next/features/app-consent/access-lis
 import ConsentBlock from '@/next/features/app-consent/consent-block';
 import ConsentSheet, { type IConsentApp } from '@/next/features/app-consent/consent-sheet';
 import AppFrame from '@/next/features/app-views/app-frame';
+import { isSpaceApp } from '@/next/features/app-views/service-health';
 import { Journal } from '@/next/features/app-views/inspector';
 import {
   APP_STATE,
@@ -369,4 +370,18 @@ const AppAboutPage = ({
   );
 };
 
-export default AppAboutPage;
+/**
+ * The page of a core space (boards, documents) is never shown: the space is a part of harnessly, not an app to read
+ * about. Its address, from an old tab or a link, opens the space itself, in place.
+ */
+const SpaceOpens = ({ id }: { id: string }) => {
+  useEffect(() => {
+    goTo({ kind: ROUTE.app, id }, { replace: true });
+  }, [id]);
+  return null;
+};
+
+const AppAboutRoute = (props: { machine: MachineId; id: string; onOpenDrawer: () => void }) =>
+  isSpaceApp(props.id) ? <SpaceOpens id={props.id} /> : <AppAboutPage {...props} />;
+
+export default AppAboutRoute;

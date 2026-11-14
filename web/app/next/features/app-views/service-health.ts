@@ -20,6 +20,13 @@ export const appService = (app: string): TAppService | null =>
     ? APP_SERVICE[app as keyof typeof APP_SERVICE]
     : null;
 
+/**
+ * A space of the person's own (the boards, the documents): its page is the space on the whole screen, a list and then
+ * what is open, with the one field over it. No chat comes along from the sidebar or the chat on screen: a
+ * chat is made over the space by the first words of its field.
+ */
+export const isSpaceApp = (app: string): boolean => appService(app) !== null;
+
 /** `unknown`: no answer yet, or a page with no hub (standalone): the view opens as it always did. */
 export const SERVICE_STATE = { up: 'up', down: 'down', unknown: 'unknown' } as const;
 export type TServiceState = (typeof SERVICE_STATE)[keyof typeof SERVICE_STATE];

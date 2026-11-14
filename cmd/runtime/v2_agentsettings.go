@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/ly-solutions/harnessly/internal/agentcfg"
+	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -25,6 +26,7 @@ func agentFiles(home string) *agentcfg.Store {
 		ClaudeDir:  claudeDir,
 		ClaudeJSON: claudeJSON,
 		CodexDir:   env("CODEX_HOME", filepath.Join(home, ".codex")),
+		AuthDir:    preflight.AuthDirOf(os.Getenv("RUNTIME_SIDE_CHAT_CONFIG")),
 	})
 }
 

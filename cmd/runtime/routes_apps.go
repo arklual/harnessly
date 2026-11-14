@@ -856,6 +856,7 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 	}
 	routes = append(routes, appPageRoutes(d, reg, appPages, chats)...)
 	routes = append(routes, noticeRoutes(d, reg, viewServer, chats)...)
+	routes = append(routes, notificationRoutes(d)...)
 	routes = append(routes, appSetupRoutes(d, reg, storage)...)
 	routes = append(routes, appMCPProxyRoute(d, reg))
 	routes = append(routes, sinopiaRoutes(d, reg, viewServer)...)

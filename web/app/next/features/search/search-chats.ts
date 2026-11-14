@@ -1,7 +1,9 @@
 import { t } from '@/next/i18n';
+import { clock, formatAgo, startOfDay } from '@/next/i18n/format';
 import { matching, termsOf, type ITerms } from '@/next/features/search/terms';
 import type { ISearchGroup, ISearchRow, ISearchScope } from '@/next/features/search/search-dialog';
 import type { MessageHit } from '@/next/protocol/v2';
+import { SUBJECT } from '@/next/features/search/subject';
 import type { ISidebarChat, ISidebarProject } from '@/next/features/sidebar/types';
 
 /** The scopes a source can search: titles and messages are one list, so there is no «where» to choose until files
@@ -9,6 +11,8 @@ import type { ISidebarChat, ISidebarProject } from '@/next/features/sidebar/type
 export const CHAT_SCOPES: readonly ISearchScope[] = [];
 
 const RECENT_COUNT = 6;
+/** The chats' own tab lists this many of the latest before anything is typed. */
+const OWN_COUNT = 40;
 
 const rowOf = (chat: ISidebarChat, projects: readonly ISidebarProject[]): ISearchRow => ({
   id: chat.id,
@@ -16,6 +20,8 @@ const rowOf = (chat: ISidebarChat, projects: readonly ISidebarProject[]): ISearc
   icon: 'message-square',
   title: chat.title,
   meta: projects.find((project) => project.id === chat.projectId)?.name ?? '',
+  preview: { kind: t('next.search.kindChat'), text: '' },
+  subject: { k: SUBJECT.chat, id: chat.id },
 });
 
 /** Chats whose title answers the query (every word of it, or a keyword of a question); the newest first. */
@@ -33,20 +39,16 @@ export const searchChats = (
 export const recentChats = (
   chats: readonly ISidebarChat[],
   projects: readonly ISidebarProject[],
+  own = false,
 ): readonly ISearchRow[] =>
   [...chats]
     .sort((a, b) => b.lastActivityAt - a.lastActivityAt)
-    .slice(0, RECENT_COUNT)
+    .slice(0, own ? OWN_COUNT : RECENT_COUNT)
     .map((chat) => rowOf(chat, projects));
 
 /** The date a message was written, as a short line: the time today, else the day. */
-const whenOf = (at: number, now: number): string => {
-  const date = new Date(at);
-  const sameDay = date.toDateString() === new Date(now).toDateString();
-  return sameDay
-    ? date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-    : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-};
+/** «16:50» today, then «вчера», «13 нояб.»: in the page's language, not the browser's. */
+const whenOf = (at: number, now: number): string => (at >= startOfDay(now) ? clock(at) : formatAgo(at, now));
 
 /** The messages found, a group for each chat they are in (the chats in the order of their newest hit); a hit in a chat
  *  the list does not have (another machine's, deleted) is left out. */
@@ -69,6 +71,8 @@ export const messageGroups = (
       snippet: hit.snippet,
       meta: whenOf(hit.at, now),
       target: { chatId: hit.convId, entryId: hit.entryId, turnId: hit.turnId },
+      preview: { kind: t('next.search.kindMessage'), text: hit.snippet },
+      subject: { k: SUBJECT.chat, id: hit.convId },
     });
     groups.set(chat.id, rows);
   }

@@ -10,6 +10,7 @@
 import { activeMachineStore } from '@/next/stores/machines';
 import { platformPath, runtimePath } from '@/next/core/net/machine';
 import type { MachineId } from '@/next/protocol/v2';
+import { countRequest } from '@/next/core/perf-journal';
 
 export type TJournalLevel = 'error' | 'warn' | 'info';
 export type TJournalSource = 'web' | 'app' | 'sinopia';
@@ -215,6 +216,7 @@ const wrapFetch = (orig: typeof fetch): typeof fetch =>
     const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
     const machine = machineOf(url);
     if (machine !== null) lastMachine = machine;
+    countRequest(method, cleanUrl(url));
     const trace = currentTrace();
     const chat = currentChat();
     let call = init;

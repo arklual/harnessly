@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import usePoller from '@/hooks/use-poller';
 import { useHlMachines } from '@/hooks/use-hl-machines';
 import { currentMachineId } from '@/lib/app-path';
@@ -92,6 +92,9 @@ const useDesignLibrary = (tabId: string | null, enabled: boolean, front: boolean
   const [state, setState] = useState<TDesignLibraryState>({ kind: 'loading' });
   // Another conversation's list must not show under this one while the first request for it is in flight.
   const [shownKey, setShownKey] = useState(key);
+  // The text of the list on screen: a poll that brings the same list sets nothing. A new object every 5 s
+  // rendered the shell and the feed again, which laid the page out while nothing changed.
+  const shownText = useRef<string | null>(null);
   if (shownKey !== key) {
     setShownKey(key);
     setState({ kind: 'loading' });
@@ -105,7 +108,13 @@ const useDesignLibrary = (tabId: string | null, enabled: boolean, front: boolean
         rememberPort(data.port);
         rememberTitles(data);
         // A reply for the previous conversation can land after the switch: its "this agent" marks are someone else's.
-        if (!signal.aborted && data.selfTabId === tabId) setState({ kind: 'ready', data });
+        if (!signal.aborted && data.selfTabId === tabId) {
+          // Keyed by the conversation: a switch back to the same list shows it again.
+          const text = `${key ?? ''}\u0000${JSON.stringify(data)}`;
+          if (text === shownText.current) return;
+          shownText.current = text;
+          setState({ kind: 'ready', data });
+        }
       } catch (error) {
         if (signal.aborted) return;
         const message = error instanceof Error ? error.message : t('hooks.useDesignLibrary.openFailed');

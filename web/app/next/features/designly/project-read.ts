@@ -159,6 +159,48 @@ export const readProject = (
     );
   });
 
+/**
+ * The reads of a project on one page. A quiet re-read (the pages' poll while an agent works, every few seconds) used to
+ * abort the read before it: on a loaded machine the library takes longer than the poll, so the machine never answered,
+ * the store always did, and a design that had once fallen back to the snapshot (a runtime restarting answers 503) stayed
+ * on it, read-only, with «Редактирование» locked. Now a re-read of the same project leaves the one before to
+ * finish, and none starts while the machine is still answering one; another project, machine or attempt aborts them.
+ */
+export const createProjectReads = () => {
+  let key: string | null = null;
+  // The machine's reads on their way, of this key only: a read of an earlier key may still settle after it is aborted.
+  let generation = 0;
+  let machineBusy = 0;
+  const running = new Set<AbortController>();
+  const stop = () => {
+    for (const abort of running) abort.abort();
+    running.clear();
+    key = null;
+    generation += 1;
+    machineBusy = 0;
+  };
+  return {
+    /** A read for `next`: its signal, or null when the machine is still answering a read of the same project. */
+    start: (next: string): AbortSignal | null => {
+      if (next === key && machineBusy > 0) return null;
+      if (next !== key) stop();
+      key = next;
+      const abort = new AbortController();
+      running.add(abort);
+      return abort.signal;
+    },
+    /** The machine's read, counted while it is on its way. */
+    machine: <T>(read: () => Promise<T>): Promise<T> => {
+      const mine = generation;
+      machineBusy += 1;
+      return read().finally(() => {
+        if (mine === generation) machineBusy -= 1;
+      });
+    },
+    stop,
+  };
+};
+
 /** Asks the machine to put the project into the hub's store now (design.StorePush); the sync does the sending. */
 export const pushToStore = (m: MachineId, project: string): Promise<unknown> =>
   runtimeJson<unknown>(m, platformPath('/design/store-push'), postJson({ project }));

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { messageGroups } from '@/next/features/search/search-chats';
+import { pinLocale } from '@/next/i18n';
+import { formatAgo } from '@/next/i18n/format';
 import type { ISidebarChat } from '@/next/features/sidebar/types';
 import type { MessageHit } from '@/next/protocol/v2';
 
@@ -60,5 +62,18 @@ describe('messageGroups', () => {
 
   it('leaves out a message of a chat the list does not have', () => {
     expect(messageGroups([hit('tab-gone', 1, 'user', 'x')], chats, 0)).toEqual([]);
+  });
+});
+
+describe('the dates of the found messages (HRN-1447)', () => {
+  it('are in the page language, as the rest of it, not the browser one', () => {
+    pinLocale('ru');
+    const a = chat('tab-a', 'Альфа');
+    const at = Date.UTC(2026, 9, 20, 12, 0);
+    const now = at + 3 * 24 * 3_600_000;
+    const groups = messageGroups([hit('tab-a' as MessageHit['convId'], 1, 'user', 'слово')], [a], now);
+    expect(groups[0]?.rows[0]?.meta).toBe(formatAgo(at, now));
+    expect(groups[0]?.rows[0]?.meta).not.toMatch(/[A-Za-z]/);
+    pinLocale(null);
   });
 });

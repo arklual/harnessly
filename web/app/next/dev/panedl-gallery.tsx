@@ -1,7 +1,7 @@
 // Designly in the right pane on made-up data, for the eye and for screenshots: ?dev=panedl with the
 // installation's next-ui feature. &view=library shows the library alone, &view=design (the default) an open design,
 // &view=site the design as its own tab shows it (no pane: the canvas's zoom pill in its corner);
-// &states=0 gives the page no settings, &pages=1 only one page, &pages=many eight of them (the pager's list gets its search), &loading=1 keeps the page loading, &theme=light|dark and &lang=en|ru pick the look.
+// &states=0 gives the page no settings, &pages=1 only one page, &pages=many eight of them (the pager's list gets its search), &pages=long a dozen with long names as Sinopia's boards have them (their files repeat the name but two) and a download on each row, &loading=1 keeps the page loading, &theme=light|dark and &lang=en|ru pick the look.
 // &nav=1 gives the page an app's own bars, a header that sticks to the top and a tab bar fixed to the bottom, to see
 // that the pane's controls leave them free on a phone. &bridge=1 puts the slot's real bridge into the page (its script is
 // asked for at /__tk/bridge.js of the gallery, which a test answers with the built dist/preview-bridge.js): the pins
@@ -48,6 +48,22 @@ const MANY_PAGES: ISitePage[] = [
     path: `screens/${i + 1}.html`,
     name,
   })),
+];
+
+/** Boards named as people name them: long, most of them filed under their own name, two filed otherwise. */
+const LONG_PAGES: ISitePage[] = [
+  ...[
+    'Инициатива А · Обзор варианта',
+    'Инициатива А · Главная лента с карточками мероприятий и фильтрами по дате',
+    'Инициатива А · Предпросмотр',
+    'Инициатива А · Готовые ответы',
+    'Инициатива А · Планы на неделю',
+    'Инициатива А · Ассистент организатора: черновик ответа, ревью и отсеянное',
+    'Минимум — вариант без панели',
+    'Лимиты — карточки провайдеров',
+  ].map((name) => ({ path: `${name}.dc.html`, name })),
+  { path: 'mobile/Оплата.dc.html', name: 'Оплата · Мобильная' },
+  { path: 'screens/board-12.dc.html', name: 'Инициатива А · Комментарии' },
 ];
 
 /** The bridge of the slot as the made-up page speaks it: picking, settings and the canvas's keys, no following of pins. */
@@ -231,6 +247,7 @@ const Viewer = ({
   dark,
   single,
   many,
+  long = false,
   loading,
   nav,
   script,
@@ -241,14 +258,19 @@ const Viewer = ({
   dark: boolean;
   single: boolean;
   many: boolean;
+  long?: boolean;
   loading: boolean;
   nav: boolean;
   script: TPageScript;
 }) => {
-  const [tab, setTab] = useState(FIRST);
+  const [tab, setTab] = useState<ISiteTab>(() => (long ? { ...FIRST, hist: [LONG_PAGES[0].path] } : FIRST));
   const [reloadKey, setReloadKey] = useState(0);
   const [editing, setEditing] = useState(false);
-  const all = many ? MANY_PAGES : PAGES;
+  const pagesOf = (): ISitePage[] => {
+    if (long) return LONG_PAGES;
+    return many ? MANY_PAGES : PAGES;
+  };
+  const all = pagesOf();
   const pages = single ? all.slice(0, 1) : all;
   // A blob page is of the gallery's own origin, which the view can post to (a data: page has the origin «null»).
   const src = useMemo(
@@ -296,6 +318,7 @@ const Viewer = ({
       onOpenDrawer={() => {}}
       onToggleMax={() => {}}
       maxed={false}
+      downloads={long ? { machine: MACHINE, artifact: DESIGN, archives: false } : undefined}
       mode={
         site
           ? {
@@ -378,6 +401,7 @@ const PanedlGallery = () => {
           dark={dark}
           single={query.pages === '1'}
           many={query.pages === 'many'}
+          long={query.pages === 'long'}
           loading={query.loading === '1'}
           nav={query.nav === '1'}
           script={pageScriptOf(query.bridge === '1', query.lib === '1')}
@@ -414,6 +438,7 @@ const PanedlGallery = () => {
               dark={dark}
               single={query.pages === '1'}
               many={query.pages === 'many'}
+              long={query.pages === 'long'}
               loading={query.loading === '1'}
               nav={query.nav === '1'}
               script={pageScriptOf(query.bridge === '1', query.lib === '1')}

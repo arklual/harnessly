@@ -311,6 +311,8 @@ export interface IBridgeHandlers {
   keyHints?: (commands: readonly string[]) => Record<string, string | null>;
   /** A slot view (an onboarding step) says it is finished. */
   slotDone?: () => void;
+  /** A view of the start page puts its own greeting in place of the host's question; an empty title gives the host's back. */
+  slotGreet?: (title: string, sub: string) => void;
   confirm?: (text: string) => Promise<boolean>;
   /** An error or console.error of the view, for the debug section (harnessly/debug.log). */
   debugLog?: (level: 'error' | 'warn', text: string) => void;
@@ -1245,6 +1247,14 @@ export class AppBridge {
       case 'harnessly/slot.done':
         this.need('slotDone')();
         return {};
+      case 'harnessly/slot.greet': {
+        const title = p.title ?? '';
+        const sub = p.sub ?? '';
+        if (typeof title !== 'string' || title.length > 120 || typeof sub !== 'string' || sub.length > 240)
+          throw new BridgeError('invalid_params', 'title is a text up to 120 characters, sub up to 240');
+        this.need('slotGreet')(title, sub);
+        return {};
+      }
       case 'harnessly/ui.confirm':
         return { ok: await this.need('confirm')(str('text', 500)) };
       case 'harnessly/debug.log': {

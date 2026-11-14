@@ -18,6 +18,8 @@ export const DEFAULT_FEED_KINDS: FeedKinds = {
   mr: true,
   stand: true,
   delivery: true,
+  task: true,
+  commit: true,
   file: false,
   mrDone: false,
 } as const satisfies Record<FeedKind, boolean>;

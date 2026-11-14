@@ -139,8 +139,18 @@ export const TURN_FAILURE_CODES = [
 export type TurnFailureCode = (typeof TURN_FAILURE_CODES)[number];
 export const FILE_OPS = ['created', 'edited', 'read'] as const;
 export type FileOp = (typeof FILE_OPS)[number];
-/** What a turn made that the person opens: a published page, a design, a document, a merge request, a stand, a file handed over. */
-export const OUTPUT_KINDS = ['artifact', 'design', 'doc', 'mr', 'stand', 'delivery'] as const;
+/** What a turn made that the person opens: a published page, a design, a document, a merge request, a stand, a file handed over,
+ *  a task of the tracker, a commit (the last two only with the cap links). */
+export const OUTPUT_KINDS = [
+  'artifact',
+  'design',
+  'doc',
+  'mr',
+  'stand',
+  'delivery',
+  'task',
+  'commit',
+] as const;
 export type OutputKind = (typeof OUTPUT_KINDS)[number];
 export const OUTPUT_OPS = ['created', 'changed'] as const;
 export type OutputOp = (typeof OUTPUT_OPS)[number];
@@ -276,7 +286,7 @@ export const CLIENT_FRAME_KINDS = ['hello', 'sub', 'unsub', 'ping'] as const;
 /** The optional parts of the frames this page reads, named in its socket's address (?caps=…) and in the HTTP calls
  *  that carry them: the runtime sends them only to a page that names them, so a tab left on an older build never meets
  *  a field it refuses. Not in hello: a runtime older than the page refuses a field of hello it does not know. */
-export const CLIENT_CAPS = ['delegation', 'workflows', 'profiles', 'msgstatus'] as const;
+export const CLIENT_CAPS = ['delegation', 'workflows', 'profiles', 'msgstatus', 'links'] as const;
 /** CLIENT_CAPS as a query: `caps=…`. */
 export const CAPS_QUERY = `caps=${CLIENT_CAPS.join(',')}`;
 export type ClientFrameKind = (typeof CLIENT_FRAME_KINDS)[number];
@@ -692,7 +702,7 @@ export const DESIGN_KINDS: readonly DesignKind[] = ['site', 'slides', 'ds', 'vid
 
 /** What a chat made, opened or changed that the tools home lists: a document, a board, a design, a tracker task, a merge
  *  request (the block of merge requests under a finished task reads it). */
-export const MADE_KINDS = ['doc', 'board', 'design', 'task', 'mr'] as const;
+export const MADE_KINDS = ['doc', 'board', 'design', 'task', 'mr', 'stand', 'commit', 'file'] as const;
 export type MadeKind = (typeof MADE_KINDS)[number];
 /** A task named by another: its epic, or a subtask of an epic. */
 export interface MadeTaskRef {
@@ -818,6 +828,9 @@ export interface DesignArtifact {
   boards: DesignBoard[];
   convs: string[];
   touchedBy?: string[];
+  /** Who worked on it, by name: the owner, then the people of its chats (a delegated chat's is its root's), each once;
+   *  never an address or a chat id. Absent from an older runtime. */
+  people?: string[];
   owner?: DesignOwner;
   role?: DesignRole;
   /** The app's document type the project is (made of Sinopia's site): its label; absent for Sinopia's own projects. */
@@ -921,6 +934,19 @@ export interface ChatDigest {
   text: string;
   path: string;
   truncated: boolean;
+}
+/** One message of a chat in its glance: when, and what it said, cut short. */
+export interface GlanceMessage {
+  at: Ms;
+  text: string;
+}
+/** What a chat said last (GET /api/v2/conversations/{id}/glance): the newest message of each side, null when it has
+ *  none; `messages` is how many the search index holds for the chat. */
+export interface ChatGlance {
+  convId: ConvId;
+  lastUser: GlanceMessage | null;
+  lastAgent: GlanceMessage | null;
+  messages: number;
 }
 /** The parts of the disk layout, in the order they are drawn; `other` is the used part none of the named folders
  *  accounts for. */
@@ -1386,7 +1412,14 @@ export interface Conversation {
   autoContinues?: AutoContinue[]; // the times the runtime went on by itself, oldest first (the last 20); absent when none
   parentId?: ConvId; // the chat whose agent delegated this one; absent for a chat the person started
   test?: boolean; // a chat an agent made to check something: the sidebar leaves it out unless the person shows test chats
+  from?: ChatFrom; // an app started the chat for the person: it sits in the app's folder until the person moves it
   rev: number;
+}
+/** The app that started a chat for the person: `app` is its id, `label` the folder's name, `title` the chat's name. */
+export interface ChatFrom {
+  app: string;
+  label: string;
+  title?: string;
 }
 /**
  * A chat held on its agent's usage limit. `resetsAt` is when the limit resets (null: unknown); `continueAt` is when the
@@ -2601,7 +2634,13 @@ const designArtifact: Decoder<DesignArtifact> = object(
     boards: array(designBoard),
     convs: array(convId),
   },
-  { touchedBy: array(convId), owner: designOwner, role: designRole, appKind: designAppKind },
+  {
+    touchedBy: array(convId),
+    people: array(str),
+    owner: designOwner,
+    role: designRole,
+    appKind: designAppKind,
+  },
 );
 const madeTaskRef: Decoder<MadeTaskRef> = object({
   key: id,
@@ -2661,6 +2700,13 @@ const messageHit: Decoder<MessageHit> = object({
 });
 const messageSearch: Decoder<MessageSearch> = object({ query: str, hits: array(messageHit), indexing: bool });
 const chatDigest: Decoder<ChatDigest> = object({ convId, title: str, text: str, path: id, truncated: bool });
+const glanceMessage: Decoder<GlanceMessage> = object({ at: ms, text: str });
+const chatGlance: Decoder<ChatGlance> = object({
+  convId,
+  lastUser: nullable(glanceMessage),
+  lastAgent: nullable(glanceMessage),
+  messages: int,
+});
 const share: Decoder<number> = (v, p) => (num(v, p) <= 1 ? (v as number) : fail(p, 'above 1'));
 const diskPartId = oneOf(DISK_PART_IDS);
 const machineDiskPart: Decoder<MachineDiskPart> = object({ id: diskPartId, bytes: int });
@@ -2894,6 +2940,11 @@ const rewindPlan: Decoder<RewindPlan> = object({
     object({ at: ms, changes: array(object({ path: id, change: oneOf(FILE_CHANGES) })), more: int }),
   ),
 });
+const CHAT_FROM_MAX = 120;
+const fromField: Decoder<string> = (v, p) =>
+  [...str(v, p)].length <= CHAT_FROM_MAX ? (v as string) : fail(p, 'too long');
+const chatFrom: Decoder<ChatFrom> = object({ app: fromField, label: fromField }, { title: fromField });
+
 const origin: Decoder<Origin> = object(
   {
     k: oneOf(ORIGIN_KINDS),
@@ -2972,6 +3023,7 @@ const conversation: Decoder<Conversation> = object(
     autoContinues: array(autoContinue),
     parentId: convId,
     test: bool,
+    from: chatFrom,
   },
 );
 
@@ -3647,6 +3699,7 @@ export const parsePage = {
   context: (v: unknown): ConvContext => convContext(v, '$'),
   search: (v: unknown): MessageSearch => messageSearch(v, '$'),
   digest: (v: unknown): ChatDigest => chatDigest(v, '$'),
+  glance: (v: unknown): ChatGlance => chatGlance(v, '$'),
   machineStats: (v: unknown): MachineStats => machineStats(v, '$'),
   machineStop: (v: unknown): MachineStopped => machineStopped(v, '$'),
   apps: (v: unknown): AppsFeed => appsFeed(v, '$'),

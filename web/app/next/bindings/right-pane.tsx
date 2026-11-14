@@ -22,6 +22,7 @@ import { ConsentAsks } from '@/next/features/app-consent/consent-ask';
 import { heldTools, quietTools, toolOfRequest } from '@/next/features/pane/tools-order';
 import { useChatMade } from '@/next/bindings/chat-made';
 import BrowserTab from '@/next/bindings/browser-tab';
+import { KeptBrowserSlot } from '@/next/features/app-views/kept-frames';
 import { isChatPlace, type IPlace } from '@/next/features/pane/place';
 import { deliveredViewOf } from '@/next/features/pane/delivered-kind';
 import { crumbsOf } from '@/next/features/pane/crumbs';
@@ -88,7 +89,14 @@ import { usePresence } from '@/next/ui/presence';
 import { plural, t } from '@/next/i18n';
 import { isLegacyTab, useLegacyPane, type ILegacyPane, type TLegacyHandoff } from '@/next/legacy/pane';
 import { MACHINE, browserAt, placeRequest, type IPaneTabs, type TTab } from '@/next/features/pane/pane-tabs';
-import { requestOf, requestsOf, type IPaneIntent, type IPaneRequest } from '@/next/features/pane/intents';
+import {
+  liftedTitle,
+  requestOf,
+  requestsOf,
+  type IPaneIntent,
+  type IPaneRequest,
+} from '@/next/features/pane/intents';
+import { liftedFrom, liftedFromLegacy, markLifted } from '@/next/features/pane/lifted-from';
 import { usePaneIntents } from '@/next/bindings/pane-intents';
 import { usePhone } from '@/next/ui/use-media';
 import { KEY_SCOPE } from '@/next/features/keys/commands';
@@ -988,8 +996,9 @@ const PaneBody = (props: IPaneBodyProps) => {
           ),
           dirty: edits.unsaved.has(x.id),
           unread: props.unread.includes(x.id),
+          from: liftedFrom(conv.id, x) ?? undefined,
         })),
-        ...legacy.tabs,
+        ...legacy.tabs.map((x) => ({ ...x, from: liftedFromLegacy(conv.id, x.kind, x.target) ?? undefined })),
       ]}
       tab={legacyTab?.id ?? tab?.id ?? (onPinned ? PINNED_APP_TAB : TOOLS_TAB)}
       ownBar={tab?.kind === 'browser' || tab?.kind === 'agent-browser' || tab?.kind === 'designly'}
@@ -1048,6 +1057,7 @@ const PaneBody = (props: IPaneBodyProps) => {
         <SideChat
           messages={side.messages}
           busy={side.busy}
+          field={side.field}
           onAsk={(q) => side.ask(q)}
           onStop={side.stop}
           onRetry={side.retry}
@@ -1109,9 +1119,9 @@ const PaneBody = (props: IPaneBodyProps) => {
         />
       )}
       {tab?.kind === 'browser' && (
-        <BrowserTab
+        <PaneBrowser
           key={tab.id}
-          conv={conv}
+          place={conv}
           tab={tab}
           onChange={(next) => setTabs((list) => list.map((x) => (x.id === next.id ? next : x)))}
           onNewTab={() => {
@@ -1124,6 +1134,27 @@ const PaneBody = (props: IPaneBodyProps) => {
     </ToolPane>
   );
 };
+
+/**
+ * A browser tab of the pane. A chat's one stands in the page's layer of kept frames over this place (kept-frames), so
+ * another tab, another chat or another screen in front does not load its page again; the start page's is drawn here.
+ */
+const PaneBrowser = ({
+  place,
+  tab,
+  onChange,
+  onNewTab,
+}: {
+  place: IPlace;
+  tab: Extract<TTab, { kind: 'browser' }>;
+  onChange: (tab: Extract<TTab, { kind: 'browser' }>) => void;
+  onNewTab: () => void;
+}) =>
+  isChatPlace(place) ? (
+    <KeptBrowserSlot place={place} tab={tab} onChange={onChange} onNewTab={onNewTab} />
+  ) : (
+    <BrowserTab conv={place} tab={tab} onChange={onChange} onNewTab={onNewTab} />
+  );
 
 /** How long the kept panes wait after the lists moved before the chats that went are forgotten. */
 const PRUNE_MS = 2000;
@@ -1440,14 +1471,27 @@ export const useRightPane = (
   };
   // A plain function: the hook below calls the newest one from its own effect event. What the agent asked with `open`
   // comes in front; what the runtime asked by itself goes behind and leaves the pane as it is (requestsOf).
+  // What a subchat's pane was asked comes here too: its tab says whose it is, by the intent's `from`, oldest
+  // first so the newest ask of a thing decides.
+  const [, bumpMarks] = useState(0);
+  const markIntents = (intents: readonly IPaneIntent[]) => {
+    if (!conv) return;
+    for (const { command } of [...intents].sort((a, b) => a.createdAt - b.createdAt)) {
+      const request = requestOf(command);
+      if (request && command.kind === 'open' && !command.reload)
+        markLifted(conv.id, request, liftedTitle(command));
+    }
+    bumpMarks((n) => n + 1);
+  };
   const applyIntents = (intents: IPaneIntent[]) => {
     for (const { command } of intents)
       if (command.kind === 'open' && command.target && command.place)
         requestFilePlace(command.target, command.place);
+    markIntents(intents);
     const { asked, quiet } = requestsOf(intents);
     applyRequests([...quiet, ...asked], false, new Set(quiet));
   };
-  usePaneIntents(conv?.machineId ?? null, legacy.tabId, applyIntents);
+  usePaneIntents(conv?.machineId ?? null, legacy.tabId, applyIntents, markIntents);
   // What was asked for this chat while the person was in another one is placed now that they are back; a tab of
   // Legacy's pane waits for it to come.
   const applyPending = useEffectEvent(applyRequests);
@@ -1604,6 +1648,7 @@ export const useRightPane = (
   // A thing the chat made opens where its kind lives: a design in Designly, a document or a board where the runtime says.
   const openMade = (item: Pick<MadeItem, 'kind' | 'ref'>) => {
     if (item.kind === 'design') openDesign(item.ref);
+    else if (item.kind === 'file') openFile(item.ref);
     else openRef(item.ref);
   };
 
@@ -1712,6 +1757,7 @@ export const useRightPane = (
       closing={float === 'closing'}
       messages={side.messages}
       busy={side.busy}
+      field={side.field}
       onAsk={(q) => side.ask(q)}
       onStop={side.stop}
       onRetry={side.retry}

@@ -480,6 +480,20 @@ func (l *Library) shownClaims(claims []Claim) []Claim {
 }
 
 // boardFileOf is the file of the board a claim key names; the key itself when no board has it.
+// BoardFileOf is the file of a project's board an agent named (its key, page or title), as the page names its boards;
+// "" when there is no such project or board.
+func (l *Library) BoardFileOf(project, board string) string {
+	a := l.ReadArtifact(project)
+	if a == nil {
+		return ""
+	}
+	key, err := ResolveBoardKey(a, board)
+	if err != nil {
+		return ""
+	}
+	return boardFileOf(a, key)
+}
+
 func boardFileOf(a *Artifact, key string) string {
 	if b, ok := boardOfKey(a, key); ok && b.Path != "" {
 		return filepath.Base(b.Path)

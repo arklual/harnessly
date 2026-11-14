@@ -33,6 +33,10 @@ export const errorText = (e: unknown): string => {
       return t('err.providerOff');
     case 'rate_limited':
       return e.retryAfter ? t('err.rateLimitedIn', { n: e.retryAfter }) : t('err.rateLimited');
+    case 'client_api_off':
+      return t('err.clientApiOff');
+    case 'code_unknown':
+      return t('err.codeUnknown');
     case 'machine_offline':
       return t('err.machineOffline');
     case 'machine_error': {

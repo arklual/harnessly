@@ -251,7 +251,7 @@ func (s *Store) UpdateTabCliStatus(sessionName string, cliState string, dismisse
 }
 
 // The metadata keys a merge may set.
-var metaKeys = []string{"launch", "mode"}
+var metaKeys = []string{"launch", "mode", "from"}
 
 // MergeMeta merges a patch into a tab's metadata: each patch key with a value replaces the stored one, keys outside the
 // known ones are ignored and stored keys the patch does not name stay. changed is false when nothing differs.

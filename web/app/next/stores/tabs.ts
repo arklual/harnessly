@@ -8,8 +8,9 @@
 // merges it by tab id against the list it last saw there, so a tab opened in one window appears in the other and a tab
 // closed in one goes in the other. What is a window's own (which tab is active, each tab's scroll and view state)
 // is kept per window, in sessionStorage, and survives a reload of that window.
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { placeKeyOf } from '@/next/routes/routes';
+import { PHONE_QUERY } from '@/next/features/shell/gestures';
+import { createContext, useCallback, useContext, useEffect, useState, useSyncExternalStore } from 'react';
+import { parseRoute, placeKeyOf, ROUTE } from '@/next/routes/routes';
 
 export interface ITab {
   id: string;
@@ -266,8 +267,52 @@ export const planOpen = (
   };
 };
 
+/**
+ * The active tab showed a design and now edits it with its chat, while another tab shows that chat alone: the design's
+ * tab stays and the chat's goes, so the person stays where they pressed «Редактирование».
+ */
+const absorbs = (from: string, other: string, to: string): boolean => {
+  const before = parseRoute(from);
+  const after = parseRoute(to);
+  return (
+    before.kind === ROUTE.site &&
+    after.kind === ROUTE.site &&
+    before.id === after.id &&
+    parseRoute(other).kind === ROUTE.chat
+  );
+};
+
 /** The active tab goes to `path` (any navigation that is not a new tab); a new place starts at its top. */
-export const navigateTab = (state: ITabsState, path: string): ITabsState => {
+/**
+ * Where no tabs are shown (the phone), a screen that holds a frame is not written over by the next place: the next
+ * place opens as a tab of its own behind the scenes, and going back finds the screen still standing (KeptScreens in
+ * bindings/shell.tsx). `keeps` tells such a screen; `max` caps the tabs, the least recent going first.
+ */
+export interface IKeepScreens {
+  keeps: (path: string) => boolean;
+  max: number;
+}
+
+/** The phone's tabs over `max` go, the least recent first (the list is kept in the order they were last on). */
+const trimTabs = (state: ITabsState, max: number): ITabsState => {
+  if (state.tabs.length <= max) return state;
+  const drop = state.tabs.filter((tab) => tab.id !== state.active).slice(0, state.tabs.length - max);
+  const gone = new Set(drop.map((tab) => tab.id));
+  return { ...state, tabs: state.tabs.filter((tab) => !gone.has(tab.id)) };
+};
+
+/** On the phone the tab switched to goes last: the list's order is the order they were last on. */
+const lastOn = (state: ITabsState, id: string): ITabsState => {
+  const tab = state.tabs.find((x) => x.id === id);
+  if (!tab) return state;
+  return { tabs: [...state.tabs.filter((x) => x.id !== id), tab], active: id };
+};
+
+export const navigateTab = (
+  state: ITabsState,
+  path: string,
+  keep: IKeepScreens | null = null,
+): ITabsState => {
   const current = activeTab(state);
   if (current.path === path) return state;
   const key = placeKeyOf(path);
@@ -275,7 +320,14 @@ export const navigateTab = (state: ITabsState, path: string): ITabsState => {
   if (placeKeyOf(current.path) === key) return patchTab(state, current.id, { path });
   // A place another tab has: that tab is switched to, the active one stays as it was.
   const other = state.tabs.find((tab) => tab.id !== current.id && placeKeyOf(tab.path) === key);
+  // A design taken into editing with its chat absorbs the chat's own tab: the two are one place now (chat-place.ts).
+  if (other && absorbs(current.path, other.path, path))
+    return patchTab({ ...state, tabs: state.tabs.filter((tab) => tab.id !== other.id) }, current.id, {
+      path,
+    });
+  if (other && keep) return lastOn(patchTab(state, other.id, { path }), other.id);
   if (other) return activateTab(patchTab(state, other.id, { path }), other.id);
+  if (keep?.keeps(current.path)) return trimTabs(openTab(state, path, { at: 'end' }), keep.max);
   return patchTab(state, current.id, { path, title: null, scroll: null });
 };
 
@@ -440,9 +492,17 @@ export const startTabs = (path: string, restore: boolean): string | null => {
   return init.go;
 };
 
+/** How the phone keeps its screens (set by the shell, which knows them); none until then. */
+let phoneKeep: IKeepScreens | null = null;
+export const keepScreensOnPhone = (keep: IKeepScreens) => {
+  phoneKeep = keep;
+};
+const keepNow = (): IKeepScreens | null =>
+  phoneKeep && typeof window !== 'undefined' && window.matchMedia(PHONE_QUERY).matches ? phoneKeep : null;
+
 export const tabs = {
   open: (path: string, options?: IOpenOptions) => commit(openTab(tabsSnapshot(), path, options)),
-  navigate: (path: string) => commit(navigateTab(tabsSnapshot(), path)),
+  navigate: (path: string) => commit(navigateTab(tabsSnapshot(), path, keepNow())),
   activate: (id: string) => commit(activateTab(tabsSnapshot(), id)),
   close: (id: string) => commit(closeTab(tabsSnapshot(), id)),
   closeOthers: (id: string) => commit(closeOtherTabs(tabsSnapshot(), id)),
@@ -474,20 +534,36 @@ export const useTabs = (): ITabsState => useSyncExternalStore(subscribe, tabsSna
  * The value must be JSON. `key` names the place it is of (a design's id), so another place in the same tab starts
  * from `initial`.
  */
+/**
+ * The tab a screen kept alive belongs to (features/shell/kept-screens): its view state is that tab's, whether it is on
+ * screen or waits hidden. Without it a view is the active tab's, as before.
+ */
+export interface ITabScope {
+  tabId: string;
+  active: boolean;
+}
+export const TabScopeContext = createContext<ITabScope | null>(null);
+export const useTabScope = (): ITabScope | null => useContext(TabScopeContext);
+
+const scopedTab = (state: ITabsState, scope: ITabScope | null): ITab =>
+  (scope && state.tabs.find((tab) => tab.id === scope.tabId)) || activeTab(state);
+
 export const useTabState = <T>(key: string, initial: T): [T, (next: T | ((current: T) => T)) => void] => {
   const snapshot = useTabs();
+  const scope = useTabScope();
+  const scopeId = scope?.tabId ?? null;
   // The first value only, as with useState: a new [] each render would be a new value each render.
   const [first] = useState(initial);
-  const tab = activeTab(snapshot);
+  const tab = scopedTab(snapshot, scope);
   const value = (tab.view?.[key] as T | undefined) ?? first;
   const set = useCallback(
     (next: T | ((current: T) => T)) => {
-      const now = activeTab(tabsSnapshot());
+      const now = scopedTab(tabsSnapshot(), scopeId === null ? null : { tabId: scopeId, active: false });
       const current = (now.view?.[key] as T | undefined) ?? first;
       const value = typeof next === 'function' ? (next as (current: T) => T)(current) : next;
       tabs.patch(now.id, { view: { ...now.view, [key]: value } });
     },
-    [key, first],
+    [key, first, scopeId],
   );
   return [value, set];
 };

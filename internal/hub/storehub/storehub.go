@@ -240,6 +240,11 @@ func (s *Store) DesignRoom(ctx context.Context, spaceID string) (*filestore.Stor
 	return s.srv.Room(ctx, s.Room(spaceID, filestore.KindDesign))
 }
 
+// CoversRoom is a space's covers collection as the hub reads it itself.
+func (s *Store) CoversRoom(ctx context.Context, spaceID string) (*filestore.Store, error) {
+	return s.srv.Room(ctx, s.Room(spaceID, filestore.KindCovers))
+}
+
 // AppsRoom is a space's apps collection as the hub reads it itself: the guest links it serves.
 func (s *Store) AppsRoom(ctx context.Context, spaceID string) (*filestore.Store, error) {
 	return s.srv.Room(ctx, s.Room(spaceID, filestore.KindApps))
@@ -377,6 +382,16 @@ func (s *Store) authorize(r *http.Request, coll string) (filestore.Access, error
 	}
 	if coll == filestore.KindDesign && s.design != nil {
 		if err := s.filter(r.Context(), m, &acc); err != nil {
+			return filestore.Access{}, err
+		}
+	}
+	if coll == filestore.KindCovers && s.design != nil {
+		if err := s.coversFilter(r.Context(), m, &acc); err != nil {
+			return filestore.Access{}, err
+		}
+	}
+	if filestore.IsRecordKind(coll) && s.design != nil {
+		if err := s.recordsFilter(r.Context(), m, &acc); err != nil {
 			return filestore.Access{}, err
 		}
 	}

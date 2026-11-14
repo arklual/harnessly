@@ -234,6 +234,9 @@ func (r *Registry) Kinds() ([]KindInfo, error) {
 	return kindsOf(list), nil
 }
 
+// DocumentKindsOf are the document types of the installed apps, by id (the hub reads them from the packages of a space's team).
+func DocumentKindsOf(list []Installed) []KindInfo { return kindsOf(list) }
+
 func kindsOf(list []Installed) []KindInfo {
 	out := []KindInfo{}
 	for _, a := range list {

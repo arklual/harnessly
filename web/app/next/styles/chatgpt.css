@@ -1,0 +1,524 @@
+/* ChatGPT: the plain chat on the person's own plan and its card in Providers. The feed, the bubbles and
+   the composer are the chat's own (chat.css, composer.css); here only what the ChatGPT screen adds. */
+
+@keyframes hx-gpt-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes hx-gpt-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes hx-gpt-dots {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+/* Screen */
+
+.hx-gpt {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background: var(--hx-bg-stage);
+}
+
+.hx-gpt__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  height: 48px;
+  flex: none;
+  padding: 0 var(--hx-space-4);
+}
+
+.hx-gpt__bar .hx-gpt__back {
+  display: none;
+}
+
+.hx-gpt__mark {
+  display: inline-flex;
+  flex: none;
+}
+
+.hx-gpt__title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hx-gpt .hx-chat {
+  flex: 1;
+  min-height: 0;
+}
+
+.hx-gpt__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--hx-space-2);
+  margin: 18vh auto 0;
+  max-width: 420px;
+  text-align: center;
+  animation: hx-gpt-in var(--hx-dur-md) var(--hx-ease-out);
+}
+
+.hx-gpt__empty b {
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-xl);
+  font-weight: var(--hx-weight-semibold);
+}
+
+.hx-gpt__empty span {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+
+.hx-gpt__answer[data-live] {
+  animation: hx-gpt-in var(--hx-dur-sm) var(--hx-ease-out);
+}
+
+.hx-gpt__dots {
+  display: inline-block;
+  width: 28px;
+  height: 8px;
+  background: radial-gradient(circle, var(--hx-fg-3) 3px, transparent 3.5px) 0 50% / 10px 8px repeat-x;
+  animation: hx-gpt-dots 1.2s var(--hx-ease-in-out) infinite;
+}
+
+.hx-gpt__note {
+  margin-top: var(--hx-space-2);
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+
+.hx-gpt__files {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--hx-space-2);
+  margin-bottom: var(--hx-space-2);
+}
+
+.hx-gpt__pic {
+  display: block;
+  overflow: hidden;
+  border-radius: var(--hx-radius-md);
+}
+
+.hx-gpt__pic img {
+  display: block;
+  max-width: 220px;
+  max-height: 180px;
+  object-fit: cover;
+}
+
+.hx-gpt__doc {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hx-space-1);
+  padding: var(--hx-space-1) var(--hx-space-3);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  text-decoration: none;
+  transition: background var(--hx-dur-sm) var(--hx-ease-out);
+}
+
+.hx-gpt__doc:hover {
+  background: var(--hx-bg-hover);
+}
+
+.hx-gpt__signin,
+.hx-gpt__fail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hx-space-2) var(--hx-space-3);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+
+.hx-gpt__signin {
+  margin-bottom: var(--hx-space-2);
+  animation: hx-gpt-in var(--hx-dur-md) var(--hx-ease-out);
+}
+
+.hx-gpt__fail a {
+  color: var(--hx-accent);
+}
+
+.hx-gpt__error {
+  margin-bottom: var(--hx-space-2);
+  animation: hx-gpt-in var(--hx-dur-md) var(--hx-ease-out);
+}
+
+.hx-gpt__error[data-state='closing'] {
+  animation: hx-gpt-out var(--hx-dur-sm) var(--hx-ease-out) forwards;
+}
+
+.hx-gpt__plan {
+  margin-top: var(--hx-space-2);
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  text-align: center;
+}
+
+/* Model chip in the composer and its picker */
+
+.hx-gpt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hx-space-1);
+  height: 28px;
+  max-width: 220px;
+  padding: 0 var(--hx-space-2);
+  border: 0;
+  border-radius: var(--hx-radius-full);
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+  transition: background var(--hx-dur-sm) var(--hx-ease-out);
+}
+
+.hx-gpt-chip:hover,
+.hx-gpt-chip[data-popup-open] {
+  background: var(--hx-bg-hover);
+}
+
+.hx-gpt-chip__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hx-gpt-chip__effort {
+  color: var(--hx-fg-3);
+}
+
+.hx-gpt-pick,
+.hx-gpt-menu {
+  padding: var(--hx-space-1);
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-lg);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  outline: 0;
+}
+
+.hx-gpt-pick {
+  width: 260px;
+}
+
+.hx-gpt-pick__head {
+  padding: var(--hx-space-2) var(--hx-space-2) var(--hx-space-1);
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+
+.hx-gpt-pick__list {
+  display: flex;
+  flex-direction: column;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.hx-gpt-pick__opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-2);
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.hx-gpt-pick__opt:hover {
+  background: var(--hx-bg-hover);
+}
+
+.hx-gpt-pick__check {
+  opacity: 0;
+  color: var(--hx-accent);
+}
+
+.hx-gpt-pick__opt[aria-selected='true'] .hx-gpt-pick__check {
+  opacity: 1;
+}
+
+.hx-gpt-pick__efforts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-1);
+  padding: 0 var(--hx-space-2) var(--hx-space-2);
+}
+
+.hx-gpt-pick__effort {
+  height: 26px;
+  padding: 0 var(--hx-space-3);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-full);
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  cursor: pointer;
+  transition:
+    background var(--hx-dur-sm) var(--hx-ease-out),
+    border-color var(--hx-dur-sm) var(--hx-ease-out);
+}
+
+.hx-gpt-pick__effort:hover {
+  background: var(--hx-bg-hover);
+}
+
+.hx-gpt-pick__effort[aria-checked='true'] {
+  border-color: var(--hx-accent);
+  background: var(--hx-accent-soft);
+  color: var(--hx-fg-1);
+}
+
+.hx-gpt-pick__foot {
+  padding: var(--hx-space-2);
+  border-top: 1px solid var(--hx-border);
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+
+/* Card in Providers */
+
+.hx-gpt-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-3);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-accent-soft);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  animation: hx-gpt-in var(--hx-dur-md) var(--hx-ease-out);
+}
+
+.hx-gpt-welcome b {
+  color: var(--hx-fg-1);
+}
+
+.hx-gpt-welcome a {
+  color: var(--hx-accent);
+}
+
+.hx-gpt-welcome[data-state='closing'],
+.hx-gpt-login-wrap[data-state='closing'] {
+  animation: hx-gpt-out var(--hx-dur-sm) var(--hx-ease-out) forwards;
+}
+
+.hx-gpt-accs {
+  display: flex;
+  flex-direction: column;
+}
+
+.hx-gpt-acc {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-2) var(--hx-space-3);
+  padding: var(--hx-space-2) 0;
+}
+
+.hx-gpt-acc + .hx-gpt-acc {
+  border-top: 1px solid var(--hx-border);
+}
+
+.hx-gpt-acc__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.hx-gpt-acc__text b {
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hx-gpt-acc__text span {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+
+.hx-gpt-acc[data-active] .hx-gpt-acc__text span {
+  color: var(--hx-accent);
+}
+
+.hx-gpt-acc__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-1);
+}
+
+.hx-gpt-accs__add {
+  align-self: flex-start;
+  margin-top: var(--hx-space-1);
+  padding: var(--hx-space-1) 0;
+  border: 0;
+  background: transparent;
+  color: var(--hx-accent);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+}
+
+.hx-gpt-login-wrap {
+  animation: hx-gpt-in var(--hx-dur-md) var(--hx-ease-out);
+}
+
+.hx-gpt-login__steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-1);
+  margin: 0 0 var(--hx-space-2);
+  padding-left: var(--hx-space-5);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+
+.hx-gpt-login__steps a {
+  color: var(--hx-accent);
+}
+
+.hx-gpt-acc__err {
+  margin-top: var(--hx-space-2);
+}
+
+/* Phone: the bar gets a way back to the chats' list */
+
+@media (max-width: 900px) {
+  .hx-gpt__bar .hx-gpt__back {
+    display: inline-flex;
+  }
+
+  .hx-gpt__bar {
+    padding: 0 var(--hx-space-2);
+  }
+
+  .hx-gpt__empty {
+    margin-top: 10vh;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-gpt *,
+  .hx-gpt-welcome,
+  .hx-gpt-login-wrap {
+    animation: none !important;
+  }
+}
+
+/* «⋯» of a chat in the bar */
+
+.hx-gpt__title {
+  flex: 1;
+}
+
+.hx-gpt-menu {
+  width: 240px;
+}
+
+.hx-gpt-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  width: 100%;
+  padding: var(--hx-space-2);
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--hx-dur-sm) var(--hx-ease-out);
+}
+
+.hx-gpt-menu__item:hover {
+  background: var(--hx-bg-hover);
+}
+
+.hx-gpt-menu__item[data-danger='true'],
+.hx-gpt-menu__btn[data-danger='true'] {
+  color: var(--hx-danger);
+}
+
+.hx-gpt-menu__ask {
+  padding: var(--hx-space-2);
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+}
+
+.hx-gpt-menu__row {
+  display: flex;
+  gap: var(--hx-space-1);
+  justify-content: flex-end;
+  padding: var(--hx-space-1);
+}
+
+.hx-gpt-menu__btn {
+  padding: var(--hx-space-1) var(--hx-space-3);
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+}
+
+.hx-gpt-menu__btn:hover {
+  background: var(--hx-bg-hover);
+}
+
+.hx-gpt-menu__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.hx-gpt-menu__rename {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-1);
+  padding: var(--hx-space-1);
+}

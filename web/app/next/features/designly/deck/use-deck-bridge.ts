@@ -1,6 +1,7 @@
 // The deck's line to the board on screen: only messages from that frame's window count (the stage keeps a second frame
 // for the crossfade, which is not listened to until it is the one on screen), read through ./bridge. Keys pressed while
 // the board has the focus come over as `tk:key` and are the deck's keys (use-deck-keys.ts).
+import { readPageGo, type IPageGo } from '@/next/features/designly/page-link';
 import { useEffect, useEffectEvent, useRef, type RefObject } from 'react';
 import {
   postDeck,
@@ -48,7 +49,10 @@ export const useDeckBridge = (
   onKey: (key: string) => void,
   /** The board's buttons on its pictures: the board is up (`hello`), or a button was pressed. */
   onImage?: (message: 'hello' | IImageAct) => void,
+  /** A link of the slide to another page of the deck (page-link.ts): the host turns to that slide. */
+  onLink?: (go: IPageGo) => void,
 ): IDeckBridge => {
+  const link = useEffectEvent((go: IPageGo) => onLink?.(go));
   const take = useEffectEvent(onMessage);
   const image = useEffectEvent((message: 'hello' | IImageAct) => onImage?.(message));
   const key = useEffectEvent(onKey);
@@ -60,6 +64,11 @@ export const useDeckBridge = (
     const listen = (event: MessageEvent) => {
       const win = frame.current?.contentWindow;
       if (!win || event.source !== win) return;
+      const go = readPageGo(event.data);
+      if (go) {
+        link(go);
+        return;
+      }
       const read = readDeckMessage(event.data);
       if (read) {
         take(read);

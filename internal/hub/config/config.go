@@ -620,7 +620,7 @@ func (c *Config) PreviewSlotHost(handle string, n int) string {
 
 var previewSlotPrefix = regexp.MustCompile(`^[a-z][a-z0-9-]{0,19}$`)
 
-var previewSlotLabel = regexp.MustCompile(`^(p[a-z2-7]{12})-([1-6])$`)
+var previewSlotLabel = regexp.MustCompile(`^(p[a-z2-7]{12})-([1-8])$`)
 
 // PreviewSlotFromHost reads the handle and the slot out of a request host of the form <prefix><handle>-<n>.<slot domain>[:port];
 // false when the host is not one. The hub's own host is never one.

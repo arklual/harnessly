@@ -413,9 +413,25 @@ func (a *API) CLIDesign(r *http.Request) Answer {
 		if c == nil {
 			return JSON(r, 400, errorBody(locale.Pick("Empty command: board, view, panel or props", "Пустая команда: board, view, panel или props")), h)
 		}
+		// The command opens the design in the chat's pane first (and in the panes of the chats above it): a page
+		// that is not there yet gets the command once it opens.
+		opened := false
+		if session, ok := strField(body, "session"); ok && sessionRe.MatchString(session) && a.OpenPane != nil {
+			opened = a.OpenPane(session, artifact, c.Board)
+		}
 		pages := a.L.SendControl(artifact, *c)
+		if pages == 0 && opened {
+			a.L.QueueControl(artifact, *c)
+			return JSON(r, 200, struct {
+				Pages   int    `json:"pages"`
+				Queued  bool   `json:"queued"`
+				Message string `json:"message"`
+			}{0, true, locale.Pick("The Sinopia Design tab is asked to open in the chat's pane (behind, with a dot); the command reaches the board as soon as it opens",
+				"Вкладка Sinopia Design открывается в правой панели чата (позади, с точкой); команда дойдёт до доски, как только она откроется")}, h)
+		}
 		if pages == 0 {
-			return JSON(r, 409, errorBody(locale.Pick("The design is not open in a preview now: ask the person to open the board in the Claude Design tab", "Макет сейчас не открыт в превью: попросите человека открыть доску во вкладке Claude Design")), h)
+			return JSON(r, 409, errorBody(locale.Pick("The design is not open in a preview now, and this command runs outside a chat: open it with "+a.L.cfg.Texts.CLI+" open design "+artifact,
+				"Макет сейчас не открыт в превью, а команда запущена не из чата: откройте его командой "+a.L.cfg.Texts.CLI+" open design "+artifact)), h)
 		}
 		time.Sleep(900 * time.Millisecond)
 		return JSON(r, 200, struct {
@@ -499,6 +515,11 @@ func (a *API) CLIClaims(r *http.Request) Answer {
 		out, err := a.L.ClaimForChat(session, project, board)
 		if err != nil {
 			return refuse(err)
+		}
+		// A board taken for editing opens in the chat's pane and in the panes above it: the person sees
+		// the board change live in the chat they sit in, whoever edits it.
+		if out.Holder == nil && !out.Lost && out.Notice == nil && !out.Offline && !out.Refreshed && a.OpenPane != nil {
+			a.OpenPane(session, out.Claim.Project, a.L.BoardFileOf(out.Claim.Project, board))
 		}
 		if out.Holder != nil {
 			o := out.Holder.Owner

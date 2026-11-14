@@ -4,6 +4,7 @@
 // and the quick ones (prompt-history.tsx), «/» the commands, skills and settings of the agent (slash-palette.tsx). On a phone the dock rides over the keyboard.
 import AttachmentThumb from '@/next/ui/attachment-thumb';
 import { formatProgress, percentOf } from '@/next/ui/transfer';
+import { distinctFiles } from '@/next/features/composer/distinct-files';
 import { useFileDrop } from '@/next/features/composer/use-file-drop';
 import ContextRing, { type IContextRingProps } from '@/next/features/composer/context-ring';
 import {
@@ -21,6 +22,7 @@ import {
 } from 'react';
 import { isStashKey, KEY_ACTION, keyAction } from '@/next/features/composer/keys';
 import LimitsChip from '@/next/features/limits/limits-chip';
+import { useHeld } from '@/next/ui/use-held';
 import type { LimitsView } from '@/next/features/limits/model';
 import ModelPicker, { type IModelPickerProps } from '@/next/features/composer/model-picker';
 import type { IPlusApps } from '@/next/features/composer/apps-pane';
@@ -44,6 +46,7 @@ import type {
 } from '@/next/features/composer/types';
 import useKeyboardInset from '@/next/features/composer/use-keyboard-inset';
 import { RoundButton } from '@/next/ui/button';
+import { useFieldValue } from '@/next/ui/use-field-value';
 import { useFieldEdges, useFitField } from '@/next/ui/use-fit-field';
 import { boxOf, canAnimate, claimEdit, FLIGHT_EASE, FLIGHT_MS, launchFrom } from '@/next/ui/flight';
 import Icon, { type TIconName } from '@/next/ui/icon';
@@ -60,6 +63,7 @@ import { commandsOfChord, isDefault } from '@/next/features/keys/keymap';
 import { keyOverrides, useKeys } from '@/next/features/keys/use-keys';
 import '@/next/styles/ui.css';
 import '@/next/styles/composer.css';
+import { countRender } from '@/next/core/perf-journal';
 
 export type TSendMode = 'queue' | 'now';
 
@@ -184,6 +188,12 @@ export interface IComposerProps {
   quiet?: boolean;
   /** The host's own buttons on the bar, before the microphone (a design's «pick a block»). */
   tools?: ReactNode;
+  /** The host takes words only (the side chat): no «+», and a file dropped or pasted is not taken. */
+  plain?: boolean;
+  /** The host has something to send without words (a picture's marks in its editor). */
+  ready?: boolean;
+  /** What the send button says where it is not a message (a review's «Спросить агента»). */
+  sendLabel?: string;
 }
 
 /** The recording bar's exit, as long as hx-recbar-out in composer.css. */
@@ -192,9 +202,21 @@ const REC_EXIT_MS = 180;
 export { RecordingTime, RecordingWave };
 
 /** The text that left the field fades up and away over this long, while the bubble takes it over. */
+/** The pastes a field has taken. */
+const pasted = new WeakSet<Event>();
+
+/** What the bar's pill, limits and ring mean, for holding them over a change of chat (ui/use-held.ts). */
+const pickerKey = (p: IModelPickerProps): string => JSON.stringify(p.value);
+const limitsKey = (view: LimitsView): string =>
+  view.state === 'ready'
+    ? JSON.stringify([view.provider, view.profile, view.limits, view.spend])
+    : view.state;
+const ringKey = (ring: IContextRingProps): string => `${ring.used}/${ring.limit}/${ring.compacting === true}`;
+
 const LIFT_MS = 200;
 const LIFT_PX = 10;
 const Composer = (props: IComposerProps) => {
+  countRender('field');
   const { value, onChange, onSubmit, mode, picker, attachments, recording, maxText } = props;
   const rootRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -215,6 +237,11 @@ const Composer = (props: IComposerProps) => {
   const stop = usePending<'stop'>();
   // The recording bar leaves with an animation and keeps what it showed meanwhile.
   const { value: bar, state: barState } = usePresence(recording, REC_EXIT_MS);
+  // Over a change of chat or screen the bar's pill, limits and ring keep what they showed until the next one's come
+  // (ui/use-held.ts): nothing vanishes for a frame. A held pill is the last chat's: it takes no click meanwhile.
+  const shownPicker = useHeld(picker, pickerKey);
+  const shownLimits = useHeld(props.limits ?? null, limitsKey);
+  const shownRing = useHeld(props.contextRing ?? null, ringKey);
   // The controls come back with a soft entrance once a recording has ended; on the page's first draw they just stand.
   const [recorded, setRecorded] = useState(false);
   if (bar && !recorded) setRecorded(true);
@@ -224,6 +251,8 @@ const Composer = (props: IComposerProps) => {
   useImperativeHandle(props.inputRef, () => fieldRef.current as HTMLTextAreaElement, []);
 
   const narrowField = useNarrowField(fieldRef);
+  // Before the fitting: it measures the text this puts in.
+  useFieldValue(fieldRef, value);
   useFitField(fieldRef, value);
   useFieldEdges(fieldRef, value);
 
@@ -346,6 +375,7 @@ const Composer = (props: IComposerProps) => {
   const tooLong = value.length > maxText;
   const failedFile = attachments.some((file) => file.status === 'error');
   const hasContent =
+    props.ready === true ||
     value.trim().length > 0 ||
     (props.quotes?.length ?? 0) > 0 ||
     (props.refs?.length ?? 0) > 0 ||
@@ -476,13 +506,16 @@ const Composer = (props: IComposerProps) => {
     }
   };
 
-  const { onFiles } = props;
-  const dropping = useFileDrop(onFiles);
+  const { onFiles, plain } = props;
+  const dropping = useFileDrop(onFiles) && !plain;
   const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
     const files = [...event.clipboardData.files];
-    if (files.length === 0) return;
+    if (files.length === 0 || plain) return;
     event.preventDefault();
-    onFiles(files);
+    // One paste is taken once, by the field it went to; the same picture twice in the clipboard is one.
+    if (pasted.has(event.nativeEvent)) return;
+    pasted.add(event.nativeEvent);
+    void distinctFiles(files).then(onFiles);
   };
 
   let fullPlaceholder = props.placeholder ?? t(PLACEHOLDER_KEYS[mode]);
@@ -594,7 +627,6 @@ const Composer = (props: IComposerProps) => {
               className="hx-composer__input"
               rows={1}
               disabled={props.quiet}
-              value={value}
               placeholder={placeholder}
               title={placeholder === fullPlaceholder ? undefined : fullPlaceholder}
               aria-label={t('next.composer.label')}
@@ -684,21 +716,27 @@ const Composer = (props: IComposerProps) => {
           </div>
         ) : (
           <div className="hx-composer__bar" data-back={recorded || undefined}>
-            <PlusMenu
-              ref={plusRef}
-              contexts={props.contexts ?? []}
-              onFiles={props.onFiles}
-              onContext={(id) => props.onContext?.(id)}
-              onPrompts={history.show}
-              attach={props.attach}
-              stash={props.stash}
-              takes={props.takes}
-              apps={props.apps}
-            />
-            {picker && <ModelPicker {...picker} />}
-            {props.limits && <LimitsChip view={props.limits} />}
+            {!plain && (
+              <PlusMenu
+                ref={plusRef}
+                contexts={props.contexts ?? []}
+                onFiles={props.onFiles}
+                onContext={(id) => props.onContext?.(id)}
+                onPrompts={history.show}
+                attach={props.attach}
+                stash={props.stash}
+                takes={props.takes}
+                apps={props.apps}
+              />
+            )}
+            {shownPicker.value && (
+              <span className="hx-composer__held" inert={shownPicker.held || undefined}>
+                <ModelPicker {...shownPicker.value} />
+              </span>
+            )}
+            {shownLimits.value && <LimitsChip view={shownLimits.value} />}
             <span className="hx-spacer" />
-            {props.contextRing && <ContextRing {...props.contextRing} />}
+            {shownRing.value && <ContextRing {...shownRing.value} />}
             {props.tools}
             {props.onMic && (
               <RoundButton
@@ -725,7 +763,7 @@ const Composer = (props: IComposerProps) => {
               <RoundButton
                 icon="arrow-up"
                 variant="accent"
-                label={working ? t('next.composer.queueTip') : t('next.composer.send')}
+                label={working ? t('next.composer.queueTip') : (props.sendLabel ?? t('next.composer.send'))}
                 keys={['↵']}
                 disabled={!canSend}
                 onClick={() => submit('queue')}

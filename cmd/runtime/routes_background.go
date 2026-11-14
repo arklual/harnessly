@@ -33,6 +33,8 @@ type backgroundFeature struct {
 	// Provider and Model are the choice; both null is «as now».
 	Provider *string `json:"provider"`
 	Model    *string `json:"model"`
+	// Effort is the reasoning effort the model is asked for; "" is the model's own.
+	Effort string `json:"effort,omitempty"`
 	// Agents: the feature may also be given a model of an agent of the machine (provider "claude" or "codex"), or
 	// turned off (provider "off").
 	Agents bool `json:"agents,omitempty"`
@@ -117,7 +119,7 @@ func backgroundView(r *bgmodel.Runner, summary noticeSummary) []backgroundFeatur
 	for _, f := range bgmodel.Features() {
 		v := backgroundFeature{Feature: f}
 		if c, ok := choices[f.ID]; ok {
-			v.Provider, v.Model = &c.Provider, &c.Model
+			v.Provider, v.Model, v.Effort = &c.Provider, &c.Model, c.Effort
 		}
 		// The summaries may also be an agent's model, or off (notice_summary.go).
 		if f.ID == bgmodel.FeatureNotifySummary {
@@ -142,6 +144,8 @@ func backgroundMessage(err error) (int, string, string) {
 		return http.StatusBadRequest, "unknown-provider", locale.Pick("There is no such provider any more. Pick another.", "Такого провайдера уже нет. Выберите другого.")
 	case errors.Is(err, bgmodel.ErrBadModel):
 		return http.StatusBadRequest, "bad-model", locale.Pick("Pick a model.", "Выберите модель.")
+	case errors.Is(err, bgmodel.ErrBadEffort):
+		return http.StatusBadRequest, "bad-effort", locale.Pick("Pick a level of reasoning the model has.", "Выберите уровень рассуждения, который есть у модели.")
 	}
 	return http.StatusInternalServerError, "failed", locale.Pick("It did not work. Try again.", "Не получилось. Попробуйте ещё раз.")
 }
@@ -200,6 +204,7 @@ func backgroundRoutes(d deps) []gate.Route {
 		var b struct {
 			Provider *string `json:"provider"`
 			Model    string  `json:"model"`
+			Effort   string  `json:"effort"`
 		}
 		raw, err := io.ReadAll(io.LimitReader(r.Body, 4<<10))
 		if err != nil || json.Unmarshal(raw, &b) != nil {
@@ -208,7 +213,7 @@ func backgroundRoutes(d deps) []gate.Route {
 		}
 		var choice *bgmodel.Choice
 		if b.Provider != nil && *b.Provider != "" {
-			choice = &bgmodel.Choice{Provider: *b.Provider, Model: b.Model}
+			choice = &bgmodel.Choice{Provider: *b.Provider, Model: b.Model, Effort: b.Effort}
 		}
 		value := func(c *bgmodel.Choice) string {
 			if c == nil {

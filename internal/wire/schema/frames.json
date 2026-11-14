@@ -249,7 +249,7 @@
     "TurnStatus": {"enum": ["live", "done", "interrupted", "failed"]},
     "TurnFailureCode": {"enum": ["api-error", "rate-limit", "context-overflow", "agent-exited", "unknown"]},
     "FileOp": {"enum": ["created", "edited", "read"]},
-    "OutputKind": {"enum": ["artifact", "design", "doc", "mr", "stand", "delivery"]},
+    "OutputKind": {"enum": ["artifact", "design", "doc", "mr", "stand", "delivery", "task", "commit"]},
     "OutputOp": {"enum": ["created", "changed"]},
     "EntryKind": {
       "enum": ["user", "say", "think", "tool", "subagent", "answers", "gate", "compaction", "notice", "interrupt", "peer"]
@@ -315,7 +315,7 @@
       ]
     },
     "RetryableRefuseCode": {"enum": ["machine-offline", "rate-limited", "internal", "timeout"]},
-    "HttpKind": {"enum": ["hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "designlyDemo", "designlyChat", "files", "file", "tasks", "legacy", "open", "openRefs", "made", "messageStatus", "context", "search", "digest", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest", "profileSwitch", "login", "loginOK"]},
+    "HttpKind": {"enum": ["hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "designlyDemo", "designlyChat", "files", "file", "tasks", "legacy", "open", "openRefs", "made", "messageStatus", "context", "search", "digest", "glance", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest", "profileSwitch", "login", "loginOK"]},
     "Channel": {"type": "string", "pattern": "^(machine|convs|conv:tab-[A-Za-z0-9_-]+)$"},
     "EntryId": {"type": "string", "pattern": "^((c:[0-9a-f-]+|x:[0-9]+)#[0-9]+|live:(c:[0-9a-f-]+|x:[0-9]+)#[0-9]+)$"},
     "TurnId": {"type": "string", "pattern": "^(c:[0-9a-f-]+|x:[0-9]+)#[0-9]+$"},
@@ -837,6 +837,26 @@
         "truncated": {"type": "boolean"}
       }
     },
+    "GlanceMessage": {
+      "type": "object",
+      "required": ["at", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "at": {"type": "integer", "minimum": 0},
+        "text": {"type": "string"}
+      }
+    },
+    "ChatGlance": {
+      "type": "object",
+      "required": ["convId", "lastUser", "lastAgent", "messages"],
+      "additionalProperties": false,
+      "properties": {
+        "convId": {"type": "string", "minLength": 1},
+        "lastUser": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/GlanceMessage"}]},
+        "lastAgent": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/GlanceMessage"}]},
+        "messages": {"type": "integer", "minimum": 0}
+      }
+    },
     "DiskPartID": {"enum": ["workspace", "caches", "agents", "other", "free"]},
     "MachineDiskPart": {
       "type": "object",
@@ -1231,7 +1251,7 @@
         }
       }
     },
-    "MadeKind": {"enum": ["doc", "board", "design", "task", "mr"]},
+    "MadeKind": {"enum": ["doc", "board", "design", "task", "mr", "stand", "commit", "file"]},
     "MadeFrom": {
       "type": "object",
       "required": ["kind", "id", "title"],
@@ -1602,6 +1622,16 @@
         "titleSource": {"$ref": "#/$defs/TitleSource"},
         "pinned": {"type": "boolean"},
         "test": {"type": "boolean"},
+        "from": {
+          "type": "object",
+          "required": ["app", "label"],
+          "additionalProperties": false,
+          "properties": {
+            "app": {"type": "string", "minLength": 1, "maxLength": 480},
+            "label": {"type": "string", "minLength": 1, "maxLength": 480},
+            "title": {"type": "string", "maxLength": 480}
+          }
+        },
         "createdAt": {"type": "integer", "minimum": 0},
         "lastActivityAt": {"type": "integer", "minimum": 0},
         "lastPromptAt": {"type": "integer", "minimum": 0},
@@ -4210,6 +4240,15 @@
           "properties": {
             "http": {"const": "digest"},
             "response": {"oneOf": [{"$ref": "#/$defs/ChatDigest"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "glance"},
+            "response": {"oneOf": [{"$ref": "#/$defs/ChatGlance"}, {"$ref": "#/$defs/Refusal"}]}
           }
         },
         {

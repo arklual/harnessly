@@ -110,3 +110,15 @@ func TestEnvSetHashCarriesTheAppsRule(t *testing.T) {
 		t.Fatal("another list with the same rule must hash otherwise")
 	}
 }
+
+func TestEnvSetHashWithLinks(t *testing.T) {
+	base := EnvSetHash("abc", AppsConsentAuto)
+	if EnvSetHashWith("abc", AppsConsentAuto, nil) != base || EnvSetHashWith("abc", AppsConsentAuto, &LinkSettings{}) != base {
+		t.Fatal("no links must keep the old hash")
+	}
+	a := EnvSetHashWith("abc", "", &LinkSettings{StandDomain: "preview.example.com"})
+	b := EnvSetHashWith("abc", "", &LinkSettings{StandDomain: "stands.example.com"})
+	if a == EnvSetHash("abc", "") || a == b {
+		t.Fatal("links must change the hash")
+	}
+}

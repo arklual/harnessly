@@ -278,6 +278,14 @@ type fakeAgents struct {
 	resumed   int
 	gaveUp    []string
 	recovered int
+	// unreadable: a pane process cannot be read (a hung NFS read).
+	unreadable bool
+}
+
+func (a *fakeAgents) Unreadable(Tab) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.unreadable
 }
 
 func (a *fakeAgents) Running(Tab) bool {

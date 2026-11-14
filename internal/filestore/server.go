@@ -70,6 +70,8 @@ type Server struct {
 
 	mu    sync.Mutex
 	rooms map[string]*Store
+	// observe hears of the commits of every room (ObserveRooms).
+	observe func(room, path string, deleted bool)
 
 	// Uploads in parts (uploads.go): the biggest one (0: no limit), when the expired ones were last removed, the
 	// size of a part and how long a complete waits before it answers 202 (zero: PartSize, finishWait).
@@ -104,6 +106,50 @@ func OpenFolder(dir string, authorize Authorizer) (*Server, error) {
 	return s, nil
 }
 
+// OpenURLs opens a store on the drivers two URLs name (OpenMetaStore, OpenBlobStore), with blobs in a folder of
+// its own when blobsURL is empty and SQLite in dir when dbURL is: a runtime on its own whose metadata lives in Postgres (RUNTIME_STORE_DB). The
+// server owns the drivers.
+func OpenURLs(ctx context.Context, dbURL, blobsURL, dir string, authorize Authorizer) (*Server, error) {
+	var meta MetaStore
+	var err error
+	if dbURL != "" {
+		meta, err = OpenMetaStore(ctx, dbURL)
+	} else {
+		meta, err = openSQLiteMeta(dir)
+	}
+	if err != nil {
+		return nil, err
+	}
+	var blobs BlobStore
+	if blobsURL != "" {
+		blobs, err = OpenBlobStore(blobsURL)
+	} else {
+		blobs, err = NewFileBlobs(dir)
+	}
+	if err != nil {
+		meta.Close()
+		return nil, err
+	}
+	s := NewServer(meta, blobs, authorize)
+	s.owned = true
+	return s, nil
+}
+
+// ObserveRooms makes fn hear of every committed write in every room the server opens from now on (and, when set before
+// the first request, in all of them): the room, the path and whether it was deleted. See Store.Observe.
+func (s *Server) ObserveRooms(fn func(room, path string, deleted bool)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.observe = fn
+	for room, st := range s.rooms {
+		if fn == nil {
+			st.Observe(nil)
+			continue
+		}
+		st.Observe(func(path string, deleted bool) { fn(room, path, deleted) })
+	}
+}
+
 // Meta and Blobs are the drivers (backup, gc, migrate run on them).
 func (s *Server) Meta() MetaStore            { return s.meta }
 func (s *Server) Blobs() BlobStore           { return s.blobs }
@@ -133,6 +179,9 @@ func (s *Server) Room(ctx context.Context, room string) (*Store, error) {
 		return nil, err
 	}
 	st := NewStore(room, rm, s.blobs, PolicyFor(room))
+	if f := s.observe; f != nil {
+		st.Observe(func(path string, deleted bool) { f(room, path, deleted) })
+	}
 	s.rooms[room] = st
 	return st, nil
 }

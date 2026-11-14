@@ -63,7 +63,7 @@ func TestLaunchStartsAConversationOnThePersonsMachine(t *testing.T) {
 	s := hubtest.New(t, withWorkspace, fleetOn, hubtest.Env("HUB_LAUNCH_TOKEN", launchKey))
 	owner := s.SignIn("owner@example.com")
 	space, _ := owner.NewSpace("Команда")
-	rt := &launchRuntime{status: 201, answer: `{"conversationId":"conv-1","provider":"claude"}`}
+	rt := &launchRuntime{status: 201, answer: `{"id":"conv-1","title":"t","provider":"claude"}`}
 	a := owner.Machine(space, rt.handler())
 	guest := s.SignIn("guest@example.com")
 	guestSpace, _ := guest.NewSpace("Гость")
@@ -121,6 +121,27 @@ func TestLaunchStartsAConversationOnThePersonsMachine(t *testing.T) {
 	}
 	delete(body, "machineId")
 
+	// An app's mark goes on to the runtime as it is; one without an app does not.
+	body["from"] = map[string]any{"app": "inbox", "label": "Inbox", "title": "Review the fix"}
+	if r := launchPost(owner, launchKey, body); r.Code != 201 {
+		t.Fatalf("with from: %s", r)
+	}
+	sent = nil
+	_ = json.Unmarshal([]byte(rt.got()[len(rt.got())-1]), &sent)
+	if f, _ := sent["from"].(map[string]any); f["app"] != "inbox" || f["label"] != "Inbox" || f["title"] != "Review the fix" {
+		t.Errorf("from sent %v", sent)
+	}
+	body["from"] = map[string]any{"label": "x"}
+	if r := launchPost(owner, launchKey, body); r.Code != 201 {
+		t.Fatalf("empty from: %s", r)
+	}
+	sent = nil
+	_ = json.Unmarshal([]byte(rt.got()[len(rt.got())-1]), &sent)
+	if _, has := sent["from"]; has {
+		t.Errorf("from without an app sent %v", sent)
+	}
+	delete(body, "from")
+
 	// Refusals before anything is looked at.
 	if r := launchPost(owner, "", body); r.Code != 403 {
 		t.Errorf("no token: %s", r)
@@ -141,8 +162,8 @@ func TestLaunchStartsAConversationOnThePersonsMachine(t *testing.T) {
 			t.Errorf("%s: %s", name, r)
 		}
 	}
-	if n := len(rt.got()); n != 2 {
-		t.Errorf("the runtime started %d conversations, want 2", n)
+	if n := len(rt.got()); n != 4 {
+		t.Errorf("the runtime started %d conversations, want 4", n)
 	}
 }
 

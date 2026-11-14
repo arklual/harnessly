@@ -1822,6 +1822,23 @@ input.hx-tbrowser__url:focus {
 .hx-legacy__sk:first-child {
   width: 60%;
 }
+/* A tab a subchat opened: whose it is, quiet, after the name; the active tab keeps its room for the name. */
+.hx-tab__from {
+  flex: 0 2 auto;
+  min-width: 0;
+  max-width: 120px;
+  margin-left: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+}
+@media (max-width: 700px) {
+  .hx-tab:not([aria-selected='true']) .hx-tab__from {
+    display: none;
+  }
+}
 /* A tab the agent opened behind the one on screen: a dot by its name until it is looked at. */
 .hx-tab[data-unread] .hx-tab__name::after {
   content: '';

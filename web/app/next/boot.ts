@@ -9,6 +9,7 @@ import { clusterApi, machineApi } from '@/next/core/net/machine';
 import { startDraftSync } from '@/next/core/drafts-cloud';
 import { watchFleet, type FleetSource, type FleetWatch } from '@/next/core/fleet-watch';
 import { startJournal } from '@/next/core/journal';
+import { startPerfJournal } from '@/next/core/perf-journal';
 import { dbNameOf, idbKV, startPersistence, type KV, type Persistence } from '@/next/core/persist';
 import { hub, type HubOptions } from '@/next/core/realtime/hub';
 import { clearPersonData } from '@/next/core/session';
@@ -137,6 +138,7 @@ let stopOutbox: (() => void) | null = null;
 let stopDraftSync: (() => void) | null = null;
 let stopQueuedChats: (() => void) | null = null;
 let stopJournal: (() => void) | null = null;
+let stopPerf: (() => void) | null = null;
 let fleetWatch: FleetWatch | null = null;
 let stopFleetNudge: (() => void) | null = null;
 
@@ -255,6 +257,8 @@ export function bootNext(o: BootOptions = {}): Promise<BootState> {
       document.addEventListener('visibilitychange', flushOnHidden);
       // The machine's journal of what the page does and where it fails.
       stopJournal = startJournal();
+      // How the page itself fares, a line a minute.
+      stopPerf = startPerfJournal();
     }
     const openKV = o.kv ?? ((person: string) => idbKV(dbNameOf(person)));
     const hint = o.lastPerson === undefined ? readHint() : o.lastPerson;
@@ -461,6 +465,8 @@ export async function shutdownNext(): Promise<void> {
   queuedChatsStore.set(null);
   stopJournal?.();
   stopJournal = null;
+  stopPerf?.();
+  stopPerf = null;
   stopFollowingFleet();
   fleetAgain = false;
   if (typeof window !== 'undefined') {

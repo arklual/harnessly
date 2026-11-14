@@ -213,10 +213,10 @@ func TestAuthDirOfTheRuntimeConfig(t *testing.T) {
 	if err := os.WriteFile(file, []byte(`{"claude_binary":"/opt/claude","auth_directory":"/run/auth/me"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got := authDirOf(file); got != "/run/auth/me" {
+	if got := AuthDirOf(file); got != "/run/auth/me" {
 		t.Errorf("authDirOf = %q", got)
 	}
-	if got := authDirOf(""); got != "" {
+	if got := AuthDirOf(""); got != "" {
 		t.Errorf("no config: %q", got)
 	}
 }

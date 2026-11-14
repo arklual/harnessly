@@ -46,7 +46,9 @@ describe('a chat history from the cluster copy', () => {
     net.getPage.mockResolvedValue({ ok: true, value: page });
     const res = await loadOlderTurns('a', 'tab-1', 't5');
     expect('ok' in res).toBe(true);
-    expect(urls()).toEqual(['/gw/history/conversations/tab-1?limit=20&before=t5']);
+    expect(urls()).toEqual([
+      '/gw/history/conversations/tab-1?limit=20&before=t5&caps=delegation,workflows,profiles,msgstatus,links',
+    ]);
   });
 
   it('asks a machine that is there for a chat the copy does not have yet', async () => {
@@ -57,7 +59,9 @@ describe('a chat history from the cluster copy', () => {
       .mockResolvedValueOnce({ ok: true, value: { turns: [], entries: [], beforeTurnId: null } });
     const res = await loadOlderTurns('a', 'tab-1', 't5');
     expect('ok' in res).toBe(true);
-    expect(urls()[1]).toBe('/m/a/conversations/tab-1/turns?before=t5&limit=20');
+    expect(urls()[1]).toBe(
+      '/m/a/conversations/tab-1/turns?before=t5&limit=20&caps=delegation,workflows,profiles,msgstatus,links',
+    );
   });
 
   it('does not ask a machine that is off', async () => {
@@ -115,7 +119,9 @@ describe('a chat history from the cluster copy', () => {
     connectionStore.set('a', { k: 'live' } as never);
     net.getPage.mockResolvedValue({ ok: true, value: { turns: [], entries: [], beforeTurnId: null } });
     await loadOlderTurns('a', 'tab-1', 't5');
-    expect(urls()).toEqual(['/m/a/conversations/tab-1/turns?before=t5&limit=20']);
+    expect(urls()).toEqual([
+      '/m/a/conversations/tab-1/turns?before=t5&limit=20&caps=delegation,workflows,profiles,msgstatus,links',
+    ]);
   });
 
   it('asks a machine that is there for turns older than what the copy keeps of a chat it does not hold whole', async () => {
@@ -125,7 +131,9 @@ describe('a chat history from the cluster copy', () => {
       .mockResolvedValueOnce({ ok: true, value: { ...page, complete: false } })
       .mockResolvedValueOnce({ ok: true, value: { turns: [], entries: [], beforeTurnId: null } });
     await loadOlderTurns('a', 'tab-1', 't0');
-    expect(urls()[1]).toBe('/m/a/conversations/tab-1/turns?before=t0&limit=20');
+    expect(urls()[1]).toBe(
+      '/m/a/conversations/tab-1/turns?before=t0&limit=20&caps=delegation,workflows,profiles,msgstatus,links',
+    );
   });
 
   it('reads a tool whole output from the copy, and from the machine only what the copy has not whole yet', async () => {
@@ -194,6 +202,8 @@ describe('a chat history from the cluster copy', () => {
       value: { turns: [{ id: 't2' }], entries: [], beforeTurnId: null },
     });
     await loadRewound('a', 'tab-1', 0);
-    expect(urls()).toEqual(['/gw/history/conversations/tab-1/rewinds/0/turns']);
+    expect(urls()).toEqual([
+      '/gw/history/conversations/tab-1/rewinds/0/turns?caps=delegation,workflows,profiles,msgstatus,links',
+    ]);
   });
 });

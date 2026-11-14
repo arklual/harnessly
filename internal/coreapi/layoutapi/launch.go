@@ -15,6 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
+	"github.com/ly-solutions/harnessly/internal/apptask"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/launch"
@@ -50,6 +51,10 @@ type Launch struct {
 	Sources         func() []status.AgentSource
 	ProjectDir      func(cwd string) string
 	Log             func(level, msg string, kv ...any)
+	// FromApp says whether the app that starts a chat for the person (from.app) is turned on in that chat: installed by
+	// the person and working in a chat. Its tools then reach the agent, so the task it handed over can report back to it
+	// nil: no app is turned on this way.
+	FromApp func(id string) bool
 }
 
 // LaunchRoutes are the launch slice's routes: starting conversations, documents, evals, side chats and Codex lines.
@@ -133,14 +138,54 @@ func (a *api) conversations(c *call) {
 			return
 		}
 		prompt, _ := c.field("prompt")
-		// Folder, environment, instruction files and metadata are not taken here: their callers have routes of their own.
-		if conv := a.start(c, launch.Options{Provider: provider, WorkspaceID: wsID, Prompt: optionalString(prompt), Launch: choice}); conv != nil {
+		o := launch.Options{Provider: provider, WorkspaceID: wsID, Prompt: optionalString(prompt), Launch: choice}
+		// An app that starts the chat for the person (the hub's launch): its mark goes into the tab's metadata,
+		// for the chat's folder in the sidebar, and its task goes to the agent in the app's envelope.
+		if f := appFrom(c); f != nil {
+			o.Meta = jsvalue.NewObject("from", jsvalue.NewObject("app", f.App, "label", f.Label, "title", f.Title))
+			if o.Prompt != nil {
+				wrapped := apptask.Wrap(f, *o.Prompt)
+				o.Prompt = &wrapped
+			}
+			o.Launch = withFromApp(o.Launch, f.App, a.l.FromApp)
+		}
+		// Folder, environment, instruction files and other metadata are not taken here: their callers have routes of their own.
+		if conv := a.start(c, o); conv != nil {
 			c.reply(201, conv)
 		}
 	default:
 		c.header.Set("Allow", "GET, POST")
 		c.end(405)
 	}
+}
+
+// withFromApp is the launch with the app that started the chat turned on in it, when the machine lets it (FromApp).
+func withFromApp(l *agents.Launch, app string, ok func(string) bool) *agents.Launch {
+	if ok == nil || !ok(app) {
+		return l
+	}
+	out := agents.Launch{}
+	if l != nil {
+		out = *l
+	}
+	for _, id := range out.Apps {
+		if id == app {
+			return l
+		}
+	}
+	out.Apps = append(append([]string(nil), out.Apps...), app)
+	return &out
+}
+
+// appFrom is the request's from {app, label, title}, cleaned; nil without one or without an app.
+func appFrom(c *call) *wire.ChatFrom {
+	v, _ := c.field("from")
+	o, ok := v.(*jsvalue.Object)
+	if !ok {
+		return nil
+	}
+	s := func(k string) string { x, _ := o.Get(k); str, _ := x.(string); return str }
+	return (&wire.ChatFrom{App: s("app"), Label: s("label"), Title: s("title")}).Clean()
 }
 
 // machineAgentPost: the machine agent's own POST, else the refusal is answered.

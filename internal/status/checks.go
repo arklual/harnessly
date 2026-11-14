@@ -20,8 +20,11 @@ func (m *Manager) pollChecks(tabID string, e *Entry, p Provider, pane *tmux.Pane
 	state, lastAt, hasEvent := e.CliState, e.lastEventAt(), e.LastEvent.Has()
 	m.mu.Unlock()
 
-	// A busy tab quiet for ten minutes whose agent is gone by two looks.
-	if state == Busy && hasEvent && now-lastAt > ms(busyStuck) {
+	// A busy tab quiet for ten minutes whose agent is gone by three witnesses, as for "gone" below: a shell in the
+	// pane's foreground, no agent in the poll's look, none in a fresh one. A look that could not read the pane's
+	// processes decides nothing (a hung NFS folder held the agents in uninterruptible waits for 104 minutes;
+	// their empty command lines read as "no agent" and ten chats were forced idle and resumed at once).
+	if state == Busy && hasEvent && now-lastAt > ms(busyStuck) && pane != nil && shellForeground(pane.Command) {
 		if !agentRunning() {
 			if fresh := m.probeRunning(tabID); fresh != nil && !*fresh {
 				m.d.Log("info", "busy stuck — agent process gone, forcing idle", "tabId", tabID)
@@ -179,8 +182,46 @@ func (m *Manager) probeRunning(tabID string) *bool {
 	r := false
 	if pane, has := panes[session]; has && pane.PID != 0 {
 		r = p.Running(pane.PID, m.d.Procs.Children(pane.PID))
+		if !r {
+			if pid := m.unreadableUnder(pane.PID); pid != 0 {
+				m.noteUnreadable(tabID, e, pid)
+				return nil
+			}
+		}
 	}
+	m.mu.Lock()
+	e.unreadableLogged = false
+	m.mu.Unlock()
 	return &r
+}
+
+// unreadableUnder is a process among the pane's children (and theirs, an agent under a sandbox) a look cannot read
+// now, 0 when there is none: while one is there, "no agent among them" is not known.
+func (m *Manager) unreadableUnder(panePID int) int {
+	for _, pid := range m.d.Procs.Children(panePID) {
+		if m.d.Procs.Unreadable(pid) {
+			return pid
+		}
+		for _, c := range m.d.Procs.Children(pid) {
+			if m.d.Procs.Unreadable(c) {
+				return c
+			}
+		}
+	}
+	return 0
+}
+
+// noteUnreadable writes the reason a tab's agent was not called gone, once until a look decides again.
+func (m *Manager) noteUnreadable(tabID string, e *Entry, pid int) {
+	m.mu.Lock()
+	logged := e.unreadableLogged
+	e.unreadableLogged = true
+	state := e.CliState
+	m.mu.Unlock()
+	if !logged {
+		m.d.Log("info", "agent check undecided — a pane process cannot be read (uninterruptible wait or empty command line); state kept",
+			"tabId", tabID, "pid", pid, "state", state)
+	}
 }
 
 // refreshHooksPresence: whether the Claude in the tab runs with the platform's hooks, looked up again when the pane's

@@ -3,6 +3,7 @@
 // answer right here. The feed shows it in place of the `harnessly ask` command; «People» opens it in a dialog.
 import { memo, useEffect, useState } from 'react';
 import type { IAsk, IAskPerson, IAskReply } from '@/next/features/asks/api';
+import { CardReply } from '@/next/bindings/reply-field';
 import Icon from '@/next/ui/icon';
 import { usePresentFlag } from '@/next/ui/presence';
 import { t } from '@/next/i18n';
@@ -121,9 +122,14 @@ const AnswerBox = ({ ask, actions }: { ask: IAsk; actions: IAskCardActions }) =>
       setError(err);
     });
   };
+  // A comment to an approval goes as «Нужны правки»: words with no choice are a request to change.
   const send = () => {
     if (!text.trim() || busy) return;
-    run(actions.onAnswer({ text: text.trim() }));
+    run(
+      actions.onAnswer(
+        ask.kind === 'approval' ? { choice: 'changes', text: text.trim() } : { text: text.trim() },
+      ),
+    );
   };
   return (
     <div className="hx-pask__answer">
@@ -187,34 +193,13 @@ const AnswerBox = ({ ask, actions }: { ask: IAsk; actions: IAskCardActions }) =>
       </div>
       {box.mounted && (
         <div className="hx-pask__box" data-state={box.state}>
-          <textarea
-            className="hx-pask__input"
-            rows={2}
+          <CardReply
             value={text}
-            disabled={busy}
+            onChange={setText}
+            busy={busy}
             placeholder={ask.kind === 'approval' ? t('next.asks.commentHint') : t('next.asks.replyHint')}
-            aria-label={ask.kind === 'approval' ? t('next.asks.commentHint') : t('next.asks.replyHint')}
-            onChange={(event) => setText(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-                event.preventDefault();
-                if (ask.kind === 'question') send();
-              }
-            }}
+            onSend={send}
           />
-          {ask.kind === 'question' && (
-            <button
-              type="button"
-              className="hx-pask__btn"
-              data-tone="primary"
-              data-busy={busy || undefined}
-              disabled={busy || !text.trim()}
-              onClick={send}
-            >
-              <Icon name="send" size="sm" />
-              {t('next.asks.send')}
-            </button>
-          )}
         </div>
       )}
       {error && (

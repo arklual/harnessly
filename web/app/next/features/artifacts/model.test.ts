@@ -124,7 +124,7 @@ describe('rowOf', () => {
   });
 
   it('a merge request says its state in words, a draft says draft', () => {
-    const base = { kind: 'mr' as const, title: 'Cache', project: 'a/b', iid: 4 };
+    const base = { kind: 'mr' as const, title: 'Cache', project: 'a/b', iid: 4, pipeline: null };
     const it = item({ kind: ARTIFACT_KIND.mr, key: 'b !4' });
     expect(rowOf(it, { ...base, state: 'merged', draft: false }, LOOK.got, MR)).toMatchObject({
       sub: 'b !4 · Merged',

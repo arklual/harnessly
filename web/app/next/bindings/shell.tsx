@@ -14,6 +14,9 @@ import '@/next/styles/tabs.css';
 
 import { createPortal } from 'react-dom';
 import {
+  Activity,
+  memo,
+  useLayoutEffect,
   lazy,
   Suspense,
   useCallback,
@@ -21,6 +24,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ComponentProps,
 } from 'react';
 import { appConfig } from '@/platform/config';
@@ -41,16 +45,19 @@ import HomeComposer from '@/next/bindings/home-composer';
 import {
   machineProjectOf,
   machineSwitchLeavesChat,
+  shownCard,
   useShellModel,
+  withLoad,
+  type IShownMachine,
   useTabChats,
 } from '@/next/bindings/shell-model';
 import { bootNext, shutdownNext, useBoot } from '@/next/boot';
-import { setGoal } from '@/next/commands';
+import { interrupt, resumeConversation, sendMessage, setGoal } from '@/next/commands';
 import { useReadWhileVisible } from '@/next/bindings/read-while-visible';
 import { connectionStore } from '@/next/stores/connection';
 import { useAll } from '@/next/core/store';
 import { hub } from '@/next/core/realtime/hub';
-import ChatHeader from '@/next/features/header/chat-header';
+import ChatHeader, { type IChatHeaderProps } from '@/next/features/header/chat-header';
 import type { IHeaderGoal } from '@/next/features/header/goal-dialog';
 import { settled } from '@/next/bindings/outcome';
 import { BackgroundButton, TerminalButton } from '@/next/features/header/header-buttons';
@@ -69,6 +76,8 @@ import { SCOPE } from '@/next/features/search/smart-rows';
 import { APP_ROW, appSearchGroup } from '@/next/features/search/app-rows';
 import { useInstalledApps } from '@/next/features/app-views/api';
 import { openAppTab } from '@/next/features/app-views/open';
+import { isSpaceApp } from '@/next/features/app-views/service-health';
+import { clearPlain, designPlaceOf } from '@/next/features/designly/chat-place';
 import { setDraftText } from '@/next/stores/drafts';
 import { useSmartSearch } from '@/next/bindings/use-smart-search';
 import {
@@ -100,7 +109,9 @@ import HomeTools, { type IHomeTool } from '@/next/features/shell/home-tools';
 import { PeopleBlock } from '@/next/bindings/asks';
 import { useShellTabs, wantsNewTab } from '@/next/bindings/tabs';
 import { useShellKeys } from '@/next/bindings/shell-keys';
-import { useTopTabs } from '@/next/stores/tabs';
+import { keepScreensOnPhone, TabScopeContext, useTabs, useTopTabs } from '@/next/stores/tabs';
+import { keptScreens, keptScreensMax } from '@/next/features/shell/kept-screens';
+import { keptBudget } from '@/next/features/shell/kept-budget';
 import { usePhone } from '@/next/ui/use-media';
 import Sidebar from '@/next/features/sidebar/sidebar';
 import { useSidebarApps } from '@/next/bindings/use-sidebar-apps';
@@ -126,10 +137,10 @@ import { useBeta } from '@/next/stores/beta';
 import LazyView from '@/next/ui/lazy-view';
 import { usePresentFlag } from '@/next/ui/presence';
 import { t } from '@/next/i18n';
-import { goTo, HOME, ROUTE, useRoute, type TRoute } from '@/next/routes/routes';
+import { goTo, HOME, parseRoute, ROUTE, routePath, useRoute, type TRoute } from '@/next/routes/routes';
 import AppsScreen from '@/next/bindings/apps';
 import SettingsScreen from '@/next/bindings/settings';
-import { BrandingHost, HomeSlots } from '@/next/features/app-views/slot-pages';
+import { BrandingHost, HomeSlots, useHomeStage } from '@/next/features/app-views/slot-pages';
 import DesignlyView from '@/next/bindings/designly';
 import { DESIGN_KIND } from '@/next/features/designly/designly-home';
 import { useWorkingDesigns } from '@/next/bindings/working-designs';
@@ -145,17 +156,20 @@ import { useRelease } from '@/next/bindings/use-release';
 import ReleaseNotice from '@/next/features/update/release-notice';
 import UpdateBanner from '@/next/features/update/update-banner';
 import LearnPage from '@/next/features/learn/learn-page';
+import { createChat as createGptChat } from '@/next/features/chatgpt/api';
+import ChatGptScreen from '@/next/features/chatgpt/chat-screen';
+import { gptChatsChanged, useGptChats, useGptSignedIn } from '@/next/features/chatgpt/store';
 import LearnWelcome from '@/next/features/learn/learn-welcome';
 import TourOverlay from '@/next/features/tour/tour-overlay';
 import WhatsNew from '@/next/features/whats-new/whats-new';
-import { REFS_MAX, type Conversation, type ConvId } from '@/next/protocol/v2';
+import { REFS_MAX, type Conversation, type ConvId, type MachineId } from '@/next/protocol/v2';
 import { chatRef } from '@/next/features/composer/chat-sources';
 import { addDraftRef } from '@/next/stores/drafts';
 import { useConversation, useConvsAnswered } from '@/next/stores/conversations';
 import { linkReason, useConnection } from '@/next/stores/connection';
 import { DEFAULT_SETTINGS, useMe } from '@/next/stores/me';
 import { useNoticeColor } from '@/next/bindings/notice-color';
-import { useHomeMachine } from '@/next/stores/machines';
+import { useHomeMachine, useMachineLoad } from '@/next/stores/machines';
 import { useCentral } from '@/next/stores/central';
 import { useFeed } from '@/next/stores/conversation';
 import {
@@ -168,6 +182,7 @@ import { UI_REQUEST, useUiRequest } from '@/next/stores/ui-requests';
 import { ToastHost, toast } from '@/next/ui/toast';
 import { useDeadline } from '@/next/ui/use-deadline';
 import { FLY_FIELD, flyComposer } from '@/next/ui/fly-composer';
+import { countRender } from '@/next/core/perf-journal';
 
 const CHAT_LEAVE_MS = 180;
 const NO_CHATS: readonly ISidebarChat[] = [];
@@ -218,6 +233,266 @@ const RailFollowsPane = () => {
 const RailSite = (props: Omit<ComponentProps<typeof DesignlySite>, 'maxed'>) => (
   <DesignlySite {...props} maxed={useRail()} />
 );
+
+interface IKeptScreensProps {
+  machine: MachineId;
+  route: TRoute;
+  activeId: string;
+  terminal: ComponentProps<typeof ChatTerminalContext.Provider>['value'];
+  onTermSlot: (slot: HTMLElement | null) => void;
+  toolPane: ComponentProps<typeof DesignlySite>['toolPane'];
+  open: ComponentProps<typeof DesignlySite>['open'];
+  onOpenDrawer: () => void;
+}
+
+/** What a tab shows: its address, or the design its chat edits (a tab is moved to the chat's address first). */
+const screenOfPath = (path: string): TRoute => designPlaceOf(parseRoute(path));
+
+/**
+ * The screen a kept tab stands for (features/shell/kept-screens): a design, an app's space (the boards, the documents),
+ * a document, a review, a kit; null for the screens that hold no frame and are drawn anew each time. It names what the
+ * screen's page is drawn anew for (its key in KeptPage): two addresses of one screen (another page of the design) are
+ * one screen.
+ */
+const keptScreenOf = (route: TRoute): string | null => {
+  if (route.kind === ROUTE.site) return `site:${route.id}`;
+  if (route.kind === ROUTE.app) return `app:${route.id}/${route.object ?? ''}/${route.chat ?? ''}`;
+  if (route.kind === ROUTE.appDoc) return `doc:${route.id}`;
+  if (route.kind === ROUTE.review && route.url !== undefined)
+    return `review:${route.url}/${route.chat ?? ''}`;
+  if (route.kind === ROUTE.kit) return `kit:${route.id}/${route.version ?? ''}/${route.theme ?? ''}`;
+  return null;
+};
+const isKeptPath = (path: string) => keptScreenOf(screenOfPath(path)) !== null;
+/** How many screens this device keeps mounted (features/shell/kept-screens). */
+const KEPT_MAX = keptScreensMax(
+  typeof navigator === 'undefined'
+    ? undefined
+    : (navigator as Navigator & { deviceMemory?: number }).deviceMemory,
+);
+// The phone shows no tabs: a screen left for another place waits in a tab of its own, and «Назад» finds it standing.
+keepScreensOnPhone({ keeps: isKeptPath, max: KEPT_MAX + 1 });
+
+interface IKeptScreenProps {
+  tabId: string;
+  active: boolean;
+  machine: MachineId;
+  /** The screen's address, as a string: the same one draws nothing anew. */
+  path: string;
+  /** Only the screen on view has them; a hidden one gets null, so nothing of the shell draws it again. */
+  terminal: IKeptScreensProps['terminal'];
+  onTermSlot: IKeptScreensProps['onTermSlot'] | null;
+  toolPane: IKeptScreensProps['toolPane'];
+  /** The shell's callbacks, read when called: a new function each shell render would draw every hidden screen again. */
+  shell: { current: Pick<IKeptScreensProps, 'open' | 'onOpenDrawer'> };
+}
+
+/** The page of one kept screen, by its kind. A hidden one moves no address: only the screen on view does. */
+const KeptPage = ({
+  route,
+  active,
+  machine,
+  toolPane,
+  open,
+  shell,
+}: {
+  route: TRoute;
+  active: boolean;
+  machine: MachineId;
+  toolPane: IKeptScreensProps['toolPane'];
+  open: NonNullable<IKeptScreensProps['open']>;
+  shell: IKeptScreenProps['shell'];
+}) => {
+  const onOpenDrawer = () => shell.current.onOpenDrawer();
+  if (route.kind === ROUTE.site)
+    return (
+      <RailSite
+        key={`${machine}/${route.id}`}
+        machine={machine}
+        id={route.id}
+        chat={route.chat ?? null}
+        access={route.access ?? null}
+        edit={route.edit ?? false}
+        onMode={(edit) => {
+          if (!active) return;
+          goTo({ ...route, ...(edit ? { edit: true } : { edit: undefined }) }, { replace: true });
+        }}
+        toolPane={toolPane}
+        open={open}
+        onToggleMax={null}
+        onOpenDrawer={onOpenDrawer}
+        onMissing={() => {
+          if (active) goTo({ kind: ROUTE.designly }, { replace: true });
+        }}
+      />
+    );
+  if (route.kind === ROUTE.app)
+    return (
+      <AppMainPage
+        key={`${route.id}/${route.object ?? ''}/${route.chat ?? ''}`}
+        machine={machine}
+        id={route.id}
+        object={route.object ?? null}
+        chat={route.chat ?? null}
+        open={open}
+        toolPane={toolPane}
+        onOpenDrawer={onOpenDrawer}
+      />
+    );
+  if (route.kind === ROUTE.review)
+    return (
+      <ReviewAppPage
+        key={`${route.url ?? ''}/${route.chat ?? ''}`}
+        machine={machine}
+        url={route.url ?? null}
+        chat={route.chat ?? null}
+        wt={route.wt ?? null}
+        open={open}
+        toolPane={toolPane}
+        onOpenDrawer={onOpenDrawer}
+      />
+    );
+  if (route.kind === ROUTE.appDoc)
+    return (
+      <AppDocPage
+        key={`${machine}/${route.id}`}
+        machine={machine}
+        id={route.id}
+        chat={route.chat ?? null}
+        edit={route.edit ?? false}
+        onMode={(edit) => {
+          if (!active) return;
+          goTo({ ...route, ...(edit ? { edit: true } : { edit: undefined }) }, { replace: true });
+        }}
+        onOpenDrawer={onOpenDrawer}
+      />
+    );
+  if (route.kind === ROUTE.kit)
+    return (
+      <KitPage
+        key={`${machine}/${route.id}/${route.version ?? ''}/${route.theme ?? ''}`}
+        machine={machine}
+        route={route}
+        onOpenDrawer={onOpenDrawer}
+      />
+    );
+  return null;
+};
+
+/**
+ * One kept screen: drawn again only when its own props change, so a hidden one stays still while the shell renders.
+ * Hidden by React's Activity: its DOM, frames and state stay, its effects (loops that follow boxes, listeners, polls)
+ * are cleaned up until it is shown again, so a hidden screen costs no CPU.
+ */
+const KeptScreen = memo(
+  ({ tabId, active, machine, path, terminal, onTermSlot, toolPane, shell }: IKeptScreenProps) => {
+    const tabRoute = parseRoute(path);
+    const scope = useMemo(() => ({ tabId, active }), [tabId, active]);
+    // The pane's openers, the same object for the screen's life: each one calls the shell's current one.
+    const open = useMemo<NonNullable<IKeptScreensProps['open']>>(
+      () => ({
+        onOpenRef: (...args) => shell.current.open?.onOpenRef?.(...args),
+        onOpenFile: (...args) => shell.current.open?.onOpenFile?.(...args),
+        onOpenOutput: (...args) => shell.current.open?.onOpenOutput?.(...args),
+      }),
+      [shell],
+    );
+    if (keptScreenOf(tabRoute) === null) return null;
+    return (
+      <div className="hx-kept-screen" data-on={active} inert={!active}>
+        <Activity mode={active ? 'visible' : 'hidden'}>
+          <TabScopeContext.Provider value={scope}>
+            <ChatTerminalContext.Provider value={terminal}>
+              <ChatTerminalSlotContext.Provider value={onTermSlot}>
+                <KeptPage
+                  route={tabRoute}
+                  active={active}
+                  machine={machine}
+                  toolPane={toolPane}
+                  open={open}
+                  shell={shell}
+                />
+              </ChatTerminalSlotContext.Provider>
+            </ChatTerminalContext.Provider>
+          </TabScopeContext.Provider>
+        </Activity>
+      </div>
+    );
+  },
+);
+
+/**
+ * The screens of the last tabs that hold a frame stay mounted (features/shell/kept-screens): a design, an app's space
+ * (the boards, the documents), a document, a review, a kit. The one on screen is in the page's flow, the others hidden
+ * in the same place (KeptScreen). A tab switched back to shows its screen at once, frames and chat as they were. Each
+ * stays under this one parent for its life: a frame moved in the document would load again.
+ */
+const KeptScreens = ({
+  machine,
+  route,
+  activeId,
+  terminal,
+  onTermSlot,
+  toolPane,
+  open,
+  onOpenDrawer,
+}: IKeptScreensProps) => {
+  const state = useTabs();
+  const [kept, setKept] = useState<readonly string[]>([]);
+  const shell = useRef({ open, onOpenDrawer });
+  useLayoutEffect(() => {
+    shell.current = { open, onOpenDrawer };
+  });
+  const screen = keptScreenOf(route);
+  const onView = screen !== null ? activeId : '';
+  // The page's one budget of frames out of sight (features/shell/kept-budget): the pane's views and browsers count too.
+  const over = useSyncExternalStore(keptBudget.subscribe, keptBudget.over, keptBudget.over);
+  const allowed = (id: string) => id === onView || !over.has(`screen:${id}`);
+  const next = keptScreens(
+    kept.every(allowed) ? kept : kept.filter(allowed),
+    onView,
+    state.tabs,
+    isKeptPath,
+    KEPT_MAX,
+  );
+  if (next !== kept) setKept(next);
+  // When each was last on screen, told to the budget.
+  const seen = useRef(new Map<string, number>());
+  useLayoutEffect(() => {
+    const now = Date.now();
+    if (onView !== '') seen.current.set(onView, now);
+    for (const id of [...seen.current.keys()]) if (!next.includes(id)) seen.current.delete(id);
+    keptBudget.report(
+      'screens',
+      next.map((id) => ({ key: `screen:${id}`, shown: id === onView, at: seen.current.get(id) ?? now })),
+    );
+  });
+  return (
+    <>
+      {/* In a fixed order, not the recent first: React moving a screen in the document would load its frames again. */}
+      {[...next].sort().map((tabId) => {
+        const active = screen !== null && tabId === activeId;
+        const fromTab = screenOfPath(state.tabs.find((tab) => tab.id === tabId)?.path ?? '/');
+        // The address is the tab's only once it names the same screen: right after a switch the tab is active while
+        // the address still names the screen left, and a screen given that one would be drawn anew as it.
+        const tabRoute = active && screen === keptScreenOf(fromTab) ? route : fromTab;
+        return (
+          <KeptScreen
+            key={tabId}
+            tabId={tabId}
+            active={active}
+            machine={machine}
+            path={routePath(tabRoute)}
+            terminal={active ? terminal : null}
+            onTermSlot={active && terminal ? onTermSlot : null}
+            toolPane={active ? toolPane : null}
+            shell={shell}
+          />
+        );
+      })}
+    </>
+  );
+};
 
 /** The cluster's copy of the chats follows the links: asked again when one goes down or comes back. */
 const useCentralList = () => {
@@ -320,10 +595,40 @@ const BootNotice = ({ kind }: { kind: 'failed' | 'no-v2' }) => (
   </div>
 );
 
+/**
+ * The header with the machine's card whose meters read the load here: the active machine reports it every
+ * 2 s, and a reading draws this header alone, not the shell with the sidebar and the chat.
+ */
+const LoadedChatHeader = ({ shown, ...props }: IChatHeaderProps & { shown: IShownMachine }) => {
+  const load = useMachineLoad(shown.view?.machine.id ?? null);
+  const card = useMemo(
+    () =>
+      shown.view && load ? shownCard(withLoad(shown.view, load), shown.lost, shown.down) : props.machine.card,
+    [shown, load, props.machine.card],
+  );
+  return (
+    <ChatHeader
+      {...props}
+      machine={card === props.machine.card ? props.machine : { ...props.machine, card }}
+    />
+  );
+};
+
 const Shell = ({ owner }: IShellProps) => {
+  countRender('shell');
   const model = useShellModel();
   const boot = useBoot();
-  const route = useRoute();
+  const asked = useRoute();
+  // A chat that edits a design is that design with its chat (chat-place.ts): shown so from the first frame, so no plain
+  // chat with the sidebar flashes, and the address follows.
+  const askedPath = routePath(asked);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the address is what moves it, not the parsed object
+  const route = useMemo(() => designPlaceOf(asked), [askedPath]);
+  useEffect(() => {
+    clearPlain(asked.kind === ROUTE.chat ? asked.id : null);
+    if (route !== asked) goTo(route, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askedPath]);
   const me = useMe();
   // The colour of what pops up, the person's setting: until it comes, the default.
   useNoticeColor(me.k === 'ready' ? me.me.settings.noticeColor : DEFAULT_SETTINGS.noticeColor);
@@ -545,17 +850,24 @@ const Shell = ({ owner }: IShellProps) => {
   const [machineReveal, setMachineReveal] = useState(0);
   const unread = notificationItems?.some((item) => item.unread) ?? false;
   // The apps of the search: read once the dialog is open, so a page that never searches does not ask.
-  const searchApps = useInstalledApps(model.active ?? 'local', 0, searchOpen && model.active !== null).list;
+  const searchAppsRead = useInstalledApps(model.active ?? 'local', 0, searchOpen && model.active !== null);
+  const searchApps = searchAppsRead.list;
+  // The apps did not come: their tab says it has none, it does not wait for ever.
+  const searchAppsOff = searchAppsRead.error !== null || model.active === null;
   const searchChat = useConversation(currentId !== null && isConvId(currentId) ? currentId : null);
   const appsGroup = useMemo(
     () =>
-      appSearchGroup(
-        searchApps?.apps ?? [],
-        searchChat && currentId ? { id: currentId, apps: searchChat.apps ?? [] } : null,
-        query,
-      ),
-    [searchApps, searchChat, currentId, query],
+      searchApps === null && !searchAppsOff
+        ? undefined
+        : appSearchGroup(
+            searchApps?.apps ?? [],
+            searchChat && currentId ? { id: currentId, apps: searchChat.apps ?? [] } : null,
+            query,
+            scope === SCOPE.apps,
+          ),
+    [searchApps, searchAppsOff, searchChat, currentId, query, scope],
   );
+  const searchBeside = route.kind === ROUTE.chat && currentId !== null && isConvId(currentId);
   const smartSearch = useSmartSearch({
     machine: model.active,
     open: searchOpen,
@@ -715,6 +1027,8 @@ const Shell = ({ owner }: IShellProps) => {
     conversations: model.conversations,
     enabled: boot.k !== 'failed' && !noV2 && route.kind === ROUTE.home,
   });
+  // A view of an app that takes the start page's stage under the field: the page of the day it brings.
+  const homeStage = useHomeStage(startOn);
   // Not one machine can take a new chat: the field says so instead of a pill with nothing in it.
   const allMachinesOff = model.startMachines.length > 0 && model.startMachines.every((m) => m.off);
   // Picked in the model's popover, for a person with several machines; the default one is no pick.
@@ -739,6 +1053,31 @@ const Shell = ({ owner }: IShellProps) => {
     route.kind === ROUTE.site ? route.id : null,
     route.kind,
   );
+  // ChatGPT's plain chats under their own item: it shows once an account is signed in or a chat is kept.
+  const gptChats = useGptChats(noV2 ? null : model.active);
+  const gptMachine = noV2 ? null : model.active;
+  const gptOn = useGptSignedIn(gptMachine);
+  const sidebarGpt =
+    gptMachine && (gptOn || (gptChats !== null && gptChats.length > 0))
+      ? {
+          rows: gptChats ?? [],
+          current: route.kind === ROUTE.chatgpt ? route.id : null,
+          onOpen: (id: string) => {
+            navigate({ kind: ROUTE.chatgpt, id });
+            setDrawerOpen(false);
+          },
+          onNew: () => {
+            setDrawerOpen(false);
+            createGptChat(gptMachine, '', '').then(
+              (chat) => {
+                gptChatsChanged();
+                navigate({ kind: ROUTE.chatgpt, id: chat.id });
+              },
+              () => navigate({ kind: ROUTE.settings, section: 'accounts' }),
+            );
+          },
+        }
+      : null;
   const openAppScreen = useCallback(
     (to: TRoute) => {
       navigate(to);
@@ -838,6 +1177,7 @@ const Shell = ({ owner }: IShellProps) => {
       onManageMachines={() => openScreen({ kind: ROUTE.settings, section: 'machines' })}
       people={<PeopleBlock machine={noV2 ? null : model.active} />}
       apps={sidebarApps}
+      gpt={sidebarGpt}
       designs={
         workingDesigns && {
           rows: workingDesigns,
@@ -948,11 +1288,41 @@ const Shell = ({ owner }: IShellProps) => {
             indexing: smartSearch.indexing,
             recent: NO_ROWS,
             idle: smartSearch.idle,
+            empty: smartSearch.empty,
             marks: smartSearch.marks,
             smart: {
               answer: smartSearch.answer,
               onAsk: smartSearch.onAsk,
               onSetting: smartSearch.onSetting,
+              detail: smartSearch.detail,
+              kept: smartSearch.kept,
+              beside: searchBeside,
+              onAside: (row: ISearchRow) => {
+                const link = row.go?.k === ROW_GO.link || row.go?.k === ROW_GO.review ? row.go.url : null;
+                // A link opens beside the chat on screen; without one (or for a chat, a design) in a new tab.
+                if (link !== null && searchBeside) {
+                  setSearchOpen(false);
+                  pane.openRef(link);
+                  return;
+                }
+                const address =
+                  link ?? smartSearch.kept.get(row.id)?.link ?? smartSearch.detail.now(row).link;
+                if (address) window.open(address, '_blank', 'noopener');
+              },
+              onSend: async (chatId: string, text: string) => {
+                if (model.active === null || !isConvId(chatId)) return false;
+                sendMessage(model.active, { conversationId: chatId, text });
+                return true;
+              },
+              onChatAct: async (chatId: string, what) => {
+                if (model.active === null || !isConvId(chatId)) return false;
+                const done = await (
+                  what === 'stop' ? interrupt(model.active, chatId) : resumeConversation(model.active, chatId)
+                ).done;
+                if (done.k === 'done') return true;
+                toast(t('next.search.chatActFailed'), { tone: 'error' });
+                return false;
+              },
               onAddSource: () => {
                 setSearchOpen(false);
                 openScreen({ kind: ROUTE.settings, section: 'connections' });
@@ -975,6 +1345,7 @@ const Shell = ({ owner }: IShellProps) => {
                   openScreen({ kind: ROUTE.review, url: go.url, ...(currentId ? { chat: currentId } : {}) });
                 else if (go.k === ROW_GO.link) window.open(go.url, '_blank', 'noopener');
                 else if (go.k === ROW_GO.designs) openScreen({ kind: ROUTE.designly });
+                else if (go.k === ROW_GO.chat) openChat(go.id);
                 else {
                   newChatProjectStore.set(null);
                   newChatMachineStore.set(null);
@@ -988,7 +1359,11 @@ const Shell = ({ owner }: IShellProps) => {
                 }
               } else if (row.id.startsWith(APP_ROW.open)) {
                 const id = row.id.slice(APP_ROW.open.length);
-                navigate({ kind: ROUTE.app, id, ...(currentId ? { chat: currentId } : {}) });
+                navigate({
+                  kind: ROUTE.app,
+                  id,
+                  ...(currentId && !isSpaceApp(id) ? { chat: currentId } : {}),
+                });
               } else if (row.id.startsWith(APP_ROW.pane)) openAppTab(row.id.slice(APP_ROW.pane.length));
               else if (row.target && isConvId(row.target.chatId)) {
                 // The chat opens at the message: the feed of that chat takes the ask when it is on screen.
@@ -1085,13 +1460,15 @@ const Shell = ({ owner }: IShellProps) => {
         route.kind !== ROUTE.apps &&
         route.kind !== ROUTE.help &&
         route.kind !== ROUTE.learn &&
+        route.kind !== ROUTE.chatgpt &&
         route.kind !== ROUTE.app &&
         route.kind !== ROUTE.review &&
         route.kind !== ROUTE.appAbout &&
         route.kind !== ROUTE.appDoc &&
         route.kind !== ROUTE.kit &&
         route.kind !== ROUTE.settings && (
-          <ChatHeader
+          <LoadedChatHeader
+            shown={model.shown}
             chat={chat}
             projects={model.projects}
             actions={model.actions}
@@ -1120,6 +1497,8 @@ const Shell = ({ owner }: IShellProps) => {
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.home && (
         <Greeting
           name={name}
+          stage={homeStage.stage}
+          greeting={homeStage.greeting}
           fromChat={screens.before === ROUTE.chat}
           onResume={resumeDialog.show}
           into={into}
@@ -1161,7 +1540,7 @@ const Shell = ({ owner }: IShellProps) => {
       )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.chat && (
         <ChatStage
-          key={stageId}
+          chatKey={stageId}
           leaving={leaving}
           fromHome={arrival.fromHome}
           side={bg.panel}
@@ -1228,56 +1607,20 @@ const Shell = ({ owner }: IShellProps) => {
         />
       )}
       {route.kind === ROUTE.learn && <LearnPage onOpenDrawer={() => setDrawerOpen(true)} />}
+      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.chatgpt && (route.machine ?? model.active) && (
+        <ChatGptScreen
+          key={`${route.machine ?? model.active}/${route.id}`}
+          machine={(route.machine ?? model.active) as MachineId}
+          id={route.id}
+          onOpenSettings={() => navigate({ kind: ROUTE.settings, section: 'accounts' })}
+          onOpenDrawer={() => setDrawerOpen(true)}
+        />
+      )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.appAbout && model.active && (
         <AppAboutPage
           key={`${model.active}/${route.id}`}
           machine={model.active}
           id={route.id}
-          onOpenDrawer={() => setDrawerOpen(true)}
-        />
-      )}
-      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.app && model.active && (
-        <AppMainPage
-          key={`${route.id}/${route.object ?? ''}/${route.chat ?? ''}/${tabs.activeId}`}
-          machine={model.active}
-          id={route.id}
-          object={route.object ?? null}
-          chat={route.chat ?? null}
-          open={designOpeners}
-          toolPane={pane.header}
-          onOpenDrawer={() => setDrawerOpen(true)}
-        />
-      )}
-      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.review && model.active && (
-        <ReviewAppPage
-          key={`${route.url ?? ''}/${route.chat ?? ''}/${tabs.activeId}`}
-          machine={model.active}
-          url={route.url ?? null}
-          chat={route.chat ?? null}
-          wt={route.wt ?? null}
-          open={designOpeners}
-          toolPane={pane.header}
-          onOpenDrawer={() => setDrawerOpen(true)}
-        />
-      )}
-      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.appDoc && model.active && (
-        <AppDocPage
-          key={`${model.active}/${route.id}`}
-          machine={model.active}
-          id={route.id}
-          chat={route.chat ?? null}
-          edit={route.edit ?? false}
-          onMode={(edit) =>
-            goTo({ ...route, ...(edit ? { edit: true } : { edit: undefined }) }, { replace: true })
-          }
-          onOpenDrawer={() => setDrawerOpen(true)}
-        />
-      )}
-      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.kit && model.active && (
-        <KitPage
-          key={`${model.active}/${route.id}/${route.version ?? ''}/${route.theme ?? ''}`}
-          machine={model.active}
-          route={route}
           onOpenDrawer={() => setDrawerOpen(true)}
         />
       )}
@@ -1289,7 +1632,6 @@ const Shell = ({ owner }: IShellProps) => {
           section={route.section}
           connect={route.connect}
           name={name ?? login}
-          onOpenDrawer={() => setDrawerOpen(true)}
         />
       )}
       {!hubFirst && route.kind === ROUTE.manage && <ManageScreen onOpen={navigate} />}
@@ -1300,28 +1642,34 @@ const Shell = ({ owner }: IShellProps) => {
         <LegacyScreen screen={LEGACY_SCREEN.efficiency} onOpen={navigate} />
       )}
       {route.kind === ROUTE.invite && <InviteAccept key={route.token} token={route.token} />}
+      {boot.k !== 'failed' &&
+        !noV2 &&
+        route.kind === ROUTE.review &&
+        route.url === undefined &&
+        model.active && (
+          <ReviewAppPage
+            key={`/${route.chat ?? ''}/${tabs.activeId}`}
+            machine={model.active}
+            url={null}
+            chat={route.chat ?? null}
+            wt={route.wt ?? null}
+            open={designOpeners}
+            toolPane={pane.header}
+            onOpenDrawer={() => setDrawerOpen(true)}
+          />
+        )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.site && !model.active && <SiteWait />}
-      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.site && model.active && (
-        <ChatTerminalContext.Provider value={term.header}>
-          <ChatTerminalSlotContext.Provider value={term.header ? setTermSlot : null}>
-            <RailSite
-              key={`${model.active}/${route.id}/${tabs.activeId}`}
-              machine={model.active}
-              id={route.id}
-              chat={route.chat ?? null}
-              access={route.access ?? null}
-              edit={route.edit ?? false}
-              onMode={(edit) =>
-                goTo({ ...route, ...(edit ? { edit: true } : { edit: undefined }) }, { replace: true })
-              }
-              toolPane={pane.header}
-              open={designOpeners}
-              onToggleMax={null}
-              onOpenDrawer={() => setDrawerOpen(true)}
-              onMissing={() => goTo({ kind: ROUTE.designly }, { replace: true })}
-            />
-          </ChatTerminalSlotContext.Provider>
-        </ChatTerminalContext.Provider>
+      {boot.k !== 'failed' && !noV2 && model.active && (
+        <KeptScreens
+          machine={model.active}
+          route={route}
+          activeId={tabs.activeId}
+          terminal={term.header}
+          onTermSlot={setTermSlot}
+          toolPane={pane.header}
+          open={designOpeners}
+          onOpenDrawer={() => setDrawerOpen(true)}
+        />
       )}
       {boot.k !== 'failed' &&
         !noV2 &&

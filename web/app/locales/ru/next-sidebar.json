@@ -11,6 +11,9 @@
   "next.sidebar.projects": "Проекты",
   "next.sidebar.projectEmpty": "Пока пусто",
   "next.sidebar.folderMore": "Дальше",
+  "next.sidebar.appChats": "Чаты, начатые приложениями",
+  "next.sidebar.appSection": "От приложений",
+  "next.sidebar.appFolderTip": "Эти чаты начало приложение «{app}». Перетащите чат в недавние или в проект, чтобы вести его самому.",
   "next.sidebar.foldList": "Свернуть список",
   "next.sidebar.unfoldList": "Развернуть список",
   "next.sidebar.favorites": "Избранное"

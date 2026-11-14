@@ -25,8 +25,10 @@ import (
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/browser"
 	"github.com/ly-solutions/harnessly/internal/design"
+	"github.com/ly-solutions/harnessly/internal/designrec"
 	"github.com/ly-solutions/harnessly/internal/envsetup"
 	"github.com/ly-solutions/harnessly/internal/extproviders"
+	"github.com/ly-solutions/harnessly/internal/filestore"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/integrations"
 	"github.com/ly-solutions/harnessly/internal/journal"
@@ -144,7 +146,11 @@ type runtimeGate struct {
 	revisions func(design.Revisions)
 	// pusher gives the library the way to put a project into the store at once.
 	pusher func(design.StorePusher)
-	store  *storelink.Link
+	// records is what the library says of its entities, watch calls fn on each change of it.
+	records func() []filestore.Record
+	watch   func(func()) func()
+	covers  func(context.Context, *designrec.Syncer)
+	store   *storelink.Link
 }
 
 // configFileOf is the runtime's config (the pair's secret, the person's settings).
@@ -321,6 +327,11 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		routes = append(routes, gate.Route{
 			Match:   func(r *http.Request) bool { return strings.HasPrefix(r.URL.Path, providers.GPTRelayPath+"/") },
 			Handler: gptRelay,
+		})
+		// The relay the same proxy reaches the OpenAI-compatible providers through, with their keys from the safe.
+		routes = append(routes, gate.Route{
+			Match:   func(r *http.Request) bool { return strings.HasPrefix(r.URL.Path, providers.ExtRelayPath+"/") },
+			Handler: extRelay(cfg.DataDir, ref.c.agents.gpt),
 		})
 	}
 	if ref.c.agents != nil && ref.c.agents.router != nil {
@@ -506,6 +517,9 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	for _, group := range bodyRouteGroups {
 		f.Add(f.AsBodyRoutes(group(d)...)...)
 	}
+	f.Add(designHomeRoutes(f)...)
+	f.Add(indexSearchRoutes(d, f)...)
+	f.Add(designRecordsRoutes()...)
 	settingsStore := stateSettings(d) // the one writer of the settings files in this process
 	f.Add(f.AsRoutes(stateRoutes(d, settingsStore, ref.c.agents.ValidateLaunch)...)...)
 	f.Add(f.AsRoutes(ref.c.stateCoreRoutes(d)...)...)
@@ -533,8 +547,10 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(secretRoutes(d, ref.c)...)
 	f.Add(extProviderRoutes(d)...)
 	f.Add(codexLoginRoutes(d)...)
+	f.Add(chatgptRoutes(d)...)
 	f.Add(backgroundRoutes(d)...)
 	f.Add(searchRoutes(d)...)
+	f.Add(uiAgentRoutes(d)...)
 	f.Add(settingsCtlRoutes(d, ref.c)...)
 	setupRunners := envSetupRunners(d, os.Getenv("AGENT_HUB_OBSERVE_FILE"), cfg.Version)
 	// The organization's rule for apps comes with the hub's list (apps_consent_policy.go).
@@ -564,7 +580,8 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		envSetup: setupRunners, library: func() string { return designAPI(d).L.Root() },
 		kits:      func() string { return designAPI(d).L.KitsDir() },
 		revisions: func(r design.Revisions) { designAPI(d).L.UseRevisions(r) },
-		pusher:    func(p design.StorePusher) { designAPI(d).L.UseStorePusher(p) }}
+		pusher:    func(p design.StorePusher) { designAPI(d).L.UseStorePusher(p) },
+		records:   func() []filestore.Record { return libraryRecords(d) }, watch: watchLibrary(d), covers: pushCovers(d)}
 	if checkOn {
 		rg.update = checker
 	}
@@ -655,6 +672,10 @@ func run(ctx context.Context, cfg gate.Config) error {
 	if jl := openJournal(cfg.DataDir); jl != nil {
 		defer jl.Close()
 	}
+	// The organization's links go over the environment before the routes read it (hub_links.go).
+	links := newHubLinks(hubLinkDirs(cfg.DataDir, os.Getenv("AGENT_HUB_OBSERVE_FILE")))
+	links.apply()
+	go links.watch(ctx, hubLinksEvery)
 	f, err := build(cfg)
 	if err != nil {
 		_ = ln.Close()

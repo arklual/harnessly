@@ -112,6 +112,9 @@ type Server struct {
 	// Digest cuts a conversation to a block of about budget characters for another agent's context and writes the whole
 	// of it to a file; nil: .../digest is a 404.
 	Digest func(ctx context.Context, conv string, budget int) (ChatDigest, error)
+	// Glance gives what a conversation said last (the newest message of each side), read from the search index and
+	// written nowhere; nil: .../glance is a 404.
+	Glance func(ctx context.Context, conv string) (ChatGlance, error)
 	// Shot opens a picture the conversation lists in its snapshot's shots; ErrNoShot for any other id. nil: .../shot is
 	// a 404.
 	Shot func(ctx context.Context, conv, id string) (ShotFile, error)

@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,6 +38,8 @@ type GPTProxy struct {
 	Dir string
 	// OnFile keeps the switch across restarts: it exists while the switch is on.
 	OnFile string
+	// OffFile keeps the person's «off»; with it set, the switch is on until it exists (switchOn).
+	OffFile string
 	// Login is the Codex CLI's sign-in the requests go up on.
 	Login *CodexLogin
 	// RelayBase is the runtime's GPT relay as the proxy reaches it (http://127.0.0.1:<port>/api/cli/gpt/v1).
@@ -47,6 +50,10 @@ type GPTProxy struct {
 	Command func(bin, config string) *exec.Cmd
 	// FastTier says whether the ChatGPT backend has the fast tier for a model (Codex's model cache); nil: for none.
 	FastTier func(model string) bool
+	// ExtRelayBase is the runtime's relay of the OpenAI-compatible providers as the proxy reaches it
+	// (http://127.0.0.1:<port>/api/cli/ext): the upstream of provider <id> is ExtRelayBase/<id>, and the relay puts the
+	// provider's key from the safe on each request, so the proxy's config holds no key of a provider. "" runs none.
+	ExtRelayBase string
 	// FastPane says whether the chat in a tmux pane (its $TMUX_PANE, on the server of that socket name, "" for any) is
 	// in fast mode; nil: none is. It is read on each request of the relay.
 	FastPane func(pane, socket string) bool
@@ -59,6 +66,101 @@ type GPTProxy struct {
 	sup        *proxySupervisor
 	healthy    atomic.Bool
 	onChange   atomic.Pointer[func()]
+	// ext are the OpenAI-compatible providers Claude Code chats run on through the proxy (SetExt): while there is one,
+	// the proxy runs whether the gpt switch is on or not, once a chat asked for it (ExtEndpoint).
+	ext atomic.Pointer[[]ExtUpstream]
+}
+
+// ExtUpstream is an OpenAI-compatible provider of the proxy: Claude Code asks for a model by its Alias, the proxy
+// sends the provider its Name at /chat/completions, through the runtime's relay of the provider.
+type ExtUpstream struct {
+	// ID is the provider's id: the path of its relay.
+	ID     string
+	Models []ExtModel
+}
+
+// ExtModel is a model of an ExtUpstream.
+type ExtModel struct {
+	Name, Alias string
+	Efforts     []wire.Effort
+}
+
+// ExtRelayPath is where the runtime mounts the relay of the OpenAI-compatible providers.
+const ExtRelayPath = "/api/cli/ext"
+
+// SetExt sets the OpenAI-compatible providers of the proxy. A proxy that runs takes them at once (its config is written
+// again, and CLIProxyAPI reads it again); one that runs only for them stops when there are none left.
+func (g *GPTProxy) SetExt(list []ExtUpstream) {
+	list = slices.Clone(list)
+	g.ext.Store(&list)
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.sup == nil {
+		return
+	}
+	if len(list) == 0 && !g.On() {
+		g.stopLocked()
+		return
+	}
+	g.rewriteLocked()
+}
+
+func (g *GPTProxy) extList() []ExtUpstream {
+	if p := g.ext.Load(); p != nil && g.ExtRelayBase != "" {
+		return *p
+	}
+	return nil
+}
+
+// ExtReady says whether a chat may start on the OpenAI-compatible provider of that id: the proxy has it among its
+// upstreams (it is started when the chat asks for it).
+func (g *GPTProxy) ExtReady(id string) bool {
+	return slices.ContainsFunc(g.extList(), func(u ExtUpstream) bool { return u.ID == id && len(u.Models) > 0 })
+}
+
+// ExtEndpoint is where a Claude Code chat on an OpenAI-compatible provider sends its requests and the file of the key
+// it sends: the proxy, started (downloaded the first time) when it does not run.
+func (g *GPTProxy) ExtEndpoint(ctx context.Context) (string, string, error) {
+	if len(g.extList()) == 0 {
+		return "", "", ErrSwitchOff
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if err := g.startLocked(ctx, false); err != nil {
+		return "", "", err
+	}
+	port, ok := g.savedPort()
+	if !ok {
+		return "", "", ErrSwitchOff
+	}
+	return "http://127.0.0.1:" + strconv.Itoa(port), g.keyFile(), nil
+}
+
+// rewriteLocked writes the config of a running proxy again: the upstreams changed. CLIProxyAPI watches its config and
+// takes the change without a restart, so the chats that stream through it go on. The file is written in place: its
+// watch is of the file, and a file renamed over it is not seen (CLIProxyAPI 8.0.48).
+func (g *GPTProxy) rewriteLocked() {
+	port, ok := g.savedPort()
+	key, err := g.clientKey()
+	if !ok || err != nil {
+		return
+	}
+	body := g.config(port, key).YAML()
+	if have, err := os.ReadFile(g.configFile()); err == nil && string(have) == string(body) {
+		return
+	}
+	if err := os.WriteFile(g.configFile(), body, 0o600); err != nil {
+		jsonlog.Log("warn", "providers: the proxy's config was not written", jsonlog.F{K: "error", V: err.Error()})
+	}
+}
+
+// config is the proxy's config: the Codex upstream while the gpt switch is on, and the OpenAI-compatible providers.
+func (g *GPTProxy) config(port int, key string) ProxyConfig {
+	cfg := ProxyConfig{Port: port, AuthDir: filepath.Join(g.Dir, "auth"), ClientKey: key, RelayKey: g.Secret(), Ext: g.extList(), ExtBase: g.ExtRelayBase}
+	if g.On() {
+		cfg.RelayBase = g.RelayBase
+	}
+	return cfg
 }
 
 // Notify sets what is told when the proxy comes up or goes down by itself, so a machine can show the profile offered
@@ -99,25 +201,30 @@ func (g *GPTProxy) pidFile() string    { return filepath.Join(g.Dir, "pid") }
 // LogFile is the proxy's output, both streams.
 func (g *GPTProxy) LogFile() string { return filepath.Join(g.Dir, "proxy.log") }
 
-func (g *GPTProxy) On() bool {
-	_, err := os.Stat(g.OnFile)
-	return err == nil
+func (g *GPTProxy) On() bool { return switchOn(g.OnFile, g.OffFile) }
+
+// signedIn says whether Codex is signed in by the subscription the requests go up on.
+func (g *GPTProxy) signedIn() bool {
+	_, ok := g.Login.Account()
+	return ok
 }
 
-// Ready: the switch is on, Codex is signed in by the subscription, and the proxy answers or its binary is there to
-// start it again.
-func (g *GPTProxy) Ready() bool {
+// Ready: the switch is on and Codex is signed in by the subscription. The proxy is started by the chat that needs it
+// (Ensure), so a machine that never opens a GPT chat never downloads it.
+func (g *GPTProxy) Ready() bool { return g.On() && g.signedIn() }
+
+// Ensure starts the proxy (downloaded the first time) when the switch is on and it does not run: a chat is about to
+// ask Endpoint for it.
+func (g *GPTProxy) Ensure(ctx context.Context) error {
+	if !g.Ready() {
+		return nil
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	if !g.On() {
-		return false
+		return nil
 	}
-	if _, ok := g.Login.Account(); !ok {
-		return false
-	}
-	if g.healthy.Load() {
-		return true
-	}
-	_, err := os.Stat(ProxyBin(g.Dir))
-	return err == nil
+	return g.startLocked(ctx, false)
 }
 
 // Endpoint is the proxy's address and the file of its key, while the switch is on and the proxy has a port.
@@ -148,29 +255,41 @@ func (g *GPTProxy) SetOn(ctx context.Context, on bool) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if !on {
-		g.stopLocked()
-		if err := os.Remove(g.OnFile); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := writeSwitch(g.OnFile, g.OffFile, false); err != nil {
 			return err
 		}
+		g.offLocked()
 		return nil
 	}
-	if _, ok := g.Login.Account(); !ok {
+	if !g.signedIn() {
 		return &wire.ProfileSwitchError{Reason: wire.SwitchNoLogin, Message: "Codex is not signed in with a ChatGPT subscription"}
 	}
-	if err := g.startLocked(ctx, false); err != nil {
+	// The switch is on before the start: the config written at it has the Codex upstream.
+	if err := writeSwitch(g.OnFile, g.OffFile, true); err != nil {
 		return err
 	}
-	if err := writePrivate(g.OnFile, nil); err != nil {
-		g.stopLocked()
+	if err := g.startLocked(ctx, false); err != nil {
+		_ = writeSwitch(g.OnFile, g.OffFile, false)
+		g.offLocked()
 		return err
 	}
 	return nil
 }
 
-// Resume starts the proxy in the background when the switch was left on: at the start of the runtime. A proxy that
-// does not come up is tried again with the pauses of a crash.
+// offLocked is the proxy after the gpt switch went off: stopped, unless the OpenAI-compatible providers keep it, which
+// then runs on without the Codex upstream.
+func (g *GPTProxy) offLocked() {
+	if g.sup != nil && len(g.extList()) > 0 {
+		g.rewriteLocked()
+		return
+	}
+	g.stopLocked()
+}
+
+// Resume starts the proxy in the background when the switch is on and Codex is signed in: at the start of the runtime.
+// A proxy that does not come up is tried again with the pauses of a crash.
 func (g *GPTProxy) Resume() {
-	if !g.On() {
+	if !g.Ready() {
 		return
 	}
 	go func() {
@@ -206,6 +325,8 @@ func (g *GPTProxy) stopLocked() {
 // keep: a first start that fails is not given up but retried (Resume).
 func (g *GPTProxy) startLocked(ctx context.Context, keep bool) error {
 	if g.sup != nil && g.healthy.Load() {
+		// Running already: what it relays may have changed.
+		g.rewriteLocked()
 		return nil
 	}
 	g.stopLocked()
@@ -390,7 +511,7 @@ func (s *proxySupervisor) runOnce(tell func(error)) (up bool, err error) {
 	if err != nil {
 		return false, err
 	}
-	cfg := ProxyConfig{Port: port, AuthDir: filepath.Join(g.Dir, "auth"), ClientKey: s.key, RelayKey: g.Secret(), RelayBase: g.RelayBase}
+	cfg := g.config(port, s.key)
 	if err := os.MkdirAll(cfg.AuthDir, 0o700); err != nil {
 		return false, err
 	}
@@ -481,13 +602,16 @@ func openProxyLog(path string) (*os.File, error) {
 	return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
 }
 
-// ProxyConfig is what the proxy's config says: where it listens and with which key, and its one upstream, the
-// runtime's relay with its key and the gpt preset's models.
+// ProxyConfig is what the proxy's config says: where it listens and with which key, and its upstreams: the runtime's
+// GPT relay with the gpt preset's models (RelayBase, "" for none), and the runtime's relay of each OpenAI-compatible
+// provider (ExtBase/<id>). Both relays take RelayKey and put the real credential on; the config holds none.
 type ProxyConfig struct {
 	Port                int
 	AuthDir             string
 	ClientKey, RelayKey string
 	RelayBase           string
+	ExtBase             string
+	Ext                 []ExtUpstream
 }
 
 // YAML is the proxy's config file, in CLIProxyAPI's flat layout (its v8 template still reads it). Everything the proxy
@@ -501,17 +625,34 @@ func (c ProxyConfig) YAML() []byte {
 	fmt.Fprintf(&b, "api-keys:\n  - %s\n", q(c.ClientKey))
 	b.WriteString("remote-management:\n  allow-remote: false\n  secret-key: \"\"\n  disable-control-panel: true\n")
 	b.WriteString("logging-to-file: false\nusage-statistics-enabled: false\nrequest-retry: 0\ndisable-image-generation: true\n")
-	b.WriteString("codex-api-key:\n")
-	fmt.Fprintf(&b, "  - api-key: %s\n    base-url: %s\n    proxy-url: %s\n    models:\n", q(c.RelayKey), q(c.RelayBase), q("direct"))
-	p, _ := Find("gpt")
-	for _, m := range p.Models {
-		fmt.Fprintf(&b, "      - name: %s\n        alias: %s\n", q(m.ID), q(m.ID))
-		if len(m.Efforts) > 0 {
-			levels := make([]string, len(m.Efforts))
-			for i, e := range m.Efforts {
-				levels[i] = q(string(e))
+	levels := func(indent string, efforts []wire.Effort) {
+		if len(efforts) == 0 {
+			return
+		}
+		out := make([]string, len(efforts))
+		for i, e := range efforts {
+			out[i] = q(string(e))
+		}
+		fmt.Fprintf(&b, "%sthinking:\n%s  levels: [%s]\n", indent, indent, strings.Join(out, ", "))
+	}
+	if c.RelayBase != "" {
+		b.WriteString("codex-api-key:\n")
+		fmt.Fprintf(&b, "  - api-key: %s\n    base-url: %s\n    proxy-url: %s\n    models:\n", q(c.RelayKey), q(c.RelayBase), q("direct"))
+		p, _ := Find("gpt")
+		for _, m := range p.Models {
+			fmt.Fprintf(&b, "      - name: %s\n        alias: %s\n", q(m.ID), q(m.ID))
+			levels("        ", m.Efforts)
+		}
+	}
+	if c.ExtBase != "" && len(c.Ext) > 0 {
+		b.WriteString("openai-compatibility:\n")
+		for _, u := range c.Ext {
+			fmt.Fprintf(&b, "  - name: %s\n    base-url: %s\n    api-key-entries:\n      - api-key: %s\n        proxy-url: %s\n    models:\n",
+				q("ext-"+u.ID), q(strings.TrimRight(c.ExtBase, "/")+"/"+u.ID), q(c.RelayKey), q("direct"))
+			for _, m := range u.Models {
+				fmt.Fprintf(&b, "      - name: %s\n        alias: %s\n", q(m.Name), q(m.Alias))
+				levels("        ", m.Efforts)
 			}
-			fmt.Fprintf(&b, "        thinking:\n          levels: [%s]\n", strings.Join(levels, ", "))
 		}
 	}
 	return []byte(b.String())

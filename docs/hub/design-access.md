@@ -9,6 +9,10 @@ pages) to someone without an account. The hub keeps these records; the machine's
 - A stored project is open to the space at the deployment's team level (`HUB_DESIGN_DEFAULT_TEAM_LEVEL`, `edit` by
   default) until its owner changes that (`view`, `comment`, `edit`, `none`). Editors may share; only the owner and
   managers change the team level and members.
+- The team level counts only for the people who may open the machine the project is recorded on: with
+  `HUB_ACCESS_ENFORCE=on` a private machine (its access list, or the owner's rule `own-work` for a role) keeps its
+  projects out of everyone else's library, snapshot and store reads. The owner, a grant by name and a grant to a team
+  still open the project; with `off` and `warn` nothing changes.
 - Every member of the machine's space appears in the snapshot the hub pushes to the machine
   (`hubproto.OpDesignAccess`); a person missing there gets nothing on a known project. The snapshot is pushed when the
   machine connects, after every change (debounced), when grants run out, and every five minutes.

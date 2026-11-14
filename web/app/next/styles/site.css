@@ -571,6 +571,7 @@
     0 4px 12px rgba(12, 14, 34, 0.08);
   opacity: 1;
   transform-origin: 70% 0;
+  transition: height 420ms var(--site-ease);
   animation: hx-float-in 420ms var(--site-ease) backwards;
 }
 .hx-site[data-mode='float'] .hx-site__chat-head {
@@ -655,7 +656,7 @@
     width: auto;
     top: auto;
     bottom: 8px;
-    height: 60%;
+    height: min(60%, var(--fh));
   }
   .hx-site[data-mode='float'] .hx-island {
     left: 16px;
@@ -2929,6 +2930,43 @@
   min-height: 20px;
   animation: hx-site-load-line 320ms var(--hx-ease-out) backwards;
 }
+/* The last saved board held while the editing frame opens (SiteHeld): at once, no fade; a pill says editing comes. */
+.hx-site-held {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #0f0f13;
+}
+.hx-site-held__frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  pointer-events: none;
+}
+.hx-site-held__line {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgb(15 15 19 / 0.82);
+  color: var(--hx-p-gray-300);
+  font-size: var(--hx-text-sm);
+  transform: translateX(-50%);
+  animation: hx-fade-in 260ms ease 400ms backwards;
+}
+.hx-site-held__spin {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgb(255 255 255 / 0.12);
+  border-top-color: var(--hx-accent);
+  border-radius: 50%;
+  animation: hx-site-load-spin 900ms linear infinite;
+}
 @keyframes hx-site-load-spin {
   to {
     transform: rotate(360deg);
@@ -3667,4 +3705,11 @@
 .hx-dlmenu .hx-cmenu__item[data-disabled] {
   opacity: 0.5;
   cursor: default;
+}
+
+/* A design kept mounted behind another tab (features/shell/kept-screens): the box is never there for the layout; the
+   hidden screen's own nodes get display: none from React's Activity, which keeps the frames (never moved in the
+   document, so never loaded again) and stops their rendering. */
+.hx-kept-screen {
+  display: contents;
 }

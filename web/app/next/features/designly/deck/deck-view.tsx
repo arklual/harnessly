@@ -56,6 +56,7 @@ import { DECK_BOARD_H, DECK_BOARD_W, deckIndexOf, deckStep } from '@/next/featur
 import { DECK_KEY, useDeckKeys, type TDeckKey } from '@/next/features/designly/deck/use-deck-keys';
 import { useBoardErrors } from '@/next/features/designly/use-board-errors';
 import { useDeckBridge } from '@/next/features/designly/deck/use-deck-bridge';
+import { pageOfLink, type IPageGo } from '@/next/features/designly/page-link';
 import ImageActions, { type IImageOpen } from '@/next/features/designly/image-gen/image-actions';
 import { frameScale, screenBoxOf, type IImageAct } from '@/next/features/designly/image-gen/image-act';
 import DeckBar from '@/next/features/designly/deck/deck-bar';
@@ -778,7 +779,22 @@ const DeckView = (props: IDeckViewProps) => {
     if (!imagesOn || !at || !slide) return;
     setImageOpen({ act: said, box: screenBoxOf(at, said) });
   };
-  useDeckBridge(frameRef, src, onBoard, (key) => pressKey(placeOf(key, '')), onImage);
+  // A link of a slide to another page of the deck turns to that slide; a link to a page that is not a slide
+  // of it says so.
+  const onLink = (link: IPageGo) => {
+    const to = pageOfLink(
+      link,
+      boards.map((b) => ({ path: b.path, name: b.title })),
+      path,
+    );
+    const at = to === null ? -1 : boards.findIndex((b) => b.path === to);
+    if (at < 0) {
+      deckToast(t('next.site.linkMissing', { page: link.ref.slice(link.ref.lastIndexOf('/') + 1) }));
+      return;
+    }
+    go(at);
+  };
+  useDeckBridge(frameRef, src, onBoard, (key) => pressKey(placeOf(key, '')), onImage, onLink);
   useBoardErrors({
     report: onBoardError,
     // The slide is two frames while it changes (the one leaving, the one coming): either may hold the board on screen.

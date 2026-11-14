@@ -1,0 +1,86 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "harnessly",
+  "title": "Harnessly",
+  "description": "Your Harnessly chats in Raycast: summaries, replies, new prompts and a menu-bar counter of chats that wait for you.",
+  "icon": "harnessly.png",
+  "author": "harnessly",
+  "license": "MIT",
+  "categories": [
+    "Developer Tools",
+    "Productivity"
+  ],
+  "platforms": [
+    "macOS",
+    "Windows"
+  ],
+  "commands": [
+    {
+      "name": "chats",
+      "title": "Chats",
+      "subtitle": "Harnessly",
+      "description": "Browse chats across all connected hubs, read summaries, reply and stop.",
+      "mode": "view",
+      "icon": "harnessly.png"
+    },
+    {
+      "name": "new-prompt",
+      "title": "Harnessly",
+      "subtitle": "Ask the agent",
+      "description": "Type a prompt and press Enter: a new chat starts on the chosen machine, project and model, and its answer shows right in Raycast.",
+      "mode": "view",
+      "arguments": [
+        {
+          "name": "prompt",
+          "placeholder": "Prompt",
+          "type": "text",
+          "required": false
+        }
+      ],
+      "icon": "harnessly.png"
+    },
+    {
+      "name": "menu-bar",
+      "title": "Chats Waiting for You",
+      "subtitle": "Harnessly",
+      "description": "Menu-bar counter of chats that need your attention.",
+      "mode": "menu-bar",
+      "interval": "1m",
+      "icon": "harnessly.png"
+    },
+    {
+      "name": "add-instance",
+      "title": "Connect Hub",
+      "subtitle": "Harnessly",
+      "description": "Connect a Harnessly hub with the device flow.",
+      "mode": "view",
+      "icon": "harnessly.png"
+    },
+    {
+      "name": "manage-instances",
+      "title": "Manage Hubs",
+      "subtitle": "Harnessly",
+      "description": "List and disconnect connected hubs.",
+      "mode": "view",
+      "icon": "harnessly.png"
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.93.0",
+    "@raycast/utils": "^1.19.0"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^2.0.4",
+    "@types/node": "22.13.10",
+    "@types/react": "19.0.10",
+    "eslint": "^9.22.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2"
+  },
+  "scripts": {
+    "build": "ray build -e dist",
+    "dev": "ray develop",
+    "fix-lint": "ray lint --fix",
+    "lint": "ray lint"
+  }
+}

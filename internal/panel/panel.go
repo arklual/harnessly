@@ -59,6 +59,9 @@ type Targets struct {
 	// DesignRef is the id of the machine's design that a text names (its id, its folder or a file in it, its title),
 	// "" for none; nil: the machine has no design library and "open design" takes no target.
 	DesignRef func(text string) string
+	// DesignBoard is the design a board file (<project>/….dc.html) of the machine's library belongs to, "" for none; it
+	// asks the design's next page to show that board. nil: a board file opens as a file.
+	DesignBoard func(path string) string
 	// AppRef is the canonical "<app id>[/<view>]" of an installed app's pane view that a text names, "" for none; nil:
 	// the machine has no apps and "open app" takes no target.
 	AppRef func(text string) string
@@ -521,6 +524,12 @@ func (t Targets) parseOpen(tab, target any) (Command, string) {
 		c = t.portTarget(text)
 	case path:
 		c = pathTarget(text)
+		// A board of the design library is a design: it opens in Sinopia Design on that board, not as a file.
+		if c != "" && name == "files" && strings.HasSuffix(c, ".dc.html") && t.DesignBoard != nil {
+			if ref := t.DesignBoard(c); ref != "" {
+				return Command{Kind: "open", Tab: "design", Target: ref}, ""
+			}
+		}
 	case doc:
 		c = t.docTarget(text)
 		if c == "" {

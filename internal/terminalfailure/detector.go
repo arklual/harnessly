@@ -11,8 +11,12 @@ type Kind string
 const QuotaExhausted Kind = "quota_exhausted"
 
 type Failure struct {
-	Kind        Kind
-	Detail      string
+	Kind   Kind
+	Detail string
+	// Status is the HTTP status the gateway answered, when the failure is a refused call (Rejected).
+	Status int
+	// Line is the screen's own record of the failure, by which a notice still on screen from before is recognized.
+	Line        string
 	Terminal    bool
 	NeedsTarget bool
 }
@@ -111,9 +115,16 @@ func detect(plain string) (Failure, bool) {
 		if conversationLine(record) {
 			continue
 		}
+		f, notice, rejected := retryNotice(record)
+		if rejected {
+			return f, true
+		}
 		candidate := printedStatusRE.MatchString(record) || apiError429RE.MatchString(record) ||
 			printedCodeFieldRE.MatchString(record) || printedRateLimitRE.MatchString(record) ||
 			printedFinalRE.MatchString(record) || printedRetryRE.MatchString(record) || printedTransientRE.MatchString(record)
+		if notice && !candidate {
+			return Failure{}, false
+		}
 		if !candidate {
 			continue
 		}
@@ -162,7 +173,11 @@ func (d *Detector) ObserveScreen(screen string) (Failure, bool) {
 	previous := d.lastScreen
 	d.lastScreen = plain
 	f, ok := detect(plain)
-	if !ok || previous != "" && strings.Contains(strings.TrimSpace(spacesRE.ReplaceAllString(previous, " ")), f.Detail) {
+	seen := f.Detail
+	if f.Line != "" {
+		seen = f.Line
+	}
+	if !ok || previous != "" && strings.Contains(strings.TrimSpace(spacesRE.ReplaceAllString(previous, " ")), seen) {
 		return Failure{}, false
 	}
 	d.emitted = true

@@ -11,6 +11,9 @@
   "next.sidebar.projects": "Projects",
   "next.sidebar.projectEmpty": "Nothing here yet",
   "next.sidebar.folderMore": "More",
+  "next.sidebar.appChats": "Chats apps started",
+  "next.sidebar.appSection": "From apps",
+  "next.sidebar.appFolderTip": "{app} started these chats for you. Drag one to the recent chats or to a project to take it over.",
   "next.sidebar.foldList": "Fold the list",
   "next.sidebar.unfoldList": "Unfold the list",
   "next.sidebar.favorites": "Favorites"

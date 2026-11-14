@@ -15,6 +15,7 @@ import { AgentsScreen } from './screens/agents';
 import { hxOn } from './hx/flag';
 import { AuthScreen } from './screens/auth';
 import { BrowserScreen } from './screens/browser';
+import { ConnectScreen } from './screens/connect';
 import { DoneScreen } from './screens/done';
 import { HomeScreen } from './screens/home';
 import { InviteScreen } from './screens/invite';
@@ -41,6 +42,7 @@ const ROUTES = [
   '/invite/:token',
   '/new',
   '/settings',
+  '/connect',
   '/network',
   '/switches',
   '/browser/:machineId',
@@ -356,6 +358,7 @@ const Routes = () => {
     );
   }
   if (route === '/settings') return <AccountScreen />;
+  if (route === '/connect') return <ConnectScreen />;
   if (route === '/network') return <NetworkScreen />;
   if (route === '/switches') return <SwitchesScreen />;
   if (route === '/apps/:app') return <AppRedirect app={params.app ?? ''} search={search} />;

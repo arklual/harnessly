@@ -115,7 +115,7 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 	b.WriteString("It is on your PATH and finds the workspace by itself; there is nothing to log in to.\n\n")
 	b.WriteString("```bash\n" +
 		"harnessly open <link|file|port>   # show it to the person in the right pane (a document, a board, ./report.md, 4400)\n" +
-		"harnessly deliver <file>          # hand a file to the person (zip, docx, pdf, md): a card in the chat to open and download\n" +
+		"harnessly deliver <file|folder>   # hand a file to the person (any type; a folder as a zip): a card in the chat, downloaded at once\n" +
 		"harnessly tab list                # the tabs of this workspace\n" +
 		"harnessly tab create -t codex-cli --prompt \"<the whole task>\" [--notify]   # hand a task to another agent: a chat nested under yours\n" +
 		"harnessly tab status <id>         # is it working or waiting\n" +
@@ -140,8 +140,10 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 			"If you ran JavaScript on a tab, use `chrome_open` to create a fresh tab before entering a secret.\n\n")
 	}
 	b.WriteString("## Handing files over\n\n")
-	b.WriteString("When the person asks you to send or collect a file (\"put it in a zip\", \"give me the docx\"), hand it over with " +
-		"`harnessly deliver <path>` (or the `deliver_file` tool): the chat gets a card that opens the file on the right and downloads it. " +
+	b.WriteString("When the person asks you to download, send or give them a file (\"скачай\", \"скинь\", \"put it in a zip\", \"give me the docx\"), " +
+		"make it and hand it over with the `deliver_file` tool (or `harnessly deliver <path>`); never answer with the path in text. " +
+		"Any type goes (html, zip, pdf, png, md, csv, docx…), a folder goes as one zip. The chat gets a card that opens the file on the right, " +
+		"and the person's browser downloads it at once. " +
 		"Deliver only files the person asked to receive. Files you merely write or change while working make no card, so do not deliver them, " +
 		"and do not deliver the same file twice unless you changed it.\n\n")
 	b.WriteString("## The file beside the chat\n\n")

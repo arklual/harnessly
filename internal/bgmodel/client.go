@@ -8,11 +8,13 @@
 package bgmodel
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
+	"mime"
 	"net/http"
 	"strings"
 	"time"
@@ -70,6 +72,38 @@ type Request struct {
 	// MaxTokens caps the answer (DefaultMaxTokens when 0), Timeout the whole call (DefaultTimeout when 0).
 	MaxTokens int
 	Timeout   time.Duration
+	// Quick asks the model to answer without thinking first (an Anthropic-form API; the other form has no common way).
+	Quick bool
+	// Effort is the reasoning effort the person gave the model (extproviders.ModelEfforts); "" sends none. A quick call
+	// does not think whatever it is.
+	Effort string
+}
+
+// openAIEffort is the reasoning_effort of an OpenAI-form request: the levels above high are high there, except xhigh
+// that the newer models take.
+func openAIEffort(e string) string {
+	switch e {
+	case "low", "medium", "high", "xhigh":
+		return e
+	case "":
+		return ""
+	}
+	return "high"
+}
+
+// thinkingBudget is the thinking budget of an Anthropic-form request for an effort; 0 for none.
+func thinkingBudget(e string) int {
+	switch e {
+	case "low":
+		return 2048
+	case "medium":
+		return 8192
+	case "high":
+		return 16384
+	case "xhigh", "max", "ultra":
+		return 32000
+	}
+	return 0
 }
 
 // Client makes the calls.
@@ -98,8 +132,9 @@ func tail(s string, max int) string {
 	return s
 }
 
-// Complete asks the model once and gives the text of its answer.
-func (c *Client) Complete(ctx context.Context, r Request) (string, error) {
+// open builds and sends the request of a call; stream asks the provider for server-sent events. The caller closes the
+// body and calls cancel, which holds the call's timeout.
+func (c *Client) open(ctx context.Context, r Request, stream bool) (res *http.Response, cancel context.CancelFunc, err error) {
 	maxTokens := r.MaxTokens
 	if maxTokens <= 0 {
 		maxTokens = DefaultMaxTokens
@@ -109,8 +144,7 @@ func (c *Client) Complete(ctx context.Context, r Request) (string, error) {
 	if timeout <= 0 {
 		timeout = DefaultTimeout
 	}
-	ctx, cancel := context.WithTimeout(ctx, min(timeout, MaxTimeout))
-	defer cancel()
+	ctx, cancel = context.WithTimeout(ctx, min(timeout, MaxTimeout))
 	prompt := tail(r.Prompt, MaxPrompt)
 
 	var body map[string]any
@@ -121,6 +155,14 @@ func (c *Client) Complete(ctx context.Context, r Request) (string, error) {
 		if r.System != "" {
 			body["system"] = r.System
 		}
+		// A quick call wants the answer, not the model's thinking first: a second or two saved on a reply of a line.
+		if r.Quick {
+			body["thinking"] = map[string]string{"type": "disabled"}
+		} else if budget := thinkingBudget(r.Effort); budget > 0 {
+			// The answer comes after the thinking, within max_tokens.
+			body["thinking"] = map[string]any{"type": "enabled", "budget_tokens": budget}
+			body["max_tokens"] = maxTokens + budget
+		}
 	} else {
 		messages := []map[string]string{}
 		if r.System != "" {
@@ -128,42 +170,152 @@ func (c *Client) Complete(ctx context.Context, r Request) (string, error) {
 		}
 		messages = append(messages, map[string]string{"role": "user", "content": prompt})
 		body = map[string]any{"model": r.Model, "max_tokens": maxTokens, "messages": messages}
+		if e := openAIEffort(r.Effort); e != "" && !r.Quick {
+			body["reasoning_effort"] = e
+		}
+	}
+	if stream {
+		body["stream"] = true
 	}
 	raw, err := json.Marshal(body)
 	if err != nil {
-		return "", err
+		cancel()
+		return nil, nil, err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, extproviders.Endpoint(r.BaseURL, r.API, path), bytes.NewReader(raw))
 	if err != nil {
-		return "", &Error{Reason: ReasonUnreachable}
+		cancel()
+		return nil, nil, &Error{Reason: ReasonUnreachable}
 	}
 	req.Header = extproviders.Headers(r.API, r.Key)
 	req.Header.Set("Content-Type", "application/json")
-	res, err := c.http().Do(req)
-	if err != nil {
-		if extproviders.IsTimeout(err) || ctx.Err() != nil {
-			return "", &Error{Reason: ReasonTimeout}
-		}
-		return "", &Error{Reason: ReasonUnreachable}
+	if stream {
+		req.Header.Set("Accept", "text/event-stream")
 	}
-	defer res.Body.Close()
-	answer, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+	res, err = c.http().Do(req)
 	if err != nil {
-		return "", &Error{Reason: ReasonTimeout, Status: res.StatusCode}
+		defer cancel()
+		if extproviders.IsTimeout(err) || ctx.Err() != nil {
+			return nil, nil, &Error{Reason: ReasonTimeout}
+		}
+		return nil, nil, &Error{Reason: ReasonUnreachable}
 	}
 	switch status := res.StatusCode; {
 	case status == http.StatusUnauthorized || status == http.StatusForbidden:
-		return "", &Error{Reason: ReasonUnauthorized, Status: status}
+		err = &Error{Reason: ReasonUnauthorized, Status: status}
 	case status == http.StatusTooManyRequests:
-		return "", &Error{Reason: ReasonRateLimited, Status: status}
+		err = &Error{Reason: ReasonRateLimited, Status: status}
 	case status < 200 || status > 299:
-		return "", &Error{Reason: ReasonRejected, Status: status}
+		err = &Error{Reason: ReasonRejected, Status: status}
+	}
+	if err != nil {
+		res.Body.Close()
+		cancel()
+		return nil, nil, err
+	}
+	return res, cancel, nil
+}
+
+// maxAnswer bounds what is read of one answer.
+const maxAnswer = 1 << 20
+
+// Complete asks the model once and gives the text of its answer.
+func (c *Client) Complete(ctx context.Context, r Request) (string, error) {
+	res, cancel, err := c.open(ctx, r, false)
+	if err != nil {
+		return "", err
+	}
+	defer cancel()
+	defer res.Body.Close()
+	answer, err := io.ReadAll(io.LimitReader(res.Body, maxAnswer))
+	if err != nil {
+		return "", &Error{Reason: ReasonTimeout, Status: res.StatusCode}
 	}
 	text := strings.TrimSpace(textOf(r.API, answer))
 	if text == "" {
 		return "", &Error{Reason: ReasonEmpty, Status: res.StatusCode}
 	}
 	return text, nil
+}
+
+// Stream asks the model once and hands over the text as it comes: onDelta gets every non-empty piece, and the whole
+// text, trimmed, is the answer. A provider that ignores «stream» and answers in one body gives one piece.
+func (c *Client) Stream(ctx context.Context, r Request, onDelta func(string)) (string, error) {
+	res, cancel, err := c.open(ctx, r, true)
+	if err != nil {
+		return "", err
+	}
+	defer cancel()
+	defer res.Body.Close()
+	body := io.LimitReader(res.Body, maxAnswer)
+	var all strings.Builder
+	if mt, _, _ := mime.ParseMediaType(res.Header.Get("Content-Type")); mt != "text/event-stream" {
+		answer, err := io.ReadAll(body)
+		if err != nil {
+			return "", &Error{Reason: ReasonTimeout, Status: res.StatusCode}
+		}
+		all.WriteString(textOf(r.API, answer))
+		if all.Len() > 0 && onDelta != nil {
+			onDelta(all.String())
+		}
+	} else {
+		sc := bufio.NewScanner(body)
+		sc.Buffer(make([]byte, 0, 64<<10), maxAnswer)
+		for sc.Scan() {
+			data, ok := strings.CutPrefix(sc.Text(), "data:")
+			if !ok {
+				continue
+			}
+			data = strings.TrimSpace(data)
+			if data == "[DONE]" {
+				break
+			}
+			if piece := deltaOf(r.API, []byte(data)); piece != "" {
+				all.WriteString(piece)
+				if onDelta != nil {
+					onDelta(piece)
+				}
+			}
+		}
+		if err := sc.Err(); err != nil {
+			if all.Len() == 0 || ctx.Err() != nil {
+				return "", &Error{Reason: ReasonTimeout, Status: res.StatusCode}
+			}
+		}
+	}
+	text := strings.TrimSpace(all.String())
+	if text == "" {
+		return "", &Error{Reason: ReasonEmpty, Status: res.StatusCode}
+	}
+	return text, nil
+}
+
+// deltaOf is the text of one event: choices[0].delta.content of the OpenAI form, the text_delta of the Anthropic one.
+func deltaOf(api extproviders.API, raw []byte) string {
+	if api == extproviders.APIAnthropic {
+		var ev struct {
+			Type  string `json:"type"`
+			Delta struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"delta"`
+		}
+		if json.Unmarshal(raw, &ev) != nil || ev.Type != "content_block_delta" || (ev.Delta.Type != "" && ev.Delta.Type != "text_delta") {
+			return ""
+		}
+		return ev.Delta.Text
+	}
+	var ev struct {
+		Choices []struct {
+			Delta struct {
+				Content string `json:"content"`
+			} `json:"delta"`
+		} `json:"choices"`
+	}
+	if json.Unmarshal(raw, &ev) != nil || len(ev.Choices) == 0 {
+		return ""
+	}
+	return ev.Choices[0].Delta.Content
 }
 
 // textOf is the text of an answer: choices[0].message.content of the OpenAI form (a string, or parts with text), the

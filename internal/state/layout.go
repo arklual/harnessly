@@ -157,6 +157,9 @@ type TabOptions struct {
 	// ID is the tab's id when the caller chose it ahead (NewTabID): a launch line that names its chat needs it before the
 	// tab exists. "" makes a new one.
 	ID string
+	// Meta is the tab's metadata from its first write (the keys MergeMeta knows), so that no reader of the layout sees
+	// the tab without it.
+	Meta *jsvalue.Object
 }
 
 // NewTabID is an id for a tab yet to be added (TabOptions.ID).
@@ -220,6 +223,11 @@ func (s *Store) AddTab(wsID, paneID string, o TabOptions) (*jsvalue.Object, erro
 		tab = s.newTab(wsID, paneID, tabID, name, next, o.Cwd)
 		if o.PanelType != "" {
 			tab.Set("panelType", o.PanelType)
+		}
+		if o.Meta != nil {
+			if meta, changed := MergeMeta(nil, o.Meta); changed {
+				tab.Set(s.cfg.MetaKey, meta)
+			}
 		}
 		pane.Set("tabs", append(pane.Array("tabs"), tab))
 		pane.Set("activeTabId", tabID)

@@ -226,6 +226,10 @@ DESIGN PROJECTS
                                     a presentation's speaker notes: every slide with its length, or one slide's text
   harnessly design notes set <project> <page> [--file PATH|-]
                                     save a slide's speaker notes (the text from a file or stdin)
+  harnessly design export <project> <page>
+                                    one page as one HTML file that opens anywhere (styles, fonts, pictures inside), handed to the person
+  harnessly design export <project> --zip|--all [--no-deliver]
+                                    the project as a zip (--zip: project/, --all: with meta/), handed to the person
   harnessly design kit install ID VERSION TARBALL|URL    install a UI kit version for boards ("help design kit")
   harnessly design kit list                              the installed kits
   harnessly design kit init FOLDER --id ID --namespace NS  start a kit that already passes the check
@@ -460,7 +464,7 @@ What you asked the pane for in the last day (and whether the person has seen it)
 tabs the pane has and which is in front.
 `,
 	"migrate": migrateHelp,
-	"design": `harnessly design page list|create|rename|remove, harnessly design notes get|set, harnessly design migrate
+	"design": `harnessly design page list|create|rename|remove, harnessly design notes get|set, harnessly design export, harnessly design migrate
 
 A design project with meta/ keeps one file per page, meta/pages/<id>.json, under a permanent id (a ULID); its
 project/canvas.json and artifact.json are built from meta/ by the runtime. Change the pages with these commands:
@@ -477,6 +481,13 @@ them with the commands, not by hand: a slide is named by its id, board file or t
   harnessly design notes get shop-deck
   harnessly design notes get shop-deck "Pricing"
   harnessly design notes set shop-deck "Pricing" --file -    (the text on stdin)
+
+When the person asks for a page or the whole project as a file ("give me the HTML of this page", "the project as a
+zip"), export it: the file is made by the project's own exporters and handed to the person in the chat (a card that
+downloads it). A page is named by its id, board file or title; --no-deliver only prints the file's path.
+
+  harnessly design export shop-admin "Payouts"
+  harnessly design export shop-admin --zip
 
 design migrate works on the library folder itself, without the runtime: every project without meta/ gets one built
 from what the library shows now (same boards, order, titles, sizes). It writes only meta/, project/canvas.json and

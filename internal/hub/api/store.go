@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/ly-solutions/harnessly/internal/filestore"
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
 	"github.com/ly-solutions/harnessly/internal/hub/designaccess"
@@ -63,6 +64,15 @@ func (v designView) RecordFromStore(ctx context.Context, m store.Machine, projec
 		return false, nil
 	}
 	return v.d.RecordFromStore(ctx, m, project, ownerFile)
+}
+
+// RecordMeta takes an entity record a machine wrote into the project's row, under the switch hub-design-owner.
+func (v designView) RecordMeta(ctx context.Context, m store.Machine, rec filestore.Record) error {
+	if v.d == nil || !v.d.OwnerOn(ctx, m) {
+		return nil
+	}
+	_, err := v.d.RecordMeta(ctx, m, rec.ID, designaccess.Meta{Title: rec.Title, Kind: rec.Kind, Preview: rec.Preview, Kit: rec.Kit, At: rec.At}, designaccess.MetaByMachine)
+	return err
 }
 
 func (v designView) ClosedUnrecorded() bool { return v.d != nil && v.d.ClosedUnrecorded() }

@@ -201,8 +201,15 @@ func (s *Store) claudeAccount(obj *jsvalue.Object) wire.AgentAccount {
 			SubscriptionType string `json:"subscriptionType"`
 		} `json:"claudeAiOauth"`
 	}
-	if raw, err := readFile(filepath.Join(s.cfg.ClaudeDir, ".credentials.json")); err == nil && len(raw) > 0 {
-		_ = json.Unmarshal(raw, &creds)
+	// The CLI's own folder first, then the folder a managed machine signs its chats in from (without it the
+	// page said «Не подключено» beside the limits of that very sign-in).
+	for _, dir := range []string{s.cfg.ClaudeDir, s.cfg.AuthDir} {
+		if dir == "" || creds.ClaudeAiOauth != nil {
+			continue
+		}
+		if raw, err := readFile(filepath.Join(dir, ".credentials.json")); err == nil && len(raw) > 0 {
+			_ = json.Unmarshal(raw, &creds)
+		}
 	}
 	if creds.ClaudeAiOauth != nil {
 		var plan *string

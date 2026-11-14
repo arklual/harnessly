@@ -38,11 +38,13 @@ var envItemID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 // AppsConsent is the organization's rule for apps, which the runtime reads from here too ("" for ask). The hub is
 // told the hash of both (hubproto.EnvSetHash).
 type envHeld struct {
-	Rev         int64                 `json:"rev"`
-	Hash        string                `json:"hash"`
-	AppsConsent string                `json:"appsConsent,omitempty"`
-	Items       []hubproto.EnvItem    `json:"items"`
-	Applied     []hubproto.EnvApplied `json:"applied"`
+	Rev         int64  `json:"rev"`
+	Hash        string `json:"hash"`
+	AppsConsent string `json:"appsConsent,omitempty"`
+	// Links are the organization's integrations for the chat's links, which the runtime reads from here too.
+	Links   *hubproto.LinkSettings `json:"links,omitempty"`
+	Items   []hubproto.EnvItem     `json:"items"`
+	Applied []hubproto.EnvApplied  `json:"applied"`
 }
 
 // setHash is the hash the hub knows the list by: the items' with the rule for apps; "" before the first list.
@@ -50,7 +52,7 @@ func (h envHeld) setHash() string {
 	if h.Hash == "" {
 		return ""
 	}
-	return hubproto.EnvSetHash(h.Hash, h.AppsConsent)
+	return hubproto.EnvSetHashWith(h.Hash, h.AppsConsent, h.Links)
 }
 
 // envKeeper is the list the agent holds.
@@ -116,26 +118,31 @@ func (k *envKeeper) Set(set hubproto.EnvSet) (hubproto.EnvState, error) {
 		return hubproto.EnvState{}, fmt.Errorf("too many items")
 	}
 	itemsHash := hubproto.EnvHash(set.Items)
-	if hubproto.EnvSetHash(itemsHash, set.AppsConsent) != set.Hash {
+	if hubproto.EnvSetHashWith(itemsHash, set.AppsConsent, set.Links) != set.Hash {
 		return hubproto.EnvState{}, fmt.Errorf("the hash is not the list's")
 	}
 	consent := ""
 	if set.AppsConsent == hubproto.AppsConsentAuto {
 		consent = hubproto.AppsConsentAuto
 	}
+	var links *hubproto.LinkSettings
+	if !set.Links.Empty() {
+		l := *set.Links
+		links = &l
+	}
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	if itemsHash == k.held.Hash && k.held.Rev != 0 {
 		// The same list under a newer revision, or with another rule for apps: nothing to apply again.
 		old := k.held
-		k.held.Rev, k.held.AppsConsent = set.Rev, consent
+		k.held.Rev, k.held.AppsConsent, k.held.Links = set.Rev, consent, links
 		if err := k.saveLocked(); err != nil {
 			k.held = old
 			return hubproto.EnvState{}, err
 		}
 		return k.stateLocked(), nil
 	}
-	next := envHeld{Rev: set.Rev, Hash: itemsHash, AppsConsent: consent, Items: set.Items}
+	next := envHeld{Rev: set.Rev, Hash: itemsHash, AppsConsent: consent, Links: links, Items: set.Items}
 	next.Applied = k.apply(set.Items)
 	old := k.held
 	k.held = next
@@ -476,10 +483,11 @@ func (h *hub) opEnvSet(req map[string]json.RawMessage) (any, func(), error) {
 	hash, _ := field[string](req, "hash")
 	items, _ := field[[]hubproto.EnvItem](req, "items")
 	appsConsent, _ := field[string](req, "appsConsent")
+	links, _ := field[*hubproto.LinkSettings](req, "links")
 	if rev <= 0 {
 		return nil, nil, invalid("rev must be a positive number")
 	}
-	st, err := h.environment.Set(hubproto.EnvSet{Rev: rev, Hash: hash, Items: items, AppsConsent: appsConsent})
+	st, err := h.environment.Set(hubproto.EnvSet{Rev: rev, Hash: hash, Items: items, AppsConsent: appsConsent, Links: links})
 	if err != nil {
 		return nil, nil, invalid("the environment list was not taken: %v", err)
 	}

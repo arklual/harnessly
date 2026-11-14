@@ -2,6 +2,7 @@ package convo
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -161,6 +162,37 @@ func TestDigestHoldsTheFirstRequestAndTheLatestAndFitsTheBudget(t *testing.T) {
 	}
 	if _, err := r.rt.ChatDigest(context.Background(), "tab-nope", 3000); err == nil {
 		t.Error("a digest of a chat that is not there")
+	}
+}
+
+func TestGlanceGivesTheNewestOfEachSideCutShort(t *testing.T) {
+	r := searchRig(t)
+	r.open()
+	if g, err := r.rt.ChatGlance(context.Background(), r.id); err != nil || g.Messages != 0 || g.LastUser != nil || g.LastAgent != nil {
+		t.Fatalf("a chat with nothing said: %+v, %v", g, err)
+	}
+	r.user("the first question")
+	r.say("the first answer")
+	r.user("the last question " + strings.Repeat("q", 700))
+	r.say("the last answer " + strings.Repeat("a", 1300))
+	r.turnEnd()
+	r.tick(time.Second)
+
+	g, err := r.rt.ChatGlance(context.Background(), r.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.ConvID != r.id || g.Messages != 4 || g.LastUser == nil || g.LastAgent == nil {
+		t.Fatalf("the glance: %+v", g)
+	}
+	if !strings.HasPrefix(g.LastUser.Text, "the last question") || len([]rune(g.LastUser.Text)) != 601 || !strings.HasSuffix(g.LastUser.Text, "…") {
+		t.Errorf("the person's line: %d characters", len([]rune(g.LastUser.Text)))
+	}
+	if !strings.HasPrefix(g.LastAgent.Text, "the last answer") || len([]rune(g.LastAgent.Text)) != 1201 {
+		t.Errorf("the agent's line: %d characters", len([]rune(g.LastAgent.Text)))
+	}
+	if _, err := r.rt.ChatGlance(context.Background(), "tab-nope"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("a glance of a chat that is not there: %v", err)
 	}
 }
 

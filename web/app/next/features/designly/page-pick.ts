@@ -14,6 +14,13 @@ export const pagesFound = (pages: readonly ISitePage[], query: string): ISitePag
   });
 };
 
+/** The page's file under its name, only where the file says something the name does not: `Оплата.dc.html` under
+ *  «Оплата» is a repeat and gives null, `mobile/Оплата.dc.html` under «Оплата · Мобильная» is kept whole. */
+export const pageFileNote = (page: ISitePage): string | null => {
+  const bare = page.path.replace(/\.dc\.html$|\.html$/i, '');
+  return bare.trim().toLowerCase() === page.name.trim().toLowerCase() ? null : page.path;
+};
+
 /** The row after a key: ↑ and ↓ go round the list, Home and End to its ends; -1 where there is no row. */
 export const rowAfter = (key: string, at: number, count: number): number => {
   if (count === 0) return -1;

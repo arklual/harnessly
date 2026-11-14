@@ -33,7 +33,7 @@ const (
 )
 
 // cardCaps: the caps of the page the hub serves, so the agents come with their profiles.
-var cardCaps = strings.Join([]string{string(wire.CapDelegation), string(wire.CapWorkflows), string(wire.CapProfiles), string(wire.CapMsgStatus)}, ",")
+var cardCaps = strings.Join([]string{string(wire.CapDelegation), string(wire.CapWorkflows), string(wire.CapProfiles), string(wire.CapMsgStatus), string(wire.CapLinks)}, ",")
 
 // platformMachines is the platform's list of machines with their subscriptions' limits (web: loadMachineLimits).
 var platformMachines = regexp.MustCompile(`^/api/[A-Za-z0-9_-]+/machines$`)

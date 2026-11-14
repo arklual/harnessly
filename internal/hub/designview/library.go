@@ -2,6 +2,9 @@ package designview
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -174,17 +177,19 @@ func (v *View) buildListed(b *listBuild, spaceID, id, key, bkey string, head int
 		b.err = err
 		return
 	}
-	snapshot, err := room.Snapshot(ctx, id+"/", head)
+	item, err := v.keptListed(ctx, spaceID, id, head, func() (designaccess.LibraryItem, error) {
+		snapshot, err := room.Snapshot(ctx, id+"/", head)
+		if err != nil {
+			return designaccess.LibraryItem{}, err
+		}
+		item, err := v.listProject(ctx, room, spaceID, id, snapshot.Entries)
+		item.Rev = head
+		return item, err
+	})
 	if err != nil {
 		b.err = err
 		return
 	}
-	item, err := v.listProject(ctx, room, spaceID, id, snapshot.Entries)
-	if err != nil {
-		b.err = err
-		return
-	}
-	item.Rev = head
 	v.mu.Lock()
 	if v.listing == nil {
 		v.listing = map[string]listedProject{}
@@ -342,4 +347,99 @@ func (v *View) ReadFile(ctx context.Context, spaceID, rel string, limit int64) (
 		return io.ReadAll(io.LimitReader(rc, limit))
 	}
 	return nil, nil
+}
+
+// keptListed is the project's item at head as the hub's database keeps it (design_derived): worked out once
+// by build from the revision's files and given from there by every replica and after a restart, instead of reading the
+// project's files again. Without the database, build each time.
+func (v *View) keptListed(ctx context.Context, spaceID, id string, head int64, build func() (designaccess.LibraryItem, error)) (designaccess.LibraryItem, error) {
+	d, code := v.derivedStore()
+	if d == nil {
+		return build()
+	}
+	sum := sha256.Sum256([]byte(fmt.Sprintf("list\x00v1\x00%s\x00%s\x00%s\x00%d", code, spaceID, id, head)))
+	key := hex.EncodeToString(sum[:])
+	if a, ok := d.Lookup(ctx, key); ok {
+		if rc, err := d.Open(ctx, spaceID, a.Sha); err == nil {
+			body, err := io.ReadAll(io.LimitReader(rc, maxDerived))
+			_ = rc.Close()
+			var item designaccess.LibraryItem
+			if err == nil && json.Unmarshal(body, &item) == nil {
+				return item, nil
+			}
+		}
+		// The store lost the blob or it does not read: worked out again below.
+	}
+	item, err := build()
+	if err != nil {
+		return item, err
+	}
+	body, err := json.Marshal(item)
+	if err != nil {
+		return item, nil
+	}
+	bs := sha256.Sum256(body)
+	a := DerivedAnswer{Key: key, SpaceID: spaceID, Project: id, Rev: head, Sha: hex.EncodeToString(bs[:]), Size: int64(len(body)),
+		Type: "application/json", Headers: map[string]string{}}
+	if err := d.Keep(context.WithoutCancel(ctx), a, body); err != nil {
+		v.o.Log.Warn("design view: a library item was not kept", "space", spaceID, "project", id, "rev", head, "error", err)
+	}
+	return item, nil
+}
+
+// Cover is a project's cover picture as the store has it, at most limit bytes; nil when there is none.
+func (v *View) Cover(ctx context.Context, spaceID, project string, limit int64) ([]byte, error) {
+	if v.o.Covers == nil || strings.ContainsAny(spaceID, "/\\.") || !(filestore.Covers{}).Synced(filestore.CoverPath(project)) {
+		return nil, nil
+	}
+	room, err := v.o.Covers(ctx, spaceID)
+	if err != nil {
+		return nil, err
+	}
+	es, err := room.HistoryUnder(ctx, "", 1)
+	if err != nil || len(es) == 0 {
+		return nil, err
+	}
+	snapshot, err := room.Snapshot(ctx, "", es[0].Rev)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range snapshot.Entries {
+		if e.Path != filestore.CoverPath(project) || e.Size > limit || !filestore.ValidSha(e.Sha) {
+			continue
+		}
+		rc, err := room.OpenBlob(ctx, e.Sha)
+		if err != nil {
+			return nil, err
+		}
+		defer rc.Close()
+		return io.ReadAll(io.LimitReader(rc, limit))
+	}
+	return nil, nil
+}
+
+// CoverVersions are the projects of a space that have a cover in the store, by project id, each with the cover's sha.
+func (v *View) CoverVersions(ctx context.Context, spaceID string) (map[string]string, error) {
+	if v.o.Covers == nil || strings.ContainsAny(spaceID, "/\\.") {
+		return nil, nil
+	}
+	room, err := v.o.Covers(ctx, spaceID)
+	if err != nil {
+		return nil, err
+	}
+	es, err := room.HistoryUnder(ctx, "", 1)
+	if err != nil || len(es) == 0 {
+		return nil, err
+	}
+	snapshot, err := room.Snapshot(ctx, "", es[0].Rev)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]string{}
+	for _, e := range snapshot.Entries {
+		if id, ok := filestore.CoverID(e.Path); ok && filestore.ValidSha(e.Sha) {
+			out[id] = e.Sha
+		}
+	}
+	return out, nil
 }

@@ -209,7 +209,7 @@ func (m ManagedSource) provider(origin, name string) Provider {
 // sameManaged says whether the registry already keeps the source as it is.
 func sameManaged(have, want Provider) bool {
 	return have.Origin == want.Origin && have.BaseURL == want.BaseURL && have.API == want.API && have.Preset == want.Preset &&
-		have.KeyRef == want.KeyRef && slices.Equal(have.Env, want.Env) && (len(want.Models) == 0 || slices.Equal(have.Models, want.Models))
+		have.KeyRef == want.KeyRef && slices.Equal(have.Env, want.Env) && (len(want.Models) == 0 || slices.EqualFunc(have.Models, want.Models, Model.Equal))
 }
 
 // OriginOf is the site of a provider's address as the safe binds a secret to it: scheme://host[:port].

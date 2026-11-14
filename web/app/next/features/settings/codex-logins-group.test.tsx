@@ -5,7 +5,15 @@ import type { ICodexLogin } from '@/next/features/settings/codex-logins-api';
 import CodexLoginsGroup, { CodexLoginCard } from '@/next/features/settings/codex-logins-group';
 import { pinLocale } from '@/next/i18n';
 
-beforeAll(() => pinLocale('ru'));
+beforeAll(() => {
+  pinLocale('ru');
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  })) as unknown as typeof window.matchMedia;
+});
 afterEach(cleanup);
 
 const second: ICodexLogin = {
@@ -30,17 +38,20 @@ describe('CodexLoginsGroup', () => {
       .fn<(name: string) => Promise<string | null>>()
       .mockResolvedValueOnce('Такое название уже есть');
     render(<CodexLoginsGroup logins={[]} full={false} onAdd={onAdd} renderLogin={() => null} />);
+    // The name opens in place under «Добавить вход».
+    expect(screen.queryByLabelText('Название входа')).toBeNull();
+    fireEvent.click(screen.getByText('Добавить вход'));
     const field = screen.getByLabelText('Название входа') as HTMLInputElement;
     fireEvent.change(field, { target: { value: '  Рабочий ' } });
     await act(async () => {
-      fireEvent.click(screen.getByText('Добавить вход'));
+      fireEvent.click(screen.getByText('Добавить'));
     });
     expect(onAdd).toHaveBeenCalledWith('Рабочий');
     expect(screen.getByText('Такое название уже есть')).toBeTruthy();
     expect(field.value).toBe('  Рабочий ');
     onAdd.mockResolvedValueOnce(null);
     await act(async () => {
-      fireEvent.click(screen.getByText('Добавить вход'));
+      fireEvent.click(screen.getByText('Добавить'));
     });
     expect(field.value).toBe('');
   });
@@ -96,10 +107,12 @@ describe('CodexLoginCard', () => {
         <i />
       </CodexLoginCard>,
     );
-    fireEvent.click(screen.getByText('Удалить'));
+    fireEvent.click(screen.getByRole('button', { name: 'Вход «Рабочий»: действия' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Удалить' }));
     expect(onRemove).not.toHaveBeenCalled();
+    expect(screen.getByText('Точно удалить? Вместе с историей чатов этого входа')).toBeTruthy();
     await act(async () => {
-      fireEvent.click(screen.getByText('Точно удалить? Вместе с историей чатов этого входа'));
+      fireEvent.click(screen.getByRole('button', { name: 'Удалить' }));
     });
     expect(onRemove).toHaveBeenCalledTimes(1);
   });
@@ -116,7 +129,8 @@ describe('CodexLoginCard', () => {
         <i />
       </CodexLoginCard>,
     );
-    fireEvent.click(screen.getByLabelText('Переименовать'));
+    fireEvent.click(screen.getByRole('button', { name: 'Вход «Рабочий»: действия' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Переименовать' }));
     fireEvent.change(screen.getByLabelText('Название входа'), { target: { value: 'Команда' } });
     await act(async () => {
       fireEvent.click(screen.getByText('Сохранить'));
@@ -131,9 +145,10 @@ describe('CodexLoginCard', () => {
         <i />
       </CodexLoginCard>,
     );
-    expect(screen.queryByText('Основной')).toBeNull();
+    expect(screen.queryByText(/основной/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Вход «Рабочий»: действия' }));
     await act(async () => {
-      fireEvent.click(screen.getByText('Сделать основным'));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Сделать основным' }));
     });
     expect(onMain).toHaveBeenLastCalledWith(true);
     rerender(
@@ -146,14 +161,15 @@ describe('CodexLoginCard', () => {
         <i />
       </CodexLoginCard>,
     );
-    expect(screen.getByText('Основной')).toBeTruthy();
+    expect(screen.getByText('work@example.com · основной')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Вход «Рабочий»: действия' }));
     await act(async () => {
-      fireEvent.click(screen.getByText('Снять основной'));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Снять основной' }));
     });
     expect(onMain).toHaveBeenLastCalledWith(false);
   });
 
-  it('offers no main mark to a sign-in that is not signed in', () => {
+  it('offers no main mark to a sign-in that is not signed in, and «Войти» opens its sign-in', async () => {
     render(
       <CodexLoginCard
         login={empty}
@@ -161,9 +177,14 @@ describe('CodexLoginCard', () => {
         onRemove={async () => null}
         onMain={async () => null}
       >
-        <i />
+        <i data-testid="panel" />
       </CodexLoginCard>,
     );
-    expect(screen.queryByText('Сделать основным')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Вход «Личный»: действия' }));
+    await screen.findByRole('menuitem', { name: 'Переименовать' });
+    expect(screen.queryByRole('menuitem', { name: 'Сделать основным' })).toBeNull();
+    expect(screen.queryByTestId('panel')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Войти' }));
+    expect(screen.getByTestId('panel')).toBeTruthy();
   });
 });

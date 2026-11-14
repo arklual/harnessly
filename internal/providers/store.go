@@ -34,6 +34,9 @@ type Store struct {
 	Secrets func(name string) (string, error)
 	// Safe reads a secret of the machine's safe: the key and the secret variables of a custom profile (Preset.Custom).
 	Safe func(name string) (string, error)
+	// Proxy is the runtime's proxy a profile of an OpenAI-compatible provider runs on (Preset.Proxied); nil for none,
+	// and such a profile is then never ready.
+	Proxy ExtProxy
 
 	mu sync.Mutex
 	// refreshed is when each profile's key was last taken from the safe.
@@ -80,6 +83,14 @@ type Switch interface {
 	// Endpoint is where Claude Code sends its requests and the file of the key it sends; ok is false while the switch
 	// is off or the proxy has never had an address.
 	Endpoint() (baseURL, keyFile string, ok bool)
+}
+
+// ExtProxy is the proxy Claude Code reaches an OpenAI-compatible provider through (GPTProxy).
+type ExtProxy interface {
+	// ExtReady: the proxy relays the provider of that id.
+	ExtReady(provider string) bool
+	// ExtEndpoint is the proxy's address and the file of its key, the proxy started when it does not run.
+	ExtEndpoint(ctx context.Context) (baseURL, keyFile string, err error)
 }
 
 // SwitchOf is the switch of a switched profile; nil for another profile, or when the runtime keeps none.
@@ -258,6 +269,9 @@ func (s *Store) LoginOf(id string) (account string, ok bool) {
 // Ready says whether a conversation can run on the profile: a key is saved, or the vendor CLI is signed in; for a
 // switched profile, its switch says.
 func (s *Store) Ready(id string) bool {
+	if p, ok := Find(id); ok && p.Proxied != "" {
+		return s.Proxy != nil && s.Proxy.ExtReady(p.Proxied)
+	}
 	if p, ok := Find(id); ok && p.Switched {
 		sw := s.SwitchOf(id)
 		return sw != nil && sw.Ready()
@@ -294,6 +308,11 @@ func (p Preset) ownCredential() bool {
 func (s *Store) Credential(ctx context.Context, id string) (string, error) {
 	if p, ok := Find(id); ok && p.Switched {
 		return s.switchKey(id)
+	}
+	if p, ok := Find(id); ok && p.Proxied != "" {
+		// The proxy's key goes only to the proxy, from its file (the chat's apiKeyHelper); a caller here would send it to
+		// the profile's BaseURL, the provider's own address. The provider is checked by the registry (extproviders).
+		return "", ErrNoKey
 	}
 	key, err := s.Key(id)
 	if err == nil || !errors.Is(err, ErrNoKey) {

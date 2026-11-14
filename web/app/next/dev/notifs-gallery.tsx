@@ -142,29 +142,21 @@ const SAMPLES: Record<TSample, Omit<ISmartItem, 'key' | 'at' | 'until'> & { deta
       digits: 6,
     },
   },
+  // a card over the chat only when the work stops (a stall, a disk at nothing); a warning is in the bell.
   machine: {
     kind: SMART_KIND.machine,
     chatId: null,
     icon: 'hard-drive',
     title: 'dev-machine',
-    text: 'Память почти кончилась — занято 15 из 16 ГБ · больше всего занимает vite',
-    machine: { id: 'dev-machine', metric: 'mem', waiting: [] },
+    text: 'Диск почти заполнен — 1,2 ГБ свободно',
+    machine: { id: 'dev-machine', metric: 'disk', waiting: [] },
     urgent: true,
     detail: {
       k: 'machine',
-      text: 'Машине не хватает памяти — чаты могут отвечать медленно.',
-      level: 0.92,
-      heavy: [
-        { key: 'agents', icon: 'messages-square', name: 'Агенты', text: '3 чата работают', stoppable: false },
-        {
-          key: 'vite',
-          icon: 'square-terminal',
-          name: 'vite',
-          text: 'сборка или дев-сервер',
-          stoppable: true,
-        },
-        { key: 'chrome', icon: 'app-window', name: 'chrome', text: 'программа', stoppable: true },
-      ],
+      text: 'Диск заполнен — агенты не смогут сохранять файлы, работа встанет.',
+      level: 0.99,
+      heavy: [],
+      hint: 'Что можно удалить: рабочие копии уже влитых веток, кэши сборки (node_modules, ~/.cache, go-build), старые логи и записи.',
     },
   },
   long: {

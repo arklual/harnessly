@@ -1,5 +1,5 @@
 import { Menu } from '@base-ui/react/menu';
-import { useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
 import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
@@ -109,6 +109,12 @@ export interface IFavoritesSectionProps {
   onDelete: (id: string) => void;
   onShift: (id: string, direction: -1 | 1) => void;
   pending: ReadonlyMap<string, TPending>;
+  /**
+   * Set when the person asked for a change of the sidebar (pinned, unpinned, carried, moved a chat or a
+   * group); the next render that moves the favorites slides them and clears it. Anything else that moves them (a
+   * list or a layout that comes in, another device's change) places them without motion.
+   */
+  movingRef: RefObject<boolean>;
 }
 
 /**
@@ -130,6 +136,7 @@ const FavoritesSection = ({
   onDelete,
   onShift,
   pending,
+  movingRef,
 }: IFavoritesSectionProps) => {
   // Groups the section has drawn; one that comes in later is fresh and slides in. null until the first list.
   const [known, setKnown] = useState<ReadonlySet<string> | null>(null);
@@ -141,7 +148,11 @@ const FavoritesSection = ({
   }
 
   const root = useRef<HTMLElement>(null);
-  useFlip(root);
+  useFlip(root, false, undefined, () => {
+    if (!movingRef.current) return false;
+    movingRef.current = false;
+    return true;
+  });
   const empty = isFavEmpty(view) && creating === GROUP_STATE.off;
   // The place of each group in the entrance cascade: a head and its chats count one each.
   const heads = view.groups.map((_, i) =>

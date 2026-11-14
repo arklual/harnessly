@@ -1,10 +1,13 @@
 // The chats our agent delegated to other agents (the runtime's delegate_task, internal/delegation): each stands as a
 // card under the turn that started it, with the chat's live state, and opens on a click.
 import { createContext } from 'react';
-import type { Conversation } from '@/next/protocol/v2';
+import type { Conversation, MadeItem } from '@/next/protocol/v2';
 
 /** The chats this chat delegated, oldest first; empty for a chat that delegated none. */
 export const DelegatedChats = createContext<readonly Conversation[]>([]);
+
+/** What the delegated chats made, each thing marked with the subchat it came through. */
+export const SubchatsMade = createContext<readonly MadeItem[]>([]);
 
 /** The delegated chats a turn started: created while it ran (a live turn runs on). */
 export const startedIn = (

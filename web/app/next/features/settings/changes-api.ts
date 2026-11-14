@@ -110,13 +110,3 @@ export const answerSettingProposal = (machine: MachineId, id: string, verb: TPro
     answer(() => true),
     TIMEOUT_MS,
   );
-
-const readChats = answer((o) => list(o.chats, 'chats', (x) => str(x, 'chat')));
-
-/** The chats the Settings window made for its own agent, the newest last. */
-export const loadSettingsChats = (machine: MachineId) =>
-  getPage(url(machine, '/settings-agent'), readChats, TIMEOUT_MS);
-
-/** Names a chat the Settings window's own: its agent changes a setting without the person's yes. */
-export const nameSettingsChat = (machine: MachineId, conv: string) =>
-  sendBody('PUT', url(machine, '/settings-agent'), { conv }, readChats, TIMEOUT_MS);

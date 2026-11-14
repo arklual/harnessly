@@ -1,226 +1,344 @@
-// The agent of the Settings window: the island at the bottom of the screen. What the person writes goes to
-// a chat the window made for it and named to the machine (PUT settings-agent), so its agent changes a setting without
-// a card of consent; the island shows that chat's last answer, the changes the journal got since, and the question the
-// agent asks before it changes anything.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { refusalOf, type ISettingChangesHandle } from '@/next/bindings/settings-changes';
-import { answerQuestion, createConversation, renameConversation } from '@/next/commands';
-import { sendMessage } from '@/next/commands/messages';
-import { useConversationChannel } from '@/next/core/realtime/hub';
+// The agent of the Settings window: the window's one field at the bottom of the page and,
+// over it, the answer. A question goes to the window's agent (POST ui-agent): a quick model answers at once, with no chat
+// and no terminal. It may take the window to the place it names (`go`, done at once), or offer a change the person
+// confirms (`confirm`: «Поменять» sets it as the person's own, with the journal's way back), and says a few words.
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { type ISettingChangesHandle } from '@/next/bindings/settings-changes';
+import { useDraftField } from '@/next/bindings/use-draft';
+import { useVoice } from '@/next/bindings/use-voice';
+import DockBar from '@/next/features/composer/dock-bar';
+import FieldFold from '@/next/features/composer/field-fold';
+import ScreenField from '@/next/features/composer/one-field';
 import AgentIsland, {
   ISLAND,
+  type IIslandAction,
   type IIslandChange,
-  type IIslandOption,
+  type IIslandConfirm,
   type TIslandPhase,
 } from '@/next/features/settings/agent-island';
-import {
-  CHANGE_BY,
-  loadSettingsChats,
-  nameSettingsChat,
-  type ISettingChange,
-} from '@/next/features/settings/changes-api';
+import { harnesslyMap } from '@/next/features/settings/agent-map';
+import { putSetting } from '@/next/features/settings/changes-api';
+import { loadSmart, type ISmartView } from '@/next/features/settings/smart-api';
 import { isRefused } from '@/next/features/settings/platform-answer';
+import {
+  askUIAgent,
+  settingPlaces,
+  UI_EVENT,
+  UI_NO_MODEL,
+  type TUIEvent,
+} from '@/next/features/settings/ui-agent-api';
 import { t } from '@/next/i18n';
-import type { Conversation, ConvId, MachineId, Provider } from '@/next/protocol/v2';
-import { goTo, ROUTE } from '@/next/routes/routes';
-import { useGates } from '@/next/stores/conversation';
-import { useConversation } from '@/next/stores/conversations';
-import { useDefaultCwd } from '@/next/stores/projects';
+import type { MachineId } from '@/next/protocol/v2';
+import { goTo, parseRoute, ROUTE } from '@/next/routes/routes';
+import { clearDraft, type ScreenDraftKey } from '@/next/stores/drafts';
+import { limitsOf } from '@/next/stores/machines';
+import { useEnterSends } from '@/next/stores/me';
+import { Button } from '@/next/ui/button';
 
 /** How long the card over the field takes to leave (styles/settings.css, .hx-isle__reply[data-state]). */
 const CLOSE_MS = 160;
 
-/** The states of a chat whose agent takes the next message as it is. */
-const ALIVE: ReadonlySet<Conversation['state']['k']> = new Set([
-  'starting',
-  'working',
-  'waiting-question',
-  'waiting-permission',
-  'ready',
-  'idle',
-  'unknown',
-]);
+/** The window's field. */
+const DRAFT: ScreenDraftKey = 'screen:settings';
 
-/** What was asked and what there was before it: the answer is the turn that came after, the changes the lines the
- *  journal did not have. */
-interface IAsked {
-  conv: ConvId | null;
-  /** The chat's last turn when the words went; null for a chat that had none. */
-  turnBefore: string | null;
-  /** The journal's lines then; null when it was not read yet (no change is shown as this answer's). */
-  journalBefore: ReadonlySet<string> | null;
-  /** Why the words did not reach an agent; null while they are on their way or answered. */
-  failure: string | null;
+/** A change the agent offered: waiting for the person, being made, made, or being taken back. */
+interface IOffer {
+  key: string;
+  value: string;
+  title: string;
+  was: string;
+  now: string;
+  state: 'asked' | 'making' | 'made' | 'undoing';
+  /** The setting's value before the change, as the journal wrote it: the way back. */
+  old: string | null;
 }
+
+/** One question and what came of it. */
+interface IAnswer {
+  phase: TIslandPhase;
+  text: string;
+  offer: IOffer | null;
+  /** The machine has no model for the window's agent. */
+  noModel: boolean;
+}
+
+const QUIET: IAnswer = { phase: ISLAND.idle, text: '', offer: null, noModel: false };
+
+const go = (path: string) => goTo(parseRoute(path));
+
+/** The model the window's assistant answers on, as Smart features names it; null while the machine picks a quick one. */
+const assistantModel = (view: ISmartView): string | null => {
+  const choice = view.features.find((feature) => feature.id === 'ui-agent')?.choice;
+  if (!choice) return null;
+  const provider = view.providers.find((p) => p.id === choice.provider);
+  return provider?.models.find((m) => m.id === choice.model)?.label || choice.model || provider?.name || null;
+};
+
+const noStop = () => Promise.resolve();
 
 interface ISettingsAgentProps {
   machine: MachineId;
-  /** The agent the chat starts on; null when the machine has none. */
-  provider: Provider | null;
   changes: ISettingChangesHandle;
 }
 
-const SettingsAgent = ({ machine, provider, changes }: ISettingsAgentProps) => {
-  const defaultCwd = useDefaultCwd(machine);
-  // The window's chats of this machine, the newest last; null until read.
-  const [chats, setChats] = useState<{ machine: MachineId; list: readonly string[] } | null>(null);
-  const [asked, setAsked] = useState<IAsked | null>(null);
+const SettingsAgent = ({ machine, changes }: ISettingsAgentProps) => {
+  const enterSends = useEnterSends();
+  const field = useRef<HTMLTextAreaElement>(null);
+  const { text: typed, setText, read } = useDraftField(DRAFT, field);
+  const {
+    notice: voiceNotice,
+    recording,
+    recognized,
+    caret,
+    onMic,
+    onCancelRecording,
+    onFinishRecording,
+  } = useVoice(machine, typed, setText, read, DRAFT);
+  const [answer, setAnswer] = useState<IAnswer>(QUIET);
   const [closing, setClosing] = useState(false);
+  const asking = useRef<AbortController | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(
+    () => () => {
+      asking.current?.abort();
+      clearTimeout(closeTimer.current ?? undefined);
+    },
+    [],
+  );
+  // Another machine's window: what was asked of this one is not its answer.
+  const [answerOf, setAnswerOf] = useState(machine);
+  if (answerOf !== machine) {
+    setAnswerOf(machine);
+    setAnswer(QUIET);
+  }
+  useEffect(() => () => asking.current?.abort(), [machine]);
+
+  // The field's model is the assistant's, picked in Smart features: the pill names it and leads there.
+  const [model, setModel] = useState<{ machine: MachineId; label: string | null } | null>(null);
   useEffect(() => {
     let live = true;
-    void loadSettingsChats(machine).then((res) => {
-      if (live && 'ok' in res && !isRefused(res.value)) setChats({ machine, list: res.value });
+    void loadSmart(machine).then((res) => {
+      if (live && 'ok' in res && !isRefused(res.value))
+        setModel({ machine, label: assistantModel(res.value) });
     });
     return () => {
       live = false;
     };
   }, [machine]);
-  useEffect(() => () => clearTimeout(closeTimer.current ?? undefined), []);
+  const modelLabel = model?.machine === machine ? model.label : null;
 
-  const kept = chats?.machine === machine ? ((chats.list.at(-1) ?? null) as ConvId | null) : null;
-  const conv = asked?.conv ?? kept;
-  const record = useConversation(conv);
-  useConversationChannel(conv ? machine : null, conv);
-  const gates = useGates(conv);
-
-  const journal = changes.journal.k === 'ready' ? changes.journal.changes : null;
-
-  const alive = conv !== null && record !== undefined && ALIVE.has(record.state.k);
-  const lastTurn = record?.lastTurn?.id ?? null;
-
-  /** A new chat of the window, named to the machine; the words of why not when it was not made. */
-  const startChat = useCallback(async (): Promise<{ id: ConvId } | { failure: string }> => {
-    if (provider === null) return { failure: t('next.settings.agentIsle.noAgent') };
-    if (!defaultCwd) return { failure: t('next.newChat.noFolder') };
-    const id = await createConversation(machine, { where: { cwd: defaultCwd }, provider, model: null })
-      .conversation;
-    if (id === null) return { failure: t('next.settings.agentIsle.noChat') };
-    // Named before the first word reaches the agent: a chat the machine does not know asks the person's yes.
-    const named = await nameSettingsChat(machine, id);
-    const refused = refusalOf(named);
-    if (refused !== null) return { failure: refused };
-    setChats((was) => ({ machine, list: [...(was?.machine === machine ? was.list : []), id] }));
-    void renameConversation(machine, id, t('next.settings.agentIsle.chatTitle'));
-    return { id };
-  }, [provider, defaultCwd, machine]);
-
-  const onSend = useCallback(
-    async (words: string) => {
-      clearTimeout(closeTimer.current ?? undefined);
-      setClosing(false);
-      const journalBefore = journal === null ? null : new Set(journal.map((change) => change.id));
-      if (alive && conv) {
-        setAsked({ conv, turnBefore: lastTurn, journalBefore, failure: null });
-        sendMessage(machine, { conversationId: conv, text: words });
+  const onEvent = useCallback((event: TUIEvent) => {
+    switch (event.type) {
+      case UI_EVENT.go:
+        go(event.place);
         return;
-      }
-      setAsked({ conv: null, turnBefore: null, journalBefore, failure: null });
-      const chat = await startChat();
-      if ('failure' in chat) {
-        setAsked({ conv: null, turnBefore: null, journalBefore, failure: chat.failure });
+      case UI_EVENT.confirm:
+        setAnswer((was) => ({
+          ...was,
+          offer: {
+            key: event.key,
+            value: event.value,
+            title: event.title,
+            was: event.was,
+            now: event.label,
+            state: 'asked',
+            old: null,
+          },
+        }));
         return;
-      }
-      setAsked({ conv: chat.id, turnBefore: null, journalBefore, failure: null });
-      sendMessage(machine, {
-        conversationId: chat.id,
-        text: `${t('next.settings.agentIsle.brief')}\n\n${words}`,
-      });
-    },
-    [alive, conv, lastTurn, journal, machine, startChat],
-  );
+      case UI_EVENT.delta:
+        setAnswer((was) => ({ ...was, phase: ISLAND.answering, text: was.text + event.text }));
+        return;
+      case UI_EVENT.done:
+        setAnswer((was) => ({ ...was, phase: ISLAND.done, text: event.text || was.text }));
+        return;
+      case UI_EVENT.error:
+        setAnswer({
+          phase: ISLAND.failed,
+          text:
+            event.code === UI_NO_MODEL
+              ? t('next.settings.agentIsle.noModel')
+              : event.message || t('next.settings.agentIsle.failed'),
+          offer: null,
+          noModel: event.code === UI_NO_MODEL,
+        });
+        return;
+    }
+  }, []);
+
+  const onSubmit = useCallback(() => {
+    const query = read().trim();
+    if (query === '') return;
+    asking.current?.abort();
+    const ask = new AbortController();
+    asking.current = ask;
+    clearTimeout(closeTimer.current ?? undefined);
+    setClosing(false);
+    setAnswer({ ...QUIET, phase: ISLAND.thinking });
+    clearDraft(DRAFT);
+    void askUIAgent(
+      machine,
+      { query, page: window.location.pathname, map: harnesslyMap(), places: settingPlaces() },
+      ask.signal,
+      (event) => {
+        if (asking.current === ask) onEvent(event);
+      },
+    );
+  }, [machine, onEvent, read]);
+
+  const onStop = useCallback(() => {
+    asking.current?.abort();
+    setAnswer((was) => (was.text === '' ? QUIET : { ...was, phase: ISLAND.done }));
+    return Promise.resolve();
+  }, []);
 
   const onDismiss = useCallback(() => {
     setClosing(true);
     closeTimer.current = setTimeout(() => {
-      setAsked(null);
+      setAnswer(QUIET);
       setClosing(false);
     }, CLOSE_MS);
   }, []);
 
-  // What the journal got since the words went, an agent's and still the setting's newest (not taken back).
-  const made = useMemo((): IIslandChange[] => {
-    const before = asked?.journalBefore;
-    if (!before || journal === null) return [];
-    return journal
-      .filter((change: ISettingChange) => change.by === CHANGE_BY.agent && !before.has(change.id))
-      .flatMap((change) => {
-        const mark = changes.marks[change.key];
-        return mark
-          ? [
-              {
-                id: change.id,
-                title: change.title,
-                was: change.oldLabel,
-                now: change.newLabel,
-                busy: mark.busy,
-                onUndo: mark.onUndo,
-              },
-            ]
-          : [];
+  const { refresh } = changes;
+  const apply = useCallback(
+    (offer: IOffer) => {
+      setAnswer((was) => (was.offer ? { ...was, offer: { ...was.offer, state: 'making' } } : was));
+      void putSetting(machine, offer.key, offer.value).then((res) => {
+        const change = 'ok' in res && !isRefused(res.value) ? res.value : null;
+        setAnswer((was) => {
+          if (was.offer?.key !== offer.key) return was;
+          if (change === null)
+            return {
+              ...was,
+              phase: ISLAND.failed,
+              text: t('next.settings.agentIsle.notChanged'),
+              offer: null,
+            };
+          return { ...was, offer: { ...was.offer, state: 'made', old: change.old } };
+        });
+        if (change !== null) refresh();
       });
-  }, [asked, journal, changes.marks]);
-
-  let phase: TIslandPhase = ISLAND.idle;
-  let text = '';
-  let options: IIslandOption[] = [];
-  if (asked !== null && asked.failure !== null) {
-    phase = ISLAND.failed;
-    text = asked.failure;
-  } else if (asked !== null && asked.conv === null) {
-    // The chat is being made.
-    phase = ISLAND.thinking;
-  } else if (asked !== null && asked.conv !== null) {
-    const chat = asked.conv;
-    const turn = record?.lastTurn ?? null;
-    const answered = turn !== null && turn.id !== asked.turnBefore && turn.status !== 'live';
-    const state = record?.state.k;
-    phase = ISLAND.thinking;
-    if (state === 'waiting-question') {
-      phase = ISLAND.ask;
-      const question = gates.questions.find((q) => q.state.k === 'open');
-      const item = question?.items.length === 1 ? question.items[0] : undefined;
-      text = item?.question ?? t('next.settings.agentIsle.asks');
-      if (question && item && !item.multi)
-        options = item.options.map((option, i) => ({
-          label: option.label,
-          hint: option.description ?? '',
-          onPick: () => void answerQuestion(machine, chat, question.id, [{ i: 0, choices: [i] }]),
-        }));
-    } else if (state === 'waiting-permission') {
-      phase = ISLAND.ask;
-      text = t('next.settings.agentIsle.asks');
-    } else if (answered && turn.status === 'done') {
-      phase = ISLAND.done;
-      text = turn.snippet;
-    } else if (answered) {
-      phase = ISLAND.failed;
-      text = t('next.settings.agentIsle.failed');
-    } else if (state === 'launch-failed' || state === 'gone' || state === 'stopped') {
-      phase = ISLAND.failed;
-      text = t('next.settings.agentIsle.noChat');
-    }
-  }
-
-  const suggestions = useMemo(
-    () => [t('next.settings.agentIsle.suggest1'), t('next.settings.agentIsle.suggest2')],
-    [],
+    },
+    [machine, refresh],
   );
+
+  const undo = useCallback(
+    (offer: IOffer, old: string) => {
+      setAnswer((was) => (was.offer ? { ...was, offer: { ...was.offer, state: 'undoing' } } : was));
+      void putSetting(machine, offer.key, old).then((res) => {
+        const ok = 'ok' in res && !isRefused(res.value);
+        setAnswer((was) => {
+          if (was.offer?.key !== offer.key) return was;
+          if (!ok) return { ...was, offer: { ...was.offer, state: 'made' } };
+          return { ...was, text: t('next.settings.agentIsle.undone'), offer: null };
+        });
+        if (ok) refresh();
+      });
+    },
+    [machine, refresh],
+  );
+
+  const offer = answer.offer;
+  // The change waits for the person's word only when the agent has said all it had.
+  const confirm: IIslandConfirm | null =
+    offer && (offer.state === 'asked' || offer.state === 'making') && answer.phase === ISLAND.done
+      ? {
+          title: offer.title,
+          was: offer.was,
+          now: offer.now,
+          busy: offer.state === 'making',
+          onApply: () => apply(offer),
+          onReject: () => setAnswer((was) => ({ ...was, offer: null })),
+        }
+      : null;
+  const old = offer?.old ?? null;
+  const made: IIslandChange[] =
+    offer && old !== null
+      ? [
+          {
+            id: offer.key,
+            title: offer.title,
+            was: offer.was,
+            now: offer.now,
+            busy: offer.state === 'undoing',
+            onUndo: () => undo(offer, old),
+          },
+        ]
+      : [];
+  const action: IIslandAction | null = answer.noModel
+    ? {
+        label: t('next.settings.agentIsle.pickModel'),
+        onClick: () => goTo({ kind: ROUTE.settings, section: 'smart' }),
+      }
+    : null;
+
+  const busy = answer.phase === ISLAND.thinking || answer.phase === ISLAND.answering;
 
   return (
     <AgentIsland
-      phase={phase}
-      text={text}
+      phase={answer.phase}
+      text={answer.text}
       changes={made}
-      options={options}
+      confirm={confirm}
+      action={action}
       closing={closing}
-      suggestions={suggestions}
-      onSend={(words) => void onSend(words)}
       onDismiss={onDismiss}
-      onOpenChat={conv ? () => goTo({ kind: ROUTE.chat, id: conv }) : undefined}
+      onGo={go}
+      field={
+        <FieldFold
+          hint={typed.trim() || t('next.settings.agentIsle.placeholder')}
+          line={busy ? t('next.settings.agentIsle.thinking') : null}
+          model={modelLabel ?? t('next.settings.agentIsle.quickModel')}
+          limit={null}
+          working={busy}
+          onStop={() => void onStop()}
+          onMic={onMic ? () => onMic() : undefined}
+          empty={typed === ''}
+        >
+          <div className="hx-dock" data-screen>
+            <DockBar notice={voiceNotice} />
+            <ScreenField
+              plain
+              enterSends={enterSends}
+              value={typed}
+              onChange={setText}
+              onSubmit={onSubmit}
+              mode={busy ? 'working' : 'new'}
+              placeholder={t('next.settings.agentIsle.placeholder')}
+              onStop={busy ? onStop : noStop}
+              picker={null}
+              tools={
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon="layers"
+                  onClick={() => goTo({ kind: ROUTE.settings, section: 'smart' })}
+                >
+                  {modelLabel ?? t('next.settings.agentIsle.quickModel')}
+                </Button>
+              }
+              inputRef={field}
+              attachments={[]}
+              onFiles={nothing}
+              onRemoveAttachment={nothing}
+              onRetryAttachment={nothing}
+              recording={recording}
+              recognized={recognized}
+              caret={caret}
+              onMic={onMic}
+              onCancelRecording={onCancelRecording}
+              onFinishRecording={onFinishRecording}
+              maxText={limitsOf(machine).maxText}
+            />
+          </div>
+        </FieldFold>
+      }
     />
   );
 };
+
+const nothing = () => undefined;
 
 export default SettingsAgent;

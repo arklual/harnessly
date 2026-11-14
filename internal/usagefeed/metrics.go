@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 	"github.com/ly-solutions/harnessly/internal/usagereport"
@@ -31,6 +32,13 @@ type metrics struct {
 	// skillsListed adds up the skills the sessions' initial listings offered; skills are the distinct skills called.
 	skillsListed float64
 	skills       map[string]bool
+	// interrupts, denials and compactions are the counts of the events the statistics page shows; hours
+	// counts the person's prompts by the UTC hour of day, for the punch card.
+	interrupts, denials, compactions float64
+	hours                            [24]float64
+	// projects counts prompts per project name (calls when a transcript has no prompts), tasks are the task keys seen.
+	projects map[string]float64
+	tasks    map[string]bool
 }
 
 // add takes one transcript's facts.
@@ -64,6 +72,28 @@ func (m *metrics) add(fa *usagereport.Facts) {
 	errs := -float64(len(fa.Denials))
 	for _, t := range fa.Tools {
 		errs += t.Error
+	}
+	m.interrupts += float64(len(fa.Interrupts))
+	m.denials += float64(len(fa.Denials))
+	m.compactions += float64(len(fa.Compactions))
+	for _, p := range fa.Prompts {
+		if p.Ts > 0 {
+			m.hours[time.Unix(int64(p.Ts), 0).UTC().Hour()]++
+		}
+		m.countProject(fa, p.Project)
+	}
+	if len(fa.Prompts) == 0 {
+		for _, r := range fa.Messages {
+			m.countProject(fa, r.Project)
+		}
+	}
+	for _, k := range fa.Tasks {
+		if k != "" {
+			if m.tasks == nil {
+				m.tasks = map[string]bool{}
+			}
+			m.tasks[k] = true
+		}
 	}
 	m.toolCalls += float64(len(fa.Tools))
 	m.toolErrors += math.Max(0, errs)
@@ -106,6 +136,43 @@ func (m *metrics) add(fa *usagereport.Facts) {
 	}
 }
 
+func (m *metrics) countProject(fa *usagereport.Facts, i int) {
+	if i < 0 || i >= len(fa.Projects) || fa.Projects[i] == "" {
+		return
+	}
+	if m.projects == nil {
+		m.projects = map[string]float64{}
+	}
+	m.projects[fa.Projects[i]]++
+}
+
+// project is the project most of the session's prompts were in, "" for none.
+func (m *metrics) project() string {
+	best, n := "", 0.0
+	for k, v := range m.projects {
+		if v > n || (v == n && k < best) {
+			best, n = k, v
+		}
+	}
+	return best
+}
+
+// maxTaskKeys bounds the task keys one session tells the hub.
+const maxTaskKeys = 20
+
+// taskKeys are the session's task keys, sorted.
+func (m *metrics) taskKeys() []string {
+	out := make([]string, 0, len(m.tasks))
+	for k := range m.tasks {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	if len(out) > maxTaskKeys {
+		out = out[:maxTaskKeys]
+	}
+	return out
+}
+
 // mrKeys are the session's merge request keys, sorted; what is not a key (a pr-link to another host's pull request) is
 // counted in `mrs` but not told to the hub.
 func (m *metrics) mrKeys() []string {
@@ -138,6 +205,12 @@ func (m *metrics) values(skills bool) map[string]float64 {
 		"firstCtx": math.Round(m.firstCtx), "mrs": float64(len(m.prs)),
 		"cacheWrite5mTokens": math.Round(m.cacheWrite5m), "cacheWrite1hTokens": math.Round(m.cacheWrite1h),
 	}
+	v["interrupts"], v["denials"], v["compactions"] = m.interrupts, m.denials, m.compactions
+	for h, n := range m.hours {
+		if n > 0 {
+			v[fmt.Sprintf("h%02d", h)] = n
+		}
+	}
 	if p := percentile(m.gaps, 0.9); p > 0 {
 		v["waitP90Ms"] = math.Round(p * 1000)
 	}
@@ -162,7 +235,7 @@ func percentile(xs []float64, p float64) float64 {
 // signature says whether the metrics (and the merge request keys, when there are any) changed since the session was
 // last written. A session with no keys has the signature it had before keys existed, so only sessions that have some are
 // written once more.
-func signature(v map[string]float64, mrKeys []string) string {
+func signature(v map[string]float64, mrKeys []string, extra ...string) string {
 	keys := make([]string, 0, len(v))
 	for k := range v {
 		keys = append(keys, k)
@@ -171,6 +244,12 @@ func signature(v map[string]float64, mrKeys []string) string {
 	var b strings.Builder
 	for _, k := range keys {
 		fmt.Fprintf(&b, "%s=%g;", k, v[k])
+	}
+	for _, e := range extra {
+		if e != "" {
+			sum := sha256.Sum256([]byte(e))
+			fmt.Fprintf(&b, "x=%x;", sum[:8])
+		}
 	}
 	if len(mrKeys) > 0 {
 		sum := sha256.Sum256([]byte(strings.Join(mrKeys, "\n")))

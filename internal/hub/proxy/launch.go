@@ -21,7 +21,11 @@ import (
 // starts only on a machine that person connected, once the rollout switch is on for them.
 //
 //	POST /api/platform/launch   Authorization: Bearer <HUB_LAUNCH_TOKEN>
-//	{"person": "<email>", "prompt": "…", "provider": "claude|codex", "machineId": "…", "workspaceId": "…"}
+//	{"person": "<email>", "prompt": "…", "provider": "claude|codex", "machineId": "…", "workspaceId": "…",
+//	 "from": {"app": "…", "label": "…", "title": "…"}}
+//
+// from marks the chat as started by an app for the person: it sits in that app's folder of the sidebar, its prompt is
+// shown as the app's task, not as the person's words, until the person takes the chat.
 //
 // 201 carries what the runtime answered plus machineId, machineName and url (the conversation in the workspace). An
 // error carries `retryable: true` when nothing reached a machine, so the caller may ask again later.
@@ -39,11 +43,19 @@ const (
 )
 
 type launchBody struct {
-	Person      string  `json:"person"`
-	Prompt      string  `json:"prompt"`
-	Provider    string  `json:"provider"`
-	MachineID   string  `json:"machineId"`
-	WorkspaceID *string `json:"workspaceId"`
+	Person      string      `json:"person"`
+	Prompt      string      `json:"prompt"`
+	Provider    string      `json:"provider"`
+	MachineID   string      `json:"machineId"`
+	WorkspaceID *string     `json:"workspaceId"`
+	From        *launchFrom `json:"from,omitempty"`
+}
+
+// launchFrom is the app that starts the chat (the runtime cleans and caps it).
+type launchFrom struct {
+	App   string `json:"app"`
+	Label string `json:"label"`
+	Title string `json:"title,omitempty"`
 }
 
 // launchErr is an error answer of the launch route.
@@ -128,7 +140,13 @@ func (s *Service) launch(w http.ResponseWriter, r *http.Request) error {
 	}
 	value["machineId"] = m.ID
 	value["machineName"] = m.Name
-	if conv, _ := value["conversationId"].(string); conv != "" {
+	// The runtime answers the new conversation as {"id": …}; conversationId is what the hub's callers read.
+	conv, _ := value["conversationId"].(string)
+	if conv == "" {
+		conv, _ = value["id"].(string)
+	}
+	if conv != "" {
+		value["conversationId"] = conv
 		value["url"] = strings.TrimRight(s.cfg.PublicURL, "/") + workspaceBase + "/?c=" + url.QueryEscape("agent:"+m.ID+":"+conv)
 	}
 	httpx.WriteJSON(w, http.StatusCreated, value)
@@ -179,6 +197,9 @@ func (s *Service) launchStart(r *http.Request, u store.User, m store.Machine, b 
 	payload := map[string]any{"provider": b.Provider, "prompt": b.Prompt}
 	if b.WorkspaceID != nil {
 		payload["workspaceId"] = *b.WorkspaceID
+	}
+	if b.From != nil && strings.TrimSpace(b.From.App) != "" {
+		payload["from"] = b.From
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {

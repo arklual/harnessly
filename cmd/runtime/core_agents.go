@@ -126,6 +126,8 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 	profiles.Switches = map[string]providers.Switch{}
 	if gpt != nil {
 		profiles.Switches["gpt"] = gpt
+		// The same proxy takes Claude Code to the OpenAI-compatible providers the person added.
+		profiles.Proxy = gpt
 	}
 	router := modelRouter(c, profiles)
 	if router != nil {
@@ -290,7 +292,8 @@ func gptProxy(c coreAgentsConfig, store *providers.Store) *providers.GPTProxy {
 		return nil
 	}
 	return &providers.GPTProxy{Dir: filepath.Join(store.Dir, "gpt-proxy"), OnFile: filepath.Join(store.Dir, "gpt.on"),
-		Login: login, RelayBase: relay}
+		OffFile: filepath.Join(store.Dir, "gpt.off"),
+		Login:   login, RelayBase: relay, ExtRelayBase: codex.MCPURL(c.Port, providers.ExtRelayPath)}
 }
 
 // modelRouter is the switch of the auto profile over the store's GLM and Kimi Code keys, mounted on the runtime's port;
@@ -301,7 +304,8 @@ func modelRouter(c coreAgentsConfig, store *providers.Store) *providers.Router {
 		return nil
 	}
 	return &providers.Router{Dir: filepath.Join(store.Dir, "auto-router"), OnFile: filepath.Join(store.Dir, "auto.on"),
-		Base: base, Store: store}
+		OffFile: filepath.Join(store.Dir, "auto.off"),
+		Base:    base, Store: store}
 }
 
 // codexRelay is the runtime's relay as Codex is told about it: on the runtime's port, behind the CLI token Codex

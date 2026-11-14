@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/delivery"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -158,5 +159,31 @@ func TestMadeReadBudgetReadsBehind(t *testing.T) {
 	}
 	if _, _, _, ok := rt.ReadBudget(filepath.Join(t.TempDir(), "nope.jsonl"), "", 1); ok {
 		t.Fatal("a path that is not a transcript is complete")
+	}
+}
+
+// A file handed over, a dev server opened and the commit a push put on its server are things the chat made.
+func TestMadeKeepsFilesStandsAndPushedCommits(t *testing.T) {
+	file := delivery.Link(delivery.Info{Path: "/w/out/report.pdf", Name: "report.pdf", Mime: "application/pdf", Size: 12, SHA256: "ab"})
+	body := madePair(t, 1, "mcp__harnessly__deliver_file", map[string]any{"path": "/w/out/report.pdf"}, "Delivered "+file, false) +
+		madePair(t, 2, "Bash", map[string]any{"command": "harnessly open 4400"}, "opened http://localhost:4400/", false) +
+		madePair(t, 3, "Bash", map[string]any{"command": "git push origin HEAD:main"}, "To https://gitlab.example.com/acme/web.git\n   fc896f915..730b8d5d8  HEAD -> main\n", false) +
+		madePair(t, 4, "Bash", map[string]any{"command": "git push origin HEAD:main"}, "To https://gitlab.example.com/acme/web.git\n ! [rejected]        HEAD -> main (fetch first)\n", true)
+	rt, path := madeRoute(t, body)
+	res, found, failed := rt.Read(path, "")
+	if !found || failed {
+		t.Fatalf("found=%v failed=%v", found, failed)
+	}
+	got := madeLines(res)
+	for _, want := range []string{
+		`commit created "web 730b8d5d8" https://gitlab.example.com/acme/web/-/commit/730b8d5d8 03.500`,
+		`file created "report.pdf" /w/out/report.pdf 01.500`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("made has no %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "rejected") || strings.Count(got, "commit ") != 1 {
+		t.Errorf("a refused push made a commit:\n%s", got)
 	}
 }

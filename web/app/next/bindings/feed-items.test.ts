@@ -179,7 +179,8 @@ describe('a message the hook accepted before the transcript shows it', () => {
     const pending = builder.snapshot()?.filter((item) => item.kind === 'outgoing');
     expect(pending).toHaveLength(1);
     const first = pending?.[0];
-    expect(first?.kind === 'outgoing' && first.message.handed).toBe(true);
+    // The hook of a normal message is the agent starting its turn with it: sent, not «waiting its turn».
+    expect(first?.kind === 'outgoing' && first.message.handed).toBe(false);
 
     // The agent took it: a turn whose prompt has the same words (no client id on the entry) replaces the bubble.
     applyTurn(CONV, { ...turn, id: 'c:9#0', startedAt: 21 });
@@ -190,6 +191,15 @@ describe('a message the hook accepted before the transcript shows it', () => {
     expect(
       items?.filter((item) => item.kind === 'turn' && item.prompt?.text === 'also check the logs'),
     ).toHaveLength(1);
+  });
+
+  it("is «waiting its turn» only as a steer, which sits in the agent's own queue until its next step", () => {
+    loaded([]);
+    applyMessage('local', steered({ k: 'accepted', entryId: null }, 1));
+    const pending = new ItemsBuilder(CONV, 'local').snapshot()?.filter((item) => item.kind === 'outgoing');
+    expect(pending).toHaveLength(1);
+    const first = pending?.[0];
+    expect(first?.kind === 'outgoing' && first.message.handed).toBe(true);
   });
 
   it('is replaced by its entry by client id as well', () => {

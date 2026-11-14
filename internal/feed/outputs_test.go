@@ -176,17 +176,25 @@ func TestOpenedAddressIsItsOwnKind(t *testing.T) {
 	t.Setenv("RUNTIME_PLATFORM_HOST", "ai.example.com")
 	t.Setenv("RUNTIME_DOCS_READER_PATH", "/agents/docs/")
 	t.Setenv("RUNTIME_CLI_NAME", "acme")
+	t.Setenv("RUNTIME_TRACKER_URL", "https://tracker.example.com")
 	cases := map[string]string{
-		"harnessly open https://a.example.com/a/plan":                 "artifact",
-		"harnessly open https://a.example.com/b/flow?k=key1":          "artifact",
-		"harnessly open https://ai.example.com/agents/docs/plan":      "artifact",
-		"acme open https://ai.example.com/agents/docs/plan/":          "artifact",
-		"acme open https://stand-1.preview.example.com/adminpanel":    "stand",
-		"acme open http://localhost:4400/dev":                         "stand",
-		"acme open https://gitlab.example.com/g/p/-/merge_requests/5": "mr",
-		"acme open https://ai.example.com/agents/chat/42":             "",
-		"acme open https://example.org/page":                          "",
-		"other open https://stand-1.preview.example.com/":             "",
+		"acme open HRN-1426":                                             "task",
+		"harnessly open 'ABC-12'":                                        "task",
+		"acme open https://tracker.example.com/issue/HRN-1426":           "task",
+		"acme open https://tracker.example.com/agiles/1":                 "",
+		"acme open https://gitlab.example.com/g/p/-/commit/8ebd61a76b62": "commit",
+		"acme open https://github.com/o/r/commit/8ebd61a":                "commit",
+		"acme open https://github.com/o/r/pull/7":                        "mr",
+		"harnessly open https://a.example.com/a/plan":                    "artifact",
+		"harnessly open https://a.example.com/b/flow?k=key1":             "artifact",
+		"harnessly open https://ai.example.com/agents/docs/plan":         "artifact",
+		"acme open https://ai.example.com/agents/docs/plan/":             "artifact",
+		"acme open https://stand-1.preview.example.com/adminpanel":       "stand",
+		"acme open http://localhost:4400/dev":                            "stand",
+		"acme open https://gitlab.example.com/g/p/-/merge_requests/5":    "mr",
+		"acme open https://ai.example.com/agents/chat/42":                "",
+		"acme open https://example.org/page":                             "",
+		"other open https://stand-1.preview.example.com/":                "",
 	}
 	for cmd, want := range cases {
 		got := ""

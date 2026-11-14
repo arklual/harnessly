@@ -1,0 +1,9 @@
+{
+  "http": "glance",
+  "response": {
+    "convId": "tab-a1b2c3",
+    "lastUser": {"at": 1767000000000, "text": "почему деплой падает"},
+    "lastAgent": null,
+    "messages": 1
+  }
+}

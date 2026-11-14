@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { t } from '@/next/i18n';
 import { useDelayed as useDelayedFlag } from '@/next/ui/skeleton';
 import Spinner from '@/next/ui/spinner';
@@ -16,6 +16,10 @@ export interface IChatStageProps {
   leaving?: boolean;
   /** The chat opens from the start page: the field comes down from where the greeting held it. */
   fromHome?: boolean;
+  /** The chat on the stage: its feed and composer are drawn anew for another chat, and play their entrance again. The
+   *  stage itself and the right column (`side`) stay: the column changes its content in place (background-panel.tsx)
+   *  instead of vanishing with the stage and growing back from nothing. */
+  chatKey?: string | null;
 }
 
 /** The chat is not in memory yet: a ring and a line in the middle, as the feed shows them (feed-status.tsx), after 150 ms. */
@@ -34,18 +38,30 @@ const FeedLoading = () => {
 /** The first moments of a chat on the stage, while its messages rise; rows a scroll mounts later do not replay it. */
 const ENTER_MS = 900;
 
-const ChatStage = ({ children, paneOpen, side, missing, leaving, fromHome }: IChatStageProps) => {
+const ChatStage = ({
+  children,
+  paneOpen,
+  side,
+  missing,
+  leaving,
+  fromHome,
+  chatKey = null,
+}: IChatStageProps) => {
   const [entering, setEntering] = useState(true);
+  // Another chat comes in: its messages rise again (state adjusted during render, not in an effect).
+  const [enteredKey, setEnteredKey] = useState(chatKey);
+  if (enteredKey !== chatKey) {
+    setEnteredKey(chatKey);
+    setEntering(true);
+  }
   useEffect(() => {
+    if (!entering) return;
     const timer = setTimeout(() => setEntering(false), ENTER_MS);
     return () => clearTimeout(timer);
-  }, []);
+  }, [entering, enteredKey]);
   return (
     <div
-      className="hx-stage hx-enter"
-      data-enter="fade"
-      data-eb="200"
-      data-ed="700"
+      className="hx-stage"
       data-phase="chat"
       data-pane={paneOpen || undefined}
       data-leaving={leaving || undefined}
@@ -53,23 +69,25 @@ const ChatStage = ({ children, paneOpen, side, missing, leaving, fromHome }: ICh
       data-arrive={fromHome ? 'home' : undefined}
       data-side={side ? 'true' : undefined}
     >
-      {missing && (
-        <div className="hx-chatmiss" role="status">
-          <b>{t('next.chatStage.missing')}</b>
-          <span>{t('next.chatStage.missingNote')}</span>
-          <button type="button" className="hx-btn" data-size="sm" onClick={missing.onHome}>
-            {t('next.chatStage.toHome')}
-          </button>
-        </div>
-      )}
-      {!missing &&
-        (children ?? (
-          <div className="hx-feed">
-            <div className="hx-feed__inner">
-              <FeedLoading />
-            </div>
+      <Fragment key={chatKey ?? ''}>
+        {missing && (
+          <div className="hx-chatmiss" role="status">
+            <b>{t('next.chatStage.missing')}</b>
+            <span>{t('next.chatStage.missingNote')}</span>
+            <button type="button" className="hx-btn" data-size="sm" onClick={missing.onHome}>
+              {t('next.chatStage.toHome')}
+            </button>
           </div>
-        ))}
+        )}
+        {!missing &&
+          (children ?? (
+            <div className="hx-feed">
+              <div className="hx-feed__inner">
+                <FeedLoading />
+              </div>
+            </div>
+          ))}
+      </Fragment>
       {side}
     </div>
   );

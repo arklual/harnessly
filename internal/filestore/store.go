@@ -15,6 +15,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -33,6 +34,9 @@ type Store struct {
 	meta   RoomMeta
 	blobs  BlobStore
 	policy Policy
+
+	// after is told of every write that changed a file (Observe); nil is nobody.
+	after atomic.Pointer[func(path string, deleted bool)]
 
 	sealMu    sync.Mutex
 	sealCache map[string]KitSeal
@@ -180,7 +184,23 @@ func (s *Store) Commit(ctx context.Context, req CommitRequest, machine string) (
 		}
 		return nil
 	}
-	return s.meta.Apply(ctx, req, machine, time.Now().UnixMilli(), verify)
+	cur, conflict, err := s.meta.Apply(ctx, req, machine, time.Now().UnixMilli(), verify)
+	if err == nil && !conflict && cur != nil {
+		if f := s.after.Load(); f != nil {
+			(*f)(req.Path, req.Deleted)
+		}
+	}
+	return cur, conflict, err
+}
+
+// Observe makes fn hear of every committed write (a path and whether it was deleted), after it is made and with no
+// lock held; the search index of HRN-1420 keeps itself up to date from it. fn must not block. nil stops it.
+func (s *Store) Observe(fn func(path string, deleted bool)) {
+	if fn == nil {
+		s.after.Store(nil)
+		return
+	}
+	s.after.Store(&fn)
 }
 
 // Changes returns the latest revision of every file changed after since, oldest first, at most limit of them.

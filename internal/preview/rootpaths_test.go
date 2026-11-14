@@ -161,10 +161,16 @@ func TestClaimPathPrefix(t *testing.T) {
 	if c, ok := parseClaim(claim("https://h.example/agents/__pv/1"+k, "/agents/__pv/1"+k), true); !ok || c.PathPrefix != "/agents/__pv/1"+k {
 		t.Fatalf("a slot by path: %+v %v", c, ok)
 	}
+	// A site (a stand) in a site slot goes by path too.
+	site := obj("sub", "u", "target", obj("kind", "url", "origin", "https://stand-1.preview.example.com"),
+		"slotOrigin", "https://h.example/agents/__pv/7"+k, "portSlots", obj(), "pathPrefix", "/agents/__pv/7"+k)
+	if c, ok := parseClaim(site, true); !ok || c.PathPrefix != "/agents/__pv/7"+k || c.Target.Kind != "url" {
+		t.Fatalf("a site by path: %+v %v", c, ok)
+	}
 	for name, o := range map[string]*jsvalue.Object{
 		"prefix not at the end of the origin": claim("https://h.example/agents/__pv/1"+k, "/agents/__pv/2"+k),
 		"path without a prefix":               claim("https://h.example/agents/__pv/1"+k, ""),
-		"a slot past 6":                       claim("https://h.example/__pv/7"+k, "/__pv/7"+k),
+		"a slot past 8":                       claim("https://h.example/__pv/9"+k, "/__pv/9"+k),
 		"no key":                              claim("https://h.example/agents/__pv/1", "/agents/__pv/1"),
 	} {
 		if _, ok := parseClaim(o, true); ok {

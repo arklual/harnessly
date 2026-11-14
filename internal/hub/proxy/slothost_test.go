@@ -296,7 +296,7 @@ func TestSlotRemovedMemberIsRefused(t *testing.T) {
 func TestSlotOpenRefusesWhatIsNotASlotAndOtherMachines(t *testing.T) {
 	f := slotSetup(t)
 	f.switchOn(t, "")
-	for _, p := range []string{"/m/" + f.id + "/api/v2/agents", "/x", "http://evil.example/m/" + f.id + "/__pv/" + slotKey + "/", f.path("/../x"), "/m/" + f.id + "/__pv/7-" + strings.Repeat("0a", 16) + "/"} {
+	for _, p := range []string{"/m/" + f.id + "/api/v2/agents", "/x", "http://evil.example/m/" + f.id + "/__pv/" + slotKey + "/", f.path("/../x"), "/m/" + f.id + "/__pv/9-" + strings.Repeat("0a", 16) + "/"} {
 		if r, _, _ := f.open(t, f.owner, p); r.Code == 200 {
 			t.Errorf("%q was opened", p)
 		}
@@ -347,11 +347,11 @@ func TestSlotHostsListIsForAdministratorsAndMatchesTheRealHosts(t *testing.T) {
 		t.Fatalf("unknown account: %s", r)
 	}
 	r, hosts := list(f.owner, "Other@Example.com")
-	if r.Code != 200 || len(hosts) != 6 {
+	if r.Code != 200 || len(hosts) != 8 {
 		t.Fatalf("list: %s %v", r, hosts)
 	}
 	bare := func(h string) string { return strings.Split(h, ":")[0] }
-	if !strings.HasSuffix(bare(hosts[0]), "-1."+slotDomain) || !strings.HasSuffix(bare(hosts[5]), "-6."+slotDomain) {
+	if !strings.HasSuffix(bare(hosts[0]), "-1."+slotDomain) || !strings.HasSuffix(bare(hosts[7]), "-8."+slotDomain) {
 		t.Errorf("hosts: %v", hosts)
 	}
 	_, _, host := f.open(t, f.other, f.path("/x"))

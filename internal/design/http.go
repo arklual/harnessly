@@ -33,6 +33,10 @@ type API struct {
 	// UploadFile is the file of a finished chunked upload by its id (nil while none is wired): a kit file too big for one
 	// request arrives that way.
 	UploadFile func(id string) (path string, ok bool)
+	// OpenPane asks the right pane of the chat a tmux session belongs to (and the panes of the chats it was delegated
+	// by) to show a design, on a board ("" for the one it shows): as `open design` does, kept with the chat,
+	// behind with a dot. False when the session is no chat's or the pane cannot be asked. Nil while the core does not run.
+	OpenPane func(session, ref, board string) bool
 	// PlatformAPI prefixes the platform's routes.
 	PlatformAPI string
 	// Launch starts an agent conversation (nil while the core does not run).

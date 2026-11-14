@@ -2,7 +2,7 @@
 // folder. A folder is a shelf, not a right: nothing here changes who sees a project. Tiles and crumbs are drop places
 // for the cards (`data-drop-folder`, use-card-drag.ts).
 import { Menu } from '@base-ui/react/menu';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { IFolder } from '@/next/features/designly/api';
 import { folderChoices } from '@/next/features/designly/library-model';
 import { Modal } from '@/next/features/designly/sdk/ui';
@@ -19,17 +19,24 @@ interface ICrumbsProps {
   folders: readonly IFolder[];
   current: string;
   onOpen: (id: string) => void;
+  /** The crumbs take dropped cards; not in the kits' folder, which holds no projects. */
+  drops?: boolean;
 }
 
 /** «Библиотека › Работа › Архив»: every crumb opens its folder and takes a drop. */
-export const Crumbs = ({ folders, current, onOpen }: ICrumbsProps) => {
+export const Crumbs = ({ folders, current, onOpen, drops = true }: ICrumbsProps) => {
   const here = folders.find((f) => f.id === current);
   const chain = [here?.parent ? folders.find((f) => f.id === here.parent) : undefined, here].filter(
     (f): f is IFolder => f !== undefined,
   );
   return (
     <nav className="hx-dl__crumbs" aria-label={t('next.designly.folderPath')}>
-      <button type="button" className="hx-dl__crumb" data-drop-folder="" onClick={() => onOpen('')}>
+      <button
+        type="button"
+        className="hx-dl__crumb"
+        data-drop-folder={drops ? '' : undefined}
+        onClick={() => onOpen('')}
+      >
         <Icon name="layers" size="sm" />
         {t('next.designly.library')}
       </button>
@@ -40,7 +47,7 @@ export const Crumbs = ({ folders, current, onOpen }: ICrumbsProps) => {
             type="button"
             className="hx-dl__crumb"
             aria-current={i === chain.length - 1 ? 'page' : undefined}
-            data-drop-folder={f.id}
+            data-drop-folder={drops ? f.id : undefined}
             onClick={() => onOpen(f.id)}
           >
             {f.name}
@@ -95,8 +102,14 @@ const FolderTile = ({ folder, onOpen, onRename, onDelete }: ITileProps) => {
   );
 };
 
-export const FolderTiles = ({ folders, ...rest }: { folders: IFolder[] } & Omit<ITileProps, 'folder'>) => (
+/** The row of folders; `lead` is a tile of the library's own before the person's (the kits' folder). */
+export const FolderTiles = ({
+  folders,
+  lead,
+  ...rest
+}: { folders: IFolder[]; lead?: ReactNode } & Omit<ITileProps, 'folder'>) => (
   <div className="hx-dl__folders">
+    {lead}
     {folders.map((f) => (
       <FolderTile key={f.id} folder={f} {...rest} />
     ))}

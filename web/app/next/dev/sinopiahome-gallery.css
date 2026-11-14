@@ -1,0 +1,7 @@
+/* The gallery of Sinopia's home: the home alone, the window's height. */
+.hx-gallery-sh {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--hx-bg-window);
+}

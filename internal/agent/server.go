@@ -60,6 +60,10 @@ func (a *Agent) handler(w http.ResponseWriter, r *http.Request) {
 		a.designEventRoute(w, r)
 		return
 	}
+	if a.localToken != "" && r.Method == http.MethodPost && r.URL.RequestURI() == "/projects/event" {
+		a.projectsEventRoute(w, r)
+		return
+	}
 	if a.localToken != "" && r.Method == http.MethodPost && r.URL.RequestURI() == "/apps/event" {
 		a.appsEventRoute(w, r)
 		return

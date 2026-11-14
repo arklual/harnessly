@@ -1,4 +1,4 @@
-<!-- {{tag}}-library-guide v11 -->
+<!-- {{tag}}-library-guide v13 -->
 # Claude Design projects: how to edit them
 
 This folder is the shared library of the whole team's designs (on {{host}} it is `{{shared}}`): the agents of several
@@ -48,6 +48,19 @@ Agents of several people edit this folder, often at once. To avoid overwriting e
   (`window.{{kit}}`, README in `project/_ds/*/`).
 - The neighbouring projects of this folder are working examples: the same boards, the same kit. Look at the nearest one
   before drawing from scratch.
+
+## Links between pages
+
+A page links to another page of the project with a plain link, and the Sinopia shell switches the page, the address,
+the properties panel, «States», the view and the agent's context:
+
+- `<a href="./Checkout.dc.html">`: a relative link to the board's file; it works outside Sinopia too.
+- `<a href="sinopia:page/Checkout">`: by the page's title or file name, for when the file may be renamed.
+- The target's props go in the query: `?variant=Mobile&loading=true` (names from its `data-props`, over the defaults);
+  a block goes in the hash: `#pay` (its `id` or `data-block`). A phone page (a narrow `$preview`) is shown in a phone.
+- In a presentation a link turns to the slide; in a video links do nothing. While a block is being picked a click
+  picks it, ⌘/Ctrl opens a new tab, and while a slide is edited Alt+click follows the link. A link to a page that is not
+  there is not followed, and Sinopia says so.
 
 ## The board format: do not break it
 
@@ -106,6 +119,17 @@ a deck editor with the slides beside the chat, speaker notes, comments, a show m
 A video is a presentation-shaped project: every board is one scene. Before you touch one, read its rules: `{{cli}} design video guide`
 (the basics), then what the task needs: `motion` (animation), `engines` (canvas, shaders), `director` (running the work), `check` (what to
 verify). They are read on demand so that other projects do not carry them.
+
+## Handing a page or the project over as a file
+
+The person asks for "the HTML of this page" or "the project as a zip": do not build the file by hand and do not write its path
+in text:
+
+- Which page the person has open: `{{cli}} design state <id>` (the board in `shown`).
+- One page as one HTML file that opens anywhere (styles, fonts and pictures inside): `{{cli}} design export <id> "<page>"`.
+  The project as an archive: `{{cli}} design export <id> --zip` (the `project/` folder) or `--all` (with `meta/`). The command
+  hands the file to the person itself: it shows as a card in the chat and downloads.
+- Any other file the person asks to download or be sent: hand it over with `deliver_file` (or `{{cli}} deliver <path>`).
 
 ## Check it yourself before you answer
 

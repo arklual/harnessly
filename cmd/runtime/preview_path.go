@@ -254,15 +254,19 @@ func (s *previewSlots) openByPath(d deps, r *http.Request, app *url.URL, slot in
 	refuse := func(status int, msg string) (int, any, http.Header) {
 		return answerJSON(r, status, previewError{msg}, previewNoStore())
 	}
-	// Every slot by path shares the page's origin: only the person's own servers, never a site of the outside world.
-	if target.Kind != "port" || slot > previewPortSlots {
+	// Every slot by path shares the page's origin, and its answers carry the sandbox without allow-same-origin: the page
+	// runs on an opaque origin, so a site (a stand, slots 7–8) is as harmless there as a dev server (slots 1–6).
+	if target.Kind == "port" && slot > previewPortSlots || target.Kind == "url" && slot <= previewPortSlots {
 		return refuse(400, "invalid slot")
 	}
 	key := newPathKey()
 	origin := app.Scheme + "://" + app.Host + pathPrefix(slot, key)
-	portSlots := map[string]string{strconv.Itoa(target.Port): origin}
-	for _, n := range neighbours {
-		portSlots[strconv.Itoa(n)] = origin + devtools.NeighbourPrefix + strconv.Itoa(n)
+	portSlots := map[string]string{}
+	if target.Kind == "port" {
+		portSlots[strconv.Itoa(target.Port)] = origin
+		for _, n := range neighbours {
+			portSlots[strconv.Itoa(n)] = origin + devtools.NeighbourPrefix + strconv.Itoa(n)
+		}
 	}
 	sub := "user"
 	if c := d.Claims(r); c != nil {

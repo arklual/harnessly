@@ -251,3 +251,18 @@ func TestAKeyInTheEnvironmentIsASignIn(t *testing.T) {
 		t.Errorf("account %+v", got.Account)
 	}
 }
+
+// A managed machine keeps Claude's sign-in in its auth folder, not in ~/.claude: the account is signed in all the same
+// (the page said «Не подключено» beside the limits of that sign-in).
+func TestClaudeSignInFromTheAuthFolder(t *testing.T) {
+	m := newMachine(t)
+	m.st.cfg.AuthDir = filepath.Join(m.home, "auth")
+	if m.get(wire.ProviderClaude).Account.SignedIn {
+		t.Fatal("signed in with no credentials anywhere")
+	}
+	m.write("auth/.credentials.json", `{"claudeAiOauth":{"accessToken":"sk-ant-oat-secret","subscriptionType":"max"}}`)
+	got := m.get(wire.ProviderClaude).Account
+	if !got.SignedIn || got.Method == nil || *got.Method != wire.AccountSubscription || got.Plan == nil || *got.Plan != "Max" {
+		t.Errorf("account %+v", got)
+	}
+}

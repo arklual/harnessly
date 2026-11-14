@@ -518,6 +518,7 @@ describe('Composer limits chip', () => {
       updatedAt: null,
       plan: null,
       error: null,
+      rejected: false,
     },
     spend: null,
   } as const;
@@ -652,5 +653,24 @@ describe('Composer with attached places', () => {
     expect(onSubmit).toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Remove ABC-1' }));
     expect(onRemoveRef).toHaveBeenCalledWith(expect.objectContaining({ id: 'ABC-1' }));
+  });
+});
+
+describe('a picture pasted into the field', () => {
+  const png = (name: string) => new File([new Uint8Array([1, 2, 3])], name, { type: 'image/png' });
+  const paste = (field: HTMLElement, files: File[]) => {
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', { value: { files, getData: () => '' } });
+    field.dispatchEvent(event);
+    return event;
+  };
+
+  it('is one attachment when the clipboard holds it twice', async () => {
+    const onFiles = vi.fn();
+    render(<Composer {...props({ onFiles })} />);
+    const event = paste(screen.getByRole('textbox'), [png('image.png'), png('Screenshot.png')]);
+    expect(event.defaultPrevented).toBe(true);
+    await waitFor(() => expect(onFiles).toHaveBeenCalledTimes(1));
+    expect(onFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['image.png']);
   });
 });

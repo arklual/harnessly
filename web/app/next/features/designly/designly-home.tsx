@@ -13,8 +13,6 @@ import {
   useRef,
   useState,
   type ChangeEvent,
-  type ClipboardEvent,
-  type KeyboardEvent,
   type RefObject,
 } from 'react';
 import { Menu } from '@base-ui/react/menu';
@@ -45,32 +43,29 @@ import {
 } from '@/next/features/designly/library-model';
 import { useCardDrag } from '@/next/features/designly/use-card-drag';
 import type { IFolder } from '@/next/features/designly/api';
-import { usePresence, usePresentFlag } from '@/next/ui/presence';
-import AttachmentThumb from '@/next/ui/attachment-thumb';
-import { useFileDrop } from '@/next/features/composer/use-file-drop';
+import { usePresentFlag } from '@/next/ui/presence';
 import Icon from '@/next/ui/icon';
 import CreatePanel, { DsChoice } from '@/next/features/designly/create-panel';
 import { DeckFound, deckSettingsLabel, useDeckStart } from '@/next/features/designly/deck/deck-start';
 import DeckSettings from '@/next/features/designly/deck/deck-settings';
-import { isPptx } from '@/next/features/designly/deck/create-settings';
 import VideoSettings, { videoSettingsLabel } from '@/next/features/designly/video/video-settings';
 import {
   DEFAULT_VIDEO_SETTINGS,
   toWireVideo,
   type IVideoCreateSettings,
 } from '@/next/features/designly/video/video-create-settings';
-import { RecordingTime, RecordingWave } from '@/next/features/composer/composer';
-import ModelPicker, { type IModelPickerProps } from '@/next/features/composer/model-picker';
+import ScreenField from '@/next/features/composer/one-field';
+import type { IModelPickerProps } from '@/next/features/composer/model-picker';
+import type { LimitsView } from '@/next/features/limits/model';
+import { DEFAULT_LIMITS } from '@/next/stores/machines';
 import type { Recording } from '@/next/features/composer/types';
 import type { IUploads } from '@/next/bindings/use-uploads';
-import { RoundButton } from '@/next/ui/button';
-import { useFieldEdges, useFitField } from '@/next/ui/use-fit-field';
 import { useStableFn } from '@/next/ui/use-stable-fn';
 import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
 import Swap from '@/next/ui/swap';
 import { HSCROLL_DIR, useHScroll } from '@/next/ui/use-h-scroll';
 import type { IDesignSystem } from '@/next/features/designly/api';
-import KitShelf, { type IKitShelf } from '@/next/features/designly/kit/kit-shelf';
+import KitShelf, { KitsFolderTile, type IKitShelf } from '@/next/features/designly/kit/kit-shelf';
 import {
   DESIGN_SCOPE,
   DESIGN_SCOPES,
@@ -151,6 +146,10 @@ export interface IDesignlyCompose {
   picker: IModelPickerProps | null;
   /** Dictation into the brief; without onMic the microphone is not offered. */
   voice: IDesignlyVoice;
+  /** The limits chip of the picked agent, as in the chat; absent where they are not known. */
+  limits?: LimitsView | null;
+  /** The longest brief the machine takes. */
+  maxText?: number;
   /** The document types installed apps add; a tile each. null while they load or when the machine lists none. */
   appKinds?: readonly IAppKind[] | null;
   /** A new document of an app's type, named by the brief typed so far; resolves once it is made, rejects (the caller says why). */
@@ -175,7 +174,8 @@ export interface IDesignlyHomeProps {
   /** Where a project is started; null is the library alone (the right pane's: its chat is the field). */
   compose: IDesignlyCompose | null;
   /** What the machine lacks for designs, with the command that fixes it; null when nothing is missing. */
-  /** The installed kits, shown above the library's root; absent where kits are not offered. */
+  /** The installed kits in the folder «UI-киты», first at the library's root; absent where kits are
+   * not offered. */
   kits?: IKitShelf;
   /** Moving projects with their kits as one file; absent where the machine cannot. */
   pack?: IPackTransfer;
@@ -191,13 +191,16 @@ export interface IPackTransfer {
 
 export interface IDesignlyVoice {
   recording: Recording | null;
-  onMic?: () => void;
+  onMic?: (at?: number) => void;
   onCancel: () => void;
   onFinish: () => void;
+  /** How much of the field the voice has written (the composer's own props). */
+  recognized?: number;
+  caret?: number | null;
 }
 
-/** The recording bar's exit, as long as hx-recbar-out in composer.css. */
-const REC_EXIT_MS = 180;
+const DEFAULT_MAX_TEXT = DEFAULT_LIMITS.maxText;
+const noStop = () => Promise.resolve();
 
 /** The cards move to their new places over this long, as in the design (dlFlip). */
 const FLIP_MS = 620;
@@ -265,6 +268,9 @@ const emptyKey = (scope: TDesignScope, searching: boolean) => {
 };
 
 /** Six cards of the grid's size, so the cards take their places without the page moving. */
+/** The kits' folder in the crumbs: not an id the machine gives a folder of the person's. */
+const KITS_FOLDER = ':kits';
+
 const LibrarySkeleton = () => (
   <div className="hx-dl__grid hx-dl__grid--sk" role="status" aria-label={t('next.designly.loading')}>
     {[0, 1, 2, 3, 4, 5].map((i) => (
@@ -294,6 +300,8 @@ const Hero = ({
   uploads,
   picker,
   voice,
+  limits = null,
+  maxText = DEFAULT_MAX_TEXT,
   appKinds = null,
   onAppKind,
   inputRef,
@@ -305,10 +313,8 @@ const Hero = ({
   const [videoSettings, setVideoSettings] = useState<IVideoCreateSettings>(DEFAULT_VIDEO_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [box, setBox] = useState<HTMLElement | null>(null);
-  const { value: bar, state: barState } = usePresence(voice.recording, REC_EXIT_MS);
   const [sending, setSending] = useState(false);
   const startsRef = useRef<HTMLDivElement>(null);
-  const filePicker = useRef<HTMLInputElement>(null);
   const hsStep = useHScroll(startsRef);
   const templatePicker = useRef<HTMLInputElement>(null);
   const deck = useDeckStart({
@@ -319,8 +325,6 @@ const Hero = ({
     active: kind === DESIGN_KIND.slides,
     templatePicker,
   });
-  useFitField(inputRef, brief);
-  useFieldEdges(inputRef, brief);
 
   const offered = systems ?? [];
   const kit = onKitAdded ? { machine, onAdded: onKitAdded } : undefined;
@@ -360,158 +364,58 @@ const Hero = ({
       .catch(() => undefined)
       .finally(() => setSending(false));
   };
-  const onKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-      event.preventDefault();
-      send();
-    }
-  };
   const pickFiles = (event: ChangeEvent<HTMLInputElement>) => {
     deck.addFiles([...(event.target.files ?? [])]);
     event.target.value = '';
-  };
-  const dropping = useFileDrop(deck.addFiles);
-  const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
-    const files = [...event.clipboardData.files];
-    if (files.length === 0) return;
-    event.preventDefault();
-    deck.addFiles(files);
   };
 
   return (
     <div className="hx-dl__hero">
       <div className="hx-dl__title">{t('next.designly.title')}</div>
       <div className="hx-dl__sub">{t('next.designly.sub')}</div>
-      <div className="hx-dl__composer" ref={setBox} data-drop={dropping || undefined}>
-        {dropping && (
-          <div className="hx-drop" aria-hidden="true">
-            <Icon name="upload" />
-            <span>{t('next.composer.dropHere')}</span>
-          </div>
-        )}
-        <textarea
-          ref={inputRef}
-          className="hx-dl__input"
-          rows={2}
+      {/* The chat's own field (HRN-1362): files by «+», a drop or a paste, the model, the limits, the voice. */}
+      <div className="hx-dock hx-dl__composer" data-screen ref={setBox} data-creating={busy || undefined}>
+        <input ref={templatePicker} type="file" accept=".pptx" hidden tabIndex={-1} onChange={pickFiles} />
+        <ScreenField
           value={brief}
-          aria-label={t('next.designly.brief')}
+          onChange={onBrief}
+          onSubmit={send}
+          mode="new"
           placeholder={t(`next.designly.hint.${kind}`)}
-          disabled={sending}
-          onChange={(event) => onBrief(event.target.value)}
-          onKeyDown={onKey}
-          onPaste={onPaste}
+          onStop={noStop}
+          picker={picker}
+          attachments={uploads.attachments}
+          onFiles={deck.addFiles}
+          onRemoveAttachment={(id) => {
+            const file = uploads.attachments.find((a) => a.id === id);
+            deck.removeFile(id, file?.name ?? '');
+          }}
+          onRetryAttachment={uploads.onRetry}
+          tools={
+            hasSettings && (
+              <button
+                type="button"
+                className="hx-deck-chip"
+                data-on={settingsOpen || label !== t('next.deck.create.settingsChip') ? '1' : '0'}
+                aria-expanded={settingsOpen}
+                aria-haspopup="dialog"
+                onClick={() => setSettingsOpen(true)}
+              >
+                <Icon name="sliders-horizontal" size="sm" />
+                <span className="hx-deck-chip__text">{label}</span>
+              </button>
+            )
+          }
+          recording={voice.recording}
+          onMic={voice.onMic}
+          recognized={voice.recognized}
+          caret={voice.caret}
+          onCancelRecording={voice.onCancel}
+          onFinishRecording={voice.onFinish}
+          limits={limits}
+          maxText={maxText}
+          inputRef={inputRef}
         />
-        {uploads.attachments.length > 0 && (
-          <div className="hx-deck-files">
-            {uploads.attachments.map((a) => {
-              const template = isDeck && isPptx(a.name);
-              const read = deck.reads.find((r) => r.name === a.name);
-              return (
-                <span key={a.id} className="hx-deck-file" data-state={a.status} title={a.error ?? undefined}>
-                  {a.kind === 'image' && a.status === 'ready' ? (
-                    <AttachmentThumb item={a} className="hx-deck-file__thumb" />
-                  ) : (
-                    <Icon
-                      name={a.status === 'uploading' ? 'loader-circle' : template ? 'layers' : 'file-text'}
-                      size="sm"
-                    />
-                  )}
-                  {a.name}
-                  {template && read?.state === 'ok' && <small>{t('next.deck.create.styleChip')}</small>}
-                  {a.status === 'error' && (
-                    <button
-                      type="button"
-                      aria-label={t('next.composer.retryAttachment', { name: a.name })}
-                      onClick={() => uploads.onRetry(a.id)}
-                    >
-                      <Icon name="rotate-ccw" size="sm" />
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    aria-label={t('next.composer.removeAttachment', { name: a.name })}
-                    onClick={() => deck.removeFile(a.id, a.name)}
-                  >
-                    <Icon name="x" size="sm" />
-                  </button>
-                </span>
-              );
-            })}
-          </div>
-        )}
-        {bar && (
-          <div className="hx-dl__bar hx-recbar" data-state={barState}>
-            <RoundButton
-              icon="x"
-              label={t('next.composer.cancelRecording')}
-              variant="ghost"
-              size="sm"
-              onClick={voice.onCancel}
-            />
-            <span className="hx-recbar__live">
-              <span className="hx-recbar__dot" />
-              {bar.busy ? (
-                <span className="hx-recbar__time">{t('next.voice.recognizing')}</span>
-              ) : (
-                <RecordingTime startedAt={bar.startedAt} />
-              )}
-            </span>
-            <RecordingWave level={bar.level} listening={!bar.busy} />
-            <RoundButton
-              icon="square"
-              iconSize="sm"
-              label={t('next.composer.finishRecording')}
-              className="hx-recbar__stop"
-              busy={bar.busy}
-              disabled={bar.busy}
-              onClick={voice.onFinish}
-            />
-          </div>
-        )}
-        <div className="hx-dl__bar" hidden={bar !== null}>
-          <input ref={filePicker} type="file" multiple hidden tabIndex={-1} onChange={pickFiles} />
-          <input ref={templatePicker} type="file" accept=".pptx" hidden tabIndex={-1} onChange={pickFiles} />
-          <button
-            type="button"
-            className="hx-btn"
-            data-variant="ghost"
-            data-size="sm"
-            data-shape="icon"
-            aria-label={t('next.designly.attach')}
-            onClick={() => filePicker.current?.click()}
-          >
-            <Icon name="paperclip" />
-          </button>
-          {hasSettings && (
-            <button
-              type="button"
-              className="hx-deck-chip"
-              data-on={settingsOpen || label !== t('next.deck.create.settingsChip') ? '1' : '0'}
-              aria-expanded={settingsOpen}
-              aria-haspopup="dialog"
-              onClick={() => setSettingsOpen(true)}
-            >
-              <Icon name="sliders-horizontal" size="sm" />
-              <span className="hx-deck-chip__text">{label}</span>
-            </button>
-          )}
-          <span className="hx-spacer" />
-          {picker && (
-            <div className="hx-dl__model">
-              <ModelPicker {...picker} />
-            </div>
-          )}
-          {voice.onMic && <RoundButton icon="mic" label={t('next.composer.voice')} onClick={voice.onMic} />}
-          <RoundButton
-            icon="arrow-up"
-            variant="accent"
-            label={t('next.designly.send')}
-            keys={['↵']}
-            busy={busy}
-            disabled={busy}
-            onClick={send}
-          />
-        </div>
       </div>
       {isDeck && deck.styled && deck.style && <DeckFound style={deck.style} />}
       <div className="hx-hs">
@@ -882,6 +786,8 @@ const DesignlyHome = ({
   const [filters, setFilters] = useState<ILibraryFilters>(NO_FILTERS);
   // The folder open ('' is the library itself), the trash, the selection and the dialogs.
   const [folder, setFolder] = useState('');
+  // The kits' folder open: it is the library's own, not one of the person's folders.
+  const [kitsOpen, setKitsOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -953,7 +859,9 @@ const DesignlyHome = ({
     return sortCards(list, filters.sort);
   }, [cards, scope, q, filters, now, searching, organizer, here]);
   const systems = useMemo(() => systemsOf(cards ?? []), [cards]);
-  const subfolders = !searching && !trashOpen ? childrenOf(folders, here) : [];
+  const inKits = kits !== undefined && kitsOpen && !searching && !trashOpen;
+  const subfolders = !searching && !trashOpen && !inKits ? childrenOf(folders, here) : [];
+  const kitsTile = kits !== undefined && !searching && !trashOpen && !inKits && here === '';
   const projectIds = useMemo(
     () => new Set((cards ?? []).filter((c) => !c.appKind).map((c) => c.id)),
     [cards],
@@ -974,6 +882,7 @@ const DesignlyHome = ({
         setScope(DESIGN_SCOPE.all);
         setTrashOpen(false);
         setFolder('');
+        setKitsOpen(false);
         setSelecting(false);
         setSelected(new Set());
       },
@@ -983,6 +892,7 @@ const DesignlyHome = ({
         setScope(DESIGN_SCOPE.all);
         setTrashOpen(false);
         setFolder('');
+        setKitsOpen(false);
         await restoreNow();
       },
     });
@@ -1097,6 +1007,11 @@ const DesignlyHome = ({
   });
   const openFolder = (id: string) => {
     setFolder(id);
+    setKitsOpen(false);
+    stopSelecting();
+  };
+  const openKits = () => {
+    setKitsOpen(true);
     stopSelecting();
   };
   const newFolder = () => {
@@ -1180,25 +1095,36 @@ const DesignlyHome = ({
           />
         )}
 
-        {!trashOpen && kits && !searching && here === '' && <KitShelf {...kits} />}
-        {!trashOpen && organizer && !searching && here !== '' && (
+        {inKits && (
+          <Crumbs
+            folders={[{ id: KITS_FOLDER, name: t('next.kit.card.section'), parent: '' }]}
+            current={KITS_FOLDER}
+            onOpen={(id) => {
+              if (id !== KITS_FOLDER) openFolder(id);
+            }}
+            drops={false}
+          />
+        )}
+        {inKits && kits && <KitShelf {...kits} />}
+        {!trashOpen && !inKits && organizer && !searching && here !== '' && (
           <Crumbs folders={folders} current={here} onOpen={openFolder} />
         )}
-        {!trashOpen && organizer && subfolders.length > 0 && (
+        {(kitsTile || (organizer && subfolders.length > 0)) && (
           <FolderTiles
-            folders={subfolders}
+            lead={kitsTile ? <KitsFolderTile onOpen={openKits} /> : undefined}
+            folders={organizer ? subfolders : []}
             onOpen={openFolder}
             onRename={(f) => setFolderForm({ folder: f, parent: f.parent })}
             onDelete={setFolderDelete}
           />
         )}
 
-        {!trashOpen && notice !== null && cards !== null && (
+        {!trashOpen && !inKits && notice !== null && cards !== null && (
           <p className="hx-dl__notice" role="status">
             {notice}
           </p>
         )}
-        {!trashOpen && cards === null && error !== null && (
+        {!trashOpen && !inKits && cards === null && error !== null && (
           <LoadFailed
             size={LOAD_FAILED_SIZE.page}
             title={t('next.designly.failed')}
@@ -1206,7 +1132,7 @@ const DesignlyHome = ({
             onRetry={onRetry}
           />
         )}
-        {!trashOpen && (cards !== null || error === null) && (
+        {!trashOpen && !inKits && (cards !== null || error === null) && (
           <Swap ready={shown !== null} skeleton={<LibrarySkeleton />}>
             {shown && shown.length > 0 && (
               <div
@@ -1239,7 +1165,7 @@ const DesignlyHome = ({
             )}
           </Swap>
         )}
-        {!trashOpen && shown && shown.length === 0 && (
+        {!trashOpen && !inKits && shown && shown.length === 0 && (
           <div className="hx-dl__empty">
             {t(
               here !== '' && !searching
@@ -1251,6 +1177,7 @@ const DesignlyHome = ({
         {compose &&
           cards !== null &&
           !trashOpen &&
+          !inKits &&
           !searching &&
           here === '' &&
           scope === DESIGN_SCOPE.all && (
@@ -1266,6 +1193,7 @@ const DesignlyHome = ({
         {onRestoreDemo &&
           cards !== null &&
           !trashOpen &&
+          !inKits &&
           !searching &&
           here === '' &&
           scope === DESIGN_SCOPE.all &&

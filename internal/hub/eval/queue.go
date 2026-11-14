@@ -122,14 +122,15 @@ func (s *Scheduler) activeRuns(ctx context.Context, machine string) ([]activeRun
 }
 
 // windows reads the owner's subscription windows on the machine; ok is false when there is no fresh reading of the weekly
-// or the five-hour window of the provider the runs use.
+// window of the provider the runs use. The five-hour one counts when the plan has it: Claude gives none since 13.11
+// and waiting for it stopped the queue.
 func (s *Scheduler) windows(ctx context.Context, machine string) (week, five float64, ok bool, err error) {
 	ws, err := s.db.S().ProviderWindowsOfMachine(ctx, machine)
 	if err != nil {
 		return 0, 0, false, err
 	}
 	since := store.Ms(s.now().Add(-windowFresh))
-	var haveWeek, haveFive bool
+	var haveWeek bool
 	for _, w := range ws {
 		if w.Provider != "claude" || w.SampledAt < since {
 			continue
@@ -138,10 +139,10 @@ func (s *Scheduler) windows(ctx context.Context, machine string) (week, five flo
 		case "seven_day":
 			week, haveWeek = w.UsedPct, true
 		case "five_hour":
-			five, haveFive = w.UsedPct, true
+			five = w.UsedPct
 		}
 	}
-	return week, five, haveWeek && haveFive, nil
+	return week, five, haveWeek, nil
 }
 
 // dispatch hands the machine's next queued run to its runner, unless a run is already with it, the switch is off, the

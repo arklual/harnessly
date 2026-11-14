@@ -34,6 +34,7 @@ vi.mock('@/next/features/designly/kit/use-kit-link', () => ({
 vi.mock('@/next/stores/tabs', () => ({
   useTabState: <T,>(_key: string, initial: T) => useState<T>(initial),
   useTabTitle: () => undefined,
+  useTabScope: () => null,
 }));
 vi.mock('@/next/features/designly/api', async (original) => ({
   ...(await original<typeof import('@/next/features/designly/api')>()),

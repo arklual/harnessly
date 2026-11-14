@@ -385,7 +385,7 @@ func (a *applier) org(in Org) error {
 		if in.Currency != "" {
 			next.Currency = in.Currency
 		}
-		if next != o {
+		if next.Name != o.Name || next.Timezone != o.Timezone || next.Currency != o.Currency {
 			if err := a.st.UpdateOrg(a.ctx, next); err != nil {
 				return err
 			}

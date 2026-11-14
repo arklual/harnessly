@@ -36,9 +36,10 @@ func slotManifest(extra string) string {
 }
 
 func TestSlotRules(t *testing.T) {
-	ok := `"targets":["settings","object-action"],"views":[
+	ok := `"targets":["settings","object-action","home"],"views":[
 	  {"id":"s","entry":"ui/s.html","targets":["settings"],"label":"Example"},
-	  {"id":"a","entry":"ui/a.html","targets":["object-action"],"objects":["machine","chat"]}]`
+	  {"id":"a","entry":"ui/a.html","targets":["object-action"],"objects":["machine","chat"]},
+	  {"id":"d","entry":"ui/d.html","targets":["home"],"height":"stage"}]`
 	if m, ps := ParseManifest([]byte(slotManifest(ok))); m == nil || len(ps) != 0 {
 		t.Fatalf("valid slots: %v", ps)
 	}
@@ -51,6 +52,8 @@ func TestSlotRules(t *testing.T) {
 		"branding http support":      {`"targets":["branding"],"branding":{"name":"X","supportUrl":"http://example.com"}`, "branding.supportUrl"},
 		"branding empty name":        {`"targets":["branding"],"branding":{"name":""}`, "branding.name"},
 		"branding target without it": {`"targets":["branding"]`, "targets"},
+		"stage height off the home":  {`"targets":["settings"],"views":[{"id":"s","entry":"ui/s.html","targets":["settings"],"height":"stage"}]`, "views[0].height"},
+		"other height":               {`"targets":["home"],"views":[{"id":"h","entry":"ui/h.html","targets":["home"],"height":"400px"}]`, "views[0].height"},
 	}
 	for name, c := range cases {
 		_, ps := ParseManifest([]byte(slotManifest(c.body)))

@@ -11,6 +11,7 @@ import {
   type IPeerOut,
   type TPeerOutcome,
 } from '@/next/features/chat/peer';
+import { CardReply } from '@/next/bindings/reply-field';
 import Icon from '@/next/ui/icon';
 import { usePresentFlag } from '@/next/ui/presence';
 import { t } from '@/next/i18n';
@@ -49,7 +50,7 @@ const FOLD_CHARS = 640;
 export const peerLine = (peer: Pick<IPeerMessage, 'person' | 'machine' | 'chat'>): string =>
   [peer.person, peer.machine, peer.chat].filter((part) => part && part.length > 0).join(' · ');
 
-const Body = ({ text }: { text: string }) => {
+export const PeerBody = ({ text }: { text: string }) => {
   const [open, setOpen] = useState(false);
   const long = text.split('\n').length > FOLD_LINES || text.length > FOLD_CHARS;
   return (
@@ -106,21 +107,13 @@ const Reply = ({ to, state, onSend, onDone, onCancel }: IReplyProps) => {
   const busy = phase === SEND_PHASE.sending;
   return (
     <div className="hx-peer-reply" data-state={state}>
-      <textarea
-        className="hx-peer-reply__input"
-        rows={2}
+      <CardReply
         value={text}
+        onChange={setText}
+        busy={busy}
         placeholder={t('next.peers.replyTo', { to })}
-        aria-label={t('next.peers.replyTo', { to })}
-        disabled={busy}
-        onChange={(event) => setText(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-            event.preventDefault();
-            send();
-          }
-          if (event.key === 'Escape') onCancel();
-        }}
+        onSend={send}
+        onEscape={onCancel}
       />
       {refusal && (
         <div className="hx-peer-reply__err" role="alert">
@@ -131,18 +124,6 @@ const Reply = ({ to, state, onSend, onDone, onCancel }: IReplyProps) => {
       <div className="hx-peer-reply__foot">
         <button type="button" className="hx-peer-msg__act" onClick={onCancel} disabled={busy}>
           {t('next.peers.cancel')}
-        </button>
-        <button
-          type="button"
-          className="hx-peer-msg__act"
-          data-tone="primary"
-          data-busy={busy || undefined}
-          disabled={busy || !text.trim()}
-          onClick={send}
-        >
-          <Icon name="send" size="sm" />
-          {t('next.peers.send')}
-          <span className="hx-spin" aria-hidden="true" />
         </button>
       </div>
     </div>
@@ -175,7 +156,7 @@ export const PeerCard = memo(({ peer, delivery }: IPeerCardProps) => {
           {where && <span className="hx-peer-msg__where">{where}</span>}
           {peer.byPerson && <span className="hx-peer-msg__by">{t('next.peers.byPerson')}</span>}
         </div>
-        <Body text={peer.text} />
+        <PeerBody text={peer.text} />
         <div className="hx-peer-msg__foot">
           <span className="hx-peer-msg__state" role="status">
             <Icon name={DELIVERY_ICON[delivery]} size="sm" />

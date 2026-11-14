@@ -7,6 +7,7 @@ import { readDeckMessage, readPickedPoint } from '@/next/features/designly/deck/
 import type { IChapterOfSlide } from '@/next/features/designly/deck/video-chapters';
 import { DECK_OPENS, type TDeckOpens } from '@/next/features/designly/deck/types';
 import { GUEST_KEY_CODE, readBridgeMessage } from '@/next/features/designly/page-bridge';
+import { pageOfLink, readPageGo } from '@/next/features/designly/page-link';
 import { useTouch } from '@/next/features/designly/guest/guest-full';
 import Icon from '@/next/ui/icon';
 import { Button } from '@/next/ui/button';
@@ -212,6 +213,18 @@ const DeckGuest = ({
           setStep(deck.steps);
         }
       }
+      return;
+    }
+    // A link of a slide to another slide of what was shared turns to it; any other page is not the guest's.
+    const link = readPageGo(event.data);
+    if (link) {
+      const to = pageOfLink(
+        link,
+        slides.map((s) => ({ path: s.path, name: s.title })),
+        slides[index]?.path ?? null,
+      );
+      const at = to === null ? -1 : slides.findIndex((s) => s.path === to);
+      if (at >= 0) go(at);
       return;
     }
     const bridge = readBridgeMessage(event.data);

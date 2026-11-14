@@ -28,11 +28,13 @@ import {
 } from '@/next/features/designly/api';
 import { useLibraryOrganizer } from '@/next/bindings/use-library-organizer';
 import type { ILibraryLayout } from '@/next/features/designly/api';
+import { primeHome } from '@/next/features/designly/home';
+import { useHomeVitals } from '@/next/features/designly/web-vitals';
 import { useLinkRestored } from '@/next/stores/connection';
 import { useConversationList } from '@/next/stores/conversations';
 import { bindDesignConv } from '@/next/bindings/design-conv';
-import { startQuietPoll } from '@/next/bindings/quiet-poll';
 import { designKey } from '@/next/features/designly/design-conv';
+import { watchLibrary } from '@/next/features/designly/library-watch';
 import type { Conversation, MachineId } from '@/next/protocol/v2';
 import { goTo, ROUTE } from '@/next/routes/routes';
 import { toast } from '@/next/ui/toast';
@@ -41,6 +43,9 @@ import { useStartChoice } from '@/next/bindings/use-start-choice';
 import { rememberChoice } from '@/next/features/composer/start-choice';
 import type { IModelPickerProps } from '@/next/features/composer/model-picker';
 import { useVoice } from '@/next/bindings/use-voice';
+import { useAgentLimits } from '@/next/bindings/use-limits';
+import { limitsOwnerOf } from '@/next/features/limits/model';
+import { limitsOf } from '@/next/stores/machines';
 import { useUploads } from '@/next/bindings/use-uploads';
 import { clearDraft, DESIGN_START_DRAFT, setDraftText, useDraft } from '@/next/stores/drafts';
 import {
@@ -136,9 +141,11 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
   const restored = useLinkRestored(machine);
 
   const load = useCallback(
-    (signal?: AbortSignal) =>
+    (signal?: AbortSignal) => {
+      // The home's parts in one answer of the machine; each reader below takes its own from it.
+      primeHome(machine);
       // The machine's library when it answers in time, else the hub's copy from its store until it does.
-      readLibrary(
+      return readLibrary(
         machine,
         { machine: () => fetchLibrary(machine, signal), store: () => fetchStoreLibrary(machine, signal) },
         (view) => {
@@ -159,7 +166,8 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
           // A failed refresh keeps the cards on screen; only the first load turns into the error.
           if (!loaded.current) setError(failure.message);
         },
-      ),
+      );
+    },
     [machine, withAppDocs],
   );
 
@@ -174,8 +182,9 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
   const drawing = designs?.some((d) => isDrawing(d, working)) ?? false;
   useEffect(() => {
     if (!drawing) return;
-    return startQuietPoll(load, DRAWING_POLL_MS);
-  }, [drawing, load]);
+    // The hub says when the library changed; without it, the timer as before.
+    return watchLibrary(machine, load, DRAWING_POLL_MS);
+  }, [drawing, load, machine]);
 
   const forget = useCallback((ids: string[]) => {
     const gone = new Set(ids);
@@ -188,6 +197,7 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
     if (designs === null) return null;
     return [...designs.map((design) => cardOf(machine, design, working, layout)), ...appDocs.map(appDocCard)];
   }, [designs, appDocs, machine, working, layout]);
+  useHomeVitals(cards !== null);
   const appDocIds = useMemo(() => new Set(appDocs.map((d) => d.document)), [appDocs]);
 
   const onPin = async (id: string, pinned: boolean) => {
@@ -320,7 +330,7 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
     return () => abort.abort();
   }, [machine, restored, kitsAdded]);
 
-  // The installed kits for the library's row; without them the row is simply not there.
+  // The installed kits for the folder «UI-киты»; a failed read leaves the folder empty.
   const [kitCards, setKitCards] = useState<IKitCard[] | null>(null);
   useEffect(() => {
     const abort = new AbortController();
@@ -339,6 +349,7 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
   const uploads = useUploads(machine, START_DRAFT, draft?.attachments ?? []);
   const voice = useVoice(machine, brief, setBrief);
   useTourFill(brief, setBrief);
+  const limits = useAgentLimits(machine, limitsOwnerOf(choice));
 
   // The document types installed apps add are only an offer: an older runtime, or none installed, shows no tile.
   const [appKinds, setAppKinds] = useState<IAppKind[] | null>(null);
@@ -430,15 +441,12 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
             setKitsAdded((n) => n + 1);
           },
         }}
-        kits={
-          kitCards
-            ? {
-                cards: shelfCards(kitCards),
-                cover: (k) => kitCover(machine, { id: k.kit, version: k.version, cover: k.cover }),
-                onOpen: (k) => goTo({ kind: ROUTE.kit, id: k.kit, ...(k.theme ? { theme: k.theme } : {}) }),
-              }
-            : undefined
-        }
+        kits={{
+          // The folder «UI-киты» is on the home before the kits are read: null draws its skeleton inside.
+          cards: kitCards ? shelfCards(kitCards) : null,
+          cover: (k) => kitCover(machine, { id: k.kit, version: k.version, cover: k.cover }),
+          onOpen: (k) => goTo({ kind: ROUTE.kit, id: k.kit, ...(k.theme ? { theme: k.theme } : {}) }),
+        }}
         compose={{
           machine,
           initialKind,
@@ -463,7 +471,11 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
             onMic: voice.onMic,
             onCancel: voice.onCancelRecording,
             onFinish: voice.onFinishRecording,
+            recognized: voice.recognized,
+            caret: voice.caret,
           },
+          limits,
+          maxText: limitsOf(machine).maxText,
         }}
       />
     </AttachmentSrc.Provider>

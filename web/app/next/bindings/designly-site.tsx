@@ -2,6 +2,7 @@
 // history, and the page on screen shown in a preview slot. The slot is opened once per load; switching pages inside it
 // only moves the frame to the page's plain address, which skips the ticket round trip and its redirect. Anyone taking
 // the slot meanwhile (another preview, another window) or its cookie nearing its end opens it anew on the next switch.
+import { ReplyMachine } from '@/next/features/composer/reply-field';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import SiteView, {
   type ISiteAccess,
@@ -41,6 +42,7 @@ import {
   awayIsSilent,
   MACHINE_PATIENCE_MS,
   PROJECT_FROM,
+  createProjectReads,
   PROJECT_READ,
   readProject,
   useStorePush,
@@ -50,10 +52,11 @@ import { LIBRARY_PAGE_SLOT, LIBRARY_PANE_SLOT, slotLeases } from '@/next/feature
 import type { IStageOptions } from '@/next/bindings/site-stage';
 import type { TChatOpeners } from '@/next/bindings/chat-view';
 import { usePaneChatStage, useSiteOnlyStage, type IStageWithChat } from '@/next/bindings/pane-stage';
-import { useTabState, useTabTitle } from '@/next/stores/tabs';
+import { useTabScope, useTabState, useTabTitle } from '@/next/stores/tabs';
 import { useChatPaneView } from '@/next/stores/pane-state';
 import { modeKindOf, modeStateKey, useDesignMode } from '@/next/features/designly/design-mode';
-import { goTo, ROUTE, routePath, type TAccessFocus } from '@/next/routes/routes';
+import { keepChatPlace } from '@/next/features/designly/chat-place';
+import { goTo, ROUTE, routePath, useRoute, type TAccessFocus } from '@/next/routes/routes';
 import KitChip from '@/next/features/designly/kit/kit-chip';
 import { useKitLink } from '@/next/features/designly/kit/use-kit-link';
 import { useLinkRestored } from '@/next/stores/connection';
@@ -181,7 +184,7 @@ const SEED_TABS = 6;
 const seedTabs = (boards: readonly { path: string }[]): ISiteTab[] =>
   boards.slice(0, SEED_TABS).map((b) => newTab(b.path));
 
-const DesignlySiteBody = ({
+const DesignlySiteInner = ({
   machine,
   id,
   chat = null,
@@ -301,7 +304,15 @@ const DesignlySiteBody = ({
   const loaded = useRef(false);
   const onSnapshot = useRef(false);
   // The window's tab is named by the page a design is open on; in a pane the chat names it.
-  useTabTitle(routePath({ kind: ROUTE.site, id }), pane ? null : (project?.design.title ?? null));
+  const route = useRoute();
+  /** The design's own address on screen (not in a pane): the page on screen is its `?page=`. */
+  // A design kept hidden behind another tab (features/shell/kept-screens) has no address of its own: it moves nothing.
+  const onScreen = useTabScope()?.active !== false;
+  const own = pane === undefined && onScreen && route.kind === ROUTE.site && route.id === id ? route : null;
+  useTabTitle(
+    own ? routePath(own) : routePath({ kind: ROUTE.site, id }),
+    pane ? null : (project?.design.title ?? null),
+  );
   const pageSlot = pane ? PANE_PAGE_SLOT : PAGE_SLOT;
   const outsideSlot = pane ? PANE_OUTSIDE_SLOT : OUTSIDE_SLOT;
   // The board's slots are this page's: an app view or a browser tab leasing one would take the board's cookie over.
@@ -329,15 +340,20 @@ const DesignlySiteBody = ({
     setAway(why);
     setMissing(true);
   });
+  const [projectReads] = useState(createProjectReads);
+  useEffect(() => () => projectReads.stop(), [projectReads]);
   useEffect(() => {
-    const abort = new AbortController();
+    // A poll while the slow machine still answers the last read waits for it.
+    const signal = projectReads.start(`${machine}|${id}|${attempt}|${String(restored)}`);
+    if (signal === null) return;
+    const abort = { signal };
     // The machine is asked first; when it is slow, has failed or has not got the project, the hub's snapshot opens the
     // design for viewing, and the machine's answer still replaces it when it comes. A store with
     // no copy never ends the wait for the machine: the project opens from it without the card.
     void readProject(
       id,
       {
-        machine: () => fetchLibrary(machine, abort.signal),
+        machine: () => projectReads.machine(() => fetchLibrary(machine, abort.signal)),
         store: () => fetchStoreLibrary(machine, abort.signal),
       },
       (state) => {
@@ -369,7 +385,7 @@ const DesignlySiteBody = ({
       },
       { store: SNAPSHOT_WAIT_MS, machine: MACHINE_PATIENCE_MS },
     );
-    return () => abort.abort();
+    // The reads end with another project, machine or attempt (start) or with the page (stop), not with a poll.
     // onMissing is the host's; a new one each render must not load the library again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [machine, id, attempt, restored, fresh]);
@@ -530,10 +546,23 @@ const DesignlySiteBody = ({
   // opened from a chat edits as that chat last had it (design-mode).
   const editing = snapshot === null && (pane !== undefined || (asked && mayEdit) || onMode === undefined);
   const viewing = !editing;
+  // Edited with its chat, the design and the chat are one place, one tab (chat-place.ts): the address names the chat the
+  // column shows, and the pair is kept with the page on screen, so the chat opened from anywhere comes back here.
+  const columnConv = stage?.conv ?? null;
+  const ownChat = own?.chat ?? null;
+  const ownEdit = own?.edit === true;
+  useEffect(() => {
+    if (!own || !editing || columnConv === null) return;
+    keepChatPlace(columnConv, { design: id, machine: own.machine ?? machine, page: path });
+    if (ownChat !== columnConv || !ownEdit) goTo({ ...own, chat: columnConv, edit: true }, { replace: true });
+    // `own` is a new object each render; the chat, the mode and the page are what move this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [own !== null, editing, columnConv, ownChat, ownEdit, path, id, machine]);
   // Looking at a design reads it from the hub's store: no slot, nothing asked of the machine for the boards.
   // A project the store has not got (or a hub that does not answer in time) opens from the machine as before, and the
   // machine's sync puts it into the store meanwhile: the store's revision, once it comes, takes over the frames.
-  const storeAt = useStoreHead(machine, id, viewing);
+  // Editing asks the store too: its last revision is the board on screen while the machine opens the slot for editing.
+  const storeAt = useStoreHead(machine, id, true);
   const storeRev = viewing && storeAt.k === STORE_AT.at ? storeAt.rev : null;
   const needSlot = !viewing || storeAt.k === STORE_AT.none;
   // The store has nothing of a project that is open from its machine: the machine is asked to put it there at once,
@@ -547,6 +576,11 @@ const DesignlySiteBody = ({
     storeRev === null || page === null ? null : storeBoardAtHref(machine, id, page, storeRev, scene);
   const boardSrc = storeRev === null ? src : storeSrc(path);
   const boardPlainSrc = storeRev === null ? plainSrc : boardSrc;
+  /** The board as the store last has it, held on screen while the editing frame opens: no empty wait (chat-place.ts). */
+  const heldSrc =
+    editing && snapshot === null && storeAt.k === STORE_AT.at && path !== null
+      ? storeBoardAtHref(machine, id, path, storeAt.rev, scene)
+      : null;
   // The apps on in this document (their panels, selection menu, marks on the boards, the gate before a share). The
   // chat they send tasks to is the one the pane sits beside, or the one the person came from.
   // The design's own chat, when it has no pane or chat it was opened from, is the column's.
@@ -712,6 +746,36 @@ const DesignlySiteBody = ({
       x.hist[x.hi] === board ? x : { ...x, hist: [...x.hist.slice(0, x.hi + 1), board], hi: x.hi + 1 },
     );
   });
+  // The address and the page on screen follow each other: a page switched in the site (a link of a board,
+  // the list, a tab) is pushed as `?page=`, so Back and Forward of the browser and a copied address find it; an address
+  // that moved (Back, Forward, a deep link) turns the tab, a step of its own history when the page is there.
+  const synced = useRef<{ route: string | null; path: string | null } | null>(null);
+  const showPage = useEffectEvent((board: string) => {
+    if (current?.hist[current.hi - 1] === board) updateTab((x) => ({ ...x, hi: x.hi - 1 }));
+    else if (current?.hist[current.hi + 1] === board) updateTab((x) => ({ ...x, hi: x.hi + 1 }));
+    else turnTo(board);
+  });
+  const routePage = own?.page ?? null;
+  useEffect(() => {
+    if (!own) return;
+    const was = synced.current;
+    if (was === null || routePage !== was.route) {
+      synced.current = { route: routePage, path: routePage ?? path };
+      if (routePage !== null && routePage !== path) showPage(routePage);
+      else if (routePage === null && path !== null) {
+        synced.current = { route: path, path };
+        goTo({ ...own, page: path }, { replace: true });
+      }
+      return;
+    }
+    if (path !== null && path !== was.path) {
+      synced.current = { route: path, path };
+      goTo({ ...own, page: path }, { replace: was.path === null });
+    }
+    // `own` is a new object each render; its page and the page on screen are what move this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routePage, path, own !== null]);
+
   useEffect(() => {
     const take = () => {
       const board = takeNoteBoard(id);
@@ -969,6 +1033,7 @@ const DesignlySiteBody = ({
       tabs={tabs}
       tab={current?.id ?? ''}
       src={boardSrc}
+      heldSrc={heldSrc}
       plainSrc={boardPlainSrc}
       phoneUrl={isPublicAddress(shareUrl) ? shareUrl : null}
       error={slotError}
@@ -1151,6 +1216,13 @@ const DesignlySiteBody = ({
     </>
   );
 };
+
+/** The design with its machine's voice in the fields its cards and its picture editor answer with. */
+const DesignlySiteBody = (props: IBodyProps) => (
+  <ReplyMachine.Provider value={props.machine}>
+    <DesignlySiteInner {...props} />
+  </ReplyMachine.Provider>
+);
 
 const DesignlySite = (props: IDesignlySiteProps) => <DesignlySiteBody {...props} />;
 

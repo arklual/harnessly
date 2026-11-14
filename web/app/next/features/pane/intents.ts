@@ -17,8 +17,22 @@ export const LEGACY_KINDS = [
 ] as const;
 export type TLegacyKind = (typeof LEGACY_KINDS)[number];
 
+/** The subchat a lifted request came from: its id and title. */
+export interface IIntentFrom {
+  id: string;
+  title: string;
+}
+
 export type TIntentCommand =
-  | { kind: 'open'; tab: string; target?: string; auto?: boolean; reload?: boolean; place?: string }
+  | {
+      kind: 'open';
+      tab: string;
+      target?: string;
+      auto?: boolean;
+      reload?: boolean;
+      place?: string;
+      from?: IIntentFrom;
+    }
   | { kind: 'show' };
 
 export interface IPaneIntent {
@@ -42,6 +56,9 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 
 const optionalBool = (v: unknown): boolean => v === undefined || typeof v === 'boolean';
 
+const optionalFrom = (v: unknown): boolean =>
+  v === undefined || (isRecord(v) && typeof v.id === 'string' && typeof v.title === 'string');
+
 const isCommand = (v: unknown): v is TIntentCommand => {
   if (!isRecord(v)) return false;
   if (v.kind === 'show') return true;
@@ -51,7 +68,8 @@ const isCommand = (v: unknown): v is TIntentCommand => {
     (v.target === undefined || typeof v.target === 'string') &&
     optionalBool(v.auto) &&
     optionalBool(v.reload) &&
-    (v.place === undefined || typeof v.place === 'string')
+    (v.place === undefined || typeof v.place === 'string') &&
+    optionalFrom(v.from)
   );
 };
 
@@ -62,6 +80,12 @@ const isIntent = (v: unknown): v is IPaneIntent =>
   isCommand(v.command) &&
   (v.appliedAt === null || typeof v.appliedAt === 'number') &&
   (v.appliedOn === null || v.appliedOn === 'desktop' || v.appliedOn === 'phone');
+
+/** The subchat an intent came up from, by its title (a nameless one is still a subchat's); null for the chat's own. */
+export const liftedTitle = (command: TIntentCommand): string | null => {
+  if (command.kind !== 'open' || !command.from) return null;
+  return command.from.title.trim() || command.from.id;
+};
 
 /** The intents of the machine's answer `{intents: [...]}`; what is not one is left out. */
 export const parseIntents = (body: unknown): IPaneIntent[] => {

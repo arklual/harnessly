@@ -13,6 +13,7 @@
 // The standard view (FIT, chosen by the device: standardFit) is kept: the area resized or another device keeps the box
 // fitted its way until the person moves the view. The lock leaves the view as it is: no pan, no zoom; «Вписать» (⌘0)
 // still takes the view back to the standard one.
+import { inHiddenScreen } from '@/next/features/shell/kept-screens';
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { IPoint } from '@/next/features/designly/site-drag';
 import { startView, type IViewMemory } from '@/next/features/designly/view-memory';
@@ -362,6 +363,7 @@ export const useCanvasZoom = (
       over = false;
     };
     const onKeyDown = (event: KeyboardEvent) => {
+      if (inHiddenScreen(area)) return;
       const key = zoomKeyOf(event);
       if (key !== null && !typing(event.target)) {
         event.preventDefault();

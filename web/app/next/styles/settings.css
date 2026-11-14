@@ -36,9 +36,6 @@
   margin-bottom: 10px;
   padding-left: 8px;
 }
-.hx-set__menu {
-  display: none;
-}
 .hx-set__h1 {
   font-size: var(--hx-text-xl);
   font-weight: var(--hx-weight-semibold);
@@ -602,7 +599,7 @@
   transition-delay: 80ms;
 }
 .hx-acct__block {
-  padding: 0 16px 16px 64px;
+  padding: 0 16px 16px var(--hx-acct-indent);
 }
 .hx-acct__label {
   display: flex;
@@ -1227,16 +1224,6 @@
     margin-bottom: 8px;
     height: 48px;
   }
-  /* The way to the app's menu on a narrow window: a button that reads as one. */
-  .hx-set__menu {
-    display: grid;
-    width: 40px;
-    height: 40px;
-    flex: none;
-    margin-right: 6px;
-    background: var(--hx-bg-hover);
-    color: var(--hx-fg-1);
-  }
   .hx-set__nav-item {
     height: 52px;
     padding: 0 12px;
@@ -1281,9 +1268,6 @@
     flex-wrap: wrap;
     row-gap: 10px;
     align-content: center;
-  }
-  .hx-acct__block {
-    padding-left: 16px;
   }
   .hx-ext__use {
     width: 64px;
@@ -1590,23 +1574,28 @@
     display: none;
   }
 }
+/* What the card holds starts under its name, past the head's mark; on the agent's own page (no head) and in a narrow window,
+   at the card's own padding. One line for all of them: --hx-acct-indent. */
+.hx-acct {
+  --hx-acct-indent: 64px;
+}
+.hx-acct--page {
+  --hx-acct-indent: 16px;
+}
+@media (max-width: 900px) {
+  .hx-acct {
+    --hx-acct-indent: 16px;
+  }
+}
 .hx-acct__inner > .hx-src,
 .hx-acct__inner > .hx-proxy,
 .hx-acct__inner > .hx-seen,
 .hx-acct__inner > .hx-acct__label {
-  margin-left: 64px;
+  margin-left: var(--hx-acct-indent);
   margin-right: 16px;
 }
 .hx-acct__inner > .hx-proxy {
   margin-bottom: 18px;
-}
-@media (max-width: 600px) {
-  .hx-acct__inner > .hx-src,
-  .hx-acct__inner > .hx-proxy,
-  .hx-acct__inner > .hx-seen,
-  .hx-acct__inner > .hx-acct__label {
-    margin-left: 16px;
-  }
 }
 
 /* ── Claude Code: конструктор правил и переменные окружения ── */
@@ -2374,15 +2363,6 @@ html[data-theme='dark'] .hx-nplace__spot[aria-checked='true'] {
 .hx-acct--page .hx-acct__inner {
   padding-top: 16px;
 }
-.hx-acct--page .hx-acct__inner > .hx-src,
-.hx-acct--page .hx-acct__inner > .hx-proxy,
-.hx-acct--page .hx-acct__inner > .hx-seen,
-.hx-acct--page .hx-acct__inner > .hx-acct__label {
-  margin-left: 16px;
-}
-.hx-acct--page .hx-acct__block {
-  padding-left: 16px;
-}
 
 /* The agent of the Settings window: a field at the bottom of the page, over what scrolls, and its answer above it */
 .hx-set__nav {
@@ -2393,8 +2373,9 @@ html[data-theme='dark'] .hx-nplace__spot[aria-checked='true'] {
   grid-column: 2;
   grid-row: 1;
 }
+/* The room under the last row is the island's height now (settings-shell measures it), so the field covers nothing. */
 .hx-set__page-in {
-  padding-bottom: 176px;
+  padding-bottom: calc(var(--hx-isle-h, 176px) + 16px);
 }
 .hx-set__isle {
   grid-column: 2;
@@ -2440,6 +2421,21 @@ html[data-theme='dark'] .hx-nplace__spot[aria-checked='true'] {
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
+.hx-isle__go {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-accent);
+  font: inherit;
+  cursor: pointer;
+}
+.hx-isle__go:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .hx-isle__think {
   display: flex;
   align-items: center;
@@ -2477,128 +2473,21 @@ html[data-theme='dark'] .hx-nplace__spot[aria-checked='true'] {
   align-items: center;
   gap: 8px;
 }
-.hx-isle__opts {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.hx-isle__opt {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--hx-border);
-  border-radius: 12px;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    background 160ms var(--hx-ease-out),
-    border-color 160ms;
-}
-.hx-isle__opt:hover {
-  background: var(--hx-bg-hover);
-  border-color: var(--hx-border-strong);
-}
-.hx-isle__opt-name {
-  flex: 1;
-  color: var(--hx-fg-1);
-  font-size: var(--hx-text-sm);
-}
-.hx-isle__opt-hint {
-  color: var(--hx-fg-3);
-  font-size: var(--hx-text-xs);
-}
-.hx-isle__box {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px 12px 10px 16px;
-  border: 1px solid var(--hx-border-strong);
-  border-radius: 20px;
-  background: var(--hx-bg-raised);
-  box-shadow: var(--hx-shadow-overlay);
-  transition: border-color 160ms;
-}
-.hx-isle__box:focus-within {
-  border-color: var(--hx-focus);
-}
-.hx-isle__row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.hx-isle__input {
-  flex: 1;
-  min-width: 0;
-  height: 28px;
-  border: 0;
-  outline: 0;
-  background: none;
-  color: var(--hx-fg-1);
-  font: inherit;
-  font-size: var(--hx-text-md);
-}
-.hx-isle__input::placeholder {
-  color: var(--hx-fg-3);
-}
-.hx-isle__send {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: 50%;
-  background: var(--hx-primary);
-  color: var(--hx-primary-fg);
-  cursor: pointer;
-  transition:
-    transform 120ms var(--hx-ease-out),
-    opacity 160ms;
-}
-.hx-isle__send:active {
-  transform: scale(0.94);
-}
-.hx-isle__send:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-.hx-isle__sugg {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.hx-isle__sugg button {
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--hx-border);
-  border-radius: var(--hx-radius-full);
-  background: transparent;
-  color: var(--hx-fg-2);
-  font-size: var(--hx-text-xs);
-  cursor: pointer;
-  transition:
-    background 160ms,
-    color 160ms;
-}
-.hx-isle__sugg button:hover {
-  background: var(--hx-bg-hover);
-  color: var(--hx-fg-1);
-}
 @media (max-width: 900px) {
   .hx-set__nav,
   .hx-set__page {
     grid-column: 1;
   }
   .hx-set__page-in {
-    padding-bottom: calc(168px + env(safe-area-inset-bottom));
+    padding-bottom: calc(var(--hx-isle-h, 168px) + 16px);
   }
+  /* An absolute child of a grid is placed in its grid area: the island takes the only column a phone has. */
   .hx-set__isle {
+    grid-column: 1;
     position: absolute;
     inset: auto 0 0;
     z-index: 3;
+    max-width: none;
     padding: 0 12px calc(12px + env(safe-area-inset-bottom));
   }
   /* The list of the sections has no field: it comes with the open section */

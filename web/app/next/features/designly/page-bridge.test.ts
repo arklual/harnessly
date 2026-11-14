@@ -204,6 +204,7 @@ describe('readBridgeMessage: settings of a board', () => {
 
   it('reads the library script hello and the page wish to show or hide the panel', () => {
     expect(readBridgeMessage({ type: 'tk:lib-ready' })).toEqual({ k: 'lib-ready' });
+    expect(readBridgeMessage({ type: 'tk:reload' })).toEqual({ k: 'reload' });
     expect(readBridgeMessage({ type: 'tk:tweaks-panel', open: true })).toEqual({
       k: 'tweaks-panel',
       open: true,

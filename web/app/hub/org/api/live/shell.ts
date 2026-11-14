@@ -5,6 +5,7 @@ import type {
   Capabilities,
   Me,
   Org,
+  OrgLinks,
   OrgList,
   OrgView,
   Scope as ApiScope,
@@ -92,6 +93,14 @@ export const liveShell = (remember: (view: OrgView, scope: ApiScope) => void): S
   setAppsConsent: async (org, value: AppsConsent) => {
     const out = await http.patch<{ org: Org }>(orgPath(org), { appsConsent: value });
     return out.org.appsConsent ?? 'ask';
+  },
+  links: async (org) => {
+    const view = await http.get<OrgView>(orgPath(org));
+    return view.org.links ?? {};
+  },
+  setLinks: async (org, value: OrgLinks) => {
+    const out = await http.patch<{ org: Org }>(orgPath(org), { links: value });
+    return out.org.links ?? {};
   },
   looseSpaces: async () => {
     const { looseSpaces } = await http.get<OrgList>('/api/orgs');

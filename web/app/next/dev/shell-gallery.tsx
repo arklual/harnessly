@@ -10,6 +10,9 @@
 //   &term=1                           the agent's terminal panel under the chat
 //   &slow=1                            every action takes 4 s (the «longer than usual» state)
 //   &favs=none                         the favorites with nothing pinned (the empty state)
+//   &favs=load|load-old                a page load replayed: the browser's copy, the machine's layout, the
+//                                      cluster's list with the person's layout, a machine's own list; load-old feeds
+//                                      the layout as the page did before (no wait). window.__favLoad counts the motion
 //   &tabs=1|many                       the strip of chat tabs over the window (many: more than fit)
 //   &max=1                             the pane open «во всю ширину»
 //   &paneTabs=many                     more tabs in the pane's strip, one with a long title
@@ -131,6 +134,43 @@ const PROJECTS: readonly ISidebarProject[] = [
 ];
 
 /** The favorites as the machine would keep them: two groups, one chat of none; the third pinned chat is unplaced. */
+/** The chats of the second machine, which come with the cluster's list on a load. */
+const SECOND_MACHINE = new Set(['c-deploy', 'c-refunds-pin']);
+const LOAD_REPLAY = FAVS === 'load' || FAVS === 'load-old';
+
+// What moved in «Избранное» during a replayed load: FLIP slides (Web Animations), CSS animations by name,
+// and every distinct order the favorites were drawn in.
+interface IFavLoadLog {
+  flip: number;
+  css: Record<string, number>;
+  orders: string[];
+}
+if (LOAD_REPLAY) {
+  const log: IFavLoadLog = { flip: 0, css: {}, orders: [] };
+  (window as unknown as { __favLoad: IFavLoadLog }).__favLoad = log;
+  const inFavs = (el: unknown) => el instanceof Element && el.closest('.hx-favs') !== null;
+  const animate = Element.prototype.animate;
+  Element.prototype.animate = function (this: Element, ...args: Parameters<Element['animate']>) {
+    if (inFavs(this)) log.flip += 1;
+    return animate.apply(this, args);
+  };
+  document.addEventListener(
+    'animationstart',
+    (event) => {
+      if (inFavs(event.target)) log.css[event.animationName] = (log.css[event.animationName] ?? 0) + 1;
+    },
+    true,
+  );
+  const watch = () => {
+    const order = [...document.querySelectorAll('.hx-favs .hx-favgroup, .hx-favs [data-chat]')]
+      .map((el) => (el instanceof HTMLElement && el.dataset.chat) || `[${el.getAttribute('data-drop-id')}]`)
+      .join(' ');
+    if (order && log.orders[log.orders.length - 1] !== order) log.orders.push(order);
+    requestAnimationFrame(watch);
+  };
+  requestAnimationFrame(watch);
+}
+
 const SEED_FAVORITES: ISidebarFavorites = {
   groups: [
     { id: 'fg-release', name: 'Релизы', chats: ['c-release', 'c-deploy'] },
@@ -613,6 +653,12 @@ const seedChats = (now: number): ISidebarChat[] => {
       status: CHAT_STATUS.limited,
       waitsFor: 'Ждёт сброса лимита до 18:00',
     }),
+    // Chats an app started for the person: its folder, until the person drags one out.
+    chat('c-app-retry', 'Повторы оплаты падают на таймауте', 20 * MIN, {
+      status: CHAT_STATUS.done,
+      from: { app: 'inbox', label: 'Входящие' },
+    }),
+    chat('c-app-review', 'Ревью: вход по ссылке', 2 * HOUR, { from: { app: 'inbox', label: 'Входящие' } }),
     chat('c-copy', 'Тексты экрана оплаты', 26 * HOUR),
     chat('c-posthog', 'PostHog: дашборд оплаты', 30 * HOUR),
     chat('c-angular', 'Angular 22: линт и API', 3 * DAY),
@@ -762,15 +808,41 @@ const answer = (failOnce: Set<string>, key: string) =>
 
 const Gallery = () => {
   const [now] = useState(() => Date.now());
-  const [chats, setChats] = useState<ISidebarChat[]>(() => seedChats(now));
+  const [chats, setChats] = useState<ISidebarChat[]>(() =>
+    LOAD_REPLAY ? seedChats(now).filter((c) => !SECOND_MACHINE.has(c.id)) : seedChats(now),
+  );
   const [projects, setProjects] = useState<readonly ISidebarProject[]>(PROJECTS);
   // The strip keeps its own order, as the tabs store does: a carried tab stays where it is put.
   const [stripTabs, setStripTabs] = useState<readonly IStripTab[]>(
     TABS === 'many' ? MANY_STRIP_TABS : STRIP_TABS,
   );
   const [favorites, setFavorites] = useState<ISidebarFavorites>(
-    FAVS === 'none' ? { groups: [], loose: [] } : SEED_FAVORITES,
+    FAVS === 'none' || LOAD_REPLAY ? { groups: [], loose: [] } : SEED_FAVORITES,
   );
+  // The replayed load: the layout is unknown (null) until the cluster's list and the person's layout came.
+  const [layoutWait, setLayoutWait] = useState(FAVS === 'load');
+  useEffect(() => {
+    if (!LOAD_REPLAY) return;
+    const steps: [number, () => void][] = [
+      // m1's own list with its layout: two of its pinned chats, ungrouped.
+      [400, () => setFavorites({ groups: [], loose: ['c-onboarding', 'c-release'] })],
+      // The cluster's list (the second machine's chats) and the person's layout.
+      [
+        900,
+        () => {
+          setChats(seedChats(now));
+          setFavorites(SEED_FAVORITES);
+          setLayoutWait(false);
+        },
+      ],
+      // The second machine's own list: new records of the same chats.
+      [1600, () => setChats(seedChats(now).map((c) => ({ ...c, lastActivityAt: c.lastActivityAt + 1 })))],
+      // The next beat: the same layout anew.
+      [2400, () => setFavorites({ ...SEED_FAVORITES })],
+    ];
+    const timers = steps.map(([at, step]) => setTimeout(step, at));
+    return () => timers.forEach(clearTimeout);
+  }, [now]);
   const [currentId, setCurrentId] = useState<string | null>(
     params.get('route') === 'home' ? null : 'c-sidebar',
   );
@@ -921,7 +993,7 @@ const Gallery = () => {
       hubHref="https://hub.example.com/"
       chats={listChats}
       projects={LIST === 'empty' ? [] : projects}
-      favorites={favorites}
+      favorites={layoutWait ? null : favorites}
       loadError={LIST === 'error' ? 'Чаты не загрузились: машина не отвечает' : null}
       onRetryLoad={() => void toast('Пробуем ещё раз', { tone: 'info' })}
       currentId={currentId}

@@ -175,9 +175,10 @@ a.hx-brand__name {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  margin-left: 16px;
-  padding-left: 10px;
-  border-left: 1px solid var(--hx-border-strong);
+  /* --hx-kids-indent: 0 in the rail (shell.css) */
+  margin-left: calc(16px * var(--hx-kids-indent, 1));
+  padding-left: calc(10px * var(--hx-kids-indent, 1));
+  border-left: calc(1px * var(--hx-kids-indent, 1)) solid var(--hx-border-strong);
 }
 .hx-nav__group[aria-expanded='true'] .hx-nav__kids {
   grid-template-rows: 1fr;

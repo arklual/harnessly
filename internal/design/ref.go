@@ -52,3 +52,27 @@ func (l *Library) RefOf(text string) string {
 	}
 	return found
 }
+
+// BoardOfPath is the design a board file lies in and the board as the design's page names it (its path in the
+// project folder); "" for a file that is not a board of the library.
+func (l *Library) BoardOfPath(p string) (ref, board string) {
+	ref = l.DesignOfPath(p)
+	if ref == "" || !strings.HasSuffix(p, dcSuffix) {
+		return "", ""
+	}
+	p = filepath.Clean(p)
+	dir := l.ProjectDir(ref)
+	dirs := []string{dir}
+	if real, err := filepath.EvalSymlinks(dir); err == nil && real != dir {
+		dirs = append(dirs, real)
+	}
+	if real, err := filepath.EvalSymlinks(p); err == nil {
+		p = real
+	}
+	for _, d := range dirs {
+		if rel, err := filepath.Rel(d, p); err == nil && !strings.HasPrefix(rel, "..") {
+			return ref, filepath.ToSlash(rel)
+		}
+	}
+	return "", ""
+}

@@ -165,6 +165,9 @@ type Slot struct {
 	Muted func(Source) bool
 	// Changed is told when the list changes (the page refreshes); nil for none.
 	Changed func()
+	// Journal is told when a notice opens ("open") and when it ends ("end", with its status), for the store to keep
+	// nil for none. It is called with the slot's lock held, so it must only queue the news.
+	Journal func(event string, n Notice, status string)
 
 	mu    sync.Mutex
 	open  map[string]*open
@@ -178,6 +181,12 @@ func (s *Slot) now() time.Time {
 		return s.Now()
 	}
 	return time.Now()
+}
+
+func (s *Slot) journal(event string, n Notice, status string) {
+	if s.Journal != nil {
+		s.Journal(event, n, status)
+	}
 }
 
 func (s *Slot) changed() {
@@ -341,6 +350,7 @@ func (s *Slot) Open(src Source, conv string, sp Spec) (Notice, error) {
 	}
 	s.open[o.ID] = o
 	n := o.Notice
+	s.journal("open", n, "")
 	s.mu.Unlock()
 	s.changed()
 	return n, nil
@@ -415,6 +425,7 @@ func (s *Slot) finish(id string, r Result) bool {
 	}
 	o.done, o.final = true, r
 	o.ExpiresAt = s.now().Add(keepDone).UnixMilli()
+	s.journal("end", o.Notice, r.Status)
 	s.mu.Unlock()
 	o.result <- r
 	s.changed()
@@ -428,9 +439,13 @@ func (s *Slot) sweep(now time.Time) {
 			continue
 		}
 		if o.done || !o.Kind.Waits() {
+			if !o.done {
+				s.journal("end", o.Notice, StatusTimeout)
+			}
 			delete(s.open, id)
 			continue
 		}
+		s.journal("end", o.Notice, StatusTimeout)
 		o.done, o.final = true, Result{Status: StatusTimeout}
 		o.ExpiresAt = now.Add(keepDone).UnixMilli()
 		o.result <- o.final

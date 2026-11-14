@@ -6,6 +6,7 @@ import useIsMobile from '@/hooks/use-is-mobile';
 import { formatModelDisplayName } from '@/lib/claude-tokens';
 import { appConfig } from '@/platform/config';
 import { useTeamUsage } from '@/components/agents/stats/use-team-usage';
+import { useHubSwitches } from '@/next/features/manage/hub-switches';
 import EChart from '@/components/agents/stats/echart';
 import {
   activityByDay,
@@ -465,9 +466,13 @@ const rateLine = (
 // --- view ---
 
 const StatsView = () => {
-  // RUNTIME_HUB_ANALYTICS: this machine counts nothing, the report comes from the hub.
-  const hubBase = appConfig().hubAnalytics ? appConfig().hubUrl : null;
-  const { team, error, loading, reload } = useTeamUsage(false, hubBase);
+  // RUNTIME_HUB_ANALYTICS: this machine counts nothing, the report comes from the hub. The switch hub-stats
+  // moves the report to the hub per person; until the hub has answered, nothing is asked of either.
+  const hubSwitches = useHubSwitches();
+  const hubBase = appConfig().hubAnalytics || hubSwitches?.stats ? appConfig().hubUrl : null;
+  const waiting = hubSwitches === null && !appConfig().hubAnalytics;
+  const { team, error, loading: loadingReport, reload } = useTeamUsage(waiting, hubBase);
+  const loading = loadingReport || waiting;
   const theme = useChartTheme();
   const [period, setPeriod] = useState<TPeriod>(30);
   const [people, setPeople] = useState<string[]>([]);

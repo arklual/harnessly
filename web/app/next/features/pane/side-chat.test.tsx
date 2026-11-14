@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useSideChat } from '@/next/bindings/side-chat';
+import { sideDraftOf, useSideChat } from '@/next/bindings/side-chat';
 import { setScheduler } from '@/next/core/store';
 import { quoteBlock, SideChatBody } from '@/next/features/pane/side-chat';
 import { pinLocale } from '@/next/i18n';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
+import { clearDraft } from '@/next/stores/drafts';
 import { askBeside, useSideAsk } from '@/next/stores/side-ask';
 import AnnotatePill from '@/next/ui/notes/pill';
 
@@ -19,6 +20,7 @@ const Side = ({ conv }: { conv: ConvId }) => {
     <SideChatBody
       messages={side.messages}
       busy={side.busy}
+      field={side.field}
       onAsk={side.ask}
       onStop={side.stop}
       onRetry={side.retry}
@@ -35,17 +37,29 @@ const Watch = ({ conv }: { conv: ConvId }) => {
 };
 const waiting = () => document.querySelector('.waiting')?.textContent;
 
-const field = () => document.querySelector<HTMLTextAreaElement>('.hx-sidechat__input') as HTMLTextAreaElement;
+const field = () =>
+  document.querySelector<HTMLTextAreaElement>('.hx-sidechat__foot textarea') as HTMLTextAreaElement;
 const frame = () => act(() => void vi.advanceTimersToNextFrame());
 
 beforeEach(() => {
   // The store tells its readers at once (the page waits for a frame).
   setScheduler('sync');
   pinLocale('en');
-  vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'setTimeout', 'clearTimeout'] });
+  vi.useFakeTimers({
+    toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'setTimeout', 'clearTimeout'],
+  });
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  })) as unknown as typeof window.matchMedia;
 });
 afterEach(() => {
   cleanup();
+  // The field's words are kept per chat: a test leaves none to the next.
+  clearDraft(sideDraftOf(CONV));
+  clearDraft(sideDraftOf(OTHER));
   vi.useRealTimers();
   setScheduler('frame');
 });

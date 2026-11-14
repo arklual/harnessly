@@ -266,8 +266,9 @@ func (s *Store) List() ([]View, error) {
 	}
 	out := make([]View, 0, len(f.Secrets))
 	for _, e := range f.Secrets {
-		// An app's secret is the app's: the safe's list and the agent's CLI do not show it.
-		if IsAppName(e.Name) {
+		// An app's secret is the app's, an integration's the runtime's: the safe's list and the agent's CLI do not
+		// show them.
+		if IsAppName(e.Name) || IsIntegrationName(e.Name) {
 			continue
 		}
 		out = append(out, viewOf(e))

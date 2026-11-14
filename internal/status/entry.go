@@ -88,14 +88,16 @@ type Entry struct {
 	HooksMissing         bool
 
 	// Kept on the server only.
-	JSONLPath             string
-	ProcessRetries        int
-	StuckCheckedAt        float64
-	StuckBackoffMs        float64
-	LastHookFiredAt       *float64
-	HooksCheckedFor       *string
-	HooksCheckedAt        *float64
-	GoneSince             *float64
+	JSONLPath       string
+	ProcessRetries  int
+	StuckCheckedAt  float64
+	StuckBackoffMs  float64
+	LastHookFiredAt *float64
+	HooksCheckedFor *string
+	HooksCheckedAt  *float64
+	GoneSince       *float64
+	// unreadableLogged: the last look found a pane process it could not read and said so in the log once.
+	unreadableLogged      bool
 	LastInterruptTs       float64
 	LastResumeOrStartedAt *float64
 }

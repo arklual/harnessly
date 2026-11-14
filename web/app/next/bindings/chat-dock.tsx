@@ -13,7 +13,7 @@ import {
   withQuotes,
   editQuote,
 } from '@/next/stores/quotes';
-import { FeedNotesBar, showFeedNote, useFeedNoteChips } from '@/next/features/chat/selbar';
+import { showFeedNote, useFeedNoteChips } from '@/next/features/chat/selbar';
 import type { INoteChipGroup } from '@/next/ui/notes/note-chips';
 import { useContextWindow } from '@/next/bindings/use-context-window';
 import { useAgentLimits } from '@/next/bindings/use-limits';
@@ -51,7 +51,9 @@ import {
 } from '@/next/features/composer/agents';
 import type { IModelPickerProps } from '@/next/features/composer/model-picker';
 import { rememberModes } from '@/next/features/composer/start-choice';
-import Composer, { type IComposerQuote, type TSendMode } from '@/next/features/composer/composer';
+import { type IComposerQuote, type TSendMode } from '@/next/features/composer/composer';
+import type { IComposerProps } from '@/next/features/composer/composer';
+import ScreenField from '@/next/features/composer/one-field';
 import { formatAnnotation, renumberBlock, withAnnotations } from '@/next/features/designly/annotation';
 import {
   CARRIED_PREFIX,
@@ -101,7 +103,7 @@ import { useChatApps } from '@/next/bindings/use-chat-apps';
 import { REFS_MAX, type MessageRef } from '@/next/protocol/v2';
 import { limitPlaceholder } from '@/next/features/chat/limit';
 import { machineNow } from '@/next/core/clock';
-import { useDraftField } from '@/next/bindings/use-draft';
+import { useDraftParts, useDraftText } from '@/next/bindings/use-draft';
 import { useFieldStash } from '@/next/bindings/use-stash';
 import { limitsOf, useMachine } from '@/next/stores/machines';
 import { useVoice } from '@/next/bindings/use-voice';
@@ -114,6 +116,7 @@ import { toast } from '@/next/ui/toast';
 import { useEnterSends } from '@/next/stores/me';
 import { takeBackMessage } from '@/next/bindings/take-back';
 import { useDelayed } from '@/next/ui/skeleton';
+import { countRender } from '@/next/core/perf-journal';
 
 const rowOf = (m: MessageView): QueueRow => ({
   clientId: m.clientId,
@@ -169,7 +172,14 @@ export const OFF_NOTICE_MS = 120_000;
 const modelBlocked = (agent: IPickerAgent): string | null =>
   agent.canSwitch ? null : t('next.picker.cantSwitch', { agent: agent.name });
 
+/** The chat's field with its text: the one part of the dock that renders on a key. */
+const DockField = ({ draftKey, ...props }: Omit<IComposerProps, 'value'> & { draftKey: ConvId }) => {
+  const value = useDraftText(draftKey);
+  return <ScreenField {...props} value={value} />;
+};
+
 const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProps) => {
+  countRender('dock');
   const enterSends = useEnterSends();
   const record = useConversation(conv);
   const machineView = useMachine(machine);
@@ -178,7 +188,17 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   const gates = useGates(conv);
   const pending = usePendingMessages(conv);
   const fed = useFedClients(conv);
-  const { text, files, refs, notes, setText: onChange, read, field } = useDraftField(conv);
+  // the dock does not re-render on a key; the text is the field's (DockField) and read() at the send.
+  const {
+    empty: fieldEmpty,
+    slash: slashed,
+    files,
+    refs,
+    notes,
+    setText: onChange,
+    read,
+    field,
+  } = useDraftParts(conv);
   const uploads = useUploads(machine, conv, files);
   const stash = useFieldStash(conv);
   const quotes = useQuotes(conv);
@@ -217,6 +237,8 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   const carried = useCarriedNotes(conv);
   const open = useMemo(() => openGates(gates), [gates]);
   const question = open.questions[0] ?? null;
+  // The answer typed for a question card: the text is read only while a card asks.
+  const ownAnswer = useDraftText(question ? conv : null);
   const chatState = useAgentState(conv);
   const working = chatState?.k === 'working';
   const waitingAgents = useWaitingAgents(conv);
@@ -291,7 +313,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   );
   const canMove = machineView?.features.includes('queue-move') ?? false;
 
-  const { notice: voiceNotice, insert, ...voice } = useVoice(machine, text, onChange, read, conv);
+  const { notice: voiceNotice, insert, ...voice } = useVoice(machine, '', onChange, read, conv);
   const takes = useTakesMenu(insert);
   const window = useContextWindow(machine, conv, working);
   // The usage meter of whoever the chat spends: the agent's own account, or the vendor's profile it runs on.
@@ -330,7 +352,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   const installedApps = useInstalledApps(
     machine,
     0,
-    chatApps.on.length > 0 || (provider === 'claude' && text.trimStart().startsWith('/')),
+    chatApps.on.length > 0 || (provider === 'claude' && slashed),
   ).list;
   // The commands of the apps on in the chat join the «/» palette.
   const appCommands = useMemo(
@@ -396,6 +418,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
       }
       // A command an installed app answers to (`activation.on: ["command:/x"]`) turns the app on in this chat first: the
       // resting agent is stopped, and this message brings it back with the app.
+      const text = read();
       const word = text.trim().split(/\s/, 1)[0] ?? '';
       const byCommand =
         provider === 'claude' && word.startsWith('/')
@@ -445,7 +468,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
     [
       machine,
       conv,
-      text,
+      read,
       refs,
       withMarks,
       quotes,
@@ -544,7 +567,6 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
 
   return (
     <>
-      <FeedNotesBar conv={conv} count={feedChips.length} onSend={() => sendRef.current?.()} />
       <ConnectionBanner
         connection={machineOff ? undefined : connection}
         machineName={machineName}
@@ -553,7 +575,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
       <QuestionCard
         question={question}
         device={deviceId()}
-        ownAnswer={question ? text : ''}
+        ownAnswer={ownAnswer}
         onSendReady={(send) => {
           cardSend.current = send;
         }}
@@ -584,10 +606,10 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         onResume={() => settled(resumeQueue(machine, conv))}
         onRetry={(id) => settled(retryMessage(id))}
       />
-      {text === '' && <AppStarters lines={starters} onPick={intoField} />}
-      <Composer
+      {fieldEmpty && <AppStarters lines={starters} onPick={intoField} />}
+      <DockField
+        draftKey={conv}
         enterSends={enterSends}
-        value={text}
         onChange={onChange}
         inputRef={field}
         onSubmit={onSubmit}

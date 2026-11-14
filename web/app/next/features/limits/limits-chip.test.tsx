@@ -32,6 +32,7 @@ const limits = (over: Partial<ProviderLimits> = {}): ProviderLimits => ({
   updatedAt: Date.now(),
   plan: 'Claude Max 20x',
   error: null,
+  rejected: false,
   ...over,
 });
 

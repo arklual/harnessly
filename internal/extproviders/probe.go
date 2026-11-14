@@ -186,10 +186,12 @@ func parseModels(raw []byte) ([]Model, bool) {
 			ID          string `json:"id"`
 			DisplayName string `json:"display_name"`
 			Name        string `json:"name"`
+			modelWindow
 		} `json:"data"`
 		Models []struct {
 			ID   string `json:"id"`
 			Name string `json:"name"`
+			modelWindow
 		} `json:"models"`
 	}
 	if json.Unmarshal(raw, &doc) != nil || (doc.Data == nil && doc.Models == nil) {
@@ -197,7 +199,7 @@ func parseModels(raw []byte) ([]Model, bool) {
 	}
 	out := []Model{}
 	seen := map[string]bool{}
-	add := func(id, label string) {
+	add := func(id, label string, window int) {
 		id = strings.TrimSpace(id)
 		if id == "" || len(id) > MaxModelID || seen[id] || len(out) >= MaxModels {
 			return
@@ -206,24 +208,51 @@ func parseModels(raw []byte) ([]Model, bool) {
 		if label == id || len(label) > MaxModelID {
 			label = ""
 		}
-		out = append(out, Model{ID: id, Label: label})
+		if window < 0 || window > MaxWindow {
+			window = 0
+		}
+		out = append(out, Model{ID: id, Label: label, Window: window})
 	}
 	for _, m := range doc.Data {
 		label := m.DisplayName
 		if label == "" {
 			label = m.Name
 		}
-		add(m.ID, label)
+		add(m.ID, label, m.window())
 	}
 	for _, m := range doc.Models {
 		if m.ID == "" {
-			add(m.Name, "")
+			add(m.Name, "", m.window())
 		} else {
-			add(m.ID, m.Name)
+			add(m.ID, m.Name, m.window())
 		}
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, true
+}
+
+// modelWindow is the context window as the vendors list it: context_length (OpenRouter, DeepSeek), context_window
+// (Groq), max_context_length, max_model_len (vLLM), top_provider.context_length (OpenRouter's served one).
+type modelWindow struct {
+	ContextLength    int `json:"context_length"`
+	ContextWindow    int `json:"context_window"`
+	MaxContextLength int `json:"max_context_length"`
+	MaxModelLen      int `json:"max_model_len"`
+	TopProvider      *struct {
+		ContextLength int `json:"context_length"`
+	} `json:"top_provider"`
+}
+
+func (w modelWindow) window() int {
+	for _, n := range []int{w.ContextLength, w.ContextWindow, w.MaxContextLength, w.MaxModelLen} {
+		if n > 0 {
+			return n
+		}
+	}
+	if w.TopProvider != nil {
+		return w.TopProvider.ContextLength
+	}
+	return 0
 }
 
 // speaksAnthropic: the body is the Anthropic API's error or message.

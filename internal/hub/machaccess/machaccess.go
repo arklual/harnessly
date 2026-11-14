@@ -261,6 +261,16 @@ func (c *Checker) Visible(ctx context.Context, userID string, m store.Machine) b
 	return c.Reach(ctx, userID, m) == nil
 }
 
+// Opens says whether the person may read what the machine holds (its chats, the design projects recorded on it) without
+// opening it: Check under HUB_ACCESS_ENFORCE=on, the owner's rule included, and yes in off and warn, where nothing is
+// hidden. Unlike Check it logs nothing, since lists ask it once per machine and person. A failed lookup is a no.
+func (c *Checker) Opens(ctx context.Context, userID string, m store.Machine) bool {
+	if !c.Hides() {
+		return true
+	}
+	return c.Check(ctx, userID, m) == nil
+}
+
 // Hides says whether the access list hides machines at all (HUB_ACCESS_ENFORCE=on): without it nothing is looked up.
 func (c *Checker) Hides() bool {
 	return c.Enforcing() && c.Config.Machines.AccessEnforce == config.AccessOn

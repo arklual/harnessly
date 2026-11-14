@@ -187,6 +187,41 @@ html[data-theme='dark'],
   --hx-scrim: rgba(0, 0, 0, 0.5);
 }
 
+/* The one look of every menu: black in both themes, as the smart notice's. Every colour token of the
+   interface is turned to the menu's inside here, in one place, so whatever it holds (a search, a picker, an empty
+   state, a check) reads on black in the light theme too: a token left out falls through to the page's theme, and a
+   light page's white field with the menu's white words is what that looked like (HRN-1416). */
+.hx-plus,
+.hx-hubmenu {
+  --hx-bg-backdrop: #000;
+  --hx-bg-app: #000;
+  --hx-bg-rail: #000;
+  --hx-bg-stage: #000;
+  --hx-bg-window: #000;
+  --hx-bg-pane: #000;
+  --hx-bg-canvas: #000;
+  --hx-bg-raised: #000;
+  --hx-bg-hover: rgb(255 255 255 / 0.11);
+  --hx-bg-active: rgb(255 255 255 / 0.14);
+  --hx-bg-bubble: rgb(255 255 255 / 0.11);
+  --hx-fg-1: #fff;
+  --hx-fg-2: rgb(255 255 255 / 0.62);
+  --hx-fg-3: rgb(255 255 255 / 0.42);
+  --hx-border: rgb(255 255 255 / 0.07);
+  --hx-border-strong: rgb(255 255 255 / 0.07);
+  --hx-primary: #fff;
+  --hx-primary-fg: #000;
+  --hx-accent: #fff;
+  --hx-accent-soft: rgb(255 255 255 / 0.14);
+  --hx-danger: #ff7a70;
+  --hx-focus: rgb(255 255 255 / 0.35);
+  --hx-shell-hover: rgb(255 255 255 / 0.11);
+  --hx-shell-active: rgb(255 255 255 / 0.14);
+  --hx-scrollbar: rgb(255 255 255 / 0.16);
+  --hx-scrollbar-hover: rgb(255 255 255 / 0.3);
+  color-scheme: dark;
+}
+
 /* The phone reads at arm's length on a small screen: every step of the type scale one pixel up (body 15px), so the
    secondary lines (times, paths, counts) stay at 13px and above. */
 @media (max-width: 900px) {

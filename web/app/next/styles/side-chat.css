@@ -88,29 +88,9 @@
   cursor: pointer;
 }
 .hx-sidechat__foot {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
+  /* The chat's own field (features/composer) in a narrow place: a dock of a screen (composer.css). */
+  flex: none;
   margin: 0 10px 10px;
-  padding: 6px 6px 6px 12px;
-  border-radius: 14px;
-  border: 1px solid var(--hx-border);
-  background: var(--hx-bg-app);
-}
-.hx-sidechat__input {
-  flex: 1;
-  min-width: 0;
-  min-height: 24px;
-  max-height: 140px;
-  padding: 4px 0;
-  border: 0;
-  background: transparent;
-  color: var(--hx-fg-1);
-  font: inherit;
-  font-size: var(--hx-text-sm);
-  line-height: 20px;
-  resize: none;
-  outline: none;
 }
 .hx-sidechat__send {
   flex: none;

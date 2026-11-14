@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
 import { PHONE_QUERY } from '@/next/features/shell/gestures';
 
 /** The slide's length and curve, easing out (`--hx-side-dur`, `--hx-side-ease` in styles/shell.css). */
@@ -28,6 +28,12 @@ const SCREEN_BOUND = '.hx-sidechat, .hx-sidesnap, .hx-selbar, .hx-gallery, .hx-i
 
 const px = (value: string): number => Number.parseFloat(value) || 0;
 
+/** How much wider the open sidebar is than its rail, in px. */
+const spanOf = (app: HTMLElement): number => {
+  const styles = getComputedStyle(app);
+  return px(styles.getPropertyValue('--hx-sidebar-w')) - px(styles.getPropertyValue('--hx-rail-w'));
+};
+
 /** How far the body is now from where the layout put it, in px (the running slide's frame, 0 at rest). */
 const currentShift = (body: HTMLElement): number => {
   const transform = getComputedStyle(body).transform;
@@ -47,6 +53,17 @@ const currentShift = (body: HTMLElement): number => {
 const useSideMotion = ({ app, main, body, strip }: ISideMotionRefs, rail: boolean): void => {
   const previous = useRef(rail);
   const running = useRef<Animation[]>([]);
+  // The columns' difference, read after the paint: read in the toggle's layout effect, it restyled the page
+  // in the middle of the commit that opens the right pane or folds the sidebar (~50 ms at CPU ×4). Taken once the page has painted after the mount, and again when a slide has landed.
+  const spanRef = useRef<number | null>(null);
+  useEffect(() => {
+    const appEl = app.current;
+    if (!appEl) return;
+    const timer = window.setTimeout(() => {
+      spanRef.current = spanOf(appEl);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [app]);
 
   useLayoutEffect(() => {
     if (previous.current === rail) return;
@@ -55,13 +72,13 @@ const useSideMotion = ({ app, main, body, strip }: ISideMotionRefs, rail: boolea
     const mainEl = main.current;
     const bodyEl = body.current;
     if (!appEl || !mainEl || !bodyEl) return;
-    const shift = currentShift(bodyEl);
+    // At rest the body stands where the layout put it: its transform is read only while a slide runs.
+    const shift = running.current.length > 0 ? currentShift(bodyEl) : 0;
     for (const animation of running.current) animation.cancel();
     running.current = [];
     appEl.removeAttribute('data-move');
     if (matchMedia(PHONE_QUERY).matches || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const styles = getComputedStyle(appEl);
-    const span = px(styles.getPropertyValue('--hx-sidebar-w')) - px(styles.getPropertyValue('--hx-rail-w'));
+    const span = spanRef.current ?? spanOf(appEl);
     // The edge was `shift` off the old place; the new place is `span` to the left (folded) or right (opened).
     const from = shift + (rail ? span : -span);
     if (from === 0 || bodyEl.querySelector(SCREEN_BOUND)) return;
@@ -97,6 +114,7 @@ const useSideMotion = ({ app, main, body, strip }: ISideMotionRefs, rail: boolea
       if (running.current !== slides) return;
       running.current = [];
       appEl.removeAttribute('data-move');
+      spanRef.current = spanOf(appEl);
     });
   }, [rail, app, main, body, strip]);
 

@@ -244,7 +244,7 @@ const land = (section: HTMLElement, aimed: IAim, onZone: TDropZone) => {
   onZone(aimed.zone, aimed.drop);
   if (aimed.zone === 'float' || aimed.zone === 'island')
     requestAnimationFrame(() =>
-      section.querySelector<HTMLTextAreaElement>('.hx-island__input')?.focus({ preventScroll: true }),
+      section.querySelector<HTMLTextAreaElement>('.hx-island textarea')?.focus({ preventScroll: true }),
     );
 };
 

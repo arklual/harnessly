@@ -23,6 +23,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/spaces"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hub/tenant"
+	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
 const (
@@ -380,6 +381,9 @@ func (s *Service) patch(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) 
 		// AppsConsent is the rule for apps: "ask" or "auto" («Не спрашивать разрешений»). It is the
 		// organization's admin's, by a person's session: Gate lets no machine's or agent's token in.
 		AppsConsent *string
+		// Links are the integrations for the chat's links: the whole object replaces the held one, an empty
+		// one clears it.
+		Links *hubproto.LinkSettings
 	}
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
@@ -418,6 +422,13 @@ func (s *Service) patch(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) 
 		}
 		next.AppsConsent = *req.AppsConsent
 	}
+	if req.Links != nil {
+		links, err := cleanLinks(*req.Links)
+		if err != nil {
+			return err
+		}
+		next.Links = links
+	}
 	for _, f := range []struct {
 		key      string
 		was, now string
@@ -425,6 +436,10 @@ func (s *Service) patch(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) 
 		if f.was != f.now {
 			before[f.key], after[f.key] = f.was, f.now
 		}
+	}
+	linksChanged := !sameLinks(o.Links, next.Links)
+	if linksChanged {
+		before["links"], after["links"] = o.Links, next.Links
 	}
 	if len(after) > 0 {
 		err = s.db.Tx(ctx, func(st store.Store) error {
@@ -437,8 +452,8 @@ func (s *Service) patch(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) 
 		if err != nil {
 			return err
 		}
-		if next.AppsConsent != o.AppsConsent && s.onEnv != nil {
-			s.onEnv() // the machines' lists carry the rule: they get it now
+		if (next.AppsConsent != o.AppsConsent || linksChanged) && s.onEnv != nil {
+			s.onEnv() // the machines' lists carry the rule and the links: they get them now
 		}
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"org": orgView(next)})

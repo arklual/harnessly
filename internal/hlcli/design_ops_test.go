@@ -33,7 +33,7 @@ func TestDesignClaimsHistoryAndPanel(t *testing.T) {
 		{[]string{"design", "logs", "shop"}, "GET", "/api/cli/design", "logs=shop", "", `{"entries":[{"at":0,"kind":"error","page":"p","message":"boom"}]}`, "boom"},
 		{[]string{"design", "list"}, "GET", "/api/cli/design", "", "", `{"rules":"/r.md","artifacts":[{"id":"shop","title":"Shop","boards":3,"projectPath":"/p"}]}`, "shop\t3 boards"},
 		{[]string{"design", "panel", "shop", "show", "--board", "Main", "--set", "n=3", "--set", "on=true", "--set", "t=hi"}, "POST", "/api/cli/design", "",
-			`{"artifact":"shop","control":{"board":"Main","panel":"show","props":{"n":3,"on":true,"t":"hi"}}}`,
+			`{"artifact":"shop","control":{"board":"Main","panel":"show","props":{"n":3,"on":true,"t":"hi"}},"session":"hs-me"}`,
 			`{"pages":1,"shown":null}`, "reached the open previews: 1"},
 	}
 	for _, tc := range cases {

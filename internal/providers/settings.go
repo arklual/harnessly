@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agents"
 )
@@ -87,11 +89,31 @@ func (s *Store) SettingsFile(id, model, hooksPath string) (string, error) {
 	if p.Switched {
 		sw := s.SwitchOf(id)
 		var ok bool
+		if e, starts := sw.(interface{ Ensure(context.Context) error }); starts {
+			// A switch on by default: its proxy is started by the first chat that needs it.
+			ctx, cancel := context.WithTimeout(context.Background(), proxyLaunchWait)
+			err := e.Ensure(ctx)
+			cancel()
+			if err != nil {
+				return "", err
+			}
+		}
 		if sw != nil {
 			base, keyFile, ok = sw.Endpoint()
 		}
 		if !ok {
 			return "", ErrSwitchOff
+		}
+	}
+	if p.Proxied != "" {
+		if s.Proxy == nil {
+			return "", ErrSwitchOff
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), proxyLaunchWait)
+		defer cancel()
+		var err error
+		if base, keyFile, err = s.Proxy.ExtEndpoint(ctx); err != nil {
+			return "", err
 		}
 	}
 	raw, err := os.ReadFile(hooksPath)
@@ -131,7 +153,10 @@ func (s *Store) SettingsFile(id, model, hooksPath string) (string, error) {
 	// An agent that prints its environment prints these: the feed hides them from now on.
 	s.hide(taken)
 	settings["env"] = env
-	if p.Custom && (p.ownCredential() || !s.Configured(id)) {
+	if p.Proxied != "" {
+		// The proxy's own key: the provider's stays with the runtime's relay.
+		settings["apiKeyHelper"] = "cat " + shellQuote(keyFile)
+	} else if p.Custom && (p.ownCredential() || !s.Configured(id)) {
 		// The provider's own token goes in the environment; a helper would be asked before it.
 		delete(settings, "apiKeyHelper")
 	} else {
@@ -158,5 +183,9 @@ func (s *Store) SettingsFile(id, model, hooksPath string) (string, error) {
 	}
 	return target, nil
 }
+
+// proxyLaunchWait bounds the start of the proxy a chat on an OpenAI-compatible provider waits for: its first start
+// downloads it.
+const proxyLaunchWait = 2 * time.Minute
 
 func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }

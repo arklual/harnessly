@@ -18,6 +18,7 @@ import { readAnnotated, type ISentNote } from '@/next/features/designly/annotati
 import { NoteChip } from '@/next/features/designly/note-chip';
 import { bubbleParts, Pasted, splitPasted } from '@/next/features/chat/pasted';
 import { parsePeers } from '@/next/features/chat/peer';
+import { AppTaskCard, parseAppTask } from '@/next/features/chat/app-task';
 import { parseContextBlock } from '@/next/features/chat/handoff';
 import { ContextCard } from '@/next/features/chat/handoff-card';
 import { PEER_DELIVERY, PeerCard, type TPeerDelivery } from '@/next/features/chat/peer-card';
@@ -271,6 +272,9 @@ const UserMessage = ({
   // A picture's path in the words (a paste of the old view) is the picture itself, without the path.
   const pictures = useNamedPictures(placed.text);
   if (!fade.mounted) return null;
+  // A task an app set in the person's name is the app's card, not the person's words.
+  const task = parseAppTask(text);
+  if (task) return <AppTaskCard task={task} />;
   // Another agent's words are never the person's bubble (internal/peers delivers them as an envelope).
   // Several agents' messages that reached the agent as one are a card each, in the order they came.
   const peers = parsePeers(text);

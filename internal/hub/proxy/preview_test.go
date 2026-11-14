@@ -14,7 +14,8 @@ func TestHubPassesPreviewPath(t *testing.T) {
 	for path, want := range map[string]bool{
 		"/m/abc/__pv/1-" + pvKey + "/x": true,
 		"/m/abc/__pv/6-" + pvKey:        true,
-		"/m/abc/__pv/7-" + pvKey + "/x": false,
+		"/m/abc/__pv/7-" + pvKey + "/x": true,
+		"/m/abc/__pv/9-" + pvKey + "/x": false,
 		"/m/abc/__pv/1/x":               false,
 		"/m/abc/__pv/1-short/x":         false,
 		"/m/abd/__pv/1-" + pvKey + "/x": false,

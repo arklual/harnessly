@@ -340,18 +340,7 @@
 
 /* ── The menus the filters open ── */
 .hx-hubmenu {
-  /* The one look of every menu: black in both themes, as the smart notice's. The interface's tokens are
-     turned to the menu's inside, so what it holds (a search, a picker, a hint) reads on black too. */
-  --hx-bg-raised: #000;
-  --hx-bg-hover: rgb(255 255 255 / 0.11);
-  --hx-bg-active: rgb(255 255 255 / 0.14);
-  --hx-fg-1: #fff;
-  --hx-fg-2: rgb(255 255 255 / 0.62);
-  --hx-fg-3: rgb(255 255 255 / 0.42);
-  --hx-border: rgb(255 255 255 / 0.07);
-  --hx-border-strong: rgb(255 255 255 / 0.07);
-  --hx-accent: #fff;
-  color-scheme: dark;
+  /* Black in both themes: its tokens are the black menu's set in tokens.css. */
   color: var(--hx-fg-1);
   width: 260px;
   max-width: calc(100vw - 16px);

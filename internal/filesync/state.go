@@ -52,6 +52,28 @@ func (s *state) get(path string) (*known, error) {
 	return &k, err
 }
 
+// all reads every file the agent knows in one query: a full scan looks its files up here instead of asking SQLite once
+// per file (on a folder of 22 000 files the per-file lookups were a quarter of the runtime's CPU).
+func (s *state) all() (map[string]known, error) {
+	rows, err := s.db.Query(`SELECT path, rev, sha, size, mtime, deleted FROM files`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]known{}
+	for rows.Next() {
+		var p string
+		var k known
+		var deleted int
+		if err := rows.Scan(&p, &k.Rev, &k.Sha, &k.Size, &k.Mtime, &deleted); err != nil {
+			return nil, err
+		}
+		k.Deleted = deleted != 0
+		out[p] = k
+	}
+	return out, rows.Err()
+}
+
 func (s *state) put(path string, k known) error {
 	d := 0
 	if k.Deleted {

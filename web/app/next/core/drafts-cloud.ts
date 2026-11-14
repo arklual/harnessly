@@ -37,7 +37,7 @@ import {
 import { activeMachineStore, hasFeature, machinesStore } from '@/next/stores/machines';
 
 /** A pause in typing this long writes the field. */
-export const CLOUD_DELAY_MS = 1000;
+export const CLOUD_DELAY_MS = 700;
 /** While the person types without such a pause, the field is written once in this long. */
 export const CLOUD_EVERY_MS = 2000;
 /** How long a field refused as stale waits for the machine's current draft before it asks for the machine's list. */
@@ -67,7 +67,7 @@ interface IKeyState {
 
 /** The fields the machine keeps: a chat's and the new chat's. A design's field (no chat yet) stays on this device. */
 type DraftKey = ConvId | typeof NEW_CHAT;
-const synced = (k: AnyDraftKey): k is DraftKey => !k.startsWith('design:');
+const synced = (k: AnyDraftKey): k is DraftKey => !k.startsWith('design:') && !k.startsWith('screen:');
 
 const states = new Map<DraftKey, IKeyState>();
 const stateOf = (k: DraftKey): IKeyState => {
@@ -238,7 +238,8 @@ export function applyRemoteDraft(machine: MachineId, d: Draft): void {
   const judged = judgeRemote(local, draftBaseStore.get(k), d, st.busy);
   if (judged === REMOTE.ignore) return;
   // This page's own write coming back moves the base only: the field keeps what it has now (cleared by a send).
-  const verdict = judged === REMOTE.take && isOwnEcho(k, d) ? REMOTE.keep : judged;
+  const own = isOwnEcho(k, d);
+  const verdict = judged === REMOTE.take && own ? REMOTE.keep : judged;
   clearBehind(st);
   const differs = !sameField(local, remote);
   batch(() => {
@@ -252,7 +253,12 @@ export function applyRemoteDraft(machine: MachineId, d: Draft): void {
         ...(remote.refs ? { refs: [...remote.refs] } : {}),
       });
   });
-  if (verdict === REMOTE.keep && differs) schedule(k, 0);
+  // The field moved on since this page's own write came back (the person types): it goes with the typing's own
+  // pause, not at once. At once, every echo of a write sent while typing sent the next one, a write per round trip (~100 ms).
+  if (verdict === REMOTE.keep && differs) {
+    if (own) scheduleTyped(k);
+    else schedule(k, 0);
+  }
 }
 
 /** The machine's drafts from its convs snapshot; then every field of it that changed here goes out. */
@@ -297,7 +303,12 @@ function resync(machine: MachineId): void {
   if (!syncs(machine)) return;
   const keys = new Set<DraftKey>([...draftsStore.keys(), ...draftBaseStore.keys()].filter(synced));
   for (const k of keys)
-    if (machineOf(k) === machine && !stateOf(k).busy && nextWrite(fieldNow(k), draftBaseStore.get(k)))
+    if (
+      machineOf(k) === machine &&
+      !stateOf(k).busy &&
+      stateOf(k).timer === null &&
+      nextWrite(fieldNow(k), draftBaseStore.get(k))
+    )
       schedule(k);
 }
 

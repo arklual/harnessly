@@ -117,8 +117,8 @@ func pageConfigFromEnv() pageConfig {
 		PaneHosts:         list(splitList(os.Getenv("RUNTIME_PANE_HOSTS"))),
 		DefaultPins:       defaultPins(os.Getenv("RUNTIME_DEFAULT_PINS")),
 		People:            people(os.Getenv("RUNTIME_PEOPLE")),
-		TrackerHosts:      list(splitList(os.Getenv("RUNTIME_TRACKER_HOSTS"))),
-		GitlabHosts:       list(splitList(env("RUNTIME_GITLAB_HOSTS", "gitlab.com"))),
+		TrackerHosts:      list(displayTrackerHosts()),
+		GitlabHosts:       list(gitlabHostsOrPublic()),
 		ConnectionHosts:   []string{},
 		LayoutKey:         env("RUNTIME_LAYOUT_KEY", "layout"),
 		LaunchDefaultsKey: env("RUNTIME_LAUNCH_DEFAULTS_KEY", "launchDefaults"),
@@ -141,7 +141,7 @@ func pageConfigFromEnv() pageConfig {
 	}
 	if issue := strings.TrimSpace(os.Getenv("RUNTIME_TRACKER_ISSUE_URL")); issue != "" {
 		c.TrackerIssueURL = &issue
-	} else if base := strings.TrimRight(strings.TrimSpace(os.Getenv("RUNTIME_TRACKER_URL")), "/"); base != "" {
+	} else if base := displayTrackerURL(); base != "" {
 		c.TrackerIssueURL = optional(base + "/issue/{key}")
 	}
 	if re := strings.TrimSpace(os.Getenv("RUNTIME_TASK_KEY_RE")); re != "" {

@@ -411,8 +411,21 @@
       });
     }, Promise.resolve());
   }
+  // A board in a slot by path is a sandbox with an opaque origin, and its own reload is a cross-site navigation: a proxy in
+  // front of the platform (Teleport) does not let it through and answers with its sign-in page, which may not be framed,
+  // and Chrome draws a broken frame instead of the board. The framing page reloads the frame itself, from its
+  // own origin; until then the board stays as it was. Only when no host answers does the board reload on its own.
+  var HOST_RELOAD_WAIT = 1500;
+  var reloading = false;
   function hardReload() {
     try { sessionStorage.setItem(scrollKey(), String(window.scrollY)); } catch (e) {}
+    if (reloading) return;
+    reloading = true;
+    if (location.origin === 'null' && window.parent !== window) {
+      try { window.parent.postMessage({ type: 'tk:reload' }, '*'); } catch (e) {}
+      setTimeout(function () { location.reload(); }, HOST_RELOAD_WAIT);
+      return;
+    }
     location.reload();
   }
   var applied = function () {};
@@ -3255,6 +3268,167 @@
     paint();
     setCollapsed(stored(COLLAPSED) === '1');
     showError();
+  }
+
+  var LINK_MISSING = 'В проекте нет страницы: ';
+  // Links between pages. A plain link to another board of the project — `<a href="./Оплата.dc.html">`, with
+  // the target's props in its query (`?variant=Mobile&loading=true`) and a block in its hash (`#pay`) — or one that
+  // names the page by its title or file (`sinopia:page/Оплата?variant=Mobile#pay`). Framed by the platform, the frame
+  // does not go there itself: the host is told (`tk:go`) and switches its page, its settings and its view; a click
+  // with ⌘/Ctrl/Shift (or target=_blank) asks for a tab of its own. While a block is being picked the click is the
+  // pick's, and while a slide is edited it is the edit's (Alt + click follows the link there). Opened alone in a browser
+  // tab, a link to a file is the browser's own and its props are taken at the target's load (below).
+  var PAGE_SCHEME = 'sinopia:page/';
+  var PAGE_FILE = /\.dc\.html$/i;
+  var LINK_PROPS_MAX = 40;
+  var LINK_TEXT_MAX = 2000;
+  function decodedPath(path) { try { return decodeURIComponent(path); } catch (e) { return path; } }
+  function linkProps(params) {
+    var out = {};
+    var count = 0;
+    params.forEach(function (value, key) {
+      if (key === 'tkv' || count >= LINK_PROPS_MAX || key.length > 80) return;
+      out[key] = value.slice(0, LINK_TEXT_MAX);
+      count += 1;
+    });
+    return out;
+  }
+  function pageLinkOf(link) {
+    var raw = String(link.getAttribute('href') || '').trim();
+    if (!raw) return null;
+    if (raw.slice(0, PAGE_SCHEME.length).toLowerCase() === PAGE_SCHEME) {
+      var rest = raw.slice(PAGE_SCHEME.length);
+      var cut = rest.search(/[?#]/);
+      var tail = new URL('http://page/' + (cut < 0 ? '' : rest.slice(cut)));
+      return { ref: decodedPath(cut < 0 ? rest : rest.slice(0, cut)).slice(0, 300), file: false, props: linkProps(tail.searchParams), hash: decodedPath(tail.hash.slice(1)).slice(0, 200) };
+    }
+    var url;
+    try { url = new URL(raw, location.href); } catch (e) { return null; }
+    if (url.origin !== location.origin || !PAGE_FILE.test(url.pathname)) return null;
+    return { ref: decodedPath(url.pathname).slice(0, 600), from: decodedPath(location.pathname).slice(0, 600), file: true, props: linkProps(url.searchParams), hash: decodedPath(url.hash.slice(1)).slice(0, 200) };
+  }
+  // A link's words are text: a switch takes «true»/«1», a number its digits, a choice the option whose words they are.
+  function linkValue(item, text) {
+    if (item.editor === 'boolean') return text === 'true' || text === '1' || text === '' ? true : text === 'false' || text === '0' ? false : undefined;
+    if (item.options && item.options.length) {
+      for (var i = 0; i < item.options.length; i += 1) if (String(item.options[i].value) === text) return item.options[i].value;
+      return undefined;
+    }
+    if (item.editor === 'number' || item.editor === 'range' || typeof item.value === 'number') { var n = Number(text); return text !== '' && isFinite(n) ? n : undefined; }
+    return text;
+  }
+  function boardNamed(ref) {
+    var wanted = ref.replace(PAGE_FILE, '');
+    for (var i = 0; i < boards.length; i += 1) {
+      var item = boards[i];
+      var file = decodedPath(new URL(item.href, location.origin).pathname).split('/').pop() || '';
+      if (item.title === ref || file === ref || file.replace(PAGE_FILE, '') === wanted) return item;
+    }
+    return null;
+  }
+  function linkSay(text) {
+    toast.textContent = text;
+    toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.hidden = true; }, 2400);
+  }
+  window.addEventListener('click', function (event) {
+    if (event.defaultPrevented || picking || event.button !== 0) return;
+    var link = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+    var target = link && pageLinkOf(link);
+    if (!target) return;
+    event.preventDefault();
+    if (deckOn && deckMode === 'edit' && !event.altKey) return;
+    var tab = event.metaKey || event.ctrlKey || event.shiftKey || link.getAttribute('target') === '_blank';
+    if (parentWin) {
+      try {
+        parentWin.postMessage({ type: 'tk:go', ref: target.ref, file: target.file, from: target.from || '', props: target.props, hash: target.hash, tab: tab }, hostOrigin);
+      } catch (e) {}
+      return;
+    }
+    var dest;
+    if (target.file) dest = new URL(link.getAttribute('href'), location.href);
+    else {
+      var board = boardNamed(target.ref);
+      if (!board) { linkSay(LINK_MISSING + target.ref); return; }
+      dest = new URL(board.href, location.origin);
+      Object.keys(target.props).forEach(function (key) { dest.searchParams.set(key, target.props[key]); });
+      dest.hash = target.hash;
+    }
+    if (tab) window.open(dest.href, '_blank', 'noopener'); else location.href = dest.href;
+  });
+  // The block a link names (its id or its data-block) is scrolled to once the page has drawn it.
+  function scrollToBlock(name) {
+    if (!name) return;
+    var tries = 0;
+    (function look() {
+      var el = document.getElementById(name);
+      if (!el) { try { el = document.querySelector('[data-block="' + (window.CSS && CSS.escape ? CSS.escape(name) : name) + '"]'); } catch (e) { el = null; } }
+      if (el) { el.scrollIntoView({ block: 'start', behavior: 'smooth' }); return; }
+      if (tries++ < 50) setTimeout(look, 100);
+    })();
+  }
+  // The props a link carried (the target's own query) are laid over the board's defaults once its runtime is up.
+  function takeLinkProps(values) {
+    var tries = 0;
+    (function look() {
+      var ready = isDesignBoard() && window.__dcRegistry && window.__dcRegistry[window.__dcRootName()];
+      if (!ready) { if (tries++ < 100) setTimeout(look, 100); return; }
+      var name = window.__dcRootName();
+      var entry = window.__dcRegistry[name];
+      var next = {};
+      var current = entry.propOverrides || {};
+      var changed = false;
+      for (var key in current) next[key] = current[key];
+      readControls().forEach(function (item) {
+        if (!item.live || !Object.prototype.hasOwnProperty.call(values, item.name)) return;
+        var value = typeof values[item.name] === 'string' ? linkValue(item, values[item.name]) : values[item.name];
+        if (value === undefined || !acceptable(item, value)) return;
+        next[item.name] = value;
+        changed = true;
+      });
+      if (!changed) return;
+      window.__dcSetProps(name, next);
+      setTimeout(function () { renderTweaks(); reportState(); tellHost(false); }, 0);
+    })();
+  }
+  (function () {
+    var values = linkProps(here().searchParams);
+    if (Object.keys(values).length) takeLinkProps(values);
+    scrollToBlock(decodedPath(location.hash.slice(1)));
+  })();
+  // The host that followed a link hands the link's props and block to the board it opened (`tk:go-take`).
+  window.addEventListener('message', function (event) {
+    var data = event.data;
+    if (!parentWin || event.source !== parentWin || event.origin !== hostOrigin || !data || data.type !== 'tk:go-take') return;
+    if (data.props && typeof data.props === 'object') {
+      var values = {};
+      Object.keys(data.props).slice(0, LINK_PROPS_MAX).forEach(function (key) {
+        var value = data.props[key];
+        if (typeof value === 'string') values[key] = value.slice(0, LINK_TEXT_MAX);
+      });
+      takeLinkProps(values);
+    }
+    if (typeof data.hash === 'string') scrollToBlock(data.hash.slice(0, 200));
+    tellFrame();
+  });
+  // The frame the board asks for (its data-props' `$preview`), told to the host that opened it for a link: a narrow one
+  // is a phone's page, and the host shows it in a phone (`tk:frame`; 0 × 0 for a board that fills the window).
+  function tellFrame() {
+    var tries = 0;
+    (function look() {
+      var entry = isDesignBoard() && window.__dcRegistry && window.__dcRegistry[window.__dcRootName()];
+      if (!entry) { if (tries++ < 100) setTimeout(look, 100); return; }
+      var preview = entry.preview && typeof entry.preview === 'object' ? entry.preview : null;
+      if (!preview) {
+        var logic = document.querySelector('script[data-dc-script]');
+        try { preview = (JSON.parse(logic && logic.getAttribute('data-props') || '{}') || {}).$preview; } catch (e) { preview = null; }
+      }
+      preview = preview && typeof preview === 'object' ? preview : {};
+      var w = Number(preview.width) || 0;
+      var h = Number(preview.height) || 0;
+      try { parentWin.postMessage({ type: 'tk:frame', w: w > 0 ? Math.round(w) : 0, h: h > 0 ? Math.round(h) : 0 }, hostOrigin); } catch (e) {}
+    })();
   }
 
   var attach = function () { document.documentElement.appendChild(host); showError(); };

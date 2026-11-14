@@ -34,7 +34,22 @@ const ask = (over: Partial<IAsk>): IAsk => ({
   ...over,
 });
 
-beforeAll(() => pinLocale('en'));
+// The answer box is the chat's own field: it asks the window for its media and its size.
+beforeAll(() => {
+  pinLocale('en');
+  window.matchMedia ??= ((query: string) =>
+    ({
+      matches: false,
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }) as unknown as MediaQueryList) as typeof window.matchMedia;
+  globalThis.ResizeObserver ??= class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+});
 afterEach(() => cleanup());
 
 describe('AskCard', () => {

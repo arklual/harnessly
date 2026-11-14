@@ -2,6 +2,7 @@
 // leaves a feature to the chat's own agent; a provider's model does it always. A feature that does not go through a
 // picked model yet says so and keeps the choice; one whose last call failed says why in the provider's words.
 import { markOf, type TChangedMarks } from '@/next/features/settings/changed-mark';
+import { effortLabel } from '@/next/features/settings/ext-models-editor';
 import { Group, MenuRow } from '@/next/features/settings/rows';
 import type { IChoice } from '@/next/features/settings/options';
 import {
@@ -37,8 +38,10 @@ interface ISmartSectionProps {
 
 export type TAgentModels = Readonly<Record<TSmartAgent, readonly { id: string; label: string }[]>>;
 
-/** A choice as the menu's value: a provider's id has no «/» (it is a slug), a model's may. */
-const valueOf = (choice: ISmartChoice): string => `${choice.provider}/${choice.model}`;
+/** A choice as the menu's value: a provider's id has no «/» (it is a slug), a model's may; a level of reasoning
+ * follows a «#», which no model id has. */
+const valueOf = (choice: ISmartChoice): string =>
+  `${choice.provider}/${choice.model}${choice.effort ? `#${choice.effort}` : ''}`;
 
 /** What a feature may be given: «as now», every model of every provider, and its own choice if no list has it. */
 export const smartChoices = (
@@ -59,8 +62,15 @@ export const smartChoices = (
         add({ provider: agent, model: model.id }, `${t(`next.settings.section.${agent}`)} · ${model.label}`);
   }
   for (const provider of providers)
-    for (const model of provider.models)
+    for (const model of provider.models) {
       add({ provider: provider.id, model: model.id }, `${provider.name} · ${model.label}`);
+      // A model with levels of reasoning is offered at each of them too.
+      for (const effort of model.efforts ?? [])
+        add(
+          { provider: provider.id, model: model.id, effort },
+          `${provider.name} · ${model.label} · ${effortLabel(effort)}`,
+        );
+    }
   const own = feature.choice;
   if (own && !byValue.has(valueOf(own))) {
     const name = providers.find((p) => p.id === own.provider)?.name ?? own.provider;

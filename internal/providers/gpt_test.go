@@ -442,3 +442,86 @@ func TestTheProxyArchiveIsTakenOnlyWithItsDigest(t *testing.T) {
 		}
 	}
 }
+
+// The OpenAI-compatible providers are upstreams of the same proxy, each through the runtime's relay with the relay's
+// key: no provider's key is in the config.
+func TestTheProxyConfigHasTheOpenAIProvidersThroughTheRelay(t *testing.T) {
+	y := string(ProxyConfig{Port: 1, AuthDir: "/a", ClientKey: "c", RelayKey: "relay-key", ExtBase: "http://127.0.0.1:7000" + ExtRelayPath,
+		Ext: []ExtUpstream{{ID: "ds", Models: []ExtModel{{Name: "deepseek-reasoner", Alias: "ds--deepseek-reasoner", Efforts: []wire.Effort{wire.EffortLow, wire.EffortHigh}}}}}}.YAML())
+	for _, want := range []string{
+		"openai-compatibility:\n  - name: \"ext-ds\"\n    base-url: \"http://127.0.0.1:7000/api/cli/ext/ds\"\n    api-key-entries:\n      - api-key: \"relay-key\"\n",
+		"      - name: \"deepseek-reasoner\"\n        alias: \"ds--deepseek-reasoner\"\n        thinking:\n          levels: [\"low\", \"high\"]\n",
+	} {
+		if !strings.Contains(y, want) {
+			t.Errorf("no %q in\n%s", want, y)
+		}
+	}
+	if strings.Contains(y, "codex-api-key") {
+		t.Errorf("a Codex upstream while the gpt switch is off:\n%s", y)
+	}
+}
+
+// The proxy runs for the OpenAI-compatible providers with the gpt switch off, and goes on when the switch goes off.
+func TestTheProxyRunsForTheProvidersWithoutTheSwitch(t *testing.T) {
+	g, _ := newGPT(t)
+	if _, _, err := g.ExtEndpoint(context.Background()); err == nil {
+		t.Fatal("an endpoint without providers")
+	}
+	g.ExtRelayBase = "http://127.0.0.1:1" + ExtRelayPath
+	g.SetExt([]ExtUpstream{{ID: "ds", Models: []ExtModel{{Name: "m", Alias: "ds--m"}}}})
+	if !g.ExtReady("ds") || g.ExtReady("other") {
+		t.Fatal("ready")
+	}
+	base, _, err := g.ExtEndpoint(context.Background())
+	if err != nil || !strings.HasPrefix(base, "http://127.0.0.1:") {
+		t.Fatalf("%s %v", base, err)
+	}
+	cfg, _ := os.ReadFile(g.configFile())
+	if !strings.Contains(string(cfg), "ds--m") || strings.Contains(string(cfg), "codex-api-key") {
+		t.Fatalf("config:\n%s", cfg)
+	}
+	// A provider more: the running proxy's config is written in place (its watch does not see a file renamed over it).
+	before, _ := os.Stat(g.configFile())
+	g.SetExt([]ExtUpstream{{ID: "ds", Models: []ExtModel{{Name: "m", Alias: "ds--m"}}}, {ID: "gq", Models: []ExtModel{{Name: "l", Alias: "gq--l"}}}})
+	after, _ := os.Stat(g.configFile())
+	if cfg, _ = os.ReadFile(g.configFile()); !strings.Contains(string(cfg), "gq--l") || !os.SameFile(before, after) {
+		t.Fatalf("not rewritten in place:\n%s", cfg)
+	}
+	if err := g.SetOn(context.Background(), true); err != nil {
+		t.Fatal(err)
+	}
+	if cfg, _ = os.ReadFile(g.configFile()); !strings.Contains(string(cfg), "codex-api-key") {
+		t.Fatalf("no Codex upstream with the switch on:\n%s", cfg)
+	}
+	port, _ := g.savedPort()
+	if err := g.SetOn(context.Background(), false); err != nil {
+		t.Fatal(err)
+	}
+	if portFree(port) {
+		t.Fatal("the switch off stopped the proxy the providers use")
+	}
+	if cfg, _ = os.ReadFile(g.configFile()); strings.Contains(string(cfg), "codex-api-key") {
+		t.Fatalf("a Codex upstream with the switch off:\n%s", cfg)
+	}
+	g.SetExt(nil)
+	if !portFree(port) {
+		t.Fatal("the proxy runs with neither the switch nor a provider")
+	}
+}
+
+// The key of the proxy never leaves for the provider's address: a proxied profile has no credential to send there.
+func TestAProxiedProfileHasNoCredential(t *testing.T) {
+	g, _ := newGPT(t)
+	g.ExtRelayBase = "http://127.0.0.1:1" + ExtRelayPath
+	g.SetExt([]ExtUpstream{{ID: "ds", Models: []ExtModel{{Name: "m", Alias: "ds--m"}}}})
+	SetCustom([]Preset{{ID: "x-ds", Label: "DS", Via: "claude", BaseURL: "https://api.deepseek.com/v1", Custom: true, Proxied: "ds",
+		Models: []Model{{ID: "ds--m", Label: "M"}}, Small: "ds--m", Test: "ds--m"}})
+	t.Cleanup(func() { SetCustom(nil) })
+	store := &Store{Dir: t.TempDir(), Proxy: g}
+	if !store.Ready("x-ds") {
+		t.Fatal("not ready")
+	}
+	if key, err := store.Credential(context.Background(), "x-ds"); key != "" || !errors.Is(err, ErrNoKey) {
+		t.Fatalf("a credential for the provider's address: %q %v", key, err)
+	}
+}

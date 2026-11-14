@@ -285,3 +285,14 @@
     display: none;
   }
 }
+
+/* A new number of the chip (another chat, a new reading) fades in; the chip eases to its width (ui/use-glide.ts). */
+.hx-lim__swap {
+  animation: hx-lim-swap 150ms var(--hx-ease-out) backwards;
+}
+@keyframes hx-lim-swap {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}

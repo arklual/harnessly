@@ -101,7 +101,7 @@ var surfaceTargets = []SurfaceTarget{
 	{Name: TargetObjectAction, Doc: "A button at an object (a machine, a chat) that opens the view.", Slot: true},
 	{Name: TargetHubSettings, Doc: "A page in the settings of a Hub.", Slot: true},
 	{Name: TargetBranding, Doc: "The product's name and accent; declared values, no view.", Slot: true},
-	{Name: TargetHome, Doc: "A block on the start page, under the field of a new chat.", Slot: true},
+	{Name: TargetHome, Doc: "A block on the start page, under the field of a new chat; with `\"height\": \"stage\"` the view takes the whole stage under the field and may put its own greeting over it (hl.slot.greet).", Slot: true},
 }
 
 var surfacePermissions = []SurfacePermission{
@@ -270,6 +270,7 @@ var surfaceMethods = []SurfaceMethod{
 	{Name: "harnessly/keys.press", SDK: "hl.keys.press(chord, {typing})", Doc: "A key pressed inside the view, run as the host's shortcut would run it; only while the view has the focus. Answers {ran}."},
 	{Name: "harnessly/keys.hints", SDK: "hl.keys.hints(commands)", Doc: "The keys the person has for the host's commands, as the host writes them: {hints: {command: label or null}}."},
 	{Name: "harnessly/slot.done", SDK: "hl.slot.done()", Doc: "A slot view (an onboarding step) says it is finished."},
+	{Name: "harnessly/slot.greet", SDK: "hl.slot.greet({title, sub})", Doc: "A view of the start page (the home slot) puts its own greeting in place of the host's question over the field: title up to 120 characters, sub up to 240; an empty title gives the host's back."},
 	{Name: "harnessly/sinopia.document", Permission: "sinopia.read", SDK: "hl.sinopia.document()", Doc: "The document the view is shown in."},
 	{Name: "harnessly/sinopia.selection", Permission: "sinopia.read", SDK: "hl.sinopia.selection()", Doc: "What the person selected."},
 	{Name: "harnessly/sinopia.node", Permission: "sinopia.read", SDK: "hl.sinopia.node(id)", Doc: "One node of the document."},

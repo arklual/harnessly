@@ -40,6 +40,8 @@ type ImportTab struct {
 	// Apps are the apps the tab's launch started with (its meta's launch.apps): the conversation keeps them on, so a
 	// relaunch and the chat's switches see what the agent runs with.
 	Apps []string
+	// From is the app that started the tab's chat for the person (its meta's from), with the chat's title.
+	From *wire.ChatFrom
 }
 
 // TabFromLayout reads a tab object of a Legacy workspace layout (state.TabFromLayout's fields); ok is false for a
@@ -92,6 +94,9 @@ func TabFromLayout(tab *jsvalue.Object, cwd, metaKey string) (ImportTab, bool) {
 				t.Apps = append(t.Apps, id)
 			}
 		}
+	}
+	if f := tab.Object(metaKey).Object("from"); metaKey != "" && f != nil {
+		t.From = (&wire.ChatFrom{App: str(f, "app"), Label: str(f, "label"), Title: str(f, "title")}).Clean()
 	}
 	if v, ok := tab.Get("createdAt"); ok {
 		if f, isNum := v.(float64); isNum {
@@ -222,6 +227,14 @@ func (r *Runtime) Import(tabs []ImportTab, queues map[string][]outbox.LegacyItem
 			TitleSource: wire.TitleFromAgent, CreatedAt: created, LastActivityAt: created, LastPromptAt: created, SeenAt: ms(now),
 			State: wire.AgentState{K: wire.StateUnknown, Since: ms(now)}, Rev: 1,
 			Session: t.Session, TranscriptPath: t.TranscriptPath, AgentSessionID: t.AgentSessionID}
+		if t.From != nil {
+			rec.From = t.From
+			if t.From.Title != "" {
+				// The app's name of the chat, not its first message (the app's task in its envelope): kept as one the
+				// person gave, so the agent's titles of the transcript do not take its place.
+				rec.Title, rec.TitleSource = titleOf(t.From.Title), wire.TitleFromUser
+			}
+		}
 		if len(t.Apps) > 0 && (t.Provider == wire.ProviderClaude || t.Provider == wire.ProviderCodex) && (r.d.AppsOK == nil || r.d.AppsOK(t.Apps) == "") {
 			rec.Apps = append([]string(nil), t.Apps...)
 		}

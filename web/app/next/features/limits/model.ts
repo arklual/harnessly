@@ -107,6 +107,8 @@ export interface ProviderLimits {
   plan: string | null;
   /** The last failure of the machine's own reading, shown beside the values it did not refresh. */
   error: string | null;
+  /** The vendor refused the key at that reading. */
+  rejected: boolean;
 }
 
 /** How Claude Code is paid on the machine, as its own files say. */
@@ -198,6 +200,7 @@ const readProvider = (v: unknown): ProviderLimits | null => {
     updatedAt: updated === null ? null : updated * 1000,
     plan: text(p.plan),
     error: text(p.error),
+    rejected: p.rejected === true,
   };
 };
 
@@ -305,14 +308,24 @@ export const readLimitsOf = (doc: unknown): MachineLimits | null => {
 
 // ---- what to draw
 
-export const windowsOf = (limits: ProviderLimits | null): { kind: WindowKind; window: LimitWindow }[] => {
+/**
+ * The windows to draw. Given the time (seconds), a window whose reset has passed is left out: it is an old copy (a
+ * hub's cache, a machine that stopped answering), and its last «used» is not what is left now. The time is
+ * passed, not read, so a memoized caller recomputes when it moves.
+ */
+export const windowsOf = (
+  limits: ProviderLimits | null,
+  nowSec?: number,
+): { kind: WindowKind; window: LimitWindow }[] => {
   if (!limits) return [];
   const all = [
     { kind: WINDOW.fiveHour, window: limits.fiveHour },
     { kind: WINDOW.sevenDay, window: limits.sevenDay },
     { kind: WINDOW.month, window: limits.month },
   ];
-  return all.flatMap(({ kind, window }) => (window ? [{ kind, window }] : []));
+  return all.flatMap(({ kind, window }) =>
+    window && (nowSec === undefined || window.resetsAt > nowSec) ? [{ kind, window }] : [],
+  );
 };
 
 /** What is left of a window, whole per cent. */

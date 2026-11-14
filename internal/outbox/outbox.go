@@ -197,6 +197,9 @@ type Box struct {
 	// typed once is looked for there before it is typed again, and a retry or a restart asks it rather than taking the
 	// first user entry for the message: the transcript, not a timeout, says whether the agent has it.
 	Transcript FindText
+	// TranscriptRead says the transcript is found and read to its end, so Transcript's «no entry» means the agent
+	// wrote none. The one retype of an unconfirmed message (HookConfirms) waits for it; nil: always read (no follower).
+	TranscriptRead func() bool
 	// HookConfirms: the agent's prompt-submit hook names the prompt it took (ConfirmsByHook). A typed message is then
 	// delivered only by that hook or by its entry in the transcript; a box that no longer shows it proves nothing, and
 	// the box types it again by itself once, and only when neither came within ConfirmWindow. False is the path of an
@@ -226,6 +229,8 @@ func ConfirmsByHook(p wire.Provider) bool { return p == wire.ProviderClaude }
 // FindText looks for the user entry of a message with this text at or after offset (or, read without its offset,
 // written at or after typedAt).
 type FindText func(offset int64, typedAt wire.Ms, text string) (entryID string, ok bool)
+
+func (b *Box) transcriptRead() bool { return b.TranscriptRead == nil || b.TranscriptRead() }
 
 // found looks for r's own entry in the transcript, by its text; find (any user entry past the offset) only when there
 // is no transcript to read the text in.

@@ -53,7 +53,6 @@ interface ISettingsShellProps {
   changed?: readonly SettingsSection[];
   onPick: (section: SettingsSection) => void;
   onBack: () => void;
-  onOpenDrawer: () => void;
   /** The agent's field, kept at the bottom of the page over what scrolls. */
   island?: ReactNode;
   children: ReactNode;
@@ -67,7 +66,6 @@ const SettingsShell = ({
   changed = [],
   onPick,
   onBack,
-  onOpenDrawer,
   island,
   children,
 }: ISettingsShellProps) => {
@@ -76,18 +74,29 @@ const SettingsShell = ({
   useEffect(() => {
     page.current?.scrollTo({ top: 0 });
   }, [section]);
+  // The agent's field lies over the page: the page keeps as much room under its last row as the field takes now (it
+  // grows with what is typed, and with the agent's answer over it), so nothing of the page stays under it.
+  const root = useRef<HTMLElement>(null);
+  const isle = useRef<HTMLDivElement>(null);
+  const hasIsland = Boolean(island);
+  useEffect(() => {
+    const set = root.current;
+    const el = isle.current;
+    if (!set || !el || !hasIsland || typeof ResizeObserver === 'undefined') return;
+    const follow = () =>
+      set.style.setProperty('--hx-isle-h', `${Math.ceil(el.getBoundingClientRect().height)}px`);
+    const watcher = new ResizeObserver(follow);
+    watcher.observe(el);
+    follow();
+    return () => {
+      watcher.disconnect();
+      set.style.removeProperty('--hx-isle-h');
+    };
+  }, [hasIsland]);
   return (
-    <section className="hx-set" data-page={pageOpen}>
+    <section className="hx-set" data-page={pageOpen} ref={root}>
       <nav className="hx-set__nav" aria-label={t('next.settings.nav')}>
         <div className="hx-set__nav-head">
-          <button
-            type="button"
-            className="hx-head-btn hx-set__menu"
-            aria-label={t('next.settings.menu')}
-            onClick={onOpenDrawer}
-          >
-            <Icon name="menu" />
-          </button>
           <span className="hx-set__h1">{t('next.settings.title')}</span>
         </div>
         {NAV_GROUPS.map((group) => (
@@ -157,7 +166,11 @@ const SettingsShell = ({
           {children}
         </div>
       </div>
-      {island && <div className="hx-set__isle">{island}</div>}
+      {island && (
+        <div className="hx-set__isle" ref={isle}>
+          {island}
+        </div>
+      )}
     </section>
   );
 };

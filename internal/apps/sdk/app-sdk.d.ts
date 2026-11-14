@@ -595,8 +595,11 @@ export interface Harnessly {
     /** How the host writes the person's key of each command, null for one with none. */
     hints(commands: string[]): Promise<Record<string, string | null>>;
   };
-  /** Slot views: an onboarding step calls done() when the person has finished it. */
-  slot: { done(): Promise<void> };
+  /**
+   * Slot views. done: an onboarding step is finished. greet: a view of the start page (home) puts its greeting over the
+   * field in place of the host's question; an empty title gives the host's back.
+   */
+  slot: { done(): Promise<void>; greet(greeting: { title?: string; sub?: string }): Promise<void> };
   /** The Document API of Sinopia; only in a view with target `sinopia.<kind>` and the matching `sinopia.*` rights. */
   sinopia: SinopiaApi;
   notify(text: string): Promise<void>;

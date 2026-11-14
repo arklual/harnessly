@@ -12,9 +12,11 @@ import (
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/coreapi/layoutapi"
 	"github.com/ly-solutions/harnessly/internal/delivery"
+	"github.com/ly-solutions/harnessly/internal/design"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/integrations"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/paneauto"
 	"github.com/ly-solutions/harnessly/internal/panel"
 	"github.com/ly-solutions/harnessly/internal/status"
 )
@@ -173,7 +175,18 @@ func (c *core) layoutRoutes(f *gate.Gate, d deps) []gate.Route {
 		return info, refusal
 	}
 	// "open design <id|path|title>" names a design of this machine's library.
-	deps.Targets.DesignRef = designAPI(d).L.RefOf
+	lib := designAPI(d).L
+	deps.Targets.DesignRef = lib.RefOf
+	// "open <project>/<board>.dc.html" opens the design on that board in Sinopia Design, not the file.
+	deps.Targets.DesignBoard = func(path string) string {
+		ref, board := lib.BoardOfPath(path)
+		if ref != "" && board != "" && !lib.HasPages(ref) {
+			lib.QueueControl(ref, design.Control{Board: board})
+		}
+		return ref
+	}
+	// `design panel … show` and `design claim` open the design in the chat's pane (and above it, by the intents' lift).
+	designAPI(d).OpenPane = c.designOpenPane(lib)
 	// An address a connection or the documents provider reads opens in its tab, as the person's click does.
 	deps.Targets.Resolve = linkResolver(connectionsFor(d), docsProviderOf(), deps.Targets)
 	// "open app <id>[/<view>]" names a pane view of an installed app.
@@ -201,5 +214,31 @@ func openOrToken(cliToken func(*http.Request) bool) func(*http.Request, string) 
 			}
 		}
 		return cliToken(r)
+	}
+}
+
+// designOpenPane asks the pane of the chat a tmux session belongs to to show a design, as `open design` does: once
+// within the repeat window, then the board is told to the page that opens. The intents' lift carries it to
+// the chats above a delegated one.
+func (c *core) designOpenPane(lib *design.Library) func(session, ref, board string) bool {
+	return func(session, ref, board string) bool {
+		if c.intents == nil {
+			return false
+		}
+		tabID := coreStatusHook{c}.AgentTab(session)
+		if tabID == "" {
+			return false
+		}
+		cmd := panel.Command{Kind: "open", Tab: "design", Target: ref}
+		if paneauto.Repeated(c.intents, tabID, cmd, time.Now()) == "" {
+			c.intents.Add(tabID, cmd.JSON())
+			if c.sync != nil {
+				c.sync.Broadcast(jsvalue.NewObject("type", "pane-intents", "tabId", tabID))
+			}
+		}
+		if board != "" && !lib.HasPages(ref) {
+			lib.QueueControl(ref, design.Control{Board: board})
+		}
+		return true
 	}
 }

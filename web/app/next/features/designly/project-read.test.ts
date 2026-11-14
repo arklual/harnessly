@@ -8,6 +8,7 @@ import {
   PROJECT_READ,
   readProject,
   type TProjectRead,
+  createProjectReads,
 } from '@/next/features/designly/project-read';
 
 vi.mock('@/next/core/net/runtime-json', () => ({ runtimeJson: vi.fn(), postJson: vi.fn() }));
@@ -174,5 +175,56 @@ describe('readProject (HRN-1308)', () => {
     const { shown } = run(denied, () => after(10, copy('p1')));
     await vi.advanceTimersByTimeAsync(100);
     expect(shown).toEqual([{ k: PROJECT_READ.open, from: PROJECT_FROM.store, design: design('p1') }]);
+  });
+});
+
+describe('createProjectReads (HRN-1405)', () => {
+  const later = () => {
+    let done!: (v: string) => void;
+    const p = new Promise<string>((resolve) => {
+      done = resolve;
+    });
+    return { p, done };
+  };
+
+  it('a poll while the machine still answers leaves that read be and starts none', async () => {
+    const reads = createProjectReads();
+    const first = reads.start('m|harnessly|0|0');
+    expect(first).not.toBeNull();
+    const slow = later();
+    const answer = reads.machine(() => slow.p);
+    expect(reads.start('m|harnessly|0|0')).toBeNull();
+    expect(first?.aborted).toBe(false);
+    slow.done('library');
+    await expect(answer).resolves.toBe('library');
+    const next = reads.start('m|harnessly|0|0');
+    expect(next).not.toBeNull();
+    expect(first?.aborted).toBe(false);
+  });
+
+  it('a poll after the machine answered reads again without aborting the read before', () => {
+    const reads = createProjectReads();
+    const first = reads.start('k');
+    const second = reads.start('k');
+    expect(second).not.toBeNull();
+    expect(first?.aborted).toBe(false);
+  });
+
+  it('another project or attempt aborts the reads on their way', () => {
+    const reads = createProjectReads();
+    const first = reads.start('m|a|0|0');
+    void reads.machine(() => new Promise(() => undefined));
+    const other = reads.start('m|b|0|0');
+    expect(first?.aborted).toBe(true);
+    expect(other).not.toBeNull();
+  });
+
+  it('stop aborts everything, and the same project starts again after it (a remount)', () => {
+    const reads = createProjectReads();
+    const first = reads.start('k');
+    void reads.machine(() => new Promise(() => undefined));
+    reads.stop();
+    expect(first?.aborted).toBe(true);
+    expect(reads.start('k')).not.toBeNull();
   });
 });

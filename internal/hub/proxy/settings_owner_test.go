@@ -174,7 +174,10 @@ func TestMachineSettingsAreReadFromTheHubsCopyWhileTheMachineIsAway(t *testing.T
 	if live.Code != 200 || live.Header.Get(proxy.SettingsCopyHeader) != "" {
 		t.Fatalf("the machine's own answer: %s %v", live, live.Header)
 	}
+	// The hub learns that the link ended a moment after the machine closed it: a read before that is still sent to
+	// the machine and fails on the dead link instead of being answered from the copy.
 	f.machine.Close()
+	f.s.Eventually("the machine to be off", func() bool { return f.s.Hub.Registry.Get(f.machine.MachineID) == nil })
 	kept := f.bob.Do("GET", path, nil)
 	var got wire.RuntimeSettings
 	kept.JSON(&got)

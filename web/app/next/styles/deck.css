@@ -2548,13 +2548,10 @@
 }
 /* The settings button says what differs from the start; a long say ends in an ellipsis at half the row, the row keeps
    its place. In a narrow field the model's pill gives way first, so a plain «Настройки» is never cut. */
-.hx-dl__bar > .hx-deck-chip {
+.hx-dl__composer .hx-deck-chip {
   min-width: 0;
   max-width: 50%;
   flex: 0 0 auto;
-}
-.hx-dl__bar .hx-picker-anchor {
-  flex: 0 1 auto;
 }
 .hx-deck-chip__text {
   min-width: 0;

@@ -66,6 +66,12 @@ export const bindDesignConv = (key: string, binding: IDesignBinding | null): voi
   keep();
 };
 
+/** The chat bound to a design's key now, read once (not a subscription). */
+export const designBound = (key: string): string | null => {
+  restore();
+  return designBindingStore.get(key)?.id ?? null;
+};
+
 /** The design's last chat as this browser keeps it; null without one (or without a design). */
 export const useDesignBound = (key: string | null): string | null => {
   restore();
@@ -179,10 +185,13 @@ export const useDesignConv = (
   fromChat: string | null,
   /** The screen's address without `?chat=`; a design's own page by default. */
   address?: TRoute,
+  /** A chat bound before that is not shown again (a space's). */
+  stale: string | null = null,
 ): IDesignConv => {
   restore();
   const key = designKey(machine, design);
-  const bound = useKey(designBindingStore, key) ?? null;
+  const kept = useKey(designBindingStore, key) ?? null;
+  const bound = kept !== null && kept.id === stale ? null : kept;
   const list = useConversationList(machine);
   const answered = useConvsAnswered(machine);
   // The arrival counts until the person picks: a pick leaves the address as it is but is the one shown.

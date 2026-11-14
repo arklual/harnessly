@@ -2,7 +2,10 @@
 // «Skills and MCP». They read the CLIs' files through the runtime and write one change at a time; a row shows the old
 // value until the machine has taken the new one.
 import { useMachineLimits } from '@/next/bindings/use-limits';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useAccountSpend } from '@/next/bindings/use-account-spend';
+import { loadCodexLogins } from '@/next/features/settings/codex-logins-api';
+import { isRefused } from '@/next/features/settings/platform-answer';
 import {
   useAgentSettings,
   useCatalog,
@@ -22,9 +25,12 @@ import AccountsSection, {
   VendorKeys,
   gptOf,
   type AccountCard,
+  type ICodexLoginCard,
   type VendorCards,
 } from '@/next/features/settings/accounts-section';
 import AgentSection from '@/next/features/settings/agent-section';
+import { AgentAccount, AgentFileNote } from '@/next/features/settings/agent-account';
+import { OWN_ACCOUNT, spendKey } from '@/next/features/limits/card-model';
 import { EnvGroup, RulesGroup } from '@/next/features/settings/rules-groups';
 import {
   EMPTY_RULES,
@@ -83,6 +89,8 @@ const busyOf = (pending: Pending['pending'], prefix: string): ReadonlySet<string
 
 interface IAgentPageProps {
   machine: MachineId;
+  /** The machine's name, said at the foot of the page beside the file. */
+  machineName: string;
   provider: Provider;
   handle: IAgentSettingsHandle;
   models: readonly AgentModel[];
@@ -114,6 +122,7 @@ const vendorsOf = ({
 
 const AgentLoaded = ({
   machine,
+  machineName,
   provider,
   handle,
   models,
@@ -125,6 +134,8 @@ const AgentLoaded = ({
   // them: the GPT switch on Codex's, the other vendors' keys on Claude Code's.
   const credentials = useAgentCredentials(machine, provider, settings, handle.retry);
   const vendors = vendorsOf(useProviders(machine));
+  const limits = useMachineLimits(machine);
+  const spend = useAccountSpend(machine);
   const key = (name: string) => `${provider}/${name}`;
   const onOption = (option: AgentOptionKey, value: AgentOptionValue) =>
     void run(key(option), t('next.settings.failed'), () =>
@@ -170,9 +181,14 @@ const AgentLoaded = ({
 
   return (
     <>
-      <AgentConnection
+      <AgentAccount
         settings={settings}
         credentials={credentials}
+        limits={limits?.[provider] ?? null}
+        spend={spend?.get(spendKey(provider, OWN_ACCOUNT)) ?? null}
+      />
+      <AgentConnection
+        settings={settings}
         busy={waiting.has(key('baseUrl'))}
         gpt={provider === 'codex' && vendors.k === 'ready' ? gptOf(vendors) : null}
         onBaseUrl={(_, url) =>
@@ -190,6 +206,7 @@ const AgentLoaded = ({
         extra={extra}
       />
       {provider === 'claude' && <VendorKeys vendors={vendors} />}
+      <AgentFileNote path={settings.path} machine={machineName} />
     </>
   );
 };
@@ -212,13 +229,32 @@ const speechOf = ({ state, onSave, onRemove, retry }: ReturnType<typeof useSpeec
   return { k: 'loading' };
 };
 
+/** The other sign-ins of Codex, read once for the cards: their limits and spend go on Codex's card. */
+const useCodexLoginCards = (machine: MachineId): readonly ICodexLoginCard[] => {
+  const [logins, setLogins] = useState<readonly ICodexLoginCard[]>([]);
+  useEffect(() => {
+    let live = true;
+    void loadCodexLogins(machine).then((answer) => {
+      if (live && 'ok' in answer && !isRefused(answer.value)) setLogins(answer.value.logins);
+    });
+    return () => {
+      live = false;
+    };
+  }, [machine]);
+  return logins;
+};
+
 export const AccountsPage = ({ machine, pages, onOpen }: IAccountsPageProps) => {
   const limits = useMachineLimits(machine);
+  const spend = useAccountSpend(machine);
+  const codexLogins = useCodexLoginCards(machine);
   const speech = speechOf(useSpeechKeys(machine));
   return (
     <AccountsSection
       cards={PROVIDER_LIST.map((provider) => cardOf(provider, pages[provider].state))}
       limits={limits}
+      spend={spend}
+      codexLogins={codexLogins}
       speech={speech}
       onOpen={onOpen}
     />

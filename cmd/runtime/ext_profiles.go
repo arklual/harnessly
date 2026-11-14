@@ -30,29 +30,48 @@ func extProfileID(provider string) string {
 	return "x-" + hex.EncodeToString(sum[:])[:16]
 }
 
-// extProfile is the launch profile of a provider; ok is false for one Claude Code cannot run on (another API, or no
-// model a launch would take).
+// extProfile is the launch profile of a provider; ok is false for one Claude Code cannot run on (no model a launch
+// would take). An Anthropic-compatible provider is reached straight at its address; an OpenAI-compatible one through
+// the runtime's proxy, which knows its models by extAlias.
 func extProfile(p extproviders.Provider) (providers.Preset, bool) {
-	if !p.ClaudeCLI() {
+	if !p.ClaudeCLI() && !p.Proxied() {
 		return providers.Preset{}, false
 	}
 	out := providers.Preset{ID: extProfileID(p.ID), Label: p.Name, Vendor: wire.VendorOwn, Via: wire.ProviderClaude,
 		BaseURL: p.BaseURL, Host: p.Host(), KeyRef: p.KeyRef, Custom: true, Env: map[string]string{}, SecretEnv: map[string]string{}}
+	name := func(id string) string { return id }
+	if p.Proxied() {
+		// The proxy holds the provider's key (through the runtime's relay): the profile names none.
+		out.Proxied, out.KeyRef = p.ID, ""
+		name = func(id string) string { return extAlias(p.ID, id) }
+	}
 	for _, m := range p.Models {
-		if !agents.IsProfileModelID(m.ID) {
+		id := name(m.ID)
+		if !agents.IsProfileModelID(id) {
 			continue
 		}
 		label := m.Label
 		if label == "" {
 			label = m.ID
 		}
-		out.Models = append(out.Models, providers.Model{ID: m.ID, Label: label})
+		pm := providers.Model{ID: id, Label: label, Window: m.Window}
+		for _, e := range m.Efforts {
+			pm.Efforts = append(pm.Efforts, wire.Effort(e))
+		}
+		if m.DefaultEffort != "" {
+			pm.DefaultEffort = wire.Effort(m.DefaultEffort)
+		}
+		out.Models = append(out.Models, pm)
 	}
 	if len(out.Models) == 0 {
 		return providers.Preset{}, false
 	}
 	out.Small, out.Test = out.Models[0].ID, out.Models[0].ID
 	for _, v := range p.Env {
+		if p.Proxied() && slices.Contains(proxiedOwnEnv, v.Name) {
+			// The chat goes to the proxy with the proxy's key: a variable that would send it elsewhere is not taken.
+			continue
+		}
 		// A value that is the sign-in of a Claude subscription makes no profile: the machine has one such sign-in.
 		if !v.Secret && agents.ClaudeSubscriptionToken(v.Value) {
 			return providers.Preset{}, false
@@ -66,10 +85,23 @@ func extProfile(p extproviders.Provider) (providers.Preset, bool) {
 	// The model the person typed is what every chat on the provider runs (providers.ClaudeModelPinned), so it is the
 	// one model the picker offers: a list to pick from would name a model the chat is not on.
 	if pinned := strings.TrimSpace(out.Env["ANTHROPIC_MODEL"]); agents.IsProfileModelID(pinned) {
-		out.Models = []providers.Model{{ID: pinned, Label: modelLabel(out.Models, pinned)}}
+		k := slices.IndexFunc(out.Models, func(m providers.Model) bool { return m.ID == name(pinned) })
+		if k >= 0 {
+			out.Models = []providers.Model{out.Models[k]}
+		} else {
+			out.Models = []providers.Model{{ID: name(pinned), Label: pinned}}
+		}
+		if p.Proxied() {
+			// The proxy is asked for the model by its alias.
+			out.Env["ANTHROPIC_MODEL"] = name(pinned)
+		}
+		out.Small, out.Test = out.Models[0].ID, out.Models[0].ID
 	}
 	return out, true
 }
+
+// proxiedOwnEnv are the variables of a chat through the proxy the runtime sets itself: where it goes and its key.
+var proxiedOwnEnv = []string{"ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"}
 
 // modelLabel is the name the provider's list gives the model, or its id when the list does not have it.
 func modelLabel(models []providers.Model, id string) string {
@@ -156,6 +188,9 @@ func syncExtProfiles(svc *extproviders.Service, store *providers.Store) {
 	}
 	providers.SetBacked(backing)
 	providers.SetCustom(out)
+	if ext, ok := store.Proxy.(interface{ SetExt([]providers.ExtUpstream) }); ok {
+		ext.SetExt(extUpstreams(list))
+	}
 	for _, pr := range out {
 		store.Stale(pr.ID)
 	}

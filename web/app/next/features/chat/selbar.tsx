@@ -10,6 +10,7 @@
 // what is said is written into the annotation's field, ↑ or Enter while it listens stops it and keeps the annotation
 // once the words are in.
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useVoice } from '@/next/bindings/use-voice';
 import { createStore, useStore } from '@/next/core/store';
 import { anchorOf, rangeOf, stillHolds, type IFeedAnchor } from '@/next/features/chat/feed-anchor';
@@ -18,7 +19,6 @@ import { t } from '@/next/i18n';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 import {
   addFeedNote,
-  clearFeedNotes,
   editQuote,
   feedNotesOf,
   nextFeedNoteId,
@@ -29,15 +29,7 @@ import { revealMessage } from '@/next/stores/reveal';
 import { askBeside } from '@/next/stores/side-ask';
 import AnnotatePill from '@/next/ui/notes/pill';
 import type { INoteChip } from '@/next/ui/notes/note-chips';
-import {
-  clipQuote,
-  NOTE_OUT_MS,
-  NOTE_ROW_H,
-  NOTE_ROW_W,
-  NoteBar,
-  NoteBarButton,
-  NoteMark,
-} from '@/next/ui/notes/notes';
+import { clipQuote, NOTE_OUT_MS, NOTE_ROW_H, NOTE_ROW_W, NoteMark } from '@/next/ui/notes/notes';
 import type { IAnnotateSpot } from '@/next/ui/notes/place';
 import { useLeavingList, usePresence } from '@/next/ui/presence';
 import '@/next/styles/feed-notes.css';
@@ -109,12 +101,43 @@ const highlight = (): Highlight | null => {
   return made;
 };
 
-/** The part of the window the feed shows: under the chat's head, over its field. */
-const shownBox = (row: Element): { top: number; bottom: number } => {
+interface IShownBox {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+/** The part of the window the feed shows: under the chat's head, over its field, between the sidebar and the pane. */
+export const shownBox = (row: Element): IShownBox => {
   const chat = row.closest('.hx-chat');
   const feed = chat?.querySelector('.hx-feed')?.getBoundingClientRect();
   const dock = chat?.querySelector('.hx-dock')?.getBoundingClientRect();
-  return { top: feed?.top ?? 0, bottom: Math.min(feed?.bottom ?? window.innerHeight, dock?.top ?? Infinity) };
+  return {
+    top: feed?.top ?? 0,
+    bottom: Math.min(feed?.bottom ?? window.innerHeight, dock?.top ?? Infinity),
+    left: Math.max(0, feed?.left ?? 0),
+    right: Math.min(window.innerWidth, feed?.right ?? window.innerWidth),
+  };
+};
+
+/** How far under (or over) its dot the row opens. */
+const ROW_GAP = 16;
+
+/**
+ * Where the comment row of a dot at (x, y) opens inside the feed's shown part: its width, how far it slides sideways
+ * to stay in (the right pane is open beside a narrow feed), and whether it opens over the dot when there is no room
+ * under it (the words are near the field).
+ */
+export const rowPlace = (x: number, y: number, box: IShownBox, rowHeight: number) => {
+  const width = Math.max(0, Math.min(NOTE_ROW_W, box.right - box.left - 2 * EDGE));
+  const left = x - ROW_LEAD;
+  let dx = Math.min(0, box.right - EDGE - width - left);
+  if (left + dx < box.left + EDGE) dx = box.left + EDGE - left;
+  const under = box.bottom - (y + ROW_GAP);
+  const over = y - ROW_GAP - box.top;
+  const up = under < rowHeight && over > under;
+  return { width, dx: Math.round(dx), up };
 };
 
 /** Where the mark of the words stands: at the end of their last line. */
@@ -127,19 +150,20 @@ const placeMark = (el: HTMLElement, range: Range | null) => {
     return;
   }
   const box = shownBox(row);
-  const x = Math.round(last.right + 6);
+  // The dot stays inside the feed: words that run to its right edge do not put it under the pane.
+  const x = Math.min(Math.round(last.right + 6), Math.round(box.right - EDGE - 10));
   const y = Math.round(last.top + 2);
   el.dataset.place = y < box.top || y > box.bottom ? 'hidden' : 'shown';
-  el.dataset.up = y + NOTE_ROW_H > box.bottom ? 'true' : 'false';
+  // A row that would run past the feed's edge (the right pane, the sidebar, a phone narrower than the row) slides
+  // back in; near the field it opens over its dot. The open row's own height counts (a dictation makes it taller).
+  const open = el.querySelector<HTMLElement>('.hx-note__row');
+  const place = rowPlace(x, y, box, Math.max(NOTE_ROW_H, open?.offsetHeight ?? 0));
+  el.dataset.up = place.up ? 'true' : 'false';
   el.dataset.flip = 'right';
-  // A row that would run past either edge of the window slides back in (a phone is narrower than the row).
-  const width = Math.min(NOTE_ROW_W, window.innerWidth - 2 * EDGE);
-  const left = x - ROW_LEAD;
-  let dx = Math.min(0, window.innerWidth - EDGE - width - left);
-  if (left + dx < EDGE) dx = EDGE - left;
   el.style.setProperty('--x', `${x}px`);
   el.style.setProperty('--y', `${y}px`);
-  el.style.setProperty('--note-row-dx', `${Math.round(dx)}px`);
+  el.style.setProperty('--note-row-w', `${place.width}px`);
+  el.style.setProperty('--note-row-dx', `${place.dx}px`);
 };
 
 const markId = (mark: IFeedMark): string => mark.id;
@@ -158,28 +182,6 @@ export const useFeedNoteChips = (conv: ConvId): INoteChip[] => {
     [quotes],
   );
 };
-
-/** «Аннотирование · N» over the field: «Очистить» and «Отправить все» (the field's own send). */
-export const FeedNotesBar = ({
-  conv,
-  count,
-  onSend,
-}: {
-  conv: ConvId;
-  count: number;
-  onSend: () => void;
-}) => (
-  <NoteBar
-    className="hx-fnotes__bar"
-    visible={count > 0}
-    count={count}
-    sendLabel={t('next.annotate.sendAll')}
-    onSend={onSend}
-    tools={
-      <NoteBarButton icon="trash-2" label={t('next.annotate.clear')} onClick={() => clearFeedNotes(conv)} />
-    }
-  />
-);
 
 interface ISelBarProps {
   conv: ConvId;
@@ -431,64 +433,70 @@ const SelBar = ({ conv, aside = false, machine = null }: ISelBarProps) => {
 
   return (
     <>
-      <AnnotatePill
-        target={picked}
-        preferBelow={coarse()}
-        onPress={press}
-        onAside={aside ? pressAside : undefined}
-        keys
-        onDismiss={dismiss}
-      />
-      {shown.length > 0 && (
-        <div className="hx-fnotes">
-          {shown.map(({ item, leaving }) => {
-            const n = leaving ? (numbers.get(item.id) ?? 0) : marks.findIndex((m) => m.id === item.id) + 1;
-            return (
-              <NoteMark
-                key={item.id}
-                markRef={(el) => {
-                  if (el) els.current.set(item.id, el);
-                  else els.current.delete(item.id);
-                }}
-                n={n}
-                label={t('next.pane.annot.mark', { n, name: `«${clipQuote(item.quote, 60)}»` })}
-                comment={item.comment}
-                editing={!leaving && editing === item.id}
-                leaving={leaving}
-                rowLabel={t('next.annotate.label')}
-                placeholder={t('next.annotate.placeholder')}
-                onOpen={() => {
-                  if (fresh && fresh.id !== item.id) setFresh(null);
-                  setEditing(editing === item.id ? null : item.id);
-                }}
-                onCommit={(comment) => keep(item, comment)}
-                onRemove={() => remove(item)}
-                onCancel={leave}
-                field={
-                  draft.id === item.id
-                    ? {
-                        value: draft.text,
-                        onValue: setText,
-                        recording: recBar.value !== null,
-                        tools: (
-                          <NoteVoice
-                            bar={recBar}
-                            onMic={voice.onMic ? () => voice.onMic?.() : undefined}
-                            onCancel={() => {
-                              setDraft((d) => ({ ...d, commitAfter: null }));
-                              voice.onCancelRecording();
-                            }}
-                            onFinish={voice.onFinishRecording}
-                          />
-                        ),
-                      }
-                    : undefined
-                }
-              />
-            );
-          })}
-        </div>
+      {createPortal(
+        <AnnotatePill
+          target={picked}
+          preferBelow={coarse()}
+          onPress={press}
+          onAside={aside ? pressAside : undefined}
+          keys
+          onDismiss={dismiss}
+        />,
+        document.body,
       )}
+      {/* Over everything, the right pane too: the chat's column clips what is fixed in it (container-type). */}
+      {shown.length > 0 &&
+        createPortal(
+          <div className="hx-fnotes">
+            {shown.map(({ item, leaving }) => {
+              const n = leaving ? (numbers.get(item.id) ?? 0) : marks.findIndex((m) => m.id === item.id) + 1;
+              return (
+                <NoteMark
+                  key={item.id}
+                  markRef={(el) => {
+                    if (el) els.current.set(item.id, el);
+                    else els.current.delete(item.id);
+                  }}
+                  n={n}
+                  label={t('next.pane.annot.mark', { n, name: `«${clipQuote(item.quote, 60)}»` })}
+                  comment={item.comment}
+                  editing={!leaving && editing === item.id}
+                  leaving={leaving}
+                  rowLabel={t('next.annotate.label')}
+                  placeholder={t('next.annotate.placeholder')}
+                  onOpen={() => {
+                    if (fresh && fresh.id !== item.id) setFresh(null);
+                    setEditing(editing === item.id ? null : item.id);
+                  }}
+                  onCommit={(comment) => keep(item, comment)}
+                  onRemove={() => remove(item)}
+                  onCancel={leave}
+                  field={
+                    draft.id === item.id
+                      ? {
+                          value: draft.text,
+                          onValue: setText,
+                          recording: recBar.value !== null,
+                          tools: (
+                            <NoteVoice
+                              bar={recBar}
+                              onMic={voice.onMic ? () => voice.onMic?.() : undefined}
+                              onCancel={() => {
+                                setDraft((d) => ({ ...d, commitAfter: null }));
+                                voice.onCancelRecording();
+                              }}
+                              onFinish={voice.onFinishRecording}
+                            />
+                          ),
+                        }
+                      : undefined
+                  }
+                />
+              );
+            })}
+          </div>,
+          document.body,
+        )}
     </>
   );
 };

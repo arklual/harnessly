@@ -301,3 +301,54 @@ func parseUsage(s string) (Usage, bool) {
 	return Usage{PPID: ppid, Comm: s[open+1 : end], CPU: time.Duration(utime+stime) * clockTick,
 		RSS: rss * int64(os.Getpagesize())}, true
 }
+
+// State is a process's state letter from /proc/<pid>/stat (R, S, D, Z…); false when it cannot be read. The stat file
+// is read without the process's memory lock, so it answers even for a process blocked on a hung file system.
+func State(pid int) (byte, bool) {
+	raw, err := os.ReadFile(dir(pid) + "/stat")
+	if err != nil {
+		return 0, false
+	}
+	return stateOfStat(string(raw))
+}
+
+func stateOfStat(s string) (byte, bool) {
+	end := strings.LastIndexByte(s, ')')
+	if end < 0 || end+2 >= len(s) {
+		return 0, false
+	}
+	fields := strings.Fields(s[end+1:])
+	if len(fields) == 0 || len(fields[0]) != 1 {
+		return 0, false
+	}
+	return fields[0][0], true
+}
+
+// Unreadable: the process exists but a look cannot tell what it runs now — it waits uninterruptibly (D: a
+// read of a hung NFS folder, an exit stuck flushing its files) or, still alive, shows an empty command line (its memory
+// already released on the way out, or not readable). Such a look decides nothing about the agent: "cannot read" is not
+// "not the agent".
+func Unreadable(pid int) bool {
+	st, ok := State(pid)
+	if !ok {
+		return false // gone: a look at a missing process is a real answer
+	}
+	return unreadableState(st, func() (string, bool) {
+		raw, err := os.ReadFile(dir(pid) + "/cmdline")
+		if err != nil {
+			return "", false
+		}
+		return string(raw), true
+	})
+}
+
+func unreadableState(st byte, cmdline func() (string, bool)) bool {
+	switch st {
+	case 'D':
+		return true
+	case 'Z', 'X', 'x':
+		return false
+	}
+	raw, ok := cmdline()
+	return !ok || raw == ""
+}

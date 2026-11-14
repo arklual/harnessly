@@ -25,6 +25,7 @@ import {
   SiteIsland,
   type TIslandStatus,
 } from '@/next/features/designly/site-chat';
+import { DemoIslandField } from '@/next/dev/demo-field';
 
 const PICKED: IPicked = {
   id: 7,
@@ -51,34 +52,24 @@ const statusOf = (k: unknown): TIslandStatus => {
 };
 
 /** The folded chat over a site: the agent's last line, what it does now, «Стоп», and the field. */
-const IslandView = ({ status }: { status: TIslandStatus }) => {
-  const [value, setValue] = useState('');
-  return (
-    <section className="hx-site hx-gallery-dl__site" data-mode="island" data-min="false" data-run="idle">
-      <SiteIsland
-        value={value}
-        onChange={setValue}
-        onSend={() => setValue('')}
-        canSend={value.trim() !== ''}
-        placeholder="Опишите правку или выделите блок"
-        sending={false}
-        status={status}
-        last={<IslandLast text="Поменял кнопку в шапке на синюю и убрал лишний отступ" onExpand={() => {}} />}
-        onStop={() => {}}
-        onDismiss={() => {}}
-        onExpand={() => {}}
-        min={false}
-        onMin={() => {}}
-        mode="island"
-        onZone={() => {}}
-        recording={false}
-        notes={0}
-        pick={false}
-        onPick={() => {}}
-      />
-    </section>
-  );
-};
+const IslandView = ({ status }: { status: TIslandStatus }) => (
+  <section className="hx-site hx-gallery-dl__site" data-mode="island" data-min="false" data-run="idle">
+    <SiteIsland
+      field={<DemoIslandField />}
+      holding={false}
+      status={status}
+      last={<IslandLast text="Поменял кнопку в шапке на синюю и убрал лишний отступ" onExpand={() => {}} />}
+      onStop={() => {}}
+      onDismiss={() => {}}
+      onExpand={() => {}}
+      min={false}
+      onMin={() => {}}
+      mode="island"
+      onZone={() => {}}
+      notes={0}
+    />
+  </section>
+);
 
 /** The design's section with its chat and the agent's terminal under the chat's field (?view=term&mode=chat|island). */
 const TermView = ({ mode }: { mode: 'chat' | 'island' }) => (

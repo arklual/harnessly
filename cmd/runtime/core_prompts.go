@@ -123,6 +123,25 @@ func (w *promptWiring) Running(tab prompts.Tab) bool {
 	return p != nil && pid > 0 && p.Running(pid, proc.ChildPIDs(pid))
 }
 
+// Unreadable: a process under the pane (or under a sandbox there) cannot be read now; see proc.Unreadable.
+func (w *promptWiring) Unreadable(tab prompts.Tab) bool {
+	pid := w.c.cfg.Tmux.PanePID(tab.Session)
+	if pid <= 0 {
+		return false
+	}
+	for _, c := range proc.ChildPIDs(pid) {
+		if proc.Unreadable(c) {
+			return true
+		}
+		for _, g := range proc.ChildPIDs(c) {
+			if proc.Unreadable(g) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (w *promptWiring) RecoverSession(tab prompts.Tab) bool { return w.m.RecoverSession(tab.ID) }
 func (w *promptWiring) Resume(tab prompts.Tab) string       { return w.resume(tab.ID) }
 func (w *promptWiring) GiveUpLaunch(tabID string)           { w.m.LaunchFailed(tabID) }

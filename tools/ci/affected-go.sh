@@ -7,12 +7,14 @@
 # internal/*/testdata, internal/apps reads docs/ and web/), so all of them run. The nightly schedule runs all of them
 # anyway; main runs none (fast-forward: the merge request checked that very commit).
 #
-# usage: affected-go.sh   (merge request pipeline: CI_MERGE_REQUEST_DIFF_BASE_SHA)
+# HL_AREA_BASE (tools/ci/changed-areas.sh: the last release) gives the base outside a merge request too, for a
+# main pipeline and for tools/ci/local-checks.sh on the build machine.
+#
+# usage: affected-go.sh   (merge request pipeline: CI_MERGE_REQUEST_DIFF_BASE_SHA; else HL_AREA_BASE)
 set -eu
 
 all() { echo ./...; exit 0; }
-[ "${CI_PIPELINE_SOURCE:-}" = merge_request_event ] || all
-base="${CI_MERGE_REQUEST_DIFF_BASE_SHA:-}"
+if [ "${CI_PIPELINE_SOURCE:-}" = merge_request_event ]; then base="${CI_MERGE_REQUEST_DIFF_BASE_SHA:-}"; else base="${HL_AREA_BASE:-}"; fi
 [ -n "$base" ] || all
 git cat-file -e "$base^{commit}" 2>/dev/null || git fetch --quiet --no-tags --depth=1 origin "$base" 2>/dev/null || all
 changed="$(git diff --name-only --no-renames "$base" HEAD 2>/dev/null)" || all

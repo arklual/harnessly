@@ -165,7 +165,7 @@ export const useChatMade = (conv: Conversation, on: boolean): IChatMade => {
     const found = metaItems.find((x) => x.url === item.ref);
     if (!found) return { title: kindWord(item), pending: false, known: false };
     const read = metas.of(found);
-    if (read.meta && (!holding || kept.has(found.url)))
+    if (read.meta?.title && (!holding || kept.has(found.url)))
       return { title: read.meta.title, pending: false, known: true };
     const waiting = read.look === LOOK.wait || (read.meta !== null && holding);
     return { title: kindWord(item), pending: waiting, known: false };

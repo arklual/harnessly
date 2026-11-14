@@ -1,6 +1,7 @@
 // The machine's pages in preview slots (/api/preview/open): each slot is an origin of its own, entered once with a
 // ticket; and the ports that listen on the machine (/api/platform/preview/ports), a chat's own first, under the runtime's platform prefix.
-import { postJson, runtimeJson } from '@/next/core/net/runtime-json';
+import { postJson, RuntimeError, runtimeJson } from '@/next/core/net/runtime-json';
+import { t } from '@/next/i18n';
 import { platformPath } from '@/next/core/net/machine';
 import { stampSlot } from '@/next/core/net/preview-stamp';
 import type { MachineId } from '@/next/protocol/v2';
@@ -19,6 +20,23 @@ export interface IPreviewSlot {
 
 /** A port of the machine, or a site (a stand) by its origin. */
 export type TPreviewTarget = { kind: 'port'; port: number } | { kind: 'url'; origin: string };
+
+/** The runtime's refusals of an open, in the person's words: its codes are for logs, not for the pane. */
+const OPEN_REFUSALS: Readonly<Record<string, string>> = {
+  'invalid slot': 'next.pane.openRefused.slot',
+  'invalid neighbours': 'next.pane.openRefused.slot',
+  'invalid target': 'next.pane.openRefused.target',
+  'invalid path': 'next.pane.openRefused.path',
+  'preview slots unavailable': 'next.pane.openRefused.unavailable',
+  'preview slots need https origins': 'next.pane.openRefused.https',
+};
+
+/** A refusal the runtime said in a code becomes a sentence; anything else stays as it was said. */
+export const openFailure = (failure: unknown): unknown => {
+  if (!(failure instanceof RuntimeError)) return failure;
+  const key = OPEN_REFUSALS[failure.message];
+  return key === undefined ? failure : new RuntimeError(t(key), failure.body);
+};
 
 /**
  * Slots 1–6 take ports, 7–8 sites: the runtime refuses the other way round. `neighbours` are the ports of the page's
@@ -46,10 +64,15 @@ export const openPreview = (
       ...(target.kind === 'port' && neighbours.length > 0 ? { neighbours: [...neighbours] } : {}),
       ...(carry ? { carry } : {}),
     }),
-  ).then((opened) => ({
-    ...opened,
-    nonce: stampSlot(slot),
-  }));
+  ).then(
+    (opened) => ({
+      ...opened,
+      nonce: stampSlot(slot),
+    }),
+    (failure: unknown) => {
+      throw openFailure(failure);
+    },
+  );
 
 export interface IListeningPort {
   port: number;

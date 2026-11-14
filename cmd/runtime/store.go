@@ -29,6 +29,7 @@ import (
 func storeOptions(cfg gate.Config) (storelink.Options, error) {
 	o := storelink.Options{DataDir: cfg.DataDir, Mode: strings.ToLower(env("RUNTIME_STORE", storelink.ModeAuto)),
 		Paired: os.Getenv("AGENT_SECRET_FILE") != "" || os.Getenv("AGENT_CLUSTER_URL") != "", Name: os.Getenv("RUNTIME_STORE_MACHINE"),
+		DB: strings.TrimSpace(os.Getenv("RUNTIME_STORE_DB")), Blobs: strings.TrimSpace(os.Getenv("RUNTIME_STORE_BLOBS")),
 		Shared: sharedLibrary}
 	switch o.Mode {
 	case storelink.ModeAuto, storelink.ModeHub, storelink.ModeEmbedded, storelink.ModeOff:
@@ -102,7 +103,17 @@ func (f *runtimeGate) startStore(ctx context.Context, cfg gate.Config) func() {
 	stopAppsCenter := startAppsCenter(ctx, f.store, cfg.DataDir)
 	stopProfile := startProfileSync(ctx, f.store, cfg.DataDir)
 	stopMove := f.startMove(ctx, f.store, cfg.DataDir)
+	recDone := make(chan struct{})
+	recCtx, recStop := context.WithCancel(ctx)
+	go func() {
+		defer close(recDone)
+		if f.records != nil {
+			startRecords(recCtx, f.store, f.records, f.watch, f.covers)
+		}
+	}()
 	stopApps := func() {
+		recStop()
+		<-recDone
 		stopMove()
 		stopProfile()
 		stopAppsCenter()

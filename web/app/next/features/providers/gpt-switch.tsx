@@ -21,9 +21,11 @@ interface IGptSwitchProps {
   ready: boolean;
   /** Turns the profile on or off; resolves null when the machine did it, else the reason. */
   onSwitch: (on: boolean) => Promise<string | null>;
+  /** A row of a settings card: the switch says it is on, no line under it lists the models. */
+  quiet?: boolean;
 }
 
-const GptSwitch = ({ kind = 'gpt', preset, ready, onSwitch }: IGptSwitchProps) => {
+const GptSwitch = ({ kind = 'gpt', preset, ready, onSwitch, quiet = false }: IGptSwitchProps) => {
   const k = (key: string) => `next.providers.${kind}.${key}`;
   const [busy, setBusy] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -97,8 +99,8 @@ const GptSwitch = ({ kind = 'gpt', preset, ready, onSwitch }: IGptSwitchProps) =
           </div>
         </div>
       </div>
-      <div className="hx-reveal" data-open={on && busy === null}>
-        <div className="hx-reveal__in" inert={!on || undefined}>
+      <div className="hx-reveal" data-open={on && busy === null && !quiet}>
+        <div className="hx-reveal__in" inert={!on || quiet || undefined}>
           <div className="hx-preset__saved hx-gpt__state">
             <Icon name="check" size="sm" />
             <span>{t(k('on'), { models })}</span>

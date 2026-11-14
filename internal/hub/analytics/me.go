@@ -20,6 +20,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/orgs"
 	"github.com/ly-solutions/harnessly/internal/hub/rates"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/switches"
 	"github.com/ly-solutions/harnessly/internal/hub/usage"
 )
 
@@ -58,6 +59,7 @@ type Service struct {
 	bus   events.Publisher
 	leads func() bool
 	flags features.Gate
+	sw    switches.Gate
 	// trig carries Trigger calls to RunLive.
 	trigMu sync.Mutex
 	trig   chan string
@@ -81,6 +83,7 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("GET /api/me/sessions", s.gate(s.meSessions))
 	mux.Handle("GET /api/me/kpis", s.gate(s.meKPIs))
 	mux.Handle("GET /api/me/stats", s.gate(s.meStats))
+	mux.Handle("GET /api/me/switches", s.gate(s.meSwitches))
 	s.mountOrg(mux)
 }
 

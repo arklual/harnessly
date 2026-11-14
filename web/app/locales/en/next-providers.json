@@ -93,8 +93,8 @@
   "next.seen.keep": "Sign in with the same account: a second account on one machine risks the subscription being blocked.",
   "next.seen.mixed": "Different accounts signed in here — that can get the subscription blocked. Keep one account per machine.",
   "next.providers.gpt.title": "GPT in Claude Code",
-  "next.providers.gpt.hint": "Codex models appear in the model picker of Claude Code chats. Regular Codex stays as it is",
-  "next.providers.gpt.needLogin": "Needs Codex signed in with a ChatGPT subscription (codex login, stored as a file, not in the keyring)",
+  "next.providers.gpt.hint": "GPT models appear in the model picker of Claude Code chats",
+  "next.providers.gpt.needLogin": "Needs Codex signed in with a ChatGPT subscription",
   "next.providers.gpt.more": "How it works",
   "next.providers.gpt.less": "Hide",
   "next.providers.gpt.how": "A small proxy starts on the machine: Claude Code talks to it, and it talks to OpenAI with your Codex sign-in. It spends your ChatGPT subscription limits. OpenAI does not officially support connecting this way, so in theory the subscription could be limited.",
@@ -142,5 +142,9 @@
   "next.codexLogins.off": "Not signed in",
   "next.codexLogins.main": "Main",
   "next.codexLogins.makeMain": "Make it the main one",
-  "next.codexLogins.unmain": "No longer the main one"
+  "next.codexLogins.unmain": "No longer the main one",
+  "next.codexLogins.menu": "Sign-in «{name}»: actions",
+  "next.codexLogins.mainHint": "main",
+  "next.codexLogins.signIn": "Sign in",
+  "next.codexLogins.addGo": "Add"
 }

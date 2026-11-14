@@ -3,6 +3,7 @@
 import { platformPath } from '@/next/core/net/machine';
 import { postJson, runtimeJson } from '@/next/core/net/runtime-json';
 import type { IAccess } from '@/next/features/app-views/api';
+import { viaHome } from '@/next/features/designly/home';
 import type { MachineId } from '@/next/protocol/v2';
 
 export const CHANNELS = ['dev', 'beta', 'stable'] as const;
@@ -109,7 +110,14 @@ export interface IAppKind {
 }
 
 export const loadKinds = async (m: MachineId): Promise<IAppKind[]> =>
-  (await runtimeJson<{ kinds: IAppKind[] }>(m, platformPath('/apps/kinds'))).kinds;
+  (
+    await viaHome(
+      m,
+      'kinds',
+      (v) => v as { kinds: IAppKind[] },
+      () => runtimeJson<{ kinds: IAppKind[] }>(m, platformPath('/apps/kinds')),
+    )
+  ).kinds;
 
 /** Makes a document of the type; the host makes the project, the app's editor fills it. */
 export const createKindDocument = (
@@ -131,7 +139,14 @@ export interface IKindDoc {
 }
 
 export const loadKindDocs = async (m: MachineId): Promise<IKindDoc[]> =>
-  (await runtimeJson<{ docs: IKindDoc[] }>(m, platformPath('/apps/kinds/docs'))).docs;
+  (
+    await viaHome(
+      m,
+      'kindDocs',
+      (v) => v as { docs: IKindDoc[] },
+      () => runtimeJson<{ docs: IKindDoc[] }>(m, platformPath('/apps/kinds/docs')),
+    )
+  ).docs;
 
 /** Why a document opens read-only (the codes of internal/apps/kindopen.go). */
 export const READ_ONLY_CODES = [

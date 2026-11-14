@@ -64,3 +64,22 @@ func TestTheCopyKeepsAToolsWholeOutputAndPagesCarryItsHead(t *testing.T) {
 		t.Errorf("an entry without output: %v", err)
 	}
 }
+
+func TestTurnsForAPageWithoutLinks(t *testing.T) {
+	both := json.RawMessage(`{"id":"t1","outputs":[{"kind":"stand","op":"created","title":"s","ref":"https://s.example.com"},{"kind":"task","op":"created","title":"HRN-1","ref":"https://t.example.com/issue/HRN-1"}]}`)
+	only := json.RawMessage(`{"id":"t2","outputs":[{"kind":"commit","op":"created","title":"c","ref":"https://g.example.com/p/-/commit/abc1234"}]}`)
+	none := json.RawMessage(`{"id":"t3"}`)
+	got := TurnsFor([]json.RawMessage{both, only, none}, false)
+	if strings.Contains(string(got[0]), "task") || !strings.Contains(string(got[0]), "stand") {
+		t.Fatalf("both: %s", got[0])
+	}
+	if strings.Contains(string(got[1]), "outputs") {
+		t.Fatalf("only: %s", got[1])
+	}
+	if string(got[2]) != string(none) {
+		t.Fatalf("none: %s", got[2])
+	}
+	if kept := TurnsFor([]json.RawMessage{both}, true); string(kept[0]) != string(both) {
+		t.Fatal("a page with links gets the turn as it is")
+	}
+}

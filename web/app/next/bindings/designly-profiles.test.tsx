@@ -22,7 +22,11 @@ const { create, agents } = vi.hoisted(() => ({
     },
   ],
 }));
-vi.mock('@/next/stores/machines', () => ({ useMachine: () => ({ machine: { agents } }) }));
+vi.mock('@/next/stores/machines', () => ({
+  useMachine: () => ({ machine: { agents } }),
+  limitsOf: () => ({ maxText: 100_000 }),
+}));
+vi.mock('@/next/bindings/use-limits', () => ({ useAgentLimits: () => null }));
 vi.mock('@/next/bindings/settings-data', () => ({
   useAgentSettings: () => ({ state: { k: 'ready', value: { options: [] } } }),
 }));

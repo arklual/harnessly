@@ -15,7 +15,6 @@
 /* Разделы */
 .hx-set__nav { display: flex; flex-direction: column; gap: 2px; padding: 28px 12px 24px 20px; overflow-y: auto; }
 .hx-set__nav-head { display: flex; align-items: center; gap: 4px; height: 40px; margin-bottom: 10px; padding-left: 8px; }
-.hx-set__menu { display: none; }
 .hx-set__h1 { font-size: var(--hx-text-xl); font-weight: var(--hx-weight-semibold); letter-spacing: -.01em; }
 .hx-set__nav-item { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border: 0; border-radius: 10px; background: none; color: var(--hx-fg-2); font: inherit; font-size: var(--hx-text-sm); text-align: left; cursor: pointer; transition: background 200ms var(--hx-ease-out), color 200ms var(--hx-ease-out); animation: hx-rise 360ms var(--hx-ease-out) backwards; animation-delay: calc(var(--i, 0) * 24ms); }
 .hx-set__nav-item:hover { background: var(--hx-bg-hover); color: var(--hx-fg-1); }
@@ -222,7 +221,6 @@
   .hx-set { grid-template-columns: minmax(0, 1fr); overflow: clip; }
   .hx-set__nav { padding: calc(8px + env(safe-area-inset-top)) 8px calc(24px + env(safe-area-inset-bottom)); }
   .hx-set__nav-head { padding-left: 0; margin-bottom: 8px; height: 48px; }
-  .hx-set__menu { display: grid; width: 40px; height: 40px; flex: none; }
   .hx-set__nav-item { height: 52px; padding: 0 12px; font-size: var(--hx-text-md); }
   .hx-set__nav-chev { display: block; }
   .hx-set__page { position: absolute; inset: 0; z-index: 2; background: var(--hx-bg-window); box-shadow: -16px 0 40px rgba(12, 14, 34, .12); transform: translate3d(100%, 0, 0); visibility: hidden; transition: transform 340ms var(--hx-m-ease), visibility 0s linear 340ms; }
@@ -271,3 +269,12 @@
 .hx-bg__row[data-status="mat"] .hx-bg__dot { display: none; }
 .hx-bg__row[data-status="mat"] .hx-bg__state { color: var(--hx-fg-3); }
 .hx-bg__row[data-status="mat"] .hx-bg__last { font-family: inherit; }
+
+/* «Ссылки в чате» в настройках организации: строка с полем справа, на узком экране поле под текстом */
+.hx-set__row--field { cursor: text; }
+.hx-set__row--field .hx-set__row-text { flex: 1 1 220px; }
+.hx-set__row-input { flex: 1 1 280px; width: auto; min-width: 0; max-width: 360px; }
+.hx-set__row--actions { justify-content: flex-end; }
+@media (max-width: 640px) {
+  .hx-set__row-input { flex-basis: 100%; max-width: none; }
+}

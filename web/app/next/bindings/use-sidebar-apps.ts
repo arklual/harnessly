@@ -4,6 +4,7 @@
 import { useMemo } from 'react';
 import { prepareViewSession, useInstalledApps } from '@/next/features/app-views/api';
 import { sidebarApps } from '@/next/features/app-main/chat-apps';
+import { isSpaceApp } from '@/next/features/app-views/service-health';
 import type { ISidebarApps } from '@/next/features/sidebar/sidebar';
 import type { Conversation, MachineId } from '@/next/protocol/v2';
 import { ROUTE, type TRoute } from '@/next/routes/routes';
@@ -24,7 +25,8 @@ export const useSidebarApps = (
         : sidebarApps(conversations, installed.apps).map(({ app, chat }) => ({
             id: app.id,
             name: app.name,
-            ...(chat === undefined ? {} : { chat }),
+            // A space (boards, documents) opens on its own, never in the chat it was last on in.
+            ...(chat === undefined || isSpaceApp(app.id) ? {} : { chat }),
           })),
     [installed, conversations],
   );

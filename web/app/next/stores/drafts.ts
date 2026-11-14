@@ -37,7 +37,9 @@ export const emptyDraft = (d: Draft): boolean =>
 export const NEW_CHAT = 'new' as const;
 /** The draft of a design that has no chat yet: its first message (bindings/design-conv.ts). */
 export type DesignDraftKey = `design:${string}`;
-export type DraftKey = ConvId | typeof NEW_CHAT | DesignDraftKey;
+/** The draft of a screen's own field (Settings, …): kept by the screen, the window's one field shows it there. */
+export type ScreenDraftKey = `screen:${string}`;
+export type DraftKey = ConvId | typeof NEW_CHAT | DesignDraftKey | ScreenDraftKey;
 /** The brief of a new design, typed on Sinopia's start page. */
 export const DESIGN_START_DRAFT: DesignDraftKey = 'design:new-start';
 

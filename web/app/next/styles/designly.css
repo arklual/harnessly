@@ -32,77 +32,10 @@
   margin-top: var(--hx-space-2);
   color: var(--hx-fg-2);
 }
+/* The start's field is the chat's own (features/composer): it draws itself; the hero only places it. */
 .hx-dl__composer {
-  position: relative;
   margin-top: var(--hx-space-6);
-  padding: var(--hx-space-4) var(--hx-space-4) var(--hx-space-3) var(--hx-space-5);
-  border: 1px solid var(--hx-border-strong);
-  border-radius: 28px;
-  background: var(--hx-bg-raised);
-  box-shadow: var(--hx-shadow-md);
   text-align: left;
-  transition:
-    border-color var(--hx-dur-sm),
-    box-shadow var(--hx-dur-md);
-}
-.hx-dl__composer:focus-within {
-  border-color: var(--hx-focus);
-  box-shadow:
-    var(--hx-shadow-md),
-    0 0 0 4px var(--hx-accent-soft);
-}
-.hx-dl__input {
-  display: block;
-  width: 100%;
-  min-height: 52px;
-  /* It grows with its text (use-fit-field.ts) up to a third of the screen, then the text scrolls inside, so the buttons
-     and the kinds stay on screen. A text that goes on past an edge fades there and never runs into the buttons. */
-  max-height: min(30dvh, 280px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--hx-border-strong) transparent;
-  --fade-top: 0px;
-  --fade-bottom: 0px;
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--fade-top),
-    #000 calc(100% - var(--fade-bottom)),
-    transparent
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--fade-top),
-    #000 calc(100% - var(--fade-bottom)),
-    transparent
-  );
-  resize: none;
-  border: 0;
-  outline: 0;
-  padding: 0;
-  background: none;
-  color: var(--hx-fg-1);
-  font: inherit;
-  font-size: var(--hx-text-lg);
-  line-height: 26px;
-}
-.hx-dl__input[data-fade-top='true'] {
-  --fade-top: 20px;
-}
-.hx-dl__input[data-fade-bottom='true'] {
-  --fade-bottom: 20px;
-}
-.hx-dl__input::placeholder {
-  color: var(--hx-fg-3);
-}
-.hx-dl__bar {
-  display: flex;
-  align-items: center;
-  gap: var(--hx-space-1);
-  margin-top: var(--hx-space-3);
-  min-width: 0;
 }
 .hx-dl__toolbar {
   position: sticky;
@@ -424,19 +357,6 @@
     animation: none;
     transform: none;
   }
-}
-.hx-dl__model {
-  margin-right: var(--hx-space-1);
-}
-.hx-dl__model .hx-picker {
-  top: calc(100% + 10px);
-  bottom: auto;
-  transform-origin: 24px 0;
-  text-align: left;
-}
-.hx-dl__model .hx-tip {
-  bottom: auto;
-  top: calc(100% + 10px);
 }
 .hx-dl__hero:has(.hx-picker) {
   position: relative;
@@ -792,16 +712,6 @@
   font-size: 11px;
 }
 @media (max-width: 600px) {
-  .hx-dl__bar .hx-model__effort {
-    display: none;
-  }
-  .hx-dl__model .hx-model > .hx-icon:last-child,
-  .hx-dl__model .hx-model > [data-chev] {
-    display: none;
-  }
-  .hx-dl__model .hx-model {
-    padding-inline: 12px;
-  }
   .hx-dl__starts {
     flex-wrap: nowrap;
     justify-content: flex-start;
@@ -876,15 +786,6 @@
   }
   .hx-dl__sub {
     text-wrap: balance;
-  }
-  .hx-root .hx-dl__input {
-    font-size: 15px;
-    line-height: 22px;
-  }
-  .hx-dl__input {
-    min-height: 44px;
-    max-height: min(26dvh, 240px);
-    overflow-y: auto;
   }
   .hx-dl__starts {
     display: flex;
@@ -1122,10 +1023,6 @@
   --i: 8;
 }
 
-/* The field's bar gives way to the recording bar while the brief is dictated. */
-.hx-dl__bar[hidden] {
-  display: none;
-}
 /* A screen of «More» brought over from Legacy (legacy/screens.tsx): the stage's page, scrolled as a whole. */
 .hx-lscreen {
   position: relative;

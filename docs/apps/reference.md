@@ -16,7 +16,7 @@ Everything an app can use, from the one table the manifest check and the bridge 
 | `object-action` | A button at an object (a machine, a chat) that opens the view. |
 | `hub-settings` | A page in the settings of a Hub. |
 | `branding` | The product's name and accent; declared values, no view. |
-| `home` | A block on the start page, under the field of a new chat. |
+| `home` | A block on the start page, under the field of a new chat; with `"height": "stage"` the view takes the whole stage under the field and may put its own greeting over it (hl.slot.greet). |
 | `sinopia.<kind>` | The editor of one Sinopia document type: panels, selection items, checks, bindings. An alias of the screen of `harnessly.sinopia`. |
 | `sinopia.*` | The editor of every Sinopia document type. An alias of the screen of `harnessly.sinopia`. |
 
@@ -161,6 +161,7 @@ Every right has a class of risk. The class forbids nothing: it orders the instal
 | `harnessly/keys.press` | — | `hl.keys.press(chord, {typing})` | A key pressed inside the view, run as the host's shortcut would run it; only while the view has the focus. Answers {ran}. |
 | `harnessly/keys.hints` | — | `hl.keys.hints(commands)` | The keys the person has for the host's commands, as the host writes them: {hints: {command: label or null}}. |
 | `harnessly/slot.done` | — | `hl.slot.done()` | A slot view (an onboarding step) says it is finished. |
+| `harnessly/slot.greet` | — | `hl.slot.greet({title, sub})` | A view of the start page (the home slot) puts its own greeting in place of the host's question over the field: title up to 120 characters, sub up to 240; an empty title gives the host's back. |
 | `harnessly/sinopia.document` | `sinopia.read` | `hl.sinopia.document()` | The document the view is shown in. |
 | `harnessly/sinopia.selection` | `sinopia.read` | `hl.sinopia.selection()` | What the person selected. |
 | `harnessly/sinopia.node` | `sinopia.read` | `hl.sinopia.node(id)` | One node of the document. |

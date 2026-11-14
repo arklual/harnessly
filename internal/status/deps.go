@@ -102,6 +102,9 @@ type Procs interface {
 	Children(pid int) []int
 	// ListeningPorts are the TCP ports the pane's descendants listen on, sorted.
 	ListeningPorts(pid int) []int
+	// Unreadable: the process exists but a look cannot tell what it runs now (waits on a hung file system, or shows an
+	// empty command line on its way out). A look that met one decides nothing about the agent.
+	Unreadable(pid int) bool
 }
 
 // Provider is an agent CLI: Claude Code or Codex.

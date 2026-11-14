@@ -15,6 +15,15 @@ export const org = obj({
   currency: lit('RUB', 'USD'),
   createdAt: time,
   appsConsent: opt(lit('ask', 'auto')),
+  links: opt(
+    obj({
+      standDomain: opt(str),
+      trackerUrl: opt(str),
+      gitlabHosts: opt(arr(str)),
+      artifactsUrl: opt(str),
+      boardsUrl: opt(str),
+    }),
+  ),
 });
 export const tenant = obj({ id: str, slug: str, name: str, orgId: str, createdAt: time, memberCount: num });
 export const team = obj({

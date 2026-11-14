@@ -27,6 +27,8 @@ export interface IPaneTab {
   unread?: boolean;
   /** Holds text that is not saved: a dot by its name. */
   dirty?: boolean;
+  /** Opened by a subchat of this chat: the subchat's title, said under the name. */
+  from?: string;
 }
 
 export interface IToolPaneProps {
@@ -121,7 +123,10 @@ const ToolPane = ({
           </Tooltip>
           <div ref={tabsRef} className="hx-strip__tabs" role="presentation">
             {tabs.map((x) => (
-              <Tooltip key={x.id} label={x.name}>
+              <Tooltip
+                key={x.id}
+                label={x.from ? t('next.pane.fromSubchatLong', { name: x.name, title: x.from }) : x.name}
+              >
                 <div
                   className="hx-tab"
                   role="tab"
@@ -142,6 +147,9 @@ const ToolPane = ({
                 >
                   <Icon name={x.icon} size="sm" className="hx-tab__ic" />
                   <span className="hx-tab__name">{x.name}</span>
+                  {x.from && (
+                    <span className="hx-tab__from">{t('next.pane.fromSubchat', { title: x.from })}</span>
+                  )}
                   {!x.pinned && (
                     <button
                       type="button"

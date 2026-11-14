@@ -8,6 +8,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/events"
 	"github.com/ly-solutions/harnessly/internal/hub/features"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/switches"
 )
 
 // What the hub does on its own for the live screens (docs/hub/analytics.md, «Live»): it ticks the numbers of the
@@ -41,6 +42,9 @@ type localPublisher interface {
 
 // UseFeatures gives the service the organizations' flags, which switch the signal checker on (ui.hx).
 func (s *Service) UseFeatures(g features.Gate) { s.flags = g }
+
+// UseSwitches gives the rollout switches GET /api/me/switches tells the page of; without them every one is off.
+func (s *Service) UseSwitches(g switches.Gate) { s.sw = g }
 
 // UsageTick is the payload of the usage.tick event: the numbers of «Сегодня» of the scope watched.
 type UsageTick struct {

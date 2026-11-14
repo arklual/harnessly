@@ -32,6 +32,9 @@ import { t } from '@/next/i18n';
 
 /** What is answered right in its card: a question's options, a permission's buttons (the rest opens its chat or the
  *  smart notice). */
+/** The column's own exit (styles/background.css, .hx-side). */
+const SIDE_EXIT_MS = 200;
+
 const IN_PLACE: ReadonlySet<string> = new Set([SMART_KIND.question, SMART_KIND.permission]);
 
 export const useChatBackground = (
@@ -107,6 +110,8 @@ export const useChatBackground = (
   // A drop opens it too, but not on a phone, where the column is a sheet over the chat: there the header's button says it.
   const auto = (room && !pane) || codes.length > 0 || (drops.length > 0 && !phone);
   const shown = has && (override ?? auto);
+  // A chat with nothing for the column takes it away with its slide and fade (data-shown), not from one frame to the next.
+  const hasMounted = usePresentFlag(has, SIDE_EXIT_MS).mounted;
 
   // What the button asks for: what the room already says is no ask at all, so the column keeps following the room.
   const toggle = () => {
@@ -128,10 +133,14 @@ export const useChatBackground = (
       );
   };
 
-  const shotSrc = (shot: Shot): string =>
-    conv && machine
-      ? machineApi(machine).http(`/conversations/${conv}/shot?id=${encodeURIComponent(shot.id)}`)
-      : '';
+  // One function per chat: the column keeps the last chat's pictures with their own addresses while they fade out.
+  const shotSrc = useCallback(
+    (shot: Shot): string =>
+      conv && machine
+        ? machineApi(machine).http(`/conversations/${conv}/shot?id=${encodeURIComponent(shot.id)}`)
+        : '',
+    [conv, machine],
+  );
 
   const header: IHeaderBackground | null =
     conv && has
@@ -155,9 +164,10 @@ export const useChatBackground = (
   };
 
   const panel =
-    has || machineMounted ? (
+    hasMounted || machineMounted ? (
       <BackgroundPanel
         ref={setRail}
+        chat={conv}
         tasks={tasks}
         recap={recap}
         shots={shots}

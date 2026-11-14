@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -27,6 +28,8 @@ const (
 	FeatureMemory = "memory"
 	// FeatureSearchAnswer: the answer the search gives to a question in words.
 	FeatureSearchAnswer = "search-answer"
+	// FeatureUIAgent: the agent of the window, which answers a request in words and takes the person where they asked.
+	FeatureUIAgent = "ui-agent"
 )
 
 // Feature is one background feature as Settings lists it.
@@ -57,6 +60,9 @@ func Features() []Feature {
 		{ID: FeatureSearchAnswer, Live: true,
 			Title:       locale.Pick("Answers in the search", "Ответы в поиске"),
 			Description: locale.Pick("A question typed into the search is answered from what the search found, with links to where the answer comes from.", "На вопрос, набранный в поиске, отвечает модель по найденному, со ссылками на то, откуда ответ.")},
+		{ID: FeatureUIAgent, Live: true,
+			Title:       locale.Pick("Window assistant", "Помощник окна"),
+			Description: locale.Pick("The field of Settings: opens what you name and offers to change a setting, at once and without a chat. A quick, cheap model is enough.", "Поле в Настройках: открывает названное и предлагает поменять настройку — сразу и без чата. Хватает быстрой дешёвой модели.")},
 	}
 }
 
@@ -69,6 +75,8 @@ func ValidFeature(id string) bool {
 type Choice struct {
 	Provider string `json:"provider"`
 	Model    string `json:"model"`
+	// Effort is the reasoning effort the model is asked for (extproviders.ModelEfforts); "" is the model's own.
+	Effort string `json:"effort,omitempty"`
 }
 
 // String is the choice as one value: "<provider>/<model>".
@@ -88,6 +96,7 @@ var (
 	ErrUnknownFeature  = errors.New("bgmodel: no such feature")
 	ErrUnknownProvider = errors.New("bgmodel: no such provider")
 	ErrBadModel        = errors.New("bgmodel: no model named")
+	ErrBadEffort       = errors.New("bgmodel: no such effort")
 )
 
 // Store keeps the choices in a file: {"features": {"<id>": {"provider", "model"}}}. A feature that is not there is
@@ -213,6 +222,92 @@ func (r *Runner) Picked(feature string) bool {
 	return ok
 }
 
+// Lister is what a registry of providers may add to Providers: its accounts, for a feature that has a default.
+type Lister interface {
+	List() ([]extproviders.View, error)
+}
+
+// resolve is the choice a feature runs on: the one picked, or, for the search's answer and the window's agent only (a
+// dead end otherwise; the agent takes a quick model first), the first provider of the registry that holds a key and names a model: an account marked default first, then the
+// others in the registry's order; the first model it lists.
+func (r *Runner) resolve(feature string) (Choice, bool) {
+	if r == nil || r.Store == nil {
+		return Choice{}, false
+	}
+	if c, ok := r.Store.Get(feature); ok {
+		return c, true
+	}
+	if feature != FeatureSearchAnswer && feature != FeatureUIAgent {
+		return Choice{}, false
+	}
+	l, ok := r.Providers.(Lister)
+	if !ok {
+		return Choice{}, false
+	}
+	views, err := l.List()
+	if err != nil {
+		return Choice{}, false
+	}
+	// The window's agent answers in a line: a quick model of an account is worth more than the first one it lists.
+	if feature == FeatureUIAgent {
+		if c, ok := quickChoice(views); ok {
+			return c, true
+		}
+	}
+	var first *Choice
+	for _, v := range views {
+		if !v.HasKey || len(v.Models) == 0 || v.Models[0].ID == "" {
+			continue
+		}
+		c := Choice{Provider: v.ID, Model: v.Models[0].ID}
+		if v.Default {
+			return c, true
+		}
+		if first == nil {
+			first = &c
+		}
+	}
+	if first == nil {
+		return Choice{}, false
+	}
+	return *first, true
+}
+
+// quickModel names the small fast models of the providers (Claude Haiku, Gemini Flash, GPT mini, GLM Air and the like).
+var quickModel = regexp.MustCompile(`(?i)(haiku|flash|mini|lite|nano|air|small|turbo)`)
+
+// quickChoice is the first quick model of an account that holds a key, the default account's first.
+func quickChoice(views []extproviders.View) (Choice, bool) {
+	var first *Choice
+	for _, v := range views {
+		if !v.HasKey {
+			continue
+		}
+		k := slices.IndexFunc(v.Models, func(m extproviders.Model) bool { return m.ID != "" && quickModel.MatchString(m.ID) })
+		if k < 0 {
+			continue
+		}
+		c := Choice{Provider: v.ID, Model: v.Models[k].ID}
+		if v.Default {
+			return c, true
+		}
+		if first == nil {
+			first = &c
+		}
+	}
+	if first == nil {
+		return Choice{}, false
+	}
+	return *first, true
+}
+
+// Usable says whether Run would call a model for the feature: one is picked, or the feature has a default to fall
+// back on.
+func (r *Runner) Usable(feature string) bool {
+	_, ok := r.resolve(feature)
+	return ok
+}
+
 // Last is how each feature's last call went, by feature; a feature that was never called is not there.
 func (r *Runner) Last() map[string]Outcome {
 	r.mu.Lock()
@@ -265,15 +360,14 @@ type Call struct {
 	Prompt    string
 	MaxTokens int
 	Timeout   time.Duration
+	// Quick: an answer of a line, wanted at once (Request.Quick).
+	Quick bool
 }
 
 // Run asks the model picked for the feature. used is false when none is picked («as now»): the caller does what it
 // did before, and nothing was called. An error means the same for the caller, and is recorded (Last, Log).
 func (r *Runner) Run(ctx context.Context, feature string, call Call) (text string, used bool, err error) {
-	if r == nil || r.Store == nil {
-		return "", false, nil
-	}
-	choice, ok := r.Store.Get(feature)
+	choice, ok := r.resolve(feature)
 	if !ok {
 		return "", false, nil
 	}
@@ -282,7 +376,23 @@ func (r *Runner) Run(ctx context.Context, feature string, call Call) (text strin
 	return text, true, err
 }
 
+// RunStream is Run with the text handed to onDelta as it comes.
+func (r *Runner) RunStream(ctx context.Context, feature string, call Call, onDelta func(string)) (text string, used bool, err error) {
+	choice, ok := r.resolve(feature)
+	if !ok {
+		return "", false, nil
+	}
+	text, err = r.requestOf(choice, call, func(req Request) (string, error) { return r.Client.Stream(ctx, req, onDelta) })
+	r.record(feature, choice, err)
+	return text, true, err
+}
+
 func (r *Runner) run(ctx context.Context, choice Choice, call Call) (string, error) {
+	return r.requestOf(choice, call, func(req Request) (string, error) { return r.Client.Complete(ctx, req) })
+}
+
+// requestOf makes the request of a call on the choice's provider and sends it with send.
+func (r *Runner) requestOf(choice Choice, call Call, send func(Request) (string, error)) (string, error) {
 	p, err := r.Providers.Get(choice.Provider)
 	if err != nil {
 		return "", &Error{Reason: ReasonNoProvider}
@@ -291,8 +401,8 @@ func (r *Runner) run(ctx context.Context, choice Choice, call Call) (string, err
 	if err != nil {
 		return "", &Error{Reason: ReasonUnauthorized}
 	}
-	return r.Client.Complete(ctx, Request{BaseURL: p.BaseURL, API: p.API, Key: key, Model: choice.Model,
-		System: call.System, Prompt: call.Prompt, MaxTokens: call.MaxTokens, Timeout: call.Timeout})
+	return send(Request{BaseURL: p.BaseURL, API: p.API, Key: key, Model: choice.Model,
+		System: call.System, Prompt: call.Prompt, MaxTokens: call.MaxTokens, Timeout: call.Timeout, Quick: call.Quick, Effort: choice.Effort})
 }
 
 // Pick keeps the choice of a feature after checking it: the provider is one of the registry and a model is named;
@@ -308,6 +418,9 @@ func (r *Runner) Pick(feature string, c *Choice) (before *Choice, err error) {
 		}
 		if _, err := r.Providers.Get(c.Provider); err != nil {
 			return nil, ErrUnknownProvider
+		}
+		if c.Effort != "" && !slices.Contains(extproviders.ModelEfforts, c.Effort) {
+			return nil, ErrBadEffort
 		}
 	}
 	return r.Store.Set(feature, c)

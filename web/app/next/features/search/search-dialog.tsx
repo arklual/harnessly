@@ -9,14 +9,28 @@ import Switch from '@/next/ui/switch';
 import { t } from '@/next/i18n';
 import { usePortalContainer } from '@/next/ui/portal';
 import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
-import { useDelayed as useDelayedFlag } from '@/next/ui/skeleton';
+import { Skeleton, useDelayed as useDelayedFlag } from '@/next/ui/skeleton';
+import {
+  useRowDetail,
+  type IDetailItem,
+  type IDetailSource,
+  type ISearchDetail,
+  type TDetailAct,
+} from '@/next/features/search/detail';
 import { partsOf } from '@/next/features/search/highlight';
+import SearchSide, { SIDE_ACT, type ISideAction, type TSideAct } from '@/next/features/search/search-side';
 import { SETTING_OFF, SETTING_ON } from '@/next/features/search/sources-api';
+import { SUBJECT, type TSearchSubject } from '@/next/features/search/subject';
+import { layoutKey, layoutOf, steadyLists, type TShownLayout } from '@/next/core/steady-order';
 import type { SettingsSection } from '@/next/routes/routes';
 
 export interface ISearchScope {
   id: string;
   label: string;
+  /** What the tab is, said when the pointer rests on it (a connected system's own name and address). */
+  hint?: string;
+  /** How many rows the words found in it; absent before anything is typed. */
+  count?: number;
 }
 
 /** Where a row leads when it is opened. A row without one is a chat (its id) or a message (its target). */
@@ -28,6 +42,7 @@ export const ROW_GO = {
   review: 'review',
   newChat: 'newChat',
   designs: 'designs',
+  chat: 'chat',
 } as const;
 
 export type TSearchGo =
@@ -35,7 +50,9 @@ export type TSearchGo =
   | { k: typeof ROW_GO.setting; key: string; section: SettingsSection }
   /** A section of Settings; null is Settings itself. */
   | { k: typeof ROW_GO.section; section: SettingsSection | null }
-  | { k: typeof ROW_GO.design; id: string }
+  /** `board` opens the design at that board. */
+  | { k: typeof ROW_GO.design; id: string; board?: string }
+  | { k: typeof ROW_GO.chat; id: string }
   /** An address outside the page: a document, an issue, a wiki page. */
   | { k: typeof ROW_GO.link; url: string }
   /** A merge request, opened in the review. */
@@ -71,13 +88,23 @@ export interface ISearchRow {
   widget?: ISearchWidget;
   /** What the side of the search says about the row: what it is, and a line about it. */
   preview?: { kind: string; text: string };
+  /** What the row stands for, for the side of the search to ask about. */
+  subject?: TSearchSubject;
 }
 
-export const ANSWER = { wait: 'wait', ready: 'ready', noModel: 'noModel', failed: 'failed' } as const;
+export const ANSWER = {
+  wait: 'wait',
+  stream: 'stream',
+  ready: 'ready',
+  noModel: 'noModel',
+  failed: 'failed',
+} as const;
 
 /** The model's answer to a question in words. */
 export type TSearchAnswer =
   | { k: typeof ANSWER.wait }
+  /** The answer as far as the model has written it. */
+  | { k: typeof ANSWER.stream; text: string }
   /** `sources` are the rows the answer rests on. */
   | { k: typeof ANSWER.ready; text: string; sources: readonly { row: ISearchRow; label: string }[] }
   /** No model is picked for the answers. */
@@ -94,6 +121,18 @@ export interface ISearchSmart {
   onSetting: (key: string, value: string) => Promise<boolean>;
   onAddSource: () => void;
   onPickModel: () => void;
+  /** What the side says about the selected row. */
+  detail?: IDetailSource;
+  /** What the side asked about while the search is open. */
+  kept?: Map<string, ISearchDetail>;
+  /** A link opens beside the chat on screen (its pane) and not in another tab of the browser. */
+  beside?: boolean;
+  /** Opens the row aside (⌘↵): beside the chat, or in a new tab of the browser. */
+  onAside?: (row: ISearchRow) => void;
+  /** Writes a line to a chat from the side; resolves true when it was taken. */
+  onSend?: (chatId: string, text: string) => Promise<boolean>;
+  /** Stops a chat's turn or wakes its agent; resolves true when the machine took it. */
+  onChatAct?: (chatId: string, act: TDetailAct) => Promise<boolean>;
 }
 
 export interface ISearchGroup {
@@ -116,8 +155,11 @@ export interface ISearchDialogProps {
   recent: readonly ISearchRow[];
   /** Other words for the field and the box (the chat navigator uses this dialog); the search's own when absent. */
   words?: { title: string; placeholder: string };
-  /** What shows before anything is typed instead of the recent (grouped as the results are). */
-  idle?: readonly ISearchGroup[];
+  /** What shows before anything is typed instead of the recent (grouped as the results are); null while the list of
+   *  the tab is on its way. */
+  idle?: readonly ISearchGroup[] | null;
+  /** What an empty tab says before anything is typed. */
+  empty?: { title: string; hint: string };
   onPick: (row: ISearchRow) => void;
   /** The machine is still reading its older chats, so the messages found may not be all there are. */
   indexing?: boolean;
@@ -130,30 +172,29 @@ export interface ISearchDialogProps {
 
 const SAVED_MS = 1600;
 const COPIED_MS = 1400;
-
-const ACT = { widget: 'widget', open: 'open', copy: 'copy' } as const;
-type TAct = (typeof ACT)[keyof typeof ACT];
-
-interface IRowAction {
-  id: TAct;
-  icon: string;
-  label: string;
-  key: string;
-}
+const SKELETON_ROWS = 6;
 
 const urlOf = (row: ISearchRow): string | null =>
   row.go && (row.go.k === ROW_GO.link || row.go.k === ROW_GO.review) ? row.go.url : null;
 
+const chatOf = (row: ISearchRow): string | null => (row.subject?.k === SUBJECT.chat ? row.subject.id : null);
+
 const openLabel = (row: ISearchRow): string => {
   if (row.go?.k === ROW_GO.setting || row.go?.k === ROW_GO.section) return t('next.search.actOpenSettings');
   if (row.go?.k === ROW_GO.newChat) return t('next.search.actCreate');
+  if (row.target) return t('next.search.actOpenMessage');
   return t('next.search.actOpen');
 };
 
 /** What can be done with the selected row, the first by Enter. */
-const actionsOf = (row: ISearchRow, mod: string): IRowAction[] => {
-  const open = (key: string): IRowAction => ({
-    id: ACT.open,
+const actionsOf = (
+  row: ISearchRow,
+  detail: ISearchDetail | null,
+  smart: ISearchSmart,
+  mod: string,
+): ISideAction[] => {
+  const open = (key: string): ISideAction => ({
+    id: SIDE_ACT.open,
     icon: row.go?.k === ROW_GO.setting ? 'settings' : 'corner-down-left',
     label: openLabel(row),
     key,
@@ -161,7 +202,7 @@ const actionsOf = (row: ISearchRow, mod: string): IRowAction[] => {
   if (row.widget?.kind === ROW_WIDGET.toggle)
     return [
       {
-        id: ACT.widget,
+        id: SIDE_ACT.widget,
         icon: 'corner-down-left',
         label: row.widget.on ? t('next.search.actOff') : t('next.search.actOn'),
         key: '↵',
@@ -170,22 +211,48 @@ const actionsOf = (row: ISearchRow, mod: string): IRowAction[] => {
     ];
   if (row.widget?.kind === ROW_WIDGET.pick)
     return [
-      { id: ACT.widget, icon: 'corner-down-left', label: t('next.search.actChoose'), key: '↵' },
+      { id: SIDE_ACT.widget, icon: 'corner-down-left', label: t('next.search.actChoose'), key: '↵' },
       open(`${mod}↵`),
     ];
-  if (urlOf(row) !== null)
-    return [open('↵'), { id: ACT.copy, icon: 'copy', label: t('next.search.actCopy'), key: '' }];
-  return [open('↵')];
+  const acts = [open('↵')];
+  const link = urlOf(row) ?? detail?.link ?? null;
+  if (smart.onAside && link !== null)
+    acts.push({
+      id: SIDE_ACT.aside,
+      icon: urlOf(row) !== null && smart.beside ? 'panel-right' : 'external-link',
+      label: urlOf(row) !== null && smart.beside ? t('next.search.actBeside') : t('next.search.actNewTab'),
+      key: `${mod}↵`,
+    });
+  if (detail?.act && smart.onChatAct)
+    acts.push({
+      id: SIDE_ACT.chat,
+      icon: detail.act === 'stop' ? 'square' : 'play',
+      label: detail.act === 'stop' ? t('next.search.actStop') : t('next.search.actResume'),
+      key: '',
+    });
+  if (link !== null) acts.push({ id: SIDE_ACT.copy, icon: 'copy', label: t('next.search.actCopy'), key: '' });
+  return acts;
 };
+
+const NO_SELECTION = { key: '', id: null, at: 0 } as const;
+const rowsOf = (group: ISearchGroup) => group.rows;
+const idOfRow = (row: ISearchRow) => row.id;
+const withRows = (group: ISearchGroup, rows: readonly ISearchRow[]): ISearchGroup => ({ ...group, rows });
+
+/** The groups held in the layout the words showed first; exported for the tests. */
+export const steadyGroups = (
+  groups: readonly ISearchGroup[],
+  layout: TShownLayout | null,
+): readonly ISearchGroup[] => steadyLists(groups, layout, rowsOf, withRows, idOfRow);
 
 const groupsShown = (
   typed: boolean,
   results: readonly ISearchGroup[] | null,
   recent: readonly ISearchRow[],
-  idle?: readonly ISearchGroup[],
+  idle?: readonly ISearchGroup[] | null,
 ): readonly ISearchGroup[] => {
   if (typed) return results ?? [];
-  if (idle) return idle;
+  if (idle !== undefined) return idle ?? [];
   if (recent.length === 0) return [];
   return [{ id: 'recent', label: t('next.search.recent'), rows: recent }];
 };
@@ -259,6 +326,7 @@ const SearchDialog = ({
   recent,
   words,
   idle,
+  empty,
   onPick,
   failed = null,
   indexing = false,
@@ -269,27 +337,56 @@ const SearchDialog = ({
   const container = usePortalContainer();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const [selected, setSelected] = useState(0);
+  /**
+   * The selected row is held by its id: an answer that comes later moves nothing under the person, and if it
+   * did, the selection would stay on the row they chose, not on its place. `at` is where it stood, for a row that went.
+   */
+  const [selected, setSelected] = useState<{ key: string; id: string | null; at: number }>(NO_SELECTION);
+  /** The rows as this query showed them: a later answer (messages, the index, a source) adds below, moves nothing. */
+  const [held, setHeld] = useState<{ key: string; layout: TShownLayout } | null>(null);
   /** The setting being saved, the one just saved, and the row whose menu of values is open. */
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [savedKey, setSavedKey] = useState<string | null>(null);
   const [pickOpen, setPickOpen] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [chatBusy, setChatBusy] = useState(false);
+  /** The last answer: it stays on screen while the next one is on its way, so typing does not blink the list. */
+  const [last, setLast] = useState(results);
+  if (results !== null && results !== last) setLast(results);
+  const [noKept] = useState(() => new Map<string, ISearchDetail>());
   const typed = query.trim() !== '';
   const lit = marks ?? query;
-  const groups = groupsShown(typed, results, recent, idle);
+  const stale = typed && results === null && last !== null;
+  const holdKey = `${scope}\u0000${query.trim()}`;
+  const natural = groupsShown(typed, results ?? last, recent, idle);
+  const heldLayout = held !== null && held.key === holdKey ? held.layout : null;
+  // The rows of the words before are still on screen while these are asked: they are not held for these words.
+  const groups = stale ? natural : steadyGroups(natural, heldLayout);
+  if (!open && held !== null) setHeld(null);
+  else if (open && !stale) {
+    const shown = layoutOf(groups, rowsOf, idOfRow);
+    if (layoutKey(shown) !== layoutKey(heldLayout)) setHeld({ key: holdKey, layout: shown });
+  }
   const starts = groups.map((_, i) => groups.slice(0, i).reduce((sum, group) => sum + group.rows.length, 0));
   const rows = groups.flatMap((group) => group.rows);
-  const at = Math.min(selected, Math.max(0, rows.length - 1));
+  const mark = selected.key === holdKey ? selected : NO_SELECTION;
+  const found = mark.id === null ? -1 : rows.findIndex((row) => row.id === mark.id);
+  const at = found >= 0 ? found : Math.min(mark.at, Math.max(0, rows.length - 1));
+  const selectAt = (index: number) => setSelected({ key: holdKey, id: rows[index]?.id ?? null, at: index });
   const current = rows[at] ?? null;
   const currentGroup = groups.find(
     (group, i) => at >= (starts[i] ?? 0) && at < (starts[i] ?? 0) + group.rows.length,
   );
   const unavailable = failed !== null && results === null;
-  const searching = useDelayedFlag(typed && results === null && !unavailable);
+  const waiting = typed ? results === null && last === null : idle === null;
+  const searching = useDelayedFlag(waiting && !unavailable);
   const nothing = typed && results !== null && rows.length === 0;
+  const idleEmpty = !typed && idle !== undefined && idle !== null && rows.length === 0 && !unavailable;
+  const elsewhere = scopes[0]?.count ?? 0;
   const mod = isMac() ? '⌘' : 'Ctrl ';
   const answer = smart?.answer ?? null;
+  const rowDetail = useRowDetail(smart ? current : null, smart?.detail, smart?.kept ?? noKept);
+  const sideActions = smart && current ? actionsOf(current, rowDetail?.detail ?? null, smart, mod) : [];
 
   useEffect(() => {
     if (savedKey === null) return;
@@ -305,7 +402,7 @@ const SearchDialog = ({
   const move = (delta: number) => {
     if (rows.length === 0) return;
     const next = (at + delta + rows.length) % rows.length;
-    setSelected(next);
+    selectAt(next);
     listRef.current?.querySelector(`[data-row="${next}"]`)?.scrollIntoView({ block: 'nearest' });
   };
 
@@ -320,21 +417,54 @@ const SearchDialog = ({
     });
   };
 
-  const act = (row: ISearchRow, id: TAct) => {
-    if (id === ACT.copy) {
-      const url = urlOf(row);
+  const act = (row: ISearchRow, id: TSideAct) => {
+    if (id === SIDE_ACT.copy) {
+      const url = urlOf(row) ?? rowDetail?.detail.link ?? null;
       if (url !== null) void navigator.clipboard.writeText(url).then(() => setCopied(row.id));
       return;
     }
-    if (id === ACT.widget && smart && row.widget?.kind === ROW_WIDGET.toggle) {
+    if (id === SIDE_ACT.widget && smart && row.widget?.kind === ROW_WIDGET.toggle) {
       change(row, row.widget.on ? SETTING_OFF : SETTING_ON);
       return;
     }
-    if (id === ACT.widget && smart && row.widget?.kind === ROW_WIDGET.pick) {
+    if (id === SIDE_ACT.widget && smart && row.widget?.kind === ROW_WIDGET.pick) {
       setPickOpen(row.id);
       return;
     }
+    if (id === SIDE_ACT.aside && smart?.onAside) {
+      smart.onAside(row);
+      return;
+    }
+    if (id === SIDE_ACT.chat) {
+      const chat = chatOf(row);
+      const what = rowDetail?.detail.act;
+      if (!smart?.onChatAct || chat === null || !what || chatBusy) return;
+      setChatBusy(true);
+      void smart.onChatAct(chat, what).then((taken) => {
+        setChatBusy(false);
+        // The chat's state changed: what the side kept of it is asked again.
+        if (taken) smart.kept?.delete(row.id);
+      });
+      return;
+    }
     onPick(row);
+  };
+
+  const stepScope = (delta: number) => {
+    const index = scopes.findIndex((item) => item.id === scope);
+    const next = scopes[(index + delta + scopes.length) % scopes.length];
+    if (!next) return;
+    setSelected(NO_SELECTION);
+    onScope(next.id);
+    listRef.current
+      ?.closest('.hx-srch__box')
+      ?.querySelector(`[data-scope="${CSS.escape(next.id)}"]`)
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  };
+
+  const pickItem = (item: IDetailItem) => {
+    if (item.go)
+      onPick({ id: item.id, kind: 'link', icon: item.icon, title: item.title, meta: '', go: item.go });
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -347,23 +477,30 @@ const SearchDialog = ({
     } else if (event.key === 'Enter') {
       event.preventDefault();
       if (!current) return;
+      const withMod = event.metaKey || event.ctrlKey;
       const withWidget = smart !== undefined && current.widget !== undefined;
-      act(current, withWidget && !(event.metaKey || event.ctrlKey) ? ACT.widget : ACT.open);
-    } else if (event.key === 'Tab' && smart) {
+      if (withWidget) act(current, withMod ? SIDE_ACT.open : SIDE_ACT.widget);
+      else if (withMod && sideActions.some((action) => action.id === SIDE_ACT.aside))
+        act(current, SIDE_ACT.aside);
+      else act(current, SIDE_ACT.open);
+    } else if (event.key === 'Tab' && smart && typed && !event.shiftKey) {
+      // Tab asks the model about the words; with nothing typed, and with Shift, it walks the tabs.
       event.preventDefault();
-      if (typed) smart.onAsk();
+      smart.onAsk();
     } else if (event.key === 'Tab' && scopes.length > 0) {
       event.preventDefault();
-      const index = scopes.findIndex((item) => item.id === scope);
-      const next = scopes[(index + (event.shiftKey ? -1 : 1) + scopes.length) % scopes.length];
-      if (next) onScope(next.id);
+      stepScope(event.shiftKey && !(smart && typed) ? -1 : 1);
+    } else if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !typed && scopes.length > 1) {
+      // The field is empty, so the arrows have no caret to move: they walk the tabs.
+      event.preventDefault();
+      stepScope(event.key === 'ArrowLeft' ? -1 : 1);
     }
   };
 
   const select = (row: ISearchRow) => {
     const index = rows.findIndex((item) => item.id === row.id);
     if (index < 0) return;
-    setSelected(index);
+    selectAt(index);
     listRef.current?.querySelector(`[data-row="${index}"]`)?.scrollIntoView({ block: 'nearest' });
   };
 
@@ -393,7 +530,7 @@ const SearchDialog = ({
                 enterKeyHint="search"
                 value={query}
                 onChange={(event) => {
-                  setSelected(0);
+                  setSelected(NO_SELECTION);
                   onQuery(event.target.value);
                 }}
                 onKeyDown={onKeyDown}
@@ -421,22 +558,28 @@ const SearchDialog = ({
                     type="button"
                     role="tab"
                     className="hx-srch__scope"
+                    data-scope={item.id}
                     aria-selected={item.id === scope}
+                    title={item.hint}
                     onClick={() => {
-                      setSelected(0);
+                      setSelected(NO_SELECTION);
                       onScope(item.id);
                     }}
                   >
                     {item.label}
+                    {typed && item.count !== undefined && item.count > 0 && (
+                      <span className="hx-srch__count">{item.count}</span>
+                    )}
                   </button>
                 ))}
                 {smart && (
                   <button
                     type="button"
                     className="hx-srch__scope hx-srch__scope--add"
+                    title={t('next.search.addSourceHint')}
                     onClick={smart.onAddSource}
                   >
-                    <Icon name="plus" size="sm" />
+                    <Icon name="plug" size="sm" />
                     {t('next.search.addSource')}
                   </button>
                 )}
@@ -459,6 +602,11 @@ const SearchDialog = ({
                       <div className="hx-srch__ans-wait">
                         <Icon name="loader-circle" size="sm" />
                         {t('next.search.answerWait')}
+                      </div>
+                    )}
+                    {answer.k === ANSWER.stream && (
+                      <div className="hx-srch__ans-text" data-writing="true">
+                        {answer.text}
                       </div>
                     )}
                     {answer.k === ANSWER.ready && (
@@ -493,13 +641,23 @@ const SearchDialog = ({
                   </div>
                 )}
                 {searching && (
-                  <div className="hx-srch__wait" role="status">
-                    <Icon name="loader-circle" size="sm" />
-                    {t('next.search.searching')}
+                  <div className="hx-srch__sks" role="status" aria-label={t('next.search.searching')}>
+                    {Array.from({ length: SKELETON_ROWS }, (_, i) => (
+                      <div key={i} className="hx-srch__skrow">
+                        <Skeleton className="hx-srch__sk-ic" />
+                        <Skeleton className="hx-srch__sk-line" />
+                      </div>
+                    ))}
                   </div>
                 )}
                 {groups.map((group, groupIndex) => (
-                  <div key={group.id} className="hx-srch__group" role="group" aria-label={group.label}>
+                  <div
+                    key={group.id}
+                    className="hx-srch__group"
+                    role="group"
+                    aria-label={group.label}
+                    data-stale={stale || undefined}
+                  >
                     <div className="hx-srch__label">{group.label}</div>
                     {group.rows.map((row, rowIndex) => {
                       const mine = (starts[groupIndex] ?? 0) + rowIndex;
@@ -517,18 +675,18 @@ const SearchDialog = ({
                           data-kind={row.kind}
                           onClick={() => {
                             // A row with a control is changed by its control; the row itself only takes the selection.
-                            if (widget) setSelected(mine);
+                            if (widget) selectAt(mine);
                             else onPick(row);
                           }}
                           onPointerMove={() => {
-                            if (mine !== at) setSelected(mine);
+                            if (mine !== at) selectAt(mine);
                           }}
                         >
                           <span className="hx-srch__ic">
                             <Icon name={row.icon} size="sm" />
                           </span>
                           <span className="hx-srch__text">
-                            <span className="hx-srch__title">
+                            <span className="hx-srch__title" title={row.title}>
                               <Highlighted text={row.title} query={lit} />
                             </span>
                             {row.snippet && (
@@ -575,6 +733,24 @@ const SearchDialog = ({
                     <b>{t('next.search.nothing')}</b>
                     <span>{t('next.search.nothingHint')}</span>
                     {indexing && <span>{t('next.search.indexing')}</span>}
+                    {scope !== scopes[0]?.id && elsewhere > 0 && (
+                      <button
+                        type="button"
+                        className="hx-srch__none-go"
+                        onClick={() => {
+                          const all = scopes[0];
+                          if (all) onScope(all.id);
+                        }}
+                      >
+                        {t('next.search.nothingElsewhere', { count: elsewhere })}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {idleEmpty && empty && (
+                  <div className="hx-srch__none">
+                    <b>{empty.title}</b>
+                    <span>{empty.hint}</span>
                   </div>
                 )}
                 {unavailable && (
@@ -585,43 +761,26 @@ const SearchDialog = ({
                     onRetry={failed.onRetry}
                   />
                 )}
-                {!typed && recent.length === 0 && !idle && !unavailable && (
+                {!typed && recent.length === 0 && idle === undefined && !unavailable && (
                   <div className="hx-srch__none">
                     <span>{t('next.search.start')}</span>
                   </div>
                 )}
               </div>
               {smart && current && (
-                <aside className="hx-srch__side" key={current.id}>
-                  <div>
-                    <div className="hx-srch__side-kind">{current.preview?.kind ?? currentGroup?.label}</div>
-                    <h3 className="hx-srch__side-title">{current.title}</h3>
-                  </div>
-                  <div className="hx-srch__side-text">
-                    <Highlighted
-                      text={current.preview?.text ?? current.snippet ?? current.meta}
-                      query={lit}
-                    />
-                  </div>
-                  <div className="hx-srch__acts">
-                    {actionsOf(current, mod).map((action) => (
-                      <button
-                        key={action.id}
-                        type="button"
-                        className="hx-srch__act"
-                        onClick={() => act(current, action.id)}
-                      >
-                        <Icon name={action.icon} size="sm" />
-                        <span>
-                          {action.id === ACT.copy && copied === current.id
-                            ? t('next.search.copied')
-                            : action.label}
-                        </span>
-                        {action.key !== '' && <kbd>{action.key}</kbd>}
-                      </button>
-                    ))}
-                  </div>
-                </aside>
+                <SearchSide
+                  key={current.id}
+                  row={current}
+                  kind={current.preview?.kind ?? currentGroup?.label ?? ''}
+                  lit={lit}
+                  detail={rowDetail}
+                  actions={sideActions}
+                  copied={copied === current.id}
+                  busy={chatBusy}
+                  onAct={(id) => act(current, id)}
+                  onItem={pickItem}
+                  onSend={smart.onSend}
+                />
               )}
             </div>
             <div className="hx-srch__foot">
@@ -634,10 +793,24 @@ const SearchDialog = ({
                 <kbd>↵</kbd>
                 {t('next.search.keyOpen')}
               </span>
-              {smart && (
+              {smart && typed && (
                 <span>
                   <kbd>Tab</kbd>
                   {t('next.search.keyAsk')}
+                </span>
+              )}
+              {smart && typed && (
+                <span>
+                  <kbd>⇧</kbd>
+                  <kbd>Tab</kbd>
+                  {t('next.search.keyScope')}
+                </span>
+              )}
+              {smart && !typed && scopes.length > 1 && (
+                <span>
+                  <kbd>←</kbd>
+                  <kbd>→</kbd>
+                  {t('next.search.keyScope')}
                 </span>
               )}
               {!smart && scopes.length > 0 && (

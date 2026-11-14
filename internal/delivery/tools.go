@@ -25,21 +25,24 @@ type Tools struct {
 var _ mcpserver.Toolset = Tools{}
 
 func (Tools) Instructions() string {
-	return "Handing files over: deliver_file gives the person a file you made for them (a zip, a docx, a pdf, a document) as a card " +
-		"in the chat that opens it on the right and downloads it. Deliver only a file the person asked to receive; the files you " +
-		"merely write or change make no card."
+	return "Handing files over: when the person asks you to download, send or give them a file (\"скачай\", \"скинь\", \"дай файлом\"), " +
+		"make it and hand it over with deliver_file; never answer with its path in text. Any type goes (html, zip, pdf, png, md, csv, docx, " +
+		"xlsx, mp4…); a folder is handed over as one zip of it. The chat shows a card that opens it on the right, and the person's browser " +
+		"downloads it at once. Deliver only a file the person asked to receive; the files you merely write or change make no card."
 }
 
 func (Tools) Tools() []any {
 	return []any{jsvalue.NewObject(
 		"name", ToolName,
-		"description", "Hand a file to the person: it appears in the chat as a card they can open in the right pane (a zip shows its "+
-			"contents) and download. Call it only for a file the person asked to receive; files you just edit or write as part of the work "+
-			"are not delivered. The file must lie inside the workspace (or /tmp). Call it again after changing the file to hand over the new version.",
+		"description", "Hand a file to the person: the way to answer \"download / send me / give me the file\". It appears in the chat as a "+
+			"card they can open in the right pane (a zip shows its contents), and their browser downloads it at once. Any type and size; a "+
+			"folder is packed into one zip. Do not write the path in your answer instead. Call it only for a file the person asked to receive; "+
+			"files you just edit or write as part of the work are not delivered. The file must lie inside the workspace (or /tmp). Call it "+
+			"again after changing the file to hand over the new version.",
 		"inputSchema", jsvalue.NewObject(
 			"type", "object",
 			"properties", jsvalue.NewObject(
-				"path", jsvalue.NewObject("type", "string", "description", "The file: an absolute path, or relative to this chat's folder."),
+				"path", jsvalue.NewObject("type", "string", "description", "The file or folder: an absolute path, or relative to this chat's folder."),
 				"title", jsvalue.NewObject("type", "string", "description", "What the card is called; omit for the file's name."),
 			),
 			"required", []any{"path"},

@@ -3,6 +3,7 @@ package storelink
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -162,5 +163,52 @@ func waitFor(t *testing.T, within time.Duration, ok func() bool) {
 			t.Fatalf("not within %s", within)
 		}
 		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// RUNTIME_STORE_DB and RUNTIME_STORE_BLOBS move a store inside the runtime to the drivers they name (a
+// Postgres of the team's own instead of SQLite), with no hub: what was put is read back after a restart, from there.
+func TestEmbeddedStoreOnNamedDrivers(t *testing.T) {
+	dir := t.TempDir()
+	dbs := []string{"sqlite://" + filepath.Join(dir, "meta")}
+	if pg := os.Getenv("HUB_TEST_POSTGRES_URL"); pg != "" {
+		dbs = append(dbs, pg)
+	} else {
+		t.Log("HUB_TEST_POSTGRES_URL unset: the Postgres case is NOT run")
+	}
+	for i, db := range dbs {
+		data := filepath.Join(dir, fmt.Sprintf("data%d", i))
+		blobs := filepath.Join(dir, fmt.Sprintf("blobs%d", i))
+		o := Options{DataDir: data, DB: db, Blobs: "file://" + blobs, Log: quiet()}
+		if k, _ := Decide(o); k != KindEmbedded {
+			t.Fatalf("a runtime on its own with RUNTIME_STORE_DB: %q", k)
+		}
+		l, err := Open(o)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body := fmt.Sprintf("pixels %d %d", i, time.Now().UnixNano())
+		e, err := l.Client(filestore.KindUploads).Put(context.Background(), "chat-1/shot.png", []byte(body), "box")
+		if err != nil {
+			t.Fatal(err)
+		}
+		l.Close()
+		if _, err := os.Stat(filepath.Join(data, "store")); err == nil {
+			if ents, _ := os.ReadDir(filepath.Join(data, "store")); len(ents) > 0 {
+				t.Fatalf("%s: the store wrote into the data folder: %v", dbKind(o), ents)
+			}
+		}
+		if ents, _ := os.ReadDir(blobs); len(ents) == 0 {
+			t.Fatalf("%s: nothing in RUNTIME_STORE_BLOBS", dbKind(o))
+		}
+		l, err = Open(o)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cur, err := l.Client(filestore.KindUploads).Current(context.Background(), "chat-1/shot.png")
+		if err != nil || cur == nil || cur.Sha != e.Sha {
+			t.Fatalf("%s: after a restart %+v %v, want %s", dbKind(o), cur, err, e.Sha)
+		}
+		l.Close()
 	}
 }

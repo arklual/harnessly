@@ -5,6 +5,7 @@
 // field, the host draws it; the island is the chat folded over the site: its field, and over it the agent's last line
 // with what it does now and «Стоп». The field, the pill and the chat are dragged by their grabs (site-drag.ts): where
 // they would stand shows in the ghost.
+import { inHiddenScreen } from '@/next/features/shell/kept-screens';
 import Logo from '@/next/ui/logo';
 import { usePresence, usePresentFlag } from '@/next/ui/presence';
 import {
@@ -12,6 +13,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -29,7 +31,6 @@ import {
 import { PANE_CHATS, type TPaneChat } from '@/next/features/designly/pane-chat';
 import { ChatTerminalButton } from '@/next/features/terminal/chat-terminal';
 import Icon from '@/next/ui/icon';
-import { RoundButton } from '@/next/ui/button';
 import { plural, t } from '@/next/i18n';
 import '@/next/styles/island.css';
 
@@ -381,14 +382,10 @@ export type TIslandStatus =
   | null;
 
 export interface ISiteIslandProps {
-  value: string;
-  onChange: (value: string) => void;
-  onSend: () => void;
-  /** There are words or notes, and no turn is running. */
-  canSend: boolean;
-  placeholder: string;
-  /** The field is not taken yet: the conversation is being made. */
-  sending: boolean;
+  /** The field: the chat's own composer, the host's — the design's chat's dock, or a new chat's field. */
+  field: ReactNode;
+  /** The field holds words, files or a recording: a blur does not fold it. */
+  holding: boolean;
   status: TIslandStatus;
   /** What the agent said last (IslandLast): the folded chat shows it over its status. */
   last?: ReactNode;
@@ -402,18 +399,10 @@ export interface ISiteIslandProps {
   mode: TSiteMode;
   /** The field was dragged to a place, or pulled down to fold. */
   onZone: TDropZone;
-  recording: boolean;
-  onMic?: () => void;
-  /** The notes going with the words, over the field. */
-  extra?: ReactNode;
   /** How many notes go with the words: the folded pill says so. */
   notes: number;
-  /** A click on the page picks a block for a note; null: the page cannot be picked from (no bridge yet). */
-  pick: boolean | null;
-  onPick: () => void;
 }
 
-const FIELD_MAX = 132;
 /** The status's fold, as long as .hx-island__status's transition in island.css. */
 const STATUS_EXIT_MS = 420;
 const BLUR_MS = 140;
@@ -427,18 +416,11 @@ export const IslandLast = ({ text, onExpand }: { text: string | null; onExpand: 
   ) : null;
 
 export const SiteIsland = (props: ISiteIslandProps) => {
-  const { value, onChange, onSend, status, min, onMin, mode } = props;
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const { status, min, onMin, mode, holding } = props;
   const rootRef = useRef<HTMLDivElement>(null);
   // The status folds away with what it said: its words stay while it leaves.
   const { value: held } = usePresence(status, STATUS_EXIT_MS);
-
-  useLayoutEffect(() => {
-    const el = inputRef.current;
-    if (!el) return;
-    el.style.removeProperty('height');
-    if (value) el.style.setProperty('height', `${Math.min(FIELD_MAX, el.scrollHeight)}px`);
-  }, [value]);
+  const focusField = () => rootRef.current?.querySelector('textarea')?.focus({ preventScroll: true });
 
   // «/» outside a field brings the folded field back.
   useEffect(() => {
@@ -446,9 +428,10 @@ export const SiteIsland = (props: ISiteIslandProps) => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as Element | null;
       if (event.key !== '/' || target?.closest('input, textarea, [contenteditable="true"]')) return;
+      if (inHiddenScreen(rootRef.current)) return;
       event.preventDefault();
       onMin(false);
-      inputRef.current?.focus({ preventScroll: true });
+      rootRef.current?.querySelector('textarea')?.focus({ preventScroll: true });
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -456,7 +439,7 @@ export const SiteIsland = (props: ISiteIslandProps) => {
 
   const expand = () => {
     onMin(false);
-    inputRef.current?.focus({ preventScroll: true });
+    focusField();
   };
 
   // A press is the gesture's; a click that no pointer made is the keyboard's.
@@ -464,13 +447,25 @@ export const SiteIsland = (props: ISiteIslandProps) => {
     if (event.detail === 0) expand();
   };
 
+  // An empty field let go of folds into the pill; the latest `holding` is read when the blur has settled.
+  const holdingRef = useRef(holding);
+  useEffect(() => {
+    holdingRef.current = holding;
+  });
   const onBlur = () => {
     if (mode !== 'island') return;
     window.setTimeout(() => {
-      const active = document.activeElement;
-      if (inputRef.current?.value.trim() || props.recording || rootRef.current?.contains(active)) return;
+      if (holdingRef.current || rootRef.current?.contains(document.activeElement)) return;
       onMin(true);
     }, BLUR_MS);
+  };
+  // Escape in an empty field folds it, as before.
+  const onKeyDown = (event: ReactKeyboardEvent) => {
+    if (event.key !== 'Escape' || mode !== 'island' || holding || event.defaultPrevented) return;
+    if (!(event.target as Element).closest('textarea')) return;
+    event.preventDefault();
+    (event.target as HTMLElement).blur();
+    onMin(true);
   };
 
   return (
@@ -518,66 +513,8 @@ export const SiteIsland = (props: ISiteIslandProps) => {
           title={t('next.site.grabTip')}
           onPointerDown={(event) => dragIsland(event, props.onZone)}
         />
-        {props.extra}
-        <div className="hx-island__row">
-          <textarea
-            ref={inputRef}
-            className="hx-island__input"
-            rows={1}
-            placeholder={props.placeholder}
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-            onBlur={onBlur}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                onSend();
-              }
-              if (event.key === 'Escape' && mode === 'island' && !value.trim()) {
-                event.preventDefault();
-                inputRef.current?.blur();
-                onMin(true);
-              }
-            }}
-          />
-          {props.pick !== null && (
-            <button
-              type="button"
-              className="hx-head-btn hx-tipped"
-              aria-pressed={props.pick}
-              aria-label={t('next.notes.pick')}
-              onClick={props.onPick}
-            >
-              <Icon name="square-dashed-mouse-pointer" />
-              <span className="hx-tip" data-align="end">
-                {t('next.notes.pickTip')}
-                <kbd>V</kbd>
-              </span>
-            </button>
-          )}
-          {props.onMic && (
-            <button
-              type="button"
-              className="hx-head-btn hx-tipped hx-island__mic"
-              data-rec={props.recording}
-              aria-label={t('next.composer.voice')}
-              onClick={props.onMic}
-            >
-              <Icon name="mic" />
-              <span className="hx-tip" data-align="end">
-                {t('next.composer.voice')}
-              </span>
-            </button>
-          )}
-          <RoundButton
-            icon="arrow-up"
-            label={t('next.site.send')}
-            variant="accent"
-            size="sm"
-            busy={props.sending}
-            disabled={!props.canSend}
-            onClick={onSend}
-          />
+        <div className="hx-island__field" onBlur={onBlur} onKeyDown={onKeyDown}>
+          {props.field}
         </div>
       </div>
       <button

@@ -224,6 +224,9 @@ func TestProfilesReadARefusalInsideASuccess(t *testing.T) {
 	if msg["message"] != "the provider did not accept the key" && msg["message"] != "провайдер не принял ключ" {
 		t.Fatalf("entry: %v", e)
 	}
+	if msg["rejected"] != true {
+		t.Fatalf("a refused key is not marked: %v", e)
+	}
 	if e["five_hour"] != nil {
 		t.Fatalf("windows out of a refusal: %v", e)
 	}

@@ -1,5 +1,5 @@
-// The «Организация» screen of the new hub (admin): the organization's own settings. For now one: the rule for apps on
-// its machines. The switch changes after the hub answered, and the machines get the rule with their list.
+// The «Организация» screen of the new hub (admin): the organization's own settings. The rule for apps on
+// its machines and the links for the chat. The switch changes after the hub answered, and the machines get the rule with their list.
 // Its own chunk: it loads when the person opens the section.
 import { useEffect, useState } from 'react';
 
@@ -7,6 +7,7 @@ import type { AppsConsent } from '../../../hub-api/orgs';
 import { orgErrorText } from '../../org/api/errors';
 import { useOrg } from '../../org/context';
 import { Titles } from '../shell';
+import { LinksSection } from './links-section';
 
 type Loaded = { value: AppsConsent } | { error: string };
 
@@ -82,6 +83,7 @@ const Screen = () => {
         {loaded && 'error' in loaded && <div className="hx-set__foot">{loaded.error}</div>}
         {failed && <div className="hx-set__foot">{failed}</div>}
       </div>
+      <LinksSection />
     </>
   );
 };

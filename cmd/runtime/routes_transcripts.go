@@ -33,10 +33,10 @@ func trackerKeys() []string {
 
 func sourceLinks() *sources.Links {
 	return &sources.Links{
-		TrackerURL:   strings.TrimRight(os.Getenv("RUNTIME_TRACKER_URL"), "/"),
-		TrackerHosts: splitList(os.Getenv("RUNTIME_TRACKER_HOSTS")),
+		TrackerURL:   displayTrackerURL(),
+		TrackerHosts: displayTrackerHosts(),
 		IssueKeys:    trackerKeys(),
-		GitLabHosts:  splitList(os.Getenv("RUNTIME_GITLAB_HOSTS")),
+		GitLabHosts:  displayGitLabHosts(),
 		DocsHost:     os.Getenv("RUNTIME_DOCS_HOST"),
 		ReaderHost:   os.Getenv("RUNTIME_PLATFORM_HOST"),
 		ReaderPath:   env("RUNTIME_DOCS_READER_PATH", "/agents/docs/"),

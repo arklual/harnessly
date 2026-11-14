@@ -1,6 +1,6 @@
 // What the UI slots put on the screens that exist: the «Extensions» page of Settings (the settings views and the
 // onboarding steps), the action row at an object and the blocks of the start page. Every piece here is empty without HARNESSLY_UI_SLOTS=on.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useInstalledApps } from '@/next/features/app-views/api';
 import {
   applyBranding,
@@ -122,14 +122,20 @@ export const ObjectActions = ({ machine, object }: { machine: MachineId; object:
   );
 };
 
+/** A view of the start page that takes the whole stage under the field (`"height": "stage"`), not a block under it. */
+export const isStageView = (e: ISlotEntry) => e.view.height === 'stage';
+
 /**
  * The blocks the apps put on the start page, under the field of a new chat (a brief of the day, a queue of work):
- * nothing at all when no app fills the `home` slot, so the page stays as it was.
+ * nothing at all when no app fills the `home` slot, so the page stays as it was. A view that takes the stage is drawn by
+ * useHomeStage instead, and then the blocks are not drawn at all.
  */
 export const HomeSlots = ({ machine }: { machine: MachineId | null }) => {
   // Without a machine to start on there is nobody to ask; the hook still runs, switched off.
   const { list } = useInstalledApps(machine ?? ('' as MachineId), 0, machine !== null);
-  const blocks = slotViews(list, 'home');
+  const views = slotViews(list, 'home');
+  // A view that takes the stage owns the page: the blocks would stand over it.
+  const blocks = views.some(isStageView) ? [] : views;
   if (machine === null || list === null || blocks.length === 0) return null;
   return (
     <div className="hx-uislot-home">
@@ -145,6 +151,46 @@ export const HomeSlots = ({ machine }: { machine: MachineId | null }) => {
       ))}
     </div>
   );
+};
+
+export interface IHomeGreeting {
+  title: string;
+  sub: string;
+}
+
+/**
+ * The view that takes the start page's stage under the field (the first by order when several apps ask for it), and the
+ * greeting it put over the field. Null when no app asks for the stage: the page stays as it was.
+ */
+export const useHomeStage = (
+  machine: MachineId | null,
+): { stage: ReactNode; greeting: IHomeGreeting | null } => {
+  const { list } = useInstalledApps(machine ?? ('' as MachineId), 0, machine !== null);
+  const entry = slotViews(list, 'home').find(isStageView) ?? null;
+  const key = entry ? keyOf(entry) : null;
+  const [greeting, setGreeting] = useState<{ key: string; value: IHomeGreeting } | null>(null);
+  const onGreet = (title: string, sub: string) => {
+    if (key !== null) setGreeting(title === '' ? null : { key, value: { title, sub } });
+  };
+  if (machine === null || list === null || entry === null) return { stage: null, greeting: null };
+  return {
+    stage: (
+      <div className="hx-home-stage">
+        <UiSlot
+          key={keyOf(entry)}
+          machine={machine}
+          app={entry.app}
+          view={entry.view}
+          target="home"
+          viewPort={list.viewPort}
+          onGreet={onGreet}
+          fill
+        />
+      </div>
+    ),
+    // A greeting is the view's own: another view, or the same one gone, leaves the host's question.
+    greeting: greeting !== null && greeting.key === key ? greeting.value : null,
+  };
 };
 
 /** Sets the product name and accent an app brings (the branding slot) on the page; draws nothing. */

@@ -13,8 +13,12 @@ import {
   titleWithCount,
   unlockSound,
 } from '@/next/features/notifications/ping';
+import { platformPath, runtimePath } from '@/next/core/net/machine';
+import { useStore } from '@/next/core/store';
 import { t } from '@/next/i18n';
 import { routePath, ROUTE } from '@/next/routes/routes';
+import { activeMachineStore } from '@/next/stores/machines';
+import { startNoticesSync } from '@/next/stores/notices-sync';
 import { convsLoadedStore, useConversationList } from '@/next/stores/conversations';
 import {
   clearChatNotices,
@@ -113,6 +117,12 @@ export interface INoticesOptions {
 export const useNotices = ({ person, currentId, onOpenChat }: INoticesOptions) => {
   setNoticesPerson(person);
   const notices = useNoticeList();
+  // The person's notices, reads and switches live in a database: the cache above follows it.
+  const machine = useStore(activeMachineStore);
+  useEffect(() => {
+    if (!machine) return;
+    return startNoticesSync({ base: runtimePath(platformPath('/notifications'), machine), person });
+  }, [machine, person]);
   const convs = useConversationList(null);
   /** Each chat's event at the last look; absent: not looked at yet, so what it stands at is not news. */
   const seen = useRef(new Map<string, string | null>());

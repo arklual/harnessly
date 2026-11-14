@@ -2,11 +2,43 @@
 // come, the finished pairs sent back as history with the next question. A stop aborts the stream (the machine ends
 // the fork); a question asked again replaces the one that was cut.
 import { useEffect, useRef, useState } from 'react';
+import { useDraftField } from '@/next/bindings/use-draft';
+import { useVoice } from '@/next/bindings/use-voice';
 import { askSideChat, type ISideTurn } from '@/next/features/pane/side-chat-api';
-import type { ISideMessage } from '@/next/features/pane/side-chat';
+import type { ISideField, ISideMessage } from '@/next/features/pane/side-chat';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
+import type { ScreenDraftKey } from '@/next/stores/drafts';
+import { DEFAULT_LIMITS, limitsOf } from '@/next/stores/machines';
+import { useEnterSends } from '@/next/stores/me';
 import { takeSideAsk, useSideAsk } from '@/next/stores/side-ask';
 import { t } from '@/next/i18n';
+
+/** Where the side chat of a chat keeps what is typed in its field: it is there again after another tab. */
+export const sideDraftOf = (conv: ConvId | null): ScreenDraftKey => `screen:side:${conv ?? ''}`;
+
+/** The field of the side chat: the chat's composer with the voice, its words kept per chat. */
+const useSideField = (machine: MachineId | null, conv: ConvId | null): ISideField => {
+  const key = sideDraftOf(conv);
+  const { text, setText, read, field } = useDraftField(key);
+  const { notice, recording, recognized, caret, onMic, onCancelRecording, onFinishRecording } = useVoice(
+    machine,
+    text,
+    setText,
+    read,
+    key,
+  );
+  const enterSends = useEnterSends();
+  return {
+    text,
+    setText,
+    read,
+    inputRef: field,
+    maxText: (machine ? limitsOf(machine) : DEFAULT_LIMITS).maxText,
+    enterSends,
+    voice: { recording, recognized, caret, onMic, onCancelRecording, onFinishRecording },
+    notice,
+  };
+};
 
 let seq = 0;
 const nextId = () => `s${++seq}`;
@@ -91,5 +123,7 @@ export const useSideChat = (machine: MachineId | null, conv: ConvId | null) => {
   const asked = useSideAsk(conv);
   const quote = asked && { quote: asked.quote, nonce: asked.nonce };
 
-  return { messages, busy, ask, stop, retry, clear, quote, takeQuote: takeSideAsk };
+  const field = useSideField(machine, conv);
+
+  return { messages, busy, field, ask, stop, retry, clear, quote, takeQuote: takeSideAsk };
 };

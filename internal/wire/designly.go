@@ -40,6 +40,8 @@ const (
 	DesignSystemMax = 200
 	DesignlyBodyMax = 256 << 10
 	DesignBoardsMax = 200
+	// DesignPeopleMax is the most people a project names (DesignArtifact.People).
+	DesignPeopleMax = 20
 )
 
 // DesignDeckTone is how a deck's speaker notes are written.
@@ -262,7 +264,11 @@ type DesignArtifact struct {
 	Boards      []DesignBoard `json:"boards"`
 	Convs       []string      `json:"convs"`
 	TouchedBy   []string      `json:"touchedBy,omitempty"`
-	Owner       *DesignOwner  `json:"owner,omitempty"`
+	// People are the names of who worked on it: the owner, then the people of the chats in Convs and TouchedBy (a
+	// chat's person is whose session started it; a delegated chat's, its root's), each once. Names only, never an
+	// address or a chat id; absent from an older runtime.
+	People []string     `json:"people,omitempty"`
+	Owner  *DesignOwner `json:"owner,omitempty"`
 	// Role is what the person may do in the project; absent from a runtime that does not restrict access.
 	Role DesignRole `json:"role,omitempty"`
 	// AppKind is the app's document type the project is (a type made of Sinopia's site): its label in the
@@ -304,6 +310,14 @@ func (a DesignArtifact) Validate() error {
 	for _, c := range a.TouchedBy {
 		if !ValidConvID(c) {
 			errs = append(errs, errors.New("touchedBy: not a conversation id"))
+		}
+	}
+	if len(a.People) > DesignPeopleMax {
+		errs = append(errs, errors.New("people: too many"))
+	}
+	for _, p := range a.People {
+		if p == "" || ValidConvID(p) || strings.Contains(p, "@") {
+			errs = append(errs, errors.New("people: not a name"))
 		}
 	}
 	return errors.Join(errs...)

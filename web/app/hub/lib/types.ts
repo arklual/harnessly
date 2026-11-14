@@ -170,6 +170,27 @@ export type Invite = {
 export type Member = { userId: string; email: string; name: string; role: Role; joinedAt: string };
 export type Passkey = { id: string; name: string; createdAt: string; lastUsedAt: string | null };
 
+/** A personal token of one of the person's own apps (docs/hub/client-api.md). */
+export type AppToken = {
+  id: string;
+  client: string;
+  device: string;
+  scopes: string[];
+  createdAt: string;
+  lastUsedAt: string;
+  expiresAt: string;
+  ip: string;
+};
+
+/** An app that asks to be connected: what the consent page shows. */
+export type DeviceRequest = {
+  client: string;
+  device: string;
+  ip: string;
+  expiresAt: string;
+  scopes: string[];
+};
+
 export type Config = {
   version: string;
   publicUrl: string;

@@ -409,6 +409,13 @@
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
+/* What the person can do about it (a full disk, what can be deleted). */
+.hx-ns__hint {
+  margin: 0;
+  color: var(--ns-fg3);
+  font-size: var(--hx-text-xs);
+  line-height: 1.45;
+}
 /* A machine's card, opened in place (features/smart-notice/machine-more.tsx): what weighs on it, a row each. */
 .hx-ns__heavy {
   display: flex;

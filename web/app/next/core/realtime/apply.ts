@@ -43,7 +43,13 @@ import {
 import { favoritesStore } from '@/next/stores/favorites';
 import { applyRemoteDraft, applyRemoteDrafts } from '@/next/core/drafts-cloud';
 import { defaultCwdStore, projectKey, projectsStore } from '@/next/stores/projects';
-import { keepFeatures, machineOrderStore, machinesStore } from '@/next/stores/machines';
+import {
+  keepFeatures,
+  machineLoadStore,
+  machineOrderStore,
+  machinesStore,
+  splitLoad,
+} from '@/next/stores/machines';
 import {
   applyMessage,
   applyPromptState,
@@ -148,7 +154,7 @@ export function applyMachineEvent(machine: MachineId, e: MachineEvent): void {
       ...(e.health ? { health: e.health } : {}),
     }));
   } else {
-    patchMachine(machine, (m) => ({ ...m, load: e.load }));
+    machineLoadStore.set(machine, e.load);
   }
 }
 
@@ -271,7 +277,7 @@ export const storeSink: Sink = {
     keepFeatures(machine, w.features);
     const orgName = machinesStore.get(machine)?.machine.orgName;
     machinesStore.set(machine, {
-      machine: { ...w.machine, id: machine, ...(orgName ? { orgName } : {}) },
+      machine: { ...splitLoad(machine, w.machine), id: machine, ...(orgName ? { orgName } : {}) },
       runtime: 'v2',
       epoch: w.epoch,
       features: w.features,
@@ -281,8 +287,9 @@ export const storeSink: Sink = {
   snapshot(machine, s) {
     if (s.ch === 'machine') {
       // The organization is the hub's word about the machine; the machine's own snapshot does not know it.
+      const record = splitLoad(machine, s.data.machine);
       patchMachine(machine, (m) => ({
-        ...s.data.machine,
+        ...record,
         id: machine,
         ...(m.orgName ? { orgName: m.orgName } : {}),
       }));

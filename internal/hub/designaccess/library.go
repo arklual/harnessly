@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
@@ -35,6 +36,24 @@ type LibraryBoard struct {
 	Path  string `json:"path"`
 }
 
+// Coverer is the part of a Viewer that gives the cover pictures kept in the store (designview.View).
+type Coverer interface {
+	// CoverVersions are the projects of the space that have a cover, each with the cover's sha.
+	CoverVersions(ctx context.Context, spaceID string) (map[string]string, error)
+	// Cover is a project's cover, at most limit bytes; nil when there is none.
+	Cover(ctx context.Context, spaceID, project string, limit int64) ([]byte, error)
+}
+
+const storeCoverPath = "/design/store-cover"
+
+// maxCover caps a cover the hub serves.
+const maxCover = 1 << 20
+
+// coverURL is where the library points a project's cover: a route of the hub under the same access as the library.
+func coverURL(project, sha string) string {
+	return "/api/platform" + storeCoverPath + "?project=" + project + "&v=" + sha[:12]
+}
+
 // Librarian is the part of a Viewer that lists a space's library (designview.View).
 type Librarian interface {
 	// Library lists the projects named of the space's library that the store has files of, newest first.
@@ -60,6 +79,8 @@ type storeArtifact struct {
 	Convs       []string       `json:"convs"`
 	Owner       *storeOwner    `json:"owner,omitempty"`
 	Role        string         `json:"role,omitempty"`
+	// WorkMachine is the machine whose folder holds the working copy (hub-design-owner).
+	WorkMachine string `json:"workMachine,omitempty"`
 }
 
 type storeFolder struct {
@@ -95,20 +116,30 @@ func layoutKey(email string) string {
 }
 
 func (s *Service) libraryRoute(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine) error {
-	lister, ok := s.view.(Librarian)
-	if !ok || m.SpaceID == "" {
-		return fail("store_off", "Хранилище дизайнов не подключено")
-	}
-	ctx := r.Context()
-	t, err := s.read(ctx, m)
+	out, err := s.storeLibraryOf(r.Context(), u, m)
 	if err != nil {
 		return err
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, out)
+	return nil
+}
+
+// storeLibraryOf is the person's library and shelves as the hub's store has them (the store-library answer).
+func (s *Service) storeLibraryOf(ctx context.Context, u store.User, m store.Machine) (storeLibrary, error) {
+	lister, ok := s.view.(Librarian)
+	if !ok || m.SpaceID == "" {
+		return storeLibrary{}, fail("store_off", "Хранилище дизайнов не подключено")
+	}
+	t, err := s.read(ctx, m)
+	if err != nil {
+		return storeLibrary{}, err
 	}
 	spaceID := m.SpaceID
 	email := normEmail(u.Email)
 	rows, err := t.projects()
 	if err != nil {
-		return err
+		return storeLibrary{}, err
 	}
 	// Only the projects open to the person are read from the store: a project closed to them is not there
 	// for them, and reading the whole space's library for one person's list is what made a cold hub too slow to answer.
@@ -118,7 +149,7 @@ func (s *Service) libraryRoute(w http.ResponseWriter, r *http.Request, u store.U
 	for _, p := range rows {
 		f, err := t.fold(p, email)
 		if err != nil {
-			return err
+			return storeLibrary{}, err
 		}
 		if f.Role == "" {
 			continue
@@ -129,11 +160,16 @@ func (s *Service) libraryRoute(w http.ResponseWriter, r *http.Request, u store.U
 	}
 	items, err := lister.Library(ctx, spaceID, also)
 	if err != nil {
-		return err
+		return storeLibrary{}, err
 	}
 	out := storeLibrary{Artifacts: []storeArtifact{}, Missing: libraryMissing,
 		Layout: storeLayout{Folders: []storeFolder{}, Placed: map[string]string{}, Systems: map[string]any{}}}
 	seen := map[string]bool{}
+	hubOwns := s.OwnerOn(ctx, m)
+	var covers map[string]string
+	if c, ok := s.view.(Coverer); ok {
+		covers, _ = c.CoverVersions(ctx, spaceID)
+	}
 	for _, it := range items {
 		// Only a project the hub has a row for, as the store's reads through the hub (team.go): an unrecorded one is
 		// still the machines', and its access is theirs to tell.
@@ -156,9 +192,60 @@ func (s *Service) libraryRoute(w http.ResponseWriter, r *http.Request, u store.U
 			}
 			a.Owner = &storeOwner{Name: name, Me: p.Owner == email}
 		}
+		if hubOwns {
+			if mr, err := t.metaOf(it.ID); err == nil {
+				a.WorkMachine = mr.WorkMachine
+				if mr.Title != "" {
+					a.Title = mr.Title
+				}
+				if mr.Preview != "" {
+					p := mr.Preview
+					a.Cover = &p
+				}
+			}
+		}
+		if sha := covers[it.ID]; sha != "" && a.Cover == nil {
+			u := coverURL(it.ID, sha)
+			a.Cover = &u
+		}
 		seen[it.ID] = true
 		out.Artifacts = append(out.Artifacts, a)
 	}
+	// The hub's own rows: a recorded project the person has a role in is in their library whether or not the store has
+	// its files and whether or not its machine is on.
+	if hubOwns {
+		for _, id := range also {
+			if seen[id] {
+				continue
+			}
+			p, ok := recorded[id]
+			if !ok {
+				continue
+			}
+			mr, err := t.metaOf(id)
+			if err != nil {
+				continue
+			}
+			a := storeArtifact{ID: id, Title: mr.Title, UpdatedAt: mr.UpdatedAt, Kind: libraryKind(mr.Kind), Boards: []LibraryBoard{}, Convs: []string{}, Role: roles[id], WorkMachine: mr.WorkMachine}
+			if a.Title == "" {
+				a.Title = id
+			}
+			if mr.Preview != "" {
+				pv := mr.Preview
+				a.Cover = &pv
+			}
+			if p.Owner != "" {
+				name := p.OwnerName
+				if name == "" {
+					name, _, _ = strings.Cut(p.Owner, "@")
+				}
+				a.Owner = &storeOwner{Name: name, Me: p.Owner == email}
+			}
+			seen[id] = true
+			out.Artifacts = append(out.Artifacts, a)
+		}
+	}
+	sort.SliceStable(out.Artifacts, func(i, j int) bool { return out.Artifacts[i].UpdatedAt > out.Artifacts[j].UpdatedAt })
 	// The person's shelves: their own layout file, with the projects they cannot see left out.
 	if raw, err := lister.ReadFile(ctx, spaceID, ".folders/"+layoutKey(email)+".json", 1<<20); err == nil && raw != nil {
 		var f struct {
@@ -180,7 +267,59 @@ func (s *Service) libraryRoute(w http.ResponseWriter, r *http.Request, u store.U
 			}
 		}
 	}
-	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, http.StatusOK, out)
-	return nil
+	return out, nil
+}
+
+// libraryKind is a kind of the library's own vocabulary (wire.DesignKind): a kit or a document type the page does not list
+// among projects, and a kind the hub has no word for, are shown as a site.
+func libraryKind(k string) string {
+	switch k {
+	case "slides", "deck":
+		return "slides"
+	case "ds", "video":
+		return k
+	}
+	return "site"
+}
+
+// coverRoute is GET <platform>/design/store-cover?project=<id>: the cover of a project the person may open.
+func (s *Service) coverRoute(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine) error {
+	c, ok := s.view.(Coverer)
+	id := r.URL.Query().Get("project")
+	if !ok || m.SpaceID == "" || !projectIDRe.MatchString(id) {
+		return fail("not_found", "Обложки нет")
+	}
+	t, err := s.read(r.Context(), m)
+	if err != nil {
+		return err
+	}
+	rows, err := t.projects()
+	if err != nil {
+		return err
+	}
+	for _, p := range rows {
+		if p.ID != id {
+			continue
+		}
+		f, err := t.fold(p, normEmail(u.Email))
+		if err != nil {
+			return err
+		}
+		if f.Role == "" {
+			break
+		}
+		b, err := c.Cover(r.Context(), m.SpaceID, id, maxCover)
+		if err != nil {
+			return err
+		}
+		if len(b) == 0 {
+			break
+		}
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		_, _ = w.Write(b)
+		return nil
+	}
+	return fail("not_found", "Обложки нет")
 }

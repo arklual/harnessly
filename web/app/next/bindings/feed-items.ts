@@ -155,6 +155,14 @@ export const isHanded = (m: MessageView): boolean => m.mode === 'steer' && m.sta
 export const isAwaitingEntry = (m: MessageView): boolean =>
   m.state.k === 'accepted' && m.state.entryId === null;
 
+/**
+ * Accepted without its entry AND in the agent's own queue: only a steer (or a normal message the runtime handed over,
+ * which it turns into a steer) waits there for the agent's next step. A normal message the agent's prompt-submit hook
+ * accepted is the prompt of the turn the agent is running now: the transcript only has not shown it yet (a new chat's
+ * file is written after the hook and found later), so it is sent, not «waiting its turn».
+ */
+export const isQueuedAtAgent = (m: MessageView): boolean => m.mode === 'steer' && isAwaitingEntry(m);
+
 const messageOf = (m: MessageView, handed: boolean): Message => ({
   clientId: m.clientId,
   text: m.text,
@@ -351,7 +359,7 @@ export class ItemsBuilder {
       // A refused message whose words were delivered later is answered: it does not stand there for ever.
       if ((refusal || isAwaitingEntry(m)) && deliveredSince(items, m)) continue;
       kept.add(id);
-      const handed = isHanded(m) || isAwaitingEntry(m);
+      const handed = isHanded(m) || isQueuedAtAgent(m);
       const auto = autoMarkOf(id, m, goes);
       const have = this.outgoing.get(id);
       let item: OutgoingItem;

@@ -935,8 +935,12 @@ export async function connect(options = {}) {
     press: (chord, { typing = false } = {}) => request('harnessly/keys.press', { chord, typing }).then((r) => r.ran === true),
     hints: (commands) => request('harnessly/keys.hints', { commands }).then((r) => r.hints),
   };
-  // An onboarding step tells the host it is finished; other slots ignore it.
-  hl.slot = { done: () => request('harnessly/slot.done', {}).then(() => undefined) };
+  // An onboarding step tells the host it is finished; other slots ignore it. A view of the start page may put its own
+  // greeting over the field (greet with an empty title gives the host's back).
+  hl.slot = {
+    done: () => request('harnessly/slot.done', {}).then(() => undefined),
+    greet: ({ title = '', sub = '' } = {}) => request('harnessly/slot.greet', { title, sub }).then(() => undefined),
+  };
   // The Document API of Sinopia, for a view shown beside a document (target sinopia.<kind>): the host and the runtime
   // check the manifest's rights (sinopia.read/write/comment/export) on every call.
   const sinopia = (method, params = {}) => request(`harnessly/sinopia.${method}`, params).then((r) => r.result);

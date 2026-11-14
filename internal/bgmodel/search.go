@@ -36,10 +36,8 @@ func clipRunes(s string, max int) string {
 	return string(r[:max])
 }
 
-// SearchAnswer answers a question from what the search found. cited are the sources the answer rests on, by their
-// place in sources, in the order the answer names them. used is false when no model is picked for the feature: there
-// is nothing the search did before, so the caller says a model has to be picked.
-func (r *Runner) SearchAnswer(ctx context.Context, question string, sources []SearchSource) (text string, cited []int, used bool, err error) {
+// searchCall is the model call of an answer: the same prompt for the plain and the streamed one.
+func searchCall(question string, sources []SearchSource) (Call, []SearchSource) {
 	if len(sources) > SearchSourcesMax {
 		sources = sources[:SearchSourcesMax]
 	}
@@ -57,20 +55,46 @@ func (r *Runner) SearchAnswer(ctx context.Context, question string, sources []Se
 		}
 		b.WriteString("\n")
 	}
-	raw, used, err := r.Run(ctx, FeatureSearchAnswer, Call{System: system, Prompt: b.String(), MaxTokens: 400, Timeout: 20 * time.Second})
-	if !used || err != nil {
-		return "", nil, used, err
-	}
+	return Call{System: system, Prompt: b.String(), MaxTokens: 400, Timeout: 20 * time.Second}, sources
+}
+
+// citedIn takes the marks out of the raw answer: the text without them, and the sources they name.
+func citedIn(raw string, n int) (text string, cited []int, err error) {
 	cited = []int{}
 	for _, m := range searchMark.FindAllStringSubmatch(raw, -1) {
-		n, _ := strconv.Atoi(m[1])
-		if n >= 1 && n <= len(sources) && !slices.Contains(cited, n-1) {
-			cited = append(cited, n-1)
+		k, _ := strconv.Atoi(m[1])
+		if k >= 1 && k <= n && !slices.Contains(cited, k-1) {
+			cited = append(cited, k-1)
 		}
 	}
 	text = strings.Join(strings.Fields(searchMark.ReplaceAllString(raw, "")), " ")
 	if text == "" {
-		return "", nil, true, &Error{Reason: ReasonEmpty}
+		return "", nil, &Error{Reason: ReasonEmpty}
 	}
-	return text, cited, true, nil
+	return text, cited, nil
+}
+
+// SearchAnswer answers a question from what the search found. cited are the sources the answer rests on, by their
+// place in sources, in the order the answer names them. used is false when no model can answer (none is picked and
+// the registry has none to fall back on): the caller says a model has to be picked.
+func (r *Runner) SearchAnswer(ctx context.Context, question string, sources []SearchSource) (text string, cited []int, used bool, err error) {
+	call, sources := searchCall(question, sources)
+	raw, used, err := r.Run(ctx, FeatureSearchAnswer, call)
+	if !used || err != nil {
+		return "", nil, used, err
+	}
+	text, cited, err = citedIn(raw, len(sources))
+	return text, cited, true, err
+}
+
+// SearchAnswerStream is SearchAnswer that hands the raw pieces of the answer to onDelta as they come (they may hold
+// the [2] marks); text and cited are what SearchAnswer gives.
+func (r *Runner) SearchAnswerStream(ctx context.Context, question string, sources []SearchSource, onDelta func(string)) (text string, cited []int, used bool, err error) {
+	call, sources := searchCall(question, sources)
+	raw, used, err := r.RunStream(ctx, FeatureSearchAnswer, call, onDelta)
+	if !used || err != nil {
+		return "", nil, used, err
+	}
+	text, cited, err = citedIn(raw, len(sources))
+	return text, cited, true, err
 }

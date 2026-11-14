@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
+
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agentbrowser"
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/paneauto"
+	"github.com/ly-solutions/harnessly/internal/paneintents"
 	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -98,4 +101,50 @@ func (v *v2Live) newPaneWatcher() *paneauto.Watcher {
 			}
 		},
 	})
+}
+
+// liftIntents carries what a delegated chat's pane is asked up to the chats that delegated it: an intent's
+// tab is the chat's Legacy tab, its parent is the conversation's ParentID, named by the subchat it came through.
+func (v *v2Live) liftIntents() {
+	c := v.c
+	if c.cfg.Tmux == nil || c.intents == nil {
+		return
+	}
+	parse := c.cfg.Tmux.ParseSessionName
+	c.intents.SetLift(func(tabID string) (paneintents.Parent, bool) {
+		if v.rt == nil {
+			return paneintents.Parent{}, false
+		}
+		rec, ok := v.rt.Record(tabID)
+		if !ok {
+			rec, ok = v.convOfTab(tabID)
+		}
+		if !ok || rec.ParentID == nil {
+			return paneintents.Parent{}, false
+		}
+		tab, err := legacyTabOf(v.rt.Record, parse, *rec.ParentID)
+		if err != nil {
+			return paneintents.Parent{}, false
+		}
+		return paneintents.Parent{TabID: tab.TabID, FromID: rec.ID, Title: rec.Title}, true
+	}, func(tabID string) {
+		if c.sync != nil {
+			c.sync.Broadcast(jsvalue.NewObject("type", "pane-intents", "tabId", tabID))
+		}
+	})
+}
+
+// convOfTab is the conversation whose Legacy tab is tabID (a tab taken over from Legacy keeps its own id).
+func (v *v2Live) convOfTab(tabID string) (wire.Conversation, bool) {
+	snap, err := v.rt.Conversations(context.Background())
+	if err != nil {
+		return wire.Conversation{}, false
+	}
+	parse := v.c.cfg.Tmux.ParseSessionName
+	for _, rec := range snap.Conversations {
+		if tab, err := legacyTabOf(v.rt.Record, parse, rec.ID); err == nil && tab.TabID == tabID {
+			return rec, true
+		}
+	}
+	return wire.Conversation{}, false
 }

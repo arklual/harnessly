@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { MainFieldArea, OneFieldRoot } from '@/next/features/composer/one-field';
 import { PortalContext } from '@/next/ui/portal';
 import useDrawerSwipe from '@/next/features/shell/use-drawer-swipe';
 import useSideMotion from '@/next/features/shell/use-side-motion';
@@ -116,11 +117,12 @@ const AppFrame = ({
           inert={inert || undefined}
         >
           <div ref={bodyRef} className="hx-main__body">
-            {children}
+            <MainFieldArea>{children}</MainFieldArea>
             {aside}
           </div>
         </main>
         {overlays}
+        <OneFieldRoot />
         <div ref={portalRef} className="hx-portal" />
       </div>
     </PortalContext>

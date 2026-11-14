@@ -125,6 +125,24 @@ func appsOK(r *apps.Registry) func(ids []string) string {
 	}
 }
 
+// fromAppOK is layoutapi.Launch.FromApp over the machine's registry: the app that starts a chat for the person (the hub's
+// launch with from.app) is on in it when the person installed it themselves and it works in a chat; a team's app is not,
+// as with alwaysApps.
+func fromAppOK(r *apps.Registry) func(id string) bool {
+	return func(id string) bool {
+		list, err := r.List()
+		if err != nil {
+			return false
+		}
+		for _, a := range list {
+			if a.ID == id {
+				return !a.Team && a.Manifest != nil && a.Manifest.HasTarget(apps.TargetChat)
+			}
+		}
+		return false
+	}
+}
+
 // alwaysApps is convo.Deps.AlwaysApps over the machine's registry: the installed apps that ask to be on in every new
 // chat (`activation.on: ["always"]`) and work in one, in the registry's order. The person turns one off in a chat with
 // the page's switch, as any other.

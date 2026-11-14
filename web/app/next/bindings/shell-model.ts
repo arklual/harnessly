@@ -60,19 +60,27 @@ import {
   conversationsByActivity,
   conversationsStore,
   useConversationList,
+  useConvsAnswered,
 } from '@/next/stores/conversations';
 import { sameItems, useAll } from '@/next/core/store';
 import {
   homeMachineStore,
   useActiveMachine,
   useHomeMachine,
+  useMachineLoads,
   useMachines,
   type MachineView,
 } from '@/next/stores/machines';
 import { movedKey, useCentral, type CentralView } from '@/next/stores/central';
 import { useFavorites } from '@/next/stores/favorites';
+import { useHubProjects, withHubProjects } from '@/next/features/manage/hub-projects';
 import { useProjects } from '@/next/stores/projects';
-import { editProfileSidebar, profileSidebarStore, useProfileSidebar } from '@/next/stores/profile-sidebar';
+import {
+  editProfileSidebar,
+  profileSidebarStore,
+  useProfileSidebar,
+  type ProfileSidebarView,
+} from '@/next/stores/profile-sidebar';
 import {
   chatProjectOf,
   favGroupAdded,
@@ -197,6 +205,17 @@ export const alertOf = (machine: Machine, linkDown: boolean): IMachineAlert | nu
   };
 };
 
+/** A disk is out only below this: with gigabytes left a full disk is a warning for the bell, not a card. */
+export const DISK_STOP_BYTES = 2 * GB;
+
+/**
+ * Whether the work on a machine stops for real: a stall, or a disk with next to nothing left. Only then the
+ * smart notice shows the machine's card; any other critical level is a warning in the bell and on the machine's card.
+ */
+export const stopsWork = (alert: IMachineAlert, load: MachineLoad | undefined): boolean =>
+  alert.metric === 'io' ||
+  (alert.metric === 'disk' && load !== undefined && load.diskTotal > 0 && load.diskFree < DISK_STOP_BYTES);
+
 /** The same machine under the same name: what the card of a machine that left the list still shows. */
 const sameMachine = (was: MachineView | null, now: MachineView): boolean =>
   was !== null && was.machine.id === now.machine.id && machineName(was.machine) === machineName(now.machine);
@@ -258,6 +277,17 @@ export const cardOf = (view: MachineView, linkDown: boolean): IMachineCard => {
     alert: alertOf(machine, linkDown),
   };
 };
+
+/** The view with the load its machine reported (stores/machines.ts keeps the load apart from the record). */
+export const withLoad = (view: MachineView, load: MachineLoad | undefined): MachineView =>
+  load === undefined || view.machine.load === load ? view : { ...view, machine: { ...view.machine, load } };
+
+/** What the card is made of, for the header that reads the load itself. */
+export interface IShownMachine {
+  view: MachineView | null;
+  lost: MachineView | null;
+  down: boolean;
+}
 
 /** The card the page shows: the machine's own, or of one that left the list (no link to it); null while none is known. */
 export const shownCard = (
@@ -439,6 +469,36 @@ export async function machineProjectOf(projectId: string, machine: MachineId): P
   return made;
 }
 
+export interface IFavoritesSources {
+  /** The list is the person's (the cluster's copy is on for the home machine). */
+  unified: boolean;
+  /** Where the person's sidebar stands (stores/profile-sidebar.ts). */
+  profile: ProfileSidebarView['k'];
+  /** The cluster has answered that its copy is on. */
+  centralOn: boolean;
+  /** The machine whose own layout would be drawn has answered with its list, or is known to be down. */
+  hereSettled: boolean;
+}
+
+/**
+ * Whether the favorites' layout the sidebar would draw now is the one that stays. The page used to draw the
+ * pinned chats as soon as any list came: all loose first, then the machine's layout, then the person's from the
+ * cluster, so the favorites were laid out three or four times on a load and every step slid. Until the sources have
+ * spoken the sidebar shows a skeleton there instead.
+ */
+export const favoritesLayoutKnown = ({
+  unified,
+  profile,
+  centralOn,
+  hereSettled,
+}: IFavoritesSources): boolean => {
+  if (profile === 'loading') return false;
+  if (unified) return profile === 'ready' || hereSettled;
+  // The cluster keeps the person's sidebar but its list has not come: the page is about to become the person's.
+  if (profile === 'ready' && !centralOn) return false;
+  return hereSettled;
+};
+
 /** A change of the favorites' layout of the person: refused with words when its group is gone. */
 const editFavorites = (edit: Parameters<typeof editProfileSidebar>[0]) =>
   editProfileSidebar(edit).then(() => undefined);
@@ -447,8 +507,11 @@ export interface IShellModel {
   active: MachineId | null;
   chats: readonly ISidebarChat[] | null;
   projects: readonly ISidebarProject[] | null;
-  favorites: ISidebarFavorites;
+  /** null while the layout that will stand is not known yet: the sidebar holds a skeleton there. */
+  favorites: ISidebarFavorites | null;
+  /** The card without the meters of the load: the sidebar's dot and alert. The header draws the full one from `shown`. */
   machine: IMachineCard | null;
+  shown: IShownMachine;
   otherMachines: readonly IMachineChoice[];
   /** Every machine a new chat may start on, the default one first. */
   startMachines: readonly IMachineChoice[];
@@ -470,7 +533,24 @@ export function useShellModel(): IShellModel {
   const active = useActiveMachine();
   const home = useHomeMachine();
   const central = useCentral();
-  const machines = useMachines();
+  const listed = useMachines();
+  // the load reaches the shell only for a machine in a critical state, whose alert names the free disk or
+  // memory; any other reading of the load draws the header's card alone (shell.tsx).
+  const critical = useMemo(
+    () => (listed ?? []).filter((v) => v.machine.health?.level === 'critical').map((v) => v.machine.id),
+    [listed],
+  );
+  const criticalLoads = useMachineLoads(critical);
+  const machines = useMemo(
+    () =>
+      listed && critical.length > 0
+        ? listed.map((v) => {
+            const at = critical.indexOf(v.machine.id);
+            return at < 0 ? v : withLoad(v, criticalLoads[at]);
+          })
+        : listed,
+    [listed, critical, criticalLoads],
+  );
   // with the cluster's copy on, the list is the person's, not a machine's: the chats of every machine the
   // copy is on for, the same list whichever machine the page goes through; a chat's machine is said in its menu only.
   // No machine is picked in the sidebar then: the card is the open chat's machine (the default one on the start page),
@@ -535,6 +615,7 @@ export function useShellModel(): IShellModel {
         ...(c.parentId ? { parentId: c.parentId } : {}),
         pinned: c.pinned,
         ...(c.test ? { test: true } : {}),
+        ...(c.from ? { from: { app: c.from.app, label: c.from.label } } : {}),
         // The person's projects hold the chats of every machine; a machine's own project (the person's sidebar off)
         // is not one of another machine's, so such a chat stands outside the groups.
         projectId: projectOfChat(c),
@@ -561,19 +642,33 @@ export function useShellModel(): IShellModel {
     return [...waitingRows, ...machineRows];
   }, [convs, here, linkDown, down, machines, central.names, moveOn, projectIndex, queued]);
   const machineFavorites = useFavorites(here);
-  const favorites = shared ? shared.favorites : machineFavorites;
+  const hereAnswered = useConvsAnswered(here);
+  const layoutKnown = favoritesLayoutKnown({
+    unified,
+    profile: profile.k,
+    centralOn: central.enabled,
+    hereSettled: hereAnswered || (here !== null && down.includes(here)),
+  });
+  const shownFavorites = shared ? shared.favorites : machineFavorites;
+  const favorites = layoutKnown ? shownFavorites : null;
   const listedProjects = useProjects(here);
+  // with the person's hub-projects switch on, the registry's projects of the machines that sleep join the list.
+  const hubProjects = useHubProjects();
   const projects = useMemo(() => {
     if (!convs || sharedWaits) return null;
     if (shared)
-      return shared.projects
-        .map((p) => ({ id: p.id, name: p.name }))
-        .sort((a, b) => a.name.localeCompare(b.name));
-    return projectsOf(
-      convs.filter((c) => c.machineId === here),
-      listedProjects,
+      return withHubProjects(
+        shared.projects.map((p) => ({ id: p.id, name: p.name })).sort((a, b) => a.name.localeCompare(b.name)),
+        hubProjects,
+      );
+    return withHubProjects(
+      projectsOf(
+        convs.filter((c) => c.machineId === here),
+        listedProjects,
+      ),
+      hubProjects,
     );
-  }, [convs, sharedWaits, shared, here, listedProjects]);
+  }, [convs, sharedWaits, shared, here, listedProjects, hubProjects]);
 
   // The card is the machine the page works with now: the open chat's (the shell makes it the active one), else here.
   const cardOn = active ?? here;
@@ -586,6 +681,10 @@ export function useShellModel(): IShellModel {
   if (activeView && !sameMachine(lastView, activeView)) setLastView(activeView);
   const lostView = !activeView && machines !== null && lastView?.machine.id === cardOn ? lastView : null;
   const machine = useMemo(() => shownCard(activeView, lostView, cardDown), [activeView, lostView, cardDown]);
+  const shown = useMemo(
+    () => ({ view: activeView, lost: lostView, down: cardDown }),
+    [activeView, lostView, cardDown],
+  );
   const otherMachines = useMemo(
     () => (unified ? [] : (machines ?? []).filter((v) => v.machine.id !== here).map(choiceOf)),
     [unified, machines, here],
@@ -617,7 +716,15 @@ export function useShellModel(): IShellModel {
         ({ machine: m }): IMachineNotice[] => {
           const alert = alertOf(m, (m.id === cardOn && cardDown) || (m.id === here && linkDown));
           return alert && m.health
-            ? [{ id: m.id, name: machineName(m), alert, since: m.health.since, urgent: true }]
+            ? [
+                {
+                  id: m.id,
+                  name: machineName(m),
+                  alert,
+                  since: m.health.since,
+                  urgent: stopsWork(alert, m.load),
+                },
+              ]
             : [];
         },
       ),
@@ -718,6 +825,7 @@ export function useShellModel(): IShellModel {
     projects,
     favorites,
     machine,
+    shown,
     otherMachines,
     startMachines,
     startCandidates,

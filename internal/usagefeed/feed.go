@@ -437,7 +437,7 @@ func (f *Feed) Pass(ctx context.Context) (int, error) {
 		over := nowMs-lastMs >= ended.Milliseconds()
 		met := s.m.values(f.cfg.SkillMetrics)
 		mrKeys := s.m.mrKeys()
-		cur := sessState{Calls: s.calls, LastTs: lastMs, Ended: over, Metrics: signature(met, mrKeys)}
+		cur := sessState{Calls: s.calls, LastTs: lastMs, Ended: over, Metrics: signature(met, mrKeys, s.m.project(), strings.Join(s.m.taskKeys(), ","))}
 		if prev, ok := f.st.Sessions[sid]; ok && prev == cur {
 			continue
 		}
@@ -447,6 +447,7 @@ func (f *Feed) Pass(ctx context.Context) (int, error) {
 		fact := &hubproto.UsageSessionFact{
 			Provider: s.provider, SessionKey: s.key, ParentKey: s.parent, StartedAt: startedAt,
 			Origin: hubproto.OriginLive, Attribution: hubproto.AttributionGuessed, Metrics: met, MRKeys: mrKeys,
+			Project: s.m.project(), TaskKeys: s.m.taskKeys(),
 		}
 		root := s.key
 		if s.parent != "" {

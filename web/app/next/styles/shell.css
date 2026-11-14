@@ -213,11 +213,11 @@ html:has(.hx-app) body {
 /* The rail is the open sidebar with its words faded: every row keeps its height and place (nothing is hidden or swapped),
    so folding and opening move nothing up or down and the row under the pointer stays the same row. The nested lists
    lose their indent, so their marks stand in the rail's column. */
-.hx-app[data-side='closed'] :is(.hx-nav__kids, .hx-tree__kids) > div {
-  margin-left: 0;
-  padding-left: 0;
-  /* No line and no room for it: a folder's chats stand in the same column as the rest. */
-  border-left-width: 0;
+/* No line and no room for it: a folder's chats stand in the same column as the rest. The rail says it to the lists
+   (sidebar.css, delegation.css read it), not to their `> div`: a tag at the end of a selector under `[data-side]` made
+   every div of the page restyle on each fold and open (HRN-1439). */
+.hx-app[data-side='closed'] :is(.hx-nav__kids, .hx-tree__kids) {
+  --hx-kids-indent: 0;
 }
 .hx-app[data-side='closed'] .hx-item[data-launch] {
   margin-left: 0;
@@ -238,6 +238,14 @@ html:has(.hx-app) body {
 .hx-app[data-side='closed'] .hx-item__badge {
   right: -4px;
   bottom: -4px;
+}
+/* The rail's list scrolls without a bar. A bar takes its width from the list's rows only, so a long list's chat marks
+   (each in the middle of its row) stood 3px left of the icons, the projects' marks, the bell and the avatar (HRN-1440). */
+.hx-app[data-side='closed'] .hx-sidebar__list {
+  scrollbar-width: none;
+}
+.hx-root.hx-app[data-side='closed'] .hx-sidebar__list::-webkit-scrollbar {
+  display: none;
 }
 /* The folded sidebar's empty space opens it (sidebar.tsx): the cursor says so. */
 @media not all and (max-width: 900px) {
@@ -272,11 +280,15 @@ html:has(.hx-app) body {
 .hx-app[data-side='closed'] .hx-user {
   padding-left: 1px;
 }
-/* On the rail the bell stands under the avatar: the notifications stay one click away. */
+/* On the rail the bell stands over the avatar, in the footer's own column: the footer grows by its row, so
+   the list of chats ends above it and never scrolls under it (HRN-1433), and bell and avatar share one axis. */
+.hx-app[data-side='closed'] .hx-user {
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: var(--hx-space-1);
+}
 .hx-app[data-side='closed'] .hx-user__bell {
-  position: absolute;
-  bottom: calc(100% + 2px);
-  left: 9px;
+  margin-left: 0;
   animation: hx-bell-to-rail var(--hx-side-dur) var(--hx-side-ease) 80ms backwards;
 }
 /* The bell jumps between the footer row and the rail, so it fades over the move instead of snapping:
@@ -408,6 +420,10 @@ html:has(.hx-app) body {
   align-items: flex-start;
   padding: 14vh 16px 16px;
 }
+/* The search of everything is tall: it starts higher, so its side has room for a chat's last words. */
+.hx-srch:has(> .hx-srch__box[data-wide]) {
+  padding-top: 7vh;
+}
 .hx-srch__scrim {
   position: absolute;
   inset: 0;
@@ -514,6 +530,47 @@ html:has(.hx-app) body {
 .hx-srch__scope[aria-selected='true'] {
   background: var(--hx-bg-active);
   color: var(--hx-fg-1);
+}
+.hx-srch__count {
+  margin-left: 6px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+/* The list of the last answer while the next one is on its way: it stays, a little quieter. */
+.hx-srch__group[data-stale] {
+  opacity: 0.6;
+  transition: opacity 200ms var(--hx-ease-out);
+}
+.hx-srch__sks {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 0;
+  animation: hx-srch-fade 160ms ease backwards;
+}
+.hx-srch__skrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 10px;
+}
+.hx-srch__sk-ic {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 9px;
+}
+.hx-srch__sk-line {
+  display: block;
+  width: 62%;
+  height: 12px;
+}
+.hx-srch__skrow:nth-child(even) .hx-srch__sk-line {
+  width: 44%;
+}
+.hx-srch__sk-line--short {
+  width: 38%;
 }
 .hx-srch__list {
   flex: 1;
@@ -624,8 +681,10 @@ html:has(.hx-app) body {
 }
 /* The search of everything: a wider box with the side of the selected row. */
 .hx-srch__box[data-wide] {
-  width: min(880px, 100%);
-  height: min(580px, 76vh);
+  width: min(960px, 100%);
+  /* The narrow box's cap would leave the side no room for a chat's last words under its actions. */
+  max-height: none;
+  height: min(720px, 86vh);
   border-radius: 20px;
 }
 .hx-srch__body {
@@ -754,20 +813,224 @@ html:has(.hx-app) body {
 }
 .hx-srch__side {
   flex: none;
-  width: 320px;
+  width: 360px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border-left: 1px solid var(--hx-border);
+  background: color-mix(in oklch, var(--hx-bg-app) 55%, var(--hx-bg-raised));
+  animation: hx-srch-fade 160ms ease backwards;
+}
+.hx-srch__side-body {
+  flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 18px;
-  border-left: 1px solid var(--hx-border);
-  background: color-mix(in oklch, var(--hx-bg-app) 55%, var(--hx-bg-raised));
+  margin: -18px -18px 0;
+  padding: 18px 18px 4px;
   overflow-y: auto;
-  animation: hx-srch-fade 160ms ease backwards;
+  overscroll-behavior: contain;
+}
+/* The parts keep their height and the body scrolls: a long answer does not squeeze the facts under it. */
+.hx-srch__side-body > * {
+  flex: none;
+}
+.hx-srch__side-foot {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hx-srch__side-sk {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hx-srch__cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top;
+  border: 1px solid var(--hx-border);
+  border-radius: 10px;
+  background: var(--hx-bg-hover);
+}
+.hx-srch__quote {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.hx-srch__quote-who {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-srch__quote-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 7;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  line-height: 1.5;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.hx-srch__facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--hx-text-sm);
+}
+.hx-srch__fact {
+  display: flex;
+  gap: 12px;
+}
+.hx-srch__fact dt {
+  flex: none;
+  width: 88px;
+  color: var(--hx-fg-3);
+}
+.hx-srch__fact dd {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--hx-fg-1);
+  overflow-wrap: anywhere;
+}
+.hx-srch__sublist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hx-srch__sublist > .hx-srch__side-kind {
+  margin-bottom: 2px;
+}
+.hx-srch__subitem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  margin: 0 -6px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms var(--hx-ease-out);
+}
+.hx-srch__subitem:disabled {
+  cursor: default;
+}
+.hx-srch__subitem:not(:disabled):hover {
+  background: var(--hx-bg-hover);
+}
+.hx-srch__subitem > i {
+  color: var(--hx-fg-3);
+}
+.hx-srch__subitem > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-srch__subitem > small {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-srch__reply {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 4px 0 12px;
+  border: 1px solid var(--hx-border);
+  border-radius: 10px;
+  background: var(--hx-bg-raised);
+  transition: border-color 160ms var(--hx-ease-out);
+}
+.hx-srch__reply:focus-within {
+  border-color: var(--hx-border-strong);
+}
+.hx-srch__reply input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+}
+.hx-srch__reply input::placeholder {
+  color: var(--hx-fg-3);
+}
+.hx-srch__reply-go {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border: 0;
+  border-radius: 8px;
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
+  cursor: pointer;
+  transition: opacity 160ms var(--hx-ease-out);
+}
+.hx-srch__reply-go:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.hx-srch__ans-text[data-writing]::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  border-radius: 2px;
+  background: var(--hx-fg-3);
+  animation: hx-srch-caret 900ms steps(2, start) infinite;
 }
 .hx-srch__side-kind {
   color: var(--hx-fg-3);
   font-size: var(--hx-text-xs);
+}
+.hx-srch__side-kind::first-letter {
+  text-transform: uppercase;
+}
+/* «Found in all tabs»: the way out of a tab that has nothing for the words. */
+.hx-srch__none-go {
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-accent);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+}
+.hx-srch__none-go:hover {
+  text-decoration: underline;
 }
 .hx-srch__side-title {
   margin: 2px 0 0;
@@ -787,13 +1050,12 @@ html:has(.hx-app) body {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-top: auto;
 }
 .hx-srch__act {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 34px;
+  height: 30px;
   padding: 0 8px;
   border: 0;
   border-radius: 9px;
@@ -807,6 +1069,10 @@ html:has(.hx-app) body {
 }
 .hx-srch__act:hover {
   background: var(--hx-bg-hover);
+}
+.hx-srch__act:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 .hx-srch__act > i {
   color: var(--hx-fg-3);
@@ -834,8 +1100,7 @@ html:has(.hx-app) body {
 @media (max-width: 700px) {
   .hx-srch__box[data-wide] {
     width: 100%;
-    height: 100%;
-    border-radius: 0;
+    height: min(92dvh, 100%);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -906,22 +1171,24 @@ html:has(.hx-app) body {
     background: var(--hx-bg-hover);
   }
 }
+/* On a phone the search is a sheet that comes up from the bottom edge and leaves the top of the page in sight. */
 @media (max-width: 700px) {
-  .hx-srch {
-    padding: 0;
+  /* A phone has no keys to hint at, whatever it says about hover. */
+  .hx-srch__foot {
+    display: none;
   }
-  .hx-srch__scrim {
-    background: var(--hx-bg-window);
+  .hx-srch {
+    align-items: flex-end;
+    padding: 0;
   }
   .hx-srch__box {
     width: 100%;
     max-height: none;
-    height: 100%;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-    padding-top: env(safe-area-inset-top);
+    height: min(92dvh, 100%);
+    border-width: 1px 0 0;
+    border-radius: 20px 20px 0 0;
     background: var(--hx-bg-window);
+    transform-origin: 50% 100%;
     animation-name: hx-srch-in-m;
   }
   .hx-srch__box[data-ending-style] {
@@ -1564,8 +1831,12 @@ html:has(.hx-app) body {
 }
 @keyframes hx-srch-in-m {
   from {
-    opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(100%);
+  }
+}
+@keyframes hx-srch-caret {
+  to {
+    visibility: hidden;
   }
 }
 @keyframes hx-srch-out {
@@ -1576,8 +1847,7 @@ html:has(.hx-app) body {
 }
 @keyframes hx-srch-out-m {
   to {
-    opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(100%);
   }
 }
 
@@ -1748,3 +2018,12 @@ html:has(.hx-app) body {
 /* The notification centre on the phone: a bottom sheet (ui/sheet.tsx). The title is the largest line, each
    section says how many it holds, a row is a finger tall with its whole name and two lines of what happened, an unread
    row is tinted besides its dot, and the machines' section (a machine about to fail its work) stands first, in red. */
+
+/* The chat's entrance: its feed and composer fade in (they are drawn anew for each chat, chat-stage.tsx), the right
+   column beside them does not — it stays over a change of chat and changes its content in place (background.css). */
+[data-play='1'] .hx-stage[data-phase='chat'] > :not(.hx-side, .hx-side__scrim, .hx-side-below) {
+  animation: hx-in-fade 700ms var(--hx-ease-out) 200ms backwards;
+}
+[data-play='0'] .hx-stage[data-phase='chat'] > :not(.hx-side, .hx-side__scrim, .hx-side-below) {
+  opacity: 0;
+}

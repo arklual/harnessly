@@ -30,6 +30,9 @@ type Config struct {
 	// ClaudeJSON is the file Claude Code keeps its account and servers in: <ClaudeDir>/.claude.json when
 	// $CLAUDE_CONFIG_DIR is set, else ~/.claude.json.
 	ClaudeJSON string
+	// AuthDir is the folder a managed machine keeps Claude's sign-in in (CLAUDE_SECURESTORAGE_CONFIG_DIR of its chats,
+	// `auth_directory` of the runtime's config); "" when the CLI keeps its own.
+	AuthDir string
 	// Getenv reads the environment the agents start in (os.Getenv when nil).
 	Getenv func(string) string
 }

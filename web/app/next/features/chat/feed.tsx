@@ -13,7 +13,10 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent,
   type ReactNode,
+  type TouchEvent,
+  type WheelEvent,
 } from 'react';
 import {
   coversWindow,
@@ -48,8 +51,16 @@ import { RewindablePrompt, RewoundRow } from '@/next/features/chat/rewind';
 import SystemNote, { TerminalStopNote } from '@/next/features/chat/system-note';
 import GoalNote from '@/next/features/chat/goal-note';
 import UserMessage from '@/next/features/chat/user-message';
-import type { BackgroundTask } from '@/next/protocol/v2';
-import { boxOf, claimOrigin, flyCopy, hasOrigin, retargetFlights, slideFrom } from '@/next/ui/flight';
+import type { BackgroundTask, MachineId } from '@/next/protocol/v2';
+import {
+  boxOf,
+  claimOrigin,
+  flyCopy,
+  hasOrigin,
+  retargetFlights,
+  sentByHand,
+  slideFrom,
+} from '@/next/ui/flight';
 import Icon from '@/next/ui/icon';
 import { useContextMenu } from '@/next/ui/context-menu';
 import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
@@ -69,9 +80,14 @@ import {
 } from '@/next/features/chat/feed-place';
 import '@/next/styles/ui.css';
 import '@/next/styles/chat.css';
+import { countRender } from '@/next/core/perf-journal';
 
 /** Within this many px of the bottom the person reads the bottom. */
 const BOTTOM_SLACK_PX = 32;
+/** A finished answer taller than the feed's visible part stands this far under its top edge, to be read from there. */
+const ANSWER_GAP_PX = 16;
+/** Keys that move the feed up: the reader leaves the bottom with them before the scroll event says so. */
+const UP_KEYS: ReadonlySet<string> = new Set(['ArrowUp', 'PageUp', 'Home']);
 /** Older turns start loading this far from the top, so they are there before the person reaches it. */
 const OLDER_AHEAD_PX = 800;
 /** A turn that grows at the bottom by less than this just follows; by more, the feed slides to its new place. */
@@ -116,6 +132,8 @@ type THandlers = Omit<ITurnHandlers, 'onToggle'>;
 export interface IFeedProps extends THandlers {
   /** The turns and outgoing messages, oldest first; null while the conversation loads. */
   items: FeedItem[] | null;
+  /** The chat's machine: the link cards read their live title and state from it. */
+  machine?: MachineId;
   /** «Скопировать ссылку на чат» of the feed's menu. */
   onCopyChatLink?: () => void;
   /** «Перезагрузить чат» of the feed's menu: the chat asked from its machine anew. */
@@ -181,6 +199,8 @@ export interface IFeedProps extends THandlers {
   shown?: TShownKinds;
   /** Where a file the agent handed over is saved from. */
   downloadUrl?: (path: string, output?: TurnOutput) => string;
+  /** Where the browser shows a file the agent handed over in a tab of its own. */
+  viewUrl?: (path: string, output?: TurnOutput) => string;
   /** The chat the chips ask where a merge request opens; without it they ask nothing. */
   /** What stands over the bottom of the feed: questions, queue, composer. */
   dock?: ReactNode;
@@ -319,6 +339,7 @@ const freshClients = (items: FeedItem[] | null, seen: { current: Set<string> | n
 };
 
 const Feed = (props: IFeedProps) => {
+  countRender('feed');
   const {
     items,
     failed = false,
@@ -359,7 +380,11 @@ const Feed = (props: IFeedProps) => {
   const [toggled, setToggled] = useState<ReadonlySet<string>>(() => new Set());
   const [range, setRange] = useState<IKeyWindow | null>(null);
   const [away, setAway] = useState(false);
+  /** How many rows the feed had when the reader left the bottom: more since, and «To new» says a message came. */
+  const [awayRows, setAwayRows] = useState(0);
   const atBottom = useRef(true);
+  /** The finished answers the feed has stood at the start of (or found there when it opened): each one only once. */
+  const answersSeen = useRef<Set<string> | null>(null);
   const lastScrollHeight = useRef(0);
   /** The scroll position the last scroll event saw: the reader leaves the bottom only by moving up from it. */
   const lastTop = useRef(0);
@@ -400,7 +425,20 @@ const Feed = (props: IFeedProps) => {
     for (let index = 0; index < win.start; index += 1) win.top += view.get(keys[index]) ?? ESTIMATED_TURN_PX;
   }
 
-  const noteAnchor = useFeedAnchor(scrollerRef, atBottom);
+  const {
+    note: noteAnchor,
+    noteNow: noteAnchorNow,
+    noteAt: noteAnchorAt,
+    keep: keepAnchor,
+  } = useFeedAnchor(scrollerRef, atBottom);
+
+  /** The reader is not at the bottom any more: the feed holds still and «To new» shows. */
+  const leaveBottom = useCallback(() => {
+    if (!atBottom.current) return;
+    atBottom.current = false;
+    setAway(true);
+    setAwayRows(latest.current.items?.length ?? 0);
+  }, []);
 
   // The place the reader left this chat at, to go back to when the feed opens; null once it is reached or given up.
   // A search result that points at a message wins over it.
@@ -464,10 +502,33 @@ const Feed = (props: IFeedProps) => {
   }, [reveal, served, revealAt, keys, range, onRevealed]);
   useEffect(() => () => window.clearTimeout(revealTimer.current), []);
 
-  const stick = useCallback(() => {
+  /**
+   * At the bottom the feed follows the turn. A finished answer taller than what the dock leaves visible is the result to
+   * read: its start stands at the top edge instead, and the feed stops following (the reader goes on by hand). Returns
+   * whether the feed stood at an answer's start.
+   */
+  const stick = useCallback((): boolean => {
     const scroller = scrollerRef.current;
-    if (scroller && atBottom.current) scroller.scrollTop = scroller.scrollHeight;
-  }, []);
+    if (!scroller || !atBottom.current) return false;
+    const answer = [...scroller.querySelectorAll<HTMLElement>('.hx-answer[data-final]')].at(-1);
+    const key = answer?.closest<HTMLElement>('.hx-turnwrap')?.dataset.key;
+    const seen = answersSeen.current;
+    if (answer && key && seen && !seen.has(key)) {
+      const pad = parseFloat(getComputedStyle(scroller).paddingBottom) || 0;
+      const box = answer.getBoundingClientRect();
+      if (box.height > scroller.clientHeight - pad - ANSWER_GAP_PX) {
+        seen.add(key);
+        scroller.scrollTop += box.top - scroller.getBoundingClientRect().top - ANSWER_GAP_PX;
+        lastTop.current = scroller.scrollTop;
+        leaveBottom();
+        noteAnchorAt(answer);
+        return true;
+      }
+    }
+    scroller.scrollTop = scroller.scrollHeight;
+    lastTop.current = scroller.scrollTop;
+    return false;
+  }, [leaveBottom, noteAnchorAt]);
 
   /** Re-reads which turns to draw for the scroll position; renders only when the viewport nears the drawn edge. */
   const rewindow = useCallback(() => {
@@ -512,6 +573,7 @@ const Feed = (props: IFeedProps) => {
       delta += rect.height - ESTIMATED_TURN_PX;
     }
     if (Math.abs(delta) >= 1) scroller.scrollTop += delta;
+    lastTop.current = scroller.scrollTop;
   }, [range, heights]);
 
   // One observer measures every drawn turn and the dock; a change keeps the bottom in view when it was. Made on first
@@ -540,23 +602,34 @@ const Feed = (props: IFeedProps) => {
         }
         const wasBottom = atBottom.current;
         const from = lastScrollHeight.current;
-        stick();
+        // At the bottom the feed follows; away from it the block the reader had at the top edge stays there.
+        const pinned = wasBottom ? stick() : false;
+        if (!wasBottom) keepAnchor();
+        if (scroller) lastTop.current = scroller.scrollTop;
         // A copy on its way aims at where its bubble stands after this change, in this frame.
         retargetFlights();
         if (scroller) {
           const moved = scroller.scrollHeight - from;
           const inner = innerRef.current;
-          if (inner && grew && wasBottom && moved >= SLIDE_MIN_PX && moved <= scroller.clientHeight)
+          if (
+            inner &&
+            grew &&
+            wasBottom &&
+            !pinned &&
+            moved >= SLIDE_MIN_PX &&
+            moved <= scroller.clientHeight
+          )
             slideFrom(inner, moved);
           lastScrollHeight.current = scroller.scrollHeight;
         }
-        noteAnchor();
+        // The place is not noted again here: a fold that animates has moved the layout again by the next frame, and a
+        // place noted then would take the move for the reader's. The reader's scroll notes it (onScroll).
       });
       const observer = observerRef.current;
       observer.observe(element);
       return () => observer.unobserve(element);
     },
-    [heights, stick, noteAnchor],
+    [heights, stick, keepAnchor],
   );
 
   useEffect(() => () => observerRef.current?.disconnect(), []);
@@ -569,10 +642,13 @@ const Feed = (props: IFeedProps) => {
     [observe],
   );
 
+  // The dock, and the whole thread: a card or a line under the turns (a limit, a goal, merge requests) changes the
+  // height without a turn of its own.
   useLayoutEffect(() => {
     const dock = dockRef.current;
-    if (!dock) return;
-    return observe(dock);
+    const inner = innerRef.current;
+    const off = [dock && observe(dock), inner && observe(inner)];
+    return () => off.forEach((stop) => stop?.());
   }, [observe]);
 
   // Open at the bottom; turns that load above keep the one in view in place; new ones below keep the bottom.
@@ -583,13 +659,27 @@ const Feed = (props: IFeedProps) => {
     const opened = firstKey.current === null;
     const wasBottom = atBottom.current;
     const from = lastScrollHeight.current;
+    let pinned = false;
     if (opened) {
       scroller.scrollTop = scroller.scrollHeight;
+      lastTop.current = scroller.scrollTop;
+      // The answers there when the chat opens were read before: the feed opens at the bottom, not at one of them.
+      answersSeen.current = new Set(
+        [...scroller.querySelectorAll<HTMLElement>('.hx-answer[data-final]')].flatMap((answer) => {
+          const key = answer.closest<HTMLElement>('.hx-turnwrap')?.dataset.key;
+          return key ? [key] : [];
+        }),
+      );
       rewindow();
     } else if (head !== firstKey.current && !wasBottom) {
       scroller.scrollTop += scroller.scrollHeight - lastScrollHeight.current;
+      lastTop.current = scroller.scrollTop;
+    } else if (wasBottom) {
+      pinned = stick();
     } else {
-      stick();
+      // Away from the bottom nothing that comes moves the feed: the block the reader has at the top edge stays.
+      keepAnchor();
+      lastTop.current = scroller.scrollTop;
     }
     firstKey.current = head;
     // The messages that came in just now: a bubble the person sent flies from the field (or from the queue's row it
@@ -598,11 +688,13 @@ const Feed = (props: IFeedProps) => {
     const fresh = freshClients(items, seenClients);
     const flying = learning ? [] : fresh.filter(hasOrigin);
     const inner = innerRef.current;
-    if (flying.length > 0 && !wasBottom) {
-      // The person sent from up in the history: the feed goes down to the bubble, smoothly.
+    if (!wasBottom && fresh.some(sentByHand)) {
+      // The person sent from up in the history: the feed goes down to the bubble, smoothly. A queued message the
+      // runtime handed over by itself does not move them.
       atBottom.current = true;
+      setAway(false);
       scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
-    } else if (!learning && wasBottom) {
+    } else if (!learning && wasBottom && !pinned) {
       const moved = scroller.scrollHeight - from;
       const rows = [...scroller.querySelectorAll<HTMLElement>('[data-client]')];
       const lands = flying.flatMap((client) => {
@@ -618,7 +710,7 @@ const Feed = (props: IFeedProps) => {
       for (const { bubble, origin } of lands) flyCopy(bubble, origin, () => boxOf(bubble));
     }
     lastScrollHeight.current = scroller.scrollHeight;
-  }, [items, keys, stick, rewindow]);
+  }, [items, keys, stick, rewindow, keepAnchor]);
 
   // Back to where the reader left the chat: the row they had at the top edge stands there again, as far under it as it
   // was. The feed opened at the bottom above; when the row is not drawn yet the window moves to it first.
@@ -678,18 +770,29 @@ const Feed = (props: IFeedProps) => {
     if (!scroller) return;
     const top = scroller.scrollTop;
     const near = scroller.scrollHeight - top - scroller.clientHeight < BOTTOM_SLACK_PX;
-    // The event of a scroll the feed made to its bottom can come after the rows grew under it (a picture loaded, a
-    // turn was drawn): it reads short of the bottom though the reader never moved. Only a move up leaves the bottom.
-    const held = !near && atBottom.current && top >= lastTop.current - 1;
-    const bottom = near || held;
+    // The feed got shorter under the reader (a turn folded its work) and the browser pulled the position up with it:
+    // that is not the reader moving.
+    const clamped = scroller.scrollHeight < lastScrollHeight.current - 1;
+    const up = top < lastTop.current - 1 && !clamped;
+    const down = top > lastTop.current + 1;
+    // The feed's own scrolls (to the bottom, back to the place) wrote their position: only another one is the reader's.
+    const theirs = Math.abs(top - lastTop.current) > 1;
     lastTop.current = top;
-    if (held) scroller.scrollTop = scroller.scrollHeight;
-    if (bottom !== atBottom.current) {
-      atBottom.current = bottom;
-      setAway(!bottom);
+    if (atBottom.current && up) {
+      // Only a move up leaves the bottom.
+      leaveBottom();
+    } else if (atBottom.current && !near) {
+      // The event of a scroll the feed made to its bottom can come after the rows grew under it (a picture loaded, a
+      // turn was drawn): it reads short of the bottom though the reader never moved.
+      scroller.scrollTop = scroller.scrollHeight;
+      lastTop.current = scroller.scrollTop;
+    } else if (!atBottom.current && near && down) {
+      // The reader came down to the bottom by hand: from here the feed follows again.
+      atBottom.current = true;
+      setAway(false);
     }
     lastScrollHeight.current = scroller.scrollHeight;
-    noteAnchor();
+    if (theirs) noteAnchorNow();
     notePlace();
     const current = latest.current;
     if (
@@ -701,7 +804,34 @@ const Feed = (props: IFeedProps) => {
     )
       current.onLoadOlder();
     rewindow();
-  }, [rewindow, noteAnchor, notePlace]);
+  }, [rewindow, noteAnchorNow, notePlace, leaveBottom]);
+
+  // A wheel, a finger or a key that moves the feed up leaves the bottom at once: the feed must not pull it back down in
+  // the frame before the scroll event comes (a turn that streams grows every frame).
+  const onWheel = useCallback(
+    (event: WheelEvent) => {
+      if (event.deltaY < 0) leaveBottom();
+    },
+    [leaveBottom],
+  );
+  const touchY = useRef<number | null>(null);
+  const onTouchStart = useCallback((event: TouchEvent) => {
+    touchY.current = event.touches[0]?.clientY ?? null;
+  }, []);
+  const onTouchMove = useCallback(
+    (event: TouchEvent) => {
+      const y = event.touches[0]?.clientY;
+      if (y !== undefined && touchY.current !== null && y > touchY.current + 1) leaveBottom();
+      touchY.current = y ?? null;
+    },
+    [leaveBottom],
+  );
+  // One key handler for the feed: the keys up leave the bottom, the menu key opens the feed's menu.
+  const menuKeyDown = feedMenu.handlers.onKeyDown;
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (UP_KEYS.has(event.key) || (event.key === ' ' && event.shiftKey)) leaveBottom();
+    menuKeyDown(event);
+  };
 
   const toNew = () => {
     const scroller = scrollerRef.current;
@@ -746,9 +876,11 @@ const Feed = (props: IFeedProps) => {
       onOpen: (output) => latest.current.onOpenOutput?.(output),
       onOpenFile: (path) => latest.current.onOpenFile?.(path),
       downloadUrl: (path, output) => latest.current.downloadUrl?.(path, output) ?? '',
+      viewUrl: (path, output) => latest.current.viewUrl?.(path, output) ?? '',
       onShareFile: canShare ? (path) => latest.current.onShareFile?.(path) : undefined,
+      machine: props.machine,
     }),
-    [shown, canShare],
+    [shown, canShare, props.machine],
   );
 
   const docs = useMemo(() => docPathsOf(items ?? []), [items]);
@@ -783,8 +915,12 @@ const Feed = (props: IFeedProps) => {
         ref={scrollerRef}
         className="hx-feed"
         onScroll={onScroll}
+        onWheel={onWheel}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
         data-virtual={virtual || undefined}
         {...feedMenu.handlers}
+        onKeyDown={onKeyDown}
       >
         <div ref={innerRef} className="hx-feed__inner">
           {items === null && !failed && <FeedLoading />}
@@ -872,7 +1008,7 @@ const Feed = (props: IFeedProps) => {
           onClick={toNew}
         >
           <Icon name="chevron-down" size="sm" />
-          {t('next.feed.toNew')}
+          {away && (items?.length ?? 0) > awayRows ? t('next.feed.newMessage') : t('next.feed.toNew')}
         </button>
         <div className="hx-enter" data-enter="up" data-eb="520" data-ed="700">
           {props.dock}

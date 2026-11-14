@@ -18,6 +18,7 @@ import {
   effortHint,
   effortLabel,
   unavailableNote,
+  modelLine,
   modelName,
   modelOf,
   withModel,
@@ -35,6 +36,7 @@ import {
 import Icon from '@/next/ui/icon';
 import Tooltip from '@/next/ui/tooltip';
 import { usePresentFlag } from '@/next/ui/presence';
+import { useGlide } from '@/next/ui/use-glide';
 import type { IMachineChoice } from '@/next/features/sidebar/types';
 import { t } from '@/next/i18n';
 import { useCoverField } from '@/next/stores/field-cover';
@@ -88,6 +90,11 @@ export interface IModelPickerProps {
     choices: readonly IMachineChoice[];
     onPick: (id: string) => void;
   } | null;
+  /**
+   * Another kind of chat beside the agents' («ChatGPT», a plain chat on the person's own plan): a row under
+   * the models; a pick closes the picker and hands over. Absent: no row.
+   */
+  extra?: { label: string; sub: string; onPick: () => void } | null;
 }
 
 /** The stops of a model's slider, in the order of the protocol's efforts. */
@@ -122,6 +129,7 @@ const ModelPicker = ({
   multi,
   handoff = null,
   machine = null,
+  extra = null,
 }: IModelPickerProps) => {
   const [open, setOpen] = useState(false);
   useCoverField(open);
@@ -129,6 +137,7 @@ const ModelPicker = ({
   const [browse, setBrowse] = useState(choiceAgentKey(value));
   const { mounted, state } = usePresentFlag(open, EXIT_MS);
   const anchorRef = useRef<HTMLDivElement>(null);
+  const [pill, setPill] = useState<HTMLButtonElement | null>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
   const segRef = useRef<HTMLDivElement>(null);
@@ -282,6 +291,15 @@ const ModelPicker = ({
   const more = multi ? multi.chosen.length - 1 : 0;
   const startsOn = machine?.choices.find((c) => c.id === machine.current) ?? null;
 
+  // Another chat's model (or depth) changes the pill's words: they fade in (keyed, styles/composer.css) and the pill
+  // eases to its new width instead of jumping.
+  const name = modelName(agent, value.model);
+  useGlide(
+    pill,
+    [name, effort ?? '', more, agent.vendor ?? value.provider, ultracode, fast].join('|'),
+    'width',
+  );
+
   const hint = (): string => {
     if (blocked) return blocked;
     if (stops.length === 0) return t('next.picker.effortNone');
@@ -291,6 +309,7 @@ const ModelPicker = ({
   return (
     <div className="hx-picker-anchor" ref={anchorRef}>
       <button
+        ref={setPill}
         type="button"
         className="hx-model hx-tipped"
         data-ultracode={ultracode || undefined}
@@ -319,8 +338,14 @@ const ModelPicker = ({
             aria-label={t('next.picker.fast')}
           />
         )}
-        <span className="hx-model__name">{modelName(agent, value.model)}</span>
-        {effort && <span className="hx-model__effort">{effortLabel(effort)}</span>}
+        <span key={name} className="hx-model__name hx-model__swap">
+          {name}
+        </span>
+        {effort && (
+          <span key={effort} className="hx-model__effort hx-model__swap">
+            {effortLabel(effort)}
+          </span>
+        )}
         {more > 0 && <span className="hx-model__more">{`+${more}`}</span>}
         <Icon name="chevron-down" size="sm" className="hx-model__chev" />
       </button>
@@ -348,9 +373,7 @@ const ModelPicker = ({
                   </span>
                   <span className="hx-picker__model">
                     <i className="hx-agent" data-agent={agent.vendor ?? value.provider} aria-hidden="true" />
-                    <span className="hx-picker__model-text">
-                      {agent.name} · {modelName(agent, value.model)}
-                    </span>
+                    <span className="hx-picker__model-text">{modelLine(agent, value.model)}</span>
                     <Icon name="chevron-right" size="sm" />
                   </span>
                 </button>
@@ -477,6 +500,22 @@ const ModelPicker = ({
                     </Tooltip>
                   )}
                 </div>
+              )}
+              {extra && (
+                <button
+                  type="button"
+                  className="hx-picker__vm"
+                  onClick={() => {
+                    setOpen(false);
+                    extra.onPick();
+                  }}
+                >
+                  <i className="hx-agent hx-picker__vm-ic" data-agent="codex" aria-hidden="true" />
+                  <span className="hx-picker__vm-name">
+                    {extra.label} · {extra.sub}
+                  </span>
+                  <Icon name="chevron-right" size="sm" className="hx-picker__vm-chev" />
+                </button>
               )}
               {machine && startsOn && (
                 <button type="button" className="hx-picker__vm" onClick={() => setView(VIEW.machines)}>

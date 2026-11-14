@@ -70,6 +70,7 @@ func accessLog(log *slog.Logger, clientIP func(*http.Request) string, next http.
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r)
 		metrics.ObserveHTTP(r.URL.Path, sw.status)
+		metrics.ObserveLatency(r.URL.Path, r.Method, sw.status, time.Since(start))
 		level := slog.LevelDebug
 		switch {
 		case sw.status >= 500:

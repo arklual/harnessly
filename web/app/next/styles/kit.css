@@ -816,8 +816,7 @@ button.hx-kit__crumb:hover {
   }
 }
 
-/* The library's row of kits. */
-/* The library's row of kits: in the library's own column (the toolbar's, the folders', the projects'), so it scrolls
+/* The kits of the folder «UI-киты»: in the library's own column (the toolbar's, the folders', the projects'), so it scrolls
    under the sticky toolbar like the rest and never hangs to the left of it. */
 .hx-kit-shelf {
   display: flex;
@@ -825,12 +824,6 @@ button.hx-kit__crumb:hover {
   gap: var(--hx-space-3);
   max-width: 1120px;
   margin: var(--hx-space-3) auto var(--hx-space-6);
-}
-.hx-kit-shelf__h {
-  margin: 0;
-  color: var(--hx-fg-3);
-  font-size: var(--hx-text-sm);
-  font-weight: var(--hx-weight-medium);
 }
 .hx-kit-shelf__list {
   display: grid;
@@ -885,6 +878,22 @@ button.hx-kit__crumb:hover {
 }
 .hx-kit-shelf__meta > span + span::before {
   content: ' · ';
+}
+.hx-kit-shelf__ghost {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+}
+.hx-kit-shelf__sk-shot {
+  display: block;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--hx-radius-md);
+}
+.hx-kit-shelf__sk-title {
+  display: block;
+  width: 60%;
+  height: 14px;
+  border-radius: var(--hx-radius-sm);
 }
 
 /* The project's kit on its bar. */

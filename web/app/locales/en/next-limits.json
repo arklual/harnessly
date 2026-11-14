@@ -49,5 +49,30 @@
   "next.limits.fc.high": "high",
   "next.limits.fc.medium": "medium",
   "next.limits.fc.low": "low",
-  "next.limits.fc.profile": "following your usual hours"
+  "next.limits.fc.profile": "following your usual hours",
+  "next.limits.card.resetIn": "resets in {span}",
+  "next.limits.card.resetAt": "resets {at}",
+  "next.limits.card.over": "Used up",
+  "next.limits.card.endsIn": "Runs out in {span}",
+  "next.limits.card.endsAt": "Runs out {at}",
+  "next.limits.card.lasts": "Lasts until the reset",
+  "next.limits.card.balanceDay": "Runs out today",
+  "next.limits.card.balanceDays": {
+    "one": "Lasts about {n} day",
+    "other": "Lasts about {n} days"
+  },
+  "next.limits.card.balanceWeeks": {
+    "one": "Lasts about {n} week",
+    "other": "Lasts about {n} weeks"
+  },
+  "next.limits.card.today": "today",
+  "next.limits.card.week": "week",
+  "next.limits.card.days7": "7 days",
+  "next.limits.card.onBalance": "on the balance",
+  "next.limits.card.rejected": "Key rejected",
+  "next.limits.card.replaceKey": "Replace key",
+  "next.limits.card.connect": "Connect",
+  "next.limits.card.left": "{left}%",
+  "next.limits.card.pace": "To last until the reset, {pace}% should be left now",
+  "next.limits.card.spark": "Spend by day this week"
 }

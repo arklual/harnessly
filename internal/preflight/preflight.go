@@ -134,11 +134,11 @@ func loginStamp(name, path string, files ...string) string {
 }
 
 func New(home string) *Checker {
-	return &Checker{Home: home, Env: os.Environ(), AuthDir: authDirOf(os.Getenv("RUNTIME_SIDE_CHAT_CONFIG"))}
+	return &Checker{Home: home, Env: os.Environ(), AuthDir: AuthDirOf(os.Getenv("RUNTIME_SIDE_CHAT_CONFIG"))}
 }
 
-// authDirOf reads `auth_directory` from the machine's runtime config, the folder its chats sign in from.
-func authDirOf(file string) string {
+// AuthDirOf reads `auth_directory` from the machine's runtime config, the folder its chats sign in from.
+func AuthDirOf(file string) string {
 	if file == "" {
 		return ""
 	}

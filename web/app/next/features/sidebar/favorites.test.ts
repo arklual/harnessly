@@ -133,6 +133,7 @@ describe('resolveDrop', () => {
     chat('p', 4, { projectId: 'prj' }),
     chat('q', 5),
     chat('r', 6, { pinned: true, projectId: 'prj' }),
+    chat('x', 7, { from: { app: 'inbox', label: 'Inbox' } }),
   ];
   const view = favoritesOf(chats, {
     groups: [
@@ -230,6 +231,15 @@ describe('resolveDrop', () => {
       unpin: false,
     });
     expect(resolve(chatSrc('q'), on(DROP.recent))).toBeNull();
+  });
+
+  it('takes a chat an app started out of its folder when it is dropped on the recent', () => {
+    expect(resolve(chatSrc('x'), on(DROP.recent))).toEqual({
+      op: PLAN.move,
+      id: 'x',
+      projectId: null,
+      unpin: false,
+    });
   });
 
   it('reorders the groups', () => {

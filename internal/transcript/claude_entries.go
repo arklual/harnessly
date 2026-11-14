@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/ly-solutions/harnessly/internal/gitpush"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -386,6 +387,12 @@ func resultLinks(content any, isError any) []any {
 	}
 	var out []any
 	for _, text := range texts {
+		// The commits a `git push` put on its server: its output names no address of theirs.
+		for _, link := range gitpush.CommitLinks(text) {
+			if len(out) < resultLinksMax && !slices.Contains(out, any(link)) {
+				out = append(out, link)
+			}
+		}
 		for _, link := range resultLinkRE.FindAllString(text, -1) {
 			link = strings.TrimRight(link, ".,;:!?*")
 			if len(out) == resultLinksMax {

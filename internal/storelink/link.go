@@ -57,6 +57,11 @@ type Options struct {
 	// Shared names folders several runtimes of the machine read (a team's library): one runtime syncs such a folder at
 	// a time, and a file the store stops showing this machine stays there for the others.
 	Shared func(dir string) bool
+	// DB and Blobs name the drivers of a store inside the runtime (RUNTIME_STORE_DB, RUNTIME_STORE_BLOBS):
+	// postgres://… or sqlite:///folder, and file:///folder or s3://…; empty is SQLite and blobs in store/ of the data
+	// folder.
+	DB    string
+	Blobs string
 	// HTTP is the client to the hub; nil for a plain one.
 	HTTP *http.Client
 	Log  *slog.Logger
@@ -144,9 +149,17 @@ func Open(o Options) (*Link, error) {
 		l.token = s.token
 		l.stateKey = "hub-" + short(base+"\x00"+o.Machine.ID)
 	case KindEmbedded:
-		srv, err := filestore.OpenFolder(filepath.Join(o.DataDir, "store"), func(r *http.Request, coll string) (filestore.Access, error) {
+		dir := filepath.Join(o.DataDir, "store")
+		authorize := func(r *http.Request, coll string) (filestore.Access, error) {
 			return filestore.Access{Member: l.name, Room: coll}, nil
-		})
+		}
+		var srv *filestore.Server
+		var err error
+		if o.DB == "" && o.Blobs == "" {
+			srv, err = filestore.OpenFolder(dir, authorize)
+		} else {
+			srv, err = filestore.OpenURLs(context.Background(), o.DB, o.Blobs, dir, authorize)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("store inside the runtime: %w", err)
 		}
@@ -155,7 +168,7 @@ func Open(o Options) (*Link, error) {
 		l.hc = &http.Client{Transport: Handler(srv.Handler())}
 		l.stateKey = KindEmbedded
 	}
-	log.Info("store: linked", "kind", kind, "why", why)
+	log.Info("store: linked", "kind", kind, "why", why, "db", dbKind(o))
 	return l, nil
 }
 
@@ -501,4 +514,15 @@ func (w *pipeWriter) WriteHeader(code int) {
 func (w *pipeWriter) Write(p []byte) (int, error) {
 	w.WriteHeader(http.StatusOK)
 	return w.pw.Write(p)
+}
+
+// dbKind is what the log says of a store inside the runtime's metadata: never the URL, which may carry a password.
+func dbKind(o Options) string {
+	switch {
+	case o.DB == "":
+		return "sqlite"
+	case strings.HasPrefix(o.DB, "postgres"):
+		return "postgres"
+	}
+	return "sqlite"
 }

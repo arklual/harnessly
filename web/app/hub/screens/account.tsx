@@ -1,5 +1,5 @@
 // /settings: the person — name, how they sign in (linked providers, passkeys), the look, sign out.
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { Button, setThemeMode, TextField, useTheme, type ThemeMode } from '@kit';
 
@@ -10,8 +10,9 @@ import { hhmm } from '../lib/format';
 import { currentLang, t, type Lang } from '../lib/i18n';
 import { Link } from '../lib/router';
 import { useMe, useSession } from '../lib/session';
+import type { AppToken } from '../lib/types';
 import { PlainPage } from '../ui/frame';
-import { Fingerprint, LogOut, Moon, Monitor, Plus, Sun, Trash2 } from '../ui/icons';
+import { Fingerprint, LogOut, Moon, Monitor, Plug, Plus, Sun, Trash2 } from '../ui/icons';
 import { Msg, Note, Segmented } from '../ui/parts';
 import { SpaceMenu, useSignOut } from './home';
 
@@ -229,6 +230,8 @@ export const AccountScreen = () => {
         </section>
       )}
 
+      <AppsSection />
+
       <section className="hub-section">
         <h2 className="hub-section__t">{t('account.look')}</h2>
         <div className="hub-row" data-between>
@@ -267,5 +270,87 @@ export const AccountScreen = () => {
         </Button>
       </div>
     </PlainPage>
+  );
+};
+
+const whenUsed = (iso: string): string =>
+  new Date(iso).toLocaleString(currentLang(), {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+/** The person's own apps connected through the client API (docs/hub/client-api.md); shown while the switch is on. */
+const AppsSection = () => {
+  const api = useApi();
+  const [state, setState] = useState<{ on: boolean; tokens: AppToken[] } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(
+    () =>
+      api.me
+        .tokens()
+        .then(setState)
+        .catch(() => setState(null)),
+    [api],
+  );
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (!state?.on) return null;
+  const revoke = async (id: string) => {
+    setBusy(id);
+    setError(null);
+    try {
+      await api.me.revokeToken(id);
+      await load();
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <section className="hub-section">
+      <h2 className="hub-section__t">{t('apps.title')}</h2>
+      <Note>{t('apps.note')}</Note>
+      {state.tokens.length > 0 && (
+        <div className="hub-list">
+          {state.tokens.map((a) => (
+            <div key={a.id} className="hub-item">
+              <div className="hub-item__head">
+                <span className="hub-ic">
+                  <Plug size={18} />
+                </span>
+                <span className="hub-t">
+                  <span className="hub-t__n">{a.device ? `${a.client} · ${a.device}` : a.client}</span>
+                  <span className="hub-item__s">
+                    {[
+                      a.scopes
+                        .map((s) => (s === 'prompt' ? t('apps.scope.prompt') : t('apps.scope.read')))
+                        .join(', '),
+                      t('apps.used', { time: whenUsed(a.lastUsedAt) }),
+                    ].join(' · ')}
+                  </span>
+                </span>
+                <Button
+                  appearance="ghost"
+                  size="xs"
+                  loading={busy === a.id}
+                  onClick={() => void revoke(a.id)}
+                >
+                  {t('apps.revoke')}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {error && <Msg tone="danger">{error}</Msg>}
+    </section>
   );
 };

@@ -19,5 +19,6 @@
   "next.settings.delegation.delivery": "Сообщения от агентов",
   "next.settings.delegation.deliveryHint": "Когда работающий агент читает сообщение другого агента: на ближайшем шаге или после хода. Вопросы приходят сразу.",
   "next.settings.delegation.delivery.step": "Сразу",
-  "next.settings.delegation.delivery.turn": "После хода"
+  "next.settings.delegation.delivery.turn": "После хода",
+  "next.delegation.made": "Сделано: {count}"
 }

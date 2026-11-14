@@ -4,11 +4,23 @@
 // home or to the object, docked, in a window or folded into the field, with the right pane of the chat beside it. The
 // first words sent from the field or from the view (`hl.chat.send`) make the chat, with the app on in it. The strip's
 // «…» holds the app's rights, the debug section of a dev install and turning the app off in the chat.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import AppAsks from '@/next/features/app-views/asks';
 import AppFrame, { fromApp } from '@/next/features/app-views/app-frame';
 import AppUnavailable from '@/next/features/app-views/app-unavailable';
-import { appService, SERVICE_STATE, useAppService } from '@/next/features/app-views/service-health';
+import {
+  appService,
+  isSpaceApp,
+  SERVICE_STATE,
+  useAppService,
+} from '@/next/features/app-views/service-health';
+import { SpacePageWait, SpaceSkeleton } from '@/next/features/app-views/space-skeleton';
+import {
+  onPage,
+  spaceChatContext,
+  spaceCleared,
+  spaceContextOf,
+} from '@/next/features/app-views/space-context';
 import { ConsentStage } from '@/next/features/app-consent/consent-ask';
 import { useInstalledApps, type IAppView, type IInstalledApp } from '@/next/features/app-views/api';
 import ConsentBlock from '@/next/features/app-consent/consent-block';
@@ -79,6 +91,7 @@ const AppStagePage = ({
   const debugMode = useAppsDebug();
   const [reload, setReload] = useState(0);
   const chats = useConversationList(machine);
+  const space = isSpaceApp(id);
   const defaultCwd = useDefaultCwd(machine);
   const fromChat = chat !== null && isConvId(chat) ? chat : null;
   const record = useConversation(fromChat);
@@ -103,6 +116,7 @@ const AppStagePage = ({
     onOpenDrawer,
     open,
     keep: true,
+    ...(space ? { space: { layoutKey: appStageDesign(id, null) } } : {}),
     app: {
       address,
       onCreated: (made) => void settled(setConversationApps(machine, made, [id])).catch(() => undefined),
@@ -141,18 +155,42 @@ const AppStagePage = ({
       goTo({ kind: ROUTE.app, id, ...(to ? { object: to } : {}), ...(conv ? { chat: conv } : {}) }),
     [id, conv],
   );
-  const { ask, fill } = stage;
+  const { ask, fill, context, anchor } = stage;
   const on = conv !== null && (chatOn?.includes(id) ?? false);
+  // The stage's calls are new on each of its renders; the view's bridge is rebuilt when its handlers change, and a view
+  // that already shook hands keeps the old bridge's port: so the frame gets handlers that never change.
+  const live = useRef({ ask, fill, context, anchor, on });
+  useLayoutEffect(() => {
+    live.current = { ask, fill, context, anchor, on };
+  });
+  // A space's view says what is open and selected: the chip of the chat's next message, and the place its
+  // window opens beside. A call written on the board puts its words in the field, over the board, for the person.
+  const onPublish = useCallback((data: unknown, frame: DOMRect | null) => {
+    const now = live.current;
+    const ctx = spaceContextOf(data);
+    if (!ctx) {
+      // Back to the list: nothing is open, the chip and the place go.
+      if (spaceCleared(data)) {
+        now.context?.(null);
+        now.anchor?.(null);
+      }
+      return;
+    }
+    now.context?.(spaceChatContext(ctx));
+    now.anchor?.(onPage(ctx.rect, frame));
+    if (ctx.call !== null) now.fill?.(ctx.call);
+  }, []);
   const handlers = useMemo(
     () => ({
       // The view's words go to the chat beside it where the app is on. Elsewhere they wait in the chat's field: the
       // person's own send makes the chat and turns the app on in it, never the view.
       chatSend: async (text: string) => {
-        if (on) ask?.(fromApp(app.name, text));
-        else fill?.(text);
+        const now = live.current;
+        if (now.on) now.ask?.(fromApp(app.name, text));
+        else now.fill?.(text);
       },
     }),
-    [on, ask, fill, app.name],
+    [app.name],
   );
 
   const share = () => {
@@ -213,13 +251,14 @@ const AppStagePage = ({
   return (
     <>
       <AppStage
-        title={object ?? t('next.appmain.home')}
+        title={object ?? (space ? app.name : t('next.appmain.home'))}
         onBack={object ? () => go(null) : undefined}
         stage={stage}
         menu={menu}
         onShare={share}
         toolPane={toolPane}
         onOpenDrawer={onOpenDrawer}
+        space={space}
         frame={
           service !== null && health.state === SERVICE_STATE.down ? (
             <AppUnavailable
@@ -242,6 +281,8 @@ const AppStagePage = ({
                 data={object ? { object } : undefined}
                 handlers={handlers}
                 onOpenObject={go}
+                skeleton={space ? <SpaceSkeleton object={object !== null} /> : undefined}
+                onPublish={space ? onPublish : undefined}
               />
             </ConsentStage>
           )
@@ -294,9 +335,14 @@ const AppMainPage = ({
   if (error) return <p className="hx-appview__error">{error}</p>;
   // The chat named by the address is not known yet: the page waits for the list rather than showing the app alone and
   // then pulling a column in.
-  if (list === null || (conv !== null && record === undefined && !answered))
-    return <div className="hx-appview__wait" aria-busy="true" />;
-  if (toReader) return <div className="hx-appview__wait" aria-busy="true" />;
+  // A space shows its own shape from the first frame; another app its quiet wait.
+  const wait = isSpaceApp(id) ? (
+    <SpacePageWait object={object !== null} />
+  ) : (
+    <div className="hx-appview__wait" aria-busy="true" />
+  );
+  if (list === null || (conv !== null && record === undefined && !answered)) return wait;
+  if (toReader) return wait;
   if (!app) return <p className="hx-appview__error">{t('next.appmain.gone')}</p>;
   // An app with a window that waits for consent shows the bar over it (ConsentStage); one with no window says
   // what it waits for here.

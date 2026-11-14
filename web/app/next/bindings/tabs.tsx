@@ -61,6 +61,7 @@ const FIXED: Record<
   [ROUTE.review]: { icon: 'git-pull-request', title: () => t('next.reviewApp.title') },
   [ROUTE.help]: { icon: 'book-open', title: () => t('next.sidebar.help') },
   [ROUTE.learn]: { icon: 'graduation-cap', title: () => t('next.learn.title') },
+  [ROUTE.chatgpt]: { icon: 'message-square', title: () => t('next.chatgpt.side.title') },
   [ROUTE.settings]: { icon: 'settings', title: () => t('next.shell.settings') },
   [ROUTE.manage]: { icon: 'sliders-horizontal', title: () => t('next.sidebar.manage') },
   [ROUTE.stats]: { icon: 'chart-column', title: () => t('next.sidebar.stats') },
@@ -87,6 +88,20 @@ export const stripTabOf = (tab: ITab, chats: ReadonlyMap<string, ITabChat>): ISt
     return { id: tab.id, title: tab.title ?? route.id, icon: 'layout-grid', busy: null, attention: false };
   if (route.kind === ROUTE.appDoc)
     return { id: tab.id, title: tab.title ?? route.id, icon: 'blocks', busy: null, attention: false };
+  // A design edited with its chat is one tab (chat-place.ts): the design's name, the chat's state.
+  if (route.kind === ROUTE.site && route.chat && route.edit) {
+    const chat = chats.get(route.chat);
+    const status = chat?.status ?? CHAT_STATUS.none;
+    const look = status === CHAT_STATUS.none ? null : STATUS_LOOK[status];
+    return {
+      id: tab.id,
+      title: tab.title ?? route.id,
+      icon: look?.icon ?? 'pen-tool',
+      busy: paceOf(status),
+      ...(chat?.waitsFor ? { note: chat.waitsFor } : {}),
+      attention: WAITING.has(status),
+    };
+  }
   if (route.kind === ROUTE.site)
     return { id: tab.id, title: tab.title ?? route.id, icon: 'pen-tool', busy: null, attention: false };
   if (route.kind === ROUTE.kit)

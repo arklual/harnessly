@@ -152,7 +152,8 @@ func (m *Made) call(e *jsvalue.Object, at wire.Ms) {
 	if tool == "Bash" {
 		c.Command = strings.TrimPrefix(e.String("summary"), "$ ")
 	}
-	if c.Publish == nil && c.Command == "" {
+	c.Deliver = outputs.IsDeliverTool(tool)
+	if c.Publish == nil && c.Command == "" && !c.Deliver {
 		return
 	}
 	if m.pending == nil || len(m.pending) >= madePendingMax {
@@ -191,7 +192,7 @@ func (m *Made) takeTask(c trackerCall, result *jsvalue.Object, at wire.Ms) {
 	}
 }
 
-// take keeps the pages and designs a finished call made.
+// take keeps the pages, designs, merge requests, stands, commits and handed-over files a finished call made.
 func (m *Made) take(c outputs.Call, links []string, at wire.Ms) {
 	for _, out := range outputs.Of(m.config(), c, links) {
 		switch out.Kind {
@@ -205,6 +206,12 @@ func (m *Made) take(c outputs.Call, links []string, at wire.Ms) {
 			m.put(MadeLink{Kind: wire.MadeDesign, Ref: out.Ref, Op: out.Op, At: at}, "design:"+out.Ref)
 		case wire.OutputMR:
 			m.put(MadeLink{Kind: wire.MadeMR, Ref: out.Ref, Title: out.Title, Op: out.Op, At: at}, "mr:"+out.Ref)
+		case wire.OutputStand:
+			m.put(MadeLink{Kind: wire.MadeStand, Ref: out.Ref, Title: out.Title, Op: wire.OutputChanged, At: at}, "stand:"+out.Ref)
+		case wire.OutputCommit:
+			m.put(MadeLink{Kind: wire.MadeCommit, Ref: out.Ref, Title: out.Title, Op: out.Op, At: at}, "commit:"+out.Ref)
+		case wire.OutputDelivery:
+			m.put(MadeLink{Kind: wire.MadeFile, Ref: out.Ref, Title: out.Title, Op: out.Op, At: at}, "file:"+out.Ref)
 		}
 	}
 }

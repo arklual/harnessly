@@ -1,8 +1,4 @@
 /* The design's island (.hx-island): the field over the site, its live status and its folded pill — verbatim. */
-.hx-island__row .hx-head-btn[aria-pressed='true'] {
-  background: var(--hx-accent-soft);
-  color: var(--hx-accent);
-}
 .hx-island {
   position: absolute;
   z-index: 7;
@@ -34,56 +30,9 @@
   width: 380px;
   opacity: 0.92;
 }
+/* The box carries the chat's own field: the field draws its surface, border and shadow itself. */
 .hx-island__box {
-  padding: 6px;
-  border: 1px solid var(--hx-border-strong);
-  border-radius: 22px;
-  background: var(--hx-bg-raised);
-  box-shadow:
-    0 10px 30px rgba(12, 14, 34, 0.16),
-    0 2px 6px rgba(12, 14, 34, 0.06);
-  transition:
-    border-color 200ms ease,
-    box-shadow 200ms ease;
-}
-.hx-island__box:focus-within {
-  border-color: var(--hx-focus);
-}
-.hx-island__row {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-}
-.hx-island__input {
-  flex: 1;
-  min-width: 0;
-  height: 36px;
-  max-height: 132px;
-  padding: 7px 6px;
-  border: 0;
-  outline: 0;
-  resize: none;
-  background: none;
-  color: var(--hx-fg-1);
-  font: inherit;
-  font-size: var(--hx-text-md);
-  line-height: 22px;
-}
-.hx-island__input::placeholder {
-  color: var(--hx-fg-3);
-}
-.hx-island__row .hx-round {
-  margin-left: 2px;
-}
-.hx-island__mic[data-rec='true'] {
-  background: color-mix(in srgb, var(--hx-danger) 12%, transparent);
-  color: var(--hx-danger);
-}
-.hx-island__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 4px 4px 6px;
+  border-radius: var(--hx-dock-r, 28px);
 }
 .hx-island__status {
   display: flex;
@@ -474,4 +423,11 @@
 }
 .hx-island__last:hover {
   color: var(--hx-fg-1);
+}
+/* The notes' chips (site-notes NoteChips) wherever they stand. */
+.hx-island__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 4px 6px;
 }

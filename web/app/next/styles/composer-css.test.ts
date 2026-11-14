@@ -29,7 +29,7 @@ describe('the narrow field', () => {
   const media = blocksOf(css, '@media (max-width:');
 
   it('is a query container of its own width, the field of a chat and the start of a design alike', () => {
-    expect(css).toMatch(/\.hx-composer,\s*\.hx-dl__composer\s*\{\s*container: hx-field \/ inline-size;/);
+    expect(css).toMatch(/\.hx-composer\s*\{\s*container: hx-field \/ inline-size;/);
   });
 
   it("has the phone's look under one container query: the pill with its name, the ring gone, the limit down to its tightest window", () => {

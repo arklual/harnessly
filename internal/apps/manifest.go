@@ -52,6 +52,9 @@ const (
 )
 
 // SlotTargets are the targets above, in the order the docs name them.
+// HeightStage: a home view that fills the start page under the field, as the page of the day it brings.
+const HeightStage = "stage"
+
 var SlotTargets = []string{TargetSettings, TargetOnboarding, TargetObjectAction, TargetHubSettings, TargetBranding, TargetHome}
 
 // IsSlot says whether a target is one of the slots.
@@ -190,7 +193,9 @@ type View struct {
 	Title   string   `json:"title,omitempty"`
 	Entry   string   `json:"entry"`
 	Targets []string `json:"targets"`
-	Height  string   `json:"height,omitempty"`
+	// Height is "stage" for a view of the start page (home) that takes the whole stage under the field instead of a
+	// block there; nothing else is run.
+	Height string `json:"height,omitempty"`
 	// Label, Icon, Order and Objects are for the slots: the name on the settings entry, the step or the button (Title when
 	// empty), a name from the icon set, the place among its neighbours, and the kinds of object an object-action view is
 	// shown at (machine, chat; every kind when empty).
@@ -689,7 +694,12 @@ func (m *Manifest) Check() Problems {
 		if m.Trust == TrustDeclarative && (strings.HasPrefix(v.Entry, "https://") || installAt(v.Entry, false)) {
 			add(path+".entry", "a declarative app serves its views from the package")
 		}
-		if v.Height != "" {
+		// The one height the host runs: a view of the start page that takes the whole stage under the field.
+		if v.Height == HeightStage {
+			if !contains(v.Targets, TargetHome) {
+				add(path+".height", "%q is for views of the home target", HeightStage)
+			}
+		} else if v.Height != "" {
 			notYet(path + ".height")
 		}
 		if len(v.Targets) == 0 {

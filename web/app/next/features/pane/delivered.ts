@@ -51,6 +51,9 @@ const keptUrl = (
 
 export const downloadUrl = (m: MachineId, path: string, file?: IKeptFile) =>
   keptUrl(m, path, file, true) ?? route(m, `download=1&path=${enc(path)}`);
+/** The file for a tab of the browser (⌘/Ctrl-click on its card): shown, not saved. */
+export const viewUrl = (m: MachineId, path: string, file?: IKeptFile) =>
+  keptUrl(m, path, file, false) ?? previewUrl(m, path);
 export const zipEntryUrl = (m: MachineId, path: string, name: string) =>
   route(m, `zip=entry&path=${enc(path)}&name=${enc(name)}`);
 

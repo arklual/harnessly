@@ -115,3 +115,26 @@ func (v *View) installed(ctx context.Context, spaceID, appID string) (apps.Insta
 	v.mu.Unlock()
 	return app, nil
 }
+
+// Kinds are the document types of the apps installed for a space, read from the packages of its team in the store
+// (the hub's GET <platform>/apps/kinds under hub-apps-catalog). An app whose package is refused adds none.
+func (v *View) Kinds(ctx context.Context, spaceID string) ([]hubproto.AppKind, error) {
+	list, err := v.team(ctx, spaceID)
+	if err != nil {
+		return nil, err
+	}
+	var have []apps.Installed
+	for _, a := range list {
+		app, err := v.installed(ctx, spaceID, a.ID)
+		if err != nil {
+			continue
+		}
+		have = append(have, app)
+	}
+	out := []hubproto.AppKind{}
+	for _, k := range apps.DocumentKindsOf(have) {
+		out = append(out, hubproto.AppKind{ID: k.ID, Title: k.Title, Icon: k.Icon, App: k.App, AppName: k.AppName,
+			Editor: k.Editor, SchemaVersion: k.SchemaVersion, Extends: k.Extends})
+	}
+	return out, nil
+}

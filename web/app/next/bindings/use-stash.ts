@@ -1,7 +1,8 @@
 // The field's stash for the composer: the drafts put aside as rows, and the three things the person does with them.
 import { useMemo } from 'react';
 import type { IStash } from '@/next/features/composer/stash-list';
-import { useDraft, type DraftKey, emptyDraft } from '@/next/stores/drafts';
+import { useSlice } from '@/next/core/store';
+import { draftsStore, type DraftKey, emptyDraft } from '@/next/stores/drafts';
 import { dropStash, restoreStash, stashDraft, useStash } from '@/next/stores/stash';
 
 /** The first line of a draft as its row's name. */
@@ -9,8 +10,8 @@ const previewOf = (text: string): string => text.trim().split('\n')[0].slice(0, 
 
 export function useFieldStash(key: DraftKey): IStash {
   const items = useStash(key);
-  const draft = useDraft(key);
-  const canStash = !!draft && !emptyDraft(draft);
+  // Only whether there is anything to put aside: the whole draft would re-render the chat's dock on every key.
+  const canStash = useSlice(draftsStore, key, (draft) => !!draft && !emptyDraft(draft));
   return useMemo(
     () => ({
       rows: items.map((i) => ({

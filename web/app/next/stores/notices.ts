@@ -153,6 +153,18 @@ const subscribeList = (listener: () => void) => {
   };
 };
 
+/** For the sync with the runtime or the hub (notices-sync.ts): called after every change of the list. */
+export const subscribeNotices = (fn: () => void): (() => void) => {
+  listeners.add(fn);
+  return () => void listeners.delete(fn);
+};
+
+/** The same for the switches. */
+export const subscribeNotify = (fn: () => void): (() => void) => {
+  settingsListeners.add(fn);
+  return () => void settingsListeners.delete(fn);
+};
+
 const NO_NOTICES: readonly INotice[] = [];
 
 export const useNoticeList = (): readonly INotice[] =>
@@ -282,6 +294,18 @@ export const setNotify = (
     window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...settings, v: NOTIFY_VERSION }));
   } catch {
     // Private mode or a full storage: the switches hold for this page.
+  }
+  for (const listener of [...settingsListeners]) listener();
+};
+
+/** The switches another device saved: kept here and shown, not sent back. */
+export const applyRemoteNotify = (doc: unknown): void => {
+  try {
+    const next = parseNotify(JSON.stringify(doc));
+    settings = next;
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...next, v: NOTIFY_VERSION }));
+  } catch {
+    // Storage blocked: the switches hold for this page.
   }
   for (const listener of [...settingsListeners]) listener();
 };

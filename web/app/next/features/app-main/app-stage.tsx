@@ -41,6 +41,8 @@ export interface IAppStageProps {
   /** The right pane of the chat (browser, files, terminal), as beside a design. */
   toolPane: { open: boolean; onToggle: () => void } | null;
   onOpenDrawer: () => void;
+  /** A space (boards, documents): the chat is called over it from the field, so the strip has no chat buttons. */
+  space?: boolean;
 }
 
 const AppStage = ({
@@ -57,6 +59,7 @@ const AppStage = ({
   onShare,
   toolPane,
   onOpenDrawer,
+  space = false,
 }: IAppStageProps) => {
   const sectionRef = useRef<HTMLElement>(null);
   const phone = usePhone();
@@ -69,7 +72,12 @@ const AppStage = ({
   useLayoutEffect(() => {
     sectionRef.current?.style.setProperty('--site-chat', `${stage.chatW}px`);
   }, [stage.chatW]);
-  const { float } = stage;
+  const { float, bindSection } = stage;
+  // The stage counts a space's window from this section.
+  useLayoutEffect(() => {
+    bindSection?.(sectionRef.current);
+    return () => bindSection?.(null);
+  }, [bindSection]);
   useLayoutEffect(() => {
     const el = sectionRef.current;
     if (!el || !float) return;
@@ -151,17 +159,19 @@ const AppStage = ({
               </div>
             </div>
             {/* Where the chat stands is picked in the open chat's head; with the chat folded, here. */}
-            {stage.mode !== 'chat' && stage.mode !== 'float' && (
+            {!space && stage.mode !== 'chat' && stage.mode !== 'float' && (
               <ChatPlacement mode={stage.mode} onMode={(mode) => stage.onMode(mode, size())} />
             )}
-            <button
-              type="button"
-              className="hx-head-btn hx-site__swap"
-              aria-label={stage.mode === 'chat' ? t('next.site.siteFull') : t('next.site.chatFull')}
-              onClick={() => stage.onMode(stage.mode === 'chat' ? 'island' : 'chat', size())}
-            >
-              <Icon name={stage.mode === 'chat' ? 'maximize-2' : 'message-square'} />
-            </button>
+            {!space && (
+              <button
+                type="button"
+                className="hx-head-btn hx-site__swap"
+                aria-label={stage.mode === 'chat' ? t('next.site.siteFull') : t('next.site.chatFull')}
+                onClick={() => stage.onMode(stage.mode === 'chat' ? 'island' : 'chat', size())}
+              >
+                <Icon name={stage.mode === 'chat' ? 'maximize-2' : 'message-square'} />
+              </button>
+            )}
             {onShare && (
               <button
                 type="button"

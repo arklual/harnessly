@@ -64,6 +64,8 @@ type Service struct {
 	oauthOr []string // provider routes in display order
 	ep      Endpoints
 	proxy   *proxyGate
+	// switches are the rollout switches (SetSwitches); nil keeps the personal tokens off.
+	switches SwitchGate
 }
 
 // New builds the service: it prepares WebAuthn when passkeys are on and the OAuth providers that are configured.
@@ -123,6 +125,8 @@ type Principal struct {
 	// Admin is whether the person administers this installation (a proven address on HUB_ADMIN_EMAILS, or the first
 	// account).
 	Admin bool
+	// Token is the personal token the request came with (client API); nil for a session.
+	Token *store.APIToken
 }
 
 // UserView is a user as the API sends it.

@@ -39,7 +39,7 @@ func TestCreateKeepsTheKeyOutOfTheFileAndTheAnswers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if view.ID != "deepseek" || view.BaseURL != "https://api.deepseek.com/v1" || view.Host != "api.deepseek.com" || !view.HasKey || view.ClaudeCLI {
+	if view.ID != "deepseek" || view.BaseURL != "https://api.deepseek.com/v1" || view.Host != "api.deepseek.com" || !view.HasKey || !view.ClaudeCLI || !view.Proxied {
 		t.Fatalf("view: %+v", view)
 	}
 	if sec["provider-deepseek-key"] != testKey {
@@ -253,5 +253,80 @@ func TestEndpoint(t *testing.T) {
 		if got := Endpoint(c[0], API(c[1]), c[2]); got != c[3] {
 			t.Errorf("%s: %s", c[0], got)
 		}
+	}
+}
+
+// What the person did to the models survives a refresh from the provider: a model they added stays, a name and efforts
+// they gave stay, and the provider's other models follow its list.
+func TestARefreshKeepsWhatThePersonDidToTheModels(t *testing.T) {
+	kept := []Model{
+		{ID: "a", Label: "Мой A", Efforts: []string{"low", "high"}, Edited: true},
+		{ID: "b", Label: "B old"},
+		{ID: "mine", Label: "Своя", Manual: true},
+		{ID: "gone"},
+	}
+	fresh := []Model{{ID: "a", Label: "A"}, {ID: "b", Label: "B new"}, {ID: "c"}}
+	got := MergeModels(kept, fresh)
+	ids := []string{}
+	for _, m := range got {
+		ids = append(ids, m.ID)
+	}
+	if strings.Join(ids, ",") != "a,b,c,mine" {
+		t.Fatalf("ids: %v", ids)
+	}
+	if got[0].Label != "Мой A" || len(got[0].Efforts) != 2 || !got[0].Edited || got[1].Label != "B new" || !got[3].Manual {
+		t.Fatalf("merged: %+v", got)
+	}
+	// A model the person added that the provider now lists is the provider's, with what the person gave it.
+	if again := MergeModels([]Model{{ID: "c", Label: "Моя C", Manual: true}}, fresh); again[2].Label != "Моя C" || again[2].Manual || !again[2].Edited {
+		t.Fatalf("listed now: %+v", again)
+	}
+}
+
+func TestAModelsEffortsAreTheWiresInTheirOrder(t *testing.T) {
+	got, err := cleanModels([]Model{{ID: "m", Efforts: []string{"high", "low", "high"}, DefaultEffort: "low"}})
+	if err != nil || strings.Join(got[0].Efforts, ",") != "low,high" {
+		t.Fatalf("%+v %v", got, err)
+	}
+	for _, bad := range []Model{{ID: "m", Efforts: []string{"turbo"}}, {ID: "m", Efforts: []string{"low"}, DefaultEffort: "high"}, {ID: "m", DefaultEffort: "low"}} {
+		if _, err := cleanModels([]Model{bad}); ReasonOf(err) != ReasonBadModel {
+			t.Errorf("%+v: %v", bad, err)
+		}
+	}
+}
+
+// A model the person typed and the name they gave a listed one are kept when the provider is asked again.
+func TestACheckKeepsTheModelsThePersonTyped(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[{"id":"listed"}]}`))
+	}))
+	defer srv.Close()
+	svc, _ := newService(t)
+	v, err := svc.Create(Input{Name: "Local", BaseURL: srv.URL + "/v1", API: APIOpenAI,
+		Models: []Model{{ID: "typed", Label: "Моя", Efforts: []string{"medium"}, Manual: true}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Check(context.Background(), v.ID); err != nil {
+		t.Fatal(err)
+	}
+	p, _ := svc.Get(v.ID)
+	if len(p.Models) != 2 || p.Models[0].ID != "listed" || p.Models[1].ID != "typed" || p.Models[1].Efforts[0] != "medium" {
+		t.Fatalf("models: %+v", p.Models)
+	}
+}
+
+// The window of a model comes in the vendors' own words; a refresh gives it to a model the person named without one.
+func TestTheModelsWindowIsReadFromTheList(t *testing.T) {
+	got, ok := parseModels([]byte(`{"data":[{"id":"a","context_length":131072},{"id":"b","context_window":32768},{"id":"c","top_provider":{"context_length":200000}},{"id":"d"}]}`))
+	if !ok || got[0].Window != 131072 || got[1].Window != 32768 || got[2].Window != 200000 || got[3].Window != 0 {
+		t.Fatalf("%+v", got)
+	}
+	merged := MergeModels([]Model{{ID: "a", Label: "Мой", Edited: true}, {ID: "b", Window: 16000, Edited: true}}, got)
+	if merged[0].Window != 131072 || merged[1].Window != 16000 {
+		t.Fatalf("merged: %+v", merged)
+	}
+	if _, err := cleanModels([]Model{{ID: "x", Window: -1}}); ReasonOf(err) != ReasonBadModel {
+		t.Fatal("a negative window")
 	}
 }

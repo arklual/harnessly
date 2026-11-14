@@ -1744,3 +1744,32 @@ func TestALaunchIsNotMadeBesideALiveAgent(t *testing.T) {
 		t.Fatalf("launched %+v, ended %v", r.launcher.launched, r.launcher.ended)
 	}
 }
+
+// A chat an app started for the person keeps the app's mark and name until the person moves it.
+func TestImportKeepsTheAppMarkUntilMoved(t *testing.T) {
+	tab := jsvalue.NewObject("id", "tab-fr1", "sessionName", "ws-1-fr1", "panelType", "claude-code",
+		"meta", jsvalue.NewObject("from", jsvalue.NewObject("app", " inbox ", "label", "Inbox", "title", "Review the fix")))
+	got, ok := TabFromLayout(tab, "/w", "meta")
+	if !ok || got.From == nil || got.From.App != "inbox" || got.From.Label != "Inbox" {
+		t.Fatalf("tab: %+v", got)
+	}
+	r := newRig(t)
+	if n := r.rt.Import([]ImportTab{got}, nil); n != 1 {
+		t.Fatalf("imported %d", n)
+	}
+	rec, _ := r.rt.Record("tab-fr1")
+	if rec.From == nil || rec.From.App != "inbox" || rec.Title != "Review the fix" || rec.TitleSource != wire.TitleFromUser {
+		t.Fatalf("record: from %+v title %q (%s)", rec.From, rec.Title, rec.TitleSource)
+	}
+	r.id = "tab-fr1"
+	r.do(wire.ConversationMoveCmd{OpID: "m1", ID: "tab-fr1"})
+	if rec, _ := r.rt.Record("tab-fr1"); rec.From != nil || rec.Title != "Review the fix" {
+		t.Fatalf("after the move: from %+v title %q", rec.From, rec.Title)
+	}
+	// A tab without an app in its mark is an ordinary one.
+	plain, _ := TabFromLayout(jsvalue.NewObject("id", "tab-fr2", "sessionName", "ws-1-fr2", "panelType", "claude-code",
+		"meta", jsvalue.NewObject("from", jsvalue.NewObject("label", "x"))), "/w", "meta")
+	if plain.From != nil {
+		t.Fatalf("plain: %+v", plain.From)
+	}
+}

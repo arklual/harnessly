@@ -41,6 +41,8 @@ interface IPlace {
   at: number;
   /** The words that were there. */
   text: string;
+  /** The person sent it just now from the field (not a queued message the runtime handed over by itself). */
+  hand?: boolean;
 }
 
 const places = new Map<string, IPlace>();
@@ -62,7 +64,7 @@ export const launchFrom = (box: IBox, text: string) => {
 
 /** The message the last launch made: its bubble will fly from where the text was. */
 export const bindLaunch = (clientId: string) => {
-  if (launch && fresh(launch, ORIGIN_TTL_MS)) places.set(clientId, launch);
+  if (launch && fresh(launch, ORIGIN_TTL_MS)) places.set(clientId, { ...launch, hand: true });
   launch = null;
   prune();
 };
@@ -85,6 +87,14 @@ export const hasOrigin = (clientId: string): boolean => {
   return standing.has(clientId) || (!!place && fresh(place, ORIGIN_TTL_MS));
 };
 
+/**
+ * The person sent this message just now from the field: the feed goes down to it even from up in the history. A queued
+ * message the runtime hands over when the turn ends flies too, but it does not move a reader who is up there.
+ */
+export const sentByHand = (clientId: string): boolean => {
+  const place = places.get(clientId);
+  return !!place?.hand && fresh(place, ORIGIN_TTL_MS);
+};
 /** The place the message's bubble flies from; used up. */
 export const claimOrigin = (clientId: string): IBox | null => {
   const place = places.get(clientId);

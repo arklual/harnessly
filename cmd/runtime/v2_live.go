@@ -184,6 +184,7 @@ func newV2Live(d deps, c *core) *v2Live {
 	ses := newV2Sessions(d.Home, func() map[string]string { return v.rt.AttachedSessions() })
 	v.ses = ses
 	publisher := autoOpenPublisher{hub: v.hub, watch: v.newPaneWatcher()}
+	v.liftIntents()
 	if d.BrowserTools != nil {
 		publisher.browser = d.BrowserTools.Access
 	}
@@ -211,7 +212,8 @@ func newV2Live(d deps, c *core) *v2Live {
 	summarizer.models = v.machine.modelsOf
 	var noticesRT atomic.Pointer[convo.Runtime]
 	notices := newChatNotices(c, &noticesRT)
-	v.rt = convo.New(convo.Deps{Notify: notices.notice, Moves: moveStore, Index: index, Digest: digest, ExportDir: filepath.Join(d.DataDir, "v2", "chat-exports"), AgentSession: ses.Find, SessionAccount: noteSessionAccount(d.DataDir, v.profiles), MachineID: v2Machine, Publisher: publisher, Machine: v.tm, Launcher: v.starter, Input: codexInputOf(c), Handoffs: handoffs,
+	var projects atomic.Pointer[projectsFeed]
+	v.rt = convo.New(convo.Deps{PersonOf: design.PersonIn, ProjectsChanged: func([]wire.Project) { projects.Load().changed() }, Notify: notices.notice, Moves: moveStore, Index: index, Digest: digest, ExportDir: filepath.Join(d.DataDir, "v2", "chat-exports"), AgentSession: ses.Find, SessionAccount: noteSessionAccount(d.DataDir, v.profiles), MachineID: v2Machine, Publisher: publisher, Machine: v.tm, Launcher: v.starter, Input: codexInputOf(c), Handoffs: handoffs,
 		Uploads: v2Uploads{uploads}, Refs: v2Refs{v}, Store: convo.NewStore(filepath.Join(d.DataDir, "v2")), Log: v2Log{}, Limits: wire.DefaultLimits, Models: v.machine.modelsOf, Background: v2Background{reader: c.bg, flows: &workflows.Reader{}}, Meta: &sessionmeta.Reader{Index: c.transcripts}, Transcripts: c.transcripts, Shots: &shots.Reader{Index: c.transcripts}, PictureRoots: []string{shots.ScratchRoot(), uploadsDir(d), uploads.Dir, imagesDir(d), codexImagesDir(d)}, Titler: titler.Title, Summarizer: turnSummarizer(d.DataDir, summarizer.Summarize), SummaryModel: func() *wire.NoticeSummaryModel { return runtimeSettings.RuntimeSettings().NoticeSummary }, Closer: v2Closer{v}, DefaultCwd: d.WorkspaceRoot,
 		Terminals: terminals, IdleStop: func() time.Duration { return runtimeSettings.RuntimeSettings().IdleStop.After() },
 		IdleFloor: idleFloor, MemoryShort: memoryShort, PressureStop: pressureFloor, LegacyLife: !sessionOwnerOn(os.Getenv),
@@ -231,6 +233,9 @@ func newV2Live(d deps, c *core) *v2Live {
 			return wire.Ms(limits.ExhaustedReset(c.limits.Read()[string(p)], float64(now.Unix())) * 1000)
 		}})
 	noticesRT.Store(v.rt)
+	feed := newProjectsFeed(v.rt.ProjectList, d.DataDir, os.Getenv("RUNTIME_AGENT_TOKEN_HEADER"))
+	projects.Store(feed)
+	go feed.run()
 	if c.agents != nil && c.agents.codexInput != nil {
 		c.agents.codexInput.rt.Store(v.rt)
 	}
@@ -276,6 +281,7 @@ func newV2Live(d deps, c *core) *v2Live {
 	if index != nil {
 		v.srv.Search = v.rt.SearchMessages
 		v.srv.Digest = v.rt.ChatDigest
+		v.srv.Glance = v.rt.ChatGlance
 	}
 	v.srv.MachineTool = v2MachineTool{ref: d.MachineKit}
 	v.srv.Apps = v2Apps{d: d}

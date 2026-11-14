@@ -490,16 +490,19 @@ type CallBucket struct {
 	Hour, Calls, ListCostMicros          int64
 	Provider, Model                      string
 	Input, Output, CacheRead, CacheWrite int64
+	// Project is the project of the session the calls belong to, "" when no machine told it.
+	Project string
 }
 
 // UserCallBuckets sums the calls of every session of a person (subagents included) made in [from, to) by hour,
 // provider and model.
 func (s Store) UserCallBuckets(ctx context.Context, userID string, from, to int64) ([]CallBucket, error) {
-	rows, err := s.q.Query(ctx, `SELECT (c.ts / 3600000) * 3600000, c.provider, c.model, COUNT(*), COALESCE(SUM(c.list_cost_micros), 0),
+	rows, err := s.q.Query(ctx, `SELECT (c.ts / 3600000) * 3600000, c.provider, c.model, COALESCE(f.project, ''), COUNT(*), COALESCE(SUM(c.list_cost_micros), 0),
 		SUM(c.input), SUM(c.output), SUM(c.cache_read), SUM(c.cache_write_5m + c.cache_write_1h)
 		FROM usage_calls c JOIN agent_sessions a ON a.org_key = c.org_key AND a.provider = c.provider AND a.session_key = c.session_key
+		LEFT JOIN session_facts f ON f.org_key = c.org_key AND f.provider = c.provider AND f.session_key = c.session_key
 		WHERE a.user_id = ? AND c.ts >= ? AND c.ts < ?
-		GROUP BY 1, c.provider, c.model ORDER BY 1, c.provider, c.model`, userID, from, to)
+		GROUP BY 1, c.provider, c.model, 4 ORDER BY 1, c.provider, c.model, 4`, userID, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -507,7 +510,7 @@ func (s Store) UserCallBuckets(ctx context.Context, userID string, from, to int6
 	var out []CallBucket
 	for rows.Next() {
 		var b CallBucket
-		if err := rows.Scan(&b.Hour, &b.Provider, &b.Model, &b.Calls, &b.ListCostMicros, &b.Input, &b.Output, &b.CacheRead, &b.CacheWrite); err != nil {
+		if err := rows.Scan(&b.Hour, &b.Provider, &b.Model, &b.Project, &b.Calls, &b.ListCostMicros, &b.Input, &b.Output, &b.CacheRead, &b.CacheWrite); err != nil {
 			return nil, err
 		}
 		out = append(out, b)

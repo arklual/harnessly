@@ -5,11 +5,16 @@
 
 /* A field takes its look from its own width, not the window's: a narrow column (a design's chat, the side chat, a chat
    in the right pane, a narrow window) gets the phone's field — see «A narrow field» below. */
-.hx-composer,
-.hx-dl__composer {
+.hx-composer {
   container: hx-field / inline-size;
 }
 /* The corners the dock's one unit shares: the field and the sheet of layers over it (the question, the bars, the queue). */
+/* The window's one field and a screen's place for it (features/composer/one-field): no box of their own. */
+.hx-onefield,
+.hx-onefield__slot {
+  display: contents;
+}
+
 .hx-dock {
   --hx-dock-r: 28px;
 }
@@ -17,6 +22,31 @@
    design's narrow column — see «A narrow dock» below. */
 .hx-chat > .hx-dock {
   container: hx-dock / inline-size;
+}
+/* The field stands out from the page wherever it is: a surface a step over what is under it, a soft shadow
+   and a border a little stronger than the page's lines; the focus ring is the hint of where the typing goes, not of
+   where the field is. */
+.hx-dock {
+  --hx-field-bg: var(--hx-bg-raised);
+  --hx-field-border: color-mix(in srgb, var(--hx-fg-3) 30%, var(--hx-border-strong));
+  --hx-field-shadow: var(--hx-shadow-overlay);
+}
+/* Dark: the pane and the islands are the raised surface already, so the field is the next step over it. */
+html[data-theme='dark'] .hx-dock,
+.hx-look[data-mode='dark'] .hx-dock {
+  --hx-field-bg: var(--hx-bg-bubble);
+}
+/* A card's reply (an agent's question, another agent's message): the same field, lower — a line or two of words. */
+.hx-dock[data-reply] .hx-composer {
+  --hx-composer-h: 92px;
+}
+/* The same field on a screen of its own (Settings, …: bindings/screen-composer): it stands where the screen puts it and
+   answers to that place's width. */
+.hx-dock[data-screen] {
+  container: hx-dock / inline-size;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 .hx-dock .hx-composer {
   --hx-composer-h: 124px;
@@ -26,9 +56,9 @@
   max-width: none;
   padding: 0;
   border-radius: var(--hx-dock-r);
-  background: var(--hx-bg-raised);
-  border: 1px solid var(--hx-border-strong);
-  box-shadow: var(--hx-shadow-md);
+  background: var(--hx-field-bg);
+  border: 1px solid var(--hx-field-border);
+  box-shadow: var(--hx-field-shadow);
   transition:
     border-radius var(--hx-dur-md) var(--hx-ease-out),
     border-color var(--hx-dur-sm),
@@ -256,18 +286,7 @@
   transform: rotate(45deg);
 }
 .hx-plus {
-  /* The one look of every menu: black in both themes, as the smart notice's. The interface's tokens are
-     turned to the menu's inside, so what it holds (a search, a picker, a hint) reads on black too. */
-  --hx-bg-raised: #000;
-  --hx-bg-hover: rgb(255 255 255 / 0.11);
-  --hx-bg-active: rgb(255 255 255 / 0.14);
-  --hx-fg-1: #fff;
-  --hx-fg-2: rgb(255 255 255 / 0.62);
-  --hx-fg-3: rgb(255 255 255 / 0.42);
-  --hx-border: rgb(255 255 255 / 0.07);
-  --hx-border-strong: rgb(255 255 255 / 0.07);
-  --hx-accent: #fff;
-  color-scheme: dark;
+  /* Black in both themes: its tokens are the black menu's set in tokens.css. */
   color: var(--hx-fg-1);
   width: 296px;
   padding: 6px;
@@ -1122,7 +1141,8 @@
   border-radius: 0;
   border-top-color: var(--hx-border);
 }
-.hx-dock :is(.hx-ask, .hx-dockbar, .hx-dockstat, .hx-qfold) + .hx-composer {
+.hx-dock :is(.hx-ask, .hx-dockbar, .hx-dockstat, .hx-qfold) + .hx-composer,
+.hx-dock :is(.hx-ask, .hx-dockbar, .hx-dockstat, .hx-qfold) + .hx-onefield__slot .hx-composer {
   border-top-left-radius: 0;
   border-top-right-radius: 0;
 }
@@ -1426,6 +1446,36 @@
   /* As in the design, the field stays under the greeting on a phone too, and goes down over the keyboard when it opens */
   .hx-stage[data-phase='home'] > .hx-dock[data-keyboard='open'] {
     transform: none;
+  }
+}
+
+/* an app's view takes the stage under the field (the page of the day it brings). The greeting and the field
+   stand at the top, the view fills the rest of the stage under the dock (greeting.tsx measures it) and scrolls inside
+   itself. */
+.hx-stage[data-home='stage'] {
+  --hx-home-top: 136px;
+}
+.hx-stage[data-phase='home'][data-home='stage'] > .hx-dock {
+  top: var(--hx-home-top);
+  bottom: auto;
+  transform: none;
+}
+.hx-home-stage {
+  position: absolute;
+  inset: calc(var(--hx-home-under, calc(var(--hx-home-top) + var(--hx-dock-rest))) + var(--hx-space-3)) 0 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+}
+.hx-home-stage > .hx-uislot {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 900px) {
+  .hx-stage[data-home='stage'] {
+    --hx-home-top: 104px;
   }
 }
 
@@ -2171,7 +2221,7 @@
   padding: 0 10px;
   border-radius: 8px;
   border: 1px solid var(--hx-border);
-  background: var(--hx-bg-app);
+  background: var(--hx-bg-hover);
   color: var(--hx-fg-3);
   transition: border-color 160ms var(--hx-ease-out);
 }
@@ -2667,5 +2717,186 @@ span.hx-takes__act {
 @keyframes hx-pagenote-fade-out {
   to {
     opacity: 0;
+  }
+}
+
+/* The folded field (features/composer/field-fold, HRN-1362, the design «Поле ввода — сжатое», A «По центру»): a pill
+   44px high and 440px wide at the bottom in the middle that opens into the field from the same point. One box changes
+   its size; the pill's words fade out at once, the field fades in a moment later. */
+.hx-fold {
+  position: relative;
+  width: 100%;
+  height: 44px;
+}
+/* Open, the box is the field's own height at once: only the pill and the field move, by transform and opacity. */
+.hx-fold[data-open='true'] {
+  height: var(--hx-fold-h, 132px);
+}
+.hx-fold__pill {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  z-index: 1;
+  width: min(440px, 100%);
+  height: 44px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px 0 18px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 22px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  cursor: text;
+  transform: translateX(-50%);
+  transform-origin: 50% 100%;
+  transition:
+    opacity 160ms var(--hx-ease-out),
+    transform 320ms var(--hx-ease-out);
+}
+.hx-fold[data-open='true'] .hx-fold__pill {
+  opacity: 0;
+  transform: translateX(-50%) scale(1.08);
+  pointer-events: none;
+}
+.hx-fold__pill:focus-visible {
+  outline: 1.5px solid var(--hx-border-strong);
+  outline-offset: 2px;
+  border-radius: 22px;
+}
+.hx-fold__hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hx-fold__hint[data-line] {
+  color: var(--hx-fg-2);
+}
+.hx-fold__model {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 9px;
+  border-radius: var(--hx-radius-full);
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 160ms var(--hx-ease-out);
+}
+.hx-fold__model:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-fold__limit {
+  flex: none;
+  padding: 0 4px;
+  color: var(--hx-warning);
+  font-size: var(--hx-text-xs);
+  white-space: nowrap;
+}
+.hx-fold__mic,
+.hx-fold__stop {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  transition:
+    background 160ms var(--hx-ease-out),
+    color 160ms var(--hx-ease-out);
+}
+.hx-fold__mic:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-fold__stop {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-fold__stop i {
+  display: block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.hx-fold__spin {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0 4px;
+  box-sizing: border-box;
+  border: 2px solid var(--hx-bg-active);
+  border-top-color: var(--hx-fg-1);
+  border-radius: 50%;
+  animation: hx-fold-spin 900ms linear infinite;
+}
+@keyframes hx-fold-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* The field lies at the bottom of the box: the box grows up to it. */
+.hx-fold__full {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.96);
+  transform-origin: 50% 100%;
+  transition:
+    opacity 160ms var(--hx-ease-out),
+    transform 160ms var(--hx-ease-out);
+}
+.hx-fold[data-open='true'] .hx-fold__full {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+  transition:
+    opacity 200ms var(--hx-ease-out) 80ms,
+    transform 320ms var(--hx-ease-out);
+}
+/* A phone's pill is as wide as the screen. */
+@media (max-width: 600px) {
+  .hx-fold__pill {
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-fold,
+  .hx-fold__pill,
+  .hx-fold__full,
+  .hx-fold[data-open='true'] .hx-fold__full {
+    transition: none;
+  }
+}
+
+/* The pill held over a change of chat (composer.tsx): a box of no layout of its own, only there to take no click. */
+.hx-composer__held {
+  display: contents;
+}
+
+/* Another chat's model or depth: the pill's new words fade in (they are keyed, model-picker.tsx) while the pill eases
+   to its width (ui/use-glide.ts). Only opacity and transform. */
+.hx-model__swap {
+  animation: hx-model-swap 150ms var(--hx-ease-out) backwards;
+}
+@keyframes hx-model-swap {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
   }
 }

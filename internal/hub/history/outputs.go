@@ -123,3 +123,52 @@ func EntryOutput(ctx context.Context, db *store.DB, userID, conv, entry string, 
 	}
 	return json.Marshal(map[string]any{"entryId": entry, "output": out})
 }
+
+// linkOutputKinds are the output kinds only a page with the cap links reads (wire.CapLinks, README 72).
+var linkOutputKinds = map[string]bool{"task": true, "commit": true}
+
+// TurnsFor is turns as a page reads them: without the task and commit outputs for a page that does not name the cap
+// links (an open tab of an older build refuses a turn with a kind it does not know). A turn that has none is passed as
+// it is; turns itself is not changed.
+func TurnsFor(turns []json.RawMessage, links bool) []json.RawMessage {
+	if links {
+		return turns
+	}
+	out := make([]json.RawMessage, len(turns))
+	for i, raw := range turns {
+		out[i] = turnWithoutLinks(raw)
+	}
+	return out
+}
+
+func turnWithoutLinks(raw json.RawMessage) json.RawMessage {
+	var t map[string]json.RawMessage
+	if json.Unmarshal(raw, &t) != nil {
+		return raw
+	}
+	var outputs []map[string]json.RawMessage
+	if json.Unmarshal(t["outputs"], &outputs) != nil || len(outputs) == 0 {
+		return raw
+	}
+	kept := outputs[:0:0]
+	for _, o := range outputs {
+		var kind string
+		if json.Unmarshal(o["kind"], &kind) == nil && linkOutputKinds[kind] {
+			continue
+		}
+		kept = append(kept, o)
+	}
+	if len(kept) == len(outputs) {
+		return raw
+	}
+	if len(kept) == 0 {
+		delete(t, "outputs")
+	} else {
+		t["outputs"], _ = json.Marshal(kept)
+	}
+	b, err := json.Marshal(t)
+	if err != nil {
+		return raw
+	}
+	return b
+}

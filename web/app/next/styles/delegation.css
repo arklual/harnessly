@@ -7,6 +7,73 @@
   align-items: flex-start;
   gap: var(--hx-space-2);
 }
+.hx-deleg-item {
+  width: min(100%, 560px);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hx-deleg-item > .hx-deleg {
+  width: 100%;
+}
+/* What the subchat made: a quiet row under its card, the list unfolds and folds back. */
+.hx-deleg__made {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 4px var(--hx-space-2);
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: none;
+  color: var(--hx-fg-3);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+.hx-deleg__made:hover {
+  color: var(--hx-fg-1);
+  background: var(--hx-bg-hover);
+}
+.hx-deleg__made:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 1px;
+}
+.hx-deleg__made-ic {
+  transition: transform 200ms var(--hx-ease-out);
+}
+.hx-deleg__made[aria-expanded='true'] .hx-deleg__made-ic {
+  transform: rotate(90deg);
+}
+.hx-deleg__list {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 240ms var(--hx-ease-out),
+    opacity 200ms var(--hx-ease-out);
+}
+.hx-deleg__list[data-state='open'] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.hx-deleg__list-in {
+  min-height: 0;
+  overflow: hidden;
+}
+.hx-deleg__list-in > .hx-files {
+  padding-top: var(--hx-space-1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-deleg__list,
+  .hx-deleg__made-ic {
+    transition: none;
+  }
+}
 .hx-deleg {
   width: min(100%, 560px);
   min-width: 0;
@@ -170,9 +237,10 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  margin-left: 14px;
-  padding-left: 6px;
-  border-left: 1px solid var(--hx-border-strong);
+  /* --hx-kids-indent: 0 in the rail (shell.css) */
+  margin-left: calc(14px * var(--hx-kids-indent, 1));
+  padding-left: calc(6px * var(--hx-kids-indent, 1));
+  border-left: calc(1px * var(--hx-kids-indent, 1)) solid var(--hx-border-strong);
 }
 .hx-tree[aria-expanded='true'] > .hx-tree__kids {
   grid-template-rows: 1fr;

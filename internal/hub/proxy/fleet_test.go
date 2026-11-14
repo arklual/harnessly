@@ -104,13 +104,20 @@ func TestFleetListsEveryMachineOfThePersonAndOnlyThose(t *testing.T) {
 	} else if r.JSON(&noneV2); len(noneV2) != 0 {
 		t.Errorf("v2 machines shows a stranger %+v", noneV2)
 	}
-	before := f.sessionCalls()
 	for _, id := range []string{f.id, other} {
 		if r := stranger.Do("GET", "/api/v2/ping?machine="+id, nil); r.Code != 403 {
 			t.Errorf("proxy for a stranger, %s: %s", id, r)
 		}
 	}
-	if n := f.sessionCalls() - before; n != 0 {
+	// Counted by the person the session is for, not by how many came meanwhile: the owner's list above asks each
+	// machine for its card behind the answer (refreshCards), and that asks the machine for the owner's session.
+	n := 0
+	for _, c := range f.a.Calls("runtime.session") {
+		if c.Str("subject") == "stranger@example.com" {
+			n++
+		}
+	}
+	if n != 0 {
 		t.Errorf("%d runtime sessions were asked for a stranger", n)
 	}
 }

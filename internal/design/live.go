@@ -40,12 +40,39 @@ type liveState struct {
 	states    map[string]DesignState
 	listeners map[string]map[int]func(Control)
 	next      int
+	// pending is a command for a design no page showed when it came: the page that opens it within
+	// PendingControlFor gets it, once.
+	pending map[string]pendingControl
 }
+
+type pendingControl struct {
+	c  Control
+	at time.Time
+}
+
+// PendingControlFor is how long a command waits for a page of its design; PendingControlDelay lets the page that
+// came list its boards before it is told which to show.
+const (
+	PendingControlFor   = 10 * time.Minute
+	PendingControlDelay = 1500 * time.Millisecond
+)
 
 func (s *liveState) init() {
 	s.logs = map[string][]LiveLogEntry{}
 	s.states = map[string]DesignState{}
 	s.listeners = map[string]map[int]func(Control){}
+	s.pending = map[string]pendingControl{}
+}
+
+// QueueControl keeps a command for the next page of the design that opens (the pane asked to show it a moment ago).
+func (l *Library) QueueControl(ref string, c Control) {
+	s := &l.live
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.pending == nil {
+		s.pending = map[string]pendingControl{}
+	}
+	s.pending[ref] = pendingControl{c: c, at: time.Now()}
 }
 
 var liveLogKinds = map[string]bool{"error": true, "rejection": true, "longtask": true, "slow": true}
@@ -164,6 +191,19 @@ func (l *Library) OnControl(ref string, fn func(Control)) func() {
 		s.listeners[ref] = map[int]func(Control){}
 	}
 	s.listeners[ref][id] = fn
+	if p, ok := s.pending[ref]; ok {
+		delete(s.pending, ref)
+		if time.Since(p.at) < PendingControlFor {
+			time.AfterFunc(PendingControlDelay, func() {
+				s.mu.Lock()
+				_, still := s.listeners[ref][id]
+				s.mu.Unlock()
+				if still {
+					fn(p.c)
+				}
+			})
+		}
+	}
 	return func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -205,4 +245,12 @@ func controlJSON(c Control) []byte {
 		o.Set("props", c.Props)
 	}
 	return jsvalue.Stringify(o, "")
+}
+
+// HasPages says whether a page of the design is open now (it hears the agents' commands).
+func (l *Library) HasPages(ref string) bool {
+	s := &l.live
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.listeners[ref]) > 0
 }

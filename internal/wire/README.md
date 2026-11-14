@@ -809,3 +809,13 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
     starts gathering when a page first asks for its snapshot. A runtime that does not gather it (an older one, or
     `RUNTIME_PANE_FEED=0`) sends no `pane`; only then does the page read the conversation for its pane by itself, over
     the Legacy timeline socket. No feature names it: a snapshot with `pane` is the sign.
+72. **Tasks and commits among what a turn made.** `Turn.outputs` may hold `{kind: task}` (a task of the
+    tracker the agent showed: `harnessly open HRN-1` or the task's address; `ref` is the task's address, `title` its
+    key) and `{kind: commit}` (a commit of GitLab or GitHub; `ref` its address, `title` «project sha»). Only a page
+    that names the cap (`?caps=links` on the socket and on `GET …/turns`) gets them: any other page gets the turn
+    without them. The card's live title and state come from `GET /api/platform/link-meta?url=`, which reads, besides a
+    task and a merge request (now with `pipeline: {status, url}` when it has one), a commit
+    (`{kind: commit, title, sha, project, pipeline}`) and a feature stand under the stands' domain
+    (`{kind: stand, up, title}`: a redirect to a sign-in is up, no answer or a 5xx is down). Which addresses are
+    stands, the tracker, GitLab, documents and boards is the organization's word when the hub sends it
+    (`env.set` `links`, hubproto.LinkSettings), the machine's environment otherwise.

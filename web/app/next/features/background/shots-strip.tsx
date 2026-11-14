@@ -23,6 +23,9 @@ export interface IShotsStripProps {
   /** Where a picture's bytes are. */
   srcOf: (shot: Shot) => string;
   now: number;
+  /** Drawn in place of another chat's pictures (a change of chat): a skeleton stands at once while they come, so the
+   *  column keeps its height instead of shrinking and growing back. */
+  instant?: boolean;
 }
 
 const who = (shot: Shot): string => shot.agent ?? t('next.shots.byAgent');
@@ -115,14 +118,15 @@ const ShotsList = ({
 
 const NONE: readonly Shot[] = [];
 
-const ShotsStrip = ({ shots, srcOf, now }: IShotsStripProps) => {
+const ShotsStrip = ({ shots, srcOf, now, instant = false }: IShotsStripProps) => {
+  const [atOnce] = useState(instant);
   const has = shots !== null && shots.length > 0;
   // The last pictures stay on screen while the section leaves.
   const { value, state } = usePresence(has ? shots : null, EXIT_MS);
   const loading = shots === null;
   // A skeleton only for a snapshot that is slow; a fast one shows nothing before the squares.
   const waited = useDelayed(loading);
-  if (loading ? !waited : !value) return null;
+  if (loading ? !(waited || atOnce) : !value) return null;
   return (
     <section className="hx-shots" data-state={state} aria-label={t('next.shots.title')}>
       <div className="hx-shots__clip">

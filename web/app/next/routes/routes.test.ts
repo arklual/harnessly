@@ -16,6 +16,20 @@ describe('routes', () => {
     });
   });
 
+  it('reads a ChatGPT chat, on its machine or the open one, and writes it back the same', () => {
+    const id = '0123456789abcdef01';
+    expect(parseRoute(`/chatgpt/${id}`)).toEqual({ kind: ROUTE.chatgpt, id });
+    expect(parseRoute(`/chatgpt/${id}/?m=runner-2`)).toEqual({
+      kind: ROUTE.chatgpt,
+      id,
+      machine: 'runner-2',
+    });
+    expect(routePath({ kind: ROUTE.chatgpt, id, machine: 'runner-2' })).toBe(`/chatgpt/${id}?m=runner-2`);
+    expect(routePath({ kind: ROUTE.chatgpt, id })).toBe(`/chatgpt/${id}`);
+    expect(placeKeyOf(`/chatgpt/${id}?m=runner-2`)).toBe(`chatgpt:${id}`);
+    expect(parseRoute('/chatgpt/not-an-id')).toEqual(HOME);
+  });
+
   it('reads the screens of «More» and writes them back the same', () => {
     expect(parseRoute('/manage/')).toEqual({ kind: ROUTE.manage });
     expect(routePath({ kind: ROUTE.manage })).toBe('/manage');
@@ -139,6 +153,17 @@ describe('routes', () => {
     expect(routePath({ kind: ROUTE.videoNew })).toBe('/designly/new/video');
     expect(placeKeyOf('/designly/new/video')).toBe('videoNew');
     expect(parseRoute('/designly/abc?chat=tab-7')).toEqual({ kind: ROUTE.site, id: 'abc', chat: 'tab-7' });
+    // The page on screen is the address's `?page=`: a deep link, Back and Forward; it does not make a new place.
+    expect(routePath({ kind: ROUTE.site, id: 'abc', edit: true, page: 'Оплата.dc.html' })).toBe(
+      '/designly/abc?edit=1&page=%D0%9E%D0%BF%D0%BB%D0%B0%D1%82%D0%B0.dc.html',
+    );
+    expect(parseRoute('/designly/abc?edit=1&page=%D0%9E%D0%BF%D0%BB%D0%B0%D1%82%D0%B0.dc.html')).toEqual({
+      kind: ROUTE.site,
+      id: 'abc',
+      edit: true,
+      page: 'Оплата.dc.html',
+    });
+    expect(placeKeyOf('/designly/abc?page=x.dc.html')).toBe('design:abc');
     expect(routePath({ kind: ROUTE.site, id: 'abc', chat: 'agent:r:tab-1' })).toBe(
       '/designly/abc?chat=agent%3Ar%3Atab-1',
     );
@@ -196,6 +221,8 @@ describe('placeKeyOf', () => {
     expect(placeKeyOf('/design/afisha/?page=2&board=b')).toBe('design:afisha');
     expect(placeKeyOf('/designly/afisha?access=people')).toBe('design:afisha');
     expect(placeKeyOf('/designly/afisha?chat=tab-1&page=2')).toBe('design:afisha+chat:tab-1');
+    // Edited with its chat, the design is the chat's place: one tab for both.
+    expect(placeKeyOf('/designly/afisha?chat=tab-1&edit=1&page=2')).toBe(placeKeyOf('/c/tab-1'));
     expect(placeKeyOf('/designly/afisha?chat=tab-2')).not.toBe(placeKeyOf('/designly/afisha?chat=tab-1'));
   });
 

@@ -5,6 +5,7 @@
 // the person's last words as one message.
 import {
   useEffect,
+  useRef,
   useLayoutEffect,
   useMemo,
   useState,
@@ -25,6 +26,7 @@ import type { ILayerMarks, NotesLayer } from '@/next/features/review/app/notes-l
 import type { IReviewNotesApi } from '@/next/features/review/app/use-review-notes';
 import { LINE_SIDE, type IFileContent, type IReviewFile, type TLineSide } from '@/next/features/review/model';
 import { Button, RoundButton } from '@/next/ui/button';
+import { CardReply } from '@/next/bindings/reply-field';
 import Icon from '@/next/ui/icon';
 import { useLeavingList, usePresence } from '@/next/ui/presence';
 import { toast } from '@/next/ui/toast';
@@ -198,6 +200,8 @@ export const Composer = ({
   placeholder = t('next.reviewApp.notes.placeholder'),
 }: IComposerProps) => {
   const [busy, setBusy] = useState(false);
+  const field = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => field.current?.focus(), []);
   const keep = () => {
     if (!text.trim() || busy) return;
     setBusy(true);
@@ -211,27 +215,28 @@ export const Composer = ({
           {pick.side === LINE_SIDE.before && ` · ${t('next.reviewApp.notes.oldVersion')}`}
         </span>
       </div>
-      <textarea
-        className="hx-rvnote__field"
+      {/* The chat's own field (HRN-1362): Enter asks the agent at once where one stands by, else keeps the remark. */}
+      <CardReply
         value={text}
-        autoFocus
-        rows={3}
+        onChange={onText}
+        busy={busy}
         placeholder={placeholder}
-        aria-label={placeholder}
-        onChange={(event) => onText(event.target.value)}
-        onKeyDown={(event) => submitKeys(event, keep, onCancel)}
+        onSend={() => (onAsk ? text.trim() && onAsk() : keep())}
+        onEscape={onCancel}
+        inputRef={field}
+        sendLabel={onAsk ? t('next.reviewApp.notes.ask') : keepLabel}
       />
       <div className="hx-rvnote__actions">
-        <span className="hx-rvnote__hint">{t('next.reviewApp.notes.keys')}</span>
         <Button size="sm" variant="ghost" onClick={onCancel}>
           {t('next.reviewApp.notes.cancel')}
         </Button>
-        {onAsk && (
-          <Button size="sm" icon="message-square" disabled={!text.trim()} onClick={onAsk}>
-            {t('next.reviewApp.notes.ask')}
-          </Button>
-        )}
-        <Button size="sm" variant="primary" busy={busy} disabled={!text.trim()} onClick={keep}>
+        <Button
+          size="sm"
+          variant={onAsk ? 'default' : 'primary'}
+          busy={busy}
+          disabled={!text.trim()}
+          onClick={keep}
+        >
           {keepLabel}
         </Button>
       </div>

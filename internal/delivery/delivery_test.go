@@ -126,3 +126,47 @@ func TestAZipListsItsFilesAndGivesOneOut(t *testing.T) {
 		t.Fatalf("outside: %d", w.Code)
 	}
 }
+
+func TestAFolderIsHandedOverAsOneZipWithoutItsSecrets(t *testing.T) {
+	root := t.TempDir()
+	PackDir = filepath.Join(root, ".packed")
+	a := files.NewAccess([]string{root}, nil)
+	site := filepath.Join(root, "сайт")
+	if err := os.MkdirAll(filepath.Join(site, "img"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{"index.html": "<h1>hi</h1>", "img/a.png": "png", ".env": "K=v"} {
+		if err := os.WriteFile(filepath.Join(site, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	info, refusal := Describe(a, site, "")
+	if refusal != nil {
+		t.Fatal(refusal)
+	}
+	if info.Name != "сайт.zip" || info.Mime != "application/zip" || !strings.HasPrefix(info.Path, PackDir) || info.Size == 0 {
+		t.Fatalf("%+v", info)
+	}
+	zr, err := zip.OpenReader(info.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zr.Close()
+	names := map[string]bool{}
+	for _, f := range zr.File {
+		names[f.Name] = true
+	}
+	if !names["сайт/index.html"] || !names["сайт/img/a.png"] || names["сайт/.env"] {
+		t.Fatalf("%v", names)
+	}
+}
+
+func TestEveryCommonTypeHasItsMime(t *testing.T) {
+	for name, want := range map[string]string{"a.html": "text/html", "a.zip": "application/zip", "a.pdf": "application/pdf",
+		"a.PNG": "image/png", "a.md": "text/markdown", "a.csv": "text/csv", "a.xml": "application/xml", "a.bin": "application/octet-stream",
+		"a.docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"} {
+		if got := MimeOf(name); got != want {
+			t.Fatalf("%s: %s", name, got)
+		}
+	}
+}

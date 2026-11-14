@@ -12,3 +12,6 @@
 web/e2e-hub-report/
 web/e2e-hub-results/
 /hub
+
+# tools/ci/local-checks.sh (HRN-1448)
+/.local-checks/

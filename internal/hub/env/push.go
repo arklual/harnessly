@@ -211,6 +211,8 @@ func (p *Pusher) Connected(machineID string, hello hubproto.Hello) {
 		Providers: p.setup[machineID] && slices.Contains(hello.Features, hubproto.FeatureEnvProviders),
 		// The rule for apps does not need the setup: the runtime reads it from the list's file.
 		AppsConsent: slices.Contains(hello.Features, hubproto.FeatureEnvAppsConsent),
+		// The links, like the rule, are read by the runtime from the list's file.
+		Links: slices.Contains(hello.Features, hubproto.FeatureEnvLinks),
 	}
 	if slices.Contains(hello.Features, hubproto.FeatureEnvironment) {
 		p.held[machineID] = hello.EnvHash
@@ -375,7 +377,8 @@ func (p *Pusher) pushOne(ctx context.Context, st store.Store, machineID string, 
 	p.mu.Unlock()
 	items := MachineItems(w, sp.ID, m.TeamID, m.CreatedBy, setup, ex)
 	consent := AppsConsentFor(w.org, ex)
-	hash := hubproto.EnvSetHash(hubproto.EnvHash(items), consent)
+	links := LinksFor(w.org, ex)
+	hash := hubproto.EnvSetHashWith(hubproto.EnvHash(items), consent, links)
 	if !ok || held == hash {
 		return nil
 	}
@@ -383,7 +386,7 @@ func (p *Pusher) pushOne(ctx context.Context, st store.Store, machineID string, 
 	if err != nil && !store.IsNotFound(err) {
 		return err
 	}
-	if last.SentRev == 0 && held == "" && len(items) == 0 && consent == "" {
+	if last.SentRev == 0 && held == "" && len(items) == 0 && consent == "" && links.Empty() {
 		return nil // nothing was ever put in, and the machine holds nothing
 	}
 	rev := last.SentRev
@@ -391,7 +394,7 @@ func (p *Pusher) pushOne(ctx context.Context, st store.Store, machineID string, 
 		rev++
 	}
 	var res hubproto.EnvState
-	if err := p.reg.DoInto(ctx, machineID, hubproto.OpEnvSet, hubproto.EnvSet{Rev: rev, Hash: hash, Items: items, AppsConsent: consent}, &res, 30*time.Second); err != nil {
+	if err := p.reg.DoInto(ctx, machineID, hubproto.OpEnvSet, hubproto.EnvSet{Rev: rev, Hash: hash, Items: items, AppsConsent: consent, Links: links}, &res, 30*time.Second); err != nil {
 		return err
 	}
 	if err := st.SaveEnvSent(ctx, machineID, rev, hash, p.now()); err != nil {
@@ -415,10 +418,12 @@ type Extra struct {
 	AppsConsent bool
 	// Providers: the machine keeps the environment's model providers (hubproto.FeatureEnvProviders).
 	Providers bool
+	// Links: the machine keeps the organization's integrations for the chat's links (hubproto.FeatureEnvLinks).
+	Links bool
 }
 
 // All is every kind: a list as the newest agent would hold it.
-var All = Extra{Claude: true, Apps: true, Packs: true, AppsConsent: true}
+var All = Extra{Claude: true, Apps: true, Packs: true, AppsConsent: true, Links: true}
 
 // AppsConsentFor is the rule for apps a machine is sent: hubproto.AppsConsentAuto when the organization gives apps their
 // rights without asking and the machine keeps the rule, else "" (ask: the field is not sent, and the hash is the
@@ -428,6 +433,16 @@ func AppsConsentFor(o store.Org, ex Extra) string {
 		return hubproto.AppsConsentAuto
 	}
 	return ""
+}
+
+// LinksFor are the integrations a machine is sent: the organization's, when it named any and the machine keeps them
+// (hubproto.FeatureEnvLinks), else nil (the field is not sent, and the hash is as an older agent checks it).
+func LinksFor(o store.Org, ex Extra) *hubproto.LinkSettings {
+	if !ex.Links || o.Links.Empty() {
+		return nil
+	}
+	l := o.Links
+	return &l
 }
 
 // ExtraOf says which extra kinds a machine does.

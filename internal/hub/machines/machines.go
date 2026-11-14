@@ -53,6 +53,8 @@ type Deps struct {
 	Env EnvSink
 	// Design keeps the machines' design access (internal/hub/designaccess); nil: off.
 	Design DesignSink
+	// Projects keeps the machines' registry of projects; nil: the hub takes none.
+	Projects ProjectsSink
 	// Docs answers the machines' doc.publish and doc.acl (internal/hub/docs); nil: nobody answers.
 	Docs DocsSink
 	// Proposals answers the machines' env.propose; nil: nobody answers.
@@ -111,6 +113,11 @@ type DesignSink interface {
 	Event(m store.Machine, e hubproto.DesignEvent)
 }
 
+// ProjectsSink keeps the registry of a machine's projects (internal/hub/projreg).
+type ProjectsSink interface {
+	Event(m store.Machine, e hubproto.ProjectsEvent)
+}
+
 // BudgetSink is what keeps a machine's limit list current (internal/hub/limits).
 type BudgetSink interface {
 	Connected(machineID string, hello hubproto.Hello)
@@ -140,6 +147,7 @@ type Service struct {
 	budget    BudgetSink
 	env       EnvSink
 	design    DesignSink
+	projects  ProjectsSink
 	docs      DocsSink
 	proposals EnvProposals
 	// automations takes the report of a conversation an automation run started (nil: automations are off).
@@ -167,7 +175,7 @@ type Service struct {
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget, env: d.Env, design: d.Design, docs: d.Docs, proposals: d.Proposals, automations: d.Automations, history: d.History, prov: d.Provider, pub: d.Publisher, gate: d.Features, notice: d.Notice}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget, env: d.Env, design: d.Design, projects: d.Projects, docs: d.Docs, proposals: d.Proposals, automations: d.Automations, history: d.History, prov: d.Provider, pub: d.Publisher, gate: d.Features, notice: d.Notice}
 	s.res.init()
 	if s.now == nil {
 		s.now = time.Now

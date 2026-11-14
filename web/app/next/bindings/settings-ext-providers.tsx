@@ -2,6 +2,7 @@
 // opens and changes only from the machine's answers. Adding a provider first checks its address and key, and the
 // models the check found are kept with it.
 import { useMachineLimits } from '@/next/bindings/use-limits';
+import { useAccountSpend } from '@/next/bindings/use-account-spend';
 import { useCallback, useEffect, useState } from 'react';
 import { refusalOf } from '@/next/bindings/settings-changes';
 import {
@@ -63,6 +64,7 @@ export const ExtProvidersPage = ({ machine }: { machine: MachineId }) => {
   const [edits, setEdits] = useState(0);
   const usage = useUsage(machine, edits);
   const limits = useMachineLimits(machine);
+  const spend = useAccountSpend(machine);
 
   useEffect(() => {
     let live = true;
@@ -199,6 +201,7 @@ export const ExtProvidersPage = ({ machine }: { machine: MachineId }) => {
     <ExtProvidersSection
       state={state}
       limits={limits}
+      spend={spend}
       usage={usage}
       onAdd={onAdd}
       onSave={onSave}

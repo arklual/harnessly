@@ -54,7 +54,8 @@
   width: 60%;
   height: 10px;
   border-radius: var(--hx-radius-sm);
-  background: var(--hx-bg-raised);
+  /* The hover ground: the raised one is the page's own white in the light theme, so the bars did not show. */
+  background: var(--hx-bg-hover);
   animation: hx-appview-pulse 1.4s ease-in-out infinite;
 }
 .hx-appview__skeleton-bar:last-child {
@@ -354,4 +355,58 @@
 }
 .hx-appdown .hx-btn {
   margin-top: var(--hx-space-3);
+}
+/* A space's skeleton (boards, documents; HRN-1391): its list as tiles, or an open sheet, in the view's place. */
+.hx-spacewait {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-4);
+  width: 100%;
+  height: 100%;
+}
+.hx-spacewait__page {
+  height: 100%;
+}
+.hx-spacewait__line,
+.hx-spacewait__tile,
+.hx-spacewait__sheet {
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-hover);
+  animation: hx-appview-pulse 1.4s ease-in-out infinite;
+}
+.hx-spacewait__line {
+  width: 40%;
+  height: 12px;
+}
+.hx-spacewait__line + .hx-spacewait__line {
+  width: 24%;
+}
+.hx-spacewait__tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--hx-space-4);
+}
+.hx-spacewait__tile {
+  aspect-ratio: 4 / 3;
+}
+.hx-spacewait__sheet {
+  flex: 1;
+  min-height: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-spacewait__line,
+  .hx-spacewait__tile,
+  .hx-spacewait__sheet {
+    animation: none;
+  }
+}
+/* A kept browser tab of the pane (kept-frames.tsx): its bar and page fill the place it stands over. */
+.hx-keptframe--browser > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+/* The place of a kept browser tab: the pane's body is a block, and the tab takes its whole height, as it did in it. */
+.hx-keptslot--browser {
+  height: 100%;
 }

@@ -48,7 +48,7 @@ func (c *counted) set(fn func()) {
 	fn()
 }
 
-func newCounted(t *testing.T) *counted {
+func newCounted(t testing.TB) *counted {
 	t.Helper()
 	c := &counted{hits: map[string]int{}}
 	srvStore, err := filestore.OpenFolder(filepath.Join(t.TempDir(), "hub"), func(r *http.Request, coll string) (filestore.Access, error) {
@@ -91,12 +91,12 @@ func newCounted(t *testing.T) *counted {
 	return c
 }
 
-func (c *counted) agent(t *testing.T, group func(string) string) (*Agent, string) {
+func (c *counted) agent(t testing.TB, group func(string) string) (*Agent, string) {
 	t.Helper()
 	return c.agentAs(t, tokenA, group)
 }
 
-func (c *counted) agentAs(t *testing.T, token string, group func(string) string) (*Agent, string) {
+func (c *counted) agentAs(t testing.TB, token string, group func(string) string) (*Agent, string) {
 	t.Helper()
 	dir := t.TempDir()
 	root := filepath.Join(dir, "root")

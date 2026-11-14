@@ -804,7 +804,7 @@ func (s *Service) guestApp(w http.ResponseWriter, r *http.Request, g guestReq) e
 	h := w.Header()
 	baseHeaders(h)
 	h.Set("Content-Type", safeType(res.Header.Get("Content-Type")))
-	h.Set("Cross-Origin-Resource-Policy", "same-origin")
+	h.Set("Cross-Origin-Resource-Policy", sandboxCORP(r))
 	h.Set("Content-Security-Policy", "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; sandbox")
 	if segs[0] == "assets" && strings.Contains(res.Header.Get("Cache-Control"), "immutable") {
 		h.Set("Cache-Control", "public, max-age=31536000, immutable")

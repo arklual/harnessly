@@ -15,6 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/history"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
+	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
 // The workspace's chat history from the hub's copy (docs/hub/history.md): what a cluster's gateway answers
@@ -241,7 +242,7 @@ func (s *Service) serveHistory(w http.ResponseWriter, r *http.Request, p *auth.P
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{
 			"machine": state[page.MachineID], "machineId": page.MachineID,
 			"conversation": withMachine(page.Conversation, page.MachineID),
-			"turns":        page.Turns, "entries": page.Entries, "beforeTurnId": page.BeforeTurnID,
+			"turns":        history.TurnsFor(page.Turns, wire.CapsOf(r).Links), "entries": page.Entries, "beforeTurnId": page.BeforeTurnID,
 		})
 	case len(parts) == 2 && parts[1] == "work":
 		// The work of the chat and of the chats it delegated, on any of the person's machines (open or closed chats).
@@ -304,7 +305,7 @@ func (s *Service) serveHistory(w http.ResponseWriter, r *http.Request, p *auth.P
 			s.fail(w, r, err)
 			return
 		}
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"turns": page.Turns, "entries": page.Entries, "beforeTurnId": nil})
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"turns": history.TurnsFor(page.Turns, wire.CapsOf(r).Links), "entries": page.Entries, "beforeTurnId": nil})
 	default:
 		httpx.WriteError(w, r, httpx.ErrNotFound)
 	}

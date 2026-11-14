@@ -1,10 +1,11 @@
 // The list of a design's pages that opens from the pane's pager: a search where there are many pages, a row
-// per page with its icon, name and path as a muted word, the current page ticked, the arrows moving the highlight
-// and Enter going there. On the phone it is a sheet like the bar's menus. It opens from the pager under the page
+// per page with its icon and its whole name (wrapped, never cut), the file under it only where it differs from the
+// name, the current page lit, the page's actions over the row's end on hover or focus, the arrows moving the
+// highlight and Enter going there. On the phone it is a sheet like the bar's menus. It opens from the pager under the page
 // (above it) and from the address bar (below it); either way it is no taller than the window leaves it.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ISitePage } from '@/next/features/designly/site-view';
-import { pagesFound, rowAfter, SEARCH_FROM } from '@/next/features/designly/page-pick';
+import { pageFileNote, pagesFound, rowAfter, SEARCH_FROM } from '@/next/features/designly/page-pick';
 import Icon from '@/next/ui/icon';
 import { SheetGrip } from '@/next/ui/sheet';
 import { t } from '@/next/i18n';
@@ -134,40 +135,40 @@ const PagePicker = ({
       )}
       <div className="hx-pgpick__list" role="listbox" aria-label={t('next.site.pages')}>
         {found.map((p, i) => {
-          const option = (
-            <button
-              key={p.path}
-              type="button"
-              role="option"
-              tabIndex={-1}
-              className="hx-pgpick__row"
-              aria-selected={p.path === path}
-              data-active={i === row}
-              onMouseMove={() => i !== row && setAt(i)}
-              onClick={() => onGo(p.path)}
-            >
-              <span className="hx-pgpick__ic">
-                <Icon name="file-text" size="sm" />
-              </span>
-              <span className="hx-pgpick__name">{p.name}</span>
-              <span className="hx-pgpick__meta">{p.path}</span>
-              <Icon name="check" size="sm" className="hx-pgpick__check" />
-            </button>
-          );
-          if (!onSave) return option;
+          const note = pageFileNote(p);
           return (
-            <div key={p.path} className="hx-pgpick__item">
-              {option}
+            <div key={p.path} className="hx-pgpick__item" data-active={i === row}>
               <button
                 type="button"
+                role="option"
                 tabIndex={-1}
-                className="hx-head-btn hx-pgpick__dl"
-                aria-label={saveLabel?.(p)}
-                title={saveLabel?.(p)}
-                onClick={(event) => onSave(p.path, event.currentTarget.getBoundingClientRect())}
+                className="hx-pgpick__row"
+                aria-selected={p.path === path}
+                data-active={i === row}
+                onMouseMove={() => i !== row && setAt(i)}
+                onClick={() => onGo(p.path)}
               >
-                <Icon name="download" size="sm" />
+                <span className="hx-pgpick__ic">
+                  <Icon name="file-text" size="sm" />
+                </span>
+                <span className="hx-pgpick__text">
+                  <span className="hx-pgpick__name">{p.name}</span>
+                  {note !== null && <span className="hx-pgpick__meta">{note}</span>}
+                </span>
               </button>
+              {onSave && (
+                <span className="hx-pgpick__acts">
+                  <button
+                    type="button"
+                    className="hx-head-btn hx-pgpick__dl"
+                    aria-label={saveLabel?.(p)}
+                    title={saveLabel?.(p)}
+                    onClick={(event) => onSave(p.path, event.currentTarget.getBoundingClientRect())}
+                  >
+                    <Icon name="download" size="sm" />
+                  </button>
+                </span>
+              )}
             </div>
           );
         })}

@@ -112,8 +112,10 @@ const (
 	KindResume = "resume"
 )
 
+// (KindSystems, KindVideos and KindDecks, the entity records, are in records.go.)
+
 // Kinds are the collection kinds a hub serves, in a stable order.
-var Kinds = []string{KindDesign, KindUploads, KindFiles, KindHandoff, KindApps, KindKits, KindProfile, KindResume}
+var Kinds = []string{KindDesign, KindUploads, KindFiles, KindHandoff, KindApps, KindKits, KindProfile, KindResume, KindSystems, KindVideos, KindDecks, KindProjects, KindCovers}
 
 // KnownKind tells whether a collection kind is one the hub serves.
 func KnownKind(kind string) bool {
@@ -133,6 +135,14 @@ func PolicyFor(room string) Policy {
 	}
 	if room == KindKits || strings.HasPrefix(room, KindKits+"-") {
 		return Kits{}
+	}
+	for _, k := range RecordKinds {
+		if room == k || strings.HasPrefix(room, k+"-") {
+			return Records{}
+		}
+	}
+	if room == KindCovers || strings.HasPrefix(room, KindCovers+"-") {
+		return Covers{}
 	}
 	if room == KindProfile || strings.HasPrefix(room, KindProfile+"-") {
 		return Profile{}

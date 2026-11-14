@@ -98,10 +98,18 @@ func (f *fakeTmux) set(session string, pane tmux.PaneInfo) {
 	f.panes[session] = pane
 }
 
-type fakeProcs struct{}
+// fakeProcs: each process has one child, pid+1; blocked holds the pids a look cannot read (a hung NFS read).
+type fakeProcs struct{ blocked *sync.Map }
 
 func (fakeProcs) Children(pid int) []int       { return []int{pid + 1} }
 func (fakeProcs) ListeningPorts(pid int) []int { return nil }
+func (f fakeProcs) Unreadable(pid int) bool {
+	if f.blocked == nil {
+		return false
+	}
+	_, ok := f.blocked.Load(pid)
+	return ok
+}
 
 type fakeProvider struct {
 	mu       sync.Mutex
@@ -206,6 +214,7 @@ type env struct {
 	hist   *history.Store
 	dir    string
 	cancel context.CancelFunc
+	procs  fakeProcs
 }
 
 const session = "tk-ws1-p1-t1"
@@ -221,12 +230,13 @@ func newEnv(t *testing.T, tab Tab, pane *tmux.PaneInfo) *env {
 	lay := &fakeLayouts{ws: []Workspace{{ID: "ws1", Name: "One", Directories: []string{"/srv/app"}}}, tabs: map[string][]Tab{"ws1": {tab}}}
 	rec := &recorder{}
 	hist := &history.Store{File: filepath.Join(dir, "session-history.json")}
-	m := New(Deps{Layouts: lay, Tmux: tm, Procs: fakeProcs{}, Providers: map[string]Provider{agents.Claude: claude}, History: hist,
+	procs := fakeProcs{blocked: &sync.Map{}}
+	m := New(Deps{Layouts: lay, Tmux: tm, Procs: procs, Providers: map[string]Provider{agents.Claude: claude}, History: hist,
 		NewID: func() string { return "hid" }}, rec)
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	m.Start(ctx)
-	return &env{m: m, rec: rec, tm: tm, claude: claude, lay: lay, hist: hist, dir: dir, cancel: cancel}
+	return &env{m: m, rec: rec, tm: tm, claude: claude, lay: lay, hist: hist, dir: dir, cancel: cancel, procs: procs}
 }
 
 func claudeTab(state string) Tab {

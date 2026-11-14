@@ -443,3 +443,19 @@ func TestRouterClassifierFallsToTheNextLightTarget(t *testing.T) {
 		t.Fatalf("journal: %s", j)
 	}
 }
+
+// a refusal the CLI cannot get past is passed on with X-Should-Retry: false, a throttle is not.
+func TestRouterTellsTheCLINotToRetryARefusal(t *testing.T) {
+	rig := newRouterRig(t, "glm")
+	rig.vendors["glm"].status = http.StatusForbidden
+	res, _ := rig.post(t, turnBody)
+	if res.StatusCode != http.StatusForbidden || res.Header.Get("X-Should-Retry") != "false" {
+		t.Fatalf("403: %d %q", res.StatusCode, res.Header.Get("X-Should-Retry"))
+	}
+	rig = newRouterRig(t, "glm")
+	rig.vendors["glm"].status = http.StatusTooManyRequests
+	res, _ = rig.post(t, turnBody)
+	if res.StatusCode != http.StatusTooManyRequests || res.Header.Get("X-Should-Retry") != "" {
+		t.Fatalf("429: %d %q", res.StatusCode, res.Header.Get("X-Should-Retry"))
+	}
+}

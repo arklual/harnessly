@@ -55,8 +55,8 @@ var (
 	parentOriginRe = regexp.MustCompile(`^https://[a-z0-9-]+(\.[a-z0-9-]+)*(:\d{1,5})?$`)
 	// localOriginRe is a standalone runtime's slot or page origin: http or https, a host, maybe a port.
 	localOriginRe = regexp.MustCompile(`^https?://(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$`)
-	// pathPrefixRe is a slot's path on the page's origin: the app base path's segments, then /__pv/<1–6>.
-	pathPrefixRe   = regexp.MustCompile(`^(?:/[A-Za-z0-9._~-]+)*/__pv/[1-6]-[0-9a-f]{32}$`)
+	// pathPrefixRe is a slot's path on the page's origin: the app base path's segments, then /__pv/<1–8> (ports 1–6, sites 7–8).
+	pathPrefixRe   = regexp.MustCompile(`^(?:/[A-Za-z0-9._~-]+)*/__pv/[1-8]-[0-9a-f]{32}$`)
 	targetOriginRe = regexp.MustCompile(`^https?://(?:[a-z0-9_-]+(?:\.[a-z0-9_-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$`)
 )
 
@@ -152,7 +152,7 @@ func parseClaim(payload *jsvalue.Object, local bool) (*Claim, bool) {
 	prefix := ""
 	if raw, present := payload.Get("pathPrefix"); present {
 		p, isString := raw.(string)
-		if !local || !isString || !pathPrefixRe.MatchString(p) || !strings.HasSuffix(slot, p) || target.Kind != "port" {
+		if !local || !isString || !pathPrefixRe.MatchString(p) || !strings.HasSuffix(slot, p) {
 			return nil, false
 		}
 		prefix = p

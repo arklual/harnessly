@@ -52,6 +52,7 @@ const CodexLoginRow = ({ machine, login, limits, reload }: ICodexLoginRowProps) 
       onRename={(name) => change(renameCodexLogin(machine, login.id, name))}
       onRemove={() => change(removeCodexLogin(machine, login.id))}
       onMain={(main) => change(setCodexLoginMain(machine, login.id, main))}
+      onLogout={flow.onLogout}
       left={
         limits !== null && login.account !== '' ? (
           <LimitsLine limits={profileLimitsOf(limits, login.profile)} />

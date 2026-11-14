@@ -51,7 +51,16 @@ interface IFrameBridgeArgs {
   onFailed: (failure: { status: number; text: string }) => void;
   /** The person clicked an element while picking (annotating): picking goes on. */
   onPicked: (picked: IFramePicked) => void;
+  /**
+   * The page asks the tab to load it again (`tk:reload`, a Sinopia board that changed past what it redraws in place). A
+   * page on an opaque origin (a slot by path) cannot reload itself past a proxy in front of the platform.
+   */
+  onReload?: () => void;
 }
+
+/** A page's ask to be loaded again. It carries nothing and does nothing but a reload, so the frame's window is enough. */
+export const asksReload = (data: unknown): boolean =>
+  typeof data === 'object' && data !== null && (data as { type?: unknown }).type === 'tk:reload';
 
 export const useFrameBridge = ({
   frame,
@@ -60,6 +69,7 @@ export const useFrameBridge = ({
   onRedirect,
   onFailed,
   onPicked,
+  onReload,
 }: IFrameBridgeArgs) => {
   // Null until the page's bridge says hello: a page without one cannot pick.
   const [picking, setPicking] = useState<boolean | null>(null);
@@ -74,6 +84,7 @@ export const useFrameBridge = ({
   const redirected = useEffectEvent((url: string): boolean => onRedirect(url));
   const picked = useEffectEvent((p: IFramePicked) => onPicked(p));
   const failed = useEffectEvent((failure: { status: number; text: string }) => onFailed(failure));
+  const reload = useEffectEvent(() => onReload?.());
   // The actions waiting for the frame's answer, and those waiting for the next page's hello.
   const acts = useRef(new Map<string, TWaiter>());
   const waitHello = useRef(new Set<() => void>());
@@ -90,7 +101,13 @@ export const useFrameBridge = ({
     if (origin === null) return;
     const onMessage = (event: MessageEvent) => {
       const known = frame.current?.contentWindow ?? null;
-      if (known === null || event.source !== known || event.origin !== origin) return;
+      if (known === null || event.source !== known) return;
+      // A board in a slot by path says `null` for its origin: its ask to reload is heard by the frame's window alone.
+      if (asksReload(event.data)) {
+        reload();
+        return;
+      }
+      if (event.origin !== origin) return;
       const message = readFrameMessage(event.data);
       if (!message) return;
       for (const waiter of [...waitKind.current]) if (waiter.kind === message.k) waiter.heard(message);

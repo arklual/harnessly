@@ -121,10 +121,14 @@ export type TBridgeMessage =
   /** The page is on its way: it has taken `resources` files so far. */
   | { k: 'progress'; state: TDocState; resources: number }
   | { k: 'lib-ready' }
+  /** The board changed past what it redraws in place and asks the host to reload its frame. */
+  | { k: 'reload' }
   /** The board's script saw the page drawn: its root filled, its fonts, pictures and videos in. */
   | { k: 'drawn' }
   | { k: 'tweaks'; controls: ITweak[] }
   | { k: 'tweaks-panel'; open: boolean }
+  /** The frame the board asks for (its `$preview`), told after a link opened it (page-link.ts); 0 × 0: it fills the window. */
+  | { k: 'frame'; w: number; h: number }
   | { k: 'picked'; picked: IPicked }
   | { k: 'pick-off' }
   /** The page applied the looks sent to it; `gone` are the numbers of blocks it no longer has. */
@@ -257,6 +261,7 @@ export const readBridgeMessage = (data: unknown): TBridgeMessage | null => {
   const m = data as Record<string, unknown>;
   if (m.type === 'tk:hello') return { k: 'hello' };
   if (m.type === 'tk:lib-ready') return { k: 'lib-ready' };
+  if (m.type === 'tk:reload') return { k: 'reload' };
   if (m.type === 'tk:drawn') return { k: 'drawn' };
   if (m.type === 'tk:images-hello') return { k: 'images-hello' };
   if (m.type === 'tk:image-act') {
@@ -269,6 +274,10 @@ export const readBridgeMessage = (data: unknown): TBridgeMessage | null => {
       ? { k: 'progress', state, resources: Math.max(0, Math.floor(m.resources)) }
       : null;
   }
+  if (m.type === 'tk:frame')
+    return isNum(m.w) && isNum(m.h)
+      ? { k: 'frame', w: Math.max(0, Math.min(MAX_COORD, m.w)), h: Math.max(0, Math.min(MAX_COORD, m.h)) }
+      : null;
   if (m.type === 'tk:tweaks-panel')
     return typeof m.open === 'boolean' ? { k: 'tweaks-panel', open: m.open } : null;
   if (m.type === 'tk:tweaks') {

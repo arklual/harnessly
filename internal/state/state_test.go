@@ -880,3 +880,18 @@ func TestRestoreSessionsLeavesOwnedSessionsToTheirOwner(t *testing.T) {
 		t.Fatalf("%d tabs left of 2", got)
 	}
 }
+
+// A tab's metadata given to AddTab is there from the tab's first write, with only the keys a merge may set.
+func TestAddTabWritesItsMetaAtOnce(t *testing.T) {
+	r := newRig(t)
+	r.writeLayout("ws-x", `{"root":{"type":"pane","id":"pane-a","tabs":[],"activeTabId":null},"activePaneId":"pane-a","updatedAt":"x"}`)
+	from := jsvalue.NewObject("app", "inbox", "label", "Inbox")
+	tab, err := r.s.AddTab("ws-x", "pane-a", TabOptions{Meta: jsvalue.NewObject("from", from, "secret", "no")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta := tabsOf(root(r.s.Layout("ws-x")))[0].Object("meta")
+	if meta == nil || meta.Object("from").String("app") != "inbox" || meta.Len() != 1 || tab.Object("meta") == nil {
+		t.Fatalf("meta %v", meta)
+	}
+}

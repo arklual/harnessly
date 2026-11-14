@@ -11,8 +11,9 @@ import { uploadSrc } from '@/next/commands/uploads';
 import ChatView, { type TChatOpeners } from '@/next/bindings/chat-view';
 import { openFileInChat } from '@/next/bindings/open-file-in-chat';
 import { keepLayout, keptLayout } from '@/next/features/designly/site-layout';
+import { openPlainOnce } from '@/next/features/designly/chat-place';
 import { noteLayoutKey } from '@/next/stores/chat-view';
-import type { IDockExtra } from '@/next/bindings/chat-dock';
+import ChatDock, { type IDockExtra } from '@/next/bindings/chat-dock';
 import { outgoingItem, useFeedItems } from '@/next/bindings/feed-items';
 import { useAgentLimits } from '@/next/bindings/use-limits';
 import { limitsOwnerOf } from '@/next/features/limits/model';
@@ -20,6 +21,7 @@ import { useStartChoice } from '@/next/bindings/use-start-choice';
 import { useUploads } from '@/next/bindings/use-uploads';
 import { useVoice } from '@/next/bindings/use-voice';
 import {
+  designBound,
   settleDesignCreating,
   startDesignConv,
   useDesignConv,
@@ -31,7 +33,7 @@ import { hub, useConversationChannel } from '@/next/core/realtime/hub';
 import Feed from '@/next/features/chat/feed';
 import type { FeedItem } from '@/next/features/chat/types';
 import type { IModelChoice, IPickerAgent } from '@/next/features/composer/agents';
-import Composer from '@/next/features/composer/composer';
+import ScreenField from '@/next/features/composer/one-field';
 import { ChatSwitch } from '@/next/features/designly/chat-switch';
 import { DESIGN_CONV, designChats, designKey, type TDesignConv } from '@/next/features/designly/design-conv';
 import { chatStatusOf } from '@/next/features/sidebar/status';
@@ -61,7 +63,6 @@ import {
 } from '@/next/features/designly/deck/chat-context';
 import { anchorItems } from '@/next/features/designly/note-anchor';
 import { itemsOf, NO_EDIT } from '@/next/features/designly/element-style';
-import { NoteChips } from '@/next/ui/notes/note-chips';
 import {
   NotePins,
   NotePopover,
@@ -216,15 +217,9 @@ interface INewChatProps {
   onFirst: (text: string, attachments: ReturnType<typeof useUploads>['ready']) => string | null;
 }
 
-/**
- * A design without a chat: the usual field with the model to start on, over a feed that is empty until the first
- * message, which stands there from the moment it is sent (pending → sent) while its chat is being made.
- */
-const NewDesignChat = ({ machine, draftKey, creating, start, extra, onFirst }: INewChatProps) => {
+/** The field of a design without a chat: the usual one with the model to start on; the first message makes the chat. */
+const NewDesignField = ({ machine, draftKey, creating, start, extra, onFirst }: INewChatProps) => {
   const enterSends = useEnterSends();
-  const me = useMe();
-  const connection = useConnection(machine);
-  const machineView = useMachine(machine);
   const draft = useDraft(draftKey);
   const text = draft?.text ?? '';
   const files = useMemo(() => draft?.attachments ?? [], [draft]);
@@ -236,9 +231,6 @@ const NewDesignChat = ({ machine, draftKey, creating, start, extra, onFirst }: I
   const voice = useVoice(machine, text, onChange);
   useTourFill(text, onChange);
   const limits = useAgentLimits(machine, limitsOwnerOf(start.choice));
-  const first = useMessage(creating?.clientId ?? null);
-  const items = useMemo(() => (first ? [outgoingItem(first)] : []), [first]);
-  const [openedAt] = useState(() => Date.now());
   const srcOf = useCallback((item: { id: string }) => uploadSrc(machine, item), [machine]);
 
   const onSubmit = () => {
@@ -260,6 +252,54 @@ const NewDesignChat = ({ machine, draftKey, creating, start, extra, onFirst }: I
 
   return (
     <AttachmentSrc.Provider value={srcOf}>
+      <ScreenField
+        enterSends={enterSends}
+        value={text}
+        onChange={onChange}
+        onSubmit={onSubmit}
+        mode="new"
+        onStop={done}
+        picker={
+          start.choice && {
+            value: start.choice,
+            agents: start.agents,
+            locked: false,
+            onChange: start.onPick,
+          }
+        }
+        quotes={extra.quotes}
+        onRemoveQuote={extra.onRemoveQuote}
+        noteGroups={extra.notes ? [extra.notes] : undefined}
+        tools={extra.tools}
+        placeholder={extra.placeholder}
+        attachments={uploads.attachments}
+        onFiles={uploads.onFiles}
+        onRemoveAttachment={uploads.onRemove}
+        onRetryAttachment={uploads.onRetry}
+        {...voice}
+        limits={limits}
+        maxText={limitsOf(machine).maxText}
+      />
+    </AttachmentSrc.Provider>
+  );
+};
+
+/**
+ * A design without a chat: the usual field with the model to start on, over a feed that is empty until the first
+ * message, which stands there from the moment it is sent (pending → sent) while its chat is being made.
+ */
+const NewDesignChat = (props: INewChatProps) => {
+  const { machine, creating } = props;
+  const me = useMe();
+  const connection = useConnection(machine);
+  const machineView = useMachine(machine);
+  const first = useMessage(creating?.clientId ?? null);
+  const items = useMemo(() => (first ? [outgoingItem(first)] : []), [first]);
+  const [openedAt] = useState(() => Date.now());
+  const srcOf = useCallback((item: { id: string }) => uploadSrc(machine, item), [machine]);
+
+  return (
+    <AttachmentSrc.Provider value={srcOf}>
       <Feed
         items={items}
         hasOlder={false}
@@ -273,40 +313,30 @@ const NewDesignChat = ({ machine, draftKey, creating, start, extra, onFirst }: I
         onRetryTurn={done}
         onRetryMessage={done}
         onDeleteMessage={done}
-        dock={
-          <Composer
-            enterSends={enterSends}
-            value={text}
-            onChange={onChange}
-            onSubmit={onSubmit}
-            mode="new"
-            onStop={done}
-            picker={
-              start.choice && {
-                value: start.choice,
-                agents: start.agents,
-                locked: false,
-                onChange: start.onPick,
-              }
-            }
-            quotes={extra.quotes}
-            onRemoveQuote={extra.onRemoveQuote}
-            noteGroups={extra.notes ? [extra.notes] : undefined}
-            tools={extra.tools}
-            placeholder={extra.placeholder}
-            attachments={uploads.attachments}
-            onFiles={uploads.onFiles}
-            onRemoveAttachment={uploads.onRemove}
-            onRetryAttachment={uploads.onRetry}
-            {...voice}
-            limits={limits}
-            maxText={limitsOf(machine).maxText}
-          />
-        }
+        dock={<NewDesignField {...props} />}
       />
     </AttachmentSrc.Provider>
   );
 };
+
+/**
+ * The folded chat's field over the site: the design's chat's own dock while it has one — the queue, «Now»,
+ * stop, the model —, before that the new design chat's field. The same one the open chat shows.
+ */
+const IslandField = ({
+  conv,
+  designDraft,
+  ...rest
+}: Omit<INewChatProps, 'draftKey'> & { conv: ConvId | null; designDraft: DraftKey }) =>
+  conv ? (
+    <div className="hx-dock" data-screen>
+      <ChatDock conv={conv} machine={rest.machine} extra={rest.extra} />
+    </div>
+  ) : (
+    <div className="hx-dock" data-screen>
+      <NewDesignField draftKey={designDraft} {...rest} />
+    </div>
+  );
 
 interface IDesignChatProps extends Omit<INewChatProps, 'draftKey'> {
   picked: TDesignConv;
@@ -398,7 +428,95 @@ export interface IStageOptions {
    * to `onCreated` (the app turns itself on in it).
    */
   app?: { address: TRoute; onCreated: (conv: ConvId) => void };
+  /**
+   * A space of the person's own (boards, documents; HRN-1391): the space takes the whole screen with the one field over
+   * it; the first words or `@harnessly` open the chat in a window over the space, rising from the field. No chat comes
+   * back by itself: a chat bound here before this page was opened is let go. Where the person puts the chat is kept
+   * for the whole app (`layoutKey`), not for each board.
+   */
+  space?: { layoutKey: string };
 }
+
+/** `@harnessly` in the field: the person calls the agent over the space. */
+export const MENTION_RE = /(^|\s)@harnessly\b/i;
+/** The mention at the start of the words is the call, not the request: the agent reads the rest. */
+export const withoutMention = (words: string): string => words.replace(/^\s*@harnessly\b[\s,:]*/i, '');
+
+interface IBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Where the window is placed: the section's box inside its padding, which is what the window's left and top count from
+ * (it measured from the outer box went past the section's edge by the padding).
+ */
+const placeBox = (el: HTMLElement | null) => {
+  if (!el) return null;
+  const box = el.getBoundingClientRect();
+  const cs = getComputedStyle(el);
+  const pad = (side: string) => parseFloat(cs.getPropertyValue(`padding-${side}`)) || 0;
+  const left = box.left + el.clientLeft + pad('left');
+  const top = box.top + el.clientTop + pad('top');
+  return {
+    left,
+    top,
+    width: el.clientWidth - pad('left') - pad('right'),
+    height: el.clientHeight - pad('top') - pad('bottom'),
+  };
+};
+
+/** A space's chat window before its first message: the head and the field with a context chip. */
+const QUIET_FLOAT_H = 212;
+
+/** The narrowest chat window beside a selection; less than this and it goes over the selection's edge. */
+const NARROW_FLOAT = 320;
+
+/**
+ * The window of a space's chat beside a selection (in the section's pixels): to its right where it fits, else to its
+ * left, else under or over it; always inside the section.
+ */
+export const nearFloat = (sel: IBox, section: { width: number; height: number }): IFloat => {
+  const { w, h } = fieldFloat(section);
+  const gap = 16;
+  const clampX = (x: number) => Math.min(Math.max(gap, x), Math.max(gap, section.width - w - gap));
+  const clampY = (y: number) => Math.min(Math.max(gap, y), Math.max(gap, section.height - h - gap));
+  if (sel.x + sel.w + gap + w <= section.width - gap)
+    return { x: sel.x + sel.w + gap, y: clampY(sel.y), w, h };
+  if (sel.x - gap - w >= gap) return { x: sel.x - gap - w, y: clampY(sel.y), w, h };
+  if (sel.y + sel.h + gap + h <= section.height - gap)
+    return { x: clampX(sel.x), y: sel.y + sel.h + gap, w, h };
+  if (sel.y - gap - h >= gap) return { x: clampX(sel.x), y: sel.y - gap - h, w, h };
+  // Nothing whole fits: a narrower window on the roomier side, never under the selection while it has room for one.
+  const right = section.width - gap - (sel.x + sel.w + gap);
+  const left = sel.x - gap - gap;
+  const room = Math.max(right, left);
+  if (room >= NARROW_FLOAT) {
+    const narrow = Math.min(w, room);
+    return { x: right >= left ? sel.x + sel.w + gap : sel.x - gap - narrow, y: clampY(sel.y), w: narrow, h };
+  }
+  return { x: clampX(sel.x), y: clampY(sel.y - gap - h), w, h };
+};
+
+/** The window of a space's chat: over the space, rising from the field at the bottom, at the middle. */
+export const fieldFloat = (section: { width: number; height: number }): IFloat => {
+  const w = Math.min(420, Math.max(280, section.width - 32));
+  const h = Math.max(280, Math.min(520, section.height - 200));
+  return {
+    x: Math.max(16, Math.round((section.width - w) / 2)),
+    y: Math.max(16, section.height - h - 132),
+    w,
+    h,
+  };
+};
+
+/**
+ * The chat each space was bound to when this page first opened it: it is not shown again. A chat made over
+ * the space in this page is another one, and stays with it.
+ */
+const letGo = new Map<string, string | null>();
 
 /** Everything the site view needs to show the chat beside it and the field over it. */
 export const useSiteStage = ({
@@ -414,9 +532,13 @@ export const useSiteStage = ({
   open,
   keep = false,
   app,
+  space,
 }: IStageOptions): ISiteStage => {
   const key = designKey(machine, design);
-  const current = useDesignConv(machine, design, fromChat, app?.address);
+  // A space opens without the chat bound to it before: that one was the chat the person happened to be in.
+  if (space && !letGo.has(key)) letGo.set(key, fromChat === null ? designBound(key) : null);
+  const layoutKey = space ? designKey(machine, space.layoutKey) : key;
+  const current = useDesignConv(machine, design, fromChat, app?.address, space ? letGo.get(key) : null);
   const { picked } = current;
   const machines = useMachines();
   const machineNames = useMemo(
@@ -449,10 +571,11 @@ export const useSiteStage = ({
   // Unless the person placed it by hand, the chat of a design being edited stands docked on the left, not over the
   // page: a place kept only because it was the old default does not count.
   const [kept] = useState(() => {
-    const layout = keep ? keptLayout(key) : null;
+    const layout = keep ? keptLayout(layoutKey) : null;
     return layout?.chosen ? layout : null;
   });
-  const [mode, setMode] = useState<TSiteMode>(kept?.mode ?? 'chat');
+  // A space: the one field over it until the person calls the agent.
+  const [mode, setMode] = useState<TSiteMode>(kept?.mode ?? (space ? 'island' : 'chat'));
   const [min, setMin] = useState(kept?.min ?? false);
   const [chosen, setChosen] = useState(kept !== null);
   const [float, setFloat] = useState<IFloat | null>(kept?.float ?? null);
@@ -460,14 +583,14 @@ export const useSiteStage = ({
   const [chatW, setChatW] = useState(kept?.chatW ?? CHAT_WIDTH);
   const [sview, setSview] = useState(false);
   // Where the chat stood open last: the folded one opens there again.
-  const [opened, setOpened] = useState<TSiteMode>(kept?.opened ?? 'chat');
+  const [opened, setOpened] = useState<TSiteMode>(kept?.opened ?? (space ? 'float' : 'chat'));
   // The chat of this screen keeps its place with the chat's view on the machine (stores/chat-view.ts).
   useEffect(() => {
     if (keep && convId) noteLayoutKey(convId, key);
   }, [keep, convId, key]);
   useEffect(() => {
-    if (keep) keepLayout(key, { mode, min, dock, chatW, float, opened, chosen });
-  }, [keep, key, mode, min, dock, chatW, float, opened, chosen]);
+    if (keep) keepLayout(layoutKey, { mode, min, dock, chatW, float, opened, chosen });
+  }, [keep, layoutKey, mode, min, dock, chatW, float, opened, chosen]);
 
   // One draft for the folded field and the open one: the chat's, or the design's own before it has a chat.
   const designDraft: DraftKey = `design:${key}`;
@@ -477,7 +600,6 @@ export const useSiteStage = ({
   const setText = (value: string) =>
     setDraft(draftKey, { text: value, attachments: draft?.attachments ?? [] });
   useTourFill(text, setText);
-  const voice = useVoice(machine, text, setText);
 
   const [notes, setNotes] = useState<INote[]>([]);
   // The blocks of the page on screen a picture is being drawn into.
@@ -498,12 +620,17 @@ export const useSiteStage = ({
   const running = conv?.state.k === 'working' || conv?.state.k === 'starting';
   if (running && !sawRun) setSawRun(true);
 
-  const openChatPage = () => convId && goTo({ kind: ROUTE.chat, id: convId });
+  // «Открыть чат»: the plain chat page, once; opened again from anywhere the chat is the design with it (chat-place.ts).
+  const openChatPage = () => {
+    if (!convId) return;
+    openPlainOnce(convId);
+    goTo({ kind: ROUTE.chat, id: convId });
+  };
   const status = statusOf(conv, now, sawRun, creating !== undefined);
 
   /** The typed words with the notes as the agent reads them. */
-  const wrap = (words: string) =>
-    withAnnotations(words, [
+  const wrap = (typed: string) =>
+    withAnnotations(space ? withoutMention(typed) : typed, [
       ...notes.map((note, i) =>
         formatAnnotation({
           n: i + 1,
@@ -540,6 +667,10 @@ export const useSiteStage = ({
     });
   };
 
+  // A space's window with no message yet is only its head and field, over the space rather than across it; the first
+  // message grows it to its size.
+  const quiet = space !== undefined && convId === null && !creating;
+  const shownFloat = quiet && float ? { ...float, h: Math.min(float.h, QUIET_FLOAT_H) } : float;
   const empty = !text.trim() && notes.length === 0;
   const canSend = !empty && !(creating && !convId);
   // The folded field: to the chat's queue as the usual field does, or the design's first message.
@@ -570,16 +701,6 @@ export const useSiteStage = ({
   const editing = noteDraft?.id === undefined ? -1 : notes.findIndex((n) => n.id === noteDraft.id);
   const noteNumber = editing >= 0 ? editing + 1 : notes.length + 1;
 
-  const startVoice = voice.onMic;
-  const onMic =
-    startVoice &&
-    (() => {
-      if (!voice.recording) startVoice();
-      else if (!voice.recording.busy) voice.onFinishRecording();
-    });
-  let placeholder = t('next.site.placeholderIslandPlain');
-  if (notes.length > 0) placeholder = t('next.notes.placeholderWith');
-  else if (bridged) placeholder = t('next.site.placeholderIsland');
   const onPick = () => {
     setMin(false);
     setPicking((on) => !on);
@@ -591,6 +712,35 @@ export const useSiteStage = ({
     setPicking(false);
     setNoteDraft(null);
   };
+  // The section the stage stands in, and a space's selection on the page: the window opens beside it.
+  const sectionEl = useRef<HTMLElement | null>(null);
+  const selection = useRef<IBox | null>(null);
+  // A space's chat comes over it where the person last put it; the first time, a window rising from the field.
+  const callOver = () => {
+    if (mode !== 'island') return;
+    // A window the person placed stays where they put it; otherwise beside the selection, or over the field.
+    if (opened === 'float' && !(chosen && float)) {
+      const box = placeBox(sectionEl.current);
+      const size = { width: box?.width ?? window.innerWidth, height: box?.height ?? window.innerHeight };
+      const sel = selection.current;
+      setFloat(
+        sel && box
+          ? nearFloat({ x: sel.x - box.left, y: sel.y - box.top, w: sel.w, h: sel.h }, size)
+          : fieldFloat(size),
+      );
+    }
+    leaveTo(opened === 'float' ? 'float' : 'chat');
+    setMin(false);
+  };
+  // `@harnessly` typed in the folded field calls the chat over the space, with the words in its field.
+  const called = space !== undefined && mode === 'island' && MENTION_RE.test(text);
+  const callRef = useRef(callOver);
+  useEffect(() => {
+    callRef.current = callOver;
+  });
+  useEffect(() => {
+    if (called) callRef.current();
+  }, [called]);
   // A lesson that edits the design keeps its chat docked beside the page: the field over the page hides what changes.
   const sideChat = useTourStep()?.sideChat === true;
   // Only when the step comes (adjusted while rendering): the person may move the chat back while it is on.
@@ -607,12 +757,17 @@ export const useSiteStage = ({
     }
     setChosen(true);
     if (zone === 'left' || zone === 'right') setDock(zone);
-    if (zone === 'float' && drop) setFloat(drop);
+    // A quiet window moved keeps the size it grows to with the first message.
+    if (zone === 'float' && drop) setFloat(quiet && float ? { ...drop, h: float.h } : drop);
     leaveTo(zone === 'left' || zone === 'right' ? 'chat' : zone);
     setMin(false);
   };
   // The folded chat opens beside the site, where it was last (an edge by default).
   const expand = () => {
+    if (space) {
+      callOver();
+      return;
+    }
     leaveTo(opened === 'float' && float ? 'float' : 'chat');
     setMin(false);
   };
@@ -650,7 +805,11 @@ export const useSiteStage = ({
       : undefined,
     onRemoveQuote: (id) => (id === DECK_CTX_ID ? setDeckCtx(null) : removeNote(id)),
     wrap,
-    onSent: afterSend,
+    onSent: () => {
+      afterSend();
+      // The first words over a space open its chat: the answer is read where it was asked.
+      if (space) callOver();
+    },
     tools: pickTool,
   };
 
@@ -701,12 +860,18 @@ export const useSiteStage = ({
           : []),
       ]
     : [];
+  // The switch names the chat; before it has one, what the new chat is about: the design, or the space.
+  const chatTitle = () => {
+    if (convId) return title;
+    if (space) return t('next.site.newSpaceChat', { name: title });
+    return t('next.site.newDesignChat');
+  };
   const chat: ISiteChatProps = {
     title,
     heading: (
       <ChatSwitch
         current={convId}
-        title={conv?.title ?? (convId ? title : t('next.site.newDesignChat'))}
+        title={conv?.title ?? chatTitle()}
         rows={rows}
         onPick={pickChat}
         onOpen={() => setAsked((n) => n + 1)}
@@ -714,7 +879,7 @@ export const useSiteStage = ({
     ),
     swapping: swap.leaving,
     mode,
-    float,
+    float: shownFloat,
     onFloat: setFloat,
     dock,
     width: chatW,
@@ -807,7 +972,7 @@ export const useSiteStage = ({
         <NotesBar notes={notes} shown={mode === 'notes' && status?.k !== ISLAND_STATUS.run} onSend={send} />
       </>
     ),
-    float,
+    float: shownFloat,
     dock,
     chatW,
     context: (ctx) =>
@@ -827,9 +992,20 @@ export const useSiteStage = ({
       sendFirst(words, []);
     },
     fill: (words) => {
+      setText(words);
+      // A space's view (a call written on the board) opens the chat over it, beside the place; a design's at its edge.
+      if (space) {
+        callOver();
+        return;
+      }
       leaveTo('chat');
       setMin(false);
-      setText(words);
+    },
+    anchor: (rect) => {
+      selection.current = rect;
+    },
+    bindSection: (el) => {
+      sectionEl.current = el;
     },
     // A board's error card sends its error to the design's chat: the chat opens where the person sees it, and the
     // message goes (the design's first one makes the chat).
@@ -874,12 +1050,18 @@ export const useSiteStage = ({
     ),
     island: (
       <SiteIsland
-        value={text}
-        onChange={setText}
-        onSend={send}
-        canSend={canSend}
-        placeholder={placeholder}
-        sending={creating !== undefined && !convId}
+        field={
+          <IslandField
+            conv={convId}
+            designDraft={designDraft}
+            machine={machine}
+            creating={creating}
+            start={start}
+            extra={extra}
+            onFirst={sendFirst}
+          />
+        }
+        holding={!empty || (draft?.attachments.length ?? 0) > 0}
         status={status}
         last={convId ? <ConvLast conv={convId} machine={machine} onExpand={expand} /> : null}
         onStop={() => convId && void interrupt(machine, convId)}
@@ -889,25 +1071,7 @@ export const useSiteStage = ({
         onMin={setMin}
         mode={mode}
         onZone={onZone}
-        recording={voice.recording !== null}
-        onMic={onMic}
-        pick={bridged ? picking : null}
-        onPick={onPick}
         notes={notes.length}
-        extra={
-          // The notes as the field's numbered chips, like their pins: the card of one changes its words, × takes it back.
-          <div className="hx-island__chips">
-            <NoteChips
-              notes={extra.notes?.notes ?? []}
-              onEdit={extra.notes?.onEdit ?? none}
-              onRemove={removeNote}
-              onOpen={(id) => {
-                setMin(false);
-                editNote(id);
-              }}
-            />
-          </div>
-        }
       />
     ),
   };

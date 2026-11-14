@@ -33,6 +33,7 @@ import {
   canRotate,
   deviceGroups,
   deviceOf,
+  DEVICE_GROUP,
   deviceSizeText,
   keptSize,
   overviewBox,
@@ -84,7 +85,7 @@ import { AnchorContext, createAnchorStore, type IAnchorItem } from '@/next/featu
 import { useDomBridge } from '@/next/features/designly/use-dom-bridge';
 import TourAnchor, { TOUR_ANCHOR } from '@/next/features/tour/tour-anchor';
 import { useTourStep } from '@/next/features/tour/use-tour-step';
-import SiteLoader from '@/next/features/designly/site-loader';
+import SiteLoader, { SiteHeld } from '@/next/features/designly/site-loader';
 import { loadStageOf, type ILoadProgress } from '@/next/features/designly/site-load';
 import { useSiteLoad } from '@/next/features/designly/use-site-load';
 import SiteTweaks from '@/next/features/designly/site-tweaks';
@@ -110,6 +111,17 @@ import { usePhone } from '@/next/ui/use-media';
 import { useHScroll } from '@/next/ui/use-h-scroll';
 import { usePresence, usePresentFlag } from '@/next/ui/presence';
 import { t } from '@/next/i18n';
+import { toast } from '@/next/features/designly/sdk/toast';
+import {
+  FRAME_VIEW,
+  frameView,
+  goTake,
+  hasTake,
+  pageOfLink,
+  readPageGo,
+  type IPageGo,
+  type IPendingTake,
+} from '@/next/features/designly/page-link';
 import ModeButton from '@/next/features/designly/mode-button';
 import '@/next/styles/designly.css';
 import '@/next/styles/vendor-devices.css';
@@ -119,6 +131,8 @@ import '@/next/styles/site-pane.css';
 
 /** A board that loaded but did not say it is drawn (a failed script) leaves the loader after this long, ms. */
 const DRAW_WAIT_MS = 8000;
+/** The phone a link to a phone's page (a narrow `$preview`) shows it in. */
+const LINK_PHONE = 'ip14';
 const POP_MS = 200;
 /** The pill under the page in the pane: a device keeps this much free under it (the pill, its gap and its margin). */
 const DOCK_ROOM = 64;
@@ -202,6 +216,8 @@ export interface ISiteViewProps {
   tab: string;
   /** The board's address for the frame; null while the slot opens. */
   src: string | null;
+  /** The board's last saved revision, shown under a thin «Открываем правку…» while the editing frame opens. */
+  heldSrc?: string | null;
   /** The same board at an address the slot lets in without a ticket (its cookie is set); the frames of «Обзор» use it. */
   plainSrc?: string | null;
   /** The address of this page for another device (a code to point a phone at); null while there is none to give. */
@@ -325,6 +341,13 @@ export interface ISiteStage {
   report?: (text: string) => void;
   /** Puts words into the chat's field, opened, for the person to send (an app's view where its chat is not yet on). */
   fill?: (text: string) => void;
+  /**
+   * A space's selection on the page: the chat's window opens beside it. null: nothing selected, the window
+   * rises from the field.
+   */
+  anchor?: (rect: { x: number; y: number; w: number; h: number } | null) => void;
+  /** The section the stage stands in: the window's place is counted from it. */
+  bindSection?: (el: HTMLElement | null) => void;
 }
 
 interface IMoreItem {
@@ -384,6 +407,7 @@ const SiteView = ({
   tabs,
   tab,
   src,
+  heldSrc = null,
   plainSrc = null,
   phoneUrl = null,
   error,
@@ -632,6 +656,50 @@ const SiteView = ({
     latestPagePath.current = pagePath;
     latestBoardError.current = onBoardError;
   });
+  // A link of the board to another page of the design (page-link.ts): the site switches its page as its own
+  // list does (the tab's history, so Back steps back), and the link's props and block wait for the new board's script.
+  const pendingTake = useRef<IPendingTake | null>(null);
+  const followLink = (go: IPageGo, post: (message: unknown) => void) => {
+    const path = pageOfLink(go, pages, pagePath);
+    if (path === null) {
+      toast(
+        guest
+          ? t('next.site.linkNotShared')
+          : t('next.site.linkMissing', { page: go.ref.slice(go.ref.lastIndexOf('/') + 1) }),
+        {
+          tone: 'error',
+        },
+      );
+      return;
+    }
+    if (go.tab) {
+      onNewTab(path);
+      return;
+    }
+    if (path === pagePath) {
+      if (hasTake(go)) post(goTake(go));
+      return;
+    }
+    pendingTake.current = { path, props: go.props, hash: go.hash };
+    onNavigate(path);
+  };
+  // The page a link opened tells the frame it asks for: a phone's page is shown in a phone, a wide one leaves the phone.
+  const followFrame = (w: number) => {
+    if (full) return;
+    const view = frameView(w);
+    const onPhone = device.group === DEVICE_GROUP.phones;
+    if (view === FRAME_VIEW.any || (view === FRAME_VIEW.phone) === onPhone) return;
+    setDeviceId(view === FRAME_VIEW.phone ? LINK_PHONE : 'fill');
+    setSize(null);
+    setRot(false);
+    setBrowserId(null);
+  };
+  const latestFollow = useRef(followLink);
+  const latestFrame = useRef(followFrame);
+  useEffect(() => {
+    latestFollow.current = followLink;
+    latestFrame.current = followFrame;
+  });
   /** A button on a picture of the page was pressed: the editor or the generator is open for it. */
   const [imageOpen, setImageOpen] = useState<IImageOpen | null>(null);
   const imagesOn = images !== undefined && guest === undefined;
@@ -692,6 +760,16 @@ const SiteView = ({
     const slot = slotOf();
     slot?.frame.contentWindow?.postMessage({ type: 'tk:ping' }, slot.origin);
   };
+  // A design kept hidden behind another tab (features/shell/kept-screens) has its effects taken down: the board is told
+  // it is out of sight, as a deck tells its slides (tk:deck-live), so it stops its stream and polling until it is
+  // shown again, when it catches up. The frame is taken at the effect's start: refs are gone by the time it is cleaned.
+  useEffect(() => {
+    const target = frameOf();
+    target?.frame.contentWindow?.postMessage({ type: 'tk:deck-live', on: true }, target.origin);
+    return () => target?.frame.contentWindow?.postMessage({ type: 'tk:deck-live', on: false }, target.origin);
+    // frameOf reads the frame of this src.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src, reloadKey]);
   const sendStyles = () => {
     const slot = slotOf();
     slot?.frame.contentWindow?.postMessage(
@@ -806,6 +884,11 @@ const SiteView = ({
           frame.contentWindow?.postMessage(boardErrorAck(boardError), origin);
         return;
       }
+      const go = readPageGo(event.data);
+      if (go) {
+        latestFollow.current(go, (m) => frame.contentWindow?.postMessage(m, origin));
+        return;
+      }
       const message = readBridgeMessage(event.data);
       const now = latestStage.current;
       if (message?.k === 'anchored') {
@@ -849,6 +932,10 @@ const SiteView = ({
         latestStage.current?.onControls?.(message.controls);
         return;
       }
+      if (message?.k === 'frame') {
+        latestFrame.current(message.w);
+        return;
+      }
       if (message?.k === 'tweaks-panel') {
         setTweaksOpen(message.open);
         return;
@@ -860,6 +947,12 @@ const SiteView = ({
       if (message?.k === 'image-act') {
         if (latestImagesOn.current && message.act.file !== '')
           setImageOpen({ act: message.act, box: screenBoxOf(frame.getBoundingClientRect(), message.act) });
+        return;
+      }
+      if (message?.k === 'reload') {
+        // A board on an opaque origin (a slot by path) cannot reload itself past a proxy in front of the platform: the
+        // frame is loaded again from this page, as the reload button does.
+        latestReload.current(false);
         return;
       }
       if (message?.k === 'drawn') {
@@ -880,6 +973,11 @@ const SiteView = ({
         // Its error card may send the error to the chat when there is one; it picks blocks for the stage.
         libFor.current = key;
         toLib();
+        const take = pendingTake.current;
+        if (take && take.path === latestPagePath.current) {
+          pendingTake.current = null;
+          frame.contentWindow?.postMessage(goTake(take), origin);
+        }
         return;
       }
       if (message?.k === 'key') {
@@ -1972,7 +2070,13 @@ const SiteView = ({
                                 mounted={src !== null}
                                 className="hx-site__fswap"
                                 contentClassName="hx-site__held"
-                                skeleton={<SiteLoader stage={loadStage} />}
+                                skeleton={
+                                  heldSrc !== null ? (
+                                    <SiteHeld src={heldSrc} title={page?.name ?? title} />
+                                  ) : (
+                                    <SiteLoader stage={loadStage} />
+                                  )
+                                }
                               >
                                 {src !== null && (
                                   <iframe

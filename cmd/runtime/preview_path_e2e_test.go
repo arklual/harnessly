@@ -86,8 +86,22 @@ func TestPreviewByPathEndToEnd(t *testing.T) {
 	if opened.code != 200 || !o.ByPath || !strings.HasPrefix(prefix, "/agents/__pv/1-") || o.EnterURL != o.Origin+"/users/7?x=1" {
 		t.Fatalf("open: %d %s", opened.code, opened.body)
 	}
-	if a := do("POST", base+"/api/preview/open", `{"target":{"kind":"url","origin":"https://example.com"},"slot":7}`, page); a.code != 400 {
-		t.Fatalf("a site of the outside world by path: %d %s", a.code, a.body)
+	// A site (a stand) goes by path as well, in a site slot, sandboxed like a dev server.
+	site := do("POST", base+"/api/preview/open", `{"target":{"kind":"url","origin":"https://example.com"},"slot":7,"path":"/adminpanel"}`, page)
+	var so struct {
+		Origin   string `json:"origin"`
+		EnterURL string `json:"enterUrl"`
+		ByPath   bool   `json:"byPath"`
+	}
+	_ = json.Unmarshal([]byte(site.body), &so)
+	if site.code != 200 || !so.ByPath || !strings.HasPrefix(so.Origin, base+"/agents/__pv/7-") || so.EnterURL != so.Origin+"/adminpanel" {
+		t.Fatalf("a site by path: %d %s", site.code, site.body)
+	}
+	for _, wrong := range []string{`{"target":{"kind":"url","origin":"https://example.com"},"slot":1}`,
+		`{"target":{"kind":"port","port":` + strconv.Itoa(devPort) + `},"slot":7}`} {
+		if a := do("POST", base+"/api/preview/open", wrong, page); a.code != 400 {
+			t.Fatalf("a target in the other kind's slot: %s → %d %s", wrong, a.code, a.body)
+		}
 	}
 
 	// The page: sandboxed, its addresses under the prefix, the bridge first and told the prefix.

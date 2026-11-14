@@ -1,11 +1,12 @@
 // «Приложения»: the installed apps of the machine. A card opens the page of the app.
 import { useState } from 'react';
-import { setSafeMode, useInstalledApps } from '@/next/features/app-views/api';
+import { setSafeMode, useInstalledApps, type IInstalledApp } from '@/next/features/app-views/api';
 import AppsCatalog from '@/next/features/app-catalog/apps-catalog';
 import PublicCatalog from '@/next/features/app-catalog/public-catalog';
 import { useTeam } from '@/next/features/app-catalog/use-team';
 import { usePublicCatalog } from '@/next/features/app-catalog/use-public';
 import AppsList from '@/next/features/app-main/apps-list';
+import { opensOwnView } from '@/next/features/app-main/chat-apps';
 import type { MachineId } from '@/next/protocol/v2';
 import { goTo, ROUTE } from '@/next/routes/routes';
 import { NEW_CHAT, setDraftText } from '@/next/stores/drafts';
@@ -31,7 +32,11 @@ const AppsListPage = ({ machine, onOpenDrawer }: { machine: MachineId; onOpenDra
     setDraftText(NEW_CHAT, t('next.appslist.createDraft'));
     goTo({ kind: ROUTE.home });
   };
-  const open = (id: string) => goTo({ kind: ROUTE.appAbout, id });
+  // An app with a screen of its own opens on it; one without, on its page.
+  const open = (app: IInstalledApp) =>
+    goTo(opensOwnView(app) ? { kind: ROUTE.app, id: app.id } : { kind: ROUTE.appAbout, id: app.id });
+  // The catalogs show what an app is before it is taken: its page.
+  const about = (id: string) => goTo({ kind: ROUTE.appAbout, id });
   const mine = list?.apps ?? null;
   const starter = mine !== null && mine.length === 0 && query.trim() === '';
   const teamHits = team.info && team.info.space !== '' ? rowsOf(team.info) : [];
@@ -49,7 +54,7 @@ const AppsListPage = ({ machine, onOpenDrawer }: { machine: MachineId; onOpenDra
       onCreate={create}
       apps={list?.apps ?? null}
       error={error}
-      onOpen={(app) => open(app.id)}
+      onOpen={open}
       onOpenDrawer={onOpenDrawer}
       onHelp={() => goTo({ kind: ROUTE.help, section: 'build-apps', page: 'overview' })}
       team={team}
@@ -57,12 +62,12 @@ const AppsListPage = ({ machine, onOpenDrawer }: { machine: MachineId; onOpenDra
       onSafeMode={safe}
       footer={
         <>
-          <AppsCatalog team={team} query={query} limit={starter ? 3 : undefined} onOpen={open} />
+          <AppsCatalog team={team} query={query} limit={starter ? 3 : undefined} onOpen={about} />
           <PublicCatalog
             catalog={catalog}
             installed={(list?.apps ?? []).map((a) => a.id)}
             limit={starter ? 3 : undefined}
-            onOpen={open}
+            onOpen={about}
             ask={list?.permissionsOff !== true}
           />
         </>

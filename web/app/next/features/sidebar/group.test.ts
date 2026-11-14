@@ -34,6 +34,26 @@ describe('sectionsOf', () => {
     { id: 'p2', name: 'empty' },
   ];
 
+  it('puts the chats an app started into its folder until the person takes them', () => {
+    const inbox = { app: 'inbox', label: 'Inbox' };
+    const chats = [
+      chat('mine', 1),
+      chat('task-a', 2, { from: inbox }),
+      chat('task-b', 3, { from: inbox }),
+      chat('cron', 4, { from: { app: 'cron', label: 'Cron' } }),
+      chat('pinned-task', 5, { from: inbox, pinned: true }),
+      chat('project-task', 6, { from: inbox, projectId: 'p1' }),
+    ];
+    const s = sectionsOf(chats, projects, NOW);
+    expect(s.apps.map((a) => [a.app, a.label, a.chats.map((c) => c.id)])).toEqual([
+      ['inbox', 'Inbox', ['task-a', 'task-b']],
+      ['cron', 'Cron', ['cron']],
+    ]);
+    expect(s.days.flatMap((d) => d.chats.map((c) => c.id))).toEqual(['mine']);
+    expect(s.pinned.map((c) => c.id)).toEqual(['pinned-task']);
+    expect(s.projects[0]?.chats.map((c) => c.id)).toEqual(['project-task']);
+  });
+
   it('shows a delegated chat under its parent, not in the day groups', () => {
     const chats = [
       chat('parent', 3),

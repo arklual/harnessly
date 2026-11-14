@@ -19,8 +19,31 @@ const (
 	pollWait    = 25 * time.Second
 )
 
+var (
+	// watchlessScan is how often the folder is walked while the system gives no watcher.
+	watchlessScan = 5 * time.Second
+	// newWatcher makes the watcher of the folder; a variable for the test of a system that gives none.
+	newWatcher = fsnotify.NewWatcher
+)
+
 // Run syncs until ctx ends: a first full sync, then the watcher, the long poll and a periodic rescan.
+//
+// The watcher is on the folder before the first sync reads it: an edit made while the first sync runs is then either
+// read by it or told by the watcher, and not left for the rescan two minutes later. A system that gives no watcher
+// (every inotify instance of the user is taken: 128 by default, and a machine runs many runtimes) does not stop the
+// sync: Run used to return the error, the caller started it again ten seconds later with one more full first sync,
+// and nothing arrived from the store in between. The folder is walked every watchlessScan instead until a watcher
+// can be made.
 func (a *Agent) Run(ctx context.Context) error {
+	w, werr := newWatcher()
+	if werr == nil {
+		a.watchTree(w, ".")
+	}
+	defer func() {
+		if w != nil {
+			w.Close()
+		}
+	}()
 	for {
 		err := a.SyncOnce(ctx)
 		if err == nil {
@@ -33,20 +56,39 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	a.log.Info("in sync", "root", a.cfg.Root)
 
-	w, err := fsnotify.NewWatcher()
-	if err != nil {
-		return err
-	}
-	defer w.Close()
-	a.watchTree(w, ".")
-
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() { defer wg.Done(); a.pollLoop(ctx) }()
 	go func() { defer wg.Done(); a.rescanLoop(ctx) }()
-	a.watchLoop(ctx, w)
+	if werr != nil {
+		a.log.Warn("no file watcher: the folder is walked instead until there is one", "err", werr, "every", watchlessScan)
+		w = a.scanUntilWatched(ctx)
+	}
+	if w != nil {
+		a.watchLoop(ctx, w)
+	}
 	wg.Wait()
 	return ctx.Err()
+}
+
+// scanUntilWatched walks the folder every watchlessScan until a watcher can be made (it is returned, on the tree) or
+// ctx ends (nil).
+func (a *Agent) scanUntilWatched(ctx context.Context) *fsnotify.Watcher {
+	for sleep(ctx, watchlessScan) {
+		w, err := newWatcher()
+		if err == nil {
+			a.watchTree(w, ".")
+		}
+		// With a watcher too: what changed before it was on the tree is read by this walk.
+		if err := a.ScanAll(ctx); err != nil {
+			a.log.Warn("scan", "err", err)
+		}
+		if w != nil {
+			a.log.Info("the file watcher is back")
+			return w
+		}
+	}
+	return nil
 }
 
 func sleep(ctx context.Context, d time.Duration) bool {

@@ -42,6 +42,8 @@ type Router struct {
 	Dir string
 	// OnFile keeps the switch across restarts: it exists while the switch is on.
 	OnFile string
+	// OffFile keeps the person's «off»; with it set, the switch is on until it exists (switchOn).
+	OffFile string
 	// Base is the router as Claude Code reaches it (http://127.0.0.1:<port>/api/cli/router).
 	Base string
 	// Store holds the vendors' keys.
@@ -154,10 +156,7 @@ func (r *Router) LogFile() string { return filepath.Join(r.Dir, "decisions.jsonl
 // Notify sets what is told when the router's readiness may have changed.
 func (r *Router) Notify(f func()) { r.onChange.Store(&f) }
 
-func (r *Router) On() bool {
-	_, err := os.Stat(r.OnFile)
-	return err == nil
-}
+func (r *Router) On() bool { return switchOn(r.OnFile, r.OffFile) }
 
 // Ready: the switch is on and at least one subscription has a key.
 func (r *Router) Ready() bool { return r.On() && len(r.configured()) > 0 }
@@ -167,7 +166,11 @@ func (r *Router) Endpoint() (string, string, bool) {
 	if !r.On() || r.Base == "" {
 		return "", "", false
 	}
-	if _, err := os.Stat(r.keyFile()); err != nil {
+	// A switch on by default has had no SetOn to make the key: it is made at the first chat.
+	if err := os.MkdirAll(r.Dir, 0o700); err != nil {
+		return "", "", false
+	}
+	if _, err := r.clientKey(); err != nil {
 		return "", "", false
 	}
 	return r.Base, r.keyFile(), true
@@ -176,10 +179,7 @@ func (r *Router) Endpoint() (string, string, bool) {
 // SetOn turns the switch. On needs a key of GLM or Kimi Code (a *wire.ProfileSwitchError without one).
 func (r *Router) SetOn(_ context.Context, on bool) error {
 	if !on {
-		if err := os.Remove(r.OnFile); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
-		return nil
+		return writeSwitch(r.OnFile, r.OffFile, false)
 	}
 	if len(r.configured()) == 0 {
 		return &wire.ProfileSwitchError{Reason: wire.SwitchNoLogin, Message: "no key of GLM or Kimi Code is saved"}
@@ -193,7 +193,7 @@ func (r *Router) SetOn(_ context.Context, on bool) error {
 	if _, err := r.clientKey(); err != nil {
 		return err
 	}
-	return writePrivate(r.OnFile, nil)
+	return writeSwitch(r.OnFile, r.OffFile, true)
 }
 
 // clientKey is made once and kept, so the settings of running chats stay right.
@@ -602,6 +602,7 @@ func stream(w http.ResponseWriter, res *http.Response) {
 			w.Header().Set(h, v)
 		}
 	}
+	noRetry(w, res.StatusCode)
 	w.WriteHeader(res.StatusCode)
 	if !strings.Contains(res.Header.Get("Content-Type"), "event-stream") {
 		_, _ = io.Copy(w, res.Body)

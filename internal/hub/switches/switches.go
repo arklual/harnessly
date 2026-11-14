@@ -19,6 +19,14 @@ import (
 const CacheTTL = 5 * time.Second
 
 // Gate answers whether a feature is on for a person on a machine.
+// The switches of the hub-first plan: what the person's pages read from the hub instead of from a machine.
+const (
+	// HubStats: the statistics page reads the hub's report, and the machine's own /stats leaves the navigation.
+	HubStats = "hub-stats"
+	// HubProjects: the sidebar «Projects» reads the hub's registry of the people's projects.
+	HubProjects = "hub-projects"
+)
+
 type Gate interface {
 	On(ctx context.Context, feature, person, machine string) bool
 }

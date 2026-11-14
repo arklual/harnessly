@@ -364,6 +364,7 @@ func (s Store) PurgeExpired(ctx context.Context, now time.Time) error {
 		{`DELETE FROM auth_challenges WHERE expires_at < ?`, ms},
 		{`DELETE FROM registration_codes WHERE expires_at < ? AND local = 0`, ms - int64(24*time.Hour/time.Millisecond)},
 		{`DELETE FROM auth_events WHERE created_at < ?`, ms - int64(180*24*time.Hour/time.Millisecond)},
+		{`DELETE FROM api_tokens WHERE COALESCE(revoked_at, expires_at) < ?`, ms - int64(30*24*time.Hour/time.Millisecond)},
 	} {
 		if _, err := s.q.Exec(ctx, q.sql, q.arg); err != nil {
 			return err

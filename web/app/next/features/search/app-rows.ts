@@ -4,12 +4,14 @@
 import type { IInstalledApp } from '@/next/features/app-views/api';
 import { foldText } from '@/next/features/search/highlight';
 import type { ISearchGroup, ISearchRow } from '@/next/features/search/search-dialog';
+import { SUBJECT } from '@/next/features/search/subject';
 import { t } from '@/next/i18n';
 
 export const APP_ROW = { command: 'appcmd:', open: 'appopen:', pane: 'apppane:' } as const;
 
 const pluginOf = (id: string): string => id.replaceAll('.', '-');
 
+/** No words match everything: the apps' own tab lists them all. */
 const matches = (words: readonly string[], ...texts: string[]) => {
   const all = foldText(texts.join(' '));
   return words.every((w) => all.includes(w));
@@ -19,9 +21,11 @@ export const appSearchGroup = (
   installed: readonly IInstalledApp[],
   chat: { id: string; apps: readonly string[] } | null,
   query: string,
+  /** The apps' own tab: with no words it lists every app and command. */
+  own = false,
 ): ISearchGroup | null => {
   const words = foldText(query).trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return null;
+  if (words.length === 0 && !own) return null;
   const rows: ISearchRow[] = [];
   for (const id of chat?.apps ?? []) {
     const app = installed.find((a) => a.id === id);
@@ -34,6 +38,8 @@ export const appSearchGroup = (
         title: `/${c.name}`,
         snippet: c.description || undefined,
         meta: app.name,
+        preview: { kind: t('next.search.kindCommand'), text: c.description || app.description },
+        subject: { k: SUBJECT.app, app },
       });
     }
   }
@@ -47,7 +53,10 @@ export const appSearchGroup = (
         kind: 'app',
         icon: app.icon ?? 'layout-grid',
         title: app.name,
+        snippet: app.description || undefined,
         meta: t('next.search.appOpen'),
+        preview: { kind: t('next.search.kindApp'), text: app.description },
+        subject: { k: SUBJECT.app, app },
       });
     else if (pane)
       rows.push({
@@ -55,7 +64,10 @@ export const appSearchGroup = (
         kind: 'app',
         icon: app.icon ?? 'layout-grid',
         title: app.name,
+        snippet: app.description || undefined,
         meta: t('next.search.appPane'),
+        preview: { kind: t('next.search.kindApp'), text: app.description },
+        subject: { k: SUBJECT.app, app },
       });
   }
   return rows.length > 0 ? { id: 'apps', label: t('next.search.groupApps'), rows } : null;

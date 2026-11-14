@@ -59,8 +59,16 @@ describe('what a turn made', () => {
   it('shows the things it made, not the files it wrote, and opens them', () => {
     const { onOpen } = draw(SHOWN_BY_DEFAULT);
     expect(screen.queryByText('turn.tsx')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /Разбор выката/ }));
+    // A link is a link: a tap opens it in the pane, ⌘-click and the arrow at its end in a new tab.
+    const card = screen.getByRole('link', { name: /Разбор выката/ });
+    expect(card.getAttribute('href')).toBe(page.ref);
+    fireEvent.click(card);
     expect(onOpen).toHaveBeenCalledWith(page);
+    fireEvent.click(card, { metaKey: true });
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole('link', { name: /Открыть в новой вкладке|Open in a new tab/ }).getAttribute('target'),
+    ).toBe('_blank');
     fireEvent.click(screen.getByRole('button', { name: /landing-v2/ }));
     expect(onOpen).toHaveBeenLastCalledWith(design);
   });
@@ -78,12 +86,36 @@ describe('what a turn made', () => {
     expect(onOpenFile).toHaveBeenCalledWith('/home/coder/workspace/harnessly/.worktrees/x/web/app/turn.tsx');
   });
 
+  it('a task, a merge request and a stand are cards of their services', () => {
+    draw(SHOWN_BY_DEFAULT, [
+      { kind: 'task', op: 'created', title: 'HRN-1426', ref: 'https://tracker.example.com/issue/HRN-1426' },
+      {
+        kind: 'mr',
+        op: 'created',
+        title: 'harnessly !80',
+        ref: 'https://gitlab.example.com/g/harnessly/-/merge_requests/80',
+      },
+      {
+        kind: 'stand',
+        op: 'created',
+        title: 'stand-1.preview.example.com',
+        ref: 'https://stand-1.preview.example.com/',
+      },
+      { kind: 'stand', op: 'created', title: 'localhost:4400', ref: 'http://localhost:4400/' },
+    ]);
+    expect(screen.getByText(/Задача|Task/)).toBeTruthy();
+    expect(screen.getByText(/MR · harnessly !80/)).toBeTruthy();
+    expect(screen.getAllByRole('link', { name: /Открыть в новой вкладке|Open in a new tab/ })).toHaveLength(
+      3,
+    );
+  });
+
   it('draws nothing for a turn that made nothing shown', () => {
     const { container } = render(<Outputs item={item([])} />);
     expect(container.innerHTML).toBe('');
   });
 
-  it('shows a file the agent handed over with its size: the card opens it, the icon downloads it', () => {
+  it('shows a file the agent handed over with its kind and size, «Открыть сбоку» and «Скачать»', () => {
     const zip: TurnOutput = {
       kind: 'delivery',
       op: 'created',
@@ -102,12 +134,16 @@ describe('what a turn made', () => {
         <Outputs item={item([zip])} />
       </OutputsContext>,
     );
-    expect(screen.getByText('2 KB')).toBeTruthy();
+    expect(screen.getByText('ZIP · 2 KB')).toBeTruthy();
+    // One line: the card opens it beside, one icon saves it; no buttons of words.
+    expect(screen.queryByText(/Открыть сбоку|Open beside/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /Отчёт/ }));
     expect(onOpen).toHaveBeenCalledWith(zip);
-    const save = screen.getByRole('link');
+    const save = screen.getByRole('link', { name: /next.delivered.save|Скачать|Download/ });
     expect(save.getAttribute('href')).toBe('/save?path=/w/out/report.zip');
     expect(save.hasAttribute('download')).toBe(true);
+    fireEvent.click(save);
+    expect(onOpen).toHaveBeenCalledTimes(1);
     // The files the turn only wrote make no card of this kind.
     expect(screen.queryByText('turn.tsx')).toBeNull();
   });

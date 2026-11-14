@@ -302,6 +302,9 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request, parts []string) {
 	case len(parts) == 2 && parts[1] == "digest":
 		s.digest(ctx, w, r, id)
 		return
+	case len(parts) == 2 && parts[1] == "glance":
+		s.glance(ctx, w, r, id)
+		return
 	case len(parts) == 2 && parts[1] == "tasks":
 		s.tasks(ctx, w, r, id)
 		return
@@ -345,7 +348,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request, parts []string) {
 			page, err = s.Service.Turns(ctx, id, before, limit)
 		}
 		page.Entries = trimOutputs(page.Entries, ToolOutputMax)
-		v = page
+		v = TurnsPageFor(page, CapsOf(r))
 	case len(parts) == 2 && parts[1] == "rewind" && s.Rewind != nil:
 		entry := r.URL.Query().Get("entryId")
 		if !ValidTurnID(entry) {
@@ -362,7 +365,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request, parts []string) {
 		var page TurnsPage
 		page, err = s.Rewind.Rewound(ctx, id, n)
 		page.Entries = trimOutputs(page.Entries, ToolOutputMax)
-		v = page
+		v = TurnsPageFor(page, CapsOf(r))
 	case len(parts) == 4 && parts[1] == "turns" && parts[3] == "entries":
 		if !ValidTurnID(parts[2]) {
 			refuse(w, RefuseBadRequest)

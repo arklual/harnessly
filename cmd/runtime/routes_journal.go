@@ -18,6 +18,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/preview/devtools"
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
 	"github.com/ly-solutions/harnessly/internal/telemetry"
+	"github.com/ly-solutions/harnessly/internal/webvitals"
 )
 
 // The machine's journal (internal/journal): every link of the way writes to it, the agent reads it.
@@ -64,7 +65,7 @@ func exportJournal(j *journal.Journal, q *telemetry.Queue) {
 func journalQuiet(r *http.Request) bool {
 	p := strings.TrimPrefix(r.URL.Path, "/agents")
 	switch {
-	case strings.HasSuffix(p, "/journal"), p == "/api/cli/logs",
+	case strings.HasSuffix(p, "/journal"), p == "/api/cli/logs", p == "/api/v2/web-vitals",
 		strings.HasSuffix(p, "/apps/view-log"), strings.HasSuffix(p, "/apps/session/renew"),
 		strings.Contains(p, "/mcp"), strings.HasPrefix(p, "/api/cli/preview/report"),
 		strings.Contains(p, "/statusline"), strings.Contains(p, "/hooks/"), strings.Contains(p, "/drafts"),
@@ -187,7 +188,25 @@ func journalRoutes(d deps) []gate.Route {
 		secretJSON(w, http.StatusOK, map[string]string{"reason": journal.Default().Reason(q.Get("app"), q.Get("chat"), q.Get("trace"), time.UnixMilli(since))})
 	}
 
+	// a runtime with no hub takes the page's timings (Sinopia's home, LCP) into its journal; behind a hub the
+	// same POST is answered by the hub, which counts them in a histogram.
+	vitals := webvitals.NewLimiter()
+	vital := func(w http.ResponseWriter, r *http.Request) {
+		if sameorigin.Refuse(w, r) {
+			return
+		}
+		if !d.SessionOK(r) {
+			secretJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+			return
+		}
+		webvitals.Serve(w, r, vitals, "page", func(s webvitals.Sample) {
+			journal.Default().Add(journal.Entry{Level: journal.Info, Source: journal.SourceWeb, Event: "web-vital",
+				Text: s.Name + " " + strconv.FormatFloat(s.Seconds, 'f', 3, 64) + " s"})
+		})
+	}
+
 	return []gate.Route{
+		{Match: is("/api/v2/web-vitals"), Handler: http.HandlerFunc(vital)},
 		{Match: is(platformAPI + "/journal/reason"), Handler: http.HandlerFunc(reason)},
 		{Match: is("/agents" + platformAPI + "/journal/reason"), Handler: http.HandlerFunc(reason)},
 		{Match: is(platformAPI + "/journal"), Handler: http.HandlerFunc(report)},

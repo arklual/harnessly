@@ -4,6 +4,11 @@ import { t } from '@/next/i18n';
 import Modal from '@/next/features/shell/modal';
 import { answerLogin, loadLogins, type ILoginAsk } from '@/next/features/browser/login-api';
 import { chatPanes } from '@/next/stores/pane-state';
+import { calmPoll } from '@/next/core/net/calm-poll';
+
+/** The step while a login waits or the list moves, and the longest one while it is quiet. */
+const LOGINS_POLL_MS = 3000;
+const LOGINS_QUIET_MS = 15_000;
 
 const label = (key: string) => t(`next.agentBrowser.${key}`);
 export function openLoginPanel(machine: MachineId, ask: ILoginAsk) {
@@ -38,29 +43,27 @@ export function BrowserLoginAskHost({
     [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (!machine) return;
-    let gone = false,
-      looking = false;
-    const look = async () => {
-      if (looking || document.visibilityState !== 'visible') return;
-      looking = true;
-      try {
+    let gone = false;
+    let last: string | null = null;
+    // Read while the page is visible, slower while nothing waits.
+    const stop = calmPoll({
+      base: LOGINS_POLL_MS,
+      max: LOGINS_QUIET_MS,
+      wakeOn: 'browser-logins-changed',
+      look: async () => {
+        // A disconnected machine leaves its requests pending until the page reconnects (calmPoll keeps going).
         const asks = await loadLogins(machine);
-        if (!gone) setRead({ machine, asks });
-      } catch {
-        // A disconnected machine leaves its requests pending until the page reconnects.
-      } finally {
-        looking = false;
-      }
-    };
-    void look();
-    const timer = setInterval(() => void look(), 3000);
-    window.addEventListener('browser-logins-changed', look);
-    document.addEventListener('visibilitychange', look);
+        if (gone) return false;
+        const said = JSON.stringify(asks);
+        const changed = said !== last;
+        last = said;
+        if (changed) setRead({ machine, asks });
+        return changed || asks.length > 0;
+      },
+    });
     return () => {
       gone = true;
-      clearInterval(timer);
-      window.removeEventListener('browser-logins-changed', look);
-      document.removeEventListener('visibilitychange', look);
+      stop();
     };
   }, [machine]);
   const asks = read?.machine === machine ? read.asks : [];

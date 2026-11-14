@@ -40,6 +40,8 @@ type Rooms func(ctx context.Context, spaceID string) (Room, error)
 // Options builds a View.
 type Options struct {
 	Rooms Rooms
+	// Covers opens a space's covers collection; nil: no covers.
+	Covers Rooms
 	// Dir holds the revisions put into folders and the contents they share (<data>/design-view).
 	Dir string
 	// GuestApp is the built web page: the guest page of a link is served from it.
@@ -148,6 +150,41 @@ func (v *View) Wait(ctx context.Context, spaceID, project string, since int64) (
 		head, err := v.Head(ctx, spaceID, project)
 		if err != nil || head > since {
 			return head, err
+		}
+		select {
+		case <-ctx.Done():
+			return head, nil
+		case <-t.C:
+		}
+	}
+}
+
+// WaitLibrary returns the newest revision of the space's library (every project and the shelves) once it is past
+// since, or as it is when ctx ends first: the page's long poll instead of reading the library on a timer.
+func (v *View) WaitLibrary(ctx context.Context, spaceID string, since int64) (int64, error) {
+	if strings.ContainsAny(spaceID, "/\\.") || spaceID == "" {
+		return 0, ErrMissing
+	}
+	room, err := v.o.Rooms(ctx, spaceID)
+	if err != nil {
+		return 0, err
+	}
+	t := time.NewTicker(v.o.Poll)
+	defer t.Stop()
+	var head int64
+	for {
+		es, err := room.HistoryUnder(ctx, "", 1)
+		if err != nil {
+			if ctx.Err() != nil {
+				return head, nil
+			}
+			return 0, err
+		}
+		if len(es) > 0 {
+			head = es[0].Rev
+		}
+		if head > since {
+			return head, nil
 		}
 		select {
 		case <-ctx.Done():

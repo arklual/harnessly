@@ -45,8 +45,41 @@ export type TMeta =
       resolved: boolean;
       assignee: IMetaPerson | null;
     }
-  | { kind: 'mr'; title: string; state: string; project: string; iid: number; draft: boolean }
-  | { kind: 'artifact'; title: string; description: string | null };
+  | {
+      kind: 'mr';
+      title: string;
+      state: string;
+      project: string;
+      iid: number;
+      draft: boolean;
+      pipeline: TPipeline | null;
+    }
+  | { kind: 'artifact'; title: string; description: string | null }
+  | { kind: 'commit'; title: string; sha: string; project: string; pipeline: TPipeline | null }
+  /** A feature stand: whether it answers, and its page's title when it does. */
+  | { kind: 'stand'; up: boolean; title: string | null };
+
+/** A pipeline's state as GitLab names it, in the four the page tells apart. */
+export const PIPELINE = { success: 'success', failed: 'failed', running: 'running', other: 'other' } as const;
+export type TPipeline = (typeof PIPELINE)[keyof typeof PIPELINE];
+
+const RUNNING_PIPELINES = new Set([
+  'running',
+  'pending',
+  'created',
+  'preparing',
+  'waiting_for_resource',
+  'scheduled',
+]);
+
+/** `{status, url}` of the runtime as one of the four; null when there is none. */
+export const readPipeline = (v: unknown): TPipeline | null => {
+  if (!isRecord(v) || typeof v.status !== 'string') return null;
+  if (v.status === 'success') return PIPELINE.success;
+  if (v.status === 'failed') return PIPELINE.failed;
+  if (RUNNING_PIPELINES.has(v.status)) return PIPELINE.running;
+  return PIPELINE.other;
+};
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
 const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v : null);
@@ -60,6 +93,8 @@ const readPerson = (v: unknown): IMetaPerson | null => {
 /** The runtime's answer, read strictly; null for a shape that is not one of the three (nothing is guessed). */
 export const readMeta = (v: unknown): TMeta | null => {
   if (!isRecord(v)) return null;
+  if (v.kind === 'stand' && typeof v.up === 'boolean')
+    return { kind: 'stand', up: v.up, title: text(v.title) };
   const title = text(v.title);
   if (!title) return null;
   if (v.kind === 'artifact') return { kind: 'artifact', title, description: text(v.description) };
@@ -71,6 +106,15 @@ export const readMeta = (v: unknown): TMeta | null => {
       project: text(v.project) ?? '',
       iid: typeof v.iid === 'number' ? v.iid : 0,
       draft: v.draft === true,
+      pipeline: readPipeline(v.pipeline),
+    };
+  if (v.kind === 'commit')
+    return {
+      kind: 'commit',
+      title,
+      sha: text(v.sha) ?? '',
+      project: text(v.project) ?? '',
+      pipeline: readPipeline(v.pipeline),
     };
   if (v.kind === 'issue')
     return {
@@ -157,6 +201,8 @@ export const rowOf = (item: IArtifactItem, meta: TMeta | null, look: TLook, mr: 
     };
   }
   if (meta?.kind === 'artifact') return { ...base, title: meta.title, sub: meta.description ?? item.where };
+  if (meta?.kind === 'commit') return { ...base, title: meta.title, sub: [meta.project, meta.sha].join(' ') };
+  if (meta?.kind === 'stand') return { ...base, title: meta.title ?? own, sub: item.where };
   if (pending) return { ...base, title: null, sub: item.key ?? item.where };
   return { ...base, title: own, sub: item.key ? item.key : item.where };
 };

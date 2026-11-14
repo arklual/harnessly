@@ -12,7 +12,9 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/features"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
+	"github.com/ly-solutions/harnessly/internal/hub/metrics"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/webvitals"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -27,8 +29,12 @@ type FeatureGate interface {
 // passes admit, the rule of /m/<id>/…: a machine the person has no access to is not listed and is refused.
 var errFleetOff = httpx.New(http.StatusNotFound, "not_enabled", "Один рантайм для всех машин не включён")
 
+// webVitalLimit caps the reports of one person (internal/webvitals).
+var webVitalLimit = webvitals.NewLimiter()
+
 func (s *Service) mountFleet(mux *http.ServeMux) {
 	mux.Handle("GET /api/me/machines", s.auth.Require(s.meMachines))
+	mux.Handle("GET /api/me/projects", s.auth.Require(s.meProjects))
 	mux.Handle("/api/v2/", http.HandlerFunc(s.serveFleet))
 }
 
@@ -376,6 +382,11 @@ func (s *Service) serveFleet(w http.ResponseWriter, r *http.Request) {
 // fleetCall answers /api/v2/… for a signed-in person; onHub is the workspace's way in (workspace.go), where only the
 // machines that may answer on the hub's own origin are there.
 func (s *Service) fleetCall(w http.ResponseWriter, r *http.Request, u store.User, onHub bool) {
+	if r.URL.Path == "/api/v2/web-vitals" {
+		// the page's own timings (Sinopia's home, LCP) are the hub's numbers, whatever machine the page shows.
+		webvitals.Serve(w, r, webVitalLimit, u.ID, func(v webvitals.Sample) { metrics.ObserveWebVital(v.Name, v.Seconds) })
+		return
+	}
 	if r.URL.Path == "/api/v2/chat-move" || strings.HasPrefix(r.URL.Path, "/api/v2/chat-move/") {
 		s.serveMove(w, r, u)
 		return

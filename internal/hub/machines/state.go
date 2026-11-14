@@ -176,6 +176,9 @@ func (s *Service) connected(l *link.Link, m store.Machine) {
 	if s.design != nil && slices.Contains(hello.Features, hubproto.FeatureDesignAccess) {
 		events = append(slices.Clone(events), hubproto.EventDesign)
 	}
+	if s.projects != nil && slices.Contains(hello.Features, hubproto.FeatureProjects) {
+		events = append(slices.Clone(events), hubproto.EventProjects)
+	}
 	if s.history != nil && slices.Contains(hello.Features, hubproto.FeatureHistory) {
 		events = append(slices.Clone(events), hubproto.EventHistoryEvents, hubproto.EventHistoryBackfill)
 	}
@@ -306,6 +309,11 @@ func (s *Service) dispatch(ctx context.Context, l *link.Link, m store.Machine, e
 		var e struct{ Run hubproto.EnvRun }
 		if s.env != nil && json.Unmarshal(ev.Raw, &e) == nil {
 			s.env.Run(m.ID, e.Run)
+		}
+	case hubproto.EventProjects:
+		var e struct{ Projects hubproto.ProjectsEvent }
+		if s.projects != nil && json.Unmarshal(ev.Raw, &e) == nil {
+			safego.Go("machines projects", func() { s.projects.Event(m, e.Projects) })
 		}
 	case hubproto.EventDesign:
 		var e struct{ Design hubproto.DesignEvent }
