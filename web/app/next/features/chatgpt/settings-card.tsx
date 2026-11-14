@@ -1,7 +1,7 @@
 // «ChatGPT» in Providers: the sign-in with ChatGPT for a plain conversation on the person's own plan. The
 // card is the providers' card; under it the accounts of this machine and the sign-in itself. On a remote
 // machine the browser's callback (127.0.0.1) does not reach it, so the person pastes the callback's address back here.
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { gptChatsChanged } from '@/next/features/chatgpt/store';
 import {
   activateAccount,
@@ -105,9 +105,68 @@ interface ILoginPanelProps {
   onCancel: () => void;
 }
 
+/** The address the browser lands on at the sign-in's end: the loopback callback with its code. */
+const CALLBACK_RE = /^https?:\/\/(127\.0\.0\.1|localhost):\d+\/auth\/callback\?\S*code=/;
+const isCallback = (text: string) => CALLBACK_RE.test(text.trim());
+/** The page may ask the clipboard (Clipboard API; absent in an insecure context). */
+const canReadClipboard = () =>
+  typeof navigator !== 'undefined' && 'clipboard' in navigator && 'readText' in navigator.clipboard;
+
+/** The browser's bar at the sign-in's end, drawn: which address to copy. */
+const BarPicture = () => (
+  <div className="hx-gpt-bar" aria-hidden="true">
+    <span className="hx-gpt-bar__dots">
+      <i />
+      <i />
+      <i />
+    </span>
+    <span className="hx-gpt-bar__url">
+      <mark>127.0.0.1:1455/auth/callback?code=…</mark>
+    </span>
+  </div>
+);
+
 const LoginPanel = ({ login, busy, error, onPaste, onCancel }: ILoginPanelProps) => {
   const id = useId();
   const [text, setText] = useState('');
+  const sent = useRef('');
+
+  // The address is sent as soon as it is there: pasted into the field, or found in the clipboard when the person comes
+  // back to this tab (where the browser lets the page read it; elsewhere nothing happens).
+  const take = useCallback(
+    (raw: string) => {
+      const value = raw.trim();
+      if (!isCallback(value) || value === sent.current) return false;
+      sent.current = value;
+      setText(value);
+      onPaste(value);
+      return true;
+    },
+    [onPaste],
+  );
+
+  useEffect(() => {
+    const look = () => {
+      if (document.visibilityState !== 'visible' || !canReadClipboard()) return;
+      navigator.clipboard.readText().then(take, () => undefined);
+    };
+    window.addEventListener('focus', look);
+    document.addEventListener('visibilitychange', look);
+    return () => {
+      window.removeEventListener('focus', look);
+      document.removeEventListener('visibilitychange', look);
+    };
+  }, [take]);
+
+  const fromClipboard = () => {
+    navigator.clipboard.readText().then(
+      (value) => {
+        if (!take(value)) setText(value.trim());
+      },
+      () => undefined,
+    );
+  };
+
   return (
     <form
       className="hx-key-form hx-gpt-login"
@@ -125,6 +184,7 @@ const LoginPanel = ({ login, busy, error, onPaste, onCancel }: ILoginPanelProps)
         </li>
         <li>{t('next.chatgpt.login.step2')}</li>
       </ol>
+      <BarPicture />
       <label className="hx-voice-words__field" htmlFor={id}>
         <span className="hx-nb__label">{t('next.chatgpt.login.pasteLabel')}</span>
         <input
@@ -136,6 +196,9 @@ const LoginPanel = ({ login, busy, error, onPaste, onCancel }: ILoginPanelProps)
           spellCheck={false}
           inputMode="url"
           placeholder="http://127.0.0.1:1455/auth/callback?code=…"
+          onPaste={(e) => {
+            if (take(e.clipboardData.getData('text'))) e.preventDefault();
+          }}
           onChange={(e) => setText(e.target.value)}
         />
       </label>
@@ -149,6 +212,11 @@ const LoginPanel = ({ login, busy, error, onPaste, onCancel }: ILoginPanelProps)
         >
           {t('next.chatgpt.login.done')}
         </SetButton>
+        {canReadClipboard() && (
+          <SetButton tone="ghost" onClick={fromClipboard}>
+            {t('next.chatgpt.login.paste')}
+          </SetButton>
+        )}
         <SetButton tone="ghost" onClick={onCancel}>
           {t('next.chatgpt.login.cancel')}
         </SetButton>

@@ -138,7 +138,8 @@
   flex: 1;
   min-width: 0;
   min-height: 34px;
-  max-height: 132px;
+  /* A long (dictated) comment is read whole up to the cap. */
+  max-height: min(240px, 40vh);
   box-sizing: border-box;
   padding: 7px 0;
   border: 0;

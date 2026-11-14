@@ -1,9 +1,11 @@
 // One field for the whole window: a chat, a new chat, Settings, Sinopia's start and its island do not each
 // mount a field of their own — they lend the one the window keeps. A screen still decides everything about it (the
 // words, the files, the model, what sending does) and hands that to the field as props; the field itself stays mounted
-// and its node moves into the screen's place, so it keeps its focus, its caret, an open menu and its size, and glides
-// from the old place to the new one. Fields outside the main area — the right pane's chat,
-// a card in the feed — are their own, as before.
+// and its node moves into the screen's place, so it keeps its focus, its caret, an open menu and its size. It glides
+// from the old place to the new one only from a start page into the screen its sending opens (the same tag in
+// glideOut and glideIn: home → chat, Sinopia's start → its design); any other move (Sinopia, Settings or another chat
+// into a chat) puts it in its place from the first frame. Fields outside the main area — the right pane's chat, a card
+// in the feed — are their own, as before.
 import {
   createContext,
   memo,
@@ -32,6 +34,7 @@ interface ILent {
 /** Who holds the field: the screens that lend it, the last mounted on top. */
 const lenders: {
   token: object;
+  glide: IGlide;
   lent: ILent;
   steady: SteadyProps<IComposerProps>;
   slot: HTMLElement | null;
@@ -61,15 +64,15 @@ const place = () => {
   if (node.parentElement === top.slot) return;
   const had = focusIn(node) ?? refocus;
   refocus = null;
-  const from = leftAt ?? fieldRect(node);
+  const from = leftAt && top.glide.in !== null && top.glide.in === leftAt.tag ? leftAt.rect : null;
   leftAt = null;
   top.slot.appendChild(node);
   had?.focus({ preventScroll: true });
   glide(node, from);
 };
 
-/** Where the field was when its screen left: the screen's node goes away with it, the next place glides from there. */
-let leftAt: DOMRect | null = null;
+/** Where the field was when a start page left (glideOut): the next place glides from there if it takes it (glideIn). */
+let leftAt: { rect: DOMRect | null; tag: string } | null = null;
 
 const fieldRect = (node: HTMLElement): DOMRect | null => {
   const field = node.querySelector<HTMLElement>('.hx-composer');
@@ -124,7 +127,7 @@ const holding = (token: object) => {
   return at < 0 || at === lenders.length - 1;
 };
 
-const lend = (token: object, props: IComposerProps, srcOf: TSrcOf, slot: HTMLElement | null) => {
+const lend = (token: object, props: IComposerProps, srcOf: TSrcOf, slot: HTMLElement | null, glide: IGlide) => {
   const me = lenders.find((l) => l.token === token);
   if (me) {
     // A screen that drew again with nothing new for the field (its clock, its handlers made anew) leaves it be.
@@ -135,7 +138,7 @@ const lend = (token: object, props: IComposerProps, srcOf: TSrcOf, slot: HTMLEle
     return;
   }
   const steady = new SteadyProps(props);
-  lenders.push({ token, lent: { props: steady.value, srcOf, of: token }, steady, slot });
+  lenders.push({ token, glide, lent: { props: steady.value, srcOf, of: token }, steady, slot });
   emit();
   place();
 };
@@ -145,7 +148,8 @@ const giveBack = (token: object) => {
   if (at < 0) return;
   if (at === lenders.length - 1 && host) {
     refocus = focusIn(host);
-    leftAt = fieldRect(host);
+    const out = lenders[at].glide.out;
+    leftAt = out === null ? null : { rect: fieldRect(host), tag: out };
     // Only the screen that comes in the same commit takes it; later the focus is the person's again.
     queueMicrotask(() => {
       refocus = null;
@@ -202,8 +206,23 @@ export const MainFieldArea = ({ children }: { children: ReactNode }) => (
   <MainField.Provider value>{children}</MainField.Provider>
 );
 
+/** Which moves of the window's field glide: from this screen (a start page whose sending opens the next screen) and
+ *  into it (the screen a start page's sending opens). */
+interface IGlide {
+  out: string | null;
+  in: string | null;
+}
+
+interface IScreenFieldProps extends IComposerProps {
+  /** A start page: the field glides from here into the screen with the same glideIn tag. */
+  glideOut?: string;
+  /** The screen a start page's sending opens: the field glides in from the start page with the same glideOut tag; from
+   *  anywhere else it stands. */
+  glideIn?: string;
+}
+
 /** A screen's place for the window's field, with what the field is for on this screen. */
-const LentField = (props: IComposerProps) => {
+const LentField = ({ glideOut, glideIn, ...props }: IScreenFieldProps) => {
   const srcOf = useContext(AttachmentSrc);
   const slot = useRef<HTMLDivElement>(null);
   const [token] = useState(() => ({}));
@@ -215,7 +234,7 @@ const LentField = (props: IComposerProps) => {
   );
 
   // Each render hands the field what this screen wants of it; the first one registers the screen as the top one.
-  useLayoutEffect(() => lend(token, props, srcOf, slot.current));
+  useLayoutEffect(() => lend(token, props, srcOf, slot.current, { out: glideOut ?? null, in: glideIn ?? null }));
   useLayoutEffect(() => () => giveBack(token), [token]);
 
   return (
@@ -227,7 +246,7 @@ const LentField = (props: IComposerProps) => {
 };
 
 /** The field of a screen: the window's one in the main area, a field of its own anywhere else. */
-const ScreenField = (props: IComposerProps) =>
-  useContext(MainField) ? <LentField {...props} /> : <Composer {...props} />;
+const ScreenField = ({ glideOut, glideIn, ...props }: IScreenFieldProps) =>
+  useContext(MainField) ? <LentField {...props} glideOut={glideOut} glideIn={glideIn} /> : <Composer {...props} />;
 
 export default ScreenField;

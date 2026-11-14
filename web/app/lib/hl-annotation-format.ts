@@ -111,9 +111,23 @@ export interface IParsedAnnotation {
   quote?: IParsedTextQuote;
 }
 
+/**
+ * A space's block (a board or a document open beside the chat) reads back as what it names: «Plan · Рилсы»,
+ * never a bare «element».
+ */
+const parseSpaceBlock = (block: string): IParsedAnnotation | null => {
+  const n = Number(block.match(/^<annotation\b[^>]*\bn="(\d+)"/)?.[1]);
+  const open = block.match(/^open: [^«\n]*«([^»\n]*)»/m)?.[1];
+  if (!Number.isInteger(n) || open === undefined) return null;
+  const selection = block.match(/^selection: (.*)$/m)?.[1] ?? '';
+  const short = clip(selection, MAX_LABEL_TEXT);
+  return { n, label: short ? `${open} · ${short}` : open, comment: '', file: null };
+};
+
 /** Reads a sent block back for the timeline: the chip label and the comment, as the composer showed them. */
 export const parseAnnotationBlock = (block: string): IParsedAnnotation | null => {
   if (/^<annotation\b[^>]*\bkind="text"/.test(block)) return parseTextAnnotationBlock(block);
+  if (/^<annotation\b[^>]*\bkind="space"/.test(block)) return parseSpaceBlock(block);
   const head = block.match(/^<annotation\b([^>]*)>\n([\s\S]*)\n<\/annotation>$/);
   const n = Number(head?.[1].match(/\bn="(\d+)"/)?.[1]);
   if (!head || !Number.isInteger(n)) return null;

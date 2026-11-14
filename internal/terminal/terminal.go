@@ -38,6 +38,8 @@ const (
 	msgKill       = 0x04
 	msgWebStdin   = 0x05
 	msgPromptMark = 0x06
+	// msgBottom: the page scrolls back to the live screen (its "Down", or a key typed while scrolled back).
+	msgBottom = 0x07
 
 	heartbeatEvery   = 30 * time.Second
 	heartbeatTimeout = 90 * time.Second
@@ -469,6 +471,9 @@ func (c *conn) readSocket() {
 			c.send([]byte{msgHeartbeat})
 		case msgKill:
 			go c.s.cfg.Tmux.KillSession(c.session)
+		case msgBottom:
+			// In order with the keys that follow: they reach the program, not the scrollback.
+			c.s.cfg.Tmux.ExitCopyMode(c.session)
 		}
 	}
 }

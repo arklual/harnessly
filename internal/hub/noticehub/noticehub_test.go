@@ -51,3 +51,40 @@ func TestSwitchAndPerson(t *testing.T) {
 		t.Fatal("read item still listed: " + w.Body.String())
 	}
 }
+
+// the hub's own news rings the bell of those with the switch on, once per key.
+func TestRing(t *testing.T) {
+	db, err := sql.Open("sqlite", "file:"+t.TempDir()+"/h.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := notices.EnsureSchema(context.Background(), db); err != nil {
+		t.Fatal(err)
+	}
+	s := New(notices.Wrap(db, false), nil)
+	ctx := context.Background()
+	if s.Ring(ctx, "m1", "a@example.com", "access-request:r1", "t", "x", "/l") {
+		t.Fatal("no wiring: nothing rings")
+	}
+	on := false
+	s.OnFor = func(context.Context, string, string) bool { return on }
+	s.UserID = func(_ context.Context, email string) (string, bool) { return "u1", email == "a@example.com" }
+	if s.Ring(ctx, "m1", "a@example.com", "access-request:r1", "t", "x", "/l") {
+		t.Fatal("switch off: only the mail")
+	}
+	on = true
+	if s.Ring(ctx, "m1", "nobody@example.com", "access-request:r1", "t", "x", "/l") {
+		t.Fatal("unknown person")
+	}
+	if !s.Ring(ctx, "m1", " A@example.com ", "access-request:r1", "Ann asks", "please", "/l") {
+		t.Fatal("not put")
+	}
+	if s.Ring(ctx, "m1", "a@example.com", "access-request:r1", "Ann asks", "please", "/l") {
+		t.Fatal("the same key shows twice")
+	}
+	st, err := s.Notices.State(ctx, "u1")
+	if err != nil || len(st.Items) != 1 || !strings.Contains(string(st.Items[0].Doc), `"kind":"access"`) || !strings.Contains(string(st.Items[0].Doc), `"link":"/l"`) {
+		t.Fatalf("%+v %v", st, err)
+	}
+}

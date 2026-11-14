@@ -4,7 +4,7 @@
 // and the quick ones (prompt-history.tsx), «/» the commands, skills and settings of the agent (slash-palette.tsx). On a phone the dock rides over the keyboard.
 import AttachmentThumb from '@/next/ui/attachment-thumb';
 import { formatProgress, percentOf } from '@/next/ui/transfer';
-import { distinctFiles } from '@/next/features/composer/distinct-files';
+import { distinctFiles, pastedFiles } from '@/next/features/composer/distinct-files';
 import { useFileDrop } from '@/next/features/composer/use-file-drop';
 import ContextRing, { type IContextRingProps } from '@/next/features/composer/context-ring';
 import {
@@ -507,15 +507,16 @@ const Composer = (props: IComposerProps) => {
   };
 
   const { onFiles, plain } = props;
-  const dropping = useFileDrop(onFiles) && !plain;
+  const dropping = useFileDrop(onFiles, rootRef) && !plain;
   const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
     const files = [...event.clipboardData.files];
     if (files.length === 0 || plain) return;
     event.preventDefault();
-    // One paste is taken once, by the field it went to; the same picture twice in the clipboard is one.
+    // One paste is taken once, by the field it went to; the same picture twice in the clipboard (its file and its
+    // pixels, or the same bytes twice) is one.
     if (pasted.has(event.nativeEvent)) return;
     pasted.add(event.nativeEvent);
-    void distinctFiles(files).then(onFiles);
+    void distinctFiles(pastedFiles(files)).then(onFiles);
   };
 
   let fullPlaceholder = props.placeholder ?? t(PLACEHOLDER_KEYS[mode]);
@@ -587,7 +588,7 @@ const Composer = (props: IComposerProps) => {
               data-big={(file.progress && file.progress.size >= BIG_UPLOAD_BYTES) || undefined}
               title={file.name}
             >
-              <AttachmentThumb item={file} className="hx-attach__thumb" />
+              <AttachmentThumb item={file} className="hx-attach__thumb" inField />
               <span className="hx-attach__text">
                 <span className="hx-attach__name">{file.name}</span>
                 {file.progress && file.progress.size >= BIG_UPLOAD_BYTES && (

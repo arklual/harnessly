@@ -95,6 +95,11 @@ type Interceptor interface {
 	ServeMachine(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine) bool
 }
 
+// Anchor names the machines that hold a hub route's project, newest first, so the route needs no ?machine=.
+type Anchor interface {
+	AnchorMachines(ctx context.Context, spaceIDs []string, rest string) []string
+}
+
 // HomeServer answers Sinopia's home itself, asking the machine through ask and its store at once.
 type HomeServer interface {
 	ServeHome(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine, ask func(ctx context.Context, w http.ResponseWriter)) bool

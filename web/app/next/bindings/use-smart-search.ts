@@ -446,10 +446,7 @@ export const useSmartSearch = ({
   }, [scope, chats, projects, mine, appsGroup, tabs, mineOf, mineKey, person]);
 
   const empty = useMemo(() => scopeEmpty(scope), [scope]);
-  const detail = useMemo(
-    () => detailSource({ machine, chats, projects, now }),
-    [machine, chats, projects, now],
-  );
+  const detail = useMemo(() => detailSource({ machine, chats, now }), [machine, chats, now]);
 
   const onAsk = useCallback(() => setAsked(words), [words]);
 

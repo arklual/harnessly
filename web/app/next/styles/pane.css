@@ -2151,6 +2151,39 @@ input.hx-tbrowser__url:focus {
   pointer-events: none;
   transform: translate(var(--x), var(--y));
 }
+/* The pencil in the picture's corner: it opens the picture in the editor. */
+.hx-deliv__mark {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 160ms var(--hx-ease-out),
+    color 160ms var(--hx-ease-out);
+}
+.hx-deliv__stage:hover .hx-deliv__mark,
+.hx-deliv__mark:focus-visible {
+  opacity: 1;
+}
+.hx-deliv__mark:hover {
+  color: var(--hx-fg-1);
+}
+@media (pointer: coarse) {
+  .hx-deliv__mark {
+    opacity: 1;
+    width: 40px;
+    height: 40px;
+  }
+}
 .hx-deliv__image {
   max-width: 100%;
   max-height: calc(100dvh - 170px);

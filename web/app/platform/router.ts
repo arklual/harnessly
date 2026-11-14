@@ -141,10 +141,11 @@ const events: IRouter['events'] = {
   emit,
 };
 
-const router = (): IRouter => ({
-  ...snapshot,
+/** The router over one reading of the address. */
+const routerOf = (at: ISnapshot): IRouter => ({
+  ...at,
   isReady: true,
-  route: snapshot.pathname,
+  route: at.pathname,
   basePath: appBasePath(),
   push: (url, as, options) => navigate('push', url, as, options),
   replace: (url, as, options) => navigate('replace', url, as, options),
@@ -155,10 +156,14 @@ const router = (): IRouter => ({
   beforePopState: () => {},
 });
 
+const router = (): IRouter => routerOf(snapshot);
+
 const Router: IRouter = new Proxy({} as IRouter, { get: (_target, key) => router()[key as keyof IRouter] });
 
+// The router is made of the reading the hook returns, not of the module's: the React Compiler memoizes on what a
+// component reads, and a call with nothing to read would keep its first answer.
 export const useRouter = (): IRouter => {
-  useSyncExternalStore(
+  const at = useSyncExternalStore(
     (fn) => {
       subscribers.add(fn);
       return () => subscribers.delete(fn);
@@ -166,7 +171,7 @@ export const useRouter = (): IRouter => {
     () => snapshot,
     () => snapshot,
   );
-  return router();
+  return routerOf(at);
 };
 
 export default Router;

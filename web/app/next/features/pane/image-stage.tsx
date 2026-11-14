@@ -1,7 +1,13 @@
 // A picture in the pane: fitted, and it zooms in place with the wheel, a pinch or a double click, a drag pans it (the image
-// viewer's own gestures, ui/use-image-zoom.ts). Shift and a drag mark a region of it, which the chat hears of.
+// viewer's own gestures, ui/use-image-zoom.ts). Shift and a drag mark a region of it, which the chat hears of. The pencil
+// in its corner opens it in the editor, where the person marks it and the marked picture goes into the chat's field.
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import useImageZoom from '@/next/ui/use-image-zoom';
+import ImageEditView from '@/next/features/image-edit/image-editor';
+import { useMarkupTarget } from '@/next/features/image-edit/to-composer';
+import { t } from '@/next/i18n';
+import Icon from '@/next/ui/icon';
+import type { DraftKey } from '@/next/stores/drafts';
 import { regionSelection, type IFileSelection } from '@/next/features/pane/file-selection';
 
 interface IShare {
@@ -18,12 +24,16 @@ interface IImageStageProps {
   src: string;
   name: string;
   onSelection?: (selection: IFileSelection | null) => void;
+  /** The field the marked picture goes to (the chat the pane is beside). */
+  markTo?: DraftKey;
 }
 
 const SMALLEST_SHARE = 0.005;
 const clampShare = (value: number) => Math.min(1, Math.max(0, value));
 
-const ImageStage = ({ src, name, onSelection }: IImageStageProps) => {
+const ImageStage = ({ src, name, onSelection, markTo }: IImageStageProps) => {
+  const [editing, setEditing] = useState(false);
+  const annotate = useMarkupTarget({ to: markTo });
   const stage = useRef<HTMLDivElement | null>(null);
   const image = useRef<HTMLImageElement | null>(null);
   const box = useRef<HTMLDivElement | null>(null);
@@ -85,7 +95,7 @@ const ImageStage = ({ src, name, onSelection }: IImageStageProps) => {
     );
   };
 
-  return (
+  const stageView = (
     <div
       className="hx-deliv__stage"
       ref={stage}
@@ -115,7 +125,28 @@ const ImageStage = ({ src, name, onSelection }: IImageStageProps) => {
     >
       <img ref={image} className="hx-deliv__image" src={src} alt={name} draggable={false} />
       {region && <div className="hx-deliv__region" ref={box} aria-hidden="true" />}
+      <button
+        type="button"
+        className="hx-deliv__mark"
+        aria-label={t('next.imageEdit.part.markup')}
+        title={t('next.imageEdit.part.markup')}
+        onClick={() => setEditing(true)}
+      >
+        <Icon name="pencil" size="sm" />
+      </button>
     </div>
+  );
+  // Beside the stage, not in it: the editor's presses must not reach the stage's own gestures through the portal.
+  return (
+    <>
+      {stageView}
+      <ImageEditView
+        item={editing ? { src, name } : null}
+        editing={null}
+        annotate={annotate}
+        onClose={() => setEditing(false)}
+      />
+    </>
   );
 };
 

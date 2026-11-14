@@ -4,7 +4,7 @@ The design library (prototypes, sites, decks; named by `RUNTIME_DESIGN_NAME`) ke
 your machine. Its boards are written in the board format of Claude Design, and a board draws itself with that format's
 engine, which the board loads as `./support.js`.
 
-**Nothing to set up.** harnessly ships its own engine (`internal/design/ownengine/support.js`, Apache 2.0), an
+**Nothing to set up.** harnessly ships its own engine (`internal/design/ownengine/support.js`, AGPL-3.0), an
 independent implementation of the format. It needs no account, so designs work with an API key, with Codex and offline.
 
 ## Which engine a project gets

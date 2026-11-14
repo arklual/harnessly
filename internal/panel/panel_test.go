@@ -561,22 +561,34 @@ func TestClassifyAsksTheResolverBeforeTheBrowserOnly(t *testing.T) {
 	}
 }
 
-// A board file of the library opens in Sinopia Design on its design, not as a file; any other file stays a file.
-func TestBoardFileOpensDesign(t *testing.T) {
+// a file of a design opens the design, on the board the file is, whatever tab the agent named; any other
+// file stays a file.
+func TestFileOfADesignOpensTheDesign(t *testing.T) {
 	withLibrary := targets
-	withLibrary.DesignBoard = func(path string) string {
-		if path == "/lib/landing/project/Main.dc.html" {
-			return "landing"
+	withLibrary.DesignRef = func(text string) string { return "" }
+	withLibrary.DesignBoard = func(p string) (string, string) {
+		switch p {
+		case "/lib/landing/project/Лимиты — поповер.dc.html":
+			return "landing", "Лимиты — поповер.dc.html"
+		case "/lib/landing":
+			return "landing", ""
 		}
-		return ""
+		return "", ""
 	}
-	c, err := withLibrary.Parse(open("files", "/lib/landing/project/Main.dc.html"))
-	if err != "" || c != (Command{Kind: "open", Tab: "design", Target: "landing"}) {
-		t.Fatalf("board → %+v %q", c, err)
+	cases := []struct {
+		tab, target string
+		want        Command
+	}{
+		{"files", "/lib/landing/project/Лимиты — поповер.dc.html", Command{Kind: "open", Tab: "design", Target: "landing", Place: "Лимиты — поповер.dc.html"}},
+		{"design", "/lib/landing/project/Лимиты — поповер.dc.html", Command{Kind: "open", Tab: "design", Target: "landing", Place: "Лимиты — поповер.dc.html"}},
+		{"files", "/lib/landing", Command{Kind: "open", Tab: "design", Target: "landing"}},
+		{"files", "/work/report.md", Command{Kind: "open", Tab: "files", Target: "/work/report.md"}},
+		{"files", "./page.html", Command{Kind: "open", Tab: "files", Target: "./page.html"}},
 	}
-	for _, in := range []string{"/w/other.dc.html", "/lib/landing/project/notes.md"} {
-		if c, err := withLibrary.Parse(open("files", in)); err != "" || c.Tab != "files" {
-			t.Errorf("%q → %+v %q", in, c, err)
+	for _, c := range cases {
+		got, err := withLibrary.Parse(open(c.tab, c.target))
+		if err != "" || got != c.want {
+			t.Errorf("%s %q → %+v %q, want %+v", c.tab, c.target, got, err, c.want)
 		}
 	}
 }

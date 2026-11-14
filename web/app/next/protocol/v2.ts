@@ -1245,7 +1245,7 @@ export interface LegacyTab {
 }
 /** The tab of the right pane a chip or a link opens in (GET /api/v2/conversations/{id}/open): a tracker task, a
  *  GitLab merge request or commit, a published document or board, any other site in the browser. */
-export const OPEN_TABS = ['task', 'gitlab', 'artifacts', 'browser', 'link'] as const;
+export const OPEN_TABS = ['task', 'gitlab', 'artifacts', 'browser', 'design', 'link'] as const;
 /** Why a `link` answer opens nothing: the connection's sign-in was refused (`connect`), or the provider cannot be
  *  shown inside a page (`embed`). The target is then the original address. */
 export const OPEN_REASONS = ['connect', 'embed'] as const;
@@ -1258,6 +1258,8 @@ export interface OpenTarget {
   reason?: OpenReason;
   /** Present when the ref fits several places (`!12` in two projects): the best first, which is tab and target. */
   choices?: OpenChoice[];
+  /** Only on the `design` tab: the board of the design the ref is (a path under its project/). */
+  board?: string;
 }
 /** One place a ref may open: the project, and what is known of the merge request there (its title). */
 export interface OpenChoice {
@@ -1296,6 +1298,8 @@ export interface FileContent {
   content: string;
   revision: string;
   bytes: number;
+  /** The file lies outside the chat's folder: it is shown, never saved. */
+  readOnly?: true;
 }
 /** PUT /api/v2/conversations/{id}/file?path=: the whole new text over the revision that was read; answers the file as it is now. */
 export interface FileSave {
@@ -2274,6 +2278,7 @@ const fail = (path: string, problem: string): never => {
 const str: Decoder<string> = (v, p) => (typeof v === 'string' ? v : fail(p, 'not a string'));
 const id: Decoder<string> = (v, p) => (str(v, p) !== '' ? (v as string) : fail(p, 'empty'));
 const bool: Decoder<boolean> = (v, p) => (typeof v === 'boolean' ? v : fail(p, 'not a boolean'));
+const onlyTrue: Decoder<true> = (v, p) => (v === true ? true : fail(p, 'not true'));
 const int: Decoder<number> = (v, p) =>
   typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 ? v : fail(p, 'not a whole number ≥ 0');
 const seq: Decoder<number> = (v, p) => (int(v, p) >= 1 ? (v as number) : fail(p, 'below 1'));
@@ -2834,6 +2839,7 @@ const openTarget: Decoder<OpenTarget> = object(
   { tab: oneOf(OPEN_TABS), target: id },
   {
     reason: oneOf(OPEN_REASONS),
+    board: id,
     choices: (v, p) => {
       const choices = array(openChoice)(v, p);
       return choices.length >= 2 ? choices : fail(p, 'fewer than 2 choices');
@@ -3685,7 +3691,8 @@ export const parsePage = {
   designlyChat: (v: unknown): DesignlyChat => designlyChat(v, '$'),
   files: (v: unknown): DirListing =>
     object({ path: str, entries: array(fileEntry), truncated: bool }, { root: str })(v, '$'),
-  file: (v: unknown): FileContent => object({ path: id, content: str, revision: id, bytes: int })(v, '$'),
+  file: (v: unknown): FileContent =>
+    object({ path: id, content: str, revision: id, bytes: int }, { readOnly: onlyTrue })(v, '$'),
   tasks: (v: unknown): Task[] => array(task)(v, '$'),
   legacy: (v: unknown): LegacyTab | null => {
     // A conversation without a tmux session yet answers {"tab":null}.

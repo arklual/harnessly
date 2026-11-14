@@ -9,6 +9,7 @@ const actions = (shown: string | null = 'tab-7') => {
     notYet: vi.fn(),
     connect: vi.fn(),
     original: vi.fn(),
+    design: vi.fn(),
   } satisfies IOpenPlaceActions;
   return a;
 };
@@ -53,5 +54,14 @@ describe('openPlace', () => {
     openPlace({ tab: 'task', target: 'conn:c:issue:K-1' }, a);
     expect(a.notYet).toHaveBeenCalled();
     expect(a.reveal).not.toHaveBeenCalled();
+  });
+
+  it('opens a board of a design on the design, never as a file (HRN-1450)', () => {
+    const a = actions();
+    openPlace({ tab: 'design', target: 'harnessly', board: 'Лимиты — поповер в поле ввода.dc.html' }, a);
+    openPlace({ tab: 'design', target: 'landing' }, a);
+    expect(a.design).toHaveBeenNthCalledWith(1, 'harnessly', 'Лимиты — поповер в поле ввода.dc.html');
+    expect(a.design).toHaveBeenNthCalledWith(2, 'landing', null);
+    expect(a.show).not.toHaveBeenCalled();
   });
 });

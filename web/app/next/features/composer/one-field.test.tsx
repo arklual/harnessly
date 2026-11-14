@@ -129,3 +129,48 @@ describe('the window’s one field', () => {
     expect(field.value).toBe('a');
   });
 });
+
+describe('the field glides only from a start page into the screen its sending opens', () => {
+  const Glide = ({ name, glideOut, glideIn }: { name: string; glideOut?: string; glideIn?: string }) => (
+    <section data-testid={name}>
+      <ScreenField {...base({ placeholder: name })} glideOut={glideOut} glideIn={glideIn} />
+    </section>
+  );
+  const At = ({ at }: { at: 'home' | 'sinopia' | 'settings' | 'chat' }) => (
+    <>
+      <MainFieldArea>
+        {at === 'home' && <Glide key="home" name="home" glideOut="chat" />}
+        {at === 'sinopia' && <Glide key="sinopia" name="sinopia" glideOut="site" />}
+        {at === 'settings' && <Glide key="settings" name="settings" />}
+        {at === 'chat' && <Glide key="chat" name="chat" glideIn="chat" />}
+      </MainFieldArea>
+      <OneFieldRoot />
+    </>
+  );
+
+  let animate: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    animate = vi.fn();
+    // jsdom lays nothing out: the field stands high on the start pages and low in the chat.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const top = this.closest('[data-testid="chat"]') ? 800 : 300;
+      return { left: 100, top, width: 600, height: 120, right: 700, bottom: top + 120, x: 100, y: top } as DOMRect;
+    });
+    HTMLElement.prototype.animate = animate as unknown as HTMLElement['animate'];
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('glides from the new chat’s page into the chat it opens (HRN-1362)', () => {
+    const { rerender } = render(<At at="home" />);
+    animate.mockClear();
+    rerender(<At at="chat" />);
+    expect(animate).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['sinopia', 'settings'] as const)('stands in its place at once when the chat comes from %s', (from) => {
+    const { rerender } = render(<At at={from} />);
+    animate.mockClear();
+    rerender(<At at="chat" />);
+    expect(animate).not.toHaveBeenCalled();
+  });
+});

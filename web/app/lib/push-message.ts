@@ -65,9 +65,9 @@ export const buildDesignPushMessage = ({ title, url, tag }: IDesignPushInput): I
   const body = t('lib.pushMessage.designBody', { title: clip(title, DESIGN_TITLE_MAX) });
   return {
     kind: 'design',
-    title: 'Claude Design',
+    title: 'Sinopia Design',
     body,
-    conversationTitle: 'Claude Design',
+    conversationTitle: 'Sinopia Design',
     detail: body,
     provider: 'claude',
     tabId: '',

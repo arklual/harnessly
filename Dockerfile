@@ -77,7 +77,7 @@ FROM debian:${DEBIAN_VERSION}-slim AS base
 LABEL org.opencontainers.image.title="harnessly" \
       org.opencontainers.image.description="A workspace for people and coding agents: terminals, conversations, documents and boards in one place" \
       org.opencontainers.image.source="https://github.com/ly-solutions/harnessly" \
-      org.opencontainers.image.licenses="Apache-2.0"
+      org.opencontainers.image.licenses="AGPL-3.0-only"
 RUN apt-get update \
  && apt-get install -y --no-install-recommends tmux git bash ca-certificates curl tini procps openssh-client ripgrep less unzip bubblewrap jq \
  && rm -rf /var/lib/apt/lists/* \
@@ -175,7 +175,7 @@ FROM debian:${DEBIAN_VERSION}-slim AS hub
 LABEL org.opencontainers.image.title="harnessly hub" \
       org.opencontainers.image.description="The hub of harnessly: sign-in, spaces and invitations, and the machines people connect, reached through one address" \
       org.opencontainers.image.source="https://github.com/ly-solutions/harnessly" \
-      org.opencontainers.image.licenses="Apache-2.0"
+      org.opencontainers.image.licenses="AGPL-3.0-only"
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates \
  && rm -rf /var/lib/apt/lists/* \

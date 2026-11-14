@@ -582,49 +582,51 @@ const Feed = (props: IFeedProps) => {
   const observe = useCallback(
     (element: Element): (() => void) => {
       if (typeof ResizeObserver === 'undefined') return () => {};
-      observerRef.current ??= new ResizeObserver((entries) => {
-        const scroller = scrollerRef.current;
-        // A turn that was drawn and grew (the live line came, a step was added) moves what is under it at once; the
-        // dock's own growth follows frame by frame and needs no help.
-        let grew = false;
-        for (const entry of entries) {
-          const target = entry.target as HTMLElement;
-          const height = entry.borderBoxSize?.[0]?.blockSize ?? target.offsetHeight;
-          if (target === dockRef.current) {
-            scroller?.style.setProperty('--dock-pad', `${Math.ceil(height) + 24}px`);
-            continue;
+      // Not `??=`: the React Compiler does not take it yet, and the feed is the component it matters most for.
+      if (!observerRef.current)
+        observerRef.current = new ResizeObserver((entries) => {
+          const scroller = scrollerRef.current;
+          // A turn that was drawn and grew (the live line came, a step was added) moves what is under it at once; the
+          // dock's own growth follows frame by frame and needs no help.
+          let grew = false;
+          for (const entry of entries) {
+            const target = entry.target as HTMLElement;
+            const height = entry.borderBoxSize?.[0]?.blockSize ?? target.offsetHeight;
+            if (target === dockRef.current) {
+              scroller?.style.setProperty('--dock-pad', `${Math.ceil(height) + 24}px`);
+              continue;
+            }
+            const key = target.dataset.key;
+            if (!key) continue;
+            const before = heights.get(key);
+            if (before !== undefined && height > before) grew = true;
+            heights.set(key, height);
           }
-          const key = target.dataset.key;
-          if (!key) continue;
-          const before = heights.get(key);
-          if (before !== undefined && height > before) grew = true;
-          heights.set(key, height);
-        }
-        const wasBottom = atBottom.current;
-        const from = lastScrollHeight.current;
-        // At the bottom the feed follows; away from it the block the reader had at the top edge stays there.
-        const pinned = wasBottom ? stick() : false;
-        if (!wasBottom) keepAnchor();
-        if (scroller) lastTop.current = scroller.scrollTop;
-        // A copy on its way aims at where its bubble stands after this change, in this frame.
-        retargetFlights();
-        if (scroller) {
-          const moved = scroller.scrollHeight - from;
-          const inner = innerRef.current;
-          if (
-            inner &&
-            grew &&
-            wasBottom &&
-            !pinned &&
-            moved >= SLIDE_MIN_PX &&
-            moved <= scroller.clientHeight
-          )
-            slideFrom(inner, moved);
-          lastScrollHeight.current = scroller.scrollHeight;
-        }
-        // The place is not noted again here: a fold that animates has moved the layout again by the next frame, and a
-        // place noted then would take the move for the reader's. The reader's scroll notes it (onScroll).
-      });
+          const wasBottom = atBottom.current;
+          const from = lastScrollHeight.current;
+          // At the bottom the feed follows; away from it the block the reader had at the top edge stays there.
+          const pinned = wasBottom ? stick() : false;
+          if (!wasBottom) keepAnchor();
+          if (scroller) lastTop.current = scroller.scrollTop;
+          // A copy on its way aims at where its bubble stands after this change, in this frame.
+          retargetFlights();
+          if (scroller) {
+            const moved = scroller.scrollHeight - from;
+            const inner = innerRef.current;
+            if (
+              inner &&
+              grew &&
+              wasBottom &&
+              !pinned &&
+              moved >= SLIDE_MIN_PX &&
+              moved <= scroller.clientHeight
+            )
+              slideFrom(inner, moved);
+            lastScrollHeight.current = scroller.scrollHeight;
+          }
+          // The place is not noted again here: a fold that animates has moved the layout again by the next frame, and a
+          // place noted then would take the move for the reader's. The reader's scroll notes it (onScroll).
+        });
       const observer = observerRef.current;
       observer.observe(element);
       return () => observer.unobserve(element);

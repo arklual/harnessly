@@ -1208,7 +1208,7 @@
         "cwd": {"type": "string"}
       }
     },
-    "OpenTab": {"enum": ["task", "gitlab", "artifacts", "browser", "link"]},
+    "OpenTab": {"enum": ["task", "gitlab", "artifacts", "browser", "design", "link"]},
     "OpenChoice": {
       "type": "object",
       "required": ["tab", "target", "label", "detail"],
@@ -1228,7 +1228,8 @@
         "tab": {"$ref": "#/$defs/OpenTab"},
         "target": {"type": "string", "minLength": 1},
         "choices": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"$ref": "#/$defs/OpenChoice"}},
-        "reason": {"enum": ["connect", "embed"]}
+        "reason": {"enum": ["connect", "embed"]},
+        "board": {"type": "string", "minLength": 1}
       }
     },
     "OpenedRefs": {
@@ -1335,7 +1336,7 @@
       "type": "object",
       "required": ["path", "content", "revision", "bytes"],
       "additionalProperties": false,
-      "properties": {"path": {"type": "string", "minLength": 1}, "content": {"type": "string"}, "revision": {"type": "string", "minLength": 1}, "bytes": {"type": "integer", "minimum": 0}}
+      "properties": {"path": {"type": "string", "minLength": 1}, "content": {"type": "string"}, "revision": {"type": "string", "minLength": 1}, "bytes": {"type": "integer", "minimum": 0}, "readOnly": {"const": true}}
     },
     "FileSave": {
       "type": "object",

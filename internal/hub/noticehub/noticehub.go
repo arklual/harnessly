@@ -5,9 +5,12 @@
 package noticehub
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/notices"
@@ -23,6 +26,39 @@ type Service struct {
 	Notices *notices.Service
 	// On tells whether the switch is on for the person's email on the machine; nil is off.
 	On func(r *http.Request, email, machineID string) bool
+	// OnFor is On for news the hub itself sends (no request): the same switch, asked by email and machine.
+	OnFor func(ctx context.Context, email, machineID string) bool
+	// UserID finds the hub user of an email; not found is "" and false.
+	UserID func(ctx context.Context, email string) (string, bool)
+}
+
+// Ring puts a news of the hub into the bell of the person with this email: kind `access`, no chat, a link to
+// the page it is about. Only where the switch is on for them on the machine, and the same key never shows twice. It
+// reports whether the notice was put.
+func (s *Service) Ring(ctx context.Context, machineID, email, key, title, text, link string) bool {
+	if s == nil || s.Notices == nil || s.OnFor == nil || s.UserID == nil {
+		return false
+	}
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" || key == "" || !s.OnFor(ctx, email, machineID) {
+		return false
+	}
+	id, ok := s.UserID(ctx, email)
+	if !ok || id == "" {
+		return false
+	}
+	now := time.Now()
+	if s.Notices.Now != nil {
+		now = s.Notices.Now()
+	}
+	at := now.UnixMilli()
+	doc, err := json.Marshal(map[string]any{"key": key, "chatId": "", "kind": "access", "icon": "key-round",
+		"title": title, "text": text, "at": at, "link": link})
+	if err != nil {
+		return false
+	}
+	fresh, err := s.Notices.Add(ctx, id, notices.Item{Key: key, At: at, Doc: doc}, "")
+	return err == nil && fresh
 }
 
 // New makes the service over the hub's database.

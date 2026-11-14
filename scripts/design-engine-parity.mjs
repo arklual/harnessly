@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Differential run of the board engine: every *.dc.html of a corpus is drawn on two engines, the reference one (the
 // support.js beside the board, or --vendor) and ours (internal/design/ownengine/support.js), and the results are compared:

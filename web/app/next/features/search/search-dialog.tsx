@@ -18,7 +18,13 @@ import {
   type TDetailAct,
 } from '@/next/features/search/detail';
 import { partsOf } from '@/next/features/search/highlight';
-import SearchSide, { SIDE_ACT, type ISideAction, type TSideAct } from '@/next/features/search/search-side';
+import SearchSide, {
+  SIDE_ACT,
+  SIDE_MENU_CLOSED,
+  type ISideAction,
+  type ISideMenu,
+  type TSideAct,
+} from '@/next/features/search/search-side';
 import { SETTING_OFF, SETTING_ON } from '@/next/features/search/sources-api';
 import { SUBJECT, type TSearchSubject } from '@/next/features/search/subject';
 import { layoutKey, layoutOf, steadyLists, type TShownLayout } from '@/next/core/steady-order';
@@ -129,8 +135,6 @@ export interface ISearchSmart {
   beside?: boolean;
   /** Opens the row aside (⌘↵): beside the chat, or in a new tab of the browser. */
   onAside?: (row: ISearchRow) => void;
-  /** Writes a line to a chat from the side; resolves true when it was taken. */
-  onSend?: (chatId: string, text: string) => Promise<boolean>;
   /** Stops a chat's turn or wakes its agent; resolves true when the machine took it. */
   onChatAct?: (chatId: string, act: TDetailAct) => Promise<boolean>;
 }
@@ -349,6 +353,11 @@ const SearchDialog = ({
   const [savedKey, setSavedKey] = useState<string | null>(null);
   const [pickOpen, setPickOpen] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  // The menu belongs to the row it was opened for: moving to another row closes it.
+  const [sideMenu, setSideMenu] = useState<{ row: string | null; menu: ISideMenu }>({
+    row: null,
+    menu: SIDE_MENU_CLOSED,
+  });
   const [chatBusy, setChatBusy] = useState(false);
   /** The last answer: it stays on screen while the next one is on its way, so typing does not blink the list. */
   const [last, setLast] = useState(results);
@@ -681,6 +690,16 @@ const SearchDialog = ({
                           onPointerMove={() => {
                             if (mine !== at) selectAt(mine);
                           }}
+                          onContextMenu={(event) => {
+                            // A right click selects the row and opens what can be done with it, where it was clicked.
+                            if (!smart) return;
+                            event.preventDefault();
+                            selectAt(mine);
+                            setSideMenu({
+                              row: row.id,
+                              menu: { open: true, at: { x: event.clientX, y: event.clientY } },
+                            });
+                          }}
                         >
                           <span className="hx-srch__ic">
                             <Icon name={row.icon} size="sm" />
@@ -777,9 +796,10 @@ const SearchDialog = ({
                   actions={sideActions}
                   copied={copied === current.id}
                   busy={chatBusy}
+                  menu={sideMenu.row === current.id ? sideMenu.menu : SIDE_MENU_CLOSED}
+                  onMenu={(menu) => setSideMenu({ row: current.id, menu })}
                   onAct={(id) => act(current, id)}
                   onItem={pickItem}
-                  onSend={smart.onSend}
                 />
               )}
             </div>

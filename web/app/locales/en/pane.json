@@ -152,7 +152,7 @@
   "pane.designLibraryTab.needZip": "A zip archive of a Claude Design project is needed (Export → ZIP)",
   "pane.designLibraryTab.uploaded": "Done: “{title}”, {boards}",
   "pane.designLibraryTab.uploadFailed": "Could not upload the project",
-  "pane.designLibraryTab.unavailable": "Claude Design is unavailable",
+  "pane.designLibraryTab.unavailable": "Sinopia Design is unavailable",
   "pane.designLibraryTab.uploadHint": "Upload a Claude Design export (.zip), or drop the file here",
   "pane.designLibraryTab.uploadZip": "Upload .zip",
   "pane.designLibraryTab.wholeFolderHint": "The whole design folder in the panel's browser",

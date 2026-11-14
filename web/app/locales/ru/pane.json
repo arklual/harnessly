@@ -152,7 +152,7 @@
   "pane.designLibraryTab.needZip": "Нужен zip-архив проекта Claude Design (Export → ZIP)",
   "pane.designLibraryTab.uploaded": "Готово: «{title}», {boards}",
   "pane.designLibraryTab.uploadFailed": "Не удалось загрузить проект",
-  "pane.designLibraryTab.unavailable": "Claude Design недоступен",
+  "pane.designLibraryTab.unavailable": "Sinopia Design недоступен",
   "pane.designLibraryTab.uploadHint": "Загрузить экспорт Claude Design (.zip) — или перетащите файл сюда",
   "pane.designLibraryTab.uploadZip": "Загрузить .zip",
   "pane.designLibraryTab.wholeFolderHint": "Вся папка макетов в браузере панели",

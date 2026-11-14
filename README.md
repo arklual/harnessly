@@ -313,4 +313,8 @@ harnessly is young: versions are `0.x` and a minor version may change the API.
 
 ## License
 
-[Apache License 2.0](LICENSE). Third-party licences: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). If you run a changed harnessly as a service, the AGPL
+asks you to offer its source to the people who use it. For use under other terms, a commercial licence is available
+from [Ly Solutions](https://github.com/ly-solutions). Versions up to and including the last release before this change
+were published under Apache-2.0 and stay so. The app SDK `@harnessly/app-sdk` stays Apache-2.0, so apps built on it
+are not bound by the AGPL. Third-party licences: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

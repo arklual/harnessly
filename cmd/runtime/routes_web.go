@@ -11,7 +11,6 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/webstatic"
-	"github.com/ly-solutions/harnessly/web"
 )
 
 // The browser front-end (web/). A standalone runtime serves it at its app base path (RUNTIME_APP_BASE_PATH, default
@@ -45,10 +44,7 @@ func webConfigFromEnv(standalone bool) *webConfig {
 			return nil
 		}
 	}
-	files := web.Dist()
-	if dir := os.Getenv("RUNTIME_WEB_DIR"); dir != "" {
-		files = os.DirFS(dir)
-	}
+	files := webFiles() // RUNTIME_WEB_DIR when this runtime answers its calls (web_dir.go), else the compiled-in page
 	if files == nil {
 		return nil
 	}

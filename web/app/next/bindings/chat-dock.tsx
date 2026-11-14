@@ -175,7 +175,7 @@ const modelBlocked = (agent: IPickerAgent): string | null =>
 /** The chat's field with its text: the one part of the dock that renders on a key. */
 const DockField = ({ draftKey, ...props }: Omit<IComposerProps, 'value'> & { draftKey: ConvId }) => {
   const value = useDraftText(draftKey);
-  return <ScreenField {...props} value={value} />;
+  return <ScreenField {...props} value={value} glideIn="chat" />;
 };
 
 const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProps) => {
@@ -216,7 +216,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         notes: feedChips,
         onEdit: (id, comment) => editQuote(conv, id, comment),
         onRemove: (id) => removeQuote(conv, id),
-        onOpen: (id) => showFeedNote(conv, id),
+        onOpen: (id, missing) => showFeedNote(conv, id, missing),
       },
       {
         key: 'design',
@@ -529,25 +529,26 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
 
   // The pill shows what the agent last said; a change waits for its answer and a refusal says why.
   const [modelBusy, setModelBusy] = useState(false);
+  const switchModel = async (choice: IModelChoice, model: NonNullable<IModelChoice['model']>) => {
+    const handle = setModel(machine, conv, model, choice.effort, choice.ultracode, {
+      fast: choice.fast === true,
+      permission: choice.permission ?? null,
+    });
+    // The modes are the person's way of working: the next new chat starts in them too.
+    rememberModes(choice);
+    const st = handle ? await handle.done : null;
+    // The agent kept its model, or the model has no such mode: said in words of the switch, the pill stays true.
+    if (st?.k === 'failed') {
+      const reason = st.failure.r === 'refused' ? refusalReason(st.failure.code) : failureText(st.failure);
+      toast(t('next.picker.failed'), { tone: 'error', description: reason });
+    }
+  };
+  // Promise.finally, not try/finally: the React Compiler does not take a finally yet, and the dock draws on every frame
+  // of an answer.
   const onModel = async (choice: IModelChoice) => {
     if (choice.model === null) return;
     setModelBusy(true);
-    try {
-      const handle = setModel(machine, conv, choice.model, choice.effort, choice.ultracode, {
-        fast: choice.fast === true,
-        permission: choice.permission ?? null,
-      });
-      // The modes are the person's way of working: the next new chat starts in them too.
-      rememberModes(choice);
-      const st = handle ? await handle.done : null;
-      // The agent kept its model, or the model has no such mode: said in words of the switch, the pill stays true.
-      if (st?.k === 'failed') {
-        const reason = st.failure.r === 'refused' ? refusalReason(st.failure.code) : failureText(st.failure);
-        toast(t('next.picker.failed'), { tone: 'error', description: reason });
-      }
-    } finally {
-      setModelBusy(false);
-    }
+    await switchModel(choice, choice.model).finally(() => setModelBusy(false));
   };
 
   // The field is there from the first frame, so the page does not jump when the chat's record arrives; the pill that

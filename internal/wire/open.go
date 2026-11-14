@@ -19,6 +19,8 @@ const (
 	OpenGitLab    OpenTab = "gitlab"
 	OpenArtifacts OpenTab = "artifacts"
 	OpenBrowser   OpenTab = "browser"
+	// OpenDesign is a design of the machine's library (Target its id), on a board of it when Board names one.
+	OpenDesign OpenTab = "design"
 	// OpenLink is an address that opens in no tab: a connection reads it but has no working sign-in (OpenReasonConnect),
 	// or the service it is on cannot be framed (OpenReasonEmbed). Target is the address; the page offers to connect or to
 	// open the original link, and never starts the remote browser by itself.
@@ -35,7 +37,7 @@ const (
 var OpenReasons = []string{OpenReasonConnect, OpenReasonEmbed}
 
 // OpenTabs is every OpenTab, in the schema's order.
-var OpenTabs = []OpenTab{OpenTask, OpenGitLab, OpenArtifacts, OpenBrowser, OpenLink}
+var OpenTabs = []OpenTab{OpenTask, OpenGitLab, OpenArtifacts, OpenBrowser, OpenDesign, OpenLink}
 
 // OpenRefMax is the longest ref the page may ask about, in bytes.
 const OpenRefMax = 512
@@ -58,6 +60,8 @@ type OpenTarget struct {
 	Choices []OpenChoice `json:"choices,omitempty"`
 	// Reason is why an OpenLink opens in no tab; set for that tab only.
 	Reason string `json:"reason,omitempty"`
+	// Board is the page of a design the ref is (relative to its project/), only on the design tab.
+	Board string `json:"board,omitempty"`
 }
 
 // OpenChoice is one place a ref may open: what the person picks from, Label the project and Detail what is known of
@@ -79,6 +83,9 @@ func (o OpenTarget) Validate() error {
 		err = errors.Join(err, in("reason", o.Reason, OpenReasons))
 	} else if o.Reason != "" {
 		err = errors.Join(err, errors.New("reason: only a link has one"))
+	}
+	if o.Board != "" && o.Tab != OpenDesign {
+		err = errors.Join(err, errors.New("board: only a design has one"))
 	}
 	if len(o.Choices) == 1 || len(o.Choices) > OpenChoicesMax {
 		err = errors.Join(err, fmt.Errorf("choices: %d, want 2 to %d or none", len(o.Choices), OpenChoicesMax))

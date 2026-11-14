@@ -157,6 +157,7 @@
   "next.upload.heic": "Could not prepare this photo. Pick it from Photos again or take it anew",
   "next.upload.tooLarge": "The file is over {limit} MB and cannot be sent",
   "next.upload.noMachine": "No machine is chosen yet, so the file was not sent. Choose a machine and attach it again",
+  "next.upload.already": "Already attached",
   "next.queue.actionFailed": "did not work, try again",
   "next.queue.attachmentsOnly": "Attachments",
   "next.queue.blockedText": "the terminal's input line holds text",

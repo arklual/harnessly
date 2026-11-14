@@ -339,4 +339,14 @@ const ChatRow = ({
   );
 };
 
-export default memo(ChatRow);
+/** the place in the entrance comes as a new object on each draw of the list; it is the same place when its
+ *  numbers are. Every other prop is compared as memo does. */
+const sameRowProps = (a: IChatRowProps, b: IChatRowProps): boolean => {
+  const keys = Object.keys(a) as (keyof IChatRowProps)[];
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every((k) =>
+    k === 'enter' ? a.enter?.base === b.enter?.base && a.enter?.index === b.enter?.index : Object.is(a[k], b[k]),
+  );
+};
+
+export default memo(ChatRow, sameRowProps);

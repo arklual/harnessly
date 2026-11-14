@@ -2,7 +2,7 @@
 // «Что поменять?»; the person draws or frames a place, says what to change, and the change runs on the host (a chat's
 // machine, a Sinopia design) while the picture waits blurred. The new version appears among the thumbnails only when
 // the host has it. A run belongs to the picture, not to the window (run-store.ts): closing does not stop it.
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { EditDock, VersionStrip, type IFailure } from '@/next/features/image-edit/edit-dock';
 import {
   EDIT_MODE,
@@ -40,8 +40,14 @@ import {
   ratioOfFormat,
   type TTool,
 } from '@/next/features/image-edit/tool-rules';
+import type { IMarkupTarget } from '@/next/features/image-edit/to-composer';
+import { useMarkup } from '@/next/features/image-edit/use-markup';
 import { t } from '@/next/i18n';
-import ImageView, { IMAGE_VIEW_EXIT_MS, type IImageViewItem } from '@/next/ui/image-view';
+import ImageView, {
+  IMAGE_VIEW_EXIT_MS,
+  type IImageViewEdit,
+  type IImageViewItem,
+} from '@/next/ui/image-view';
 import { usePresence } from '@/next/ui/presence';
 
 /** A new version comes in from blur over this long (image-edit.css). */
@@ -58,9 +64,41 @@ interface IImageEditViewProps {
   onClose: () => void;
   position?: { at: number; of: number };
   onStep?: (delta: 1 | -1) => void;
-  /** Absent: a plain viewer (a gallery, a side chat, a picture the person sent). */
+  /** The change tools (a model changes the picture); null: none. */
   editing: IImageEditing | null;
+  /** The person's own marks: where the marked picture goes. Absent with no `editing`: a plain viewer. */
+  annotate?: IMarkupTarget | null;
 }
+
+/** The two sets of tools, when the picture has both. */
+export const EDITOR_PART = { markup: 'markup', change: 'change' } as const;
+export type TEditorPart = (typeof EDITOR_PART)[keyof typeof EDITOR_PART];
+
+/** The switch between the person's marks and the model's changes, over the tools. */
+const PartSwitch = ({
+  part,
+  onPart,
+  disabled,
+}: {
+  part: TEditorPart;
+  onPart: (part: TEditorPart) => void;
+  disabled: boolean;
+}) => (
+  <div className="hx-ie__parts" role="group" aria-label={t('next.imageEdit.parts')}>
+    {[EDITOR_PART.markup, EDITOR_PART.change].map((one) => (
+      <button
+        key={one}
+        type="button"
+        className="hx-ie__part"
+        aria-pressed={part === one}
+        disabled={disabled}
+        onClick={() => onPart(one)}
+      >
+        {t(`next.imageEdit.part.${one}`)}
+      </button>
+    ))}
+  </div>
+);
 
 interface ISession {
   /** The original this state belongs to; another picture (a step) starts afresh. */
@@ -114,6 +152,7 @@ const fileNameOf = (version: IImageVersion, fallback: string): string => {
 
 const Editor = ({
   editing,
+  annotate,
   item,
   onClose,
   position,
@@ -132,6 +171,22 @@ const Editor = ({
   const run = useRun(original.id);
   const running = run?.state === RUN_STATE.running;
   const selected = s.versions.find((version) => version.id === s.at) ?? s.versions[0];
+  // A change still running for this picture opens on the change tools; else the person's marks come first.
+  const [part, setPart] = useState<TEditorPart>(() =>
+    annotate && run?.state !== RUN_STATE.running ? EDITOR_PART.markup : EDITOR_PART.change,
+  );
+  const marking = annotate !== undefined && annotate !== null && part === EDITOR_PART.markup;
+  const switcher: ReactNode = annotate ? (
+    <PartSwitch part={part} onPart={setPart} disabled={running} />
+  ) : null;
+  const markup = useMarkup({
+    src: selected.src,
+    name: item?.name ?? '',
+    target: annotate ?? NO_TARGET,
+    natural: s.natural,
+    onClose,
+    switcher,
+  });
 
   // The versions the host knows (a chat's come from the machine, so they outlive a reload); a run that was going on
   // when the viewer was closed puts the picture it changes back on screen.
@@ -246,14 +301,15 @@ const Editor = ({
       position={position}
       onStep={onStep}
       edit={{
-        ratio,
+        ratio: marking ? markup.ratio : ratio,
         clear: selected.clear,
         busy: running,
         fresh: s.fresh,
-        locked: drawing,
-        layer: overlay || undefined,
+        locked: marking ? markup.locked : drawing,
+        layer: marking ? markup.layer : overlay || undefined,
         onLoad: (natural) => patch({ natural }),
         onBack: () => {
+          if (marking) return markup.onBack?.() === true;
           if (s.tool === null) return false;
           patch({ tool: null, marks: NO_MARKS });
           return true;
@@ -269,8 +325,11 @@ const Editor = ({
         versions: (
           <VersionStrip versions={s.versions} at={selected.id} disabled={running} onPick={pickVersion} />
         ),
-        dock: (
+        dock: marking ? (
+          markup.dock
+        ) : (
           <EditDock
+            switcher={switcher}
             tool={s.tool}
             onTool={pickTool}
             running={running}
@@ -295,21 +354,78 @@ const Editor = ({
   );
 };
 
+/** The marks' tools leave over this long (image-edit.css .hx-ie__in). */
+const MARKUP_EXIT_MS = 160;
+
+const NO_TARGET: IMarkupTarget = { replacing: false, give: () => undefined };
+
+/**
+ * A picture only the person marks (no model to change it): the plain viewer with «Пометить» by the cross, which puts the
+ * marks' tools under the picture; Esc with no tool on goes back to looking.
+ */
+const MarkupEditor = ({
+  item,
+  onClose,
+  position,
+  onStep,
+  annotate,
+}: IImageEditViewProps & { annotate: IMarkupTarget }) => {
+  const [natural, setNatural] = useState<{ src: string; w: number; h: number } | null>(null);
+  const [marking, setMarking] = useState<string | null>(null);
+  // The picture it shows, kept through the viewer's exit so the layout does not change while it leaves.
+  const [last, setLast] = useState<IImageViewItem | null>(item);
+  if (item !== null && item !== last) {
+    // Opened again: it opens for looking.
+    if (last === null) setMarking(null);
+    setLast(item);
+  }
+  const shownItem = item ?? last;
+  const src = shownItem?.src ?? '';
+  // Another picture (a step): back to looking.
+  const on = marking !== null && marking === src;
+  const tools = usePresence(on ? src : null, MARKUP_EXIT_MS);
+  const size = natural !== null && natural.src === src ? natural : null;
+  const markup = useMarkup({ src, name: shownItem?.name ?? '', target: annotate, natural: size, onClose });
+  const edit: IImageViewEdit = {
+    ...markup,
+    dock: (
+      <div className="hx-ie__in" data-state={tools.state}>
+        {markup.dock}
+      </div>
+    ),
+    onLoad: (loaded) => setNatural({ src, ...loaded }),
+    onBack: () => {
+      if (markup.onBack?.() === true) return true;
+      setMarking(null);
+      return true;
+    },
+  };
+  return (
+    <ImageView
+      item={item}
+      onClose={onClose}
+      position={position}
+      onStep={onStep}
+      edit={tools.value !== null ? edit : undefined}
+      action={{ icon: 'pencil', label: t('next.imageEdit.part.markup'), onClick: () => setMarking(src) }}
+    />
+  );
+};
+
 /**
  * The viewer of a picture that can be changed. `editing` null gives the plain viewer. The editor stays mounted through
  * the viewer's exit animation, so the dock leaves with the picture.
  */
 const ImageEditView = (props: IImageEditViewProps) => {
-  const { item, editing } = props;
+  const { item, editing, annotate } = props;
   const open = item !== null && editing !== null;
   const { value: shownId } = usePresence(open ? editing.original.id : null, IMAGE_VIEW_EXIT_MS);
   // The last picture it was open on, for the exit.
   const [last, setLast] = useState<IImageEditing | null>(null);
   if (open && last !== editing) setLast(editing);
-  if (shownId === null || last === null) {
-    return <ImageViewPlain {...props} />;
-  }
-  return <Editor {...props} editing={open ? editing : last} />;
+  if (shownId !== null && last !== null) return <Editor {...props} editing={open ? editing : last} />;
+  if (annotate) return <MarkupEditor {...props} annotate={annotate} />;
+  return <ImageViewPlain {...props} />;
 };
 
 const ImageViewPlain = ({ item, onClose, position, onStep }: IImageEditViewProps) => (

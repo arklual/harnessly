@@ -159,6 +159,7 @@
   "next.upload.heic": "Не удалось подготовить это фото. Выберите его в «Фото» ещё раз или снимите заново",
   "next.upload.tooLarge": "Файл больше {limit} МБ, его нельзя отправить",
   "next.upload.noMachine": "Машина ещё не выбрана — файл не отправлен. Выберите машину и прикрепите снова",
+  "next.upload.already": "Уже прикреплена",
   "next.queue.actionFailed": "не получилось, попробуйте ещё раз",
   "next.queue.attachmentsOnly": "Вложения",
   "next.queue.blockedText": "в поле ввода терминала есть текст",

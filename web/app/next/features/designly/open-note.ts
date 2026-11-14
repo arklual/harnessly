@@ -9,12 +9,28 @@ export interface INotePlace {
 type TListener = (place: INotePlace) => void;
 
 const listeners = new Set<TListener>();
+/** The designs' viewers: they turn to an asked board, whoever asked (a note's chip, the agent's open). */
+const viewers = new Set<TListener>();
 /** The board each design was last asked to show, until its viewer takes it. */
 const asked = new Map<string, string>();
 
 export const openNotePage = (place: INotePlace): void => {
   asked.set(place.design, place.board);
   listeners.forEach((listen) => listen(place));
+  viewers.forEach((listen) => listen(place));
+};
+
+/** A board the pane was asked to show (the agent's `open` of a board's file, a chip naming it): the design's
+ *  tab itself is placed by the request; only its viewer turns to the board, now or once it mounts. */
+export const askBoard = (place: INotePlace): void => {
+  asked.set(place.design, place.board);
+  viewers.forEach((listen) => listen(place));
+};
+
+/** The design's viewer listens while it is mounted; the returned function stops it. */
+export const onBoardAsked = (listen: TListener): (() => void) => {
+  viewers.add(listen);
+  return () => viewers.delete(listen);
 };
 
 /** The pane and the viewer listen while they are mounted; the returned function stops it. */

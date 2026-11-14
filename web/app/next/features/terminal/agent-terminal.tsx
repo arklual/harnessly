@@ -2,6 +2,7 @@
 // the session, the body is the agent's real CLI pane in xterm over the runtime's terminal socket. The grip changes the
 // height; ⌃` and the chevron fold it. Typing goes to the agent as in its own terminal.
 import { useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import ScrollDown from '@/next/features/terminal/scroll-down';
 import { useTerminalSocket } from '@/next/features/terminal/xterm-socket';
 import Icon from '@/next/ui/icon';
 import type { Provider } from '@/next/protocol/v2';
@@ -27,7 +28,7 @@ const AgentTerminal = ({ open, url, cwd, title, provider, onClose }: IAgentTermi
   const rootRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const start = useRef<{ y: number; h: number } | null>(null);
-  useTerminalSocket(open, url, bodyRef);
+  const { scrolled, toBottom, forwardWheel } = useTerminalSocket(open, url, bodyRef);
 
   useLayoutEffect(() => {
     rootRef.current?.style.setProperty('--term-h', `${height}px`);
@@ -104,6 +105,7 @@ const AgentTerminal = ({ open, url, cwd, title, provider, onClose }: IAgentTermi
           </button>
         </div>
         <div className="hx-term__body" ref={bodyRef} />
+        <ScrollDown shown={scrolled} onClick={toBottom} onWheel={forwardWheel} />
       </div>
     </section>
   );

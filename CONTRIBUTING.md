@@ -123,4 +123,6 @@ that prepares the release.
 
 ## License
 
-By contributing you agree that your contribution is licensed under the [Apache License 2.0](LICENSE).
+By contributing you agree that your contribution is licensed under the
+[GNU Affero General Public License v3.0](LICENSE), and that Ly Solutions may also distribute it under a commercial
+licence and under Apache-2.0 as part of `@harnessly/app-sdk`.

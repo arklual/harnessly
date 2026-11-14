@@ -1,10 +1,10 @@
-<!-- {{tag}}-library-guide v13 -->
-# Claude Design projects: how to edit them
+<!-- {{tag}}-library-guide v14 -->
+# Sinopia Design projects: how to edit them
 
 This folder is the shared library of the whole team's designs (on {{host}} it is `{{shared}}`): the agents of several
-people work here. Every subfolder is a Claude Design project: `<id>/project/` with the boards `*.dc.html`, the runtime
-`support.js` and everything the boards pull in (`lib/`, `_ds/`, fonts). A person looks at them in the "Claude Design"
-section of {{host}} (projects → boards) and in the "Claude Design" tab of the right pane: the page reloads by itself
+people work here. Every subfolder is a Sinopia Design project: `<id>/project/` with the boards `*.dc.html`, the runtime
+`support.js` and everything the boards pull in (`lib/`, `_ds/`, fonts). A person looks at them in the "Sinopia Design"
+section of {{host}} (projects → boards) and in the "Sinopia Design" tab of the right pane: the page reloads by itself
 when any file of the project changes. A comment from the pane arrives as an `<annotation>` block: `template:` is the
 board file and the line with the element's text, `element:` and `html:` say what is picked, `comment:` says what to change.
 
@@ -71,7 +71,7 @@ the properties panel, «States», the view and the agent's context:
   both places.
 - Tweaks (the screen variant, the theme) are declared in `data-props` of the same script: change the defaults, do not
   delete them.
-- Styles are inline in `style="…"`: the Claude Design properties panel edits them. The page's shared rules are in
+- Styles are inline in `style="…"`: the Sinopia Design properties panel edits them. The page's shared rules are in
   `<helmet><style>`.
 - The design system's components are pulled in with `<x-import component-from-global-scope="…">`; use the real ones, do
   not draw look-alikes.

@@ -7,6 +7,8 @@ import '@/next/styles/ui.css';
 import '@/next/styles/chat.css';
 import '@/next/styles/icons.css';
 import '@/next/styles/image-card.css';
+import '@/next/styles/image-edit.css';
+import '@/next/styles/motion.css';
 import '@/next/dev/images-gallery.css';
 
 import { useEffect, useMemo, type ReactNode } from 'react';

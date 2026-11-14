@@ -15,7 +15,7 @@ Claude Code, Codex and plain shells.
 
 | | harnessly | Happy | Paseo | T3 Code | Orca | Claude Code Remote Control |
 | --- | --- | --- | --- | --- | --- | --- |
-| License | Apache-2.0 | MIT | Apache-2.0 | MIT | MIT | Proprietary, not open source |
+| License | AGPL-3.0 | MIT | Apache-2.0 | MIT | MIT | Proprietary, not open source |
 | Where the agent runs | Your machine or server, in tmux | Your machine | Your machine or server (a daemon) | Your machine or server (`t3`) | Your machine; a remote box over SSH or `orca serve` (beta) | Your machine |
 | Agents | Claude Code, Codex, plain shells | Claude, Codex, Grok, Gemini (via Antigravity), other ACP agents (beta) | Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, Muse Code | Claude Code, Codex, Cursor, Grok Build, OpenCode, Antigravity, Pi, Muse Code | Any CLI agent: Claude Code, Codex, OpenCode, Pi and others | Claude Code only |
 | Clients | Web UI served by the runtime; web push. No native desktop or mobile app | iOS and Android apps, web, desktop app | Desktop app, iOS and Android apps, web, CLI | Desktop app, iOS and Android apps, web (app.t3.codes and local) | Desktop app, iOS and Android companion apps. Web UI: ? | claude.ai/code in a browser, Claude iOS and Android apps, Claude Desktop |

@@ -838,11 +838,65 @@ html:has(.hx-app) body {
 .hx-srch__side-body > * {
   flex: none;
 }
-.hx-srch__side-foot {
+.hx-srch__side-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.hx-srch__side-name {
+  flex: 1;
+  min-width: 0;
+}
+.hx-srch__side-more {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  margin: -4px -6px 0 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  transition:
+    background 120ms var(--hx-ease-out),
+    color 120ms var(--hx-ease-out);
+}
+.hx-srch__side-more:hover,
+.hx-srch__side-more[data-popup-open] {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+/* The keys of what can be done, as a reminder; the actions themselves are in the menu. */
+.hx-srch__side-keys {
   flex: none;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-srch__side-keys > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.hx-srch__side-keys kbd,
+.hx-srch__menu-key {
+  min-width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-2);
+  font-family: var(--hx-font-ui);
+  font-size: 11px;
+}
+.hx-srch__menu-key {
+  margin-left: auto;
 }
 .hx-srch__side-sk {
   display: flex;
@@ -873,7 +927,7 @@ html:has(.hx-app) body {
 }
 .hx-srch__quote-text {
   display: -webkit-box;
-  -webkit-line-clamp: 7;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   color: var(--hx-fg-1);
@@ -955,51 +1009,6 @@ html:has(.hx-app) body {
   color: var(--hx-fg-3);
   font-size: var(--hx-text-xs);
 }
-.hx-srch__reply {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 4px 0 12px;
-  border: 1px solid var(--hx-border);
-  border-radius: 10px;
-  background: var(--hx-bg-raised);
-  transition: border-color 160ms var(--hx-ease-out);
-}
-.hx-srch__reply:focus-within {
-  border-color: var(--hx-border-strong);
-}
-.hx-srch__reply input {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  border: 0;
-  outline: 0;
-  background: none;
-  color: var(--hx-fg-1);
-  font: inherit;
-  font-size: var(--hx-text-sm);
-}
-.hx-srch__reply input::placeholder {
-  color: var(--hx-fg-3);
-}
-.hx-srch__reply-go {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  flex: none;
-  border: 0;
-  border-radius: 8px;
-  background: var(--hx-bg-active);
-  color: var(--hx-fg-1);
-  cursor: pointer;
-  transition: opacity 160ms var(--hx-ease-out);
-}
-.hx-srch__reply-go:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
 .hx-srch__ans-text[data-writing]::after {
   content: '';
   display: inline-block;
@@ -1045,52 +1054,6 @@ html:has(.hx-app) body {
   font-size: var(--hx-text-sm);
   line-height: 1.55;
   overflow-wrap: anywhere;
-}
-.hx-srch__acts {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.hx-srch__act {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 30px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 9px;
-  background: none;
-  color: var(--hx-fg-1);
-  font: inherit;
-  font-size: var(--hx-text-sm);
-  text-align: left;
-  cursor: pointer;
-  transition: background 120ms var(--hx-ease-out);
-}
-.hx-srch__act:hover {
-  background: var(--hx-bg-hover);
-}
-.hx-srch__act:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.hx-srch__act > i {
-  color: var(--hx-fg-3);
-}
-.hx-srch__act > span {
-  flex: 1;
-}
-.hx-srch__act kbd {
-  min-width: 22px;
-  height: 22px;
-  display: inline-grid;
-  place-items: center;
-  padding: 0 6px;
-  border-radius: 6px;
-  background: var(--hx-bg-hover);
-  color: var(--hx-fg-2);
-  font-family: var(--hx-font-ui);
-  font-size: 11px;
 }
 @media (max-width: 860px) {
   .hx-srch__side {

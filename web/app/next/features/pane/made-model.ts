@@ -10,6 +10,7 @@ import {
 } from '@/next/protocol/v2';
 import { plural, t } from '@/next/i18n';
 import { stateText } from '@/next/features/apps/model';
+import { designIcon } from '@/next/features/designly/design-icon';
 import type { IMadeCard, IMadeKid } from '@/next/features/pane/made-block';
 
 export interface IMadeImage {
@@ -55,7 +56,7 @@ const ICON_OF: Record<MadeItem['kind'], string> = {
 };
 
 export const iconOf = (item: MadeItem): string => {
-  if (item.kind === 'design' && item.designKind === 'slides') return 'presentation';
+  if (item.kind === 'design') return designIcon({ kind: item.designKind });
   if (item.kind === 'task' && isEpic(item)) return 'layers';
   return ICON_OF[item.kind];
 };

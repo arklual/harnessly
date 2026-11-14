@@ -2,7 +2,9 @@
 // browser (features/composer/annotation-chips.tsx) and the words picked in the chat's feed. A card over the chip (hover or
 // keyboard focus, ui/use-hover-intent.ts) says what is annotated — the host's facts: the page, the element, the words —
 // and holds the comment to change (Enter saves, Esc takes the change back) and «Delete»; × on the chip deletes too. A
-// host that can show the annotated thing gets the chip's press (the feed scrolls to the words). A chip comes in from a little below (a batch of them one after another) and goes
+// host that can show the annotated thing gets the chip's press: the feed scrolls to the words and opens their own
+// editor there, the one they were annotated with; where the words are gone the card opens instead, wide, its
+// field growing with a long (dictated) comment. A chip comes in from a little below (a batch of them one after another) and goes
 // with its own exit; the others slide to the freed place (ui/use-flip.ts). Only transform and opacity move.
 import { Fragment, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react';
 import { t } from '@/next/i18n';
@@ -38,15 +40,28 @@ export interface INoteChipGroup {
   notes: readonly INoteChip[];
   onEdit: (id: string, comment: string) => void;
   onRemove: (id: string) => void;
-  onOpen?: (id: string) => void;
+  onOpen?: INoteOpen;
 }
+
+/**
+ * A press on a chip, given to a host that can show the annotated thing and change it there (the feed's words). The host
+ * calls `missing` when it cannot (the words are not in the feed): the chip's card opens instead.
+ */
+export type INoteOpen = (id: string, missing: () => void) => void;
+
+/** The card's field grows with its words; past the cap the stylesheet scrolls it. */
+const grow = (field: HTMLTextAreaElement | null) => {
+  if (!field) return;
+  field.style.height = '0px';
+  field.style.height = `${field.scrollHeight}px`;
+};
 
 export interface INoteChipsProps {
   notes: readonly INoteChip[];
   onEdit: (id: string, comment: string) => void;
   onRemove: (id: string) => void;
-  /** A press on the chip shows the annotated thing (besides opening the card on a touch screen). */
-  onOpen?: (id: string) => void;
+  /** A press on the chip shows the annotated thing and its editor; the card opens only when the host cannot. */
+  onOpen?: INoteOpen;
 }
 
 interface ILadder {
@@ -65,12 +80,13 @@ interface INoteChipProps {
   leaving: boolean;
   onEdit: (id: string, comment: string) => void;
   onRemove: (id: string) => void;
-  onOpen?: (id: string) => void;
+  onOpen?: INoteOpen;
 }
 
 const NoteChip = ({ note, n, step, leaving, onEdit, onRemove, onOpen }: INoteChipProps) => {
   const wrapRef = useRef<HTMLSpanElement>(null);
   const mainRef = useRef<HTMLButtonElement>(null);
+  const fieldRef = useRef<HTMLTextAreaElement>(null);
   const { open, setTrigger, setFloating, getFloating, triggerProps, floatingProps, close } = useHoverIntent({
     disabled: leaving,
   });
@@ -88,6 +104,10 @@ const NoteChip = ({ note, n, step, leaving, onEdit, onRemove, onOpen }: INoteChi
   useLayoutEffect(() => {
     wrapRef.current?.style.setProperty('--step', String(step));
   }, [step]);
+  // Measured while the card is shown: a hidden field has no height of its words.
+  useLayoutEffect(() => {
+    if (open) grow(fieldRef.current);
+  }, [draft, open]);
 
   const save = () => {
     if (dirty) onEdit(note.id, draft.trim());
@@ -134,8 +154,16 @@ const NoteChip = ({ note, n, step, leaving, onEdit, onRemove, onOpen }: INoteChi
           disabled={leaving}
           onFocus={triggerProps.onFocus}
           onClick={() => {
-            onOpen?.(note.id);
-            triggerProps.onClick();
+            if (!onOpen) {
+              triggerProps.onClick();
+              return;
+            }
+            // The words are changed where they stand; the card is only the way back when they are gone.
+            close();
+            onOpen(note.id, () => {
+              triggerProps.onClick();
+              fieldRef.current?.focus();
+            });
           }}
         >
           <span className="hx-attach__thumb hx-pagenote__num">{n}</span>
@@ -174,6 +202,7 @@ const NoteChip = ({ note, n, step, leaving, onEdit, onRemove, onOpen }: INoteChi
           ))}
         </dl>
         <textarea
+          ref={fieldRef}
           className="hx-pagenote__comment"
           value={draft}
           rows={2}

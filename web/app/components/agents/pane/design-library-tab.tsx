@@ -734,7 +734,7 @@ const DesignLibraryTab = ({ library, onOpenBoard }: IDesignLibraryTabProps) => {
     >
       <header className="tw-dlib-head">
         <div className="tw-dlib-heading">
-          <h3 className="tw-dlib-title">Claude Design</h3>
+          <h3 className="tw-dlib-title">Sinopia Design</h3>
         </div>
         <div className="tw-dlib-head-actions">
           <TwTooltip content={t('pane.designLibraryTab.uploadHint')}>
@@ -753,7 +753,7 @@ const DesignLibraryTab = ({ library, onOpenBoard }: IDesignLibraryTabProps) => {
               variant={BUTTON_VARIANT.ghost}
               icon={<FolderOpen />}
               aria-label={t('pane.designLibraryTab.wholeFolder')}
-              onClick={() => onOpenBoard(`localhost:${port}/`, 'Claude Design')}
+              onClick={() => onOpenBoard(`localhost:${port}/`, 'Sinopia Design')}
             />
           </TwTooltip>
         </div>

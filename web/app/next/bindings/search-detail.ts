@@ -1,22 +1,21 @@
 // What the side of the search (⌘K) says about the selected row, off what the page and the machine already have:
-// a chat's state, model and folder from the conversation's record, its last words (GET …/glance) and what it made
-// (GET …/made); a design's cover and boards from the library; a document's versions; a task whole from its tracker.
+// a chat's last words and when (GET …/glance; HRN-1463 keeps the side of a chat to that); a design's cover and boards
+// from the library; a document's versions; a task whole from its tracker.
 // No model is asked: running over the list costs nothing but these reads, each kept while the search is open.
-import { loadChatGlance, loadMade } from '@/next/commands/pages';
+import { loadChatGlance } from '@/next/commands/pages';
 import { agoText } from '@/next/features/apps/model';
 import { thumbPath } from '@/next/features/designly/api';
-import { modelName } from '@/next/features/limits/model';
+import { peerFrom } from '@/next/features/chat/peer';
 import {
   DETAIL_ACT,
   NO_DETAIL,
   type IDetailFact,
   type IDetailItem,
-  type IDetailList,
   type IDetailQuote,
   type IDetailSource,
   type ISearchDetail,
 } from '@/next/features/search/detail';
-import { ROW_GO, type ISearchRow, type TSearchGo } from '@/next/features/search/search-dialog';
+import { ROW_GO, type ISearchRow } from '@/next/features/search/search-dialog';
 import {
   FOUND_KIND,
   loadDocVersions,
@@ -27,142 +26,66 @@ import {
 } from '@/next/features/search/sources-api';
 import { SUBJECT } from '@/next/features/search/subject';
 import { isRefused } from '@/next/features/settings/platform-answer';
-import { CHAT_STATUS, type ISidebarChat, type ISidebarProject } from '@/next/features/sidebar/types';
+import { CHAT_STATUS, type ISidebarChat } from '@/next/features/sidebar/types';
 import type { IInstalledApp } from '@/next/features/app-views/api';
 import { t } from '@/next/i18n';
-import type {
-  ChatGlance,
-  ChatMade,
-  Conversation,
-  ConvId,
-  DesignArtifact,
-  MachineId,
-  MadeItem,
-} from '@/next/protocol/v2';
+import type { ChatGlance, Conversation, ConvId, DesignArtifact, MachineId } from '@/next/protocol/v2';
 import { ROUTE, routePath } from '@/next/routes/routes';
 import { conversationsStore } from '@/next/stores/conversations';
 
 const isConvId = (id: string): id is ConvId => id.startsWith('tab-');
 
 const LIST_MAX = 6;
-const FOLDER_TAIL = 2;
 
 const fact = (label: string, value: string, title?: string): IDetailFact[] =>
   value === '' ? [] : [{ label, value, ...(title ? { title } : {}) }];
-
-const absolute = (path: string): string => new URL(path, window.location.origin).toString();
-
-/** The last folders of a path: «…/projects/app». */
-const shortFolder = (cwd: string): string => {
-  const parts = cwd.split('/').filter(Boolean);
-  return parts.length <= FOLDER_TAIL ? cwd : `…/${parts.slice(-FOLDER_TAIL).join('/')}`;
-};
 
 const whenOf = (at: number | string | null, now: number): string => {
   const ms = typeof at === 'string' ? Date.parse(at) : at;
   return ms === null || Number.isNaN(ms) || ms <= 0 ? '' : agoText(ms, now);
 };
 
-/** What a chat is busy with, in plain words; '' when it is just there. */
-const stateOf = (chat: ISidebarChat): string => {
-  if (chat.status === CHAT_STATUS.background && chat.waitsFor) return chat.waitsFor;
-  if (chat.status === CHAT_STATUS.limited && chat.waitsFor) return chat.waitsFor;
-  return chat.status === CHAT_STATUS.none ? '' : t(`next.search.state.${chat.status}`);
-};
-
-const MADE_ICON: Readonly<Record<MadeItem['kind'], string>> = {
-  doc: 'file-text',
-  board: 'layout-dashboard',
-  design: 'pen-tool',
-  task: 'circle-dot',
-  mr: 'git-pull-request',
-  stand: 'rocket',
-  commit: 'git-commit-horizontal',
-  file: 'file-down',
-};
-
-const madeGo = (item: MadeItem): TSearchGo => {
-  if (item.kind === 'design') return { k: ROW_GO.design, id: item.ref };
-  if (item.kind === 'mr') return { k: ROW_GO.review, url: item.ref };
-  return { k: ROW_GO.link, url: item.ref };
-};
-
-const madeItem = (item: MadeItem): IDetailItem => ({
-  id: `made:${item.kind}:${item.ref}`,
-  icon: MADE_ICON[item.kind],
-  title: item.title || item.task?.key || item.ref,
-  meta: item.task?.state ?? '',
-  go: madeGo(item),
-});
+const absolute = (path: string): string => new URL(path, window.location.origin).toString();
 
 interface IChatInput {
   machine: MachineId;
   chats: readonly ISidebarChat[];
-  projects: readonly ISidebarProject[];
   now: number;
 }
 
-const chatDetail = (
-  id: string,
-  input: IChatInput,
-  glance: ChatGlance | null,
-  made: ChatMade | null,
-): ISearchDetail => {
-  const { chats, projects, now } = input;
+/** A chat's last words as the side quotes them: the newest of the person's (or another chat's) and the agent's. */
+const lastQuote = (glance: ChatGlance, now: number): IDetailQuote | null => {
+  const { lastUser: user, lastAgent: agent } = glance;
+  if (agent && (!user || agent.at >= user.at))
+    return { who: t('next.search.agent'), text: agent.text, when: whenOf(agent.at, now) };
+  if (!user) return null;
+  const said = peerFrom(user.text);
+  const who = said.from === null ? t('next.search.you') : t('next.search.from', { chat: said.from });
+  return { who, text: said.text, when: whenOf(user.at, now) };
+};
+
+/**
+ * A chat on the side: its name, the last thing said in it and when. No states, no lists: what can be done
+ * with it is in the menu.
+ */
+const chatDetail = (id: string, input: IChatInput, glance: ChatGlance | null): ISearchDetail => {
+  const { chats, now } = input;
   const chat = chats.find((item) => item.id === id);
   const record: Conversation | undefined = isConvId(id) ? conversationsStore.get(id) : undefined;
   if (!chat) return NO_DETAIL;
-  const quotes: IDetailQuote[] = [];
-  if (glance?.lastUser)
-    quotes.push({
-      who: t('next.search.you'),
-      text: glance.lastUser.text,
-      when: whenOf(glance.lastUser.at, now),
-    });
-  if (glance?.lastAgent)
-    quotes.push({
-      who: t('next.search.agent'),
-      text: glance.lastAgent.text,
-      when: whenOf(glance.lastAgent.at, now),
-    });
+  const said = glance ? lastQuote(glance, now) : null;
   // A machine that does not tell the last words yet: the line of the last turn is what there is.
-  if (glance === null && record?.lastTurn?.snippet)
-    quotes.push({ who: t('next.search.agent'), text: record.lastTurn.snippet });
+  const turn =
+    glance === null && record?.lastTurn?.snippet
+      ? { who: t('next.search.agent'), text: record.lastTurn.snippet, when: whenOf(chat.lastActivityAt, now) }
+      : null;
+  const quote = said ?? turn;
   const working = chat.status === CHAT_STATUS.thinking;
   const asleep = !chat.terminal && chat.status !== CHAT_STATUS.waitingMachine;
-  const lists: IDetailList[] = [];
-  const madeItems = (made?.items ?? []).slice(0, LIST_MAX).map(madeItem);
-  if (madeItems.length > 0) lists.push({ label: t('next.search.listMade'), items: madeItems });
-  const children = chats
-    .filter((item) => item.parentId === id)
-    .slice(0, LIST_MAX)
-    .map((child): IDetailItem => ({
-      id: `chat:${child.id}`,
-      icon: 'message-square',
-      title: child.title,
-      meta: stateOf(child),
-      go: { k: ROW_GO.chat, id: child.id },
-    }));
-  if (children.length > 0) lists.push({ label: t('next.search.listChildren'), items: children });
-  const model = record?.model ? modelName(record.model.id) : '';
   return {
-    quotes,
-    facts: [
-      ...fact(t('next.search.factNow'), stateOf(chat)),
-      ...fact(t('next.search.factWhen'), whenOf(chat.lastActivityAt, now)),
-      ...fact(
-        t('next.search.factModel'),
-        [record ? t(`next.search.provider.${record.provider}`) : '', model].filter(Boolean).join(' · '),
-      ),
-      ...fact(t('next.search.factFolder'), record?.cwd ? shortFolder(record.cwd) : '', record?.cwd),
-      ...fact(
-        t('next.search.factProject'),
-        projects.find((project) => project.id === chat.projectId)?.name ?? '',
-      ),
-      ...fact(t('next.search.factGoal'), record?.goal?.text ?? ''),
-    ],
-    lists,
-    reply: true,
+    quotes: quote ? [quote] : [],
+    facts: [],
+    lists: [],
     ...(working ? { act: DETAIL_ACT.stop } : asleep ? { act: DETAIL_ACT.resume } : {}),
     link: absolute(routePath({ kind: ROUTE.chat, id })),
   };
@@ -324,18 +247,16 @@ export interface IDetailInput {
   machine: MachineId | null;
   /** null while the chat list is on its way. */
   chats: readonly ISidebarChat[] | null;
-  projects: readonly ISidebarProject[];
   now: number;
 }
 
 /** The side's source for the search of one machine. */
-export const detailSource = ({ machine, chats, projects, now }: IDetailInput): IDetailSource => {
+export const detailSource = ({ machine, chats, now }: IDetailInput): IDetailSource => {
   const list = chats ?? [];
   const now_ = (row: ISearchRow): ISearchDetail => {
     const subject = row.subject;
     if (!subject || machine === null) return NO_DETAIL;
-    if (subject.k === SUBJECT.chat)
-      return chatDetail(subject.id, { machine, chats: list, projects, now }, null, null);
+    if (subject.k === SUBJECT.chat) return chatDetail(subject.id, { machine, chats: list, now }, null);
     if (subject.k === SUBJECT.design) return designDetail(subject.design, subject.board, machine, list, now);
     if (subject.k === SUBJECT.doc) return docDetail(subject.doc, now, []);
     if (subject.k === SUBJECT.setting) return settingDetail(subject.setting);
@@ -357,15 +278,9 @@ export const detailSource = ({ machine, chats, projects, now }: IDetailInput): I
       const subject = row.subject;
       if (!subject || machine === null) return null;
       if (subject.k === SUBJECT.chat && isConvId(subject.id)) {
-        const [glance, made] = await Promise.all([
-          loadChatGlance(machine, subject.id),
-          loadMade(machine, subject.id),
-        ]);
-        const said = valueOf<ChatGlance>(glance);
-        const did = valueOf<ChatMade>(made);
-        if (said === null && did === null) return null;
+        const said = valueOf<ChatGlance>(await loadChatGlance(machine, subject.id));
         // A machine that knows no last words answers with none: the last turn's line stays instead.
-        return chatDetail(subject.id, { machine, chats: list, projects, now }, said, did);
+        return said === null ? null : chatDetail(subject.id, { machine, chats: list, now }, said);
       }
       if (subject.k === SUBJECT.doc) {
         const res = await loadDocVersions(machine, subject.doc.slug);

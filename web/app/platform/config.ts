@@ -92,7 +92,7 @@ const DEFAULTS: IAppConfig = {
   taskKeyPattern: '[A-Z][A-Z0-9]{1,9}-\\d{1,6}',
   gitlabHosts: ['gitlab.com'],
   productName: 'harnessly',
-  designName: 'Designly',
+  designName: 'Sinopia Design',
   markUrl: null,
   speedPosthogHost: null,
   speedPosthogKey: null,

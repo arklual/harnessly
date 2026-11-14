@@ -50,6 +50,9 @@ export interface IFilesViewProps {
   opening: 'file' | 'folder';
   /** Reads the folder or the file again. */
   onRetry: () => void;
+  /** The failure was the link's (no answer, a lost network): asking again may help. A refusal (no access, no such
+   *  file) has no «Повторить», only the way back to the chat's folder. */
+  retryable?: boolean;
   onOpen: (path: string, kind: 'file' | 'directory') => void;
   /** Opens an entry in a tab of its own (⌘-click or the middle button on its row). */
   onOpenBeside?: (path: string, kind: 'file' | 'directory') => void;
@@ -201,6 +204,7 @@ const FilesView = ({
   error,
   opening,
   onRetry,
+  retryable = true,
   onOpen,
   onOpenBeside,
   onDownload,
@@ -534,9 +538,20 @@ const FilesView = ({
           )}
           {error !== null && (
             <LoadFailed
-              title={t(opening === 'file' ? 'next.load.file' : 'next.load.files')}
+              title={t(
+                retryable ? (opening === 'file' ? 'next.load.file' : 'next.load.files') : 'next.load.notHere',
+              )}
               reason={error}
-              onRetry={onRetry}
+              onRetry={retryable ? onRetry : null}
+              action={
+                path === ''
+                  ? null
+                  : {
+                      label: t('next.files.toChatFolder'),
+                      icon: 'folder-open',
+                      onClick: () => onOpen('', 'directory'),
+                    }
+              }
             />
           )}
           {error === null && file !== null && editor}

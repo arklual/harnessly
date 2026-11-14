@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 import { VIZ_UNIT_COUNT, type VizUnit } from '../model/format';
 import type { VizTheme, VizZoneTone } from '../model/palette';
 import { niceCeil, niceStep } from '../model/scale';

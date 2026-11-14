@@ -14,12 +14,7 @@ func (l *Library) DesignOfPath(p string) string {
 		return ""
 	}
 	p = filepath.Clean(p)
-	root := l.Root()
-	roots := []string{root}
-	if real, err := filepath.EvalSymlinks(root); err == nil && real != root {
-		roots = append(roots, real)
-	}
-	for _, r := range roots {
+	for _, r := range l.roots() {
 		if ref := folderUnder(r, p); IsLibraryID(ref) && l.ReadArtifact(ref) != nil {
 			return ref
 		}
@@ -53,26 +48,42 @@ func (l *Library) RefOf(text string) string {
 	return found
 }
 
-// BoardOfPath is the design a board file lies in and the board as the design's page names it (its path in the
-// project folder); "" for a file that is not a board of the library.
+// BoardOfPath is the design an absolute path is a page of, and the page as the design's viewer names it (its path in the
+// project folder): a board, an .html of the project. The design's own folder (or its project/) is the design with no
+// board (""). Any other file (a script, a style, the design system's notes) is ("", ""): it opens as the file it is, as
+// does a path outside the library.
 func (l *Library) BoardOfPath(p string) (ref, board string) {
-	ref = l.DesignOfPath(p)
-	if ref == "" || !strings.HasSuffix(p, dcSuffix) {
+	if ref = l.DesignOfPath(p); ref == "" {
 		return "", ""
 	}
 	p = filepath.Clean(p)
-	dir := l.ProjectDir(ref)
-	dirs := []string{dir}
-	if real, err := filepath.EvalSymlinks(dir); err == nil && real != dir {
-		dirs = append(dirs, real)
+	paths := []string{p}
+	if real, err := filepath.EvalSymlinks(p); err == nil && real != p {
+		paths = append(paths, real)
 	}
-	if real, err := filepath.EvalSymlinks(p); err == nil {
-		p = real
-	}
-	for _, d := range dirs {
-		if rel, err := filepath.Rel(d, p); err == nil && !strings.HasPrefix(rel, "..") {
-			return ref, filepath.ToSlash(rel)
+	for _, root := range l.roots() {
+		folder := filepath.Join(root, ref)
+		for _, q := range paths {
+			if q == folder || q == filepath.Join(folder, ProjectDirname) {
+				return ref, ""
+			}
+			rel, err := filepath.Rel(filepath.Join(folder, ProjectDirname), q)
+			if err != nil || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+				continue
+			}
+			if low := strings.ToLower(rel); strings.HasSuffix(low, ".html") || strings.HasSuffix(low, ".htm") {
+				return ref, filepath.ToSlash(rel)
+			}
 		}
 	}
 	return "", ""
+}
+
+// roots are the library's folder as configured and, when it is a link, where it leads.
+func (l *Library) roots() []string {
+	root := l.Root()
+	if real, err := filepath.EvalSymlinks(root); err == nil && real != root {
+		return []string{root, real}
+	}
+	return []string{root}
 }

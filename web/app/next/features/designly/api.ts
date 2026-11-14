@@ -1,8 +1,8 @@
 // Designly over v2 (/api/v2/designly/*): the library lists the machine's Claude Design projects with their boards,
 // kinds and the conversations drawing them; a new project opens a conversation of an agent in its folder. The pictures
 // come from the runtime's library route; a board opens in a preview slot of its own origin.
-import { platformPath, runtimePath } from '@/next/core/net/machine';
-import { postJson, runtimeJson } from '@/next/core/net/runtime-json';
+import { gatewayPath, platformPath, runtimePath } from '@/next/core/net/machine';
+import { hubJson, postJson, runtimeJson } from '@/next/core/net/runtime-json';
 import { readCheck, readPageLog } from '@/next/features/designly/server-data';
 import { wordedPage } from '@/next/core/net/worded';
 import { homeHas, viaHome } from '@/next/features/designly/home';
@@ -82,7 +82,7 @@ export const fetchStoreLibrary = async (m: MachineId, signal?: AbortSignal): Pro
       if (typeof v !== 'object' || v === null) throw new Error('no copy');
       return v as TRaw;
     },
-    () => runtimeJson<TRaw>(m, platformPath('/design/store-library'), { signal }),
+    () => hubJson<TRaw>('/design/store-library', { signal }),
   );
   // The projects are the machine's v2 shape: checked by the same reader, with the port and folder the hub has not.
   const { artifacts } = parsePage.designlyLibrary({ port: 0, root: '-', artifacts: raw.artifacts ?? [] });
@@ -163,26 +163,22 @@ export const readLibrary = (
   });
 
 /** A board of a project read-only from the hub's store, for a machine that is off (designaccess design/store). */
-export const storeBoardHref = (m: MachineId, id: string, board: string, query = '') =>
-  runtimePath(
-    platformPath(
-      `/design/store/${encodeURIComponent(id)}/f/${board.split('/').map(encodeURIComponent).join('/')}${query}`,
-    ),
-    m,
+export const storeBoardHref = (id: string, board: string, query = '') =>
+  gatewayPath(
+    `/design/store/${encodeURIComponent(id)}/f/${board.split('/').map(encodeURIComponent).join('/')}${query}`,
   );
 
-/** The board at one revision of the store: a newer revision is another address, so the frame loads again. The query
- *  goes in before the machine's, or the address carries two «?» and names no machine. A video's scene asks
+/** The board at one revision of the store: a newer revision is another address, so the frame loads again. The hub
+ *  finds the machine by the project, so the address names none. A video's scene asks
  *  for the scene's runtime (design/public.go GuestSceneParam). */
-export const storeBoardAtHref = (m: MachineId, id: string, board: string, rev: number, scene: boolean) =>
-  storeBoardHref(m, id, board, `?rev=${rev}${scene ? '&scene=1' : ''}`);
+export const storeBoardAtHref = (id: string, board: string, rev: number, scene: boolean) =>
+  storeBoardHref(id, board, `?rev=${rev}${scene ? '&scene=1' : ''}`);
 
 /**
  * The hub's stream «the project is at revision N» (designaccess team.go, `events`): the first event is the newest
  * revision; a project the store has nothing of answers 404.
  */
-export const storeEventsHref = (m: MachineId, id: string) =>
-  runtimePath(platformPath(`/design/store/${encodeURIComponent(id)}/events`), m);
+export const storeEventsHref = (id: string) => gatewayPath(`/design/store/${encodeURIComponent(id)}/events`);
 
 /** A new project from the brief: the runtime copies the template and opens a conversation of an agent in it. */
 export const createDesign = (m: MachineId, body: DesignlyCreate) =>

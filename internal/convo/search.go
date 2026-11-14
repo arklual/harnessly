@@ -12,6 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/attach"
 	"github.com/ly-solutions/harnessly/internal/feed"
 	"github.com/ly-solutions/harnessly/internal/msgindex"
+	"github.com/ly-solutions/harnessly/internal/peers"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -38,7 +39,7 @@ func messageDoc(conv string, e wire.Entry) (msgindex.Doc, bool) {
 	switch e.T {
 	case wire.EntryUser:
 		// The block of places under the person's words (another chat's excerpt among them) is not what they wrote.
-		role, text = msgindex.RoleUser, attach.Strip(e.Text)
+		role, text = msgindex.RoleUser, peers.Plain(attach.Strip(e.Text))
 	case wire.EntrySay:
 		role, text = msgindex.RoleAgent, e.MD
 	default:
@@ -198,7 +199,7 @@ func (r *Runtime) SearchMessages(_ context.Context, query string, limit int) (wi
 		if _, ok := alive[h.Conv]; !ok {
 			continue
 		}
-		hit := wire.MessageHit{ConvID: h.Conv, EntryID: h.Entry, At: h.At, Role: wire.MessageUser, Snippet: h.Snippet}
+		hit := wire.MessageHit{ConvID: h.Conv, EntryID: h.Entry, At: h.At, Role: wire.MessageUser, Snippet: peers.Plain(h.Snippet)}
 		if h.Role == msgindex.RoleAgent {
 			hit.Role = wire.MessageAgent
 		}
@@ -297,7 +298,7 @@ func (r *Runtime) ChatGlance(ctx context.Context, id string) (wire.ChatGlance, e
 		}
 	}
 	if user != nil {
-		out.LastUser = &wire.GlanceMessage{At: user.At, Text: cut(user.Text, glanceUserMax)}
+		out.LastUser = &wire.GlanceMessage{At: user.At, Text: cut(peers.Plain(user.Text), glanceUserMax)}
 	}
 	if agent != nil {
 		out.LastAgent = &wire.GlanceMessage{At: agent.At, Text: cut(agent.Text, glanceAgentMax)}

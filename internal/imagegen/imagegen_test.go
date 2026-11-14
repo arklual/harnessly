@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // fakeCodex writes a script that acts as `codex exec --json`: it names a thread and drops pictures into the thread's
@@ -237,5 +239,18 @@ func TestSourceIsCheckedAgainWithItsLinksFollowedWhenRead(t *testing.T) {
 	}
 	if _, err := prepareSource(Request{Source: filepath.Join(allowed, "f.png"), SourceOK: func(string) bool { return true }}, t.TempDir()); err == nil {
 		t.Fatal("a FIFO was read")
+	}
+}
+
+// the picture tools are never deferred, so a model behind tool search sees generate_images in its first turn.
+func TestToolsAreAlwaysLoaded(t *testing.T) {
+	for _, def := range (Tools{}).Tools() {
+		js := string(jsvalue.Stringify(def, ""))
+		if !strings.Contains(js, `"anthropic/alwaysLoad":true`) {
+			t.Errorf("tool not always loaded: %.80s", js)
+		}
+	}
+	if in := (Tools{}).Instructions(); !strings.Contains(in, "нарисуй") || !strings.Contains(in, "python") {
+		t.Errorf("instructions do not name the asks and the python detour: %s", in)
 	}
 }

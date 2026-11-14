@@ -74,6 +74,8 @@ export interface ISmartItem {
   machine?: ISmartMachine;
   /** Work is about to fail: the card may open by itself for a few seconds (features/notifications/auto-open.ts). */
   urgent?: boolean;
+  /** A notice with no chat that leads to a page (an access request): the card opens it. */
+  href?: string;
 }
 
 export interface ISmartMachine {

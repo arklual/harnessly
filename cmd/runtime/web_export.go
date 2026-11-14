@@ -10,17 +10,13 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agentbrowser/host"
 	"github.com/ly-solutions/harnessly/internal/apps"
-	"github.com/ly-solutions/harnessly/web"
 )
 
 // webExport writes the page this runtime would serve into dir: its files as they are and index.html with the base, the
 // API prefixes and the page settings of this environment filled in. A proxy in front of the runtimes can then serve the
 // page itself, the same build as the runtime, while the machine behind it is down. `runtime web export <dir>`.
 func webExport(dir string) error {
-	files := web.Dist()
-	if src := os.Getenv("RUNTIME_WEB_DIR"); src != "" {
-		files = os.DirFS(src)
-	}
+	files := webFiles()
 	if files == nil {
 		return errors.New("this runtime carries no page (build with -tags webui or set RUNTIME_WEB_DIR)")
 	}

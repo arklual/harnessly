@@ -7,6 +7,7 @@ import { createContext, useContext, useMemo, useState } from 'react';
 import { ImageHost } from '@/next/features/chat/image-card';
 import { useChatEditing } from '@/next/features/image-edit/chat-host';
 import ImageEditView from '@/next/features/image-edit/image-editor';
+import { useMarkupTarget } from '@/next/features/image-edit/to-composer';
 import type { Picture } from '@/next/protocol/v2';
 import { t } from '@/next/i18n';
 import type { IImageViewItem } from '@/next/ui/image-view';
@@ -134,6 +135,8 @@ export const PictureCards = ({ pictures, srcOf, side = 'agent' }: IPictureCardsP
   // The agent's pictures can be changed from here; what the person sent themselves is shown as it is.
   const changeable = side === 'agent' && shown !== undefined && shown.text.startsWith('/');
   const editing = useChatEditing(chat, changeable ? { id: shown.text, src: srcOf(shown) } : null);
+  // Any picture of the feed can be marked by the person; the marked one goes into the field.
+  const annotate = useMarkupTarget({ to: chat?.conv });
   if (pictures.length === 0) return null;
   const at = viewing === null ? -1 : pictures.findIndex((one) => one.id === viewing);
   const current = at >= 0 ? pictures[at] : null;
@@ -150,6 +153,7 @@ export const PictureCards = ({ pictures, srcOf, side = 'agent' }: IPictureCardsP
       <ImageEditView
         item={item}
         editing={editing}
+        annotate={annotate}
         onClose={() => setViewing(null)}
         position={at >= 0 ? { at: at + 1, of: pictures.length } : undefined}
         onStep={step}

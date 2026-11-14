@@ -303,7 +303,8 @@ closed: each request opens once.
   harnessly open https://docs.example.com/a/release-plan          a document
   harnessly open 'https://boards.example.com/b/arch?k=abc123'      a board
   harnessly open 4400                                              a dev server of this machine (localhost:4400)
-  harnessly open ./report.md                                       a file
+  harnessly open ./report.md                                       a file (a page and markdown open rendered)
+  harnessly open <library>/<id>/project/Main.dc.html               a board: the design's tab, on that board
   harnessly open changes /home/me/work/repo                        the changes tab for a folder
   harnessly open design landing                                    a design of this machine's library (its id,
                                                                    its folder or a file in it, or its title)

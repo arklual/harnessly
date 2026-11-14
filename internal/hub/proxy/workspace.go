@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"path"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -171,6 +172,9 @@ func (s *Service) workspaceAPI(w http.ResponseWriter, r *http.Request, p *auth.P
 	q := r.URL.Query()
 	id := q.Get("machine")
 	if id == "" || id == "local" {
+		id = s.anchorOf(r.Context(), p.User.ID, rest)
+	}
+	if id == "" {
 		if id = s.home(r.Context(), p.User.ID, true); id == "" {
 			s.fail(w, r, s.workspaceEmpty(r.Context(), p.User.ID))
 			return
@@ -479,4 +483,30 @@ func hostOf(raw string) string {
 		return ""
 	}
 	return u.Host
+}
+
+// anchorOf is the machine that holds the project a hub route names and the person may open (admit), "" when the path
+// is not one or no such machine holds it: the route is then answered as for the home machine. A project
+// held only on a teammate's own machine is closed to the others by the owner's rule (own-work): taking that machine
+// would refuse the person at the door instead of letting the hub answer «ask for access» from the home machine.
+func (s *Service) anchorOf(ctx context.Context, userID, rest string) string {
+	a, ok := s.design.(Anchor)
+	if !ok {
+		return ""
+	}
+	byID, _, err := s.fleetSpaces(ctx, userID)
+	if err != nil {
+		return ""
+	}
+	ids := make([]string, 0, len(byID))
+	for id := range byID {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range a.AnchorMachines(ctx, ids, rest) {
+		if m, err := s.admit(ctx, userID, id); err == nil && s.trustedOnHub(ctx, m) == nil {
+			return id
+		}
+	}
+	return ""
 }

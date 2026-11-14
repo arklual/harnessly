@@ -43,7 +43,6 @@ describe('«Работали» in the preview of a design (HRN-1447)', () => {
     const source = detailSource({
       machine: 'm1' as MachineId,
       chats: [chat('tab-k1yksasiw', 'Шапка сайта')],
-      projects: [],
       now: 2,
     });
     const detail = source.now({

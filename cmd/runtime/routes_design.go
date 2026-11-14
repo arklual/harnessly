@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/ly-solutions/harnessly/internal/agentcfg"
-	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,7 +14,6 @@ import (
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/wire"
-	"github.com/ly-solutions/harnessly/web"
 )
 
 // The design library (slice "design"): the library's listing, its loopback server, board edits, imports and new
@@ -87,14 +85,6 @@ func designConfig(d deps) design.Config {
 			People:       people(os.Getenv("RUNTIME_PEOPLE")),
 		},
 	}
-}
-
-// webFiles are the built front-end the runtime serves: RUNTIME_WEB_DIR, else the files compiled in (nil without either).
-func webFiles() fs.FS {
-	if dir := os.Getenv("RUNTIME_WEB_DIR"); dir != "" {
-		return os.DirFS(dir)
-	}
-	return web.Dist()
 }
 
 // designAPI is one library per runtime, so every route shares its caches, server and background.

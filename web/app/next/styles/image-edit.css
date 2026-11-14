@@ -485,3 +485,83 @@
     padding: 0 10px;
   }
 }
+
+/* ── The person's own marks (features/image-edit/use-markup.tsx) ── */
+/* With no tool on, the marks are shown and a press goes to the viewer (zoom, a swipe to the next picture). */
+.hx-ie__canvas:not([data-tool]) {
+  pointer-events: none;
+  cursor: default;
+}
+.hx-ie__canvas[data-tool='text'] {
+  cursor: text;
+}
+/* «Пометить» · «Изменить»: which tools are under the picture, when it has both. */
+.hx-ie__parts {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-raised);
+  border: 1px solid var(--hx-border);
+}
+.hx-ie__part {
+  height: 28px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--hx-radius-full);
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  cursor: pointer;
+  transition:
+    background 160ms var(--hx-ease-out),
+    color 160ms var(--hx-ease-out);
+}
+.hx-ie__part:hover:not(:disabled) {
+  color: var(--hx-fg-1);
+}
+.hx-ie__part[aria-pressed='true'] {
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
+}
+.hx-ie__part:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.hx-ie__words {
+  animation: hx-in-fade 160ms var(--hx-ease-out) backwards;
+}
+.hx-ie__finish {
+  min-width: 180px;
+  transition: opacity 160ms var(--hx-ease-out);
+}
+.hx-ie__finish:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.hx-ie__finish[data-busy] {
+  opacity: 0.7;
+  cursor: progress;
+}
+@media (pointer: coarse) {
+  .hx-ie__part {
+    height: 36px;
+  }
+  .hx-ie__finish {
+    min-height: 44px;
+  }
+}
+/* The marks' tools come in under the picture and leave the same way (Esc back to looking). */
+.hx-ie__in {
+  width: 100%;
+  animation: hx-in-fade 200ms var(--hx-ease-out) backwards;
+  transition:
+    opacity 160ms var(--hx-ease-out),
+    translate 160ms var(--hx-ease-out);
+}
+.hx-ie__in[data-state='closing'] {
+  opacity: 0;
+  translate: 0 6px;
+  pointer-events: none;
+}

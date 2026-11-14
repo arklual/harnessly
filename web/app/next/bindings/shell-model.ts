@@ -62,6 +62,7 @@ import {
   useConversationList,
   useConvsAnswered,
 } from '@/next/stores/conversations';
+import { useKeptItems } from '@/next/core/kept';
 import { sameItems, useAll } from '@/next/core/store';
 import {
   homeMachineStore,
@@ -277,6 +278,9 @@ export const cardOf = (view: MachineView, linkDown: boolean): IMachineCard => {
     alert: alertOf(machine, linkDown),
   };
 };
+
+const chatKey = (chat: ISidebarChat): string => chat.id;
+const projectKey = (project: { id: string }): string => project.id;
 
 /** The view with the load its machine reported (stores/machines.ts keeps the load apart from the record). */
 export const withLoad = (view: MachineView, load: MachineLoad | undefined): MachineView =>
@@ -584,7 +588,7 @@ export function useShellModel(): IShellModel {
 
   // the new chats that wait in the hub for their machine stand first.
   const queued = useQueuedChats();
-  const chats = useMemo<readonly ISidebarChat[] | null>(() => {
+  const builtChats = useMemo<readonly ISidebarChat[] | null>(() => {
     if (!convs) return null;
     const away = new Set(down);
     const views = new Map((machines ?? []).map((v) => [v.machine.id, v]));
@@ -654,7 +658,7 @@ export function useShellModel(): IShellModel {
   const listedProjects = useProjects(here);
   // with the person's hub-projects switch on, the registry's projects of the machines that sleep join the list.
   const hubProjects = useHubProjects();
-  const projects = useMemo(() => {
+  const builtProjects = useMemo(() => {
     if (!convs || sharedWaits) return null;
     if (shared)
       return withHubProjects(
@@ -669,6 +673,9 @@ export function useShellModel(): IShellModel {
       hubProjects,
     );
   }, [convs, sharedWaits, shared, here, listedProjects, hubProjects]);
+  // a frame of one chat rebuilds the lists; the rows of the chats it did not touch keep their items.
+  const chats = useKeptItems(builtChats, chatKey);
+  const projects = useKeptItems(builtProjects, projectKey);
 
   // The card is the machine the page works with now: the open chat's (the shell makes it the active one), else here.
   const cardOn = active ?? here;

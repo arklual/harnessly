@@ -3,6 +3,7 @@
 // messages come as <cross-session-message>. Neither is the person's words: the feed draws them as another agent's card.
 // A message our agent sends is a tool step: Claude's SendMessage, or `harnessly peers send` in the shell.
 import { createContext } from 'react';
+import { t } from '@/next/i18n';
 
 /** The runtime's refusals (internal/peers/policy.go), each a key of next.peers.reason.*. */
 export const PEER_REASONS = [
@@ -222,3 +223,30 @@ export interface IPeerActions {
 }
 
 export const PeerActions = createContext<IPeerActions | null>(null);
+
+/** «От «<chat>»: <text>» as the runtime gives another agent's message outside the chat. */
+const FROM_LINE = /^От «([^»]+)»: ([\s\S]*)$/;
+
+export interface IPeerFrom {
+  /** The sender's chat (or its owner); null for the person's own words. */
+  from: string | null;
+  text: string;
+}
+
+/**
+ * Who wrote a message as a line outside the chat shows it (the ⌘K side, a search hit, a tab's snippet): another
+ * chat with its words without the envelope, or the person. Takes both the raw envelope (an older runtime) and the
+ * runtime's «От «<chat>»: <text>».
+ */
+export const peerFrom = (input: string): IPeerFrom => {
+  const peer = parsePeer(input);
+  if (peer) return { from: peer.chat || peer.person || null, text: peer.text };
+  const line = FROM_LINE.exec(input);
+  return line ? { from: line[1] ?? null, text: line[2] ?? '' } : { from: null, text: input };
+};
+
+/** A message as one line outside the chat: «От «<chat>»: <text>» for another agent's, as it is for the person's. */
+export const peerLine = (input: string): string => {
+  const said = peerFrom(input);
+  return said.from === null ? said.text : `${t('next.search.from', { chat: said.from })}: ${said.text}`;
+};

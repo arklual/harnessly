@@ -2,12 +2,14 @@
 // its files), with the open one always among them, the pinned first, then the latest changed. Pure: the sidebar's hook
 // reads the library and the chats and asks this.
 import type { IDesign } from '@/next/features/designly/api';
-import type { Conversation, DesignKind } from '@/next/protocol/v2';
+import type { Conversation, DesignAppKind, DesignKind } from '@/next/protocol/v2';
 
 export interface IWorkingDesign {
   id: string;
   title: string;
   kind: DesignKind;
+  /** The app's document type, when the project is one (its icon is a document's). */
+  appKind?: DesignAppKind;
 }
 
 /** A chat stays live this long after its last activity. */
@@ -27,4 +29,4 @@ export const workingDesigns = (
   designs
     .filter((d) => d.id === current || [...d.convs, ...(d.touchedBy ?? [])].some((id) => live.has(id)))
     .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt)
-    .map(({ id, title, kind }) => ({ id, title, kind }));
+    .map(({ id, title, kind, appKind }) => ({ id, title, kind, ...(appKind ? { appKind } : {}) }));

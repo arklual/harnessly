@@ -56,6 +56,9 @@ type Deps struct {
 	LinkKey []byte
 	// Notice mails a person about access to a project (a request, a decision); nil sends nothing.
 	Notice Notice
+	// Bell puts the same news into the bell of the person's hub notices; nil, or a person without the switch
+	// hub-notices, leaves the mail alone.
+	Bell Bell
 	// Shared: the hub's store keeps every space's design library, so a project is the space's, not one
 	// machine's: its access rows are found under whichever machine of the space recorded it first, and a change of
 	// them reaches the snapshot of every machine of the space.
@@ -98,6 +101,7 @@ type Service struct {
 	seal          *sealer
 	files         *fileKeyer // the keys of the store's board addresses (filekey.go)
 	notice        Notice
+	bell          Bell
 	shared        bool
 	opens         func(ctx context.Context, userID string, m store.Machine) bool
 	homeOn        func(ctx context.Context, email, machineID string) bool
@@ -132,7 +136,7 @@ type dayCount struct {
 func New(d Deps) *Service {
 	s := &Service{
 		db: d.DB, reg: d.Reg, log: d.Log, now: d.Now, hubURL: strings.TrimRight(d.HubURL, "/"), platformAPI: d.PlatformAPI,
-		transport: d.Transport, seal: newSealer(d.LinkKey), files: newFileKeyer(d.LinkKey), notice: d.Notice, shared: d.Shared, opens: d.Opens, homeOn: d.HomeOn, ownerOn: d.OwnerOn, view: d.View, kits: d.Kits,
+		transport: d.Transport, seal: newSealer(d.LinkKey), files: newFileKeyer(d.LinkKey), notice: d.Notice, bell: d.Bell, shared: d.Shared, opens: d.Opens, homeOn: d.HomeOn, ownerOn: d.OwnerOn, view: d.View, kits: d.Kits,
 		serving: map[string]bool{}, prefixes: map[string]string{}, timers: map[string]*time.Timer{},
 		events: map[string]*dayCount{}, tokens: map[string]cachedToken{}, budget: newBudget(),
 		teamLevel: roleEdit, closed: d.ClosedUnrecorded,

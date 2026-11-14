@@ -95,6 +95,9 @@
 .hx-icon[data-i='cpu'] {
   --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M12 20v2%22 /%3E%3Cpath d=%22M12 2v2%22 /%3E%3Cpath d=%22M17 20v2%22 /%3E%3Cpath d=%22M17 2v2%22 /%3E%3Cpath d=%22M2 12h2%22 /%3E%3Cpath d=%22M2 17h2%22 /%3E%3Cpath d=%22M2 7h2%22 /%3E%3Cpath d=%22M20 12h2%22 /%3E%3Cpath d=%22M20 17h2%22 /%3E%3Cpath d=%22M20 7h2%22 /%3E%3Cpath d=%22M7 20v2%22 /%3E%3Cpath d=%22M7 2v2%22 /%3E%3Crect x=%224%22 y=%224%22 width=%2216%22 height=%2216%22 rx=%222%22 /%3E%3Crect x=%228%22 y=%228%22 width=%228%22 height=%228%22 rx=%221%22 /%3E%3C/svg%3E');
 }
+.hx-icon[data-i='crop'] {
+  --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M6 2v14a2 2 0 0 0 2 2h14%22 /%3E%3Cpath d=%22M18 22V8a2 2 0 0 0-2-2H2%22 /%3E%3C/svg%3E');
+}
 .hx-icon[data-i='download'] {
   --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M12 15V3%22 /%3E%3Cpath d=%22M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4%22 /%3E%3Cpath d=%22m7 10 5 5 5-5%22 /%3E%3C/svg%3E');
 }
@@ -304,6 +307,9 @@
 }
 .hx-icon[data-i='triangle-alert'] {
   --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3%22 /%3E%3Cpath d=%22M12 9v4%22 /%3E%3Cpath d=%22M12 17h.01%22 /%3E%3C/svg%3E');
+}
+.hx-icon[data-i='type'] {
+  --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M12 4v16%22 /%3E%3Cpath d=%22M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2%22 /%3E%3Cpath d=%22M9 20h6%22 /%3E%3C/svg%3E');
 }
 .hx-icon[data-i='undo-2'] {
   --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M9 14 4 9l5-5%22 /%3E%3Cpath d=%22M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11%22 /%3E%3C/svg%3E');

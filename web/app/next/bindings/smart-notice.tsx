@@ -155,6 +155,7 @@ const NOTICE_KIND_OF: Record<Exclude<INotice['kind'], 'waiting'>, TSmartKind> = 
   done: SMART_KIND.done,
   failed: SMART_KIND.failed,
   limit: SMART_KIND.limit,
+  access: SMART_KIND.info,
 };
 
 /** A finished chat's recap the machine wrote for its notice (the notification centre's chat adds it; none before). */
@@ -243,6 +244,7 @@ export const itemsOfNotices = (
       text: n.text,
       at: n.at,
       until: null,
+      ...(n.link ? { href: n.link } : {}),
     };
     if (n.chatId === SAMPLE_CHAT)
       return live.has(n.key) ? [{ ...base, kind: SMART_KIND.done, chatId: null }] : [];
@@ -1003,7 +1005,8 @@ const SmartNoticeHost = ({
       onMain={setMainKey}
       onOpenChat={(item) => {
         setOpen(false);
-        if (item.chatId) onOpenChat(item.chatId);
+        if (item.href) window.location.assign(item.href);
+        else if (item.chatId) onOpenChat(item.chatId);
       }}
       onAnswer={onAnswer}
       onDecide={onDecide}

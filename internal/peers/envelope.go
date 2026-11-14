@@ -180,3 +180,32 @@ func envelopeOf(attrs, body string) Envelope {
 	}
 	return e
 }
+
+// plainTagRE is an envelope's tag, whole or cut by a snippet's edge, for Plain to drop from a text it cannot parse.
+var plainTagRE = regexp.MustCompile(`(?i)<\s*/?\s*peer-message\b[^>]*>?`)
+
+// Plain is how a message of another agent reads outside the chat itself — the ⌘K preview, a search hit, a tab's
+// snippet, a notification: «От «<chat>»: <text>», one line per sender, without the envelope. A text that is not
+// another agent's message comes back as it is, save for a stray envelope tag (a snippet cut out of one).
+func Plain(text string) string {
+	all := ParseAll(text)
+	if len(all) == 0 {
+		return strings.TrimSpace(plainTagRE.ReplaceAllString(text, ""))
+	}
+	parts := make([]string, 0, len(all))
+	for _, e := range all {
+		parts = append(parts, "От «"+plainSender(e)+"»: "+strings.TrimSpace(e.Text))
+	}
+	return strings.Join(parts, "\n\n")
+}
+
+// plainSender is what a reader knows the sender by: the chat's title, else its owner, else the plain word.
+func plainSender(e Envelope) string {
+	switch {
+	case e.Chat != "":
+		return e.Chat
+	case e.Person != "":
+		return e.Person
+	}
+	return "другого чата"
+}

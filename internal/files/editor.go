@@ -68,7 +68,7 @@ func (e *EditorError) Error() string { return e.Text }
 
 var (
 	errNotInProject = func() *EditorError {
-		return &EditorError{403, locale.Pick("Only files of the current project can be opened.", "Можно открывать только файлы текущего проекта.")}
+		return &EditorError{403, locale.Pick("This file is outside your folders or keeps keys and settings, so it is not shown here.", "Этот файл не из ваших папок или хранит ключи и настройки — здесь его не показываем.")}
 	}
 	errOutside = func() *EditorError {
 		return &EditorError{403, locale.Pick("The path is outside the project.", "Путь находится за пределами проекта.")}

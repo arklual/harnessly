@@ -38,6 +38,9 @@ const (
 // Notice mails one person about their access; nil leaves the hub silent.
 type Notice func(ctx context.Context, to, subject, body, link string) error
 
+// Bell drops one news into a person's bell: key is stable (the same request never shows twice), link is the page.
+type Bell func(ctx context.Context, machineID, to, key, title, text, link string)
+
 func shareRole(v any) (string, error) {
 	r, _ := v.(string)
 	if r != roleView && r != roleComment && r != roleEdit {
@@ -936,13 +939,20 @@ func (s *Service) pageURL(m store.Machine, project, access string) string {
 	return u
 }
 
-func (s *Service) send(to, subject, body, link string) {
-	if s.notice == nil || to == "" {
+// send mails the news (when there is a mailer) and rings the person's bell (when the hub has one); key names the news.
+func (s *Service) send(machineID, to, key, subject, body, link string) {
+	if (s.notice == nil && s.bell == nil) || to == "" {
 		return
 	}
 	safego.Go("designaccess send", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), noticeTimeout)
 		defer cancel()
+		if s.bell != nil {
+			s.bell(ctx, machineID, to, key, subject, body, link)
+		}
+		if s.notice == nil {
+			return
+		}
 		if err := s.notice(ctx, to, subject, body, link); err != nil {
 			s.log.Warn("design access notice not sent", "error", err)
 		}
@@ -951,7 +961,7 @@ func (s *Service) send(to, subject, body, link string) {
 
 // noticeRequest tells those who run the access that somebody asks for it; never the one who asked.
 func (s *Service) noticeRequest(m store.Machine, project, asker string, rq requestRow) {
-	if s.notice == nil {
+	if s.notice == nil && s.bell == nil {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -983,7 +993,7 @@ func (s *Service) noticeRequest(m store.Machine, project, asker string, rq reque
 	subject := clip(t.w.displayName(asker), 60) + " просит " + what + " «" + clip(project, 80) + "»"
 	link := s.pageURL(m, project, "requests")
 	for addr := range to {
-		s.send(addr, subject, clip(rq.Message, 180), link)
+		s.send(m.ID, addr, "access-request:"+rq.ID, subject, clip(rq.Message, 180), link)
 	}
 }
 
@@ -994,10 +1004,10 @@ func (s *Service) noticeDecision(m store.Machine, project, actor string, rq requ
 	}
 	title := "«" + clip(project, 80) + "»"
 	if rq.Status == "allowed" {
-		s.send(rq.Email, "Доступ выдан", title, s.pageURL(m, project, ""))
+		s.send(m.ID, rq.Email, "access-decision:"+rq.ID, "Доступ выдан", title, s.pageURL(m, project, ""))
 		return
 	}
-	s.send(rq.Email, "Отклонён", "Запрос доступа к "+title+" отклонён", "")
+	s.send(m.ID, rq.Email, "access-decision:"+rq.ID, "Отклонён", "Запрос доступа к "+title+" отклонён", "")
 }
 
 var kitIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)

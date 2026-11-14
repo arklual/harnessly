@@ -671,6 +671,82 @@ describe('a picture pasted into the field', () => {
     const event = paste(screen.getByRole('textbox'), [png('image.png'), png('Screenshot.png')]);
     expect(event.defaultPrevented).toBe(true);
     await waitFor(() => expect(onFiles).toHaveBeenCalledTimes(1));
-    expect(onFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['image.png']);
+    // The file wins over the browser's copy of its pixels: its name is the person's.
+    expect(onFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['Screenshot.png']);
+  });
+
+  it('is taken once when the same paste event reaches the field twice', async () => {
+    const onFiles = vi.fn();
+    render(<Composer {...props({ onFiles })} />);
+    const field = screen.getByRole('textbox');
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', { value: { files: [png('shot.png')], getData: () => '' } });
+    field.dispatchEvent(event);
+    field.dispatchEvent(event);
+    await waitFor(() => expect(onFiles).toHaveBeenCalledTimes(1));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(onFiles).toHaveBeenCalledTimes(1);
+  });
+
+  it('is one attachment when the picture comes both as an item and as a file', async () => {
+    const onFiles = vi.fn();
+    render(<Composer {...props({ onFiles })} />);
+    const shot = png('shot.png');
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    const items = [{ kind: 'file', type: 'image/png', getAsFile: () => shot }];
+    Object.defineProperty(event, 'clipboardData', { value: { items, files: [shot], getData: () => '' } });
+    screen.getByRole('textbox').dispatchEvent(event);
+    await waitFor(() => expect(onFiles).toHaveBeenCalledTimes(1));
+    expect(onFiles.mock.calls[0][0]).toEqual([shot]);
+  });
+
+  it('keeps two different pictures', async () => {
+    const onFiles = vi.fn();
+    render(<Composer {...props({ onFiles })} />);
+    const a = new File([new Uint8Array([1])], 'a.png', { type: 'image/png' });
+    const b = new File([new Uint8Array([2])], 'b.png', { type: 'image/png' });
+    paste(screen.getByRole('textbox'), [a, b]);
+    await waitFor(() => expect(onFiles).toHaveBeenCalledTimes(1));
+    expect(onFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['a.png', 'b.png']);
+  });
+});
+
+describe('files dropped on the window', () => {
+  const drop = (files: File[]) => {
+    const event = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'dataTransfer', { value: { types: ['Files'], files } });
+    window.dispatchEvent(event);
+  };
+  const file = (bytes: number[], name: string) => new File([new Uint8Array(bytes)], name, { type: 'image/png' });
+
+  it('are one attachment when the same file comes twice', async () => {
+    const onFiles = vi.fn();
+    render(<Composer {...props({ onFiles })} />);
+    drop([file([1, 2], 'a.png'), file([1, 2], 'a copy.png')]);
+    await waitFor(() => expect(onFiles).toHaveBeenCalledTimes(1));
+    expect(onFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['a.png']);
+  });
+
+  it('go to one field when two fields of a screen listen', async () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    render(
+      <>
+        <Composer {...props({ onFiles: first })} />
+        <Composer {...props({ onFiles: second })} />
+      </>,
+    );
+    drop([file([3], 'b.png')]);
+    await waitFor(() => expect(first.mock.calls.length + second.mock.calls.length).toBe(1));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(first.mock.calls.length + second.mock.calls.length).toBe(1);
+  });
+
+  it('keep different pictures', async () => {
+    const onFiles = vi.fn();
+    render(<Composer {...props({ onFiles })} />);
+    drop([file([1], 'a.png'), file([2], 'b.png')]);
+    await waitFor(() => expect(onFiles).toHaveBeenCalledTimes(1));
+    expect(onFiles.mock.calls[0][0].map((f: File) => f.name)).toEqual(['a.png', 'b.png']);
   });
 });

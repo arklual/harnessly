@@ -70,7 +70,7 @@ const SvgPicture = ({ svg, name }: { svg: string; name: string }) => (
 
 /** The modes of a file that reads two ways: which one is the text, which the view, and which comes first. */
 const MODES_OF: Record<TShownAs, { view: string; edit: string; first: 'edit' | 'preview' }> = {
-  markdown: { view: 'next.editor.preview', edit: 'next.editor.edit', first: 'edit' },
+  markdown: { view: 'next.editor.preview', edit: 'next.editor.edit', first: 'preview' },
   html: { view: 'next.editor.page', edit: 'next.editor.code', first: 'preview' },
   json: { view: 'next.editor.tree', edit: 'next.editor.code', first: 'preview' },
   svg: { view: 'next.editor.picture', edit: 'next.editor.code', first: 'preview' },
@@ -119,6 +119,8 @@ export interface IFileEditorProps {
   at?: { line: number; col: number; size: number } | null;
   /** Hands the selection to the chat's field as a quote: the path with the lines, the code, the person's ask. */
   onAsk?: (quote: string, note: string | null) => void;
+  /** The file lies outside the chat's folder and opened because the agent showed it: read, never typed into. */
+  readOnly?: boolean;
 }
 
 /** What the editor's text is shown against: its name over the diff, its text, or why there is none. */
@@ -174,6 +176,7 @@ const FileEditor = ({
   onCloseCompare,
   onAsk,
   at = null,
+  readOnly = false,
 }: IFileEditorProps) => {
   const host = useRef<HTMLDivElement>(null);
   const live = useRef<ILive | null>(null);
@@ -248,6 +251,7 @@ const FileEditor = ({
           onUpdate: track,
         }),
         ...(askable ? [askTip(askChoices, (on, note) => askOf(on, note))] : []),
+        ...(readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
       ],
     });
     const view = new EditorView({ state, parent });
@@ -271,7 +275,7 @@ const FileEditor = ({
       live.current = null;
       leave(draft);
     };
-  }, [path, start, markdown, askable]);
+  }, [path, start, markdown, askable, readOnly]);
 
   // The place asked for: selected, in the middle of the view, with the focus in the text.
   const atLine = at?.line ?? 0;

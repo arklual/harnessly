@@ -76,6 +76,9 @@ type FileContent struct {
 	Content  string `json:"content"`
 	Revision string `json:"revision"`
 	Bytes    int    `json:"bytes"`
+	// ReadOnly: the file lies outside the conversation's folder and opened only because the agent showed it or it is in
+	// the workspace's places; it is read, never saved.
+	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
 func (f FileContent) Validate() error {

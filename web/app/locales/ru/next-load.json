@@ -22,5 +22,6 @@
   "next.load.openRef": "Не удалось открыть",
   "next.load.terminals": "Терминалы чата не загрузились",
   "next.load.editor": "Редактор не загрузился",
-  "next.load.tool": "Инструмент не открылся"
+  "next.load.tool": "Инструмент не открылся",
+  "next.load.notHere": "Здесь этот файл не откроется"
 }

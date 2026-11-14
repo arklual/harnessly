@@ -320,9 +320,13 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
       replaces its old socket.
     - The socket speaks the Legacy terminal protocol, binary frames of one byte of type and a payload. Page to runtime:
       `0x00` keystrokes (UTF-8), `0x02` resize (uint16 cols, uint16 rows, big endian), `0x03` heartbeat (every 30 s, the
-      runtime answers `0x03`; 90 s without one closes the socket). Runtime to page: `0x01` output (UTF-8, whole
+      runtime answers `0x03`; 90 s without one closes the socket), `0x07` back from the history to the live screen (the
+      pane leaves tmux's copy mode; keys sent after it reach the program). Runtime to page: `0x01` output (UTF-8, whole
       characters), `0x03` heartbeat answer. The screen of the pane arrives first, as the output a terminal would draw to
       catch up. The page keeps the socket by reconnecting when it closes; nothing is lost, tmux holds the session.
+      The history lives in tmux: the wheel reaches it as a mouse report and scrolls the pane in copy mode, or goes to a
+      program that asked for the mouse. While the runtime's tmux.conf is in force, the window title is
+      `hx-scroll:1` while the pane is scrolled back and `hx-scroll:0` at the live screen (the page's "Down").
     - `GET /api/v2/conversations/{id}/terminals` lists the own terminals `[{id, createdAt}]`, oldest first;
       `POST` makes one (a shell in the conversation's folder) and answers `{id, createdAt}`; `DELETE .../{terminalId}`
       ends it (204). A ninth is 409. The shells are tmux sessions, so they outlive a restart of the runtime; deleting the

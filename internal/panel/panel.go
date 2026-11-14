@@ -59,9 +59,10 @@ type Targets struct {
 	// DesignRef is the id of the machine's design that a text names (its id, its folder or a file in it, its title),
 	// "" for none; nil: the machine has no design library and "open design" takes no target.
 	DesignRef func(text string) string
-	// DesignBoard is the design a board file (<project>/….dc.html) of the machine's library belongs to, "" for none; it
-	// asks the design's next page to show that board. nil: a board file opens as a file.
-	DesignBoard func(path string) string
+	// DesignBoard is the design of the machine's library an absolute path lies in and the board of it the path is (a
+	// page under the design's project/, as its viewer names it; "" for the design's other files), ("", "") outside the
+	// library; nil: no library. A file of a design opens in the design's tab, never as a file.
+	DesignBoard func(path string) (design, board string)
 	// AppRef is the canonical "<app id>[/<view>]" of an installed app's pane view that a text names, "" for none; nil:
 	// the machine has no apps and "open app" takes no target.
 	AppRef func(text string) string
@@ -524,12 +525,6 @@ func (t Targets) parseOpen(tab, target any) (Command, string) {
 		c = t.portTarget(text)
 	case path:
 		c = pathTarget(text)
-		// A board of the design library is a design: it opens in Sinopia Design on that board, not as a file.
-		if c != "" && name == "files" && strings.HasSuffix(c, ".dc.html") && t.DesignBoard != nil {
-			if ref := t.DesignBoard(c); ref != "" {
-				return Command{Kind: "open", Tab: "design", Target: ref}, ""
-			}
-		}
 	case doc:
 		c = t.docTarget(text)
 		if c == "" {
@@ -559,10 +554,29 @@ func (t Targets) parseOpen(tab, target any) (Command, string) {
 	if blocked != "" {
 		return Command{}, blocked
 	}
+	if name == "files" || name == "design" {
+		if design, ok := t.DesignOf(jsvalue.TrimJS(text)); ok {
+			return design, ""
+		}
+	}
 	if c == "" {
 		return Command{}, t.hint(name, k)
 	}
 	return Command{Kind: "open", Tab: name, Target: c}, ""
+}
+
+// DesignOf is the command that opens the file at an absolute path where it belongs when it is a design's: the design's
+// tab, on its board (Place) when the path is one. ok is false for a path outside the library: an agent that
+// opens `<library>/<id>/project/Board.dc.html` as a file gets the design, not its source.
+func (t Targets) DesignOf(p string) (Command, bool) {
+	if t.DesignBoard == nil || !strings.HasPrefix(p, "/") || !clean(p) {
+		return Command{}, false
+	}
+	design, board := t.DesignBoard(p)
+	if design == "" {
+		return Command{}, false
+	}
+	return Command{Kind: "open", Tab: "design", Target: design, Place: board}, true
 }
 
 // Parse reduces a request body to a command the pane knows; the error is the text the agent reads. Unknown keys,
@@ -578,7 +592,7 @@ func (t Targets) Parse(input any) (Command, string) {
 		tab, _ := o.Get("tab")
 		target, _ := o.Get("target")
 		command, refusal := t.parseOpen(tab, target)
-		if place, _ := o.Get("place"); refusal == "" {
+		if place, _ := o.Get("place"); refusal == "" && command.Place == "" {
 			if text, isText := place.(string); isText && len(text) <= maxPlace {
 				command.Place = text
 			}

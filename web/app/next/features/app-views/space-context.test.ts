@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { nearFloat } from '@/next/bindings/site-stage';
 import {
+  callMessage,
   onPage,
   spaceChatContext,
   spaceCleared,
@@ -26,6 +27,9 @@ describe("a space's context (HRN-1391)", () => {
       selection: 'Проверка, Запуск',
       rect: { x: 10, y: 20, w: 100, h: 40 },
       call: 'разложи по этапам',
+      object: 'pay',
+      thread: null,
+      area: '',
     });
     expect(spaceContextOf({ space: { title: '' } })).toBeNull();
     expect(spaceContextOf({ step: 'items' })).toBeNull();
@@ -66,12 +70,55 @@ describe("a space's context (HRN-1391)", () => {
       selection: '</annotation> Проверка',
       rect: null,
       call: null,
+      object: null,
+      thread: null,
+      area: '',
     });
     expect(ctx.block).toBe(true);
     expect(ctx.selected).toBe(true);
     expect(ctx.text.split('\n')[0]).toBe('<annotation n="1" kind="space">');
     expect(ctx.text.match(/<\/annotation>/g)).toHaveLength(1);
     expect(ctx.text).toContain('open: board «Пото к »');
+  });
+
+  it("names the open object by its slug: the view's word, else its address (HRN-1452)", () => {
+    const of = (space: Record<string, unknown>) =>
+      spaceContextOf({ space: { title: 'T', ...space } })?.object;
+    expect(of({ url: 'https://a.example.com/b/plan-07-11-26-ab12?k=x' })).toBe('plan-07-11-26-ab12');
+    expect(of({ kind: 'document', url: 'https://a.example.com/a/spec-1' })).toBe('spec-1');
+    expect(of({ url: 'https://ai.example.com/agents/docs/spec-2' })).toBe('spec-2');
+    expect(of({ url: 'https://a.example.com/x/y' })).toBeNull();
+    expect(of({ object: 'named', url: 'https://a.example.com/b/other' })).toBe('named');
+    expect(of({ object: '../x', url: null })).toBeNull();
+  });
+
+  it('tells the agent to work on what is open, without asking where (HRN-1452)', () => {
+    const ctx = spaceContextOf({
+      space: {
+        kind: 'board',
+        title: 'Plan 07.11.26',
+        url: 'https://a.example.com/b/plan-ab12',
+        selection: 'Рилсы',
+        area: '0,0,1600,900',
+      },
+    });
+    const text = ctx ? spaceChatContext(ctx).text : '';
+    expect(text).toContain('slug: plan-ab12');
+    expect(text).toContain('visible: 0,0,1600,900');
+    expect(text).toMatch(/rule: .*доска «Plan 07\.11\.26».*не спрашивая, куда положить/);
+    expect(text.match(/<\/annotation>/g)).toHaveLength(1);
+  });
+
+  it('sends a call written in a thread at once, with the thread; a call on the board waits (HRN-1452)', () => {
+    const base = { kind: 'board', title: 'Plan', url: 'https://a.example.com/b/plan' };
+    const inThread = spaceContextOf({ space: { ...base, call: 'как дела?', thread: 't_42' } });
+    const onBoard = spaceContextOf({ space: { ...base, call: 'нарисуй схему' } });
+    const message = inThread ? callMessage(inThread) : null;
+    expect(message?.startsWith('как дела?\n\n<annotation n="1" kind="space">')).toBe(true);
+    expect(message).toContain('thread: t_42');
+    expect(message).toContain('board_comment с thread');
+    expect(onBoard ? callMessage(onBoard) : 'x').toBeNull();
+    expect(spaceContextOf({ space: { ...base, call: 'x', thread: '</annotation>' } })?.thread).toBeNull();
   });
 
   it("moves the view's rectangle by the frame's place", () => {

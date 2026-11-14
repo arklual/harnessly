@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 import { floorTo, GRANULARITY_STEP, HOUR, MOSCOW_ZONE, type VizGranularity, type VizTimeZone } from './time';
 import type { VizBucketFrame } from './types';
 

@@ -984,9 +984,11 @@
     (function look() {
       var root = pageRoot();
       var has = !!root && Array.prototype.some.call(root.children, function (el) {
-        return !domOurs(el) && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE';
+        return !domOurs(el) && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE' && el.tagName !== 'X-DC';
       });
-      if (!has && tries++ < 100) { setTimeout(look, 100); return; }
+      // The bare <x-dc> template (its support.js has not run: blocked, failed) is not a drawn page, and a page that never
+      // draws is not told drawn either: the host's own wait gives up on it.
+      if (!has) { if (tries++ < 100) setTimeout(look, 100); return; }
       boardDrawn(root || document.body).then(function () {
         if (parentWin) { try { parentWin.postMessage({ type: 'tk:drawn' }, hostOrigin); } catch (e) {} }
       });
@@ -3055,7 +3057,7 @@
       location.href = carryTheme(page);
     });
 
-    var bar = make('div', { class: 'bar', role: 'toolbar', 'aria-label': 'Доски макета Claude Design' });
+    var bar = make('div', { class: 'bar', role: 'toolbar', 'aria-label': 'Доски макета Sinopia Design' });
     var pill = make('div', { class: 'pill' });
     var expand = iconButton('boards', 'Показать панель досок');
     pill.appendChild(expand);

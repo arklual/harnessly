@@ -254,3 +254,19 @@ func Repeated(intents *paneintents.Store, tabID string, c panel.Command, now tim
 	}
 	return ""
 }
+
+// AskedFile: the conversation's pane was asked to show the file at this absolute path, as a file (`open files`, a
+// hand-over, file_show) or as the design it is a board of. Only what the agent itself pointed at counts: a file it
+// showed opens to read although it lies outside the chat's folder.
+func AskedFile(intents *paneintents.Store, tabID, path string) bool {
+	if intents == nil || path == "" {
+		return false
+	}
+	for _, it := range intents.List(tabID) {
+		cmd := it.Object("command")
+		if cmd != nil && cmd.String("kind") == "open" && cmd.String("tab") == "files" && cmd.String("target") == path {
+			return true
+		}
+	}
+	return false
+}

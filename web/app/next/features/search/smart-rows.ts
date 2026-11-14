@@ -25,6 +25,7 @@ import {
   sectionWords,
   type IPageSetting,
 } from '@/next/features/search/page-settings';
+import { designIcon } from '@/next/features/designly/design-icon';
 import { SUBJECT } from '@/next/features/search/subject';
 import { t } from '@/next/i18n';
 import type { DesignArtifact } from '@/next/protocol/v2';
@@ -205,7 +206,7 @@ export const docsGroup = (
 const designRow = (design: DesignArtifact, board: string | null): ISearchRow => ({
   id: board === null ? `design:${design.id}` : `design:${design.id}:${board}`,
   kind: 'board',
-  icon: 'pen-tool',
+  icon: designIcon(design),
   title: board ?? design.title,
   snippet: board === null ? undefined : design.title,
   meta: dayOf(design.updatedAt),

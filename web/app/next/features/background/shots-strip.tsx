@@ -8,7 +8,9 @@ import type { Shot } from '@/next/protocol/v2';
 import { formatAgo } from '@/next/i18n/format';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
-import ImageView, { type IImageViewItem } from '@/next/ui/image-view';
+import ImageEditView from '@/next/features/image-edit/image-editor';
+import { useMarkupTarget } from '@/next/features/image-edit/to-composer';
+import type { IImageViewItem } from '@/next/ui/image-view';
 import { usePresence } from '@/next/ui/presence';
 import { Skeleton, useDelayed } from '@/next/ui/skeleton';
 
@@ -67,6 +69,7 @@ const ShotsList = ({
 }) => {
   const [more, setMore] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
+  const annotate = useMarkupTarget();
   const head = shots.slice(0, SHOTS_HEAD);
   const rest = shots.slice(SHOTS_HEAD);
   const at = viewing === null ? -1 : shots.findIndex((x) => x.id === viewing);
@@ -106,8 +109,10 @@ const ShotsList = ({
           </button>
         </>
       )}
-      <ImageView
+      <ImageEditView
         item={item}
+        editing={null}
+        annotate={annotate}
         onClose={() => setViewing(null)}
         position={at >= 0 ? { at: at + 1, of: shots.length } : undefined}
         onStep={step}

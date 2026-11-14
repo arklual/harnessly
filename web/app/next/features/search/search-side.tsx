@@ -1,12 +1,13 @@
-// The side of the search (⌘K): what the selected row is and what can be done with it. The name is the largest thing
-// here; under it come the last words of a chat, a cover, facts and lists of what belongs to it, then the actions.
-import { useState, type KeyboardEvent } from 'react';
+// The side of the search (⌘K): what the selected row is. The name is the largest thing here; under it come the last
+// words of a chat, a cover, facts and lists of what belongs to it. What can be done with it is in the menu of «⋯» (and
+// of a right click on the row); the foot only reminds the keys.
+import { Menu } from '@base-ui/react/menu';
 import type { IDetailItem, IRowDetail } from '@/next/features/search/detail';
 import { partsOf } from '@/next/features/search/highlight';
 import type { ISearchRow } from '@/next/features/search/search-dialog';
-import { SUBJECT } from '@/next/features/search/subject';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
+import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
 import { Skeleton } from '@/next/ui/skeleton';
 
 export const SIDE_ACT = {
@@ -26,7 +27,12 @@ export interface ISideAction {
   key: string;
 }
 
-const SENT_MS = 1800;
+/** Where the menu of actions opens: from «⋯», or at the point a row was right-clicked. */
+export interface ISideMenu {
+  open: boolean;
+  at: { x: number; y: number } | null;
+}
+export const SIDE_MENU_CLOSED: ISideMenu = { open: false, at: null };
 
 interface ISearchSideProps {
   row: ISearchRow;
@@ -40,9 +46,10 @@ interface ISearchSideProps {
   copied: boolean;
   /** A chat's stop or wake is on its way. */
   busy: boolean;
+  menu: ISideMenu;
+  onMenu: (menu: ISideMenu) => void;
   onAct: (id: TSideAct) => void;
   onItem: (item: IDetailItem) => void;
-  onSend?: (chatId: string, text: string) => Promise<boolean>;
 }
 
 const Lit = ({ text, query }: { text: string; query: string }) => (
@@ -55,6 +62,10 @@ const Lit = ({ text, query }: { text: string; query: string }) => (
   </>
 );
 
+const pointAt = ({ x, y }: { x: number; y: number }) => ({
+  getBoundingClientRect: () => new DOMRect(x, y, 0, 0),
+});
+
 const SearchSide = ({
   row,
   kind,
@@ -63,44 +74,64 @@ const SearchSide = ({
   actions,
   copied,
   busy,
+  menu,
+  onMenu,
   onAct,
   onItem,
-  onSend,
 }: ISearchSideProps) => {
-  const [line, setLine] = useState('');
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
+  const menuActions = useMenuActions();
   const shown = detail?.detail ?? null;
   const loading = detail?.loading ?? false;
-  const chatId = row.subject?.k === SUBJECT.chat ? row.subject.id : null;
   const fallback = row.preview?.text || row.snippet || '';
   const text = shown?.text ?? (shown && shown.quotes.length > 0 ? '' : fallback);
-
-  const send = () => {
-    const words = line.trim();
-    if (!onSend || chatId === null || words === '' || sending) return;
-    setSending(true);
-    void onSend(chatId, words).then((taken) => {
-      setSending(false);
-      if (!taken) return;
-      setLine('');
-      setSent(true);
-      setTimeout(() => setSent(false), SENT_MS);
-    });
-  };
-
-  const onLineKey = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
-    event.preventDefault();
-    send();
-  };
+  const keyed = actions.filter((action) => action.key !== '');
+  const labelOf = (action: ISideAction) =>
+    action.id === SIDE_ACT.copy && copied ? t('next.search.copied') : action.label;
 
   return (
     <aside className="hx-srch__side">
       <div className="hx-srch__side-body">
-        <div>
-          <div className="hx-srch__side-kind">{kind}</div>
-          <h3 className="hx-srch__side-title">{row.title}</h3>
+        <div className="hx-srch__side-head">
+          <div className="hx-srch__side-name">
+            <div className="hx-srch__side-kind">{kind}</div>
+            <h3 className="hx-srch__side-title">{row.title}</h3>
+          </div>
+          {actions.length > 0 && (
+            <Menu.Root
+              actionsRef={menuActions}
+              open={menu.open}
+              onOpenChange={(open) => onMenu(open ? { open, at: menu.at } : SIDE_MENU_CLOSED)}
+            >
+              <Menu.Trigger
+                render={
+                  <button type="button" className="hx-srch__side-more" aria-label={t('next.search.more')}>
+                    <Icon name="ellipsis" size="sm" />
+                  </button>
+                }
+              />
+              <MenuPanel
+                actions={menuActions}
+                className="hx-cmenu"
+                label={row.title}
+                align={menu.at ? 'start' : 'end'}
+                menu="search-actions"
+                {...(menu.at ? { anchor: pointAt(menu.at) } : {})}
+              >
+                {actions.map((action) => (
+                  <Menu.Item
+                    key={action.id}
+                    className="hx-cmenu__item"
+                    disabled={action.id === SIDE_ACT.chat && busy}
+                    onClick={() => onAct(action.id)}
+                  >
+                    <Icon name={action.icon} size="sm" />
+                    <span className="hx-cmenu__txt">{labelOf(action)}</span>
+                    {action.key !== '' && <kbd className="hx-srch__menu-key">{action.key}</kbd>}
+                  </Menu.Item>
+                ))}
+              </MenuPanel>
+            </Menu.Root>
+          )}
         </div>
         {shown?.cover && (
           <img className="hx-srch__cover" src={shown.cover.src} alt={shown.cover.alt} loading="lazy" />
@@ -158,46 +189,16 @@ const SearchSide = ({
           </div>
         ))}
       </div>
-      <div className="hx-srch__side-foot">
-        {shown?.reply && onSend && chatId !== null && (
-          <label className="hx-srch__reply">
-            <input
-              type="text"
-              value={line}
-              placeholder={sent ? t('next.search.replySent') : t('next.search.replyPlaceholder')}
-              aria-label={t('next.search.replyPlaceholder')}
-              autoComplete="off"
-              disabled={sending}
-              onChange={(event) => setLine(event.target.value)}
-              onKeyDown={onLineKey}
-            />
-            <button
-              type="button"
-              className="hx-srch__reply-go"
-              aria-label={t('next.search.replySend')}
-              disabled={sending || line.trim() === ''}
-              onClick={send}
-            >
-              <Icon name="arrow-up" size="sm" />
-            </button>
-          </label>
-        )}
-        <div className="hx-srch__acts">
-          {actions.map((action) => (
-            <button
-              key={action.id}
-              type="button"
-              className="hx-srch__act"
-              disabled={action.id === SIDE_ACT.chat && busy}
-              onClick={() => onAct(action.id)}
-            >
-              <Icon name={action.icon} size="sm" />
-              <span>{action.id === SIDE_ACT.copy && copied ? t('next.search.copied') : action.label}</span>
-              {action.key !== '' && <kbd>{action.key}</kbd>}
-            </button>
+      {keyed.length > 0 && (
+        <div className="hx-srch__side-keys">
+          {keyed.map((action) => (
+            <span key={action.id}>
+              <kbd>{action.key}</kbd>
+              {labelOf(action)}
+            </span>
           ))}
         </div>
-      </div>
+      )}
     </aside>
   );
 };

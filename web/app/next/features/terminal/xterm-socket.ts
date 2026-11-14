@@ -1,12 +1,13 @@
 // xterm over the runtime's terminal socket (README §39): the shared body of the agent's terminal and the own shells
 // of the right pane. The socket comes back after a drop while the terminal is shown.
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ClipboardAddon } from '@xterm/addon-clipboard';
 import { FitAddon } from '@xterm/addon-fit';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal, type ITheme } from '@xterm/xterm';
 import { isCopyKey, isPasteKey, isReservedKey, mappedBytes } from '@/next/features/terminal/keys';
+import { isTyped, scrolledByTitle, swipeWheel, wheelAllowed } from '@/next/features/terminal/scroll';
 import { skipIdleSelectionRedraws } from '@/next/features/terminal/selection-redraw';
 import '@xterm/xterm/css/xterm.css';
 
@@ -21,8 +22,9 @@ const SMOOTH_SCROLL_MS = 120;
 /** The scrollbar's width: xterm draws it inside the screen and the fit leaves room for it. */
 const SCROLLBAR_W = 6;
 
-/** The terminal socket's frames (README §39): 0x00 keys, 0x01 output, 0x02 size, 0x03 heartbeat. */
-const FRAME = { input: 0, output: 1, resize: 2, beat: 3 } as const;
+/** The terminal socket's frames (README §39): 0x00 keys, 0x01 output, 0x02 size, 0x03 heartbeat, 0x07 out of the
+ *  history (copy mode) to the live screen. */
+const FRAME = { input: 0, output: 1, resize: 2, beat: 3, bottom: 7 } as const;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -72,6 +74,18 @@ export const useTerminalSocket = (
   url: string,
   host: React.RefObject<HTMLDivElement | null>,
 ) => {
+  // The pane is scrolled back into its history (tmux's copy mode): the page offers the way down.
+  const [scrolled, setScrolled] = useState(false);
+  const bottomRef = useRef<(() => void) | null>(null);
+  const toBottom = useCallback(() => bottomRef.current?.(), []);
+  // The wheel over what stands on the screen ("Down") still scrolls the terminal under it.
+  const elementRef = useRef<HTMLElement | null>(null);
+  const forwardWheel = useCallback((event: WheelEvent) => {
+    const target = elementRef.current;
+    if (!target) return;
+    event.preventDefault();
+    target.dispatchEvent(new WheelEvent('wheel', event));
+  }, []);
   useEffect(() => {
     const el = host.current;
     if (!open || !el) return;
@@ -97,6 +111,7 @@ export const useTerminalSocket = (
     term.loadAddon(new WebLinksAddon());
     term.loadAddon(new ClipboardAddon());
     term.open(el);
+    elementRef.current = term.element ?? null;
     skipIdleSelectionRedraws(term);
     if (canFit(el)) fit.fit();
 
@@ -107,7 +122,22 @@ export const useTerminalSocket = (
     const send = (data: Uint8Array<ArrayBuffer>) => {
       if (socket?.readyState === WebSocket.OPEN) socket.send(data);
     };
-    const type = (keys: string) => send(frame(FRAME.input, encoder.encode(keys)));
+    const raw = (keys: string) => send(frame(FRAME.input, encoder.encode(keys)));
+    // A key typed while the pane is scrolled back goes to the program: the pane comes down first, as in a terminal.
+    let inHistory = false;
+    const bottom = () => {
+      send(new Uint8Array([FRAME.bottom]));
+      inHistory = false;
+      setScrolled(false);
+    };
+    bottomRef.current = () => {
+      bottom();
+      term.focus();
+    };
+    const type = (keys: string) => {
+      if (inHistory && isTyped(keys)) bottom();
+      raw(keys);
+    };
     const connect = () => {
       const ws = new WebSocket(`${url}&cols=${term.cols}&rows=${term.rows}`);
       ws.binaryType = 'arraybuffer';
@@ -127,6 +157,39 @@ export const useTerminalSocket = (
     };
     connect();
     const input = term.onData(type);
+    const title = term.onTitleChange((text) => {
+      const state = scrolledByTitle(text);
+      if (state === null) return;
+      inHistory = state;
+      setScrolled(inHistory);
+    });
+
+    // The wheel scrolls the output, never the input history: xterm turns it into ↑/↓ when the screen has no
+    // scrollback of its own and nobody asked for the mouse — a tmux without the mouse. Then the wheel does nothing.
+    term.attachCustomWheelEventHandler(() =>
+      wheelAllowed(term.buffer.active.type, term.modes.mouseTrackingMode),
+    );
+    // A swipe on a phone is the wheel: tmux scrolls the history, or the program that asked for the mouse gets it.
+    let touchY: number | null = null;
+    const onTouchStart = (event: TouchEvent) => {
+      touchY = event.touches.length === 1 ? event.touches[0].clientY : null;
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      if (touchY === null || term.modes.mouseTrackingMode === 'none') return;
+      const y = event.touches[0].clientY;
+      const { reports, used } = swipeWheel(y - touchY, el.clientHeight / Math.max(term.rows, 1));
+      if (!reports) return;
+      event.preventDefault();
+      touchY += used;
+      raw(reports);
+    };
+    const onTouchEnd = () => {
+      touchY = null;
+    };
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd);
+    el.addEventListener('touchcancel', onTouchEnd);
 
     // The keys are the terminal's while it has the focus: xterm hands over only what the page reserves for itself
     // (see keys.ts), and what xterm does not turn into bytes (the digits, Esc) never reaches the page's handlers.
@@ -212,10 +275,19 @@ export const useTerminalSocket = (
       el.removeEventListener('focusout', onFocusOut);
       el.removeEventListener('focusin', onFocusIn);
       el.removeEventListener('pointerdown', onPointerDown);
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('touchcancel', onTouchEnd);
+      bottomRef.current = null;
+      elementRef.current = null;
+      setScrolled(false);
+      title.dispose();
       input.dispose();
       resized.dispose();
       socket?.close();
       term.dispose();
     };
   }, [open, url, host]);
+  return { scrolled, toBottom, forwardWheel };
 };

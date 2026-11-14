@@ -1,5 +1,6 @@
 // The new interface's addresses over @/platform/router: `/` is the greeting, `/c/:id` a chat (its id readable, the
 // colons of a key kept as they are). The development galleries (`?dev=<name>`) are opened by main.tsx.
+import { useMemo } from 'react';
 import Router, { useRouter } from '@/platform/router';
 import { APP_OBJECT_RE } from '@/next/routes/app-object';
 
@@ -417,5 +418,9 @@ export const goTo = (next: TRoute, options: { replace?: boolean } = {}) => {
   void (options.replace ? Router.replace(href) : Router.push(href));
 };
 
-/** The route on screen; it follows Back, Forward and links. */
-export const useRoute = (): TRoute => parseRoute(useRouter().asPath);
+/** The route on screen; it follows Back, Forward and links. The same object while the address is the same:
+ *  what is memoized on the route keeps. */
+export const useRoute = (): TRoute => {
+  const path = useRouter().asPath;
+  return useMemo(() => parseRoute(path), [path]);
+};

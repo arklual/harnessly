@@ -39,20 +39,25 @@ type Tools struct {
 var _ mcpserver.Toolset = Tools{}
 
 func (Tools) Instructions() string {
-	return "Pictures: generate_images draws raster images (illustrations, photos, icons, covers) with Codex's image model; the " +
-		"chat shows them as they are drawn. Ask for several variants with count. The answer lists the files; save_to copies them " +
-		"into a folder of the project. To change an existing picture, pass it as source."
+	return "Pictures: when the person asks to draw, generate or make a picture, photo, poster, icon, logo, cover or illustration " +
+		"(«нарисуй», «сгенерируй картинку», «сделай фото / плакат / иконку»), call generate_images at once, in the same turn: it is " +
+		"your only way to draw. Do not write code (python, PIL, SVG, canvas) to draw it and do not ask first unless the brief is empty. " +
+		"The chat shows the pictures as they are drawn; do not deliver them as files or paste their paths unless the person asks for a file " +
+		"(then deliver_file). Ask for several variants with count; save_to copies them into a folder of the project; to change an existing " +
+		"picture, pass it as source."
 }
 
 func (Tools) Tools() []any {
 	return []any{
 		jsvalue.NewObject(
 			"name", ToolGenerate,
-			"description", "Draw raster pictures from a brief with Codex's built-in image model (gpt-image). The person sees them in the "+
+			"description", "Draw raster pictures (photos, illustrations, posters, icons, logos, covers) from a brief with Codex's built-in "+
+				"image model (gpt-image). This is the way to answer «нарисуй / сгенерируй / сделай картинку, фото, плакат, иконку»: call it in the "+
+				"first turn, not code that draws (python, PIL, SVG). The person sees the pictures in the "+
 				"chat while they are drawn (a blurred card per picture, then the picture). count asks for that many distinct variants "+
 				"(1–8). Waits for the pictures and answers with their file paths; if they take longer than the call may wait, the answer "+
 				"gives a job_id to pass to wait_images. Write the brief like for an illustrator: subject, style, composition, colours, "+
-				"text if any (quote it exactly).",
+				"text if any (quote it exactly). Hand the files over with deliver_file only when the person asks for a file.",
 			"inputSchema", jsvalue.NewObject(
 				"type", "object",
 				"properties", jsvalue.NewObject(
@@ -66,6 +71,7 @@ func (Tools) Tools() []any {
 				),
 				"required", []any{"prompt"},
 			),
+			"_meta", alwaysLoad(),
 		),
 		jsvalue.NewObject(
 			"name", ToolWait,
@@ -75,9 +81,14 @@ func (Tools) Tools() []any {
 				"properties", jsvalue.NewObject("job_id", jsvalue.NewObject("type", "string", "description", "The job_id generate_images gave.")),
 				"required", []any{"job_id"},
 			),
+			"_meta", alwaysLoad(),
 		),
 	}
 }
+
+// alwaysLoad keeps the tools out of Claude Code's tool search: behind a non-Anthropic model (ENABLE_TOOL_SEARCH) a deferred
+// generate_images had to be found with ToolSearch first, and models drew with python instead or asked again.
+func alwaysLoad() *jsvalue.Object { return jsvalue.NewObject("anthropic/alwaysLoad", true) }
 
 func (Tools) Has(name string) bool { return name == ToolGenerate || name == ToolWait }
 

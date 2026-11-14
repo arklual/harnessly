@@ -1,3 +1,4 @@
+import { peerFrom } from '@/next/features/chat/peer';
 import { t } from '@/next/i18n';
 import { clock, formatAgo, startOfDay } from '@/next/i18n/format';
 import { matching, termsOf, type ITerms } from '@/next/features/search/terms';
@@ -52,6 +53,14 @@ const whenOf = (at: number, now: number): string => (at >= startOfDay(now) ? clo
 
 /** The messages found, a group for each chat they are in (the chats in the order of their newest hit); a hit in a chat
  *  the list does not have (another machine's, deleted) is left out. */
+/** Who a hit's words are: the agent, another chat (its message) or the person. */
+const whoSaid = (hit: MessageHit): { icon: string; title: string; text: string } => {
+  if (hit.role !== 'user') return { icon: 'sparkles', title: t('next.search.agent'), text: hit.snippet };
+  const said = peerFrom(hit.snippet);
+  if (said.from === null) return { icon: 'user', title: t('next.search.you'), text: said.text };
+  return { icon: 'messages-square', title: t('next.search.from', { chat: said.from }), text: said.text };
+};
+
 export const messageGroups = (
   hits: readonly MessageHit[],
   chats: readonly ISidebarChat[],
@@ -63,15 +72,16 @@ export const messageGroups = (
     const chat = byId.get(hit.convId);
     if (!chat) continue;
     const rows = groups.get(chat.id) ?? [];
+    const said = whoSaid(hit);
     rows.push({
       id: `message:${hit.convId}:${hit.entryId}`,
       kind: 'message',
-      icon: hit.role === 'user' ? 'user' : 'sparkles',
-      title: hit.role === 'user' ? t('next.search.you') : t('next.search.agent'),
-      snippet: hit.snippet,
+      icon: said.icon,
+      title: said.title,
+      snippet: said.text,
       meta: whenOf(hit.at, now),
       target: { chatId: hit.convId, entryId: hit.entryId, turnId: hit.turnId },
-      preview: { kind: t('next.search.kindMessage'), text: hit.snippet },
+      preview: { kind: t('next.search.kindMessage'), text: said.text },
       subject: { k: SUBJECT.chat, id: hit.convId },
     });
     groups.set(chat.id, rows);

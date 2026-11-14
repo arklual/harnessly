@@ -45,6 +45,7 @@ import { useCardDrag } from '@/next/features/designly/use-card-drag';
 import type { IFolder } from '@/next/features/designly/api';
 import { usePresentFlag } from '@/next/ui/presence';
 import Icon from '@/next/ui/icon';
+import { DESIGN_KIND_ICON, designIcon } from '@/next/features/designly/design-icon';
 import CreatePanel, { DsChoice } from '@/next/features/designly/create-panel';
 import { DeckFound, deckSettingsLabel, useDeckStart } from '@/next/features/designly/deck/deck-start';
 import DeckSettings from '@/next/features/designly/deck/deck-settings';
@@ -82,12 +83,6 @@ import '@/next/styles/designly.css';
 export const DESIGN_KIND = { site: 'site', slides: 'slides', video: 'video', ds: 'ds' } as const;
 export type TDesignKind = (typeof DESIGN_KIND)[keyof typeof DESIGN_KIND];
 
-const KIND_ICON: Record<TDesignKind, string> = {
-  [DESIGN_KIND.site]: 'app-window',
-  [DESIGN_KIND.slides]: 'presentation',
-  [DESIGN_KIND.video]: 'clapperboard',
-  [DESIGN_KIND.ds]: 'palette',
-};
 const KINDS = [DESIGN_KIND.site, DESIGN_KIND.slides, DESIGN_KIND.video, DESIGN_KIND.ds] as const;
 
 export interface IDesignCard {
@@ -377,6 +372,7 @@ const Hero = ({
       <div className="hx-dock hx-dl__composer" data-screen ref={setBox} data-creating={busy || undefined}>
         <input ref={templatePicker} type="file" accept=".pptx" hidden tabIndex={-1} onChange={pickFiles} />
         <ScreenField
+          glideOut="site"
           value={brief}
           onChange={onBrief}
           onSubmit={send}
@@ -458,7 +454,7 @@ const Hero = ({
               }}
             >
               <span className="hx-dl-start__ic">
-                <Icon name={KIND_ICON[k]} />
+                <Icon name={DESIGN_KIND_ICON[k]} />
               </span>
               <span className="hx-dl-start__text">
                 <span className="hx-dl-start__name">{t(`next.designly.kinds.${k}`)}</span>
@@ -745,7 +741,7 @@ const DesignCard = memo(
         <span className="hx-dl-card__text">
           <span className="hx-dl-card__title">{card.title}</span>
           <span className="hx-dl-card__sub">
-            <Icon name={card.appKind ? 'blocks' : KIND_ICON[card.kind]} size="sm" />
+            <Icon name={designIcon(card)} size="sm" />
             {cardSub(card, now)}
           </span>
         </span>

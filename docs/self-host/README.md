@@ -1,6 +1,6 @@
 # Running harnessly yourself
 
-harnessly is open source (Apache-2.0) and runs entirely on your own machines. Pick the shape that fits:
+harnessly is open source (AGPL-3.0) and runs entirely on your own machines. Pick the shape that fits:
 
 | Shape | For | What runs | Start here |
 | --- | --- | --- | --- |

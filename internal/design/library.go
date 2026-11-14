@@ -184,6 +184,10 @@ func (l *Library) configuredWorkspaceRoot() string {
 	return ""
 }
 
+// RootOf is the library folder a configuration names, without starting a library (nothing is read or written but the
+// workspace's config).
+func RootOf(cfg Config) string { return (&Library{cfg: cfg}).Root() }
+
 // Root is the one folder of all design projects.
 func (l *Library) Root() string {
 	if l.cfg.LibraryDir != "" {

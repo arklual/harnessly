@@ -253,6 +253,7 @@ const NewDesignField = ({ machine, draftKey, creating, start, extra, onFirst }: 
   return (
     <AttachmentSrc.Provider value={srcOf}>
       <ScreenField
+        glideIn="site"
         enterSends={enterSends}
         value={text}
         onChange={onChange}

@@ -35,6 +35,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/machine"
 	"github.com/ly-solutions/harnessly/internal/msgindex"
 	"github.com/ly-solutions/harnessly/internal/outbox"
+	"github.com/ly-solutions/harnessly/internal/paneauto"
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/prompts"
 	"github.com/ly-solutions/harnessly/internal/providers"
@@ -268,7 +269,14 @@ func newV2Live(d deps, c *core) *v2Live {
 	v.srv.HandoffDraft = (&v2Handoff{rt: v.rt, runtimeFile: os.Getenv("RUNTIME_SIDE_CHAT_CONFIG")}).Draft
 	// The start page's pane browses the machine's own place without a chat (wire.HomeConv).
 	place := homeRecord(homePlace(d), v.rt.Record)
-	v2f := &v2Files{record: place, touched: v.rt.Touched, delivered: v.rt.Delivered, access: workspaceAccess(d)}
+	v2f := &v2Files{record: place, touched: v.rt.Touched, delivered: v.rt.Delivered, access: workspaceAccess(d),
+		own: []string{d.Home, d.WorkspaceRoot}}
+	if c.cfg.Tmux != nil && c.intents != nil {
+		v2f.asked = func(conv, path string) bool {
+			tab, err := legacyTabOf(v.rt.Record, c.cfg.Tmux.ParseSessionName, conv)
+			return err == nil && tab.TabID != "" && paneauto.AskedFile(c.intents, tab.TabID, path)
+		}
+	}
 	v.srv.Files = v2f
 	v.srv.Download = v2f.ServeDownload
 	v.srv.GitSide = v2f.ServeGitSide
@@ -303,6 +311,7 @@ func newV2Live(d deps, c *core) *v2Live {
 	checker := newMRChecker(handlers.S)
 	targets := panelTargets()
 	targets.Resolve = linkResolver(connectionsFor(d), docsProviderOf(), targets)
+	targets.DesignBoard = designAPI(d).L.BoardOfPath
 	open := v2Open{record: v.rt.Record, targets: targets, mrLinks: transcriptMRs(chatSources), mr: checker.lookup, projects: checker.projects, state: &mrState{}}
 	v.srv.Open = open.Open
 	v.srv.OpenAll = open.OpenAll

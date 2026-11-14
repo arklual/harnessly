@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Manual-mode hint bubble (open state is owned by the caller), reduced from the design system Hint: the
 // placement is the same pure function, the bubble is portaled to a shared host, enter and exit are CSS keyframes.
 import {

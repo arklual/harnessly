@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 import { formatCompact, formatDay, formatNumber, formatRange, formatTime } from '../model/format';
 import { type VizTheme, type VizZoneTone, zoneToneColor } from '../model/palette';
 import { isMidnight, TICK_LEVELS, type TickLevel, tickLevelFor, ticksFor } from '../model/time';

@@ -177,13 +177,14 @@ func (c *core) layoutRoutes(f *gate.Gate, d deps) []gate.Route {
 	// "open design <id|path|title>" names a design of this machine's library.
 	lib := designAPI(d).L
 	deps.Targets.DesignRef = lib.RefOf
-	// "open <project>/<board>.dc.html" opens the design on that board in Sinopia Design, not the file.
-	deps.Targets.DesignBoard = func(path string) string {
+	// …and a file of a design opens the design on its board, whatever tab the agent named: the board goes
+	// with the request (place); a design without pages of its own is also told by its live control.
+	deps.Targets.DesignBoard = func(path string) (string, string) {
 		ref, board := lib.BoardOfPath(path)
 		if ref != "" && board != "" && !lib.HasPages(ref) {
 			lib.QueueControl(ref, design.Control{Board: board})
 		}
-		return ref
+		return ref, board
 	}
 	// `design panel … show` and `design claim` open the design in the chat's pane (and above it, by the intents' lift).
 	designAPI(d).OpenPane = c.designOpenPane(lib)
@@ -229,7 +230,8 @@ func (c *core) designOpenPane(lib *design.Library) func(session, ref, board stri
 		if tabID == "" {
 			return false
 		}
-		cmd := panel.Command{Kind: "open", Tab: "design", Target: ref}
+		// The board goes with the request (place): the pane's design viewer turns to it, pages of its own or not.
+		cmd := panel.Command{Kind: "open", Tab: "design", Target: ref, Place: board}
 		if paneauto.Repeated(c.intents, tabID, cmd, time.Now()) == "" {
 			c.intents.Add(tabID, cmd.JSON())
 			if c.sync != nil {

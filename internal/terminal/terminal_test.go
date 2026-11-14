@@ -296,3 +296,28 @@ func TestCompleteUTF8(t *testing.T) {
 }
 
 func httpHandler(s *Server) http.Handler { return http.HandlerFunc(s.Handle) }
+
+// The page's "Down" (and a key typed while scrolled back) leaves copy mode, so the keys reach the program.
+func TestBottomLeavesCopyMode(t *testing.T) {
+	r := newRig(t)
+	r.session("hs-scroll", "cat")
+	c := r.dial("session=hs-scroll")
+	send(t, c, []byte{msgHeartbeat})
+	until(t, c, msgHeartbeat, "", 3*time.Second)
+	inMode := func() string {
+		out, _ := exec.Command("tmux", "-L", r.socket, "display-message", "-p", "-t", "hs-scroll", "#{pane_in_mode}").Output()
+		return strings.TrimSpace(string(out))
+	}
+	if out, err := exec.Command("tmux", "-L", r.socket, "copy-mode", "-t", "hs-scroll").CombinedOutput(); err != nil {
+		t.Fatalf("copy-mode: %v %s", err, out)
+	}
+	if inMode() != "1" {
+		t.Fatal("not in copy mode")
+	}
+	send(t, c, []byte{msgBottom})
+	send(t, c, frame(msgStdin, "typed\r"))
+	until(t, c, msgStdout, "typed", 5*time.Second)
+	if inMode() != "0" {
+		t.Fatal("still in copy mode")
+	}
+}

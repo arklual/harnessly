@@ -83,12 +83,15 @@ const pickedNow = (): IPicked | null => {
   return { quote: text, anchor, ...spotOf(range) };
 };
 
-/** A press on a chip in the field: its words come into view and their mark calls itself out. */
-const showAsk = createStore<{ conv: ConvId; id: string; nonce: number } | null>(null);
+/**
+ * A press on a chip in the field: its words come into view, their mark calls itself out and opens its editor, the one
+ * the annotation was made with. Words the feed does not hold (another chat's, a turn gone) call `missing`.
+ */
+const showAsk = createStore<{ conv: ConvId; id: string; nonce: number; missing?: () => void } | null>(null);
 let asked = 0;
-export const showFeedNote = (conv: ConvId, id: string): void => {
+export const showFeedNote = (conv: ConvId, id: string, missing?: () => void): void => {
   asked += 1;
-  showAsk.set({ conv, id, nonce: asked });
+  showAsk.set({ conv, id, nonce: asked, missing });
 };
 
 /** The highlight of the marked words, one for all the marks. */
@@ -319,7 +322,8 @@ const SelBar = ({ conv, aside = false, machine = null }: ISelBarProps) => {
   }, [ids, draw]);
   useEffect(() => () => highlight()?.clear(), []);
 
-  // A press on a chip: the words into view (the feed first draws their turn when it is far), the mark flashes.
+  // A press on a chip: the words into view (the feed first draws their turn when it is far), the mark flashes and its
+  // editor opens beside it. Words that do not come leave the change to the chip's card.
   const ask = useStore(showAsk);
   const known = useRef(marks);
   const showTimer = useRef(0);
@@ -330,7 +334,10 @@ const SelBar = ({ conv, aside = false, machine = null }: ISelBarProps) => {
     if (ask === null || ask.conv !== conv) return;
     showAsk.set(null);
     const mark = known.current.find((m) => m.id === ask.id);
-    if (!mark) return;
+    if (!mark) {
+      ask.missing?.();
+      return;
+    }
     window.clearTimeout(showTimer.current);
     let tries = 0;
     const show = () => {
@@ -339,9 +346,12 @@ const SelBar = ({ conv, aside = false, machine = null }: ISelBarProps) => {
         if (tries === 0) revealMessage({ conv, entryId: mark.anchor.key, turnId: mark.anchor.key });
         tries += 1;
         if (tries < SHOW_TRIES) showTimer.current = window.setTimeout(show, SHOW_RETRY_MS);
+        else ask.missing?.();
         return;
       }
       range.startContainer.parentElement?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      setFresh(null);
+      setEditing(mark.id);
       const el = els.current.get(mark.id);
       if (!el) return;
       el.removeAttribute('data-flash');

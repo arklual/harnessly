@@ -1,7 +1,7 @@
 // The files of a draft: pick, upload ahead of sending (spec §3), show the progress, keep the uploaded ones in the
 // draft. A failed one stays with its reason and a retry until it is removed; nothing uploads for ever (the upload ends
 // on silence).
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   newUploadSession,
   UPLOAD_FAILURE,
@@ -11,6 +11,7 @@ import {
   type UploadOutcome,
 } from '@/next/commands/uploads';
 import { formatBytes } from '@/next/ui/transfer';
+import { useTakeMarked } from '@/next/features/image-edit/to-composer';
 import { fitPicture, isHeic, isSqueezable, limitFor, megabytes } from '@/next/commands/photo';
 import type { ComposerAttachment } from '@/next/features/composer/types';
 import type { AttachmentRef, MachineId } from '@/next/protocol/v2';
@@ -19,6 +20,8 @@ import { limitsOf } from '@/next/stores/machines';
 import { connectionStore } from '@/next/stores/connection';
 import { appConfig } from '@/platform/config';
 import { t } from '@/next/i18n';
+import { contentKey } from '@/next/features/composer/distinct-files';
+import { toast } from '@/next/ui/toast';
 
 interface ILocal {
   id: string;
@@ -52,6 +55,45 @@ const failureText = (outcome: Extract<UploadOutcome, { ok: false }>): string => 
 
 let seq = 0;
 
+/** A row still uploading is named so; anything else is an uploaded file's ref. */
+const LOCAL_PREFIX = 'up-';
+
+/**
+ * What each file of a draft holds (contentKey: SHA-256 of its bytes), by its row's or its ref's id. Kept
+ * outside the hook: two fields of one draft (Sinopia's folded field and its open chat) see the same files.
+ */
+const contentsOf = new Map<DraftKey, Map<string, string>>();
+const contentsFor = (key: DraftKey): Map<string, string> => {
+  const have = contentsOf.get(key);
+  if (have) return have;
+  const made = new Map<string, string>();
+  contentsOf.set(key, made);
+  return made;
+};
+
+/** The contents attached to the draft now: rows uploading and refs still in it. */
+const heldBy = (key: DraftKey): Set<string> => {
+  const inDraft = new Set((draftsStore.get(key)?.attachments ?? []).map((a) => a.id));
+  const held = new Set<string>();
+  for (const [id, content] of contentsFor(key)) {
+    if (id.startsWith(LOCAL_PREFIX) || inDraft.has(id)) held.add(content);
+  }
+  return held;
+};
+
+/** The draft's files with the same one twice left out (by id, or by what it holds): a message sends each once. */
+export const distinctRefs = (files: readonly AttachmentRef[], contents: ReadonlyMap<string, string>): AttachmentRef[] => {
+  const ids = new Set<string>();
+  const held = new Set<string>();
+  return files.filter((file) => {
+    const content = contents.get(file.id);
+    if (ids.has(file.id) || (content !== undefined && held.has(content))) return false;
+    ids.add(file.id);
+    if (content !== undefined) held.add(content);
+    return true;
+  });
+};
+
 export interface IUploads {
   attachments: ComposerAttachment[];
   /** The uploaded files, for the message. */
@@ -70,6 +112,16 @@ export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles:
   const [local, setLocal] = useState<ILocal[]>([]);
   const controllers = useRef(new Map<string, AbortController>());
   const sessions = useRef(new Map<string, IUploadSession>());
+  /** The rows this field made: a failed one leaves with the field, and the message may take that file again. */
+  const mine = useRef(new Set<string>());
+  useEffect(() => {
+    const made = mine.current;
+    return () => {
+      const contents = contentsFor(key);
+      for (const id of made) contents.delete(id);
+      made.clear();
+    };
+  }, [key]);
   const rowSession = useCallback((id: string) => {
     const have = sessions.current.get(id);
     if (have) return have;
@@ -123,6 +175,11 @@ export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles:
         if (outcome.ok) {
           setLocal((rows) => rows.filter((r) => r.id !== id));
           sessions.current.delete(id);
+          const contents = contentsFor(key);
+          const content = contents.get(id);
+          contents.delete(id);
+          mine.current.delete(id);
+          if (content !== undefined) contents.set(outcome.ref.id, content);
           const have = draftsStore.get(key) ?? { text: '', attachments: [] };
           setDraft(key, { ...have, attachments: [...have.attachments, outcome.ref] });
         } else if (outcome.code !== UPLOAD_FAILURE.aborted) {
@@ -158,25 +215,40 @@ export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles:
   );
 
   // No machine yet (the list still loading): the files are shown with the reason and a retry, never dropped in silence.
+  // A file the message already has (the same bytes) is not attached again: a short notice says so.
   const onFiles = useCallback(
     (files: File[]) => {
-      for (const file of files) {
-        const id = `up-${(seq += 1)}`;
-        const row: ILocal = {
-          id,
-          name: file.name,
-          kind: isHeic(file) || file.type.startsWith('image/') ? 'image' : 'file',
-          status: 'uploading',
-          error: null,
-          file,
-          sent: 0,
-          speed: 0,
-        };
-        setLocal((rows) => [...rows, row]);
-        start(id, file);
-      }
+      void Promise.all(files.map(contentKey)).then((keys) => {
+        const contents = contentsFor(key);
+        const held = heldBy(key);
+        let twice = false;
+        files.forEach((file, i) => {
+          const content = keys[i];
+          if (held.has(content)) {
+            twice = true;
+            return;
+          }
+          held.add(content);
+          const id = `${LOCAL_PREFIX}${(seq += 1)}`;
+          contents.set(id, content);
+          mine.current.add(id);
+          const row: ILocal = {
+            id,
+            name: file.name,
+            kind: isHeic(file) || file.type.startsWith('image/') ? 'image' : 'file',
+            status: 'uploading',
+            error: null,
+            file,
+            sent: 0,
+            speed: 0,
+          };
+          setLocal((rows) => [...rows, row]);
+          start(id, file);
+        });
+        if (twice) toast(t('next.upload.already'));
+      });
     },
-    [start],
+    [key, start],
   );
 
   const onRetry = useCallback(
@@ -197,6 +269,7 @@ export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles:
       controllers.current.delete(id);
       setLocal((rows) => rows.filter((r) => r.id !== id));
       sessions.current.delete(id);
+      contentsFor(key).delete(id);
       const have = draftsStore.get(key);
       if (have?.attachments.some((a) => a.id === id)) {
         setDraft(key, { ...have, attachments: have.attachments.filter((a) => a.id !== id) });
@@ -205,10 +278,22 @@ export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles:
     [key],
   );
 
-  const reset = useCallback(() => setLocal([]), []);
+  const reset = useCallback(() => {
+    const contents = contentsFor(key);
+    for (const row of local) contents.delete(row.id);
+    setLocal([]);
+  }, [key, local]);
+  // A picture marked in the editor (features/image-edit) comes as a file picked with «+»; one marked from an
+  // attachment of this field takes its place.
+  useTakeMarked(key, {
+    onFiles,
+    onRemove,
+    owns: (id) => draftFiles.some((a) => a.id === id) || local.some((r) => r.id === id),
+  });
 
+  const files = useMemo(() => distinctRefs(draftFiles, contentsFor(key)), [draftFiles, key]);
   const attachments: ComposerAttachment[] = [
-    ...draftFiles.map((a): ComposerAttachment => ({
+    ...files.map((a): ComposerAttachment => ({
       id: a.id,
       name: a.name,
       kind: a.kind,
@@ -226,7 +311,7 @@ export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles:
   ];
   return {
     attachments,
-    ready: draftFiles,
+    ready: files,
     uploading: local.some((r) => r.status === 'uploading'),
     onFiles,
     onRemove,

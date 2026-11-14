@@ -141,7 +141,7 @@ const DeliveredView = ({ conv, machine, path, view, crumbs, onCrumb, tools }: ID
       <PaneHead lead={<Crumbs items={crumbs} onPick={onCrumb} />} tools={tools}>
         {view === DELIVERED_VIEW.zip && <ZipContents machine={machine} path={path} />}
         {view === DELIVERED_VIEW.image && (
-          <ImageStage key={path} src={src} name={name} onSelection={onSelection} />
+          <ImageStage key={path} src={src} name={name} onSelection={onSelection} markTo={conv} />
         )}
         {view === DELIVERED_VIEW.pdf && (
           <LazyView

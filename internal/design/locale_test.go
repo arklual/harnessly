@@ -80,7 +80,7 @@ func TestEnglishPages(t *testing.T) {
 	index := l.indexPage([]*Artifact{a}, "/lib")
 	mustContain(t, "index", index, `<html lang="en">`, "Folder: /lib", "1 board")
 	empty := l.indexPage(nil, "/lib")
-	mustContain(t, "empty index", empty, "Nothing here yet. Put a Claude Design project in the folder above or import an archive.")
+	mustContain(t, "empty index", empty, "Nothing here yet. Put a Sinopia Design project (or a Claude Design export) in the folder above or import an archive.")
 	page := l.artifactPage(a)
 	mustContain(t, "design page", page, "← All designs", " · updated ")
 	mustContain(t, "not found", l.notFoundPage(), "<title>Not found</title>", "There is no such design.")
@@ -129,7 +129,7 @@ func TestEmbeddedTextsFollowTheLocale(t *testing.T) {
 	l := New(Config{Texts: Texts{CLI: "acme-cli", Host: "acme.example", Tag: "acme", KitGlobal: "AcmeKit", SharedDir: "/srv/shared"}})
 	t.Setenv("RUNTIME_LOCALE", "en")
 	guide, script, css := l.Guide(), l.clientScript(), l.text("library.css")
-	mustContain(t, "English guide", guide, "<!-- acme-library-guide v13 -->", "# Claude Design projects: how to edit them",
+	mustContain(t, "English guide", guide, "<!-- acme-library-guide v14 -->", "# Sinopia Design projects: how to edit them",
 		"`acme-cli design claim <id>", "`window.AcmeKit`", "(on acme.example it is `/srv/shared`)")
 	if cyrillic.MatchString(guide) {
 		t.Errorf("the English guide has Russian text: %s", cyrillic.FindString(guide))
@@ -141,7 +141,7 @@ func TestEmbeddedTextsFollowTheLocale(t *testing.T) {
 	}
 	t.Setenv("RUNTIME_LOCALE", "ru")
 	ruGuide, ruScript := l.Guide(), l.clientScript()
-	mustContain(t, "Russian guide", ruGuide, "<!-- acme-library-guide v13 -->", "# Макеты Claude Design: как их править")
+	mustContain(t, "Russian guide", ruGuide, "<!-- acme-library-guide v14 -->", "# Макеты Sinopia Design: как их править")
 	mustContain(t, "Russian client script", ruScript, "'Ошибка скрипта'", "'Найти доску'", "'Десктоп'", "'Телефон'")
 	if l.text("library.css") != css {
 		t.Error("the stylesheet differs between languages")

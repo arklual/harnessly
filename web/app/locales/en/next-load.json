@@ -22,5 +22,6 @@
   "next.load.openRef": "Could not open",
   "next.load.terminals": "The chat's terminals did not load",
   "next.load.editor": "The editor did not load",
-  "next.load.tool": "The tool did not open"
+  "next.load.tool": "The tool did not open",
+  "next.load.notHere": "This file does not open here"
 }

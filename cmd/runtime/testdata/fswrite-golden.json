@@ -3060,11 +3060,11 @@
    "status": 403,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"Vgi5hIGmEp8ILKic94WLdvA2p-w\"",
+    "etag": "\"LePko-lxTpDfhewo2Gf-sM4JVPY\"",
     "cache-control": "no-store",
     "content-length": "98"
    },
-   "answer": "{\"error\":\"Можно открывать только файлы текущего проекта.\"}"
+   "answer": "{\"error\":\"Этот файл не из ваших папок или хранит ключи и настройки — здесь его не показываем.\"}"
   },
   {
    "method": "PUT",

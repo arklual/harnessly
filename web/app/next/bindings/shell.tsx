@@ -52,7 +52,7 @@ import {
   useTabChats,
 } from '@/next/bindings/shell-model';
 import { bootNext, shutdownNext, useBoot } from '@/next/boot';
-import { interrupt, resumeConversation, sendMessage, setGoal } from '@/next/commands';
+import { interrupt, resumeConversation, setGoal } from '@/next/commands';
 import { useReadWhileVisible } from '@/next/bindings/read-while-visible';
 import { connectionStore } from '@/next/stores/connection';
 import { useAll } from '@/next/core/store';
@@ -621,14 +621,12 @@ const Shell = ({ owner }: IShellProps) => {
   const asked = useRoute();
   // A chat that edits a design is that design with its chat (chat-place.ts): shown so from the first frame, so no plain
   // chat with the sidebar flashes, and the address follows.
-  const askedPath = routePath(asked);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- the address is what moves it, not the parsed object
-  const route = useMemo(() => designPlaceOf(asked), [askedPath]);
+  // useRoute keeps the object while the address is the same: the address is what moves these.
+  const route = useMemo(() => designPlaceOf(asked), [asked]);
   useEffect(() => {
     clearPlain(asked.kind === ROUTE.chat ? asked.id : null);
     if (route !== asked) goTo(route, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [askedPath]);
+  }, [asked, route]);
   const me = useMe();
   // The colour of what pops up, the person's setting: until it comes, the default.
   useNoticeColor(me.k === 'ready' ? me.me.settings.noticeColor : DEFAULT_SETTINGS.noticeColor);
@@ -702,18 +700,21 @@ const Shell = ({ owner }: IShellProps) => {
   // Switching chats, the open one leaves first (its thread fades up, 180 ms), then the next one comes in.
   const stageId = useLeaving(currentId, CHAT_LEAVE_MS);
   const leaving = stageId !== currentId;
-  // A chat that opens from the start page: its field comes down from under the greeting, as in the design.
-  const [arrival, setArrival] = useState<{ id: string | null; fromHome: boolean }>({
-    id: stageId,
-    fromHome: false,
-  });
-  if (arrival.id !== stageId) setArrival({ id: stageId, fromHome: arrival.id === null });
   // The start page's field rises from the chat's place only when a chat was the screen before it.
   const [screens, setScreens] = useState<{ now: TRoute['kind']; before: TRoute['kind'] | null }>({
     now: route.kind,
     before: null,
   });
+  const screenBefore = screens.now !== route.kind ? screens.now : screens.before;
   if (screens.now !== route.kind) setScreens({ now: route.kind, before: screens.now });
+  // A chat that opens from the start page: its field comes down from under the greeting, as in the design. From
+  // Sinopia, settings or any other screen the field stands at the bottom from the first frame.
+  const [arrival, setArrival] = useState<{ id: string | null; fromHome: boolean }>({
+    id: stageId,
+    fromHome: false,
+  });
+  if (arrival.id !== stageId)
+    setArrival({ id: stageId, fromHome: arrival.id === null && screenBefore === ROUTE.home });
   const record = useConversation(stageId && isConvId(stageId) ? stageId : null);
   const feed = useFeed(stageId && isConvId(stageId) ? stageId : null);
   const chatMachine = record?.machineId ?? feed?.machineId ?? null;
@@ -1104,6 +1105,12 @@ const Shell = ({ owner }: IShellProps) => {
     () => (newChatName === null ? null : { name: newChatName, onClear: () => newChatProjectStore.set(null) }),
     [newChatName],
   );
+  // The sidebar's actions read the chats when they run, not when they were made: a frame of any chat made a
+  // new list, the actions anew, and every row of the sidebar drew again.
+  const chatsNow = useRef(model.chats);
+  useLayoutEffect(() => {
+    chatsNow.current = model.chats;
+  });
   const chatActions = {
     ...model.actions,
     onOpenInNewTab: tabs.enabled ? (id: string) => openInNewTab({ kind: ROUTE.chat, id }, true) : undefined,
@@ -1112,7 +1119,7 @@ const Shell = ({ owner }: IShellProps) => {
     onAttachChat:
       currentId !== null && isConvId(currentId)
         ? (id: string) => {
-            const chat = model.chats?.find((item) => item.id === id);
+            const chat = chatsNow.current?.find((item) => item.id === id);
             if (chat && id !== currentId)
               addDraftRef(currentId, chatRef(chat.id as ConvId, chat.title), REFS_MAX);
           }
@@ -1308,11 +1315,6 @@ const Shell = ({ owner }: IShellProps) => {
                 const address =
                   link ?? smartSearch.kept.get(row.id)?.link ?? smartSearch.detail.now(row).link;
                 if (address) window.open(address, '_blank', 'noopener');
-              },
-              onSend: async (chatId: string, text: string) => {
-                if (model.active === null || !isConvId(chatId)) return false;
-                sendMessage(model.active, { conversationId: chatId, text });
-                return true;
               },
               onChatAct: async (chatId: string, what) => {
                 if (model.active === null || !isConvId(chatId)) return false;

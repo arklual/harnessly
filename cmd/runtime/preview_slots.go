@@ -911,7 +911,7 @@ func previewOpenRoute(d deps) gate.JSONRoute {
 
 // previewBridgeFromWeb is the page bridge's script built next to the page's files (web/dist/preview-bridge.js).
 func previewBridgeFromWeb() func() ([]byte, bool) {
-	if dir := os.Getenv("RUNTIME_WEB_DIR"); dir != "" {
+	if dir := servedWebDir(); dir != "" {
 		return previewBridgeScript(dir + "/preview-bridge.js")
 	}
 	files := web.Dist()

@@ -47,7 +47,7 @@ export const PANE_KINDS: Record<TPaneTabKind, IPaneKindSpec> = {
   plan: { title: t('pane.paneRegistry.plan'), icon: ListChecks, agentOnly: false },
   peers: { title: t('pane.paneRegistry.peers'), icon: MessagesSquare, agentOnly: true },
   economics: { title: t('pane.paneRegistry.economics'), icon: Gauge, agentOnly: false },
-  design: { title: 'Claude Design', icon: LayoutTemplate, agentOnly: true },
+  design: { title: 'Sinopia Design', icon: LayoutTemplate, agentOnly: true },
   gallery: { title: t('pane.paneRegistry.gallery'), icon: Images, agentOnly: false },
   task: { title: t('pane.paneRegistry.task'), icon: ClipboardList, agentOnly: false },
   vault: { title: t('pane.paneRegistry.vault'), icon: KeyRound, agentOnly: false },

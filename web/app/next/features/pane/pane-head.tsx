@@ -12,6 +12,8 @@ const HeadSlot = createContext<HTMLElement | null | undefined>(undefined);
 export interface ICrumb {
   name: string;
   path: string;
+  /** What hovering it says: the whole path a short name stands for. */
+  title?: string;
 }
 
 /** Which step a crumb is, for which gives way first on a narrow row: the folders in the middle, then the first and
@@ -27,7 +29,13 @@ export const Crumbs = ({ items, onPick }: { items: readonly ICrumb[]; onPick: (p
   <div className="hx-disk__crumbs">
     {items.map((c, i) =>
       i === items.length - 1 ? (
-        <span key={c.path} className="hx-disk__crumb" data-step="last" aria-current="true" title={c.name}>
+        <span
+          key={c.path}
+          className="hx-disk__crumb"
+          data-step="last"
+          aria-current="true"
+          title={c.title ?? c.name}
+        >
           {c.name}
         </span>
       ) : (
@@ -36,7 +44,7 @@ export const Crumbs = ({ items, onPick }: { items: readonly ICrumb[]; onPick: (p
             type="button"
             className="hx-disk__crumb"
             data-step={stepOf(i, items.length)}
-            title={c.name}
+            title={c.title ?? c.name}
             onClick={() => onPick(c.path)}
           >
             {c.name}

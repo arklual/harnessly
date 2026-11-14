@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ly-solutions/harnessly/internal/design"
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
@@ -247,9 +248,15 @@ func uploadsRoute(r *http.Request) ([]string, string, bool) {
 }
 
 // workspaceAccess is which files the viewer shows, hands over and the agent delivers: the workspace's folders, the
-// shared projects and the temp folders, no secrets.
+// shared projects, the machine's design library and the temp folders, no secrets.
 func workspaceAccess(d deps) *files.Access {
-	access := files.NewAccess([]string{d.WorkspaceRoot, sharedProjects, files.NodeTempDir(), "/tmp", imagesDir(d), codexImagesDir(d)}, splitList(os.Getenv("RUNTIME_SECRET_CONFIG_DIRS")))
+	roots := []string{d.WorkspaceRoot, sharedProjects, files.NodeTempDir(), "/tmp", imagesDir(d), codexImagesDir(d)}
+	// The design library is the team's (the machine's design folder): its boards and their sources open like the workspace's
+	// files, never as «only files of the current project».
+	if lib := design.RootOf(designConfig(d)); lib != "" {
+		roots = append(roots, lib)
+	}
+	access := files.NewAccess(roots, splitList(os.Getenv("RUNTIME_SECRET_CONFIG_DIRS")))
 	access.VersionsDir = filepath.Join(d.DataDir, "file-versions")
 	return access
 }

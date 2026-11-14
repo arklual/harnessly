@@ -2937,12 +2937,22 @@
   height: 100%;
   background: #0f0f13;
 }
+.hx-site-held > .hx-site-load {
+  position: absolute;
+  inset: 0;
+}
+/* The copy is unseen until its runtime says it is drawn: the bare template never shows. */
 .hx-site-held__frame {
   display: block;
   width: 100%;
   height: 100%;
   border: 0;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+}
+.hx-site-held[data-drawn='true'] .hx-site-held__frame {
+  opacity: 1;
 }
 .hx-site-held__line {
   position: absolute;
@@ -2957,7 +2967,8 @@
   color: var(--hx-p-gray-300);
   font-size: var(--hx-text-sm);
   transform: translateX(-50%);
-  animation: hx-fade-in 260ms ease 400ms backwards;
+  /* A quick switch says nothing: the line comes only when the wait is longer than 300 ms. */
+  animation: hx-fade-in 260ms ease 300ms backwards;
 }
 .hx-site-held__spin {
   width: 12px;

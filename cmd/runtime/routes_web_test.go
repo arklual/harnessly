@@ -191,6 +191,13 @@ func TestStandaloneTmuxConf(t *testing.T) {
 	if raw, _ := os.ReadFile(f); f != filepath.Join(data, "tmux.conf") || !strings.Contains(string(raw), "set -g status off") {
 		t.Fatalf("standalone default: %q %q", f, raw)
 	}
+	if raw, _ := os.ReadFile(f); !strings.Contains(string(raw), "set -g mouse on") {
+		t.Fatalf("the default turns the mouse on, or the wheel types arrows (HRN-1453): %q", raw)
+	}
+	_ = os.WriteFile(f, []byte(oldDefaultTmuxConfs[0]), 0o644)
+	if tmuxConfigFile(cfg); func() string { raw, _ := os.ReadFile(f); return string(raw) }() != defaultTmuxConf {
+		t.Fatal("an earlier default is not replaced")
+	}
 	_ = os.WriteFile(f, []byte("set -g status on\n"), 0o644)
 	if tmuxConfigFile(cfg); func() string { raw, _ := os.ReadFile(f); return string(raw) }() != "set -g status on\n" {
 		t.Fatal("an edited tmux.conf is overwritten")

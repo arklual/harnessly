@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { VizViewport } from '../model/viewport';
 import { BAR_RENDERER } from './bar-paint';
 import { VizTimeEngine } from './time-engine';

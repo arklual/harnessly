@@ -170,76 +170,22 @@ const DETAILS: Readonly<Record<string, ISearchDetail>> = {
   'tab-a1': {
     quotes: [
       {
-        who: 'Вы',
-        text: 'Скидка 10% по промокоду не считается, если в корзине есть подарочный набор. Найди причину и почини.',
-        when: '2 часа назад',
-      },
-      {
         who: 'Агент',
-        text: 'Нашёл: наборы исключались из базы скидки целиком, а не только их подарочная часть. Поправил расчёт в cart/discount.ts, добавил три теста на наборы. Открыл запрос на слияние, пайплайн зелёный. Осталось проверить на стенде оформление заказа с двумя наборами.',
+        text: 'Нашёл: наборы исключались из базы скидки целиком, а не только их подарочная часть. Поправил расчёт в cart/discount.ts, добавил три теста на наборы. Открыл запрос на слияние, пайплайн зелёный.',
         when: '12 мин назад',
       },
     ],
-    facts: [
-      { label: 'Сейчас', value: 'Работает' },
-      { label: 'Активность', value: '12 мин назад' },
-      { label: 'Модель', value: 'Claude Code · Opus' },
-      { label: 'Папка', value: '…/projects/shop', title: '/home/dev/projects/shop' },
-      { label: 'Проект', value: 'Магазин' },
-    ],
-    lists: [
-      {
-        label: 'Сделано в чате',
-        items: [
-          {
-            id: 'm1',
-            icon: 'git-pull-request',
-            title: 'Корзина: скидка для подарочных наборов',
-            go: { k: ROW_GO.review, url: 'https://code.example.com/shop/web/-/merge_requests/214' },
-          },
-          {
-            id: 'm2',
-            icon: 'circle-dot',
-            title: 'SHOP-412',
-            meta: 'В работе',
-            go: { k: ROW_GO.link, url: 'https://tracker.example.com/issue/SHOP-412' },
-          },
-        ],
-      },
-      {
-        label: 'Подчаты',
-        items: [
-          {
-            id: 'c1',
-            icon: 'message-square',
-            title: 'Тесты расчёта скидки',
-            meta: 'Работает',
-            go: { k: ROW_GO.chat, id: 'tab-a4' },
-          },
-        ],
-      },
-    ],
-    reply: true,
+    facts: [],
+    lists: [],
     act: DETAIL_ACT.stop,
     link: 'https://app.example.com/chat/tab-a1',
   },
   'tab-a2': {
     quotes: [
-      { who: 'Вы', text: 'Сделай поля 20 мм и номера страниц снизу по центру.', when: 'вчера' },
-      {
-        who: 'Агент',
-        text: 'Готово: поля 20 мм, номер страницы в подвале. Проверил на отчёте в 14 страниц.',
-        when: 'вчера',
-      },
+      { who: 'От «Сборка отчётов»', text: 'Шаблон обновлён, можно пересобирать отчёт.', when: 'вчера' },
     ],
-    facts: [
-      { label: 'Сейчас', value: 'Остановлен' },
-      { label: 'Активность', value: 'вчера' },
-      { label: 'Модель', value: 'Codex · gpt-5' },
-      { label: 'Папка', value: '…/projects/reports', title: '/home/dev/projects/reports' },
-    ],
+    facts: [],
     lists: [],
-    reply: true,
     act: DETAIL_ACT.resume,
     link: 'https://app.example.com/chat/tab-a2',
   },
@@ -484,10 +430,6 @@ const SearchGallery = () => {
             kept,
             beside: true,
             onAside: (item) => toast(`aside: ${item.title}`),
-            onSend: async (chat, text) => {
-              toast(`${chat}: ${text}`);
-              return true;
-            },
             onChatAct: async (chat, what) => {
               toast(`${what}: ${chat}`);
               return true;

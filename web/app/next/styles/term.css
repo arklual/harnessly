@@ -216,3 +216,47 @@
     bottom: 8px;
   }
 }
+
+/* "Down" over a terminal scrolled back into its history (scroll-down.tsx): bottom right of the screen, above the
+   output; it fades and slides instead of popping in and out. */
+.hx-term__inner,
+.hx-sh {
+  position: relative;
+}
+.hx-term-down {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px 0 10px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--hx-term-fg);
+  color: var(--hx-term-bg);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition:
+    opacity 160ms ease-out,
+    transform 200ms ease-out;
+}
+.hx-term-down[data-shown='true'] {
+  opacity: 0.92;
+  transform: none;
+  pointer-events: auto;
+}
+.hx-term-down[data-shown='true']:hover {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-term-down {
+    transition: none;
+  }
+}

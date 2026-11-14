@@ -1,6 +1,7 @@
 import { Menu } from '@base-ui/react/menu';
 import { useKeyHint } from '@/next/features/keys/keys-help';
 import Logo from '@/next/ui/logo';
+import { useKeptItems } from '@/next/core/kept';
 import {
   cloneElement,
   Fragment,
@@ -62,7 +63,7 @@ import {
 } from '@/next/features/sidebar/group';
 import type { TShownLayout } from '@/next/core/steady-order';
 import type { IWorkingDesign } from '@/next/features/designly/working';
-import type { DesignKind } from '@/next/protocol/v2';
+import { designIcon } from '@/next/features/designly/design-icon';
 import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
 import ProductSwitcher from '@/next/features/sidebar/product-switcher';
 import useDrag, { afterTouchClick } from '@/next/ui/use-drag';
@@ -91,6 +92,8 @@ import { countRender } from '@/next/core/perf-journal';
 
 /** The delegated chats stay folded under their parent; they open by themselves only while one of them waits for the
  *  person (a question, a permission, a plan), unless the person folded them. */
+const favGroupKey = (group: { id: string }): string => group.id;
+
 const KIDS_SHOWN_BY: ReadonlySet<TChatStatus> = new Set([
   CHAT_STATUS.question,
   CHAT_STATUS.perm,
@@ -274,13 +277,6 @@ export interface ISidebarDesigns {
   onOpen: (id: string) => void;
 }
 
-const DESIGN_ICON: Record<DesignKind, string> = {
-  site: 'app-window',
-  slides: 'presentation',
-  video: 'clapperboard',
-  ds: 'palette',
-};
-
 interface INavItemProps {
   icon: string;
   label: string;
@@ -444,7 +440,7 @@ const DesignRows = ({
           aria-current={d.id === designs.current ? 'page' : undefined}
           onClick={() => designs.onOpen(d.id)}
         >
-          <Icon name={DESIGN_ICON[d.kind]} size="sm" className="hx-nav__kid-icon" />
+          <Icon name={designIcon(d)} size="sm" className="hx-nav__kid-icon" />
           <span className="hx-item__title">{d.title}</span>
         </button>
       ))}
@@ -701,7 +697,10 @@ const Sidebar = ({
     [chats, favorites],
   );
   // The groups for the menus, and where each favorite chat stands: both keep their identity while the view does.
-  const favGroups = useMemo(() => favView.groups.map(({ id, name }) => ({ id, name })), [favView]);
+  const favGroups = useKeptItems(
+    useMemo(() => favView.groups.map(({ id, name }) => ({ id, name })), [favView]),
+    favGroupKey,
+  );
   const slots = useMemo(() => {
     const out = new Map<string, IFavSlot>();
     for (const chat of [...favView.groups.flatMap((group) => group.chats), ...favView.loose]) {

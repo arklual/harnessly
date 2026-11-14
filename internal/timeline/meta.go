@@ -7,6 +7,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/peers"
 )
 
 const maxUserMessageLength = 200
@@ -25,7 +26,7 @@ func findLastUserMessage(entries []*jsvalue.Object) string {
 		if !ok {
 			continue
 		}
-		if t := jscompat.Trim(s); t != "" {
+		if t := jscompat.Trim(peers.Plain(s)); t != "" {
 			if jscompat.Len(t) > maxUserMessageLength {
 				return jscompat.Slice(t, maxUserMessageLength) + "…"
 			}

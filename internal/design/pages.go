@@ -63,13 +63,13 @@ func (l *Library) indexPage(artifacts []*Artifact, root string) string {
 		cards.WriteString(`<li><a class="card" href="/a/` + esc(a.ID) + `/"><span><b>` + esc(a.Title) + `</b></span><small>` +
 			boardsLabel(len(a.Boards)) + ` · ` + when(a.UpdatedAt) + `</small></a></li>`)
 	}
-	body := `<h1>Claude Design</h1><p class="hint">` + locale.Pick("Folder: ", "Папка: ") + esc(root) + `</p>`
+	body := `<h1>Sinopia Design</h1><p class="hint">` + locale.Pick("Folder: ", "Папка: ") + esc(root) + `</p>`
 	if len(artifacts) > 0 {
 		body += `<ul>` + cards.String() + `</ul>`
 	} else {
-		body += `<p class="empty">` + locale.Pick("Nothing here yet. Put a Claude Design project in the folder above or import an archive.", "Пока ничего нет. Положите проект Claude Design в папку выше или импортируйте архив.") + `</p>`
+		body += `<p class="empty">` + locale.Pick("Nothing here yet. Put a Sinopia Design project (or a Claude Design export) in the folder above or import an archive.", "Пока ничего нет. Положите проект Sinopia Design (или экспорт Claude Design) в папку выше или импортируйте архив.") + `</p>`
 	}
-	return l.shell("Claude Design", body, "")
+	return l.shell("Sinopia Design", body, "")
 }
 
 func (l *Library) artifactPage(a *Artifact) string {

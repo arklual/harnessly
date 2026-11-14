@@ -1,9 +1,11 @@
 // An attachment's square in a message or the queue: the picture itself when the page can reach it, else its icon.
 // Where pictures come from is the screen's business (AttachmentSrc); a picture that does not load shows a «Повторить»
-// on its square, and a press asks the picture again. A picture opens full size on a click.
+// on its square, and a press asks the picture again. A picture opens full size on a click, where the person can mark
+// it: the marked picture goes into the field, and one that was the field's own attachment takes its place.
 import { createContext, useContext, useState } from 'react';
 import Icon from '@/next/ui/icon';
-import ImageView from '@/next/ui/image-view';
+import ImageEditView from '@/next/features/image-edit/image-editor';
+import { useMarkupTarget } from '@/next/features/image-edit/to-composer';
 import { t } from '@/next/i18n';
 
 export interface IThumbAttachment {
@@ -21,6 +23,8 @@ export const AttachmentSrc = createContext<(item: IThumbAttachment) => string | 
 interface IAttachmentThumbProps {
   item: IThumbAttachment;
   className: string;
+  /** An attachment of the field: its marked picture takes its place. */
+  inField?: boolean;
 }
 
 interface IViewerProps {
@@ -28,10 +32,11 @@ interface IViewerProps {
   set: IThumbAttachment[] | null;
   srcOf: (item: IThumbAttachment) => string | null;
   onShow: (item: IThumbAttachment | null) => void;
+  inField: boolean;
 }
 
 /** The open picture and its neighbours among the set's pictures. */
-const Viewer = ({ item, set, srcOf, onShow }: IViewerProps) => {
+const Viewer = ({ item, set, srcOf, onShow, inField }: IViewerProps) => {
   const pictures = (set ?? []).filter((one) => one.kind === 'image' && srcOf(one) !== null);
   const at = item ? pictures.findIndex((one) => one.id === item.id) : -1;
   const src = item ? srcOf(item) : null;
@@ -39,8 +44,11 @@ const Viewer = ({ item, set, srcOf, onShow }: IViewerProps) => {
     if (at < 0 || pictures.length < 2) return;
     onShow(pictures[(at + delta + pictures.length) % pictures.length]);
   };
+  const annotate = useMarkupTarget({ replace: inField && item ? item.id : undefined });
   return (
-    <ImageView
+    <ImageEditView
+      editing={null}
+      annotate={annotate}
       item={item && src ? { src, name: item.name } : null}
       onClose={() => onShow(null)}
       position={at >= 0 ? { at: at + 1, of: pictures.length } : undefined}
@@ -49,7 +57,7 @@ const Viewer = ({ item, set, srcOf, onShow }: IViewerProps) => {
   );
 };
 
-const AttachmentThumb = ({ item, className }: IAttachmentThumbProps) => {
+const AttachmentThumb = ({ item, className, inField = false }: IAttachmentThumbProps) => {
   const srcOf = useContext(AttachmentSrc);
   const [broken, setBroken] = useState(false);
   const [round, setRound] = useState(0);
@@ -94,7 +102,7 @@ const AttachmentThumb = ({ item, className }: IAttachmentThumbProps) => {
       >
         <img key={round} src={src} alt="" loading="lazy" decoding="async" onError={() => setBroken(true)} />
       </button>
-      <Viewer item={viewing} set={set} srcOf={srcOf} onShow={setViewing} />
+      <Viewer item={viewing} set={set} srcOf={srcOf} onShow={setViewing} inField={inField} />
     </>
   );
 };

@@ -277,6 +277,16 @@ export interface ISiteViewProps {
   };
 }
 
+/**
+ * What the failure card says. Editing that did not open says so in words, not with the slot's technical error
+ * a look at the design keeps its reason.
+ */
+const failureWords = (error: string | null, editing: boolean): { title: string; reason: string } => {
+  if (error === null) return { title: t('next.site.stalled'), reason: t('next.site.stalledReason') };
+  if (editing) return { title: t('next.site.editFailed'), reason: t('next.site.editFailedReason') };
+  return { title: t('next.site.failed'), reason: error };
+};
+
 export interface ISiteStage {
   /** The design's chat the column shows (the apps' selection items send their tasks to it); null while it has none. */
   conv?: ConvId | null;
@@ -1221,6 +1231,7 @@ const SiteView = ({
   const stalled = clock.stalled;
   const failed = error !== null || stalled;
   const loading = pending && !failed;
+  const failure = failureWords(error, mode?.editing === true);
   const frameProgress = progress?.key === frameKey ? progress : null;
   const loadStage = loadStageOf(frameProgress, clock.slow);
   const noBack = !current || current.hi <= 0;
@@ -2036,8 +2047,8 @@ const SiteView = ({
               {failed && (
                 <LoadFailed
                   size={LOAD_FAILED_SIZE.page}
-                  title={error === null ? t('next.site.stalled') : t('next.site.failed')}
-                  reason={error ?? t('next.site.stalledReason')}
+                  title={failure.title}
+                  reason={failure.reason}
                   onRetry={onRetry}
                 />
               )}

@@ -4,7 +4,7 @@ The hub is the server people sign in to. It knows accounts, spaces (teams), the 
 agents are ready on them, and it carries a person's browser to the runtime of a machine. It does not run agents and
 does not keep conversations: agents, code, transcripts and every agent login stay on the machines.
 
-It is one static Go binary, `cmd/hub`, in this repository (Apache-2.0, `CGO_ENABLED=0` like the rest). The same binary
+It is one static Go binary, `cmd/hub`, in this repository (AGPL-3.0, `CGO_ENABLED=0` like the rest). The same binary
 runs a self-hosted installation and the public cloud; what differs is configuration ([OSS and cloud](#oss-and-cloud)).
 
 The exact contract (every endpoint, frame and variable) is [api.md](api.md); who builds what is [plan.md](plan.md).

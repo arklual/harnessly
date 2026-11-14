@@ -412,7 +412,10 @@ func New(o Options) (*Hub, error) {
 	h.Design = designaccess.New(designaccess.Deps{
 		DB: db, Reg: h.Registry, Log: log, Now: o.Now, HubURL: cfg.PublicURL, ShareURL: cfg.DesignShareURL,
 		ShareAliases: cfg.DesignShareAliases, PlatformAPI: cfg.DesignPlatformAPI, Transport: func(id string) http.RoundTripper { return px.Transport(id) },
-		LinkKey: linkKey, Notice: notice, Shared: !cfg.Store.Off, Kits: kitAccess(cfg, db, o),
+		LinkKey: linkKey, Notice: notice,
+		Bell: func(ctx context.Context, machineID, to, key, title, text, link string) {
+			h.Notices.Ring(ctx, machineID, to, key, title, text, link)
+		}, Shared: !cfg.Store.Off, Kits: kitAccess(cfg, db, o),
 		TeamLevel: cfg.DesignAccess.TeamLevel, ClosedUnrecorded: cfg.DesignAccess.ClosedUnrecorded,
 		Opens: (&machaccess.Checker{Config: cfg, DB: db, Authz: h.Spaces.Authz, IsAdmin: h.Auth.IsInstanceAdmin, Log: log,
 			Switches: h.Switches, Now: o.Now}).Opens,
@@ -464,6 +467,13 @@ func New(o Options) (*Hub, error) {
 		return h.Switches != nil && h.Switches.On(r.Context(), noticehub.Switch, email, machineID)
 	})
 	h.Notices.Notices.Now = o.Now
+	h.Notices.OnFor = func(ctx context.Context, email, machineID string) bool {
+		return h.Switches != nil && h.Switches.On(ctx, noticehub.Switch, email, machineID)
+	}
+	h.Notices.UserID = func(ctx context.Context, email string) (string, bool) {
+		u, err := db.S().UserByEmail(ctx, email)
+		return u.ID, err == nil && u.DisabledAt == nil && u.ID != ""
+	}
 	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now, Design: noticehub.Chain{h.Notices, h.Design}, Features: h.Features, Workspace: o.Workspace, History: cfg.History, VoiceTakes: cfg.VoiceTakes, Fleet: h.Fleet, Switches: h.Switches, SlotKey: slotKey})
 	// A person whose sessions were all ended at once holds nothing open: neither the live streams of their spaces nor
 	// what they had open on the machines.

@@ -2,7 +2,7 @@
 // field with the round send button; and the versions as thumbnails. One layout for every screen: the dock is a
 // container, and when it is narrow (a phone, a phone held sideways) the tools are a five-column grid with a short label
 // under each icon.
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { CardReply } from '@/next/bindings/reply-field';
 import useKeyboardInset from '@/next/features/composer/use-keyboard-inset';
 import { EDIT_FORMATS, type IImageVersion, type TEditFormat } from '@/next/features/image-edit/host';
@@ -25,6 +25,8 @@ export interface IFailure {
 }
 
 interface IEditDockProps {
+  /** Over the tools: the switch to the person's own marks, where the picture has them. */
+  switcher?: ReactNode;
   tool: TTool | null;
   onTool: (tool: TTool) => void;
   running: boolean;
@@ -59,6 +61,7 @@ export const EditDock = (props: IEditDockProps) => {
   const hasOptions = drawsLine || tool === TOOL.size;
   return (
     <div ref={root} className="hx-ie">
+      {props.switcher}
       {hasOptions && (
         <div className="hx-ie__opts" key={tool}>
           {tool === TOOL.mark &&

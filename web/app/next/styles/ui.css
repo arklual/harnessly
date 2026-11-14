@@ -916,6 +916,14 @@ button[data-pic='true']:focus-visible {
 .hx-imgview__x:hover {
   background: var(--hx-bg-hover);
 }
+/* «Пометить» beside the cross (features/image-edit): it opens the marks' tools. */
+.hx-imgview__act {
+  right: 56px;
+  color: var(--hx-fg-2);
+}
+.hx-imgview__act:hover {
+  color: var(--hx-fg-1);
+}
 .hx-imgview__pos {
   color: var(--hx-fg-3);
 }
@@ -985,6 +993,10 @@ button[data-pic='true']:focus-visible {
   display: grid;
   gap: 2px;
   min-width: 0;
+}
+/* A refusal is no failure: the icon is quiet, nothing red. */
+.hx-lf[data-refused] .hx-lf__icon {
+  color: var(--hx-fg-3);
 }
 .hx-lf__title {
   color: var(--hx-fg-1);

@@ -12,6 +12,7 @@ import '@/next/styles/icons.css';
 import '@/next/styles/chat.css';
 import '@/next/styles/composer.css';
 import '@/next/styles/questions.css';
+import '@/next/styles/image-edit.css';
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from '@/platform/router';
@@ -50,6 +51,7 @@ import type {
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { setMetaFetch } from '@/next/features/artifacts/meta-store';
 import Composer, { type IComposerQuote } from '@/next/features/composer/composer';
+import { AttachmentSrc, type IThumbAttachment } from '@/next/ui/attachment-thumb';
 import type { IPickerAgent } from '@/next/features/composer/agents';
 import DockBar from '@/next/features/composer/dock-bar';
 import Queue from '@/next/features/composer/queue';
@@ -1982,7 +1984,7 @@ const SceneView = ({ build }: { build: (now: Ms) => IScene }) => {
       notes: feedChips,
       onEdit: (id, comment) => editQuote(CONV, id, comment),
       onRemove: (id) => removeQuote(CONV, id),
-      onOpen: (id) => showFeedNote(CONV, id),
+      onOpen: (id, missing) => showFeedNote(CONV, id, missing),
     },
   ];
   const send = () => {
@@ -2347,6 +2349,14 @@ const LINK_META: Record<string, unknown> = {
   },
 };
 
+/** A picture for an attachment of the gallery: a soft gradient with a card on it, drawn from its name. */
+const attachmentSrc = (item: IThumbAttachment): string | null => {
+  if (item.kind !== 'image') return null;
+  const hue = [...item.name].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 360;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue} 60% 62%)"/><stop offset="1" stop-color="hsl(${(hue + 60) % 360} 55% 38%)"/></linearGradient></defs><rect width="960" height="600" fill="url(#g)"/><rect x="250" y="130" width="460" height="340" rx="24" fill="#fff" opacity=".92"/><rect x="290" y="180" width="260" height="24" rx="12" fill="#c9c9d6"/><rect x="290" y="230" width="380" height="16" rx="8" fill="#e2e2ea"/><rect x="290" y="262" width="340" height="16" rx="8" fill="#e2e2ea"/><rect x="290" y="390" width="180" height="48" rx="24" fill="hsl(${hue} 60% 50%)"/></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+};
+
 const ChatGallery = () => {
   const router = useRouter();
   const { query } = router;
@@ -2383,48 +2393,50 @@ const ChatGallery = () => {
 
   return (
     <PortalContext value={portalRef}>
-      <div className="hx-root hx-gallery" data-chrome={chrome || undefined}>
-        {chrome && (
-          <nav className="hx-gallery__bar">
-            <div className="hx-gallery__scenes">
-              {scenes.map(([id, scene]) => (
-                <button
-                  key={id}
-                  type="button"
-                  className="hx-gallery__scene"
-                  aria-pressed={id === sceneId}
-                  onClick={() => go({ scene: id })}
-                >
-                  {scene.title}
-                </button>
-              ))}
-            </div>
-            <Segmented
-              label="Theme"
-              value={theme}
-              options={[
-                { value: 'light', label: 'Light' },
-                { value: 'dark', label: 'Dark' },
-              ]}
-              onChange={(value) => go({ theme: value })}
-            />
-            <Segmented
-              label="Language"
-              value={lang}
-              options={[
-                { value: 'ru', label: 'RU' },
-                { value: 'en', label: 'EN' },
-              ]}
-              onChange={(value) => go({ lang: value })}
-            />
-          </nav>
-        )}
-        <main className="hx-main hx-gallery__frame">
-          <SceneView key={`${sceneId}-${lang}`} build={SCENES[sceneId].build} />
-        </main>
-        <ToastHost />
-        <div ref={portalRef} className="hx-portal" />
-      </div>
+      <AttachmentSrc.Provider value={attachmentSrc}>
+        <div className="hx-root hx-gallery" data-chrome={chrome || undefined}>
+          {chrome && (
+            <nav className="hx-gallery__bar">
+              <div className="hx-gallery__scenes">
+                {scenes.map(([id, scene]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className="hx-gallery__scene"
+                    aria-pressed={id === sceneId}
+                    onClick={() => go({ scene: id })}
+                  >
+                    {scene.title}
+                  </button>
+                ))}
+              </div>
+              <Segmented
+                label="Theme"
+                value={theme}
+                options={[
+                  { value: 'light', label: 'Light' },
+                  { value: 'dark', label: 'Dark' },
+                ]}
+                onChange={(value) => go({ theme: value })}
+              />
+              <Segmented
+                label="Language"
+                value={lang}
+                options={[
+                  { value: 'ru', label: 'RU' },
+                  { value: 'en', label: 'EN' },
+                ]}
+                onChange={(value) => go({ lang: value })}
+              />
+            </nav>
+          )}
+          <main className="hx-main hx-gallery__frame">
+            <SceneView key={`${sceneId}-${lang}`} build={SCENES[sceneId].build} />
+          </main>
+          <ToastHost />
+          <div ref={portalRef} className="hx-portal" />
+        </div>
+      </AttachmentSrc.Provider>
     </PortalContext>
   );
 };

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 import { formatBucket, formatDay, formatNumber, formatValue } from '../model/format';
 import { stackAt } from '../model/stack';
 import { rgba } from './colors';

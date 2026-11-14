@@ -601,7 +601,7 @@ func PhoneTargets(subs []push.Subscription, sender string) []push.Subscription {
 // PushMessage is the notification of a board sent to a phone.
 func PushMessage(req PushRequest, tagPrefix string) push.Message {
 	body := locale.Pick("Take a look at the mobile version: ", "Посмотрите мобильную версию: ") + push.Clip(req.Title, 90)
-	return push.Message{Kind: "design", Title: "Claude Design", Body: body, ConversationTitle: "Claude Design", Detail: body,
+	return push.Message{Kind: "design", Title: "Sinopia Design", Body: body, ConversationTitle: "Sinopia Design", Detail: body,
 		Provider: "claude", Tag: tagPrefix + req.Tag, At: nowMs(), URL: req.URL}
 }
 

@@ -246,7 +246,9 @@ export interface IMetaView {
   waiting: number;
 }
 
-const view = (items: readonly IArtifactItem[]): IMetaView => {
+/** `_seen` is the store's version: the React Compiler memoizes the call on its arguments, so the version is one of
+ *  them, or the titles that came would not show. */
+const view = (items: readonly IArtifactItem[], _seen: number): IMetaView => {
   const readable = items.filter((item) => item.readable);
   return {
     of: (item) => {
@@ -270,11 +272,11 @@ const snapshot = () => version;
 /** The metas of the items, asked for as the list changes. The view is read again whenever an answer comes. */
 export const useArtifactMetas = (machine: MachineId, items: readonly IArtifactItem[]): IMetaView => {
   restore();
-  useSyncExternalStore(subscribe, snapshot, snapshot);
+  const seen = useSyncExternalStore(subscribe, snapshot, snapshot);
   useEffect(() => {
     requestMetas(machine, items);
   }, [machine, items]);
-  return view(items);
+  return view(items, seen);
 };
 
 /** Forgets everything (tests). */

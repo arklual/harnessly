@@ -588,28 +588,6 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	return rg, nil
 }
 
-// defaultTmuxConf is the tmux.conf a standalone runtime writes when none is named: the page's terminals have tabs
-// of their own, so tmux's status bar (with the host name and clock) stays off.
-const defaultTmuxConf = `# Written by the runtime because RUNTIME_TMUX_CONF names no file. It is never overwritten: edit it freely.
-set -g status off
-`
-
-// tmuxConfigFile is RUNTIME_TMUX_CONF; set but empty, tmux's defaults. Unset on a standalone runtime, it is tmux.conf in
-// the data directory, written with defaultTmuxConf when missing; in front of the previous runtime, none.
-func tmuxConfigFile(cfg gate.Config) string {
-	if f, ok := os.LookupEnv("RUNTIME_TMUX_CONF"); ok || !cfg.Standalone() || cfg.DataDir == "" {
-		return f
-	}
-	f := filepath.Join(cfg.DataDir, "tmux.conf")
-	if _, err := os.Stat(f); errors.Is(err, os.ErrNotExist) {
-		if err := os.WriteFile(f, []byte(defaultTmuxConf), 0o644); err != nil {
-			agent.Log("warn", "standalone: default tmux.conf not written; tmux runs with its defaults", agent.F{K: "err", V: err.Error()})
-			return ""
-		}
-	}
-	return f
-}
-
 // runtimePort is the port the previous runtime reported as its own: its inner one in front of it, the gate's alone.
 func runtimePort(cfg gate.Config) int {
 	if cfg.Standalone() {

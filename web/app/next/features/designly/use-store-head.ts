@@ -42,7 +42,7 @@ export const useStoreHead = (m: MachineId, id: string, on: boolean): TStoreAt =>
       if (!got) setSeen((was) => (was.key === key && was.at.k === STORE_AT.at ? was : { key, at: NONE }));
     }, STORE_ASK_MS);
     const open = () => {
-      const es = new EventSource(storeEventsHref(m, id));
+      const es = new EventSource(storeEventsHref(id));
       source = es;
       es.addEventListener('rev', (event) => {
         const rev = readStoreRev((event as MessageEvent<unknown>).data);

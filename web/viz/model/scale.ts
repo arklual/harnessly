@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 /** «Круглые» множители шага сетки. */
 const NICE_FRACTIONS = [1, 2, 2.5, 5, 10] as const;
 

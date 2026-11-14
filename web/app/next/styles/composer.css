@@ -2565,7 +2565,8 @@ span.hx-takes__act {
   left: 0;
   bottom: calc(100% + 10px);
   z-index: 40;
-  width: 300px;
+  /* Wide enough for a dictated comment to be read and changed. */
+  width: 480px;
   max-width: calc(100vw - 32px);
   padding: 12px 12px 10px;
   border-radius: 14px;
@@ -2623,11 +2624,13 @@ span.hx-takes__act {
   white-space: nowrap;
   color: var(--hx-fg-1);
 }
-/* A fixed height: saving a change moves nothing. */
+/* The field grows with its words (note-chips.tsx measures it), a long comment whole up to the cap, then it scrolls. */
 .hx-pagenote__comment {
   display: block;
   width: 100%;
-  height: 58px;
+  min-height: 58px;
+  max-height: min(240px, 40vh);
+  overflow-y: auto;
   box-sizing: border-box;
   padding: 6px 8px;
   resize: none;

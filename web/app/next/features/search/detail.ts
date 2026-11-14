@@ -42,8 +42,6 @@ export interface ISearchDetail {
   /** A description, in the thing's own words. */
   text?: string;
   lists: readonly IDetailList[];
-  /** A line can be written to it from here (a chat). */
-  reply?: boolean;
   act?: TDetailAct;
   /** The address «Скопировать ссылку» copies and «в новой вкладке» opens. */
   link?: string;

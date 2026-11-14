@@ -298,7 +298,7 @@ the previous runtime the pages are someone else's and the gate leaves those path
 | `RUNTIME_UPDATE_STABLE_URL` | the address of the stable pointer (default: the project's `stable.json`); for a mirror or a test |
 | `RUNTIME_UPDATE_CHECK_URL` | the address of the latest-release check (default: the project's GitHub releases API); for a mirror or a test |
 | `RUNTIME_WEB` | `on` serves the page in front of the previous runtime too, `off` never; unset: standalone only |
-| `RUNTIME_WEB_DIR` | a built page (`web/dist`) to serve instead of the one compiled in (`-tags webui`); without either there is no page; its files go out gzipped to browsers that accept it |
+| `RUNTIME_WEB_DIR` | a built page (`web/dist`) to serve instead of the one compiled in (`-tags webui`); without either there is no page; its files go out gzipped to browsers that accept it; a page that carries its contract (`web-release.json`, `tools/web-compat.mjs`) is served only when this runtime answers every call it makes, else the compiled-in page is (the log names the missing calls) |
 Every page variable below is read the same way by `runtime web export <dir>`: it writes the page this runtime would serve
 into `<dir>` (its files and `index.html` with the base and the settings filled in), so a proxy in front of the runtimes
 can serve the same build while the machine behind it is down.

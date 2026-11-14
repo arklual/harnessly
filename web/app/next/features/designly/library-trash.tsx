@@ -2,6 +2,7 @@
 // whole in its trash folder until they are erased here.
 import { useEffect, useState } from 'react';
 import type { ITrashItem } from '@/next/features/designly/api';
+import { designIcon } from '@/next/features/designly/design-icon';
 import { Modal } from '@/next/features/designly/sdk/ui';
 import { Button } from '@/next/ui/button';
 import Icon from '@/next/ui/icon';
@@ -10,11 +11,6 @@ import { usePresence } from '@/next/ui/presence';
 import { formatAgoFull } from '@/next/i18n/format';
 import { t } from '@/next/i18n';
 
-const KIND_ICON: Record<ITrashItem['kind'], string> = {
-  site: 'app-window',
-  slides: 'presentation',
-  video: 'clapperboard',
-};
 const EXIT_MS = 240;
 
 interface ITrashProps {
@@ -73,7 +69,7 @@ const TrashView = ({ items, now, load, onBack, onRestore, onPurge }: ITrashProps
         <ul className="hx-dl__trash-list">
           {items.map((item) => (
             <li key={item.id} className="hx-dl__trash-row">
-              <Icon name={KIND_ICON[item.kind]} size="sm" />
+              <Icon name={designIcon(item)} size="sm" />
               <span className="hx-dl__trash-title">{item.title}</span>
               <span className="hx-dl__trash-when">{formatAgoFull(item.deletedAt, now)}</span>
               <Button

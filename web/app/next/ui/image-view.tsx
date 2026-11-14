@@ -64,12 +64,14 @@ interface IImageViewProps {
   onStep?: (delta: 1 | -1) => void;
   /** The editor's slots; absent: a plain viewer. */
   edit?: IImageViewEdit;
+  /** A button beside the cross of the plain viewer (the editor's «Пометить»). */
+  action?: { icon: string; label: string; onClick: () => void };
 }
 
 /** What a press on must neither close the viewer nor pan or swipe the picture: the editor's own controls. */
 const KEEP = '.hx-imgview__keep';
 
-const ImageView = ({ item, onClose, position, onStep, edit }: IImageViewProps) => {
+const ImageView = ({ item, onClose, position, onStep, edit, action }: IImageViewProps) => {
   const { value, state } = usePresence(item, IMAGE_VIEW_EXIT_MS);
   const container = usePortalContainer();
   const ref = useRef<HTMLDivElement>(null);
@@ -224,6 +226,20 @@ const ImageView = ({ item, onClose, position, onStep, edit }: IImageViewProps) =
             <Icon name="chevron-right" />
           </button>
         </>
+      )}
+      {!edit && action && (
+        <button
+          type="button"
+          className="hx-imgview__x hx-imgview__act"
+          aria-label={action.label}
+          title={action.label}
+          onClick={(event) => {
+            event.stopPropagation();
+            action.onClick();
+          }}
+        >
+          <Icon name={action.icon} />
+        </button>
       )}
       {edit?.download && (
         <a

@@ -51,10 +51,16 @@ const read = (machine: MachineId) => {
 
 /** Whether the port listens on the machine; null while it is not known. */
 export const usePortUp = (machine: MachineId | undefined, port: number | null): boolean | null => {
-  useSyncExternalStore(subscribe, snapshot, snapshot);
+  const seen = useSyncExternalStore(subscribe, snapshot, snapshot);
   useEffect(() => {
     if (machine !== undefined && port !== null) read(machine);
   }, [machine, port]);
+  return portUpOf(machine, port, seen);
+};
+
+/** What the reads say of the port. `_seen` is the store's version: the React Compiler memoizes this call on its
+ *  arguments, so the version is one of them, or a new read would not show. */
+const portUpOf = (machine: MachineId | undefined, port: number | null, _seen: number): boolean | null => {
   if (machine === undefined || port === null) return null;
   const ports = reads.get(machine)?.ports ?? null;
   return ports === null ? null : ports.has(port);

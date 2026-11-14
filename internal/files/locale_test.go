@@ -22,7 +22,7 @@ func TestEnglishEditorAndPreviewRefusals(t *testing.T) {
 	cases := map[string]string{
 		"../outside/private.txt": "The path is outside the project.",
 		"escape/private.txt":     "The link leads outside the project.",
-		"a\x00b":                 "Only files of the current project can be opened.",
+		"a\x00b":                 "This file is outside your folders or keeps keys and settings, so it is not shown here.",
 		"missing.txt":            "The file or folder no longer exists.",
 	}
 	for rel, want := range cases {

@@ -256,7 +256,7 @@ func pluginJSON(version string) []byte {
 		"version":     "0.0.0-" + version,
 		"description": "Skills for agents running in a harnessly workspace: the harnessly command, boards and artifacts.",
 		"homepage":    "https://github.com/ly-solutions/harnessly",
-		"license":     "Apache-2.0",
+		"license":     "AGPL-3.0-only",
 		"author":      map[string]string{"name": "Ly Solutions", "url": "https://github.com/ly-solutions"},
 	}, "", "  ")
 	return append(b, '\n')

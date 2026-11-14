@@ -421,6 +421,7 @@ const HomeComposer = ({
         <div className="hx-enter" data-enter="up" data-eb="520" data-ed="700">
           <DockBar notice={voiceNotice ?? (allMachinesOff ? NO_MACHINES : signIn ? SIGN_IN : null)} />
           <ScreenField
+            glideOut="chat"
             enterSends={enterSends}
             value={text}
             onChange={setText}

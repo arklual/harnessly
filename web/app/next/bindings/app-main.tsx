@@ -17,6 +17,7 @@ import {
 import { SpacePageWait, SpaceSkeleton } from '@/next/features/app-views/space-skeleton';
 import {
   onPage,
+  callMessage,
   spaceChatContext,
   spaceCleared,
   spaceContextOf,
@@ -156,6 +157,10 @@ const AppStagePage = ({
     [id, conv],
   );
   const { ask, fill, context, anchor } = stage;
+  // What the view has open inside itself: a board opened in the view never reaches the page's address, and
+  // the frame starts anew when the first message makes the chat; the view then reopens it rather than its list.
+  const [inView, setInView] = useState<string | null>(null);
+  const opens = object ?? inView;
   const on = conv !== null && (chatOn?.includes(id) ?? false);
   // The stage's calls are new on each of its renders; the view's bridge is rebuilt when its handlers change, and a view
   // that already shook hands keeps the old bridge's port: so the frame gets handlers that never change.
@@ -173,12 +178,19 @@ const AppStagePage = ({
       if (spaceCleared(data)) {
         now.context?.(null);
         now.anchor?.(null);
+        setInView(null);
       }
       return;
     }
+    if (ctx.object !== null) setInView(ctx.object);
     now.context?.(spaceChatContext(ctx));
     now.anchor?.(onPage(ctx.rect, frame));
-    if (ctx.call !== null) now.fill?.(ctx.call);
+    if (ctx.call === null) return;
+    // A call in a comment goes to the agent at once and is answered in its thread; one written on the board waits in
+    // the field for the person's send.
+    const message = callMessage(ctx);
+    if (message === null) now.fill?.(ctx.call);
+    else now.ask?.(message);
   }, []);
   const handlers = useMemo(
     () => ({
@@ -278,7 +290,7 @@ const AppStagePage = ({
                 viewPort={viewPort}
                 conversation={conv}
                 reloadToken={reload}
-                data={object ? { object } : undefined}
+                data={opens ? { object: opens } : undefined}
                 handlers={handlers}
                 onOpenObject={go}
                 skeleton={space ? <SpaceSkeleton object={object !== null} /> : undefined}

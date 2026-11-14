@@ -4,7 +4,7 @@ Time-series charts for the hub: a smooth wave chart on a canvas with HTML overla
 a legend, a zoom control, a range navigator and a status layer. Ported from the internal design system viz addon;
 the design board's bundle of that addon is the reference for how it looks and moves.
 
-Licensed under Apache-2.0, like the rest of the repository.
+Licensed under AGPL-3.0, like the rest of the repository.
 
 ## Use
 

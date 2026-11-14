@@ -22,6 +22,7 @@ import { t } from '@/next/i18n';
 import { useChatEditing } from '@/next/features/image-edit/chat-host';
 import type { IImageEditHost } from '@/next/features/image-edit/host';
 import ImageEditView from '@/next/features/image-edit/image-editor';
+import { useMarkupTarget } from '@/next/features/image-edit/to-composer';
 import type { IImageViewItem } from '@/next/ui/image-view';
 
 /** Where the chat is: its pictures are read from this machine, its running jobs asked about in this conversation. */
@@ -147,6 +148,7 @@ const Card = ({ host, entry }: { host: IImageHost; entry: ImageEntry }) => {
     host,
     current === undefined ? null : { id: current, src: srcOfPath(host, current) },
   );
+  const annotate = useMarkupTarget({ to: host.conv });
   return (
     <div className="hx-imgs" data-cols={cols} data-count={view.tiles.length} data-shape={shape ?? undefined}>
       {view.tiles.length > 0 && (
@@ -181,6 +183,7 @@ const Card = ({ host, entry }: { host: IImageHost; entry: ImageEntry }) => {
       <ImageEditView
         item={item}
         editing={editing}
+        annotate={annotate}
         onClose={() => setViewing(null)}
         position={viewing === null ? undefined : { at: viewing + 1, of: files.length }}
         onStep={step}

@@ -238,7 +238,7 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
       toast(t('next.designly.copyNoBoards'), { tone: 'error' });
       return true;
     }
-    window.open(storeBoardHref(machine, id, board.path), '_blank', 'noopener');
+    window.open(storeBoardHref(id, board.path), '_blank', 'noopener');
     return true;
   };
   const notice = storeCopy !== null ? t('next.designly.storeCopy') : null;

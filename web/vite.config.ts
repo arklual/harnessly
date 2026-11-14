@@ -6,6 +6,8 @@ import react from '@vitejs/plugin-react';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
+import { reactCompiler } from './vite.compiler';
+
 // The runtime serves the built page under its app base path and rewrites <base href>; relative asset URLs follow it.
 // In development the API and sockets go to a runtime on RUNTIME_URL (default 127.0.0.1:8022).
 const runtime = process.env.RUNTIME_URL ?? 'http://127.0.0.1:8022';
@@ -226,6 +228,7 @@ export default defineConfig({
   base: './',
   plugins: [
     react(),
+    reactCompiler(),
     tailwindcss(),
     dictionaries(),
     preloadDictionary(),

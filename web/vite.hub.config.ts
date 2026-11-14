@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 
+import { reactCompiler } from './vite.compiler';
+
 // The hub UI (hub.html + app/hub): a separate entry from the runtime's page, built into dist-hub for the hub binary
 // to embed (web/hub_embed.go). The hub serves index.html for each UI route and the files under /assets/, so the page
 // is built for the site root and nothing else (no public folder, the icon is inlined in hub.html).
@@ -50,7 +52,7 @@ export default defineConfig({
     },
   },
   publicDir: false,
-  plugins: [react(), indexHtml(), spaFallback()],
+  plugins: [react(), reactCompiler(), indexHtml(), spaFallback()],
   resolve: {
     alias: {
       '@kit': fileURLToPath(new URL('./kit', import.meta.url)),

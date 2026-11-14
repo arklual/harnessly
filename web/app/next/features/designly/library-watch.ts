@@ -3,25 +3,19 @@
 // newer revision. Where there is no such poll (a runtime without the hub, hub-design-home off) the page asks on the
 // timer, as before; a slow timer stays behind the poll for what the store has not been told yet.
 import { startQuietPoll } from '@/next/bindings/quiet-poll';
-import { platformPath } from '@/next/core/net/machine';
-import { runtimeJson } from '@/next/core/net/runtime-json';
+import { hubJson } from '@/next/core/net/runtime-json';
 import type { MachineId } from '@/next/protocol/v2';
 
 /** The slow read behind the long poll: what reaches the machine but not the store still shows, later. */
 export const LIBRARY_SAFETY_MS = 30_000;
 
+/** The hub names the machine by the project itself, so the machine asked about is not sent. */
 export const waitLibraryChange = async (
-  m: MachineId,
+  _machine: MachineId,
   since: number,
   signal: AbortSignal,
 ): Promise<number> => {
-  const answer = await runtimeJson<{ rev?: unknown }>(
-    m,
-    platformPath(`/design/store-library/changes?since=${since}`),
-    {
-      signal,
-    },
-  );
+  const answer = await hubJson<{ rev?: unknown }>(`/design/store-library/changes?since=${since}`, { signal });
   if (typeof answer.rev !== 'number') throw new Error('no revision');
   return answer.rev;
 };

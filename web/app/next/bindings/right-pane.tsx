@@ -1,6 +1,7 @@
 // The open chat's right pane over the machine: the header's button, the tabs and what each shows. A tab is the
 // launcher, the side chat (questions about this chat, the agent is not disturbed), an own terminal of the chat (a shell
 // the machine keeps until the tab closes it) or a browser tab with its own history. Only tools the machine really has are offered; the rest of the design's list waits for its API.
+import { WordedError } from '@/next/core/net/worded';
 import { requestFilePlace } from '@/next/features/pane/file-place';
 import {
   useCallback,
@@ -37,7 +38,7 @@ import PinnedAppTab, { PINNED_APP_TAB, usePinnedApp } from '@/next/features/app-
 import { useInstalledApps } from '@/next/features/app-views/api';
 import { onOpenAddressTab, onOpenAppTab, openAppTab } from '@/next/features/app-views/open';
 import { workflowsOf } from '@/next/features/workflows/run';
-import { onOpenNotePage } from '@/next/features/designly/open-note';
+import { askBoard, onOpenNotePage } from '@/next/features/designly/open-note';
 import { onOpenAttached } from '@/next/features/pane/open-attached';
 import type { MadeItem, MessageRef } from '@/next/protocol/v2';
 import { loadKindDocs } from '@/next/features/app-catalog/api';
@@ -294,6 +295,13 @@ const machineFolderOf = (path: string, file: boolean): string | null => {
   return path.slice(0, path.lastIndexOf('/')) || '/';
 };
 
+/** A failure asking again may cure: the link's (no answer, the network) or the machine's own; never a refusal. */
+const retryable = (failure: Error) =>
+  !(failure instanceof WordedError) ||
+  failure.code === 'network' ||
+  failure.code === 'http' ||
+  (failure.status ?? 0) >= 500;
+
 const absIn = (cwd: string, path: string) =>
   path.startsWith('/') ? path : `${cwd.replace(/\/+$/, '')}/${path}`;
 
@@ -304,6 +312,8 @@ interface IShownFile {
   /** What the editor opens with: the text an earlier visit left unsaved, or the disk's. */
   initial: IDraft | null;
   error: string | null;
+  /** The failure was the link's: asking again may help; a refusal it would not change. */
+  retry: boolean;
 }
 
 /** The chat's folder: the place on screen is the tab's, so the crumbs survive a switch of tabs. A file opens in the
@@ -351,7 +361,14 @@ export const FilesTab = ({
       setShown((current) =>
         current?.key === asked && (current.listing || current.file)
           ? current
-          : { key: asked, listing: null, file: null, initial: null, error: failure.message },
+          : {
+              key: asked,
+              listing: null,
+              file: null,
+              initial: null,
+              error: failure.message,
+              retry: retryable(failure),
+            },
       );
     };
     if (delivered) return undefined;
@@ -367,12 +384,13 @@ export const FilesTab = ({
               revision: file.revision,
             },
             error: null,
+            retry: false,
           }),
         fail,
       );
     else
       listFolder(conv.machineId, conv.id, tab.path, abort.signal).then(
-        (listing) => done({ listing, file: null, initial: null, error: null }),
+        (listing) => done({ listing, file: null, initial: null, error: null, retry: false }),
         fail,
       );
     return () => abort.abort();
@@ -469,6 +487,7 @@ export const FilesTab = ({
         onLeave={(draft) => edits.onLeave(tab.id, tab.path, draft)}
         onState={(state) => edits.onState(tab.id, state)}
         readAsset={readAsset}
+        readOnly={now.file.readOnly === true}
         compare={shownCompare}
         onCloseCompare={() => onChange({ ...tab, against: undefined })}
         at={tab.at ?? null}
@@ -505,6 +524,7 @@ export const FilesTab = ({
       editor={editor}
       tools={tools}
       error={now?.error ?? null}
+      retryable={now?.retry ?? true}
       opening={tab.file ? 'file' : 'folder'}
       onRetry={() => setEpoch((n) => n + 1)}
       onOpen={(path, kind) =>
@@ -1231,7 +1251,7 @@ export const useRightPane = (
       });
     };
     const later = () => {
-      timer ??= setTimeout(prune, PRUNE_MS);
+      if (timer === null) timer = setTimeout(prune, PRUNE_MS);
     };
     later();
     const offLoaded = convsLoadedStore.subscribeAll(later);
@@ -1371,15 +1391,10 @@ export const useRightPane = (
   // Words of the chat asked about aside (the pill over picked words): the side chat comes forward. Its open window takes
   // them where it is; otherwise it opens as the pane's tab, whose field takes them (the quote waits in the store).
   const asideConv = conv?.provider === 'claude' ? conv.id : null;
-  useEffect(
-    () =>
-      onSideAsk((ask) => {
-        if (ask.conv === asideConv && float !== 'open') dockSide();
-      }),
-    // dockSide is made anew each render; what it does depends on nothing else here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [asideConv, float],
-  );
+  const sideAsked = useEffectEvent((askedConv: string) => {
+    if (askedConv === asideConv && float !== 'open') dockSide();
+  });
+  useEffect(() => onSideAsk((ask) => sideAsked(ask.conv)), []);
   // The pane's shortcuts (features/keys): the pane itself, and the side chat of a Claude chat.
   useKeys(
     KEY_SCOPE.global,
@@ -1485,8 +1500,11 @@ export const useRightPane = (
   };
   const applyIntents = (intents: IPaneIntent[]) => {
     for (const { command } of intents)
-      if (command.kind === 'open' && command.target && command.place)
-        requestFilePlace(command.target, command.place);
+      if (command.kind === 'open' && command.target && command.place) {
+        // A board of a design opens the design on that board; any other place is a file's (a range, a time, a page).
+        if (command.tab === 'design') askBoard({ design: command.target, board: command.place });
+        else requestFilePlace(command.target, command.place);
+      }
     markIntents(intents);
     const { asked, quiet } = requestsOf(intents);
     applyRequests([...quiet, ...asked], false, new Set(quiet));
@@ -1552,6 +1570,25 @@ export const useRightPane = (
   // link in a browser tab.
   const openFile = (path: string) => {
     if (!conv) return;
+    // A page (an .html, a design's board among them) asks the runtime first: a board of the library opens on its
+    // design, never as its source; anything else opens as the file it is.
+    if (path.startsWith('/') && /\.html?$/i.test(path)) {
+      const forConv = conv.id;
+      void loadOpenTarget(conv.machineId, conv.id, path).then((res) => {
+        if (shownConv.current !== forConv) return;
+        if ('ok' in res && res.value.tab === 'design') {
+          if (res.value.board) askBoard({ design: res.value.target, board: res.value.board });
+          openDesign(res.value.target);
+          return;
+        }
+        openFileTab(path);
+      });
+      return;
+    }
+    openFileTab(path);
+  };
+  const openFileTab = (path: string) => {
+    if (!conv) return;
     const root = conv.cwd.replace(/\/+$/, '');
     const rel = path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path;
     const tab: TTab = { id: nextId(), kind: 'files', path: rel, file: true };
@@ -1568,6 +1605,10 @@ export const useRightPane = (
     openPlace(place, {
       browser: (target) => handoff([{ kind: 'browser', target }]),
       show: (tab, target) => legacy.show(tab, target),
+      design: (design, board) => {
+        if (board !== null) askBoard({ design, board });
+        openDesign(design);
+      },
       reveal: (id) => {
         setOpen(true);
         setActive(id);

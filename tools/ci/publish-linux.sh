@@ -59,9 +59,9 @@ reuse() {
     curl -fsS --retry 2 --header "JOB-TOKEN: $CI_JOB_TOKEN" -o "$out/$f" "$api/packages/generic/agent-build/$CI_COMMIT_SHA/$f" \
       || { echo "cannot fetch $f of release-build job $job from the package agent-build/$CI_COMMIT_SHA"; return 1; }
   done
-  # Nobody wrote to the package while it was downloaded: the listing is the same as the one that was checked.
+  # Nobody wrote to the package while it was downloaded: the same files, hashes and writers as the listing checked.
   files_after="$(get "packages/$package_id/package_files?per_page=100")" || files_after=""
-  [ "$files_after" = "$files" ] || { echo "package $package_id changed while it was downloaded"; return 1; }
+  [ "$(files_fingerprint "$files_after")" = "$(files_fingerprint "$files")" ] || { echo "package $package_id changed while it was downloaded"; return 1; }
   built_sha="$(sed -n 's/^RELEASE_SHA=//p' "$out/release.env")"
   built_version="$(sed -n 's/^RELEASE_VERSION=//p' "$out/release.env")"
   [ "$built_sha" = "$CI_COMMIT_SHA" ] || { echo "release-build job $job built $built_sha, not $CI_COMMIT_SHA"; return 1; }

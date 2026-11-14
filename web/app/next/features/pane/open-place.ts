@@ -8,7 +8,9 @@ export interface IOpenPlaceActions {
   /** The pane's browser is asked for `target` (the live browser starts). */
   browser: (target: string) => void;
   /** A native tab of the pane; the id of the tab, or null while the pane cannot show one. */
-  show: (tab: Exclude<OpenTarget['tab'], 'browser' | 'link'>, target: string) => string | null;
+  show: (tab: Exclude<OpenTarget['tab'], 'browser' | 'link' | 'design'>, target: string) => string | null;
+  /** A design of the library, on its board when the ref is one: the pane's design tab. */
+  design: (design: string, board: string | null) => void;
   /** A tab was opened: bring it to the front. */
   reveal: (id: string) => void;
   /** The pane cannot show a tab yet. */
@@ -19,7 +21,11 @@ export interface IOpenPlaceActions {
   original: (address: string) => void;
 }
 
-export const openPlace = ({ tab, target, reason }: OpenTarget, actions: IOpenPlaceActions): void => {
+export const openPlace = ({ tab, target, reason, board }: OpenTarget, actions: IOpenPlaceActions): void => {
+  if (tab === 'design') {
+    actions.design(target, board ?? null);
+    return;
+  }
   if (tab === 'link') {
     if (reason === 'connect') actions.connect();
     else actions.original(target);

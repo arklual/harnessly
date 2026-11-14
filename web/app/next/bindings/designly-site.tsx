@@ -67,7 +67,7 @@ import { useVideo } from '@/next/stores/video';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { toast } from '@/next/ui/toast';
 import { t } from '@/next/i18n';
-import { onOpenNotePage, takeNoteBoard } from '@/next/features/designly/open-note';
+import { onBoardAsked, takeNoteBoard } from '@/next/features/designly/open-note';
 import DesignlyDeck from '@/next/bindings/designly-deck';
 import KitBand, { hasKitBand, useProjectKit } from '@/next/features/designly/versions/kit-band';
 import {
@@ -531,7 +531,7 @@ const DesignlySiteInner = ({
   const mayShow = opened !== null && (!entering || (waited && !refused)) && lateKey === null;
   const plainSrc =
     mayShow && opened.origin !== null && path !== null ? slotBoardHref(opened.origin, id, path) : null;
-  const hubSrc = (page: string | null) => (page === null ? null : storeBoardHref(machine, id, page));
+  const hubSrc = (page: string | null) => (page === null ? null : storeBoardHref(id, page));
   const src = snapshot !== null ? hubSrc(path) : mayShow ? plainSrc : null;
   const slotOrigin = opened?.origin ?? null;
   const slotError = opened?.error ?? null;
@@ -573,13 +573,13 @@ const DesignlySiteInner = ({
    *  scene asks for the scene's runtime (design/public.go GuestSceneParam), as the machine gives it. */
   const scene = project?.design.kind === 'video';
   const storeSrc = (page: string | null) =>
-    storeRev === null || page === null ? null : storeBoardAtHref(machine, id, page, storeRev, scene);
+    storeRev === null || page === null ? null : storeBoardAtHref(id, page, storeRev, scene);
   const boardSrc = storeRev === null ? src : storeSrc(path);
   const boardPlainSrc = storeRev === null ? plainSrc : boardSrc;
   /** The board as the store last has it, held on screen while the editing frame opens: no empty wait (chat-place.ts). */
   const heldSrc =
     editing && snapshot === null && storeAt.k === STORE_AT.at && path !== null
-      ? storeBoardAtHref(machine, id, path, storeAt.rev, scene)
+      ? storeBoardAtHref(id, path, storeAt.rev, scene)
       : null;
   // The apps on in this document (their panels, selection menu, marks on the boards, the gate before a share). The
   // chat they send tasks to is the one the pane sits beside, or the one the person came from.
@@ -782,7 +782,7 @@ const DesignlySiteInner = ({
       if (board !== null) turnTo(board);
     };
     take();
-    return onOpenNotePage((place) => {
+    return onBoardAsked((place) => {
       if (place.design === id) take();
     });
   }, [id]);

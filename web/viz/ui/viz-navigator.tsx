@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { classNames } from '../internal/cx';

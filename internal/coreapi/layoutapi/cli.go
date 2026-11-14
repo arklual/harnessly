@@ -682,7 +682,14 @@ func (a *api) cliDeliver(c *call) {
 		return
 	}
 	// The pane opens a file it can show, once, like anything the agent asks it to open.
-	if info.Opens() && a.d.Intents != nil && paneauto.OpenOnce(a.d.Intents, tabID, "files", info.Path) {
+	// A board of a design handed over opens on the design, not as its source.
+	if design, ok := a.d.Targets.DesignOf(info.Path); ok && a.d.Intents != nil {
+		if paneauto.Repeated(a.d.Intents, tabID, design, time.Now()) == "" {
+			design.Auto = true
+			a.d.Intents.Add(tabID, design.JSON())
+			a.d.Sync.Broadcast(jsvalue.NewObject("type", "pane-intents", "tabId", tabID))
+		}
+	} else if info.Opens() && a.d.Intents != nil && paneauto.OpenOnce(a.d.Intents, tabID, "files", info.Path) {
 		a.d.Sync.Broadcast(jsvalue.NewObject("type", "pane-intents", "tabId", tabID))
 	}
 	c.reply(200, jsvalue.NewObject("ok", true, "name", info.Name, "size", float64(info.Size), "mime", info.Mime, "sha256", info.SHA256,

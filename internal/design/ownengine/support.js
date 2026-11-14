@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Harnessly's board engine: an independent implementation of the *.dc.html format, written from its observed behaviour.
 //
 // A board is one HTML file: a template inside <x-dc>, logic in <script type="text/x-dc" data-dc-script>, tweaks in that

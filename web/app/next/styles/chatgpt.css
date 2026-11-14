@@ -522,3 +522,62 @@
   gap: var(--hx-space-1);
   padding: var(--hx-space-1);
 }
+
+/* The browser's bar at the sign-in's end, drawn: the address to copy is selected */
+
+@keyframes hx-gpt-select {
+  from {
+    background-size: 0% 100%;
+  }
+}
+
+.hx-gpt-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  margin: 0 0 var(--hx-space-3);
+  padding: var(--hx-space-2) var(--hx-space-3);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-app);
+  min-width: 0;
+}
+
+.hx-gpt-bar__dots {
+  display: inline-flex;
+  flex: none;
+  gap: 5px;
+}
+
+.hx-gpt-bar__dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-border-strong);
+}
+
+.hx-gpt-bar__url {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 3px var(--hx-space-2);
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-2);
+  font-family: var(--hx-font-mono);
+  font-size: var(--hx-text-xs);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hx-gpt-bar__url mark {
+  background: linear-gradient(var(--hx-accent-soft), var(--hx-accent-soft)) no-repeat 0 0 / 100% 100%;
+  color: var(--hx-fg-1);
+  animation: hx-gpt-select 900ms var(--hx-ease-out) 300ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-gpt-bar__url mark {
+    animation: none;
+  }
+}

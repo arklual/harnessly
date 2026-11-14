@@ -139,6 +139,14 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 			"To sign in, use `chrome_fill_secret` for an existing safe entry; otherwise use `chrome_request_login`. " +
 			"If you ran JavaScript on a tab, use `chrome_open` to create a fresh tab before entering a secret.\n\n")
 	}
+	b.WriteString("## Pictures\n\n")
+	b.WriteString("You can draw. When the person asks for a picture, photo, poster, icon, logo, cover or illustration (\"нарисуй\", " +
+		"\"сгенерируй картинку\", \"сделай фото кота\", \"плакат A3\", \"make an icon\"), call the MCP tool `generate_images` in that same turn: " +
+		"write the brief yourself from what they said and do not ask first. It is already loaded (no ToolSearch needed). " +
+		"Never draw with code instead (python, PIL, matplotlib, SVG, canvas), never answer that you cannot draw. " +
+		"The pictures appear in the chat as they are drawn, so do not deliver them or paste their paths; hand a file over with `deliver_file` " +
+		"only when the person asks for one (a PNG to download, a PDF for print), after the picture is in the chat. " +
+		"To change a picture, call `generate_images` with it as `source`.\n\n")
 	b.WriteString("## Handing files over\n\n")
 	b.WriteString("When the person asks you to download, send or give them a file (\"скачай\", \"скинь\", \"put it in a zip\", \"give me the docx\"), " +
 		"make it and hand it over with the `deliver_file` tool (or `harnessly deliver <path>`); never answer with the path in text. " +

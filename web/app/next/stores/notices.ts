@@ -10,6 +10,8 @@ export const NOTICE_KIND = {
   done: 'done',
   failed: 'failed',
   limit: 'limit',
+  /** Somebody asks for access to the person's design, or the person's own request was decided. */
+  access: 'access',
 } as const;
 export type TNoticeKind = (typeof NOTICE_KIND)[keyof typeof NOTICE_KIND];
 export const NOTICE_KINDS = [
@@ -17,6 +19,7 @@ export const NOTICE_KINDS = [
   NOTICE_KIND.done,
   NOTICE_KIND.failed,
   NOTICE_KIND.limit,
+  NOTICE_KIND.access,
 ] as const satisfies readonly TNoticeKind[];
 
 export interface INotice {
@@ -36,6 +39,8 @@ export interface INotice {
    * turn summaries off; `text` stays the answer's start either way.
    */
   summary?: string;
+  /** Where the notice leads when it has no chat (a kind `access`: the page of the project's requests). */
+  link?: string;
 }
 
 /** The chat of the sample notice Settings → Notifications shows: it has no chat to open. */
@@ -57,6 +62,7 @@ const isNotice = (raw: unknown): raw is INotice => {
     typeof n.icon === 'string' &&
     typeof n.at === 'number' &&
     (n.summary === undefined || typeof n.summary === 'string') &&
+    (n.link === undefined || typeof n.link === 'string') &&
     (NOTICE_KINDS as readonly unknown[]).includes(n.kind)
   );
 };
@@ -212,7 +218,7 @@ export interface INotifySettings {
 }
 
 export const DEFAULT_NOTIFY: INotifySettings = {
-  kinds: { waiting: true, done: true, failed: true, limit: true },
+  kinds: { waiting: true, done: true, failed: true, limit: true, access: true },
   sound: true,
   sounds: { wait: true, urgent: true, done: false },
   system: false,

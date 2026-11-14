@@ -30,6 +30,10 @@ type v2Files struct {
 	delivered func(ctx context.Context, conv, path string) (string, bool, error)
 	// access is the viewer's places and secrets rule: what may be downloaded besides the conversation's folder.
 	access *files.Access
+	// asked is whether the conversation's agent asked its pane to show the file at an absolute path; nil:
+	// never. own are the person's folders (the profile's home, the workspace) such a file must lie in.
+	asked func(conv, path string) bool
+	own   []string
 }
 
 var _ wire.FilesSource = (*v2Files)(nil)
@@ -168,31 +172,57 @@ func (f *v2Files) machineDir(dir string) (wire.DirListing, error) {
 }
 
 // place is the folder and the name a file is read and saved under: the conversation's folder and the path in it, or,
-// for an absolute path a turn of the conversation touched or one in the workspace's places, the file's own folder and its name.
-func (f *v2Files) place(ctx context.Context, conv, file string) (root, rel string, err error) {
+// for an absolute path a turn of the conversation touched, one in the workspace's places or one the agent asked the
+// pane to show, the file's own folder and its name. readOnly: a file that opens only because the agent asked to show it
+// is read, never saved.
+func (f *v2Files) place(ctx context.Context, conv, file string) (root, rel string, readOnly bool, err error) {
 	root, err = f.root(conv)
 	if err != nil || !strings.HasPrefix(file, "/") || f.touched == nil || filepath.Clean(file) != file {
-		return root, file, err
+		return root, file, false, err
 	}
 	ok, err := f.touched(ctx, conv, file)
 	if err != nil {
-		return root, file, err
+		return root, file, false, err
+	}
+	if ok {
+		return filepath.Dir(file), filepath.Base(file), false, nil
 	}
 	// Any file of the workspace's places opens too, as the viewer opens it: a file the person was sent to
 	// outside the chat's folder reads here instead of in the old viewer. Secrets stay closed.
-	if !ok && f.access != nil {
-		if real, rerr := files.Realpath(file); rerr == nil && f.access.Allowed(real) && !f.access.Secret(real) {
-			ok = true
+	real, rerr := files.Realpath(file)
+	if rerr != nil || f.access == nil || f.access.Secret(real) {
+		return root, file, false, nil
+	}
+	if f.access.Allowed(real) {
+		return filepath.Dir(file), filepath.Base(file), false, nil
+	}
+	if f.askedToShow(conv, file, real) {
+		return filepath.Dir(file), filepath.Base(file), true, nil
+	}
+	return root, file, false, nil
+}
+
+// askedToShow: the agent of the conversation asked its pane to show this very file (`open`, a hand-over), and it lies
+// in the person's own folders (Own) outside any hidden folder, where a tool keeps its settings and keys. Another
+// person's profile, ~/.ssh, a safe or a config is never shown, whatever the agent asked.
+func (f *v2Files) askedToShow(conv, file, real string) bool {
+	if f.asked == nil || !f.asked(conv, file) {
+		return false
+	}
+	for _, own := range f.own {
+		if own == "" {
+			continue
+		}
+		rest, in := strings.CutPrefix(real, strings.TrimSuffix(own, "/")+"/")
+		if in && !strings.HasPrefix(rest, ".") && !strings.Contains(rest, "/.") {
+			return true
 		}
 	}
-	if !ok {
-		return root, file, nil
-	}
-	return filepath.Dir(file), filepath.Base(file), nil
+	return false
 }
 
 func (f *v2Files) File(ctx context.Context, conv, file string) (wire.FileContent, error) {
-	root, rel, err := f.place(ctx, conv, file)
+	root, rel, readOnly, err := f.place(ctx, conv, file)
 	if err != nil {
 		return wire.FileContent{}, err
 	}
@@ -206,19 +236,23 @@ func (f *v2Files) File(ctx context.Context, conv, file string) (wire.FileContent
 			if ee != nil {
 				return wire.FileContent{}, fileError(ee)
 			}
-			return fileContent(file, obj), nil
+			out := fileContent(file, obj)
+			out.ReadOnly = true
+			return out, nil
 		}
 	}
 	obj, ee := files.ReadProjectFile(root, rel)
 	if ee != nil {
 		return wire.FileContent{}, fileError(ee)
 	}
-	return fileContent(file, obj), nil
+	out := fileContent(file, obj)
+	out.ReadOnly = readOnly
+	return out, nil
 }
 
 // Abs is the absolute, resolved path of a file as File would open it: what a document made of the file is bound to.
 func (f *v2Files) Abs(ctx context.Context, conv, file string) (string, error) {
-	root, rel, err := f.place(ctx, conv, file)
+	root, rel, _, err := f.place(ctx, conv, file)
 	if err != nil {
 		return "", err
 	}
@@ -231,9 +265,14 @@ func (f *v2Files) Abs(ctx context.Context, conv, file string) (string, error) {
 
 // Save writes the text over the revision the page read; a file that changed since is a conflict.
 func (f *v2Files) Save(ctx context.Context, conv, file, content, revision string) (wire.FileContent, error) {
-	root, rel, err := f.place(ctx, conv, file)
+	root, rel, readOnly, err := f.place(ctx, conv, file)
 	if err != nil {
 		return wire.FileContent{}, err
+	}
+	if readOnly {
+		return wire.FileContent{}, &wire.FileError{Code: wire.RefuseForbidden, Message: locale.Pick(
+			"This file lies outside the chat's folder: it opens to read, changes are not saved here.",
+			"Файл лежит вне папки чата: он открыт для чтения, правки здесь не сохраняются.")}
 	}
 	obj, ee := files.SaveProjectFile(root, rel, content, revision)
 	if ee != nil {
@@ -336,7 +375,8 @@ func (f *v2Files) touchedOrDelivered(ctx context.Context, conv, abs string) bool
 			return true
 		}
 	}
-	return false
+	// A picture, a PDF or a page the agent asked the pane to show is shown in place like any of these.
+	return f.access != nil && !f.access.Secret(mustReal(abs)) && f.askedToShow(conv, abs, mustReal(abs))
 }
 
 // ServeGitSide answers GET .../file-git?path=…[&ref=HEAD]: the file as the revision has it, for the editor's diff
@@ -351,7 +391,7 @@ func (f *v2Files) ServeGitSide(w http.ResponseWriter, r *http.Request, conv stri
 		fail(http.StatusBadRequest, locale.Pick("A file and a revision are required", "Нужны файл и ревизия"))
 		return
 	}
-	root, rel, err := f.place(r.Context(), conv, q.Get("path"))
+	root, rel, _, err := f.place(r.Context(), conv, q.Get("path"))
 	if err != nil {
 		fail(http.StatusNotFound, locale.Pick("No such conversation", "Такого чата нет"))
 		return

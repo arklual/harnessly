@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/ly-solutions/harnessly/internal/convo"
+	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -286,4 +287,43 @@ func TestV2FilesOpenADeliveredFileOutsideTheFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	refused(given, wire.RefuseForbidden)
+}
+
+// a file the agent asked its pane to show opens to read although it lies outside the folder and the places,
+// as long as it is the person's own and in no hidden folder; it is never saved, and a key never opens.
+func TestV2FilesOpenAFileTheAgentShowed(t *testing.T) {
+	cwd, home := t.TempDir(), t.TempDir()
+	shown := filepath.Join(home, "projects", "repo", "plan.md")
+	hidden := filepath.Join(home, ".kube", "config")
+	key := filepath.Join(home, "projects", "repo", "id_rsa")
+	other := filepath.Join(t.TempDir(), "notes.md")
+	for _, p := range []string{shown, hidden, key, other} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("# x\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f := &v2Files{
+		record:  func(id string) (wire.Conversation, bool) { return wire.Conversation{ID: id, Cwd: cwd}, true },
+		touched: func(context.Context, string, string) (bool, error) { return false, nil },
+		access:  files.NewAccess(nil, nil),
+		asked:   func(_, p string) bool { return p != filepath.Join(home, "projects", "repo", "untold.md") },
+		own:     []string{home},
+	}
+	ctx := context.Background()
+	got, err := f.File(ctx, "c", shown)
+	if err != nil || !got.ReadOnly || got.Content != "# x\n" {
+		t.Fatalf("%+v %v", got, err)
+	}
+	var fe *wire.FileError
+	if _, err := f.Save(ctx, "c", shown, "y", got.Revision); !errors.As(err, &fe) || fe.Code != wire.RefuseForbidden {
+		t.Fatalf("saved a file opened to read: %v", err)
+	}
+	for _, p := range []string{hidden, key, other} {
+		if _, err := f.File(ctx, "c", p); !errors.As(err, &fe) || fe.Code != wire.RefuseForbidden {
+			t.Errorf("%s: %v", p, err)
+		}
+	}
 }
