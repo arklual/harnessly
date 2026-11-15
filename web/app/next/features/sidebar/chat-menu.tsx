@@ -3,13 +3,23 @@ import { useState, type ReactElement } from 'react';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
 import { pointAnchor, type IMenuPoint } from '@/next/ui/context-menu';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import type { IChatActions, ISidebarProject } from '@/next/features/sidebar/types';
 
 const NO_GROUPS: readonly { id: string; name: string }[] = [];
 
 const VIEW = { root: 'root', move: 'move', favorite: 'favorite', remove: 'remove', stop: 'stop' } as const;
 type TView = (typeof VIEW)[keyof typeof VIEW];
+
+/** An item the phone's header moves into «⋯» (the machine, the right pane, «Слои»): drawn first: on the phone they are the most used. */
+export interface IChatMenuExtra {
+  key: string;
+  icon: string;
+  label: string;
+  onClick: () => void;
+}
+
+const NO_EXTRAS: readonly IChatMenuExtra[] = [];
 
 export interface IChatMenuProps {
   /** The element that opens the menu: «…» of a row or of the header. */
@@ -54,6 +64,8 @@ export interface IChatMenuProps {
   onGoal?: () => void;
   /** «Поделиться…» (beta «chatShare»): the header's menu opens the sharing dialog. */
   onShare?: () => void;
+  /** The header's own buttons on a narrow phone, where only the bell and «⋯» stay. */
+  extras?: readonly IChatMenuExtra[];
   onOpenChange?: (open: boolean) => void;
   /** Mounted already open: a row mounts its menu on the first press of «…». */
   defaultOpen?: boolean;
@@ -95,6 +107,7 @@ const ChatMenu = ({
   machine,
   onGoal,
   onShare,
+  extras = NO_EXTRAS,
   onRetitle,
   onOpenChange,
   defaultOpen = false,
@@ -109,7 +122,7 @@ const ChatMenu = ({
   const grouping = actions.onPlaceFavorite !== undefined && favGroups.length > 0;
 
   return (
-    <Menu.Root
+    <MenuRoot
       actionsRef={menuActions}
       defaultOpen={defaultOpen}
       onOpenChange={(open) => onOpenChange?.(open)}
@@ -149,10 +162,35 @@ const ChatMenu = ({
                 <Menu.Separator className="hx-cmenu__sep hx-cmenu__term" />
               </>
             )}
+            {extras.map((extra) => (
+              <Menu.Item key={extra.key} className="hx-cmenu__item" onClick={extra.onClick}>
+                <Icon name={extra.icon} size="sm" />
+                <span className="hx-cmenu__txt">{extra.label}</span>
+              </Menu.Item>
+            ))}
+            {extras.length > 0 && <Menu.Separator className="hx-cmenu__sep" />}
             {onOpenInNewTab && (
               <Menu.Item className="hx-cmenu__item" onClick={onOpenInNewTab}>
                 <Icon name="external-link" size="sm" />
                 <span className="hx-cmenu__txt">{t('next.rowMenu.openInNewTab')}</span>
+              </Menu.Item>
+            )}
+            {onContinue && (
+              <Menu.Item className="hx-cmenu__item" onClick={onContinue}>
+                <Icon name="arrow-left-right" size="sm" />
+                <span className="hx-cmenu__txt">{t('next.rowMenu.continue')}</span>
+              </Menu.Item>
+            )}
+            {onFork && (
+              <Menu.Item className="hx-cmenu__item" onClick={onFork}>
+                <Icon name="git-fork" size="sm" />
+                <span className="hx-cmenu__txt">{t('next.rowMenu.fork')}</span>
+              </Menu.Item>
+            )}
+            {onGoal && (
+              <Menu.Item className="hx-cmenu__item" onClick={onGoal}>
+                <Icon name="locate" size="sm" />
+                <span className="hx-cmenu__txt">{t('next.rowMenu.goal')}</span>
               </Menu.Item>
             )}
             {actions.onRename && onStartRename && (
@@ -165,36 +203,6 @@ const ChatMenu = ({
               <Menu.Item className="hx-cmenu__item" onClick={onRetitle}>
                 <Icon name="sparkles" size="sm" />
                 <span className="hx-cmenu__txt">{t('next.rowMenu.retitle')}</span>
-              </Menu.Item>
-            )}
-            {onFork && (
-              <Menu.Item className="hx-cmenu__item" onClick={onFork}>
-                <Icon name="git-fork" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.fork')}</span>
-              </Menu.Item>
-            )}
-            {onMerge && (
-              <Menu.Item className="hx-cmenu__item" onClick={onMerge}>
-                <Icon name="git-merge" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.merge')}</span>
-              </Menu.Item>
-            )}
-            {onContinue && (
-              <Menu.Item className="hx-cmenu__item" onClick={onContinue}>
-                <Icon name="arrow-left-right" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.continue')}</span>
-              </Menu.Item>
-            )}
-            {onGoal && (
-              <Menu.Item className="hx-cmenu__item" onClick={onGoal}>
-                <Icon name="locate" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.goal')}</span>
-              </Menu.Item>
-            )}
-            {onShare && (
-              <Menu.Item className="hx-cmenu__item" onClick={onShare}>
-                <Icon name="share" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.share')}</span>
               </Menu.Item>
             )}
             {actions.onPin && !grouping && (
@@ -228,6 +236,18 @@ const ChatMenu = ({
                 <span className="hx-cmenu__txt">{t('next.rowMenu.down')}</span>
               </Menu.Item>
             )}
+            {onCopyLink && (
+              <Menu.Item className="hx-cmenu__item" onClick={onCopyLink}>
+                <Icon name="share" size="sm" />
+                <span className="hx-cmenu__txt">{t('next.rowMenu.copyLink')}</span>
+              </Menu.Item>
+            )}
+            {onShare && (
+              <Menu.Item className="hx-cmenu__item" onClick={onShare}>
+                <Icon name="share" size="sm" />
+                <span className="hx-cmenu__txt">{t('next.rowMenu.share')}</span>
+              </Menu.Item>
+            )}
             {actions.onMove && (
               <Menu.Item
                 className="hx-cmenu__item"
@@ -240,10 +260,10 @@ const ChatMenu = ({
                 <Icon name="chevron-right" size="sm" className="hx-cmenu__chev" />
               </Menu.Item>
             )}
-            {onCopyLink && (
-              <Menu.Item className="hx-cmenu__item" onClick={onCopyLink}>
-                <Icon name="share" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.copyLink')}</span>
+            {onMerge && (
+              <Menu.Item className="hx-cmenu__item" onClick={onMerge}>
+                <Icon name="git-merge" size="sm" />
+                <span className="hx-cmenu__txt">{t('next.rowMenu.merge')}</span>
               </Menu.Item>
             )}
             {(actions.onDelete || onStopTerminal) && <Menu.Separator className="hx-cmenu__sep" />}
@@ -392,7 +412,7 @@ const ChatMenu = ({
           </>
         )}
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };
 

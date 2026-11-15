@@ -50,7 +50,7 @@ import { PERSON_KEY, personPatch } from '@/next/features/search/page-settings';
 import { isQuestion, termsOf, type ITerms } from '@/next/features/search/terms';
 import { putSetting } from '@/next/features/settings/changes-api';
 import { isRefused } from '@/next/features/settings/platform-answer';
-import type { ISidebarChat, ISidebarProject } from '@/next/features/sidebar/types';
+import type { ISidebarChat } from '@/next/features/sidebar/types';
 import { t } from '@/next/i18n';
 import type { DesignArtifact, MachineId, MessageHit } from '@/next/protocol/v2';
 import { patchSettings, useMe } from '@/next/stores/me';
@@ -133,7 +133,6 @@ export interface ISmartSearchInput {
   scope: string;
   /** null while the chat list is on its way. */
   chats: readonly ISidebarChat[] | null;
-  projects: readonly ISidebarProject[];
   /** The apps' rows for the words, every app when nothing is typed in their own tab (features/search/app-rows.ts);
    *  undefined while the apps are on their way. */
   appsGroup: ISearchGroup | null | undefined;
@@ -174,7 +173,6 @@ export const useSmartSearch = ({
   query,
   scope,
   chats,
-  projects,
   appsGroup,
   now,
 }: ISmartSearchInput): ISmartSearch => {
@@ -303,7 +301,7 @@ export const useSmartSearch = ({
     const foundNow = found?.key === foundKey ? found.byConn : {};
     const all = [
       settingsGroup(mine?.catalog ?? null, terms, true, person),
-      ...searchChats(chats, projects, words, terms),
+      ...searchChats(chats, words, terms, now),
       ...(hits ? messageGroups(hits, chats, now) : []),
       designsGroup(mergeDesigns(mine?.designs ?? null, indexedDesigns), terms, true),
       docsGroup(mine?.docs ?? null, terms, true),
@@ -311,21 +309,7 @@ export const useSmartSearch = ({
       ...tabs.map((tab) => foundGroup(tab, foundNow[tab.id] ?? [])),
     ].filter((group) => group !== null);
     return all;
-  }, [
-    chats,
-    projects,
-    words,
-    terms,
-    hits,
-    now,
-    mine,
-    appsGroup,
-    found,
-    foundKey,
-    tabs,
-    person,
-    indexedDesigns,
-  ]);
+  }, [chats, words, terms, hits, now, mine, appsGroup, found, foundKey, tabs, person, indexedDesigns]);
 
   const results = useMemo(() => {
     if (groups === null) return null;
@@ -423,15 +407,16 @@ export const useSmartSearch = ({
     const one = (group: ISearchGroup | null): readonly ISearchGroup[] => (group ? [group] : []);
     if (scope === SCOPE.all)
       return idleGroups({
-        chats: chats === null ? [] : recentChats(chats, projects),
+        chats: chats === null ? [] : recentChats(chats),
         designs: mine?.designs ?? null,
         docs: mine?.docs ?? null,
       });
     if (scope === SCOPE.chats) {
       if (chats === null) return null;
-      const rows = recentChats(chats, projects, true);
+      const rows = recentChats(chats, true);
       return one(
-        rows.length > 0 ? { id: SCOPE.chats, label: t('next.search.groupRecentChats'), rows } : null,
+        // The day parts name the rows: a name of the group over them would say it twice.
+        rows.length > 0 ? { id: SCOPE.chats, label: '', rows } : null,
       );
     }
     if (scope === SCOPE.apps) return appsGroup === undefined ? null : one(appsGroup);
@@ -443,7 +428,7 @@ export const useSmartSearch = ({
     if (!tab) return [];
     if (mineOf?.key !== mineKey) return null;
     return one(foundGroup({ id: tab.id, label: t('next.search.groupMine') }, mineOf.items));
-  }, [scope, chats, projects, mine, appsGroup, tabs, mineOf, mineKey, person]);
+  }, [scope, chats, mine, appsGroup, tabs, mineOf, mineKey, person]);
 
   const empty = useMemo(() => scopeEmpty(scope), [scope]);
   const detail = useMemo(() => detailSource({ machine, chats, now }), [machine, chats, now]);

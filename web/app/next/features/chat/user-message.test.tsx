@@ -43,15 +43,15 @@ describe('UserMessage of a steer', () => {
   it('says it is going out while the runtime types it', () => {
     show(steer({ k: 'typing' }));
     expect(screen.getByText('Sending straight into the turn')).toBeTruthy();
-    expect(screen.queryByText("In the agent's queue — read after the current step")).toBeNull();
+    expect(screen.queryByText('In the agent’s turn')).toBeNull();
   });
 
-  it('says the agent reads it after the current step, and offers no retry however long that takes', () => {
+  it('says the message is in the agent’s turn, and offers no retry however long that takes', () => {
     show(steer({ k: 'in-input' }, true));
-    expect(screen.getByText("In the agent's queue — read after the current step")).toBeTruthy();
+    expect(screen.getByText('In the agent’s turn')).toBeTruthy();
     expect(look()).toBe('waiting');
     act(() => void vi.advanceTimersByTime(10 * 60_000));
-    expect(screen.getByText("In the agent's queue — read after the current step")).toBeTruthy();
+    expect(screen.getByText('In the agent’s turn')).toBeTruthy();
     expect(screen.queryByText('Retry')).toBeNull();
     expect(look()).toBe('waiting');
   });
@@ -59,7 +59,7 @@ describe('UserMessage of a steer', () => {
   it('says it was read once the transcript has it', () => {
     show(steer({ k: 'accepted', entryId: 'c:1#0' }));
     expect(screen.getByText('Read by the agent mid-turn')).toBeTruthy();
-    expect(screen.queryByText("In the agent's queue — read after the current step")).toBeNull();
+    expect(screen.queryByText('In the agent’s turn')).toBeNull();
     expect(look()).toBe('sent');
   });
 });
@@ -81,6 +81,8 @@ describe('UserMessage', () => {
     expect(screen.getByText('Takes longer than usual…')).toBeTruthy();
     act(() => void vi.advanceTimersByTime(10 * 60_000));
     expect(look()).toBe('sending');
+    // A minute on, it says why — still no red and no retry of its own: the runtime is still at it.
+    expect(screen.getByText(/The machine is busy/)).toBeTruthy();
     expect(document.querySelector('[data-tone="fail"]')).toBeNull();
     expect(screen.queryByText('Retry')).toBeNull();
   });

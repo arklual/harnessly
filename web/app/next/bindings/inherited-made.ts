@@ -11,6 +11,10 @@ const NONE: readonly MadeItem[] = [];
 /** The pause after a subchat moved before the list is asked again. */
 export const INHERITED_DEBOUNCE_MS = 1000;
 
+/** Two answers of …/made that say the same: the items are plain data off the wire. */
+const sameMade = (a: readonly MadeItem[], b: readonly MadeItem[]): boolean =>
+  a.length === b.length && a.every((item, index) => JSON.stringify(item) === JSON.stringify(b[index]));
+
 /** The card a made thing is in the feed: a document or a board is a page of the portal, a design is its id, a file
  *  handed over is its path. */
 const OUTPUT_OF = {
@@ -58,7 +62,12 @@ export const useInheritedMade = (
     let live = true;
     const timer = window.setTimeout(() => {
       void loadMade(machine, conv).then((outcome) => {
-        if (live && 'ok' in outcome) setMade({ conv, list: outcome.value.items.filter((item) => item.from) });
+        if (!live || !('ok' in outcome)) return;
+        const list = outcome.value.items.filter((item) => item.from);
+        // The same answer keeps the same list: a new one, even empty, redraws every turn of the feed.
+        setMade((current) =>
+          current.conv === conv && sameMade(current.list, list) ? current : { conv, list: list.length ? list : NONE },
+        );
       });
     }, INHERITED_DEBOUNCE_MS);
     return () => {

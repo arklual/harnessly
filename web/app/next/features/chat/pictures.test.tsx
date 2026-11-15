@@ -7,6 +7,16 @@ import type { Picture } from '@/next/protocol/v2';
 
 afterEach(cleanup);
 
+// The full-size picture opens a markup layer that watches its box; jsdom has no ResizeObserver.
+vi.stubGlobal(
+  'ResizeObserver',
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+);
+
 const SHOT = '/tmp/claude-1001/-home-x/s1/scratchpad/home.png';
 const PASTE = '/home/coder/.harnessly/uploads/unknown/unknown/1792894270382-e2af4dde-image.png';
 const LISTED: Picture[] = [

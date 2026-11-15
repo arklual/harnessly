@@ -128,6 +128,12 @@ func (s *Service) guest(w http.ResponseWriter, r *http.Request) (*resaccess.Gues
 	if err == nil && g.Kind != resaccess.KindDoc {
 		err = errors.New("not a document link")
 	}
+	if err == nil {
+		// A thing in the trash opens for nobody, a guest included (manage.go).
+		if m, _, _ := s.meta(r.Context(), g.ID, reachSpace(g.Space)); m != nil && m.TrashedAt != 0 {
+			err = errors.New("in the trash")
+		}
+	}
 	if err != nil {
 		code, text := "not_found", "Ссылка не найдена"
 		status := http.StatusNotFound

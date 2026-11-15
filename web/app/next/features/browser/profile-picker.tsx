@@ -1,5 +1,5 @@
 import { Menu } from '@base-ui/react/menu';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import Icon from '@/next/ui/icon';
 import { useEffect, useState } from 'react';
 import type { MachineId } from '@/next/protocol/v2';
@@ -66,7 +66,7 @@ export function ProfilePicker({
   };
   return (
     <div className="hx-browser-profile-picker">
-      <Menu.Root
+      <MenuRoot
         actionsRef={menuActions}
         onOpenChange={(open) => {
           if (open) setAttempt((n) => n + 1);
@@ -118,7 +118,7 @@ export function ProfilePicker({
             {bp('settings')}
           </Menu.Item>
         </MenuPanel>
-      </Menu.Root>
+      </MenuRoot>
       {error && (
         <button
           type="button"

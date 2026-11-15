@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import ImageView, { SWIPE_PX } from '@/next/ui/image-view';
 
 const ITEM = { src: 'a.png', name: 'a' };
@@ -14,8 +14,18 @@ beforeAll(() => {
     const [w, h] = [400 * scale, 300 * scale];
     return DOMRect.fromRect({ x: 300 + x - w / 2, y: 250 + y - h / 2, width: w, height: h });
   };
+  // Its place in the layout, which its own translate and scale do not move (the zoom's centre is read from it).
+  const layout = { offsetLeft: 100, offsetTop: 100, offsetWidth: 400, offsetHeight: 300 };
+  for (const [key, value] of Object.entries(layout))
+    Object.defineProperty(HTMLElement.prototype, key, { configurable: true, get: () => value });
 });
 afterEach(cleanup);
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 const setup = () => {
   const onStep = vi.fn();
@@ -49,12 +59,44 @@ describe('ImageView zoom', () => {
     expect(parseFloat(img.style.translate)).toBeCloseTo(-100 * (scale - 1), 3);
   });
 
-  it('wheeling back out to fit clears the zoom', () => {
+  it('wheeling back out goes below fit to half at most, centred, and clears the zoom', () => {
     const { dialog, img } = setup();
     fireEvent.wheel(dialog, { deltaY: -300, clientX: 300, clientY: 250 });
-    fireEvent.wheel(dialog, { deltaY: 3000, clientX: 300, clientY: 250 });
-    expect(img.style.scale).toBe('');
+    fireEvent.wheel(dialog, { deltaY: 3000, clientX: 300, clientY: 250, ctrlKey: true });
+    expect(img.style.scale).toBe('0.5');
+    expect(parseFloat(img.style.translate)).toBe(0);
     expect(dialog.dataset.zoomed).toBeUndefined();
+  });
+
+  it('a wheel without ctrl pans a zoomed picture (two fingers on a trackpad), with ctrl it zooms', () => {
+    const { dialog, img } = setup();
+    fireEvent.wheel(dialog, { deltaY: -300, clientX: 300, clientY: 250, ctrlKey: true });
+    const scale = Number(img.style.scale);
+    fireEvent.wheel(dialog, { deltaX: 30, deltaY: 0, clientX: 300, clientY: 250 });
+    expect(Number(img.style.scale)).toBe(scale);
+    expect(parseFloat(img.style.translate)).toBeCloseTo(-30, 3);
+  });
+
+  it('the buttons and the keys zoom, the percent goes to 100% and back', () => {
+    const { dialog, img } = setup();
+    const buttons = () => [...dialog.querySelectorAll<HTMLButtonElement>('.hx-imgview__zb')];
+    act(() => vi.runAllTimers());
+    const [out, pct, plus, fit] = buttons();
+    expect(fit.disabled).toBe(true);
+    act(() => plus.click());
+    expect(Number(img.style.scale)).toBeCloseTo(1.5, 5);
+    act(() => vi.runAllTimers());
+    expect(buttons()[1].textContent).toBe('150%');
+    act(() => out.click());
+    expect(img.style.scale).toBe('');
+    fireEvent.keyDown(dialog, { key: '+' });
+    fireEvent.keyDown(dialog, { key: '+' });
+    expect(Number(img.style.scale)).toBeCloseTo(2.25, 5);
+    fireEvent.keyDown(dialog, { key: '0' });
+    expect(img.style.scale).toBe('');
+    // A picture of unknown size: its real size is the fitted one, so 100% zooms nowhere.
+    act(() => pct.click());
+    expect(img.style.scale).toBe('');
   });
 
   it('a double click zooms in and the next one is back to fit', () => {

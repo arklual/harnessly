@@ -35,9 +35,11 @@ type backgroundFeature struct {
 	Model    *string `json:"model"`
 	// Effort is the reasoning effort the model is asked for; "" is the model's own.
 	Effort string `json:"effort,omitempty"`
-	// Agents: the feature may also be given a model of an agent of the machine (provider "claude" or "codex"), or
-	// turned off (provider "off").
+	// Agents: the feature may also be given a model of an agent of the machine (provider "claude" or "codex"), through
+	// its CLI and the machine's plan.
 	Agents bool `json:"agents,omitempty"`
+	// Offable: the feature may also be turned off (provider "off"); the summaries only.
+	Offable bool `json:"offable,omitempty"`
 	// Last is how the feature's last call to its provider went; absent when it was not called since the runtime
 	// started.
 	Last *bgmodel.Outcome `json:"last,omitempty"`
@@ -68,6 +70,7 @@ func bgRunnerFor(d deps) *bgmodel.Runner {
 		Store:     &bgmodel.Store{Path: filepath.Join(d.DataDir, "v2", "background-tasks.json")},
 		Providers: providers,
 		Client:    &bgmodel.Client{},
+		Agent:     newBgAgentCaller(d.DataDir),
 		Log: func(feature string, c bgmodel.Choice, err error) {
 			// The record of a fallback: the feature did what it did before. Never the key, never the provider's body.
 			agent.Log("warn", "background: the provider failed, the feature fell back", agent.F{K: "feature", V: feature},
@@ -117,13 +120,13 @@ func backgroundView(r *bgmodel.Runner, summary noticeSummary) []backgroundFeatur
 	choices, last := r.Store.All(), r.Last()
 	out := []backgroundFeature{}
 	for _, f := range bgmodel.Features() {
-		v := backgroundFeature{Feature: f}
+		v := backgroundFeature{Feature: f, Agents: r.Agent != nil}
 		if c, ok := choices[f.ID]; ok {
 			v.Provider, v.Model, v.Effort = &c.Provider, &c.Model, c.Effort
 		}
 		// The summaries may also be an agent's model, or off (notice_summary.go).
 		if f.ID == bgmodel.FeatureNotifySummary {
-			v.Agents = true
+			v.Agents, v.Offable = true, true
 			if provider, model := summary.Pick(); provider != "" {
 				v.Provider, v.Model = &provider, &model
 			}

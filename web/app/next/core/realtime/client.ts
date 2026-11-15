@@ -31,6 +31,12 @@ export const DEAD_MS = 35000;
 export const CONNECT_MS = 10000;
 export const BACKOFF_MS = [3000, 6000, 12000, 20000] as const;
 export const JITTER = 0.2;
+/** A socket that was live and closed (a hub replica moving its machines, a runtime restarting for an update) is tried
+ *  again after this, not after BACKOFF_MS[0]: a planned close is back within a second, and the page shows
+ *  «connecting» meanwhile instead of «Нет связи». Only the first try is quick; the next ones back off as always. */
+export const QUICK_RETRY_MS = 500;
+/** …and only for a socket that had been live this long: one that a machine closes at once is not tried in a loop. */
+export const QUICK_AFTER_LIVE_MS = 5000;
 
 export type Welcome = Extract<ServerFrame, { f: 'welcome' }>;
 export type OfflineCause = Extract<Connection, { k: 'offline' }>['cause'];
@@ -134,6 +140,8 @@ export class RealtimeClient {
   private conn: Connection = { k: 'connecting', attempt: 1 };
   private epoch: string | null = null;
   private failures = 0;
+  /** When the socket last said welcome. */
+  private welcomedAt = Number.NEGATIVE_INFINITY;
   private stopped = true;
   private readonly subs = new Map<Channel, Sub>();
   private waiters: SeqWaiter[] = [];
@@ -278,7 +286,9 @@ export class RealtimeClient {
     ws.onclose = () => {
       if (this.ws !== ws) return;
       this.ws = null;
-      this.fail();
+      const settled = this.o.clock.now() - this.welcomedAt >= QUICK_AFTER_LIVE_MS;
+      if ((this.conn.k === 'live' || this.conn.k === 'stale') && settled) this.quickRetry();
+      else this.fail();
     };
     ws.onerror = () => {};
     this.timers.connect = this.o.clock.setTimeout(() => {
@@ -345,6 +355,7 @@ export class RealtimeClient {
     const epochChanged = this.epoch !== null && this.epoch !== w.epoch;
     this.epoch = w.epoch;
     this.failures = 0;
+    this.welcomedAt = this.o.clock.now();
     this.o.sink.welcome(this.machine, w);
     this.setConn({ k: 'live', since: this.o.clock.now() });
     if (epochChanged) this.settleWaiters(() => true, 'gone');
@@ -515,6 +526,15 @@ export class RealtimeClient {
         }
       });
     }
+  }
+
+  /** The first try after a live socket closed: soon, and as «connecting»; a failure of it backs off as usual. */
+  private quickRetry(): void {
+    if (this.stopped) return;
+    this.clearTimers();
+    const delay = Math.round(QUICK_RETRY_MS * (1 + (this.random() * 2 - 1) * JITTER));
+    this.setConn({ k: 'connecting', attempt: 1 });
+    this.timers.retry = this.o.clock.setTimeout(() => this.connect(1), delay);
   }
 
   private clearTimers(): void {

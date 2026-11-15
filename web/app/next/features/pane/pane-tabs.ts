@@ -24,8 +24,9 @@ export type TTab =
       at?: { line: number; col: number; size: number };
     }
   | { id: string; kind: 'shell'; terminal: string }
-  /** An installed app's view; `view` null: the app's first view for the pane. */
-  | { id: string; kind: 'app'; app: string; view: string | null }
+  /** An installed app's view; `view` null: the app's first view for the pane. `object`: one of the app's own objects
+   *  (a board's slug) the view opens instead of its home. */
+  | { id: string; kind: 'app'; app: string; view: string | null; object?: string | null }
   /** `reload` counts the reloads asked from outside the tab (a page the agent published again). */
   | { id: string; kind: 'browser'; hist: IAddress[]; hi: number; reload?: number };
 
@@ -153,6 +154,27 @@ const placeApp = (state: IPaneTabs, target: string | null, ctx: IPlaceContext): 
   if (have) return { next: front(state, have.id, ctx.busy), effect: null, show: true };
   return {
     next: added(state, { id: ctx.nextId(), kind: 'app', app: named.app, view: named.view }, ctx.busy),
+    effect: null,
+    show: true,
+  };
+};
+
+/** One of an app's objects (a board, a document) in the app's view of the pane: the tab of the same view shows it, or a
+ *  new tab does. */
+export const placeAppObject = (
+  state: IPaneTabs,
+  app: string,
+  view: string | null,
+  object: string,
+  ctx: IPlaceContext,
+): IPlaced => {
+  const have = state.tabs.find((x) => x.kind === 'app' && x.app === app && x.view === view);
+  if (have?.kind === 'app') {
+    const tabs = state.tabs.map((x) => (x.id === have.id ? { ...have, object } : x));
+    return { next: front({ ...state, tabs }, have.id, ctx.busy), effect: null, show: true };
+  }
+  return {
+    next: added(state, { id: ctx.nextId(), kind: 'app', app, view, object }, ctx.busy),
     effect: null,
     show: true,
   };

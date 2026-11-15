@@ -1,0 +1,480 @@
+/* The voice mode (features/voice-live): the conversation over the screen. The orb breathes with
+   --hx-voice-level (0…1), which the call sets on it every frame from the loudness of whoever speaks. */
+
+@keyframes hx-voice-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+@keyframes hx-voice-out {
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+@keyframes hx-voice-idle {
+  50% {
+    transform: scale(1.04);
+  }
+}
+@keyframes hx-voice-think {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes hx-voice-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.hx-voice {
+  position: fixed;
+  inset: 0;
+  z-index: 8995; /* over «What's new» (8990), under the connection notice (9000) */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--hx-space-5) var(--hx-space-4) max(var(--hx-space-5), env(safe-area-inset-bottom));
+  background: var(--hx-bg-app);
+  color: var(--hx-fg-1);
+  animation: hx-voice-in var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-voice[data-state='closing'] {
+  animation: hx-voice-out var(--hx-dur-md) var(--hx-ease-out) forwards;
+  pointer-events: none;
+}
+
+.hx-voice__top {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+.hx-voice__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  height: 36px;
+  padding: 0 var(--hx-space-3);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-full);
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  cursor: pointer;
+  transition: background var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-voice__chip:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-voice__chip small {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  font-weight: normal;
+}
+/* The model menu opens over the conversation, which stands over everything else. */
+.hx-pop-pos:has(> .hx-voice__models) {
+  z-index: 8996;
+}
+.hx-voice__models {
+  width: 240px;
+  padding: var(--hx-space-1);
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-lg);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  outline: 0;
+  animation: hx-voice-in var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-voice__model {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--hx-space-2);
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.hx-voice__model:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-voice__models-note {
+  margin: 0;
+  padding: var(--hx-space-1) var(--hx-space-2) var(--hx-space-2);
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  line-height: 1.4;
+}
+
+.hx-voice__stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hx-space-4);
+  width: min(560px, 100%);
+  min-height: 0;
+}
+
+.hx-voice__orb {
+  --hx-voice-level: 0;
+  position: relative;
+  width: 168px;
+  height: 168px;
+  border-radius: var(--hx-radius-full);
+  transform: scale(calc(1 + var(--hx-voice-level) * 0.35));
+  transition: transform 80ms linear;
+}
+.hx-voice__orb i {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 35% 30%, color-mix(in oklab, var(--hx-accent) 30%, white) 0%, transparent 55%),
+    radial-gradient(circle at 70% 75%, color-mix(in oklab, var(--hx-accent) 70%, black) 0%, transparent 60%),
+    var(--hx-accent);
+  box-shadow: 0 0 calc(24px + var(--hx-voice-level) * 64px)
+    color-mix(in oklab, var(--hx-accent) 45%, transparent);
+  animation: hx-voice-idle 3.2s var(--hx-ease-in-out) infinite;
+}
+.hx-voice[data-floor='thinking'] .hx-voice__orb i {
+  background: conic-gradient(
+    from 0deg,
+    var(--hx-accent),
+    color-mix(in oklab, var(--hx-accent) 35%, white),
+    var(--hx-accent)
+  );
+  animation: hx-voice-think 1.6s linear infinite;
+}
+.hx-voice[data-floor='connecting'] .hx-voice__orb i,
+.hx-voice[data-floor='ended'] .hx-voice__orb i,
+.hx-voice[data-floor='failed'] .hx-voice__orb i {
+  opacity: 0.35;
+  box-shadow: none;
+}
+
+.hx-voice__status {
+  margin: 0;
+  font-size: var(--hx-text-xl);
+  font-weight: var(--hx-weight-semibold);
+  text-align: center;
+}
+.hx-voice__work {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  margin: 0;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+.hx-voice__note {
+  max-width: 32rem;
+  margin: 0;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  text-align: center;
+}
+.hx-voice__work .hx-icon {
+  animation: hx-voice-spin 900ms linear infinite;
+}
+
+.hx-voice__lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  width: 100%;
+  max-height: 32vh;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, transparent 0, black 24px);
+  justify-content: flex-end;
+}
+.hx-voice__line {
+  margin: 0;
+  font-size: var(--hx-text-md);
+  line-height: 1.45;
+  color: var(--hx-fg-2);
+  text-align: center;
+  animation: hx-voice-in var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-voice__line[data-role='user'] {
+  color: var(--hx-fg-3);
+}
+.hx-voice__lines .hx-voice__line:last-child {
+  color: var(--hx-fg-1);
+}
+
+.hx-voice__bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hx-space-3);
+}
+.hx-voice__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  height: 56px;
+  padding: 0 var(--hx-space-4);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  cursor: pointer;
+  transition:
+    background var(--hx-dur-sm) var(--hx-ease-out),
+    transform var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-voice__btn:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-voice__btn:active {
+  transform: scale(0.96);
+}
+.hx-voice__btn[data-on] {
+  background: var(--hx-fg-1);
+  color: var(--hx-bg-app);
+}
+.hx-voice__btn[data-tone='end'] {
+  border-color: transparent;
+  background: var(--hx-danger);
+  color: white;
+}
+.hx-voice__btn:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-voice,
+  .hx-voice__line,
+  .hx-voice__orb i {
+    animation: none;
+  }
+  .hx-voice__orb {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .hx-voice__orb {
+    width: 136px;
+    height: 136px;
+  }
+}
+
+/* «Голос — в поле»: the voice is a state of the field. The wave takes the text line where the placeholder stands (or the
+   next line under typed words); who has the floor shows only in the wave's colour and the field's ring. */
+.hx-composer__voice {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  pointer-events: none;
+  animation: hx-voice-field-in 360ms var(--hx-ease-out) both;
+}
+.hx-composer[data-live] .hx-composer__field {
+  position: relative;
+}
+@keyframes hx-voice-field-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.hx-composer__voice[data-typed='true'] {
+  left: auto;
+  width: 30%;
+}
+.hx-composer__voice .hx-wave {
+  margin: 0;
+  --hx-info: var(--hx-danger);
+  --hx-accent: var(--hx-danger);
+}
+.hx-composer__voice[data-floor='starting'] .hx-wave,
+.hx-composer__voice[data-floor='thinking'] .hx-wave {
+  --hx-info: var(--hx-fg-3);
+  --hx-accent: var(--hx-fg-3);
+}
+.hx-composer__voice[data-floor='thinking'] .hx-wave {
+  transform: scaleY(0.32);
+}
+.hx-composer__voice[data-floor='speaking'] .hx-wave,
+.hx-composer__voice[data-floor='muted'] .hx-wave {
+  --hx-info: var(--hx-accent);
+  --hx-accent: var(--hx-accent);
+}
+.hx-composer__voice[data-floor='failed'] .hx-wave {
+  opacity: 0.4;
+  transform: scaleY(0.1);
+}
+.hx-composer__heard {
+  flex: none;
+  max-width: 70%;
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hx-dock .hx-composer[data-live='listening'],
+.hx-composer[data-live='listening'] {
+  border-color: color-mix(in srgb, var(--hx-danger) 42%, var(--hx-border-strong));
+}
+.hx-composer[data-live='listening']::after {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--hx-danger) 18%, transparent);
+  opacity: calc(0.4 + var(--hx-voice, 0) * 0.6);
+}
+.hx-composer[data-live='speaking']::after {
+  opacity: calc(0.4 + var(--hx-voice, 0) * 0.6);
+}
+.hx-composer[data-live] .hx-voice-btn {
+  color: var(--hx-danger);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-composer__voice {
+    animation: none;
+  }
+}
+.hx-voice-holder {
+  display: inline-flex;
+}
+.hx-voice-btn[aria-pressed='true'] {
+  color: var(--hx-danger);
+}
+
+/* Quiet lines of what the voice did, just over the field («Заголовок крупнее · Отменить»). */
+.hx-voice-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-1);
+  padding: 0 var(--hx-space-3) var(--hx-space-2);
+}
+
+.hx-voice-note {
+  display: flex;
+  align-items: baseline;
+  gap: var(--hx-space-2);
+  margin: 0;
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-3);
+  animation: hx-voice-note-in var(--hx-dur-md) var(--hx-ease-out);
+}
+
+.hx-voice-note__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hx-voice-note__act {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  transition: color var(--hx-dur-sm) var(--hx-ease-out);
+}
+
+.hx-voice-note__act::before {
+  content: '· ';
+  color: var(--hx-fg-3);
+}
+
+.hx-voice-note__act:hover {
+  color: var(--hx-fg-1);
+}
+
+@keyframes hx-voice-note-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-voice-note {
+    animation: none;
+  }
+}
+
+/* The voice's own reply, line by line as it is said. */
+.hx-composer__heard[data-said='true'] {
+  color: var(--hx-fg-2);
+}
+
+/* ⌥ Space away from a chat: the field over the screen, bottom centre, the size of a chat's field. */
+.hx-voice-float {
+  position: fixed;
+  left: 50%;
+  bottom: var(--hx-space-5);
+  z-index: 60;
+  width: min(720px, calc(100vw - 2 * var(--hx-space-4)));
+  transform: translateX(-50%);
+  animation: hx-voice-float-in var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-voice-float[data-closing] {
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition:
+    opacity 200ms var(--hx-ease-out),
+    transform 200ms var(--hx-ease-out);
+}
+.hx-voice-float__field {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-2) var(--hx-space-2) var(--hx-space-2) var(--hx-space-4);
+}
+.hx-voice-float__line {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hx-voice-float__line[data-said='true'] {
+  color: var(--hx-fg-2);
+}
+.hx-voice-float__field .hx-wave {
+  flex: none;
+  width: 96px;
+  margin: 0;
+}
+.hx-voice-float__tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+.hx-voice-float .hx-voice-notes {
+  padding: 0 0 var(--hx-space-2);
+}
+@keyframes hx-voice-float-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-voice-float {
+    animation: none;
+  }
+}

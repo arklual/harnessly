@@ -474,6 +474,7 @@ HTML page «Машина не на связи» with status 502.
 | --- | --- | --- |
 | `GET /install` | | `text/x-shellscript`: `deploy/install/install.sh` (from `HUB_DIST_DIR`) with `HARNESSLY_HUB_URL` set to the public URL and, when `HUB_CONTAINER_IMAGE` is set, `HARNESSLY_IMAGE` set to it, on the lines right after the shebang |
 | `GET /dl/manifest.json` | | `{ version, files: { "<name>": { sha256, size } } }`, names `runtime-<os>-<arch>`, `agent-<os>-<arch>` for linux/darwin × amd64/arm64 |
+| `GET /dl/web.json`, `GET /dl/web.tar.gz` | | the machines' page released apart from the runtime: its version, SHA-256 and the archive of `web/dist`, taken from the protected package `web/<version>` and verified (`internal/hub/webpkg`); 404 without `HUB_WEB_PACKAGE_URL` |
 | `GET /dl/{name}` | | the binary (`application/octet-stream`), from `HUB_DIST_DIR` |
 | `POST /agent/register` | `RegisterRequest` | 201 `RegisterResponse` (200 when the machine kept its id, below); 410 `expired`, 400, 429 |
 | `GET /agent/v1` | WebSocket upgrade with the signed `Authorization` header | 101; 401 bad signature/unknown key/old time/replayed nonce; 403 revoked (`forbidden` with `details.reason: "revoked"`; only this, or the close code 4010, stops the agent dialing: a 403 without it, as a proxy may answer, is retried with the usual backoff); 426 agent older than `HUB_MIN_AGENT_VERSION` |
@@ -938,6 +939,7 @@ requests already carry the base path and pass the route filter unchanged, `X-For
 | `HUB_RUNTIME_DOMAIN` | | e.g. `run.example.net`: subdomain mode, a domain that is not on the hub's registrable domain (a parent of the hub's host is refused; a same-site one is a warning, and the cloud edition refuses it unless `HUB_ALLOW_SAME_SITE_RUNTIME=1`); empty: path mode (only machines an instance administrator connected are opened; refused by the cloud edition) |
 | `HUB_ALLOW_SAME_SITE_RUNTIME` | `0` | `1` accepts, in the cloud edition, a `HUB_RUNTIME_DOMAIN` on the hub's registrable domain (one site: the `__Host-` cookies and the cross-site checks narrow what a machine's script can do there, they do not remove it) |
 | `HUB_DIST_DIR` | `/opt/harnessly/dist` | binaries and `manifest.json` served under `/dl/` |
+| `HUB_WEB_PACKAGE_URL`, `HUB_WEB_PACKAGE_TOKEN` | (off) | the project API (`https://host/api/v4/projects/<id>`) and a `read_api` token: the hub takes the newest page package written by a tag pipeline into `HUB_DATA_DIR/web-package` and serves it at `/dl/web.json` |
 | `HUB_CONTAINER_IMAGE` | | image for the container profile; empty hides it |
 | `HUB_LOCAL_CODE_FILE` | | when set, the hub keeps a local registration code in this file (self-hosted «Эта машина»), mode `0600` in a `0700` folder |
 | `HUB_LOCAL_CODE_GROUP` | | numeric group id that may read that file instead (`0640`, folder `0750`) |

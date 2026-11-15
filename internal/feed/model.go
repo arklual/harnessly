@@ -775,6 +775,7 @@ func (b *builder) imagesResult(s *step, e *wire.Entry, o *jsvalue.Object, ok boo
 	}
 	img.Count = max(img.Count, len(img.Done))
 	card.Images = &img
+	b.drew(img.Done)
 	if own {
 		b.jobs[img.JobID] = e.ID
 		return true
@@ -798,6 +799,7 @@ func (b *builder) imageResult(s *step, o *jsvalue.Object) {
 		img.Failed = sptr(failure)
 	} else if p := str(o, "path"); p != "" && !slices.Contains(img.Done, p) {
 		img.Done = append(img.Done, p)
+		b.drew([]string{p})
 	}
 	img.Count = max(img.Count, len(img.Done))
 	if img.Prompt == "" {
@@ -806,6 +808,22 @@ func (b *builder) imageResult(s *step, o *jsvalue.Object) {
 	e.Images, e.Rev = &img, e.Rev+1
 	b.entries[i] = e
 	s.updated = append(s.updated, i)
+}
+
+// drew lists the pictures a call drew on the turn it ends in (Turn.Pictures), each once, the newest kept.
+func (b *builder) drew(paths []string) {
+	t := b.cur()
+	if t == nil {
+		return
+	}
+	for _, p := range paths {
+		if p != "" && !slices.Contains(t.rec.Pictures, p) {
+			t.rec.Pictures = append(t.rec.Pictures, p)
+		}
+	}
+	if n := len(t.rec.Pictures); n > wire.TurnPicturesMax {
+		t.rec.Pictures = slices.Clone(t.rec.Pictures[n-wire.TurnPicturesMax:])
+	}
 }
 
 // cur is the turn a new entry belongs to: the open one, else the one the runtime ended ahead of the transcript.

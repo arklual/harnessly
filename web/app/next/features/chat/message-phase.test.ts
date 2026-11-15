@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { MESSAGE_PHASE, messagePhase, nextPhaseIn, SEND_SLOW_MS } from '@/next/features/chat/message-phase';
+import {
+  MESSAGE_PHASE,
+  messagePhase,
+  nextPhaseIn,
+  SEND_SLOW_MS,
+  SEND_STALLED_MS,
+} from '@/next/features/chat/message-phase';
 
 const since = 1_000_000;
 
@@ -9,7 +15,7 @@ describe('messagePhase', () => {
     expect(messagePhase(state, since, since, false)).toBe(MESSAGE_PHASE.sending);
     expect(messagePhase(state, since, since + SEND_SLOW_MS - 1, false)).toBe(MESSAGE_PHASE.sending);
     expect(messagePhase(state, since, since + SEND_SLOW_MS, false)).toBe(MESSAGE_PHASE.slow);
-    expect(messagePhase(state, since, since + 10 * 60_000, false)).toBe(MESSAGE_PHASE.slow);
+    expect(messagePhase(state, since, since + 10 * 60_000, false)).toBe(MESSAGE_PHASE.stalled);
   });
 
   it('waits for the machine, calmly, when the last try got no answer from it — however long it takes', () => {
@@ -55,8 +61,8 @@ describe('a steer handed to a working agent', () => {
 
   it("an ordinary message in-input goes slow; «not confirmed» is the runtime's to say, by its own deadline", () => {
     expect(messagePhase(inInput, since, since + SEND_SLOW_MS, false)).toBe(MESSAGE_PHASE.slow);
-    expect(messagePhase(inInput, since, since + 10 * 60_000, false)).toBe(MESSAGE_PHASE.slow);
-    expect(nextPhaseIn(inInput, since, since + SEND_SLOW_MS, false)).toBeNull();
+    expect(messagePhase(inInput, since, since + 10 * 60_000, false)).toBe(MESSAGE_PHASE.stalled);
+    expect(nextPhaseIn(inInput, since, since + SEND_SLOW_MS, false)).toBe(SEND_STALLED_MS - SEND_SLOW_MS);
   });
 });
 
@@ -64,7 +70,19 @@ describe('nextPhaseIn', () => {
   it('names the next threshold, and none once nothing changes by time', () => {
     const state = { k: 'submitting' } as const;
     expect(nextPhaseIn(state, since, since + 1000, false)).toBe(SEND_SLOW_MS - 1000);
-    expect(nextPhaseIn(state, since, since + SEND_SLOW_MS + 500, false)).toBeNull();
+    expect(nextPhaseIn(state, since, since + SEND_SLOW_MS + 500, false)).toBe(
+      SEND_STALLED_MS - SEND_SLOW_MS - 500,
+    );
     expect(nextPhaseIn(state, since, since, true)).toBeNull();
+  });
+});
+
+describe('a message the busy machine has not confirmed for a minute (HRN-1452)', () => {
+  it('says the agent is still starting instead of «longer than usual» forever, and stays no failure', () => {
+    const state = { k: 'submitting' } as never;
+    expect(messagePhase(state, 0 as never, 4_000 as never, false)).toBe(MESSAGE_PHASE.slow);
+    expect(nextPhaseIn(state, 0 as never, 4_000 as never, false)).toBe(SEND_STALLED_MS - 4_000);
+    expect(messagePhase(state, 0 as never, SEND_STALLED_MS as never, false)).toBe(MESSAGE_PHASE.stalled);
+    expect(nextPhaseIn(state, 0 as never, SEND_STALLED_MS as never, false)).toBeNull();
   });
 });

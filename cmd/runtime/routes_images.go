@@ -45,7 +45,9 @@ func imageJobs(d deps) *imagegen.Service {
 		imageJobsSvc = &imagegen.Service{
 			Dir:       imagesDir(d),
 			CodexHome: env("CODEX_HOME", filepath.Join(d.Home, ".codex")),
-			Env:       func() []string { return withAgentEnv(os.Environ(), envDir, agents.Codex) },
+			// RUNTIME_IMAGEGEN_BIN replaces `codex` for pictures: an eval stand draws with a fake (docs/agent-evals.md).
+			Binary: os.Getenv("RUNTIME_IMAGEGEN_BIN"),
+			Env:    func() []string { return withAgentEnv(os.Environ(), envDir, agents.Codex) },
 		}
 
 	})

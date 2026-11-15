@@ -1,0 +1,41 @@
+id: picture-first-turn
+title: «Нарисуй…» — картинка в ленте с первого хода, а не код
+tags: [pictures]
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'internal/imagegen/**'
+  - 'internal/imagecard/**'
+  - 'internal/codemode/**'
+prompt: нарисуй кота в шляпе
+expect:
+  - name: drew with the picture tool
+    called: harnessly\.generate_images
+  - name: the picture reached the chat
+    images: 1
+  - name: did not draw with code
+    not_called: Write|Edit
+    args: {file_path: '(?i)\.(py|svg|html|js)$'}
+  - name: did not run a drawing script
+    not_called: Bash
+    args: {command: '(?i)python|PIL|convert |magick|svg'}
+  - name: did not ask what to draw
+    text_not: '(?i)какой (стиль|кот)|уточни|what (style|kind)'
+variants:
+  - id: v1
+    kind: short
+    text: "кот в шляпе, рисуй"
+  - id: v2
+    kind: long
+    text: "слушай, мне для одного проекта очень нужна картинка, там всё крутится вокруг котов, поэтому нарисуй, пожалуйста, кота в шляпе"
+  - id: v3
+    kind: typos
+    text: "нарисуи кота в шлаепе"
+  - id: v4
+    kind: english
+    text: "draw a cat in a hat"
+  - id: v5
+    kind: formal
+    text: "Не могли бы вы, пожалуйста, нарисовать кота в шляпе?"
+  - id: v6
+    kind: indirect
+    text: "Хотелось бы увидеть на картинке кота, который щеголяет в шляпе."

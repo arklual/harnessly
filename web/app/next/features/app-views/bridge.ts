@@ -610,6 +610,11 @@ export class AppBridge {
       this.notify('harnessly/notifications/event', { kind, ...params });
   }
 
+  /** A voice quick edit changed the app's own object: the view lights up what moved, no subscription needed. */
+  quickEdit(params: { object: string; ids: string[]; hint: string }): void {
+    if (this.initialized) this.notify('harnessly/notifications/event', { kind: 'quick-edit', ...params });
+  }
+
   /** Files of a watch changed: their names only. */
   filesChanged(paths: readonly string[]): void {
     if (this.initialized) this.notify('harnessly/notifications/files-changed', { paths });

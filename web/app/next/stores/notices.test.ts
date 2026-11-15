@@ -62,11 +62,17 @@ describe('the switches', () => {
     expect(parseNotify(JSON.stringify({ place: 'middle' }))).toEqual(DEFAULT_NOTIFY);
   });
 
-  it('move the old default corner to the field, but keep a corner picked after it', () => {
-    expect(parseNotify(JSON.stringify({ place: 'top-right' })).place).toBe('bottom-center');
+  it('move the old default corner to the top middle, but keep a corner picked after it', () => {
+    expect(parseNotify(JSON.stringify({ place: 'top-right' })).place).toBe('top-center');
     expect(parseNotify(JSON.stringify({ place: 'top-left' })).place).toBe('top-left');
     expect(parseNotify(JSON.stringify({ v: 2, place: 'top-right' })).place).toBe('top-right');
     expect(parseNotify(JSON.stringify({ v: 3, place: 'top-right' })).place).toBe('top-right');
+  });
+
+  it('move the old default over the field to the top middle (HRN-1487), but keep it picked after', () => {
+    expect(parseNotify(null).place).toBe('top-center');
+    expect(parseNotify(JSON.stringify({ v: 3, place: 'bottom-center' })).place).toBe('top-center');
+    expect(parseNotify(JSON.stringify({ v: 4, place: 'bottom-center' })).place).toBe('bottom-center');
   });
 
   it('keep the machine switch, on by default', () => {

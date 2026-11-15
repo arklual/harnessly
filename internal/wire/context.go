@@ -19,6 +19,8 @@ const (
 type ConvContext struct {
 	UsedTokens  int64 `json:"usedTokens"`
 	LimitTokens int64 `json:"limitTokens"`
+	// CompactAtTokens is where the agent compacts by itself, by its settings; 0 (absent) where the runtime cannot say.
+	CompactAtTokens int64 `json:"compactAtTokens,omitempty"`
 }
 
 func (c ConvContext) Validate() error {

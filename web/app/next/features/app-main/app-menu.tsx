@@ -1,7 +1,7 @@
 // «…» of an app's screen: about the app, its settings, the debug section, turning the app off or on in this chat.
 import { Menu } from '@base-ui/react/menu';
 import Icon from '@/next/ui/icon';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import { t } from '@/next/i18n';
 
 export interface IAppMenuItem {
@@ -16,7 +16,7 @@ export const AppMenu = ({ items }: { items: readonly IAppMenuItem[] }) => {
   const actions = useMenuActions();
   if (items.length === 0) return null;
   return (
-    <Menu.Root actionsRef={actions}>
+    <MenuRoot actionsRef={actions}>
       <Menu.Trigger
         render={
           <button type="button" className="hx-head-btn" aria-label={t('next.appmain.menu')}>
@@ -43,6 +43,6 @@ export const AppMenu = ({ items }: { items: readonly IAppMenuItem[] }) => {
           </Menu.Item>
         ))}
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };

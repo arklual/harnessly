@@ -4,7 +4,16 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { pinLocale } from '@/next/i18n';
 import { MenuRow, SegRow, SwitchRow } from '@/next/features/settings/rows';
 
-beforeAll(() => pinLocale('en'));
+beforeAll(() => {
+  pinLocale('en');
+  // A wide window: the menu stays by its button (on a phone it is a sheet in the page's body).
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  })) as unknown as typeof window.matchMedia;
+});
 afterEach(cleanup);
 
 describe('SegRow', () => {

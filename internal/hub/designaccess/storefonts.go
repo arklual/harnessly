@@ -2,11 +2,12 @@ package designaccess
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/base64"
+	"io"
 	"net/http"
 	"path"
 	"regexp"
-	"strconv"
 	"strings"
 )
 
@@ -63,19 +64,34 @@ func isStylesheet(segs []string) bool {
 // serveSheet answers a stylesheet of the store with its fonts inside; read is the viewer's answer for a file of the
 // same revision.
 func serveSheet(w http.ResponseWriter, r *http.Request, segs []string, read func(w http.ResponseWriter, r *http.Request, segs []string) error) error {
+	out, pass, err := buildSheet(r, segs, read)
+	if err != nil {
+		return err
+	}
+	if pass != nil {
+		copyAnswer(w, r, pass)
+		return nil
+	}
+	out.write(w, r)
+	return nil
+}
+
+// buildSheet works out the sheet with its fonts inside; pass is the viewer's own answer when it is not a sheet to work
+// on (missing, refused, packed some way the hub does not unpack), to go out as it came.
+func buildSheet(r *http.Request, segs []string, read func(w http.ResponseWriter, r *http.Request, segs []string) error) (*sheetOut, *bufferedAnswer, error) {
 	plain := plainRead(r)
 	sheet := &bufferedAnswer{header: http.Header{}}
 	if err := read(sheet, plain, segs); err != nil {
-		return err
+		return nil, nil, err
 	}
-	if sheet.status != http.StatusOK {
-		copyAnswer(w, r, sheet)
-		return nil
+	raw, ok := plainBody(sheet, inlineSheetMax)
+	if sheet.status != http.StatusOK || !ok {
+		return nil, sheet, nil
 	}
 	dir := path.Dir(path.Join(segs...))
 	budget := inlineSheetMax
 	fonts := map[string]string{}
-	body := cssURL.ReplaceAllFunc(sheet.body.Bytes(), func(m []byte) []byte {
+	body := cssURL.ReplaceAllFunc(raw, func(m []byte) []byte {
 		parts := cssURL.FindSubmatch(m)
 		if string(parts[1]) != string(parts[3]) {
 			return m
@@ -99,26 +115,42 @@ func serveSheet(w http.ResponseWriter, r *http.Request, segs []string, read func
 			return m
 		}
 		font := &bufferedAnswer{header: http.Header{}}
-		if err := read(font, plain, fontSegs); err != nil || font.status != http.StatusOK || font.body.Len() > inlineFontMax || font.body.Len() > budget {
+		if err := read(font, plain, fontSegs); err != nil || font.status != http.StatusOK {
 			return m
 		}
-		budget -= font.body.Len()
-		data := "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(font.body.Bytes())
+		fb, ok := plainBody(font, inlineFontMax)
+		if !ok || len(fb) > inlineFontMax || len(fb) > budget {
+			return m
+		}
+		budget -= len(fb)
+		data := "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(fb)
 		fonts[at] = data
 		return []byte(`url("` + data + `")`)
 	})
-	h := w.Header()
-	for _, k := range []string{"Content-Type", "Cache-Control", "Last-Modified"} {
-		if v := sheet.header.Get(k); v != "" {
-			h.Set(k, v)
-		}
+	return newSheetOut(sheet.header, body), nil, nil
+}
+
+// plainBody is the answer's body as the file's own bytes. The viewer gzips a file for a request that names no encoding
+// (design.takesGzip), and plainRead names none: a sheet rewritten from its packed bytes went out as gzip without
+// Content-Encoding, and the browser dropped every style of the board. False when the body is packed some
+// other way, is not gzip after all, or unpacks past max.
+func plainBody(a *bufferedAnswer, max int) ([]byte, bool) {
+	switch enc := strings.ToLower(strings.TrimSpace(a.header.Get("Content-Encoding"))); enc {
+	case "", "identity":
+		return a.body.Bytes(), true
+	case "gzip":
+	default:
+		return nil, false
 	}
-	h.Set("Content-Length", strconv.Itoa(len(body)))
-	w.WriteHeader(http.StatusOK)
-	if r.Method != http.MethodHead {
-		_, _ = w.Write(body)
+	zr, err := gzip.NewReader(bytes.NewReader(a.body.Bytes()))
+	if err != nil {
+		return nil, false
 	}
-	return nil
+	out, err := io.ReadAll(io.LimitReader(zr, int64(max)+1))
+	if err != nil || len(out) > max {
+		return nil, false
+	}
+	return out, true
 }
 
 func copyAnswer(w http.ResponseWriter, r *http.Request, a *bufferedAnswer) {

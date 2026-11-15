@@ -631,3 +631,23 @@ func TestHookSettingsWithTheStatusProgram(t *testing.T) {
 		t.Fatalf("%+v", hooks)
 	}
 }
+
+func TestHookSettingsWithTheVoiceGuard(t *testing.T) {
+	c := HookSettingsConfig{StatusHook: "/h/s.sh", Statusline: "/h/l.sh", BudgetHook: "/h/b.sh", VoiceGuardHook: "'/bin/harnessly' hook voice-guard"}
+	var got struct {
+		Hooks map[string][]struct {
+			Hooks []struct{ Command string }
+		}
+	}
+	if err := json.Unmarshal(HookSettings(c), &got); err != nil {
+		t.Fatal(err)
+	}
+	pre := got.Hooks["PreToolUse"]
+	if len(pre) != 1 || len(pre[0].Hooks) != 2 || pre[0].Hooks[1].Command != "'/bin/harnessly' hook voice-guard 2>/dev/null || true" {
+		t.Fatalf("PreToolUse %+v", pre)
+	}
+	c.BudgetHook = ""
+	if err := json.Unmarshal(HookSettings(c), &got); err != nil || len(got.Hooks["PreToolUse"][0].Hooks) != 1 {
+		t.Fatalf("the voice guard alone: %+v %v", got.Hooks["PreToolUse"], err)
+	}
+}

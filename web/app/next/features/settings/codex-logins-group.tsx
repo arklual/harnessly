@@ -10,7 +10,7 @@ import { Fold } from '@/next/features/settings/agent-account';
 import { FormError, Group, SetButton } from '@/next/features/settings/rows';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import { usePresence } from '@/next/ui/presence';
 
 /** A fold's exit, as long as hx-apage-fold-out in agent-page.css. */
@@ -49,7 +49,7 @@ const RowMenu = ({ login, busy, onMain, onRename, onLeave, onRemove }: IRowMenuP
   const label = t('next.codexLogins.menu', { name: login.name });
   const signed = login.account !== '';
   return (
-    <Menu.Root actionsRef={actions}>
+    <MenuRoot actionsRef={actions}>
       <Menu.Trigger
         disabled={busy}
         render={
@@ -83,7 +83,7 @@ const RowMenu = ({ login, busy, onMain, onRename, onLeave, onRemove }: IRowMenuP
           <span className="hx-cmenu__txt">{t('next.codexLogins.remove')}</span>
         </Menu.Item>
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };
 

@@ -2,7 +2,7 @@
 // work folds into «Worked 4 min · 12 actions» with the answer below, and what it made stays at the bottom. A turn
 // that ended without an answer says how: «Turn interrupted» with the reason and Continue / Retry turn, «Stopped by
 // you», or that it stopped on the usage limit.
-import { Fragment, memo, useEffect, useState, type ReactNode } from 'react';
+import { Fragment, memo, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useSeen } from '@/next/ui/presence';
 import Md from '@/next/features/chat/md';
 import NowBlock from '@/next/features/chat/now';
@@ -13,7 +13,7 @@ import CopyButton from '@/next/features/chat/copy-button';
 import ErrorLine, { errorHeadline } from '@/next/features/chat/error-line';
 import { isRetryable, parseErrorText, type ParsedError } from '@/next/features/chat/error-text';
 import UserMessage from '@/next/features/chat/user-message';
-import Outputs from '@/next/features/chat/outputs';
+import Outputs, { drawnOf, OutputsContext } from '@/next/features/chat/outputs';
 import DelegationCards from '@/next/features/chat/delegation-card';
 import type {
   Entry,
@@ -199,6 +199,14 @@ export const splitAtMessages = (steps: Entry[]): { parts: Entry[][]; messages: U
   return { parts, messages };
 };
 
+/** A finished call whose pictures all show under the answer (Turn.pictures): its card is not drawn again in the work. */
+export const shownBelow = (entry: Entry, drawn: readonly string[]): boolean =>
+  entry.t === 'tool' &&
+  entry.images !== undefined &&
+  entry.images.state === 'done' &&
+  entry.images.done.length > 0 &&
+  entry.images.done.every((path) => drawn.includes(path));
+
 /**
  * Whether a turn is unfolded before the person folds or unfolds it: every turn in the full density; a turn the person
  * stopped in any, so what the agent thought and wrote up to the stop stays in view under «Остановлено».
@@ -221,6 +229,8 @@ const TurnView = ({ item, open, machineName, handlers }: ITurnViewProps) => {
   const worked = parts.flat();
   // A finished turn keeps its dynamic workflows in view under the folded work: they run on after the turn.
   const flows = live ? [] : worked.filter(isWorkflowCall);
+  // A finished turn shows what it drew under its answer (Outputs); the work keeps only the cards not shown there.
+  const below = useContext(OutputsContext).viewUrl ? drawnOf(item) : [];
   const expanded = live || open;
   const seen = useSeen(expanded);
   // Once the turn's page has loaded, what it holds is all there is: a turn whose steps loaded empty has nothing to
@@ -278,7 +288,11 @@ const TurnView = ({ item, open, machineName, handlers }: ITurnViewProps) => {
                   <StepsLoading />
                 ) : (
                   <Steps
-                    steps={live ? part : part.filter((entry) => !isWorkflowCall(entry))}
+                    steps={
+                      live
+                        ? part
+                        : part.filter((entry) => !isWorkflowCall(entry) && !shownBelow(entry, below))
+                    }
                     live={live && last}
                     renderGate={handlers.renderGate}
                   />

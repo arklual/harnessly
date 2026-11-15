@@ -38,16 +38,24 @@ interface IMarkupState {
   history: IMarkupHistory;
   /** Where the words being typed will stand. */
   place: IPoint | null;
+  /** Their size: the share of the usual at the zoom the place was tapped at (markup.ts markScale). */
+  placeScale?: number;
   text: string;
   saving: boolean;
   failed: boolean;
 }
 
-const startOf = (src: string): IMarkupState => ({
+/**
+ * The marks not handed over yet, by picture: stepping to another picture or closing the viewer keeps them quietly, and
+ * the picture opens with them again. Only for this page's life.
+ */
+const drafts = new Map<string, IMarkupHistory>();
+
+const startOf = (src: string, tool: TMarkupTool | null): IMarkupState => ({
   forSrc: src,
-  tool: null,
+  tool,
   color: DEFAULT_MARKUP_COLOR,
-  history: freshHistory(),
+  history: drafts.get(src) ?? freshHistory(),
   place: null,
   text: '',
   saving: false,
@@ -63,6 +71,8 @@ interface IUseMarkupProps {
   onClose: () => void;
   /** Over the tools: the switch to the change tools, where there are some. */
   switcher?: ReactNode;
+  /** The tool on when a picture opens: the first stroke marks it. */
+  startTool?: TMarkupTool;
 }
 
 export type TMarkupSlots = Pick<IImageViewEdit, 'dock' | 'layer' | 'locked' | 'onBack' | 'ratio'>;
@@ -74,26 +84,39 @@ export const useMarkup = ({
   natural,
   onClose,
   switcher,
+  startTool,
 }: IUseMarkupProps): TMarkupSlots => {
-  const [state, setState] = useState<IMarkupState>(() => startOf(src));
+  const first = startTool ?? null;
+  const [state, setState] = useState<IMarkupState>(() => startOf(src, first));
   let s = state;
   if (s.forSrc !== src) {
-    s = startOf(src);
+    s = startOf(src, first);
     setState(s);
   }
+  // The marks are the picture's draft until they are handed over.
+  useEffect(() => {
+    if (hasMarkup(s.history.now)) drafts.set(s.forSrc, s.history);
+    else drafts.delete(s.forSrc);
+  }, [s.forSrc, s.history]);
   const patch = (change: Partial<IMarkupState>) => setState((now) => ({ ...now, ...change }));
   const markup = s.history.now;
   const writing = s.tool === MARKUP_TOOL.text;
 
   const pickTool = (tool: TMarkupTool) => {
     if (s.saving) return;
-    patch({ tool: s.tool === tool ? null : tool, place: null, text: '' });
+    patch({ tool: s.tool === tool ? null : tool, place: null, placeScale: undefined, text: '' });
   };
   const placeText = () => {
     const words = s.text.trim();
     if (words === '') return;
     const item = { kind: 'text' as const, color: s.color, at: s.place ?? MIDDLE, text: words };
-    patch({ history: pushMarkup(s.history, addItem(markup, item)), place: null, text: '' });
+    const sized = s.placeScale === undefined ? item : { ...item, scale: s.placeScale };
+    patch({
+      history: pushMarkup(s.history, addItem(markup, sized)),
+      place: null,
+      placeScale: undefined,
+      text: '',
+    });
   };
   const finish = () => {
     if (s.saving || !hasMarkup(markup)) return;
@@ -101,7 +124,7 @@ export const useMarkup = ({
     renderMarkup(src, markup, markedName(name, target.replacing)).then(
       (file) => {
         target.give(file);
-        patch({ saving: false });
+        patch({ saving: false, history: freshHistory() });
         onClose();
       },
       () => patch({ saving: false, failed: true }),
@@ -113,9 +136,9 @@ export const useMarkup = ({
       tool={s.tool}
       markup={markup}
       color={s.color}
-      pending={writing ? { at: s.place ?? MIDDLE, text: s.text, color: s.color } : null}
+      pending={writing ? { at: s.place ?? MIDDLE, text: s.text, color: s.color, scale: s.placeScale } : null}
       onChange={(next) => patch({ history: pushMarkup(s.history, next), failed: false })}
-      onPlace={(place) => patch({ place })}
+      onPlace={(place, placeScale) => patch({ place, placeScale })}
       label={t('next.imageEdit.canvas')}
     />
   );
@@ -146,7 +169,7 @@ export const useMarkup = ({
     ratio: natural === null ? undefined : natural.w / natural.h,
     onBack: () => {
       if (s.tool === null) return false;
-      patch({ tool: null, place: null, text: '' });
+      patch({ tool: null, place: null, placeScale: undefined, text: '' });
       return true;
     },
   };

@@ -24,11 +24,18 @@ import ChatRow, {
   type IFavSlot,
   type IRowEnter,
   RENAME,
+  RenameField,
   ROW_VARIANT,
   type IRowHandlers,
   type TRename,
   type TRowVariant,
+  HEAD_OF_LOOK,
+  useRowVoice,
 } from '@/next/features/sidebar/chat-row';
+import MiniWave from '@/next/features/voice-live/mini-wave';
+import VoiceHead from '@/next/features/voice-live/voice-head';
+import { gptConv } from '@/next/features/chatgpt/voice-bridge';
+import { useVoiceMascot } from '@/next/stores/me';
 import FavoritesSection, {
   GROUP_STATE,
   groupKey,
@@ -55,6 +62,7 @@ import {
 import {
   childrenOf,
   DAY_GROUP,
+  dayGroupOf,
   folderRows,
   holdSections,
   sectionsOf,
@@ -64,7 +72,16 @@ import {
 import type { TShownLayout } from '@/next/core/steady-order';
 import type { IWorkingDesign } from '@/next/features/designly/working';
 import { designIcon } from '@/next/features/designly/design-icon';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import {
+  NAV_ITEM,
+  PINNED_APPS,
+  appOfKey,
+  navLayout,
+  type TNavItem,
+} from '@/next/features/sidebar/nav-layout';
+import type { NavSettings } from '@/next/stores/me';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
+import { toast } from '@/next/ui/toast';
 import ProductSwitcher from '@/next/features/sidebar/product-switcher';
 import useDrag, { afterTouchClick } from '@/next/ui/use-drag';
 import MachineAlert from '@/next/features/sidebar/machine-alert';
@@ -235,8 +252,12 @@ export interface ISidebarProps {
   apps?: ISidebarApps | null;
   /** «ChatGPT»: its plain chats under the item, which starts a new one; null shows no item. */
   gpt?: ISidebarGpt | null;
+  /** The menu as the person laid it out (Settings → «Меню»); absent, the default layout. */
+  nav?: NavSettings;
   ref?: Ref<HTMLElement>;
 }
+
+const DEFAULT_NAV: NavSettings = { order: [], hidden: [], apps: [] };
 
 /** An app of harnessly's own under «Приложения», always there (the «Ревью кода»). */
 export interface ISidebarBuiltin {
@@ -251,7 +272,7 @@ export interface ISidebarApps {
   /** harnessly's own apps, above the installed ones. */
   builtins?: readonly ISidebarBuiltin[];
   /** chat: the chat the app was last on in; absent for an environment app no chat has on yet. */
-  rows: readonly { id: string; name: string; chat?: string }[];
+  rows: readonly { id: string; name: string; icon?: string; chat?: string }[];
   /** The app on screen. */
   current: string | null;
   /** The list of every installed app is on screen. */
@@ -262,12 +283,16 @@ export interface ISidebarApps {
   onAll: () => void;
 }
 
+/** The plain ChatGPT chats: they stand among the chats of their day, not in a section of their own. */
 export interface ISidebarGpt {
-  rows: readonly { id: string; title: string }[];
-  /** The ChatGPT chat on screen; it is never hidden behind «Дальше». */
+  rows: readonly { id: string; title: string; updatedAt: number }[];
+  /** The ChatGPT chat on screen. */
   current: string | null;
   onOpen: (id: string) => void;
-  onNew: () => void;
+  /** Renames a chat; refused, it throws. */
+  onRename: (id: string, title: string) => Promise<unknown>;
+  /** Deletes a chat; refused, it throws. */
+  onDelete: (id: string) => Promise<unknown>;
 }
 
 export interface ISidebarDesigns {
@@ -286,6 +311,8 @@ interface INavItemProps {
   /** The place in the entrance cascade of the nav. */
   index: number;
   onClick: (anchor: HTMLElement) => void;
+  /** The page it opens, fetched ahead when the person points at it (bindings/shell.tsx, data-warm). */
+  warm?: string;
   children?: ReactNode;
   /** The rows under it are a list of its own: no chevron in the item, the click goes where the item goes. */
   list?: boolean;
@@ -304,6 +331,7 @@ const NavItem = ({
   children,
   list,
   onFold,
+  warm,
 }: INavItemProps) => (
   <div
     className="hx-nav__group hx-enter"
@@ -318,6 +346,7 @@ const NavItem = ({
       aria-current={current ? 'page' : undefined}
       aria-expanded={children ? expanded : undefined}
       data-tip={label}
+      data-warm={warm}
       onClick={(event) => onClick(event.currentTarget)}
     >
       <span className="hx-nav__ic">
@@ -386,36 +415,58 @@ const keepAppsFolded = (folded: boolean) => {
 
 /** The last apps that are on in chats; all the installed ones open from «Приложения» itself. */
 const APP_ROWS = 3;
-const AppRows = ({ apps }: { apps: ISidebarApps }) => (
-  <>
-    {apps.builtins?.map((b) => (
-      <button
-        key={b.id}
-        type="button"
-        className="hx-nav__kid"
-        aria-current={b.current ? 'page' : undefined}
-        onClick={b.onOpen}
-      >
-        <Icon name={b.icon} size="sm" className="hx-nav__kid-icon" />
-        <span className="hx-item__title">{b.name}</span>
-      </button>
-    ))}
-    {apps.rows.slice(0, APP_ROWS).map((a) => (
-      <button
-        key={a.id}
-        type="button"
-        className="hx-nav__kid"
-        aria-current={a.id === apps.current ? 'page' : undefined}
-        onClick={() => apps.onOpen(a.id, a.chat)}
-        onPointerEnter={() => apps.onPrepare?.(a.id, a.chat)}
-        onFocus={() => apps.onPrepare?.(a.id, a.chat)}
-      >
-        <Icon name="layout-grid" size="sm" className="hx-nav__kid-icon" />
-        <span className="hx-item__title">{a.name}</span>
-      </button>
-    ))}
-  </>
-);
+const AppRows = ({
+  apps,
+  ids,
+  named,
+}: {
+  apps: ISidebarApps;
+  ids: readonly string[];
+  named: readonly string[];
+}) => {
+  // The apps the person ordered (or the pinned boards and documents) and harnessly's own are always listed; of the
+  // rest, the last few that are on in chats.
+  let rest = 0;
+  const shown = ids.filter(
+    (id) => named.includes(id) || apps.builtins?.some((b) => b.id === id) || rest++ < APP_ROWS,
+  );
+  return (
+    <>
+      {shown.map((id) => {
+        const b = apps.builtins?.find((x) => x.id === id);
+        if (b)
+          return (
+            <button
+              key={b.id}
+              type="button"
+              className="hx-nav__kid"
+              aria-current={b.current ? 'page' : undefined}
+              onClick={b.onOpen}
+            >
+              <Icon name={b.icon} size="sm" className="hx-nav__kid-icon" />
+              <span className="hx-item__title">{b.name}</span>
+            </button>
+          );
+        const a = apps.rows.find((x) => x.id === id);
+        if (!a) return null;
+        return (
+          <button
+            key={a.id}
+            type="button"
+            className="hx-nav__kid"
+            aria-current={a.id === apps.current ? 'page' : undefined}
+            onClick={() => apps.onOpen(a.id, a.chat)}
+            onPointerEnter={() => apps.onPrepare?.(a.id, a.chat)}
+            onFocus={() => apps.onPrepare?.(a.id, a.chat)}
+          >
+            <Icon name={a.icon || 'layout-grid'} size="sm" className="hx-nav__kid-icon" />
+            <span className="hx-item__title">{a.name}</span>
+          </button>
+        );
+      })}
+    </>
+  );
+};
 
 /** The designs at work under «Sinopia Design»: five, then «Дальше» for the rest. */
 const DesignRows = ({
@@ -453,29 +504,99 @@ const DesignRows = ({
   );
 };
 
-/** The ChatGPT chats under «ChatGPT»: five, then «Дальше» for the rest. */
-const GptRows = ({ gpt, all, onAll }: { gpt: ISidebarGpt; all: boolean; onAll: () => void }) => {
-  const { shown, hidden } = all ? { shown: gpt.rows, hidden: 0 } : folderRows(gpt.rows, gpt.current);
+/** A ChatGPT chat among the day's chats: the same row, opened by its own screen, with its menu (rename, delete). */
+const GptRow = ({
+  row,
+  current,
+  gpt,
+}: {
+  row: ISidebarGpt['rows'][number];
+  current: boolean;
+  gpt: ISidebarGpt;
+}) => {
+  const title = row.title || t('next.chatgpt.newChat');
+  // The talk going on in this chat is lit as an agent chat's is (chat-row.tsx).
+  const voice = useRowVoice(gptConv(row.id));
+  const mascot = useVoiceMascot();
+  const menuActions = useMenuActions();
+  const [renaming, setRenaming] = useState<{ saving: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const renamed = (next: string | null) => {
+    if (next === null) return setRenaming(null);
+    setRenaming({ saving: true });
+    gpt.onRename(row.id, next).then(
+      () => setRenaming(null),
+      () => {
+        setRenaming(null);
+        toast(t('next.sidebar.renameFailed'), { tone: 'error' });
+      },
+    );
+  };
+  const remove = () => {
+    setBusy(true);
+    gpt.onDelete(row.id).catch(() => {
+      setBusy(false);
+      toast(t('next.sidebar.deleteFailed'), { tone: 'error' });
+    });
+  };
   return (
-    <>
-      {shown.map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          className="hx-nav__kid"
-          aria-current={c.id === gpt.current ? 'page' : undefined}
-          onClick={() => gpt.onOpen(c.id)}
-        >
-          <Icon name="message-square" size="sm" className="hx-nav__kid-icon" />
-          <span className="hx-item__title">{c.title || t('next.chatgpt.newChat')}</span>
-        </button>
-      ))}
-      {hidden > 0 && (
-        <button type="button" className="hx-folder-more" onClick={onAll}>
-          {t('next.sidebar.folderMore')}
+    <div
+      className="hx-item"
+      aria-current={current ? 'page' : undefined}
+      aria-busy={busy || undefined}
+      data-voice={voice ? (voice.closing ? 'out' : 'on') : undefined}
+    >
+      <span className="hx-item__mark" aria-hidden="true">
+        <span className="hx-mono">{title.slice(0, 1).toUpperCase()}</span>
+      </span>
+      {renaming ? (
+        <RenameField title={title} saving={renaming.saving} onDone={renamed} />
+      ) : (
+        <button type="button" className="hx-item__open" data-tip={title} onClick={() => gpt.onOpen(row.id)}>
+          {voice && (
+            <span className="hx-item__voice-head">
+              <VoiceHead state={HEAD_OF_LOOK[voice.look]} kind={mascot} />
+            </span>
+          )}
+          <span className="hx-item__title">{title}</span>
         </button>
       )}
-    </>
+      {!renaming && (
+        <span className="hx-item__end">
+          {voice && <MiniWave look={voice.look} />}
+          <MenuRoot actionsRef={menuActions}>
+            <Menu.Trigger
+              render={
+                <button
+                  type="button"
+                  className="hx-item__more hx-item__menu"
+                  aria-label={t('next.rowMenu.label')}
+                >
+                  <Icon name="ellipsis" size="sm" />
+                </button>
+              }
+            />
+            <MenuPanel
+              actions={menuActions}
+              className="hx-cmenu"
+              label={t('next.rowMenu.label')}
+              side="right"
+              align="start"
+              sideOffset={8}
+            >
+              <Menu.Item className="hx-cmenu__item" onClick={() => setRenaming({ saving: false })}>
+                <Icon name="pencil" size="sm" />
+                <span className="hx-cmenu__txt">{t('next.rowMenu.rename')}</span>
+              </Menu.Item>
+              <Menu.Item className="hx-cmenu__item" data-danger="true" onClick={remove}>
+                <Icon name="trash-2" size="sm" />
+                <span className="hx-cmenu__txt">{t('next.chatgpt.side.delete')}</span>
+              </Menu.Item>
+            </MenuPanel>
+          </MenuRoot>
+        </span>
+      )}
+    </div>
   );
 };
 
@@ -485,7 +606,7 @@ const MoreMenu = ({ items }: { items: readonly IMoreItem[] }) => {
   const current = items.some((item) => item.current);
   return (
     <div className="hx-nav__group hx-enter" data-enter="up" data-eb="220" data-i={4}>
-      <Menu.Root actionsRef={menuActions}>
+      <MenuRoot actionsRef={menuActions}>
         <Menu.Trigger
           render={
             <button
@@ -517,7 +638,7 @@ const MoreMenu = ({ items }: { items: readonly IMoreItem[] }) => {
             </Menu.Item>
           ))}
         </MenuPanel>
-      </Menu.Root>
+      </MenuRoot>
     </div>
   );
 };
@@ -538,6 +659,7 @@ const ProfileButton = ({
       type="button"
       className="hx-user__open"
       data-tip={person?.name}
+      data-warm="settings"
       aria-current={current ? 'page' : undefined}
     >
       <span className="hx-avatar" aria-hidden="true">
@@ -553,7 +675,7 @@ const ProfileButton = ({
   // One entry (settings) is a link: the person goes there at once, without a menu of one.
   if (items.length === 1) return cloneElement(button, { onClick: items[0].onSelect });
   return (
-    <Menu.Root actionsRef={menuActions}>
+    <MenuRoot actionsRef={menuActions}>
       <Menu.Trigger render={button} />
       <MenuPanel
         actions={menuActions}
@@ -569,7 +691,7 @@ const ProfileButton = ({
           </Menu.Item>
         ))}
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };
 
@@ -609,6 +731,7 @@ const Sidebar = ({
   people,
   designs = null,
   gpt = null,
+  nav = DEFAULT_NAV,
   ref,
 }: ISidebarProps) => {
   countRender('sidebar');
@@ -638,14 +761,21 @@ const Sidebar = ({
   // Folders whose «Дальше» was pressed: they show all their chats.
   const [longFolders, setLongFolders] = useState<ReadonlySet<string>>(new Set());
   const [allDesigns, setAllDesigns] = useState(false);
-  const [allGpt, setAllGpt] = useState(false);
-  const [gptFolded, setGptFolded] = useState(false);
   const [appsFolded, setAppsFolded] = useState(readAppsFolded);
   const foldApps = () => {
     keepAppsFolded(!appsFolded);
     setAppsFolded(!appsFolded);
   };
-  const appRowCount = apps ? apps.rows.length + (apps.builtins?.length ?? 0) : 0;
+  const layout = useMemo(() => {
+    const items: TNavItem[] = [NAV_ITEM.newChat, NAV_ITEM.search];
+    if (onDesignly) items.push(NAV_ITEM.designly);
+    if (apps) items.push(NAV_ITEM.apps);
+    const ids = apps ? [...(apps.builtins ?? []).map((b) => b.id), ...apps.rows.map((r) => r.id)] : [];
+    return navLayout(nav, items, ids);
+  }, [nav, apps, onDesignly]);
+  const appIds = layout.apps.filter((id) => !layout.hidden.has(`app:${id}`));
+  const namedApps = nav.apps.length > 0 ? nav.apps : PINNED_APPS;
+  const appRowCount = appIds.length;
   const [designsFolded, setDesignsFolded] = useState(readDesignsFolded);
   const foldDesigns = () => {
     keepDesignsFolded(!designsFolded);
@@ -691,6 +821,18 @@ const Sidebar = ({
     () => (natural === null || !holding ? natural : holdSections(natural, held)),
     [natural, holding, held],
   );
+
+  // The ChatGPT chats join the chats of their day; a day with only them shows too.
+  const daysWithGpt = useMemo(() => {
+    const rows = gpt?.rows ?? [];
+    return Object.values(DAY_GROUP)
+      .map((group) => ({
+        group,
+        chats: sections?.days.find((d) => d.group === group)?.chats ?? [],
+        gptRows: rows.filter((r) => dayGroupOf(r.updatedAt, now) === group),
+      }))
+      .filter((d) => d.chats.length > 0 || d.gptRows.length > 0);
+  }, [sections, gpt?.rows, now]);
 
   const favView = useMemo(
     () => (chats === null || favorites === null ? EMPTY_VIEW : favoritesOf(chats, favorites)),
@@ -1071,64 +1213,93 @@ const Sidebar = ({
       </div>
 
       <nav className="hx-nav" aria-label={t('next.sidebar.actions')}>
-        <NavItem
-          icon="square-pen"
-          label={t('next.sidebar.newChat')}
-          current={false}
-          index={0}
-          onClick={onNewChat}
-        />
-        <NavItem
-          icon="search"
-          label={t('next.sidebar.search')}
-          current={searchOpen}
-          index={1}
-          onClick={onSearch}
-        />
-        {onDesignly && (
-          <NavItem
-            icon="palette"
-            label={t('next.sidebar.designly')}
-            current={view === SIDEBAR_VIEW.designly && !designs?.current}
-            index={2}
-            onClick={onDesignly}
-            expanded={designs !== null && designs.rows.length > 0 && !designsFolded}
-            list
-            onFold={designs !== null && designs.rows.length > 0 ? foldDesigns : undefined}
-          >
-            {designs !== null && designs.rows.length > 0 && (
-              <DesignRows designs={designs} all={allDesigns} onAll={() => setAllDesigns(true)} />
-            )}
-          </NavItem>
-        )}
-        {apps && (
-          <NavItem
-            icon="layout-grid"
-            label={t('next.sidebar.apps')}
-            current={apps.allCurrent}
-            index={3}
-            onClick={apps.onAll}
-            expanded={appRowCount > 0 && !appsFolded}
-            list
-            onFold={appRowCount > 0 ? foldApps : undefined}
-          >
-            {appRowCount > 0 && <AppRows apps={apps} />}
-          </NavItem>
-        )}
-        {gpt && (
-          <NavItem
-            icon="message-square"
-            label={t('next.chatgpt.side.title')}
-            current={gpt.current !== null && gpt.rows.every((r) => r.id !== gpt.current)}
-            index={3}
-            onClick={gpt.onNew}
-            expanded={gpt.rows.length > 0 && !gptFolded}
-            list
-            onFold={gpt.rows.length > 0 ? () => setGptFolded(!gptFolded) : undefined}
-          >
-            {gpt.rows.length > 0 && <GptRows gpt={gpt} all={allGpt} onAll={() => setAllGpt(true)} />}
-          </NavItem>
-        )}
+        {layout.top
+          .filter((key) => !layout.hidden.has(key))
+          .map((key, index) => {
+            if (key === NAV_ITEM.newChat)
+              return (
+                <NavItem
+                  key={key}
+                  icon="square-pen"
+                  label={t('next.sidebar.newChat')}
+                  current={false}
+                  index={index}
+                  onClick={onNewChat}
+                />
+              );
+            if (key === NAV_ITEM.search)
+              return (
+                <NavItem
+                  key={key}
+                  icon="search"
+                  label={t('next.sidebar.search')}
+                  current={searchOpen}
+                  index={index}
+                  onClick={onSearch}
+                />
+              );
+            if (key === NAV_ITEM.designly && onDesignly)
+              return (
+                <NavItem
+                  key={key}
+                  icon="palette"
+                  label={t('next.sidebar.designly')}
+                  warm="designly"
+                  current={view === SIDEBAR_VIEW.designly && !designs?.current}
+                  index={index}
+                  onClick={onDesignly}
+                  expanded={designs !== null && designs.rows.length > 0 && !designsFolded}
+                  list
+                  onFold={designs !== null && designs.rows.length > 0 ? foldDesigns : undefined}
+                >
+                  {designs !== null && designs.rows.length > 0 && (
+                    <DesignRows designs={designs} all={allDesigns} onAll={() => setAllDesigns(true)} />
+                  )}
+                </NavItem>
+              );
+            if (key === NAV_ITEM.apps && apps)
+              return (
+                <NavItem
+                  key={key}
+                  icon="layout-grid"
+                  label={t('next.sidebar.apps')}
+                  current={apps.allCurrent}
+                  index={index}
+                  onClick={apps.onAll}
+                  expanded={appRowCount > 0 && !appsFolded}
+                  list
+                  onFold={appRowCount > 0 ? foldApps : undefined}
+                >
+                  {appRowCount > 0 && <AppRows apps={apps} ids={appIds} named={namedApps} />}
+                </NavItem>
+              );
+            const id = appOfKey(key);
+            if (id === null || !apps) return null;
+            const own = apps.builtins?.find((b) => b.id === id);
+            if (own)
+              return (
+                <NavItem
+                  key={key}
+                  icon={own.icon}
+                  label={own.name}
+                  current={own.current}
+                  index={index}
+                  onClick={own.onOpen}
+                />
+              );
+            const row = apps.rows.find((r) => r.id === id);
+            if (!row) return null;
+            return (
+              <NavItem
+                key={key}
+                icon={row.icon || 'layout-grid'}
+                label={row.name}
+                current={row.id === apps.current}
+                index={index}
+                onClick={() => apps.onOpen(row.id, row.chat)}
+              />
+            );
+          })}
         {more.length > 0 && <MoreMenu items={more} />}
       </nav>
 
@@ -1308,7 +1479,7 @@ const Sidebar = ({
         )}
 
         <div className="hx-recent" data-drop="recent">
-          {sections?.days.map(({ group, chats: ofDay }) => {
+          {daysWithGpt.map(({ group, chats: ofDay, gptRows }) => {
             const open = !foldedDays.has(group);
             const head = cascade;
             cascade += 1 + ofDay.length;
@@ -1329,6 +1500,10 @@ const Sidebar = ({
                 <div className="hx-group__body" inert={!open}>
                   <div>
                     {renderRows(ofDay, ROW_VARIANT.item, (i) => ({ base: '560', index: head + 1 + i }))}
+                    {gpt &&
+                      gptRows.map((row) => (
+                        <GptRow key={row.id} row={row} current={row.id === gpt.current} gpt={gpt} />
+                      ))}
                   </div>
                 </div>
               </section>

@@ -8,6 +8,26 @@ import { PENDING, type TPending } from '@/next/ui/use-pending-list';
 import ChatMenu, { type IChatMenuProps } from '@/next/features/sidebar/chat-menu';
 import { STATUS_LOOK } from '@/next/features/sidebar/status';
 import { CHAT_STATUS, type ISidebarChat } from '@/next/features/sidebar/types';
+import { useVoiceLookOf, VOICE_LOOK, type TVoiceLook } from '@/next/features/voice-live/field';
+import MiniWave from '@/next/features/voice-live/mini-wave';
+import VoiceHead, { HEAD } from '@/next/features/voice-live/voice-head';
+import { useVoiceMascot } from '@/next/stores/me';
+import { PRESENCE, usePresence } from '@/next/ui/presence';
+
+/** The talk's mark leaves the row in this long (hx-voice-row-out). */
+const VOICE_ROW_EXIT_MS = 300;
+export const HEAD_OF_LOOK = {
+  [VOICE_LOOK.speak]: HEAD.speak,
+  [VOICE_LOOK.listen]: HEAD.listen,
+  [VOICE_LOOK.think]: HEAD.think,
+};
+
+/** The talk going on in this chat («Голос — в другом чате»): the row is lit with the accent, the voice's head
+ *  stands before the title and a small wave at the end; it all fades out when the talk ends. */
+export const useRowVoice = (conv: string): { look: TVoiceLook; closing: boolean } | null => {
+  const { value, state } = usePresence(useVoiceLookOf(conv), VOICE_ROW_EXIT_MS);
+  return value ? { look: value, closing: state === PRESENCE.closing } : null;
+};
 
 export const ROW_VARIANT = { item: 'item', kid: 'kid', pinned: 'pinned', delegated: 'delegated' } as const;
 export type TRowVariant = (typeof ROW_VARIANT)[keyof typeof ROW_VARIANT];
@@ -165,6 +185,8 @@ const ChatRow = ({
   const { copyLink, openInNewTab, terminal, stopTerminal, fork, continueIn, moveVm } = handlers;
   const showMenu = !busy && rename === RENAME.off;
   const rowClass = enter ? `${ROW_CLASS[variant]} hx-enter` : ROW_CLASS[variant];
+  const voice = useRowVoice(chat.id);
+  const mascot = useVoiceMascot();
 
   return (
     <div
@@ -173,6 +195,7 @@ const ChatRow = ({
       data-eb={enter && !fresh ? enter.base : undefined}
       data-i={enter && !fresh ? Math.min(enter.index, 24) : undefined}
       data-status={chat.status}
+      data-voice={voice ? (voice.closing ? 'out' : 'on') : undefined}
       data-terminal={chat.terminal ? undefined : 'off'}
       data-chat={chat.id}
       data-launch={chat.launch ? '' : undefined}
@@ -225,6 +248,11 @@ const ChatRow = ({
             }}
             onClick={() => handlers.open(chat.id)}
           >
+            {voice && (
+              <span className="hx-item__voice-head">
+                <VoiceHead state={HEAD_OF_LOOK[voice.look]} kind={mascot} />
+              </span>
+            )}
             <span className="hx-item__title">{chat.launch ? chat.launch.model : chat.title}</span>
           </button>
         </Tooltip>
@@ -248,6 +276,7 @@ const ChatRow = ({
         </button>
       )}
       <span className="hx-item__end">
+        {voice && <MiniWave look={voice.look} />}
         {showMenu && menuMount === MENU_MOUNT.none && (
           <button
             type="button"
@@ -345,7 +374,9 @@ const sameRowProps = (a: IChatRowProps, b: IChatRowProps): boolean => {
   const keys = Object.keys(a) as (keyof IChatRowProps)[];
   if (keys.length !== Object.keys(b).length) return false;
   return keys.every((k) =>
-    k === 'enter' ? a.enter?.base === b.enter?.base && a.enter?.index === b.enter?.index : Object.is(a[k], b[k]),
+    k === 'enter'
+      ? a.enter?.base === b.enter?.base && a.enter?.index === b.enter?.index
+      : Object.is(a[k], b[k]),
   );
 };
 

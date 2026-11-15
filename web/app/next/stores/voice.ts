@@ -1,5 +1,6 @@
 // «Голосовой ввод» (Settings → Voice input): the microphone and the language of dictation. This browser's, as the theme
 // is: a microphone is a device of this computer, and the language goes with the person at it.
+import { notePrefWrite } from '@/next/core/pref-write';
 import { useSyncExternalStore } from 'react';
 import { locale } from '@/next/i18n';
 
@@ -44,6 +45,7 @@ export const setVoicePrefs = (patch: Partial<IVoicePrefs>): void => {
     // Private mode or a full storage: the choice holds for this page.
   }
   for (const listener of [...listeners]) listener();
+  if (patch.lang !== undefined) notePrefWrite('voice.lang');
 };
 
 /** What a dictation asks the machine to hear. */

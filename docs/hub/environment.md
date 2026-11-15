@@ -344,6 +344,14 @@ Like «Рекомендованное», the items and their entries (`builtin-e
   default is the branch `main` of the service's own repository, not a tag: the package's version is in its manifest,
   a machine installs it anew only when the version or the files change, and the package has to match the service the
   installation runs. Name a tag in `…_APP_BRANCH` to hold a version.
+- **New versions reach the machines by themselves**. A machine done with its list looks at the branch of
+  every `app` item of a repository outside the list every ten minutes (`git ls-remote`, the scripts' and packs'
+  branches every half an hour as before); a branch that moved starts an apply, which installs the app again from the
+  new commit. Each run's step of an app carries `version`, the manifest's version now on the machine; the row of the
+  app in `GET …/env` has `appVersion` and `appUpdatedAt` (when a machine last put that version on, from the runs of
+  the last two weeks), and «Окружение» shows them in the item's sheet. The page reads the machine's apps every three
+  minutes while a view of one is on screen: a new version starts the view anew, and the view opens what it had open
+  (`data.object`), so an open board stays open.
 - **A person** turns an app off for themselves on their machine («Приложения», or the settings), as any app of the
   environment that is not pinned. The hub's personal switch (`PUT /api/me/env/{itemId}`) answers 409 `built_in` for a
   platform's item, and `GET /api/me/env` lists it with `canToggle: false`.

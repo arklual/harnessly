@@ -116,6 +116,9 @@ func (s *Service) rightsOf(r *http.Request, req rightsRequest) (map[string]strin
 	}
 	c := s.circleOf(p)
 	for slug, m := range metas {
+		if m.TrashedAt != 0 {
+			continue // in the trash: none
+		}
 		out[slug] = rightOf(s.rank(ctx, slug, &m, "", p, c))
 	}
 	return out, nil

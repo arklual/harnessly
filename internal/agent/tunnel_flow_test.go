@@ -287,3 +287,43 @@ func TestAgentWithoutWindowStillCarriesAnAnswer(t *testing.T) {
 		t.Fatalf("%d of %d bytes came, the same: %v", n, total, bytes.Equal(got, want))
 	}
 }
+
+// a tunnel whose local socket takes nothing must not hold the link's reader past tunnelStall, or the hub,
+// whose pings that reader answers, drops the whole machine. The tunnel is given up and the cluster told.
+func TestStalledTunnelDoesNotHoldTheLink(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	c, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := bareLink()
+	const id = "0123456789abcdef0123456789abcdef"
+	// No writer and no room in the queue: the local socket takes nothing.
+	tn := &tunnel{link: l, conn: c.(*net.TCPConn), writes: make(chan []byte), done: make(chan struct{})}
+	ts := &tunnels{open: map[string]*tunnel{id: tn}}
+
+	start := time.Now()
+	ts.Frame(EncodeFrame(FrameData, id, []byte("hello")))
+	if took := time.Since(start); took > tunnelStall+time.Second {
+		t.Fatalf("the link's reader waited %s for one tunnel", took)
+	}
+	ts.mu.Lock()
+	_, still := ts.open[id]
+	ts.mu.Unlock()
+	if still {
+		t.Fatal("the stalled tunnel is still open")
+	}
+	if _, closed := sent(l, id); !closed {
+		t.Fatal("the cluster was not told the tunnel closed")
+	}
+	// Frames for it afterwards pass without waiting.
+	start = time.Now()
+	ts.Frame(EncodeFrame(FrameData, id, []byte("more")))
+	if time.Since(start) > 100*time.Millisecond {
+		t.Fatal("a frame for a given-up tunnel waited")
+	}
+}

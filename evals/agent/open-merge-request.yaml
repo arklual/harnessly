@@ -1,0 +1,14 @@
+id: open-merge-request
+title: «Открой MR» — вкладка GitLab правой панели на этом MR
+tags: [pane]
+timeout_s: 240
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/hlcli/hlcli.go'
+  - 'internal/hlcli/preview.go'
+  - 'internal/paneintents/**'
+prompt: открой мне https://gitlab.example.test/shop/web/-/merge_requests/42 справа, гляну дифф
+expect:
+  - name: opened the merge request in the GitLab tab
+    pane: {tab: gitlab, target: 'merge_requests/42'}

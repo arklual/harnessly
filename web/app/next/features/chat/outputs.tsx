@@ -7,6 +7,7 @@ import type { FileOp, OutputKind, TurnItem, TurnOutput } from '@/next/features/c
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
 import DeliveryCard from '@/next/features/chat/delivery-card';
+import { PictureCards } from '@/next/features/chat/pictures';
 import { LINK_ICON, linkOf, viewOf, type ILinkOutput } from '@/next/features/chat/link-output';
 import { usePortUp } from '@/next/features/chat/port-up';
 import OutputRow from '@/next/features/chat/output-row';
@@ -248,9 +249,19 @@ const LinkOutputCard = ({
   );
 };
 
+const PICTURE_EXT = /\.(?:png|jpe?g|gif|webp|svg)$/i;
+
+/** A handed-over file the feed shows as the picture it is (deliver_file of a PNG, a poster for print), not as a line. */
+export const isPictureFile = (output: Pick<TurnOutput, 'ref' | 'name' | 'mime'>): boolean =>
+  output.mime?.startsWith('image/') === true || PICTURE_EXT.test(output.name ?? output.ref);
+
 /** The files the turn handed to the person: each is a card of one line, with the way to save it. */
 export const deliveriesOf = (item: TurnItem, context: IOutputsContext): TurnOutput[] =>
   context.shown.delivery ? (item.turn.outputs ?? []).filter((o) => o.kind === 'delivery') : [];
+
+/** The pictures a finished turn drew, shown under its answer: the folded work would hide their cards. */
+export const drawnOf = (item: TurnItem): readonly string[] =>
+  item.turn.status === 'live' ? [] : (item.turn.pictures ?? []);
 
 const Outputs = ({ item }: { item: TurnItem }) => {
   const context = useContext(OutputsContext);
@@ -259,6 +270,7 @@ const Outputs = ({ item }: { item: TurnItem }) => {
       cards={cardsOf(item, context)}
       links={linksOf(item, context)}
       deliveries={deliveriesOf(item, context)}
+      drawn={drawnOf(item)}
     />
   );
 };
@@ -283,16 +295,36 @@ const OutputCards = ({
   cards,
   links,
   deliveries,
+  drawn = [],
 }: {
   cards: ICard[];
   links: { output: TurnOutput; link: ILinkOutput }[];
   deliveries: TurnOutput[];
+  drawn?: readonly string[];
 }) => {
   const context = useContext(OutputsContext);
-  if (cards.length === 0 && deliveries.length === 0 && links.length === 0) return null;
+  if (cards.length === 0 && deliveries.length === 0 && links.length === 0 && drawn.length === 0) return null;
+  // A picture handed over shows as one: the same card, viewer and marks as a picture the agent drew; the
+  // viewer keeps the way to save it. Without a way to show the file (a gallery) it stays a line.
+  const view = context.viewUrl;
+  const pictures = view ? deliveries.filter(isPictureFile) : [];
+  const files = deliveries.filter((output) => !pictures.includes(output));
+  // What the turn drew and what it handed over, each once: a drawn picture it also delivered is one card.
+  const shown = view ? [...new Set([...drawn, ...pictures.map((output) => output.ref)])] : [];
   return (
     <div className="hx-files">
-      {deliveries.map((output, index) => (
+      {shown.length > 0 && view && (
+        <PictureCards
+          pictures={shown.map((path) => ({ id: path, text: path }))}
+          srcOf={(picture) =>
+            view(
+              picture.text,
+              pictures.find((output) => output.ref === picture.text),
+            )
+          }
+        />
+      )}
+      {files.map((output, index) => (
         <DeliveryCard
           key={output.ref}
           output={output}

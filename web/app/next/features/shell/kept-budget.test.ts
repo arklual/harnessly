@@ -37,5 +37,6 @@ describe('kept budget', () => {
     expect(keptHiddenMax(undefined)).toBe(4);
     expect(keptHiddenMax(4)).toBe(2);
     expect(keptHiddenMax(2)).toBe(1);
+    expect(keptHiddenMax(undefined, true)).toBe(1);
   });
 });

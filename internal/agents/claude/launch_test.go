@@ -54,7 +54,7 @@ func words(t *testing.T, command string) []string {
 func TestManagedLauncher(t *testing.T) {
 	c := testConfig(t)
 	c.Launcher = "/opt/personal user's/claude"
-	prefix := editorPrefix() + ` DISABLE_AUTOUPDATER=1 '/opt/personal user'\''s/claude'`
+	prefix := editorPrefix() + ` DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 '/opt/personal user'\''s/claude'`
 	if got, err := c.LaunchCommand("work", nil, nil); err != nil || got != prefix+" --settings /tmp/hooks.json --mcp-config /tmp/preview-mcp.json --append-system-prompt-file /tmp/prompt.md" {
 		t.Fatalf("%q %v", got, err)
 	}
@@ -62,10 +62,10 @@ func TestManagedLauncher(t *testing.T) {
 		t.Fatalf("%q", got)
 	}
 	c.Launcher = ""
-	if got, _ := c.LaunchCommand("", nil, nil); got != editorPrefix()+" DISABLE_AUTOUPDATER=1 claude --settings /tmp/hooks.json --mcp-config /tmp/preview-mcp.json" {
+	if got, _ := c.LaunchCommand("", nil, nil); got != editorPrefix()+" DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 claude --settings /tmp/hooks.json --mcp-config /tmp/preview-mcp.json" {
 		t.Fatalf("plain claude: %q", got)
 	}
-	if got, _ := c.ResumeCommand(session, "", nil); got != editorPrefix()+" DISABLE_AUTOUPDATER=1 claude --resume "+session+" --settings /tmp/hooks.json --mcp-config /tmp/preview-mcp.json" {
+	if got, _ := c.ResumeCommand(session, "", nil); got != editorPrefix()+" DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 claude --resume "+session+" --settings /tmp/hooks.json --mcp-config /tmp/preview-mcp.json" {
 		t.Fatalf("plain resume: %q", got)
 	}
 	c.Launcher = "relative-launcher"
@@ -114,17 +114,17 @@ func TestFlagsBeforePrompt(t *testing.T) {
 		t.Fatal(err)
 	}
 	command := agents.WithInitialPrompt("claude", line, "fix it -- now '$HOME'", "")
-	if command != editor+`DISABLE_AUTOUPDATER=1 claude --settings /tmp/hooks.json --mcp-config /tmp/preview-mcp.json --append-system-prompt-file /tmp/prompt.md --model 'fable' --effort high -- "$(printf %b 'fix it -- now '\''$HOME'\''')"` {
+	if command != editor+`DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 claude --settings /tmp/hooks.json --mcp-config /tmp/preview-mcp.json --append-system-prompt-file /tmp/prompt.md --model 'fable' --effort high -- "$(printf %b 'fix it -- now '\''$HOME'\''')"` {
 		t.Fatalf("%q", command)
 	}
-	if got := words(t, strings.TrimPrefix(strings.TrimPrefix(command, editor), "DISABLE_AUTOUPDATER=1 claude ")); !slices.Equal(got, []string{"--settings", "/tmp/hooks.json", "--mcp-config", "/tmp/preview-mcp.json", "--append-system-prompt-file", "/tmp/prompt.md", "--model", "fable", "--effort", "high", "--", "fix it -- now '$HOME'"}) {
+	if got := words(t, strings.TrimPrefix(strings.TrimPrefix(command, editor), "DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 claude ")); !slices.Equal(got, []string{"--settings", "/tmp/hooks.json", "--mcp-config", "/tmp/preview-mcp.json", "--append-system-prompt-file", "/tmp/prompt.md", "--model", "fable", "--effort", "high", "--", "fix it -- now '$HOME'"}) {
 		t.Fatalf("%q", got)
 	}
-	if got, _ := c.ResumeCommand(session, "ws", launch("fable", "high")); got != editor+"DISABLE_AUTOUPDATER=1 claude --resume "+session+" --settings /tmp/hooks.json --mcp-config /tmp/preview-mcp.json --append-system-prompt-file /tmp/prompt.md --model 'fable' --effort high" {
+	if got, _ := c.ResumeCommand(session, "ws", launch("fable", "high")); got != editor+"DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 claude --resume "+session+" --settings /tmp/hooks.json --mcp-config /tmp/preview-mcp.json --append-system-prompt-file /tmp/prompt.md --model 'fable' --effort high" {
 		t.Fatalf("%q", got)
 	}
 	c.Launcher = "/opt/profile/managed-claude"
-	if got, _ := c.ResumeCommand(session, "ws", launch("sonnet", "")); got != editor+"DISABLE_AUTOUPDATER=1 '/opt/profile/managed-claude' --resume "+session+" --settings /tmp/hooks.json --mcp-config /tmp/preview-mcp.json --append-system-prompt-file /tmp/prompt.md --model 'sonnet'" {
+	if got, _ := c.ResumeCommand(session, "ws", launch("sonnet", "")); got != editor+"DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 '/opt/profile/managed-claude' --resume "+session+" --settings /tmp/hooks.json --mcp-config /tmp/preview-mcp.json --append-system-prompt-file /tmp/prompt.md --model 'sonnet'" {
 		t.Fatalf("%q", got)
 	}
 	c.SkipPermissions = func() bool { return true }
@@ -161,7 +161,7 @@ func TestPromptFiles(t *testing.T) {
 	}
 	c.Launcher = "/opt/launcher"
 	managed, _ := c.LaunchCommand("", nil, []string{a, b})
-	rest := strings.TrimPrefix(managed, editorPrefix()+" DISABLE_AUTOUPDATER=1 '/opt/launcher' ")
+	rest := strings.TrimPrefix(managed, editorPrefix()+" DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 '/opt/launcher' ")
 	if got := words(t, rest); !slices.Equal(got, []string{"--settings", "/tmp/hooks.json", "--mcp-config", "/tmp/preview-mcp.json", "--append-system-prompt-file", a, "--append-system-prompt-file", b}) {
 		t.Fatalf("%q", got)
 	}

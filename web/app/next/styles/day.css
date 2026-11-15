@@ -1,0 +1,2061 @@
+/* The page of the day the host draws on the start page's stage from an app's feed (features/day): the digest,
+   the calendar strip, the priorities and a thing opened into its chat. Positions along the strip come as CSS variables
+   (--l, --w, --x) the components set through refs. */
+.hx-day {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  container: hx-day / inline-size;
+  /* A long word of the feed (an address, a branch) breaks inside its line and never widens the page. */
+  overflow-wrap: anywhere;
+}
+.hx-day__scroll {
+  flex: 1;
+  min-height: 0;
+  /* The page scrolls down only: what is wider than it (the calendar strip) scrolls inside itself. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: var(--hx-space-2) max(var(--hx-space-5), calc((100% - var(--hx-feed-max) - 120px) / 2)) 48px;
+}
+.hx-day__note {
+  margin: var(--hx-space-8) auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--hx-space-3);
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-2);
+}
+.hx-day__note p {
+  margin: 0;
+  max-width: 420px;
+  padding: 0 var(--hx-space-5);
+  text-align: center;
+  text-wrap: balance;
+}
+.hx-day__note-acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.hx-day__sk {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: var(--hx-space-2) max(var(--hx-space-5), calc((100% - var(--hx-feed-max) - 120px) / 2)) 0;
+}
+.hx-day__sk-line {
+  width: 60%;
+  height: 22px;
+}
+.hx-day__sk-strip {
+  height: 164px;
+  border-radius: 16px;
+}
+.hx-day__sk-card {
+  height: 96px;
+  border-radius: 16px;
+}
+/* A thing open over the page takes the whole stage: the greeting and the field wait behind it, and stand in their
+   place again by the time the thing folds back. */
+.hx-stage[data-home='stage']:has(.hx-day[data-item='open']) > .hx-dock {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 200ms ease-out,
+    visibility 0s 200ms;
+}
+
+/* The links of the greeting's line and of the digest */
+.hx-day-link {
+  color: inherit;
+  cursor: pointer;
+  /* In the greeting the link stands outside the page of the day: a long word breaks there too. */
+  overflow-wrap: anywhere;
+  pointer-events: auto;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--hx-accent) 45%, transparent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+  transition:
+    color 140ms ease,
+    text-decoration-color 140ms ease;
+}
+.hx-day-link[data-tone='hello'] {
+  text-decoration-thickness: 1px;
+}
+.hx-day-link:hover,
+.hx-day-link:focus-visible {
+  color: var(--hx-accent);
+  text-decoration-color: var(--hx-accent);
+  outline: none;
+}
+
+/* The digest */
+.hx-day-sum {
+  margin: 4px 0 20px;
+}
+.hx-day-sum__h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 30px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: var(--hx-weight-medium);
+  color: var(--hx-accent);
+}
+.hx-day-sum__t {
+  min-width: 0;
+}
+.hx-day-sum__h > :not(.hx-day-sum__t) {
+  flex: none;
+}
+/* The talk about an item under the digest read out by voice (day-voice.tsx) leaves as it came. */
+.hx-day-talk[data-closing] {
+  animation: hx-voice-pop-out 0.2s var(--hx-ease-out) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-day-talk[data-closing] {
+    animation: none;
+  }
+}
+.hx-day-sum p {
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 25px;
+  color: var(--hx-fg-1);
+  text-wrap: pretty;
+}
+.hx-day-tm {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 28px;
+  margin-top: 14px;
+}
+.hx-day-tm:empty {
+  display: none;
+}
+.hx-day-tm h4 {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  font-weight: var(--hx-weight-medium);
+  color: var(--hx-fg-3);
+}
+.hx-day-tm__r {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+  border: 0;
+  border-top: 1px solid var(--hx-border);
+  background: none;
+  font: inherit;
+  text-align: left;
+}
+button.hx-day-tm__r {
+  cursor: pointer;
+}
+button.hx-day-tm__r:is(:hover, :focus-visible) b {
+  color: var(--hx-accent);
+}
+.hx-day-tm__r time {
+  flex: none;
+  width: 64px;
+  padding-top: 1px;
+  font-size: 12.5px;
+  line-height: 20px;
+  color: var(--hx-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+.hx-day-tm__r > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.hx-day-tm__r b {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: var(--hx-weight-medium);
+  color: var(--hx-fg-1);
+  transition: color 140ms ease;
+}
+.hx-day-tm__r span span {
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--hx-fg-2);
+}
+
+/* The calendar strip */
+.hx-day-cal {
+  position: relative;
+  margin-top: 4px;
+  border-radius: 12px;
+}
+.hx-day-cal__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  margin: 0 2px 8px;
+}
+.hx-day-cal__head > b {
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-fg-1);
+}
+.hx-day-cal__head > span {
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+}
+.hx-day-cal__head > :is(b, span) {
+  animation: hx-day-label 220ms ease-out;
+}
+@keyframes hx-day-label {
+  from {
+    opacity: 0;
+    translate: 0 3px;
+  }
+}
+.hx-day-how {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--hx-fg-3);
+  cursor: default;
+}
+.hx-day-how:is(:hover, :focus-visible, [aria-expanded='true']) {
+  color: var(--hx-fg-1);
+  outline: none;
+}
+.hx-day-how__row {
+  display: flex;
+  gap: 10px;
+}
+.hx-day-how__row > .hx-icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--hx-fg-3);
+}
+.hx-day-how__row em {
+  font-style: normal;
+  font-weight: var(--hx-weight-medium);
+}
+.hx-day-how__src {
+  padding-top: 10px;
+  border-top: 1px solid var(--hx-border);
+  font-size: 12px;
+  color: var(--hx-fg-3);
+}
+.hx-day-k {
+  position: relative;
+  display: flex;
+  overflow-x: auto;
+  /* The strip's own scroll ends at its edge: it never hands the swipe on to the page. */
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  border: 1px solid var(--hx-border);
+  border-radius: 16px;
+  background: var(--hx-bg-raised);
+}
+.hx-day-k::-webkit-scrollbar {
+  display: none;
+}
+.hx-day-k__body {
+  position: relative;
+  flex: none;
+  min-width: 1800px;
+  height: 164px;
+  margin: 0 16px;
+  cursor: copy;
+}
+.hx-day-k__body[data-off] {
+  width: 240px;
+  min-width: 240px;
+  cursor: default;
+}
+.hx-day-k__h {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--l, 0);
+  border-left: 1px solid color-mix(in oklab, var(--hx-border) 60%, transparent);
+}
+.hx-day-k__body > .hx-day-k__h:first-child {
+  border-left-color: var(--hx-border-strong);
+}
+.hx-day-k__h span {
+  position: absolute;
+  top: 10px;
+  left: 5px;
+  font-size: 12px;
+  color: var(--hx-fg-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hx-day-k__h span em {
+  margin-right: 6px;
+  font-style: normal;
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-fg-1);
+}
+.hx-day-k__off {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 70px;
+  margin: 0;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--hx-fg-3);
+}
+.hx-day-k__now {
+  position: absolute;
+  top: 36px;
+  bottom: 12px;
+  left: var(--l, 0);
+  border-left: 1.5px solid var(--hx-danger);
+  pointer-events: none;
+}
+.hx-day-k__now::after {
+  content: attr(data-t);
+  position: absolute;
+  left: 6px;
+  top: -1px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--hx-danger);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hx-day-e {
+  position: absolute;
+  top: 42px;
+  left: var(--l, 0);
+  width: calc(var(--w, 0%) - 3px);
+  height: 50px;
+  margin-left: 2px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--hx-bg-active) 70%, transparent);
+  cursor: pointer;
+  outline: none;
+  transition:
+    box-shadow 160ms ease,
+    opacity 160ms ease-out,
+    scale 160ms ease-out;
+}
+.hx-day-e:is(:hover, :focus-visible, [aria-expanded='true']) {
+  box-shadow: 0 0 0 1.5px var(--hx-border-strong);
+  z-index: 20;
+}
+.hx-day-e__in {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  overflow: hidden;
+}
+.hx-day-e[data-short] .hx-day-e__in {
+  padding: 0 8px;
+}
+.hx-day-e__in b {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: var(--hx-weight-regular);
+  line-height: 15px;
+  color: var(--hx-fg-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-day-e__ic {
+  flex: none;
+  color: var(--hx-fg-3);
+}
+.hx-day-e__more {
+  flex: none;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--hx-fg-3);
+}
+.hx-day-e[data-k='focus'] {
+  background: var(--hx-accent-soft);
+}
+.hx-day-e[data-k='focus'] .hx-day-e__in b {
+  color: var(--hx-accent);
+}
+.hx-day-e[data-k='focus']:is(:hover, :focus-visible, [aria-expanded='true']) {
+  box-shadow: 0 0 0 1.5px var(--hx-accent);
+}
+.hx-day-e[data-stack] {
+  box-shadow:
+    4px -4px 0 -1px var(--hx-bg-raised),
+    4px -4px 0 0 var(--hx-border);
+}
+.hx-day-e[data-stack]:is(:hover, :focus-visible, [aria-expanded='true']) {
+  box-shadow:
+    0 0 0 1.5px var(--hx-border-strong),
+    4px -4px 0 -1px var(--hx-bg-raised),
+    4px -4px 0 0 var(--hx-border);
+}
+.hx-day-e[data-past] {
+  opacity: 0.45;
+}
+/* What the agent proposes is dashed until the person decides */
+.hx-day-e[data-offer] {
+  background: none;
+  border: 1px dashed var(--hx-accent);
+}
+.hx-day-e[data-offer] .hx-day-e__ic {
+  color: var(--hx-accent);
+}
+.hx-day-e[data-offer='leaving'] {
+  opacity: 0;
+  scale: 0.96;
+}
+.hx-day-e[data-in] {
+  animation: hx-day-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* The person's own entry while they name it */
+.hx-day-e[data-draft] {
+  min-width: 190px;
+  background: var(--hx-bg-raised);
+  box-shadow: 0 0 0 2px var(--hx-fg-1);
+  z-index: 21;
+  cursor: text;
+  animation: hx-day-in 140ms ease-out;
+}
+.hx-day-e__inp {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--hx-fg-1);
+}
+.hx-day-e__inp::placeholder {
+  color: var(--hx-fg-3);
+}
+.hx-day-k__ghost {
+  position: absolute;
+  top: 42px;
+  left: var(--l, 0);
+  width: calc(5.56% - 3px);
+  height: 50px;
+  margin-left: 2px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  border: 1px dashed var(--hx-border-strong);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--hx-fg-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  pointer-events: none;
+  animation: hx-day-in 140ms ease-out;
+}
+@keyframes hx-day-in {
+  from {
+    opacity: 0;
+    scale: 0.94;
+  }
+}
+/* A promise: a line at its deadline and a pill left of it */
+.hx-day-flag {
+  position: absolute;
+  top: 104px;
+  left: var(--x, var(--l, 0));
+  width: 0;
+  height: 32px;
+  cursor: pointer;
+  outline: none;
+  z-index: 5;
+}
+.hx-day-flag::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  border-right: 1.5px solid var(--hx-accent);
+}
+.hx-day-flag[data-who='me']::after {
+  border-right-color: var(--hx-fg-3);
+}
+.hx-day-flag[data-kind='reply']::after {
+  border-right-color: var(--hx-warning);
+}
+.hx-day-flag[data-nodue]::after {
+  display: none;
+}
+.hx-day-flag__p {
+  position: absolute;
+  right: 4px;
+  top: 6px;
+  max-width: 260px;
+  height: 20px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--hx-accent);
+  background: var(--hx-accent-soft);
+  transition: box-shadow 160ms ease;
+}
+.hx-day-flag__p > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-day-flag__p > .hx-icon {
+  flex: none;
+}
+.hx-day-flag__n {
+  flex: none;
+  font-style: normal;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.hx-day-flag[data-who='me'] .hx-day-flag__p {
+  color: var(--hx-fg-2);
+  background: transparent;
+  border: 1px dashed var(--hx-border-strong);
+}
+.hx-day-flag[data-kind='reply'] .hx-day-flag__p {
+  color: var(--hx-fg-1);
+  background: color-mix(in oklab, var(--hx-warning) 14%, transparent);
+  border: 0;
+}
+.hx-day-flag[data-kind='reply'] .hx-day-flag__p .hx-icon {
+  color: var(--hx-warning);
+}
+.hx-day-flag:is(:hover, :focus-visible, [aria-expanded='true']) .hx-day-flag__p {
+  box-shadow: 0 0 0 1.5px currentColor;
+}
+.hx-day-flag[data-past] {
+  opacity: 0.5;
+}
+
+/* The cards over the strip (hover-card.tsx): mounted in .hx-root, placed by --x and --y */
+.hx-day-pop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  translate: var(--x, 0) var(--y, 0);
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border: 1px solid var(--hx-border);
+  border-radius: 12px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--hx-fg-1);
+  animation: hx-day-pop-in 160ms ease-out;
+}
+.hx-day-pop[data-state='closing'] {
+  animation: hx-day-pop-out 140ms ease-in both;
+  pointer-events: none;
+}
+@keyframes hx-day-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes hx-day-pop-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.hx-day-pop--wide {
+  width: 420px;
+}
+.hx-day-pop--list {
+  width: 300px;
+  padding: 8px 14px;
+}
+.hx-day-pop--how {
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hx-day-pop--how > b {
+  font-size: 14px;
+  font-weight: var(--hx-weight-medium);
+}
+.hx-day-pop__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+.hx-day-pop__head b {
+  font-size: 14px;
+  font-weight: var(--hx-weight-medium);
+  color: var(--hx-fg-1);
+}
+.hx-day-pop__head span {
+  font-size: 12px;
+  color: var(--hx-fg-3);
+}
+.hx-day-pop__ctx {
+  margin: 0 0 10px;
+}
+.hx-day-pop__ctx:last-child {
+  margin-bottom: 0;
+}
+.hx-day-pop__ctx + .hx-day-pop__ctx {
+  margin-top: -4px;
+}
+.hx-day-pop__lbl {
+  color: var(--hx-fg-3);
+}
+.hx-day-pop__quote {
+  margin: 0 0 10px;
+  padding-left: 10px;
+  border-left: 2px solid var(--hx-border-strong);
+  color: var(--hx-fg-2);
+}
+.hx-day-pop__cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.hx-day-pop__col > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--hx-fg-3);
+}
+.hx-day-pop__col > span::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hx-fg-3);
+}
+.hx-day-pop__col[data-k='bad'] > span::before {
+  background: var(--hx-danger);
+}
+.hx-day-pop__col ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hx-day-pop__foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hx-border);
+}
+.hx-day-pop__mats {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.hx-day-pop__acts {
+  display: flex;
+  gap: 8px;
+}
+.hx-day-mat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--hx-fg-2);
+  text-decoration: none;
+}
+.hx-day-mat .hx-icon {
+  color: var(--hx-fg-3);
+}
+a.hx-day-mat:hover {
+  color: var(--hx-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.hx-day-more {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: var(--hx-weight-medium);
+  color: var(--hx-accent);
+  cursor: pointer;
+}
+.hx-day-more:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.hx-day-pop__item {
+  margin: 0 -8px;
+  padding: 8px;
+  border-radius: 10px;
+  outline: none;
+  transition: background 140ms ease;
+}
+.hx-day-pop__item[data-pick] {
+  cursor: pointer;
+}
+.hx-day-pop__item:is(:hover, :focus-visible, [aria-expanded='true']) {
+  background: var(--hx-bg-active);
+}
+.hx-day-pop__item .hx-day-pop__head {
+  margin-bottom: 0;
+}
+.hx-day-pop__item .hx-day-pop__head b {
+  font-size: 13px;
+}
+
+/* An answer in one press: the first one is the main, dark */
+.hx-day-chip {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--hx-border);
+  border-radius: 16px;
+  background: var(--hx-bg-raised);
+  font: inherit;
+  font-size: 13px;
+  color: var(--hx-fg-1);
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    opacity 140ms ease;
+}
+.hx-day-chip:is(:hover, :focus-visible) {
+  border-color: var(--hx-border-strong);
+}
+.hx-day-chip[data-main] {
+  border-color: var(--hx-fg-1);
+  background: var(--hx-fg-1);
+  color: var(--hx-bg-raised);
+}
+.hx-day-chip[data-main]:is(:hover, :focus-visible) {
+  opacity: 0.88;
+}
+.hx-day-chip:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Priorities */
+.hx-day-h {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 26px 2px 10px;
+  border-radius: 12px;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-fg-1);
+}
+:is(.hx-day-h, .hx-day-cal)[data-flash] {
+  animation: hx-day-flash 1.2s ease-out;
+}
+@keyframes hx-day-flash {
+  0%,
+  30% {
+    background: var(--hx-accent-soft);
+    box-shadow: 0 0 0 6px var(--hx-accent-soft);
+  }
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+.hx-day-prs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.hx-day-pr {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1px solid var(--hx-border);
+  border-radius: 16px;
+  background: var(--hx-bg-raised);
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
+}
+.hx-day-pr:is(:hover, :focus-visible) {
+  border-color: color-mix(in oklab, var(--hx-fg-3) 45%, var(--hx-border));
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.04);
+}
+.hx-day-pr:active {
+  background: color-mix(in oklab, var(--hx-bg-active) 50%, var(--hx-bg-raised));
+}
+.hx-day-pr__t {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.hx-day-pr__t b {
+  flex: 1;
+  min-width: 0;
+  font-size: 15.5px;
+  line-height: 21px;
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-fg-1);
+}
+.hx-day-pr__t time {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--hx-fg-3);
+}
+/* The deadline is near and the thing is not begun */
+.hx-day-pr__t time[data-soon] {
+  color: var(--hx-warning);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-day-pr__sub {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--hx-fg-2);
+}
+.hx-day-pr__pts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.hx-day-pr__pts li {
+  position: relative;
+  padding-left: 14px;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--hx-fg-2);
+}
+.hx-day-pr__pts li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--hx-fg-3);
+}
+.hx-day-pr__cta {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--hx-fg-3);
+  transition:
+    color 140ms ease,
+    opacity 500ms ease;
+}
+.hx-day-pr__cta > span {
+  text-decoration: underline dashed;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in oklab, var(--hx-fg-3) 70%, transparent);
+  text-underline-offset: 4px;
+}
+.hx-day-pr__cta .hx-icon {
+  transition: translate 160ms ease-out;
+}
+.hx-day-pr:is(:hover, :focus-visible) .hx-day-pr__cta {
+  color: var(--hx-fg-1);
+}
+.hx-day-pr:is(:hover, :focus-visible) .hx-day-pr__cta .hx-icon {
+  translate: 3px 0;
+}
+/* A done thing: a thin grey tick and «done» in place of the deadline, then the card folds into a line under «Done» */
+.hx-day-pr__ok {
+  display: none;
+  flex: none;
+  align-self: center;
+  width: 16px;
+  height: 16px;
+  margin-right: -4px;
+}
+.hx-day-pr__ok svg {
+  display: block;
+}
+.hx-day-pr__ok path {
+  fill: none;
+  stroke: var(--hx-fg-3);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 14;
+  stroke-dashoffset: 14;
+}
+.hx-day-pr__donet {
+  display: none;
+  flex: none;
+  font-style: normal;
+  font-size: 12.5px;
+  color: var(--hx-fg-3);
+}
+.hx-day-pr__t b,
+.hx-day-pr__sub {
+  transition:
+    color 500ms ease,
+    opacity 500ms ease;
+}
+.hx-day-pr[data-done] .hx-day-pr__ok {
+  display: block;
+}
+.hx-day-pr[data-done] .hx-day-pr__ok path {
+  animation: hx-day-ok-draw 360ms 80ms ease-out forwards;
+}
+.hx-day-pr[data-done] .hx-day-pr__t time {
+  display: none;
+}
+.hx-day-pr[data-done] .hx-day-pr__donet {
+  display: inline;
+  animation: hx-day-fade 300ms ease-out both;
+}
+.hx-day-pr[data-done] .hx-day-pr__t b {
+  color: var(--hx-fg-3);
+}
+.hx-day-pr[data-done] :is(.hx-day-pr__sub, .hx-day-pr__pts, .hx-day-pr__cta) {
+  opacity: 0.55;
+}
+.hx-day-pr[data-folded] {
+  order: 99;
+  padding: 6px 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.hx-day-pr[data-folded] :is(.hx-day-pr__sub, .hx-day-pr__pts, .hx-day-pr__cta) {
+  display: none;
+}
+.hx-day-pr[data-folded] .hx-day-pr__t b {
+  font-size: 14px;
+  font-weight: var(--hx-weight-regular);
+}
+.hx-day-pr[data-folded]:is(:hover, :focus-visible) .hx-day-pr__t b {
+  color: var(--hx-fg-1);
+}
+.hx-day-pr[data-folded] .hx-day-pr__ok path {
+  animation: none;
+  stroke-dashoffset: 0;
+}
+.hx-day-pr[data-folded] .hx-day-pr__donet {
+  animation: none;
+}
+.hx-day-prs__done {
+  order: 98;
+  margin: 18px 2px -2px;
+  font-weight: var(--hx-weight-regular);
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+  animation: hx-day-fade 500ms 300ms ease-out both;
+}
+@keyframes hx-day-ok-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes hx-day-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* A thing opened: the page unfolds from the pressed element into its chat, over the whole stage */
+.hx-day-item {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  background: var(--hx-bg-stage, var(--hx-bg-window));
+}
+.hx-day-item[data-state='open'] {
+  animation: hx-day-item-open 460ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.hx-day-item[data-state='closing'] {
+  animation: hx-day-item-close 340ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  pointer-events: none;
+}
+@keyframes hx-day-item-open {
+  from {
+    clip-path: inset(var(--ct, 0) var(--cr, 0) var(--cb, 0) var(--cl, 0) round 10px);
+  }
+  to {
+    clip-path: inset(0 0 0 0 round 0);
+  }
+}
+@keyframes hx-day-item-close {
+  from {
+    clip-path: inset(0 0 0 0 round 0);
+  }
+  to {
+    clip-path: inset(var(--ct, 0) var(--cr, 0) var(--cb, 0) var(--cl, 0) round 10px);
+    opacity: 0.4;
+  }
+}
+.hx-day-item__in {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: var(--hx-space-5) 24px 64px;
+}
+.hx-day-item[data-state='open'] .hx-day-item__in {
+  animation: hx-day-rise 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.hx-day-item[data-state='closing'] .hx-day-item__in {
+  opacity: 0;
+  transition: opacity 140ms ease-out;
+}
+/* A thing an agent works on is its chat (the design's dx-chat): the widget heads the chat's feed and scrolls with it,
+   the agent's turns follow under it, and the chat's own field waits at the bottom. */
+.hx-day-item[data-chat] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.hx-day-item[data-chat] .hx-feed__lead {
+  padding-bottom: var(--hx-space-2);
+}
+.hx-day-item[data-state='open'] .hx-feed__lead {
+  animation: hx-day-rise 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.hx-day-item[data-state='closing'] .hx-chat {
+  opacity: 0;
+  transition: opacity 140ms ease-out;
+}
+@keyframes hx-day-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+.hx-day-w {
+  --hx-day-soft: color-mix(in oklab, var(--hx-bg-active) 45%, var(--hx-bg-raised));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 20px 18px;
+  border: 1px solid var(--hx-border);
+  border-radius: 20px;
+  background: var(--hx-bg-raised);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.03),
+    0 8px 28px rgb(0 0 0 / 0.04);
+}
+.hx-day-w__bar {
+  display: flex;
+  align-items: center;
+  margin: 0 -8px;
+}
+.hx-day-w__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+.hx-day-w__back:is(:hover, :focus-visible) {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+  outline: none;
+}
+.hx-day-w__t {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.hx-day-w__t b {
+  flex: 1;
+  min-width: 0;
+  font-size: 22px;
+  line-height: 28px;
+  letter-spacing: -0.01em;
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-fg-1);
+}
+.hx-day-w__t time {
+  flex: none;
+  font-size: 13px;
+  color: var(--hx-fg-3);
+}
+.hx-day-w__t time[data-soon] {
+  color: var(--hx-warning);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-day-w__lead {
+  margin: -6px 0 0;
+  font-size: 15px;
+  line-height: 23px;
+  color: var(--hx-fg-2);
+  text-wrap: pretty;
+}
+.hx-day-w__parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.hx-day-w__parts:empty {
+  display: none;
+}
+.hx-day-w__f,
+.hx-day-w__say {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.hx-day-w__inp {
+  flex: 1;
+  min-width: 180px;
+  height: 32px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 16px;
+  background: var(--hx-bg-raised);
+  font: inherit;
+  font-size: 13px;
+  color: var(--hx-fg-1);
+  outline: none;
+}
+.hx-day-w__inp:focus {
+  border-color: var(--hx-focus);
+}
+.hx-day-ln {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0 1px;
+  padding: 0 6px 0 4px;
+  border-radius: 6px;
+  background: var(--hx-accent-soft);
+  color: var(--hx-accent);
+  font-size: 0.92em;
+  line-height: 1.5;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+.hx-day-ln .hx-icon {
+  width: 13px;
+  height: 13px;
+}
+
+/* The small widgets (parts.tsx) */
+.hx-day-p {
+  flex: 1 1 calc(50% - 5px);
+  min-width: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--hx-day-soft);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--hx-fg-2);
+}
+.hx-day-p:is(
+  [data-k='rich'],
+  [data-k='chart'],
+  [data-k='doc'],
+  [data-k='slides'],
+  [data-k='design'],
+  [data-k='data'],
+  [data-k='file'],
+  [data-k='mr'],
+  [data-k='review']
+) {
+  flex-basis: 100%;
+}
+.hx-day-p:is([data-k='file'], [data-k='doc']) {
+  padding: 0;
+  background: none;
+}
+.hx-day-p p {
+  margin: 0;
+  color: var(--hx-fg-2);
+  text-wrap: pretty;
+}
+.hx-day-p__h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--hx-fg-3);
+}
+.hx-day-p__h > .hx-icon {
+  flex: none;
+}
+.hx-day-p__h b {
+  font-weight: var(--hx-weight-medium);
+  color: var(--hx-fg-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-day-p__h em {
+  flex: 1;
+  min-width: 0;
+  font-style: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-day-p__a {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--hx-fg-2);
+  text-decoration: none;
+}
+.hx-day-p__a:hover {
+  color: var(--hx-fg-1);
+}
+.hx-day-p .hx-day-p__n {
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--hx-fg-3);
+}
+/* Formatted text runs straight through the widget */
+.hx-day-p[data-k='rich'] {
+  gap: 6px;
+  padding: 0;
+  background: none;
+  font-size: 15px;
+  line-height: 23px;
+  color: var(--hx-fg-1);
+}
+.hx-day-p[data-k='rich'] h4 {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-fg-1);
+}
+.hx-day-p[data-k='rich'] h4:first-child {
+  margin-top: 0;
+}
+.hx-day-p[data-k='rich'] p {
+  color: var(--hx-fg-1);
+}
+.hx-day-p[data-k='rich'] b {
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-day-p[data-k='rich'] ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.hx-day-p[data-k='text'] ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hx-day-p[data-k='text'] li {
+  position: relative;
+  padding-left: 14px;
+}
+.hx-day-p[data-k='text'] li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--hx-fg-3);
+}
+.hx-day-p[data-k='text'] li b {
+  font-weight: var(--hx-weight-regular);
+  color: var(--hx-fg-1);
+}
+/* A chart of bars */
+.hx-day-ch {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 132px;
+  max-width: 520px;
+}
+.hx-day-ch__c {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+}
+.hx-day-ch__c span {
+  font-size: 11.5px;
+  color: var(--hx-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+.hx-day-ch__c i {
+  width: 100%;
+  max-width: 36px;
+  height: var(--h, 6%);
+  border-radius: 5px 5px 2px 2px;
+  background: color-mix(in oklab, var(--hx-fg-3) 38%, transparent);
+}
+.hx-day-ch__c em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--hx-fg-3);
+}
+.hx-day-ch__c[data-hot] i {
+  background: var(--hx-fg-1);
+}
+.hx-day-ch__c[data-hot] :is(span, em) {
+  color: var(--hx-fg-1);
+}
+/* Figures */
+.hx-day-kpi {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+.hx-day-kpi > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 72px;
+}
+.hx-day-kpi span {
+  font-size: 12.5px;
+  color: var(--hx-fg-3);
+}
+.hx-day-kpi b {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-fg-1);
+  font-variant-numeric: tabular-nums;
+}
+.hx-day-kpi em {
+  font-style: normal;
+  font-size: 12.5px;
+  color: var(--hx-warning);
+}
+/* A table */
+.hx-day-tb {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--hx-border);
+  border-radius: 10px;
+  background: var(--hx-bg-raised);
+  overflow: hidden;
+  font-size: 13.5px;
+}
+.hx-day-tb__r {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--hx-border);
+  color: var(--hx-fg-1);
+  font-variant-numeric: tabular-nums;
+}
+.hx-day-tb__r:first-child {
+  border-top: 0;
+}
+.hx-day-tb__r span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-day-tb__r[data-head] {
+  font-size: 12.5px;
+  color: var(--hx-fg-3);
+}
+.hx-day-tb__r[data-hot] span:last-child {
+  color: var(--hx-warning);
+}
+/* A document: its first page with the real text */
+.hx-day-doc {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--hx-border);
+  border-radius: 14px;
+  background: var(--hx-bg-raised);
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 140ms ease;
+}
+a:is(.hx-day-doc, .hx-day-fl):hover {
+  border-color: color-mix(in oklab, var(--hx-fg-3) 45%, var(--hx-border));
+}
+.hx-day-doc__pg {
+  max-height: 196px;
+  padding: 20px 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--hx-bg-active) 30%, var(--hx-bg-raised));
+  mask-image: linear-gradient(#000 55%, transparent);
+}
+.hx-day-doc__pg > b {
+  margin-bottom: 4px;
+  font-size: 17px;
+  line-height: 23px;
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-fg-1);
+}
+.hx-day-doc__pg h4 {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 19px;
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-fg-1);
+}
+.hx-day-doc__pg p {
+  font-size: 13.5px;
+  line-height: 20px;
+}
+.hx-day-doc__f {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--hx-border);
+  font-size: 13px;
+  color: var(--hx-fg-3);
+}
+.hx-day-doc__f span {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-day-doc__f em {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-style: normal;
+  color: var(--hx-fg-1);
+}
+/* A file */
+.hx-day-fl {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 10px;
+  border: 1px solid var(--hx-border);
+  border-radius: 14px;
+  background: var(--hx-bg-raised);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 140ms ease;
+}
+.hx-day-fl__ic {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--hx-day-soft);
+  color: var(--hx-fg-2);
+}
+.hx-day-fl__m {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hx-day-fl__m b {
+  font-size: 14px;
+  font-weight: var(--hx-weight-medium);
+  color: var(--hx-fg-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-day-fl__m span {
+  font-size: 13px;
+  color: var(--hx-fg-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-day-fl__b {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--hx-fg-2);
+  text-decoration: none;
+  cursor: pointer;
+}
+.hx-day-fl__b:is(:hover, :focus-visible) {
+  color: var(--hx-fg-1);
+  outline: none;
+}
+/* Slides and design variants: a row of thumbnails */
+.hx-day-sl,
+.hx-day-ds {
+  display: flex;
+  gap: 10px;
+  margin: 0 -16px;
+  padding: 0 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+:is(.hx-day-sl, .hx-day-ds) figure {
+  flex: none;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hx-day-sl figure {
+  width: 148px;
+}
+.hx-day-sl__s {
+  aspect-ratio: 16 / 9;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--hx-border);
+  border-radius: 8px;
+  background: var(--hx-bg-raised);
+  overflow: hidden;
+}
+.hx-day-sl__s b {
+  margin-bottom: 2px;
+  font-size: 9.5px;
+  line-height: 12px;
+  color: var(--hx-fg-1);
+}
+.hx-day-sl__s:is([data-k='title'], [data-k='num']) {
+  justify-content: center;
+}
+.hx-day-sl__s:is([data-k='title'], [data-k='num']) b {
+  font-size: 12px;
+  line-height: 15px;
+}
+.hx-day-sl__s > i {
+  width: var(--w, 70%);
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--hx-fg-3) 30%, transparent);
+}
+.hx-day-sl__s > span {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+.hx-day-sl__s > span i {
+  flex: 1;
+  height: 40%;
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--hx-fg-3) 40%, transparent);
+}
+.hx-day-sl__s > span i:nth-child(2) {
+  height: 65%;
+}
+.hx-day-sl__s > span i:nth-child(3) {
+  height: 50%;
+}
+.hx-day-sl__s > span i:nth-child(4) {
+  height: 90%;
+  background: var(--hx-fg-1);
+}
+.hx-day-sl figcaption {
+  font-size: 12px;
+  color: var(--hx-fg-3);
+}
+.hx-day-sl figure[data-warn] .hx-day-sl__s {
+  border-color: var(--hx-warning);
+}
+.hx-day-sl figure[data-warn] figcaption {
+  color: var(--hx-warning);
+}
+.hx-day-ds figure {
+  width: 212px;
+}
+.hx-day-ds__s {
+  height: 132px;
+  box-sizing: border-box;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--hx-border);
+  border-radius: 10px;
+  background: var(--hx-bg-raised);
+}
+.hx-day-ds__s i {
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--hx-fg-3) 22%, transparent);
+}
+.hx-day-ds__s[data-k='table'] {
+  grid-template-rows: 14px repeat(3, 1fr);
+}
+.hx-day-ds__s[data-k='table'] i:first-child {
+  background: color-mix(in oklab, var(--hx-fg-3) 45%, transparent);
+}
+.hx-day-ds__s[data-k='cards'] {
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+}
+.hx-day-ds__s[data-k='wizard'] {
+  grid-template-rows: 10px 1fr 22px;
+  padding: 16px 40px;
+}
+.hx-day-ds__s[data-k='wizard'] i:last-child {
+  width: 50%;
+  justify-self: end;
+  border-radius: 11px;
+  background: var(--hx-fg-1);
+}
+.hx-day-ds figcaption {
+  display: flex;
+  flex-direction: column;
+}
+.hx-day-ds figcaption b {
+  font-size: 13.5px;
+  font-weight: var(--hx-weight-medium);
+  color: var(--hx-fg-1);
+}
+.hx-day-ds figcaption span {
+  font-size: 12.5px;
+  line-height: 17px;
+  color: var(--hx-fg-3);
+}
+/* A letter with its draft */
+.hx-day-p blockquote {
+  margin: 0;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid var(--hx-border-strong);
+  color: var(--hx-fg-2);
+}
+.hx-day-p blockquote b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: var(--hx-weight-medium);
+  color: var(--hx-fg-3);
+}
+.hx-day-ms {
+  padding: 10px 12px;
+  border: 1px dashed var(--hx-border-strong);
+  border-radius: 12px;
+  background: var(--hx-bg-raised);
+}
+.hx-day-ms em {
+  display: block;
+  margin-bottom: 2px;
+  font-style: normal;
+  font-size: 12.5px;
+  color: var(--hx-fg-3);
+}
+.hx-day-ms p {
+  color: var(--hx-fg-1);
+}
+/* A merge request under review: its files with the size of the change, not the diff itself */
+.hx-day-p .hx-day-mr__s {
+  font-size: 14.5px;
+  line-height: 22px;
+  color: var(--hx-fg-1);
+}
+.hx-day-mr {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--hx-border);
+  border-radius: 12px;
+  background: var(--hx-bg-raised);
+  overflow: hidden;
+}
+.hx-day-mr__r {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--hx-border);
+  font-size: 13.5px;
+  line-height: 20px;
+}
+.hx-day-mr > .hx-day-mr__r:first-child {
+  border-top: 0;
+}
+.hx-day-mr__p {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--hx-font-mono);
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-day-mr__p em {
+  font-style: normal;
+  color: var(--hx-fg-3);
+}
+.hx-day-mr__p b {
+  font-weight: var(--hx-weight-regular);
+  color: var(--hx-fg-1);
+}
+.hx-day-mr__n {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--hx-fg-2);
+}
+.hx-day-mr__d {
+  flex: none;
+  width: 64px;
+  display: flex;
+  gap: 2px;
+}
+.hx-day-mr__d i {
+  width: var(--w, 3px);
+  height: 6px;
+  border-radius: 3px;
+  background: var(--hx-fg-1);
+}
+.hx-day-mr__d i[data-del] {
+  background: color-mix(in oklab, var(--hx-fg-3) 45%, transparent);
+}
+.hx-day-mr__c {
+  flex: none;
+  width: 76px;
+  text-align: right;
+  font-size: 12.5px;
+  color: var(--hx-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+.hx-day-ci {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--hx-fg-2);
+}
+.hx-day-ci span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+/* Review comments: the file, the line of code, the words, the replacement proposed */
+.hx-day-rv,
+.hx-day-rv .hx-day-rest > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hx-day-rv__c {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--hx-border);
+  border-radius: 12px;
+  background: var(--hx-bg-raised);
+}
+.hx-day-rv__f {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--hx-fg-3);
+}
+.hx-day-rv__f b {
+  font-weight: var(--hx-weight-regular);
+}
+.hx-day-rv pre {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--hx-day-soft);
+  font-family: var(--hx-font-mono);
+  font-size: 12.5px;
+  line-height: 20px;
+  color: var(--hx-fg-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.hx-day-rv__c > p {
+  font-size: 14.5px;
+  line-height: 22px;
+  color: var(--hx-fg-1);
+}
+.hx-day-rv__s em {
+  display: block;
+  margin-bottom: 4px;
+  font-style: normal;
+  font-size: 12.5px;
+  color: var(--hx-fg-3);
+}
+.hx-day-rv__s pre {
+  color: var(--hx-fg-1);
+}
+/* «Show the rest»: the height travels from nothing, the rows come in one after another; it folds back the same way */
+.hx-day-rest {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.hx-day-rv .hx-day-rest {
+  margin-top: -8px;
+  transition:
+    grid-template-rows 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    margin-top 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.hx-day-rest > div {
+  min-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition: visibility 0s 320ms;
+}
+.hx-day-rest > div > * {
+  opacity: 0;
+  translate: 0 -6px;
+  transition:
+    opacity 180ms ease-out,
+    translate 240ms ease-out;
+}
+.hx-day-rest[data-open] {
+  grid-template-rows: 1fr;
+}
+.hx-day-rv .hx-day-rest[data-open] {
+  margin-top: 0;
+}
+.hx-day-rest[data-open] > div {
+  visibility: visible;
+  transition-delay: 0s;
+}
+.hx-day-rest[data-open] > div > * {
+  opacity: 1;
+  translate: 0 0;
+  transition-delay: calc(60ms + var(--i, 0) * 40ms);
+}
+.hx-day-rest > div > :nth-child(2) {
+  --i: 1;
+}
+.hx-day-rest > div > :nth-child(3) {
+  --i: 2;
+}
+.hx-day-rest > div > :nth-child(n + 4) {
+  --i: 3;
+}
+.hx-day-mr .hx-day-rest > div > .hx-day-mr__r:first-child {
+  border-top: 1px solid var(--hx-border);
+}
+.hx-day-rest__b {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+}
+.hx-day-mr .hx-day-rest__b {
+  margin: 4px 6px;
+}
+.hx-day-rest__b:is(:hover, :focus-visible) {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+  outline: none;
+}
+.hx-day-rest__b .hx-icon {
+  transition: rotate 220ms ease;
+}
+.hx-day-rest__b[data-open] .hx-icon {
+  rotate: 180deg;
+}
+
+@container hx-day (max-width: 700px) {
+  .hx-day-tm {
+    grid-template-columns: 1fr;
+  }
+  .hx-day-pr__t,
+  .hx-day-w__t {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .hx-day-w {
+    padding: 12px 14px 16px;
+    border-radius: 18px;
+  }
+  .hx-day-w__t b {
+    font-size: 19px;
+    line-height: 25px;
+  }
+  .hx-day-p {
+    flex-basis: 100%;
+  }
+  .hx-day-doc__pg {
+    padding: 16px 16px 0;
+  }
+  .hx-day-item__in {
+    padding: var(--hx-space-3) 12px 48px;
+  }
+  .hx-day-mr__d {
+    display: none;
+  }
+  .hx-day-mr__r {
+    flex-wrap: wrap;
+    gap: 2px 12px;
+  }
+  .hx-day-mr__p {
+    flex-basis: 100%;
+  }
+  .hx-day-mr__c {
+    width: auto;
+    margin-left: auto;
+  }
+}
+@media (max-width: 900px) {
+  .hx-day__scroll,
+  .hx-day__sk {
+    padding-left: var(--hx-space-3);
+    padding-right: var(--hx-space-3);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-day-item,
+  .hx-day-item__in,
+  .hx-day-item .hx-feed__lead,
+  .hx-day-pop,
+  .hx-day-e,
+  .hx-day-k__ghost,
+  .hx-day-cal__head > :is(b, span) {
+    animation: none;
+  }
+  .hx-day-rest,
+  .hx-day-rest > div,
+  .hx-day-rest > div > * {
+    transition: none;
+  }
+}
+
+/* The dark theme has no frames here: the blocks stand apart by a lighter ground alone */
+html[data-theme='dark'] .hx-day {
+  --hx-border: rgb(255 255 255 / 0.045);
+  --hx-border-strong: rgb(255 255 255 / 0.09);
+}
+html[data-theme='dark'] :is(.hx-day-pr, .hx-day-k, .hx-day-w) {
+  border-color: transparent;
+  background: color-mix(in oklab, var(--hx-bg-active) 38%, var(--hx-bg-raised));
+  box-shadow: none;
+}
+html[data-theme='dark'] .hx-day-pr[data-folded] {
+  background: transparent;
+}
+html[data-theme='dark'] .hx-day-pr:not([data-folded]):is(:hover, :focus-visible) {
+  background: color-mix(in oklab, var(--hx-bg-active) 62%, var(--hx-bg-raised));
+}
+html[data-theme='dark'] .hx-day-k__h {
+  border-left-color: color-mix(in oklab, var(--hx-border) 35%, transparent);
+}
+html[data-theme='dark'] .hx-day-chip:not([data-main]) {
+  border-color: transparent;
+  background: color-mix(in oklab, var(--hx-bg-active) 80%, var(--hx-bg-window));
+}
+html[data-theme='dark'] .hx-day-w {
+  --hx-day-soft: color-mix(in oklab, var(--hx-bg-active) 75%, var(--hx-bg-raised));
+}
+html[data-theme='dark']
+  .hx-day-w
+  :is(
+    .hx-day-doc,
+    .hx-day-fl,
+    .hx-day-mr,
+    .hx-day-rv__c,
+    .hx-day-tb,
+    .hx-day-ms,
+    .hx-day-sl__s,
+    .hx-day-ds__s
+  ) {
+  border-color: transparent;
+}

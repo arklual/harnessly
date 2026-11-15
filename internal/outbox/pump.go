@@ -706,6 +706,59 @@ func (b *Box) UserEntry(entryID string, offset int64, turn *string, now time.Tim
 // later — Claude took the text after all) is accepted, not left to be typed a second time.
 func (b *Box) UserEntryText(entryID, text string, offset int64, turn *string, now time.Time) (string, Change) {
 	var ch Change
+	client := b.takeEntry(&ch, entryID, text, offset, turn, now)
+	if client != "" && text != "" {
+		b.readTogether(&ch, client, entryID, text, offset, turn, now)
+	}
+	return client, ch
+}
+
+// readTogether takes the other messages the same entry holds: Claude read the messages waiting in its queue at once,
+// as one prompt of their texts a line apart, and the transcript has one entry for them all. The entry
+// carries the client id of the first; the others are accepted with it and join the turn, not left «in the agent's
+// queue» until their term runs out and then failed as unconfirmed while the agent has answered them.
+func (b *Box) readTogether(ch *Change, took, entryID, text string, offset int64, turn *string, now time.Time) {
+	for _, r := range b.sorted() {
+		if r.Message.ClientID == took || offset < r.TypedOffset || r.TypedAt == 0 || !b.onItsWay(r) ||
+			!screen.JoinedIn(text, r.Message.Text) {
+			continue
+		}
+		if b.log != nil {
+			b.log.Info("message read with another in one entry", "conversationId", b.conv, "clientId", r.Message.ClientID,
+				"with", took, "state", string(r.Message.State.K))
+		}
+		queued := slices.Contains(b.items, r.Message.ClientID)
+		reason := r.Reason
+		if queued {
+			b.dropItem(r.Message.ClientID)
+		}
+		if r.Message.State.K == wire.MsgTyping {
+			r.Submitted = true
+			b.typing = false
+		}
+		b.accept(ch, r, &entryID, now)
+		b.join(ch, r, turn, now)
+		if queued {
+			ch.add(wire.QueueChangedEv{Queue: b.Queue()})
+			b.positions(ch, reason, now)
+		}
+	}
+}
+
+// onItsWay: a typed message the agent has not been seen to take — still in its box or queue, or given up on as
+// unconfirmed or stalled while the agent may have read it after all.
+func (b *Box) onItsWay(r *Record) bool {
+	switch st := r.Message.State; st.K {
+	case wire.MsgTyping, wire.MsgInInput, wire.MsgQueued, wire.MsgFailed:
+		return true
+	case wire.MsgAccepted:
+		return st.EntryID == nil
+	}
+	return false
+}
+
+// takeEntry is the message a user entry is: the one on its way, or one typed before that went back or failed.
+func (b *Box) takeEntry(ch *Change, entryID, text string, offset int64, turn *string, now time.Time) string {
 	for _, r := range b.sorted() {
 		st := r.Message.State
 		ours := r.Message.ClientID == b.flight && (st.K == wire.MsgInInput || st.K == wire.MsgTyping) ||
@@ -724,12 +777,12 @@ func (b *Box) UserEntryText(entryID, text string, offset int64, turn *string, no
 			b.typing = false
 		}
 		b.cut(r, text)
-		b.accept(&ch, r, &entryID, now)
-		b.join(&ch, r, turn, now)
-		return r.Message.ClientID, ch
+		b.accept(ch, r, &entryID, now)
+		b.join(ch, r, turn, now)
+		return r.Message.ClientID
 	}
 	if text == "" {
-		return "", ch
+		return ""
 	}
 	for _, r := range b.sorted() {
 		st := r.Message.State
@@ -745,15 +798,15 @@ func (b *Box) UserEntryText(entryID, text string, offset int64, turn *string, no
 		queued := slices.Contains(b.items, r.Message.ClientID)
 		reason := r.Reason
 		b.dropItem(r.Message.ClientID)
-		b.accept(&ch, r, &entryID, now)
-		b.join(&ch, r, turn, now)
+		b.accept(ch, r, &entryID, now)
+		b.join(ch, r, turn, now)
 		if queued {
 			ch.add(wire.QueueChangedEv{Queue: b.Queue()})
-			b.positions(&ch, reason, now) // the ones behind it move up, the head waits on what it waited on
+			b.positions(ch, reason, now) // the ones behind it move up, the head waits on what it waited on
 		}
-		return r.Message.ClientID, ch
+		return r.Message.ClientID
 	}
-	return "", ch
+	return ""
 }
 
 // takes: a user entry with this text is this message's — all of it, or its start when Claude cut the paste short.
@@ -854,6 +907,12 @@ func (b *Box) Tick(now time.Time) Change {
 			if b.flight == r.Message.ClientID {
 				b.flight = ""
 			}
+			if id, ok := b.readAfterAll(r); ok {
+				// Its entry came and was not matched to it on the way: the feed already read says the agent
+				// has it. One lookup in what is read, at its term, once.
+				b.accept(&ch, r, &id, now)
+				continue
+			}
 			b.fail(&ch, r, wire.MsgFailedUnconfirmed, true, now)
 		case st.K == wire.MsgInInput && st.Wait != nil && t >= st.Wait.DeadlineAt && !mine,
 			st.K == wire.MsgTyping && !mine && t-r.TypedAt >= wire.ConfirmDeadline:
@@ -883,6 +942,15 @@ func (b *Box) Tick(now time.Time) Change {
 		}
 	}
 	return ch
+}
+
+// readAfterAll looks for a message at its term in the transcript already read: its own entry, or one it shares with
+// the messages Claude read with it. Only with a transcript to look in.
+func (b *Box) readAfterAll(r *Record) (string, bool) {
+	if b.Transcript == nil || r.TypedAt == 0 {
+		return "", false
+	}
+	return b.Transcript(r.TypedOffset, r.TypedAt, r.Message.Text)
 }
 
 // forget keeps the id of a message let go, at most GoneMax of them (the oldest go first).

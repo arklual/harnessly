@@ -7,7 +7,7 @@ import { openAppTab } from '@/next/features/app-views/open';
 import { t } from '@/next/i18n';
 import { RoundButton } from '@/next/ui/button';
 import Icon from '@/next/ui/icon';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 
 /** Buttons that stand at the field; the rest go into one «⋯» menu. */
 const INLINE_BUTTONS = 2;
@@ -78,7 +78,7 @@ export const AppButtons = ({
         />
       ))}
       {rest.length > 0 && (
-        <Menu.Root actionsRef={actions}>
+        <MenuRoot actionsRef={actions}>
           <Menu.Trigger
             render={
               <button type="button" className="hx-round" data-variant="ghost" aria-label={more}>
@@ -101,7 +101,7 @@ export const AppButtons = ({
               </Menu.Item>
             ))}
           </MenuPanel>
-        </Menu.Root>
+        </MenuRoot>
       )}
     </>
   );

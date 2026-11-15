@@ -1,0 +1,14 @@
+id: open-stand
+title: «Открой стенд» — фича-стенд в браузере правой панели
+tags: [pane]
+timeout_s: 240
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/hlcli/hlcli.go'
+  - 'internal/hlcli/preview.go'
+  - 'internal/paneintents/**'
+prompt: открой мне стенд https://checkout.preview.example.test/cart в браузере справа
+expect:
+  - name: opened the stand in the pane's browser
+    pane: {tab: browser, target: 'checkout\.preview\.example\.test'}

@@ -1,0 +1,73 @@
+{
+  "itemId": 101,
+  "title": "Review the export merge request",
+  "whenText": "by 11:00",
+  "lead": "Robin's export to a file is ready for review. The agent read it overnight: the code is sound, two places need your decision.",
+  "parts": [
+    {
+      "k": "rich",
+      "v": [
+        [
+          "p",
+          "The change adds **export to a file** to the reports page and moves the heavy part to a background job. The tests pass. What is left is a question of taste and one real risk: [export.ts|file-code] reads the whole table into memory."
+        ]
+      ]
+    },
+    {
+      "k": "mr",
+      "h": "Export reports to a file",
+      "src": "example-corp/app",
+      "url": "https://example.com/app/merge-requests/212",
+      "sum": "Nine files, most of the change is the new job and its tests.",
+      "files": [
+        ["src/reports/export.ts", 142, 0, "new"],
+        ["src/reports/export.test.ts", 96, 0, "new"],
+        ["src/jobs/export-job.ts", 88, 0, "new"],
+        ["src/reports/page.tsx", 34, 12],
+        ["src/jobs/queue.ts", 21, 4],
+        ["src/reports/format.ts", 18, 9],
+        ["src/api/routes.ts", 9, 1],
+        ["docs/reports.md", 14, 0],
+        ["package.json", 1, 1]
+      ],
+      "ci": [
+        ["tests", "ok"],
+        ["lint", "ok"],
+        ["build", "ok"]
+      ]
+    },
+    {
+      "k": "review",
+      "h": "What the agent would change",
+      "items": [
+        [
+          "src/reports/export.ts:48",
+          "const rows = await table.all();",
+          "The whole table goes into memory. A report of a large account will not fit.",
+          "for await (const rows of table.pages(500)) write(rows);"
+        ],
+        [
+          "src/jobs/export-job.ts:21",
+          "retries: 10,",
+          "Ten retries of a job that takes minutes can hold the queue for an hour.",
+          "retries: 3,"
+        ],
+        [
+          "src/reports/format.ts:12",
+          "export const asCsv = (rows) =>",
+          "A value with a comma inside is not quoted. Worth a test."
+        ]
+      ]
+    }
+  ],
+  "chips": [
+    { "label": "Send the comments to Robin", "kind": "take" },
+    { "label": "Say it differently", "kind": "say" },
+    {
+      "label": "Open the merge request",
+      "kind": "open",
+      "url": "https://example.com/app/merge-requests/212"
+    },
+    { "label": "Done", "kind": "done" }
+  ]
+}

@@ -56,6 +56,8 @@ export const envEntryRow = obj({
   position: num,
   builtIn: opt(bool),
   off: opt(bool),
+  appVersion: opt(str),
+  appUpdatedAt: opt(str),
 });
 export const envGroup = obj({
   id: str,

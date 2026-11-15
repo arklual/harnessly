@@ -2,7 +2,7 @@
 // connection or a slow machine (spec §12): it is rows from the store at any state of the socket, and the only thing
 // that comes of a bad connection is the strip over the field and a live turn that says it waits.
 import SelBar from '@/next/features/chat/selbar';
-import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useState, type ReactNode } from 'react';
 import {
   cancelMessage,
   decideLimit,
@@ -98,6 +98,8 @@ interface IChatViewProps {
   pendingItems?: FeedItem[] | null;
   /** Opens the chat's terminal on the agent's pane (a gate the page could not decide); null while it has none. */
   onOpenTerminal?: (() => void) | null;
+  /** What stands before the first turn and scrolls with them: the thing the chat is about (the day's opened item). */
+  lead?: ReactNode;
 }
 
 /** Where the chat's chips, links and cards open: a host without a right pane of its own passes its pane's. */
@@ -145,6 +147,7 @@ const ChatView = ({
   dockExtra = null,
   pendingItems = null,
   onOpenTerminal = null,
+  lead,
 }: IChatViewProps) => {
   useConversationChannel(machine, conv);
   useCentralFeed(machine, conv);
@@ -392,6 +395,7 @@ const ChatView = ({
                           <WorkflowRuns value={workflowRuns}>
                             <Feed
                               items={items}
+                              lead={lead}
                               placeKey={conv}
                               onCopyChatLink={() => copyLink(chatUrl(conv))}
                               onReloadChat={() => hub.reloadConversation(machine, conv)}

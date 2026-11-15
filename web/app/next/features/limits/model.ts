@@ -328,6 +328,16 @@ export const windowsOf = (
   );
 };
 
+/** The outline of the model pill: how much of the five-hour window is spent, whole per cent, and its level;
+ *  null when the chat's agent reports no five-hour window (or it has passed). */
+export const ringOf = (view: LimitsView | null, nowSec: number): { used: number; level: Level } | null => {
+  if (view?.state !== 'ready') return null;
+  const five = windowsOf(view.limits, nowSec).find((w) => w.kind === WINDOW.fiveHour);
+  if (!five) return null;
+  const left = leftOf(five.window);
+  return { used: 100 - left, level: levelOf(left) };
+};
+
 /** What is left of a window, whole per cent. */
 export const leftOf = (window: LimitWindow): number =>
   Math.max(0, Math.min(100, Math.round(100 - window.usedPct)));

@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { hub } from '@/next/core/realtime/hub';
-import { BACKOFF_MS, DEAD_MS, STALE_MS, SUB_RETRY_MS } from '@/next/core/realtime/client';
+import {
+  BACKOFF_MS,
+  DEAD_MS,
+  QUICK_AFTER_LIVE_MS,
+  QUICK_RETRY_MS,
+  STALE_MS,
+  SUB_RETRY_MS,
+} from '@/next/core/realtime/client';
 import { fixture, FakeRuntime, type FakeSocket } from '@/next/core/testing/fake-runtime';
 import { bootFake, settle, useFakeTime } from '@/next/core/testing/setup';
 import { connectionStore, secondsToRetry } from '@/next/stores/connection';
@@ -105,6 +112,27 @@ describe('RealtimeClient', () => {
     rt.dropAll();
     await settle();
     expect((conn(m) as { retryAt: number }).retryAt - Date.now()).toBe(3000);
+  });
+
+  it('tries a socket that was live again within a second, as connecting, then backs off as always', async () => {
+    const { rt, m } = await bootFake();
+    await vi.advanceTimersByTimeAsync(QUICK_AFTER_LIVE_MS);
+    rt.dropAll(); // a hub replica moving its machines
+    await settle();
+    expect(conn(m).k).toBe('connecting');
+    await vi.advanceTimersByTimeAsync(QUICK_RETRY_MS);
+    await settle();
+    expect(conn(m).k).toBe('live');
+
+    await vi.advanceTimersByTimeAsync(QUICK_AFTER_LIVE_MS);
+    rt.down = true;
+    rt.dropAll();
+    await settle();
+    expect(conn(m).k).toBe('connecting');
+    await vi.advanceTimersByTimeAsync(QUICK_RETRY_MS);
+    await settle();
+    expect(conn(m).k).toBe('offline');
+    expect((conn(m) as { retryAt: number }).retryAt - Date.now()).toBe(BACKOFF_MS[0]);
   });
 
   it('jitters within ±20 %', async () => {

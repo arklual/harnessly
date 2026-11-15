@@ -1,4 +1,10 @@
 {
+  "next.whatsNew.2026-11-15.boardCards.title": "A board or document link is a card",
+  "next.whatsNew.2026-11-15.boardCards.text": "In a chat a link to a board or a document shows its name, who made it, when it changed and the board’s picture. Only people who may open it see the card.",
+  "next.whatsNew.2026-11-15.boardInPane.title": "A board opens beside the chat",
+  "next.whatsNew.2026-11-15.boardInPane.text": "A click on a board link opens it in «Boards» in the right pane, with no separate sign-in: select shapes and the agent sees the selection and edits the board in front of you.",
+  "next.whatsNew.2026-11-15.appsUpdate.title": "Boards and Documents update by themselves",
+  "next.whatsNew.2026-11-15.appsUpdate.text": "A new version of the apps reaches the machine within minutes, no chat restarts; an open board stays open. The version and when it came are in «Environment».",
   "next.whatsNew.2026-11-13.reviewSeamless.title": "Review is the main screen, the chat is beside it",
   "next.whatsNew.2026-11-13.reviewSeamless.text": "«Expand» in the right pane and «Review» under the agent's answer make the merge request the main screen of the window, with no separate «app»: the bar is as in Sinopia — back, the merge request's title, project and number. The chat stays as a column at the left, a window over it or the field at the foot, the sidebar folds by itself, «Back» returns to the chat. The right pane shows only the diff by default. The merge request card in the chat is now off: turn it on in Settings → Plugins → Code review.",
   "next.whatsNew.2026-11-13.noticeStack.title": "«Waiting for you» stacks up, like on an iPhone",

@@ -530,3 +530,22 @@ func (s Store) UserIDByVerifiedEmail(ctx context.Context, email string) (string,
 	}
 	return ids[0], nil
 }
+
+// ActiveUserEmails are the id and e-mail of every user that is not switched off: few on a hub, read to find a person by
+// a keyed hash of their e-mail (docs/board_mentions.go).
+func (s Store) ActiveUserEmails(ctx context.Context) (map[string]string, error) {
+	rows, err := s.q.Query(ctx, `SELECT id, email FROM users WHERE disabled_at IS NULL AND email <> ''`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var id, email string
+		if err := rows.Scan(&id, &email); err != nil {
+			return nil, err
+		}
+		out[id] = email
+	}
+	return out, rows.Err()
+}

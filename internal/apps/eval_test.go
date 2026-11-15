@@ -336,6 +336,34 @@ func TestPrepareEvalPackageMocksTheServers(t *testing.T) {
 	}
 }
 
+func TestPrepareEvalPackageTrustsTheMocksOfASandboxedApp(t *testing.T) {
+	dir := evalPackage(t)
+	manifest := filepath.Join(dir, ManifestPath)
+	raw, _ := os.ReadFile(manifest)
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	m["trust"] = "sandboxed"
+	raw, _ = json.Marshal(m)
+	_ = os.WriteFile(manifest, raw, 0o644)
+	_ = os.MkdirAll(filepath.Join(dir, "fixtures"), 0o755)
+	_ = os.WriteFile(filepath.Join(dir, "fixtures", "bank.json"), []byte(`{"tools":[{"name":"get_categories","result":"x"}]}`), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, ".mcp.json"), []byte(`{"mcpServers":{"bank-cashback":{"type":"http","url":"https://bank.example/mcp"}}}`), 0o644)
+	c, _ := ParseEvalCase("create-basic", []byte(caseJSON))
+	pkg, cleanup, err := PrepareEvalPackage(dir, c, "/usr/bin/harnessly")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	if _, ps, err := (&Registry{Root: t.TempDir()}).Install(pkg, InstallOptions{Dev: true, HostVersion: "dev"}); err != nil {
+		t.Fatalf("the prepared copy does not install: %v %v", err, ps)
+	}
+	if orig, _ := os.ReadFile(manifest); !strings.Contains(string(orig), "sandboxed") {
+		t.Fatal("the author's manifest was changed")
+	}
+}
+
 func TestClaudeEvalArgs(t *testing.T) {
 	dir := evalPackage(t)
 	c, _ := ParseEvalCase("c", []byte(`{"prompt":"p"}`))
@@ -431,6 +459,15 @@ func TestCheckAppServers(t *testing.T) {
 	}
 	if err := run(`{"type":"system","subtype":"init","mcp_servers":[{"name":"plugin:acme-standup:standup","status":"connected"}]}`); err != nil {
 		t.Fatal(err)
+	}
+	// Pending in the first event: fine when the agent then called it, a failure when it never did.
+	pending := `{"type":"system","subtype":"init","mcp_servers":[{"name":"plugin:acme-standup:standup","status":"pending"}]}` + "\n"
+	call := `{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"mcp__plugin_acme-standup_standup__list","input":{}}]}}`
+	if err := run(pending + call); err != nil {
+		t.Fatalf("a pending server that was called: %v", err)
+	}
+	if err := run(pending); err == nil || !strings.Contains(err.Error(), "pending") {
+		t.Fatalf("want a never-called pending server named, got %v", err)
 	}
 	// A stream without the init event says nothing about servers.
 	if err := run(`{"type":"result","result":"x"}`); err != nil {

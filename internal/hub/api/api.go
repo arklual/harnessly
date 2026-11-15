@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -56,6 +57,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/rates"
 	"github.com/ly-solutions/harnessly/internal/hub/relay"
 	"github.com/ly-solutions/harnessly/internal/hub/repl"
+	"github.com/ly-solutions/harnessly/internal/hub/rollout"
 	"github.com/ly-solutions/harnessly/internal/hub/spaces"
 	"github.com/ly-solutions/harnessly/internal/hub/sshinstall"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
@@ -65,6 +67,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/ticket"
 	"github.com/ly-solutions/harnessly/internal/hub/usage"
 	"github.com/ly-solutions/harnessly/internal/hub/vaultsvc"
+	"github.com/ly-solutions/harnessly/internal/hub/webpkg"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 	"github.com/ly-solutions/harnessly/internal/safego"
 	"github.com/ly-solutions/harnessly/internal/secrets"
@@ -128,6 +131,8 @@ type Hub struct {
 	// of its own (HUB_METRICS_LISTEN) and is never mounted on Handler.
 	Metrics http.Handler
 
+	// Rollout says whether a rollout is under way and takes the pipeline's word about it.
+	Rollout   *rollout.Service
 	Auth      *auth.Service
 	Spaces    *spaces.Service
 	Orgs      *orgs.Service
@@ -238,6 +243,10 @@ func New(o Options) (*Hub, error) {
 		h.Registry.SetCluster(c)
 		h.Internal = recoverer(log, c.Handler())
 		h.lead = leader.New(db, id, log, o.Now)
+	}
+	h.Rollout = &rollout.Service{DB: db, Replica: cfg.ReplicaID, Token: cfg.RolloutToken, Log: log, Now: o.Now}
+	if c := h.Registry.Cluster(); c != nil {
+		h.Rollout.Replica = c.ID
 	}
 	h.Auth, err = auth.New(auth.Deps{Config: cfg, DB: db, Mailer: o.Mailer, Limiter: o.Limiter, Log: log, Now: o.Now, HTTPClient: o.HTTPClient, Endpoints: o.Endpoints})
 	if err != nil {
@@ -432,7 +441,9 @@ func New(o Options) (*Hub, error) {
 		h.Design.ReconcileLinks(ctx)
 	}()
 	h.Efficiency = &efficiency.Service{DB: db, OrgGate: h.Orgs.OrgGate, Features: h.Features, Switches: h.Switches, Now: o.Now}
-	h.Docs = docs.New(docs.Deps{Config: cfg, DB: db, Auth: h.Auth, Log: log, Now: o.Now, Links: h.Registry, Gate: h.Switches, Notice: func(ctx context.Context, to, subject, body, link string) error {
+	h.Docs = docs.New(docs.Deps{Config: cfg, DB: db, Auth: h.Auth, Log: log, Now: o.Now, Links: h.Registry, Gate: h.Switches, AppToken: h.appTokenSubject, Bell: func(ctx context.Context, userID, email, key, title, text, link string) bool {
+		return h.Notices.RingMention(ctx, userID, email, key, title, text, link)
+	}, Notice: func(ctx context.Context, to, subject, body, link string) error {
 		if n, ok := o.Mailer.(mail.Noticer); ok {
 			_, err := n.SendNotice(ctx, to, subject, body, link)
 			return err
@@ -474,7 +485,7 @@ func New(o Options) (*Hub, error) {
 		u, err := db.S().UserByEmail(ctx, email)
 		return u.ID, err == nil && u.DisabledAt == nil && u.ID != ""
 	}
-	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now, Design: noticehub.Chain{h.Notices, h.Design}, Features: h.Features, Workspace: o.Workspace, History: cfg.History, VoiceTakes: cfg.VoiceTakes, Fleet: h.Fleet, Switches: h.Switches, SlotKey: slotKey})
+	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now, Design: noticehub.Chain{h.Notices, h.Design}, Features: h.Features, Workspace: o.Workspace, History: cfg.History, VoiceTakes: cfg.VoiceTakes, Fleet: h.Fleet, Switches: h.Switches, SlotKey: slotKey, Rollout: h.Rollout.ServeState})
 	// A person whose sessions were all ended at once holds nothing open: neither the live streams of their spaces nor
 	// what they had open on the machines.
 	h.Auth.OnSessionsEnded(func(userID string) {
@@ -492,6 +503,10 @@ func New(o Options) (*Hub, error) {
 	px.UseDocs(h.Docs.Handler(), h.Docs.Prefix())
 	h.Proxy = px
 	h.Dist = dist.New(cfg.DistDir, cfg.AgentURL, buildinfo.Version, cfg.ContainerImage)
+	if cfg.WebPackageURL != "" {
+		// each replica keeps its own verified copy of the machines' page in its data folder.
+		h.Dist.WebDir = filepath.Join(cfg.DataDir, "web-package")
+	}
 	if cfg.SSH {
 		// The way is optional: a hub whose data folder cannot hold the key runs without it, and the page hides it.
 		h.SSH, err = sshinstall.New(sshinstall.Deps{
@@ -572,6 +587,7 @@ func New(o Options) (*Hub, error) {
 	mux.Handle("GET /api/config", httpx.Handler(h.config))
 	mux.Handle("GET /api/capabilities", httpx.Handler(h.capabilities))
 	mux.Handle("GET /api/ext/ui", httpx.Handler(h.extUI))
+	mux.Handle("POST /api/rollout", httpx.Handler(h.Rollout.ServeMark))
 	h.Auth.Mount(mux)
 	h.Spaces.Mount(mux)
 	h.Orgs.Mount(mux)
@@ -694,7 +710,7 @@ func New(o Options) (*Hub, error) {
 			mux.ServeHTTP(w, r)
 		}
 	})
-	secured := securityHeaders(cfg.Secure, routed)
+	secured := frameSafe(securityHeaders(cfg.Secure, routed))
 	guarded := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if (h.Sites != nil && h.Sites.IsSiteHost(r.Host)) || h.Design.IsShareHost(r.Host) || h.Design.IsShareAlias(r.Host) || isGuestHost(r.Host) || h.Proxy.IsSlotHost(r.Host) {
 			// A published page sets its own headers; the hub's (frame ban, referrer policy) are for the hub's pages.
@@ -838,6 +854,10 @@ func (h *Hub) Run(ctx context.Context) {
 	}
 	safego.Go("live analytics", func() { h.Analytics.RunLive(ctx, h.OrgEvents.Active) })
 	safego.Go("design", func() { h.Design.Run(ctx) })
+	if h.Dist.WebDir != "" {
+		src := webpkg.Source{API: h.cfg.WebPackageURL, Token: h.cfg.WebPackageToken}
+		safego.Go("web package", func() { src.Run(ctx, h.Dist.WebDir, h.log) })
+	}
 	if h.search != nil {
 		safego.Go("search index", func() { h.runSearch(ctx) })
 	}
@@ -958,6 +978,10 @@ func newProvider(cfg *config.Config) (provider.Provider, error) {
 // taken go on.
 func (h *Hub) BeginDrain() {
 	h.draining.Store(true)
+	// First of all, so the pages hear «an update is under way» from every replica before a link moves.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	h.Rollout.Stopping(ctx, h.cfg.ShutdownGrace+rolloutTail)
+	cancel()
 	if h.Dialer != nil {
 		h.Dialer.Refuse()
 	}
@@ -993,7 +1017,14 @@ func (h *Hub) Shutdown() {
 	if h.SSH != nil {
 		h.SSH.Close()
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	h.Rollout.Stopped(ctx, rolloutTail)
+	cancel()
 }
+
+// rolloutTail is how long the pages keep hearing «an update is under way» after a replica has stopped: the next one
+// is usually starting by then, and one rollout does not read as two.
+const rolloutTail = 20 * time.Second
 
 // anyGate is on for a feature when any of its gates is.
 type anyGate []env.FeatureGate
@@ -1050,3 +1081,11 @@ func docGuestLink(mux *http.ServeMux, r *http.Request) bool {
 	_, pattern := mux.Handler(r)
 	return pattern == "GET /d/{token}" || pattern == "GET /static/fonts/{name}"
 }
+
+// The proxy gets the design service inside a noticehub.Chain: the chain must keep what the proxy asks of the service
+// beyond ServeMachine, or each of these silently does nothing on a hub.
+var (
+	_ proxy.HomeServer = noticehub.Chain{}
+	_ proxy.Anchor     = noticehub.Chain{}
+	_ proxy.KeyedFiles = noticehub.Chain{}
+)

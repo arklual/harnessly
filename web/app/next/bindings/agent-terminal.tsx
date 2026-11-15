@@ -17,6 +17,13 @@ export const useAgentTerminal = (conv: Conversation | null) => {
   useMachines();
   const available = !!conv && conv.state.k !== 'stopped' && hasFeature(conv.machineId, 'terminal');
   const shown = available && open;
+  // The panel is opened for one chat: another chat starts with it folded.
+  const convId = conv?.id ?? null;
+  const [openFor, setOpenFor] = useState(convId);
+  if (openFor !== convId) {
+    setOpenFor(convId);
+    setOpen(false);
+  }
 
   useEffect(() => {
     if (!available) return;
@@ -42,6 +49,7 @@ export const useAgentTerminal = (conv: Conversation | null) => {
         cwd={conv.cwd}
         title={conv.title}
         provider={conv.provider}
+        model={conv.model?.id}
         onClose={() => setOpen(false)}
       />
     </Suspense>

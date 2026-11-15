@@ -8,6 +8,69 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Agent evals for new features (docs/agent-evals.md «New features»): `evals/agent/surface.txt` lists the
+  agent's surface (workspace prompt, skills, MCP tools, `harnessly` commands) and every scenario names the paths it
+  checks (`covers:`). `harnessly eval affected` names the scenarios a change touches and, with `--check`, exits 3 when
+  the surface changed without a scenario; `harnessly eval suggest` drafts a scenario for a change with a cheap model.
+  CI warns about such a push (`agent-evals-coverage`) and runs the affected scenarios on haiku when asked
+  (`agent-evals-smoke`: `[eval]` in the message, on a runner that can host stands).
+
+### Fixed
+
+- `harnessly eval` with Codex: the login copy gets an empty `refresh_token` and a fresh `last_refresh` (Codex showed its
+  sign-in screen without the field, and the real image generator answered 401), Codex runs without its own sandbox in a
+  stand (Landlock is the boundary; bubblewrap could not start and every command failed), and the tool calls of Codex's
+  code mode are read out of its scripts.
+- `harnessly eval` judges the person's chat when the agent delegated (the delegated chat's session, written last in the
+  same folder, was taken instead), the secret scenario no longer counts «вставьте токен туда, а не в чат» as asking for
+  the token in the chat, and delegating with `harnessly tab create --prompt` counts as delegating.
+
+### Changed
+
+- The workspace prompt tells agents how to hand over a Sinopia Design page (`harnessly design export <project> "<page>"`,
+  `--zip` for a project) instead of rewriting its HTML, and, when the deployment has a tracker, that a task key or a
+  merge request opens in the pane with `harnessly open <key>`, without a tracker connection of the agent's own
+  (measured with `harnessly eval`).
+- `harnessly eval` has no way to run without Landlock any more: `--no-sandbox` is gone, and a machine without it refuses
+  the run before any stand is made.
+
+### Added
+
+- Boards and documents through the hub: a link to one of the installation's boards or documents in a chat
+  shows as a card with its name, who changed it last and when (a board's last edit, a document's current version), and a
+  look at it: a board's picture, an HTML document's first page in a sandboxed frame that may not call anywhere, a text
+  document's first lines; the hub answers it
+  (`GET <platform api>/docs/{slug}/card`, `…/{slug}/preview`) only to a person who may read it, and the board's key
+  never reaches the browser. A click on a board link opens the «Доски» app in the right pane on that board, signed in by
+  the app's view itself; without the app it opens as before.
+- Documents and boards are made, copied, renamed and put into the trash through the hub: `POST <p>`,
+  `POST <p>/{slug}/duplicate`, `PATCH <p>/{slug}`, `DELETE <p>/{slug}`, `POST <p>/{slug}/restore`, `GET <p>/_trash`
+  under `/api/platform/docs`, with the boards' rights (anybody in a space makes one, the owner or an administrator
+  trashes it); a thing in the trash opens for nobody until it is taken out. The documents and boards apps call them
+  for a person with the shared secret and the person's platform token (`X-Harnessly-Token`), never as an
+  administrator; the trash revokes a document's public link. Migration 0074 adds `doc_meta.kind`, `trashed_at`,
+  `trashed_by`.
+- The documents service learns of the trash from the hub: putting a document into the trash or taking it out
+  posts `{trashed}` to `/api/v1/artifacts/{slug}/trash`, so `/a/{slug}` answers `404` for everybody; when the service
+  does not confirm, the hub logs it and the leader sends the state again every minute and at start (migration 0075,
+  `doc_meta.trash_sync`). The agent of the owner's machine puts its document into the trash through `POST /docs/acl`
+  with a route ending in `/trash`.
+- Apps of the environment follow their branch: a machine looks at the branch of each `app` item of a
+  repository outside the list every ten minutes and installs a new commit by itself; the run's step says the app's
+  `version`, «Окружение» shows the version and when it came, and a view on screen starts anew on a new version with
+  the board or document it had open.
+- `harnessly eval` (docs/agent-evals.md): checks that harnessly by itself makes an agent behave. Scenarios are
+  YAML in `evals/agent/`, each run gets a disposable stand (its own home, runtime, port and workspace, no memory, no
+  plugins), and the run is judged by its facts: tool calls from the transcript, the right pane's intents, picture jobs,
+  files. `run` (matrix of scenarios × models × stored prompt variants × repeats, parallel stands, budget, retries of
+  infrastructure failures, reuse), `report` (pass rate with Wilson intervals, change against the earlier run, failures),
+  `variants` (rewordings by a cheap model, stored in the scenario), `list`. `RUNTIME_IMAGEGEN_BIN` replaces `codex` for
+  pictures, so a stand draws with a fake. Stands are confined by Landlock (`harnessly eval sandbox`): an agent reads and
+  writes only its stand.
+- `@Name` in a comment on a board rings that person's bell: the hub takes `message.mentions` of the boards
+  webhook (`hub:<id>` or a keyed hash of the e-mail, only people who were on the board), tells each once with a link that
+  opens the board on the thread in the page (`/apps/harnessly.boards?o=<slug>&th=<thread>`); `noticehub.RingMention`.
+  The bell opens a link of the page inside it, without loading the page again.
 - A view of the start page can take the whole stage: `"height": "stage"` on a `home` view puts the greeting and
   the field at the top and fills the rest of the stage with the view, which scrolls inside itself; `hl.slot.greet({title,
   sub})` (`harnessly/slot.greet`) puts its own greeting in place of the host's question.
@@ -412,6 +475,11 @@ All notable changes to this project are documented here. The format follows
   with the `dir`, `container` and `full` profiles (`docs/hub/machine.md`).
 
 ### Changed
+
+- The boards and the documents are one stage: one screen, one island, one draft and one chat over both; their
+  windows stay alive, hidden, once opened, so going between a board, a document and their lists loads nothing again. A
+  view on the app's own server keeps its frame and its bridge when the chat changes (the first message makes it): only
+  its session follows the chat; page tools and the published context offered before go to the new chat.
 
 - `HUB_ORGS` is `off` or `on`: the value `shadow` (instance administrators only) is gone, and a hub that
   still has it in its environment stops at start and says which values to set. Every variable the hub reads is in one

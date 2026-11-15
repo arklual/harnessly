@@ -2,6 +2,7 @@
 // applied as the `dark` class and `color-scheme` on <html>; and the palette over it (graphite, midnight, forest…),
 // stored the same way and applied as `data-palette` (styles/palettes.css). A change made from a click spreads from
 // that point as a circle (a view transition) where the browser can and the person did not ask for less motion.
+import { notePrefWrite } from '@/next/core/pref-write';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 type TTheme = 'light' | 'dark' | 'system';
@@ -55,6 +56,7 @@ const keep = (key: string, value: string) => {
   } catch {
     // private mode: the choice lasts for this page only
   }
+  notePrefWrite(key);
 };
 
 const paint = (mode: 'light' | 'dark', palette: TPalette) => {
@@ -116,6 +118,15 @@ export function ThemeProvider({
     const on = () => setSystemTheme(m.matches ? 'dark' : 'light');
     m.addEventListener('change', on);
     return () => m.removeEventListener('change', on);
+  }, []);
+  // The person's settings brought another device's theme or palette (next/stores/synced-prefs.ts).
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === KEY) setThemeState(readStored());
+      if (event.key === PALETTE_KEY) setPaletteState(readPalette());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
   const resolvedTheme = theme === 'system' ? systemTheme : theme;
   useEffect(() => paint(resolvedTheme, palette), [resolvedTheme, palette]);

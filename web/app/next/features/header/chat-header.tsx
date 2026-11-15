@@ -5,7 +5,9 @@ import usePendingList, { PENDING } from '@/next/ui/use-pending-list';
 import { UI_REQUEST, useUiRequest } from '@/next/stores/ui-requests';
 import ChatShareDialog, { type IChatShare } from '@/next/features/chat-share/share-dialog';
 import GoalDialog, { type IHeaderGoal } from '@/next/features/header/goal-dialog';
-import ChatMenu from '@/next/features/sidebar/chat-menu';
+import ChatMenu, { type IChatMenuExtra } from '@/next/features/sidebar/chat-menu';
+import ChatsSheet from '@/next/features/header/chats-sheet';
+import { useMedia, usePhone } from '@/next/ui/use-media';
 import {
   BackgroundButton,
   TerminalButton,
@@ -36,6 +38,9 @@ export interface IHeaderMachine {
 
 const MACHINE_KEY = 'machine';
 
+/** A narrow phone: the title takes the bar, only the bell and «⋯» stay beside it, the rest goes into «⋯». */
+const NARROW_QUERY = '(max-width: 600px)';
+
 export type { IHeaderBackground };
 
 export interface IChatHeaderProps {
@@ -58,6 +63,8 @@ export interface IChatHeaderProps {
   /** The chat whose agent delegated this one, before the title as the way back to it; null for any other chat. */
   parent?: { title: string; onOpen: () => void } | null;
   bell: { unread: boolean; open: boolean; onToggle: (anchor: HTMLElement) => void };
+  /** The chats a tap on the title offers on a narrow phone («Чаты»); null leaves the title a plain heading. */
+  chats?: { list: readonly ISidebarChat[] | null; onOpen: (id: string) => void } | null;
 }
 
 /**
@@ -80,7 +87,16 @@ const ChatHeader = ({
   share = null,
   parent = null,
   bell,
+  chats = null,
 }: IChatHeaderProps) => {
+  const narrow = useMedia(NARROW_QUERY);
+  // On the greeting there is no «⋯» to take the buttons: they stay where they are.
+  const compact = narrow && chat !== null;
+  // On the phone the right pane matters more than the bell: the pane's button takes the bell's place and
+  // the notifications go into «⋯».
+  const phone = usePhone();
+  const paneFirst = phone && chat !== null && pane !== null;
+  const [chatsOpen, setChatsOpen] = useState(false);
   const { pending, run } = usePendingList();
   const [rename, setRename] = useState<{ value: string; saving: boolean } | null>(null);
   const [goalOpen, setGoalOpen] = useState(false);
@@ -123,6 +139,103 @@ const ChatHeader = ({
   const [pickedMachine, setPickedMachine] = useState<string | null>(null);
   const switching = pending.get(MACHINE_KEY);
 
+  const extras: IChatMenuExtra[] = [];
+  if (background && compact)
+    extras.push({
+      key: 'layers',
+      icon: 'layers',
+      label: t('next.header.layers'),
+      onClick: background.onToggle,
+    });
+  if (machine.onManage && compact)
+    extras.push({
+      key: 'machine',
+      icon: 'server',
+      label: t('next.header.machine'),
+      onClick: machine.onManage,
+    });
+  if (paneFirst)
+    extras.push({
+      key: 'bell',
+      icon: 'bell',
+      label: t('next.header.bell'),
+      onClick: () => {
+        const anchor = document.querySelector<HTMLElement>('.hx-header__more, .hx-header');
+        if (anchor) bell.onToggle(anchor);
+      },
+    });
+
+  const menu = chat && !rename && busy === undefined && (
+    <ChatMenu
+      title={chat.title}
+      pinned={chat.pinned}
+      projectId={chat.projectId}
+      projects={projects}
+      actions={actions}
+      onStartRename={() => setRename({ value: chat.title, saving: false })}
+      onPin={() => {
+        const onPin = actions.onPin;
+        if (onPin)
+          chatAction(chat.pinned ? t('next.sidebar.unpinFailed') : t('next.sidebar.pinFailed'), (id) =>
+            onPin(id, !chat.pinned),
+          );
+      }}
+      onMove={(projectId) => {
+        const onMove = actions.onMove;
+        if (onMove) chatAction(t('next.sidebar.moveFailed'), (id) => onMove(id, projectId));
+      }}
+      onDelete={() => {
+        const onDelete = actions.onDelete;
+        if (onDelete) chatAction(t('next.sidebar.deleteFailed'), onDelete);
+      }}
+      onCopyLink={
+        actions.onCopyLink
+          ? () => {
+              const onCopyLink = actions.onCopyLink;
+              if (onCopyLink) chatAction(t('next.sidebar.copyFailed'), onCopyLink);
+            }
+          : undefined
+      }
+      onTerminal={actions.onTerminal ? () => actions.onTerminal?.(chat.id) : undefined}
+      onStopTerminal={
+        actions.onStopTerminal && chat.canStopTerminal
+          ? () => {
+              const onStop = actions.onStopTerminal;
+              if (onStop) chatAction(t('next.sidebar.stopTerminalFailed'), onStop);
+            }
+          : undefined
+      }
+      onRetitle={() => {
+        const onRetitle = actions.onRetitle;
+        if (onRetitle) chatAction(t('next.sidebar.retitleFailed'), onRetitle);
+      }}
+      onFork={
+        actions.onFork && chat.canFork
+          ? () => {
+              const onFork = actions.onFork;
+              if (onFork) chatAction(t('next.handoff.forkFailed'), onFork);
+            }
+          : undefined
+      }
+      onMerge={actions.onMerge && chat.canMerge ? () => actions.onMerge?.(chat.id) : undefined}
+      onContinue={actions.onContinue && chat.canContinue ? () => actions.onContinue?.(chat.id) : undefined}
+      onMoveVm={actions.onMoveVm && chat.canMoveVm ? () => actions.onMoveVm?.(chat.id) : undefined}
+      onGoal={goal ? () => setGoalOpen(true) : undefined}
+      onShare={share ? () => setShareOpen(true) : undefined}
+      extras={extras.length > 0 ? extras : undefined}
+      trigger={
+        <button
+          type="button"
+          className="hx-head-btn hx-item__menu hx-header__more"
+          aria-label={paneFirst && bell.unread ? t('next.header.bellUnread') : t('next.rowMenu.label')}
+        >
+          <Icon name="ellipsis" size="sm" />
+          {paneFirst && bell.unread && <span className="hx-header__dot" />}
+        </button>
+      }
+    />
+  );
+
   return (
     <header className="hx-header" data-busy={busy !== undefined || undefined}>
       <button
@@ -163,7 +276,20 @@ const ChatHeader = ({
             <Icon name="chevron-right" size="sm" className="hx-header__parent-sep" />
           </button>
         )}
-        {chat && !rename && (
+        {chat && !rename && compact && chats && (
+          <button
+            type="button"
+            className="hx-header__switch"
+            aria-haspopup="dialog"
+            aria-expanded={chatsOpen}
+            aria-label={`${chat.title} · ${t('next.header.switchChat')}`}
+            onClick={() => setChatsOpen(true)}
+          >
+            <h1 className="hx-header__name">{chat.title}</h1>
+            <Icon name="chevron-down" size="sm" className="hx-header__switch-chev" />
+          </button>
+        )}
+        {chat && !rename && !(compact && chats) && (
           <h1 className="hx-header__name" title={chat.title}>
             {chat.title}
           </h1>
@@ -177,106 +303,40 @@ const ChatHeader = ({
             aria-label={busy === PENDING.slow ? t('next.chatRow.slow') : t('next.chatRow.busy')}
           />
         )}
-        {chat && !rename && busy === undefined && (
-          <ChatMenu
-            title={chat.title}
-            pinned={chat.pinned}
-            projectId={chat.projectId}
-            projects={projects}
-            actions={actions}
-            onStartRename={() => setRename({ value: chat.title, saving: false })}
-            onPin={() => {
-              const onPin = actions.onPin;
-              if (onPin)
-                chatAction(chat.pinned ? t('next.sidebar.unpinFailed') : t('next.sidebar.pinFailed'), (id) =>
-                  onPin(id, !chat.pinned),
-                );
-            }}
-            onMove={(projectId) => {
-              const onMove = actions.onMove;
-              if (onMove) chatAction(t('next.sidebar.moveFailed'), (id) => onMove(id, projectId));
-            }}
-            onDelete={() => {
-              const onDelete = actions.onDelete;
-              if (onDelete) chatAction(t('next.sidebar.deleteFailed'), onDelete);
-            }}
-            onCopyLink={
-              actions.onCopyLink
-                ? () => {
-                    const onCopyLink = actions.onCopyLink;
-                    if (onCopyLink) chatAction(t('next.sidebar.copyFailed'), onCopyLink);
-                  }
-                : undefined
-            }
-            onTerminal={actions.onTerminal ? () => actions.onTerminal?.(chat.id) : undefined}
-            onStopTerminal={
-              actions.onStopTerminal && chat.canStopTerminal
-                ? () => {
-                    const onStop = actions.onStopTerminal;
-                    if (onStop) chatAction(t('next.sidebar.stopTerminalFailed'), onStop);
-                  }
-                : undefined
-            }
-            onRetitle={() => {
-              const onRetitle = actions.onRetitle;
-              if (onRetitle) chatAction(t('next.sidebar.retitleFailed'), onRetitle);
-            }}
-            onFork={
-              actions.onFork && chat.canFork
-                ? () => {
-                    const onFork = actions.onFork;
-                    if (onFork) chatAction(t('next.handoff.forkFailed'), onFork);
-                  }
-                : undefined
-            }
-            onMerge={actions.onMerge && chat.canMerge ? () => actions.onMerge?.(chat.id) : undefined}
-            onContinue={
-              actions.onContinue && chat.canContinue ? () => actions.onContinue?.(chat.id) : undefined
-            }
-            onMoveVm={actions.onMoveVm && chat.canMoveVm ? () => actions.onMoveVm?.(chat.id) : undefined}
-            onGoal={goal ? () => setGoalOpen(true) : undefined}
-            onShare={share ? () => setShareOpen(true) : undefined}
-            trigger={
-              <button
-                type="button"
-                className="hx-head-btn hx-item__menu hx-header__more"
-                aria-label={t('next.rowMenu.label')}
-              >
-                <Icon name="ellipsis" size="sm" />
-              </button>
-            }
-          />
-        )}
+        {!compact && menu}
       </div>
 
-      {/* The machine always shows (HRN-870), with all about it in its card (HRN-891): on a chat and on the start page */}
-      <div className="hx-headmach-card">
-        <MachineCard
-          machine={machine.card}
-          others={machine.others}
-          switching={switching && pickedMachine ? { id: pickedMachine, pending: switching } : null}
-          onPick={
-            machine.onPick
-              ? (id) => {
-                  const pick = machine.onPick;
-                  if (!pick) return;
-                  setPickedMachine(id);
-                  void run(MACHINE_KEY, t('next.sidebar.machineFailed'), () => pick(id));
-                }
-              : undefined
-          }
-          onManage={machine.onManage}
-          reveal={machine.reveal}
-        />
-      </div>
+      {/* The machine always shows (HRN-870), with all about it in its card (HRN-891): on a chat and on the start page;
+          on a narrow phone it is an item of «⋯». */}
+      {!compact && (
+        <div className="hx-headmach-card">
+          <MachineCard
+            machine={machine.card}
+            others={machine.others}
+            switching={switching && pickedMachine ? { id: pickedMachine, pending: switching } : null}
+            onPick={
+              machine.onPick
+                ? (id) => {
+                    const pick = machine.onPick;
+                    if (!pick) return;
+                    setPickedMachine(id);
+                    void run(MACHINE_KEY, t('next.sidebar.machineFailed'), () => pick(id));
+                  }
+                : undefined
+            }
+            onManage={machine.onManage}
+            reveal={machine.reveal}
+          />
+        </div>
+      )}
 
       <span className="hx-spacer" />
 
       {/* The buttons hang on the window's right edge: when the sidebar slides, they stay (use-side-motion.ts). */}
       <div className="hx-header__end">
-        {terminal && !pane?.open && <TerminalButton terminal={terminal} />}
+        {terminal && !compact && !pane?.open && <TerminalButton terminal={terminal} />}
 
-        {pane && !pane.open && (
+        {pane && !compact && !paneFirst && !pane.open && (
           <button
             type="button"
             className="hx-head-btn hx-tipped hx-header__tools"
@@ -294,7 +354,7 @@ const ChatHeader = ({
           </button>
         )}
 
-        {chat && onNewChat && (
+        {chat && !compact && onNewChat && (
           <button
             type="button"
             className="hx-head-btn hx-header__new"
@@ -306,19 +366,42 @@ const ChatHeader = ({
           </button>
         )}
 
-        {background && !pane?.open && <BackgroundButton background={background} />}
+        {background && !compact && !pane?.open && <BackgroundButton background={background} />}
 
-        <button
-          type="button"
-          className="hx-head-btn hx-header__bell"
-          aria-expanded={bell.open}
-          aria-label={bell.unread ? t('next.header.bellUnread') : t('next.header.bell')}
-          onClick={(event) => bell.onToggle(event.currentTarget)}
-        >
-          <Icon name="bell" />
-          {bell.unread && <span className="hx-header__dot" />}
-        </button>
+        {paneFirst && pane && (
+          <button
+            type="button"
+            className="hx-head-btn hx-header__tools"
+            aria-pressed={pane.open}
+            aria-label={t('next.header.pane')}
+            onClick={pane.onToggle}
+          >
+            <Icon name="panel-right" />
+          </button>
+        )}
+        {!paneFirst && (
+          <button
+            type="button"
+            className="hx-head-btn hx-header__bell"
+            aria-expanded={bell.open}
+            aria-label={bell.unread ? t('next.header.bellUnread') : t('next.header.bell')}
+            onClick={(event) => bell.onToggle(event.currentTarget)}
+          >
+            <Icon name="bell" />
+            {bell.unread && <span className="hx-header__dot" />}
+          </button>
+        )}
+        {compact && menu}
       </div>
+      {chats && (
+        <ChatsSheet
+          open={chatsOpen}
+          onClose={() => setChatsOpen(false)}
+          chats={chats.list}
+          currentId={chat?.id ?? null}
+          onOpen={chats.onOpen}
+        />
+      )}
       {share && <ChatShareDialog open={shareOpen} share={share} onClose={() => setShareOpen(false)} />}
       {goal && <GoalDialog open={goalOpen} goal={goal} onClose={() => setGoalOpen(false)} />}
     </header>

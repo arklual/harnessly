@@ -2,7 +2,7 @@ import { Menu } from '@base-ui/react/menu';
 import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import type { TPending } from '@/next/ui/use-pending-list';
 import { RenameField, ROW_VARIANT, type IRowEnter, type TRowVariant } from '@/next/features/sidebar/chat-row';
 import { isFavEmpty, type IFavGroupView, type IFavView } from '@/next/features/sidebar/favorites';
@@ -41,7 +41,7 @@ const GroupMenu = ({
   if (!canRename && !canDelete && !prev && !next) return null;
   return (
     <span className="hx-item__end">
-      <Menu.Root actionsRef={menuActions}>
+      <MenuRoot actionsRef={menuActions}>
         <Menu.Trigger
           render={
             <button
@@ -87,7 +87,7 @@ const GroupMenu = ({
             </>
           )}
         </MenuPanel>
-      </Menu.Root>
+      </MenuRoot>
     </span>
   );
 };

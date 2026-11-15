@@ -54,6 +54,7 @@ const SEND_LOOK: Record<TMessagePhase, string> = {
   draft: 'sending',
   sending: 'sending',
   slow: 'sending',
+  stalled: 'sending',
   'waiting-net': 'waiting',
   'waiting-machine': 'waiting',
   queued: 'sending',
@@ -138,6 +139,14 @@ const OutgoingState = ({ message, phase, onRetry, onResend, onDelete, onEdit }: 
       <div className="hx-msg-user__state" role="status">
         <Icon name="clock" size="sm" />
         {t('next.message.slow')}
+      </div>
+    );
+  }
+  if (phase === MESSAGE_PHASE.stalled) {
+    return (
+      <div className="hx-msg-user__state" role="status">
+        <Icon name="clock" size="sm" />
+        {t('next.message.stalled')}
       </div>
     );
   }

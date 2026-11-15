@@ -1,5 +1,6 @@
 import { useRef, type ReactNode } from 'react';
 import { t } from '@/next/i18n';
+import Icon from '@/next/ui/icon';
 import { usePresence } from '@/next/ui/presence';
 import usePaneSwipe from '@/next/features/shell/use-pane-swipe';
 import usePaneWidth from '@/next/features/shell/use-pane-width';
@@ -14,14 +15,25 @@ export interface IPaneDrawerProps {
   width?: number | null;
   /** The person dragged the pane to this width. */
   onWidth?: (width: number) => void;
+  /** On the phone the sheet takes the whole screen at once (a design); else it rises to two thirds. */
+  full?: boolean;
   children: ReactNode;
 }
 
 /**
- * The right pane's frame: a column at the right of the stage on desktop; on the phone a sheet over the chat that
- * slides in from the right and goes with a swipe to the right or a tap on the scrim. Its content is the pane feature's.
+ * The right pane's frame: a column at the right of the stage on desktop; on the phone a bottom sheet over the chat
+ * that rises to two thirds of the screen (a design: to all of it), opens to the whole screen with a drag up
+ * and folds, then closes, with a drag down or a tap on the scrim. Its content is the pane feature's.
  */
-const PaneDrawer = ({ open, onClose, wide = false, width = null, onWidth, children }: IPaneDrawerProps) => {
+const PaneDrawer = ({
+  open,
+  onClose,
+  wide = false,
+  width = null,
+  onWidth,
+  full = false,
+  children,
+}: IPaneDrawerProps) => {
   const paneRef = useRef<HTMLElement>(null);
   const scrimRef = useRef<HTMLDivElement>(null);
   const presence = usePresence(open ? true : null, paneExitMs());
@@ -29,7 +41,7 @@ const PaneDrawer = ({ open, onClose, wide = false, width = null, onWidth, childr
   const onSplit = usePaneWidth(paneRef, presence.value !== null, width, onWidth);
   usePaneMotion(paneRef, open);
   usePaneMax(paneRef, wide, presence.value !== null);
-  usePaneSwipe(paneRef, scrimRef, open, onClose);
+  usePaneSwipe(paneRef, scrimRef, open, onClose, full);
   if (presence.value === null) return null;
   return (
     <>
@@ -49,6 +61,19 @@ const PaneDrawer = ({ open, onClose, wide = false, width = null, onWidth, childr
       >
         <div className="hx-pane__split" aria-hidden="true" onPointerDown={onSplit}>
           <span />
+        </div>
+        {/* The phone's handle: the grip to drag the sheet by, and a plain way back to the chat (a design's own «←» is
+            its history, not the way out). */}
+        <div className="hx-pane__grip">
+          <span className="hx-pane__grip-bar" aria-hidden="true" />
+          <button
+            type="button"
+            className="hx-head-btn hx-pane__grip-x"
+            aria-label={t('next.pane.toChat')}
+            onClick={onClose}
+          >
+            <Icon name="x" size="sm" />
+          </button>
         </div>
         {children}
       </aside>

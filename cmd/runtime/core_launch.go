@@ -105,6 +105,7 @@ func (c *core) newLauncher() {
 		Admit: c.budgetAdmit, BeforeAgent: beforeAgent(firstRunBeforeAgent(c.cfg.Home), memoryBeforeAgent),
 	})
 	c.inbox = &launch.Inbox{Starter: c.launcher, Tmux: inboxTmux{c}, Log: coreLog,
+		SpaceCwd: func() string { return spaceChatDir(c.cfg.Home) },
 		Submit: func(session, text string) error {
 			svc := c.promptService()
 			if svc == nil {

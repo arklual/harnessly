@@ -151,7 +151,6 @@ export const AppStageDemo = ({
           } else if (zone === 'float' || zone === 'island') setMode(zone);
         }}
         onHide={() => setMode('island')}
-        onOpenDrawer={onOpenDrawer}
         onMode={onMode}
         more={[]}
         onOpenSite={() => undefined}

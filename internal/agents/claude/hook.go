@@ -58,6 +58,9 @@ type HookSettingsConfig struct {
 	// AppsLiveHook is the command line of the live hook of the apps (`harnessly hook app-context --live`): on
 	// UserPromptSubmit it tells the agent of the apps turned on or off in its chat since it started. "" adds none.
 	AppsLiveHook string
+	// VoiceGuardHook is the command line of the voice mode's PreToolUse hook (`harnessly hook voice-guard`): while the
+	// person talks to the chat by voice, a call that reaches outside asks first. "" adds none.
+	VoiceGuardHook string
 }
 
 // AppsLiveHookTimeout is how long Claude waits for the live hook: one call to the runtime on loopback.
@@ -158,11 +161,18 @@ func HookSettings(c HookSettingsConfig) []byte {
 		}{"PermissionRequest", []hookEntry{{Matcher: "", Hooks: []hookCommand{
 			{Type: "command", Command: shScript(c.PermissionHook, ""), Timeout: PermissionHookTimeout}}}}})
 	}
+	var pre []hookCommand
 	if c.BudgetHook != "" {
+		pre = append(pre, budgetCommand(c.BudgetHook, "PreToolUse", timeout))
+	}
+	if c.VoiceGuardHook != "" {
+		pre = append(pre, hookCommand{Type: "command", Command: c.VoiceGuardHook + " 2>/dev/null || true", Timeout: timeout})
+	}
+	if len(pre) > 0 {
 		hooks = append(hooks, struct {
 			name  string
 			entry []hookEntry
-		}{"PreToolUse", []hookEntry{{Matcher: "", Hooks: []hookCommand{budgetCommand(c.BudgetHook, "PreToolUse", timeout)}}}})
+		}{"PreToolUse", []hookEntry{{Matcher: "", Hooks: pre}}})
 	}
 	allow := c.Allow
 	if allow == nil {

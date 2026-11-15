@@ -1,0 +1,23 @@
+id: delegate-and-collect
+title: «Поручи другому агенту» — подчат, и результат принесён назад
+tags: [delegation]
+agents: [claude]
+timeout_s: 900
+setup:
+  files:
+    src/a.txt: "one\ntwo\nthree\n"
+    src/b.txt: "four\nfive\n"
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/delegation/**'
+prompt: Поручи это другому агенту в отдельном чате, сам не считай — пусть посчитает, сколько всего строк в файлах папки src, и принеси мне его ответ.
+expect:
+  # Both ways the workspace prompt names give the person a chat under theirs.
+  - name: delegated to a chat
+    any_of:
+      - called: harnessly\.delegate_task
+      - called: Bash
+        args: {command: 'harnessly tab create\b.*--prompt'}
+  - name: brought the answer back
+    text: '\b5\b'

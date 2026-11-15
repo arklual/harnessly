@@ -1560,7 +1560,8 @@
         "failure": {"oneOf": [{"$ref": "#/$defs/TurnFailure"}, {"type": "null"}]},
         "answerEntryId": {"oneOf": [{"$ref": "#/$defs/EntryId"}, {"type": "null"}]},
         "files": {"type": "array", "items": {"$ref": "#/$defs/TurnFile"}},
-        "outputs": {"type": "array", "items": {"$ref": "#/$defs/TurnOutput"}}
+        "outputs": {"type": "array", "items": {"$ref": "#/$defs/TurnOutput"}},
+        "pictures": {"type": "array", "items": {"type": "string", "minLength": 1}, "maxItems": 24}
       }
     },
     "TurnSummary": {

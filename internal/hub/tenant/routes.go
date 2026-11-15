@@ -247,6 +247,8 @@ var Routes = all(
 		"GET /dl/release.json",
 		"GET /dl/release.json.sig",
 		"GET /dl/network.json",
+		"GET /dl/web.json",
+		"GET /dl/web.tar.gz",
 		"GET /dl/{name}",
 	),
 	guarded("internal/hub/dist", Install, "the instance administrator",

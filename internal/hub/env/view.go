@@ -101,6 +101,9 @@ type EntryItem struct {
 	// it is Off (PATCH …/catalog/{itemId} with `source.off`). Off: the app is off for the whole organization.
 	BuiltIn bool `json:"builtIn,omitempty"`
 	Off     bool `json:"off,omitempty"`
+	// AppVersion and AppUpdatedAt: for an app, the version the machines have now and when one last put it on.
+	AppVersion   *string `json:"appVersion,omitempty"`
+	AppUpdatedAt *string `json:"appUpdatedAt,omitempty"`
 }
 
 // LayerView is one layer with its rows.
@@ -180,6 +183,10 @@ type Card struct {
 	Pinned       bool         `json:"pinned"`
 	Locked       bool         `json:"locked"`
 	LockedReason *string      `json:"lockedReason"`
+	// AppVersion is, for an app, the version the organization's machines have of it now, and AppUpdatedAt when a
+	// machine last put a new one on; absent when no machine has said in the last two weeks.
+	AppVersion   *string `json:"appVersion,omitempty"`
+	AppUpdatedAt *string `json:"appUpdatedAt,omitempty"`
 }
 
 func audienceView(raw string) AudienceView {

@@ -143,6 +143,8 @@ type EnvStep struct {
 	Ms      int64  `json:"ms"`
 	// Log is the step's output, secrets masked, at most EnvLogMax (the tail).
 	Log string `json:"log,omitempty"`
+	// Version is, for an app, the version of its manifest now on the machine.
+	Version string `json:"version,omitempty"`
 }
 
 // EnvSetupState is the runtime's account (EnvSetupFile).

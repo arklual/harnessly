@@ -125,3 +125,34 @@ func TestDeletedIDStaysTakenAndIsAnnouncedUntilTheGatewayForgetsIt(t *testing.T)
 		t.Fatalf("announced after the gateway forgot it: %v", events)
 	}
 }
+
+// an agent deletes a project through the CLI's route, the way the library does, and only its owner may.
+func TestCLIDeleteSendsTheProjectToTheTrashForItsOwnerOnly(t *testing.T) {
+	root := t.TempDir()
+	makeProject(t, root, "mine", "mine", "")
+	makeProject(t, root, "edited", "edited", "")
+	l := accessLibrary(t, root)
+	var events []string
+	l.emitFn = func(kind, project string) { events = append(events, kind+" "+project) }
+	if err := l.SetAccess(snapshot(map[string]Grant{"mine": {Role: "owner"}, "edited": {Role: "edit"}}, map[string]string{"mine": "none", "edited": "none"})); err != nil {
+		t.Fatal(err)
+	}
+	a := pagesAPI(l)
+	call := func(id string) int {
+		r := httptest.NewRequest(http.MethodPost, "/api/cli/design", strings.NewReader(`{"artifact":"`+id+`","delete":true}`))
+		r.Header.Set("Content-Type", "application/json")
+		return a.CLIDesign(r).Status
+	}
+	if c := call("edited"); c != 403 {
+		t.Fatalf("editor: %d", c)
+	}
+	if c := call("mine"); c != 200 {
+		t.Fatalf("owner: %d", c)
+	}
+	if kept, _ := filepath.Glob(filepath.Join(root, ".trash", "mine-*")); len(kept) != 1 {
+		t.Fatalf("trash: %v", kept)
+	}
+	if len(events) != 1 || events[0] != "design.deleted mine" {
+		t.Fatalf("events: %v", events)
+	}
+}

@@ -1335,6 +1335,42 @@
   flex: none;
   margin: var(--hx-space-3) 0;
 }
+/* A board's picture or an HTML document's first page in place of the icon: the card keeps its size. */
+.hx-file__ico.hx-linkcard__thumb {
+  width: 56px;
+  overflow: hidden;
+  background: var(--hx-bg-raised);
+}
+.hx-file__ico.hx-linkcard__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* The page is laid out at a desktop width and shrunk to the thumbnail: a still look, not a place to click. */
+.hx-file__ico.hx-linkcard__thumb--page {
+  position: relative;
+  place-items: start;
+}
+.hx-linkcard__thumb--page iframe {
+  width: 1280px;
+  height: 823px;
+  border: 0;
+  transform: scale(0.04375);
+  transform-origin: 0 0;
+  pointer-events: none;
+  background: #fff;
+}
+/* A text document's first lines under the card's line. */
+.hx-linkcard__excerpt {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-line;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-2);
+}
 
 /* A code block: dark in both themes, folds after 14 lines. */
 .hx-code {

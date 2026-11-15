@@ -181,6 +181,12 @@ type Config struct {
 	// registrable domain with the hub (app.example.com and run.example.com). Other editions only warn.
 	AllowSameSiteRuntime bool
 	DistDir              string
+	// WebPackageURL (HUB_WEB_PACKAGE_URL) is the project's API in the package registry
+	// (https://host/api/v4/projects/<id>) whose protected package web/<version> the hub hands the machines as their page
+	// (internal/hub/webpkg); empty, the default: the hub hands out no page and the machines keep their own.
+	// WebPackageToken (HUB_WEB_PACKAGE_TOKEN) reads it (read_api).
+	WebPackageURL   string
+	WebPackageToken string
 
 	// Sites (internal/sites): published static sites. SitesDomain is the wildcard domain they live under
 	// (<site>--<space>.<domain>); without it a self-hosted hub serves them under /sites/ on its own origin, sandboxed.
@@ -277,7 +283,10 @@ type Config struct {
 	// LaunchToken (HUB_LAUNCH_TOKEN, 32 characters or more) is the bearer a service (the messenger bot's /prompt) shows to
 	// start a conversation for a person on their own machine (internal/hub/proxy/launch.go); empty keeps the door
 	// shut. The rollout switch «prompt-launch» then decides, per person, whether it opens.
-	LaunchToken            string
+	LaunchToken string
+	// RolloutToken (HUB_ROLLOUT_TOKEN, 32 characters or more) opens POST /api/rollout, the pipeline's word that a rollout
+	// of the hub or of the runtimes starts or ends (internal/hub/rollout); empty keeps the route shut.
+	RolloutToken           string
 	AutomationsNotifyURL   string
 	AutomationsNotifyToken string
 	AutomationsGitLabURL   string
@@ -705,6 +714,8 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		RPName:            def("HUB_RP_NAME", "harnessly"),
 		RuntimeDomain:     strings.ToLower(strings.Trim(get("HUB_RUNTIME_DOMAIN"), ".")),
 		DistDir:           def("HUB_DIST_DIR", "/opt/harnessly/dist"),
+		WebPackageURL:     get("HUB_WEB_PACKAGE_URL"),
+		WebPackageToken:   get("HUB_WEB_PACKAGE_TOKEN"),
 		SitesDomain:       strings.ToLower(strings.Trim(get("HARNESSLY_SITES_DOMAIN"), ".")),
 		PreviewSlotDomain: strings.ToLower(strings.Trim(get("HUB_PREVIEW_SLOT_DOMAIN"), ".")),
 		PreviewSlotPrefix: strings.ToLower(get("HUB_PREVIEW_SLOT_PREFIX")),
@@ -889,6 +900,9 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	}
 	c.AutomationsSecret, c.AutomationsPortEnv = get("HUB_AUTOMATIONS_SECRET"), def("HUB_AUTOMATIONS_PORT_ENV", "AGENT_REPORT_PORT")
 	c.AutomationsTokenEnv = def("HUB_AUTOMATIONS_TOKEN_ENV", "HARNESS_AUTOMATION_RESULT_TOKEN")
+	if c.RolloutToken = get("HUB_ROLLOUT_TOKEN"); c.RolloutToken != "" && len(c.RolloutToken) < 32 {
+		bad("HUB_ROLLOUT_TOKEN must be 32 characters or more")
+	}
 	if c.LaunchToken = get("HUB_LAUNCH_TOKEN"); c.LaunchToken != "" && len(c.LaunchToken) < 32 {
 		bad("HUB_LAUNCH_TOKEN must be 32 characters or more")
 	}

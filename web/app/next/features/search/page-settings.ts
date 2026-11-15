@@ -6,7 +6,7 @@ import { ROW_WIDGET, type ISearchWidget } from '@/next/features/search/search-di
 import { SETTING_ON } from '@/next/features/search/sources-api';
 import { t } from '@/next/i18n';
 import type { SettingsSection } from '@/next/routes/routes';
-import { NOTICE_COLORS, type PersonSettings } from '@/next/stores/me';
+import type { PersonSettings } from '@/next/stores/me';
 
 export interface IPageSetting {
   id: string;
@@ -31,7 +31,6 @@ const LABELS: readonly { id: string; section: SettingsSection; label: string }[]
   { id: 'theme', section: 'appearance', label: 'next.settings.general.theme' },
   { id: 'textSize', section: 'appearance', label: 'next.settings.general.textSize' },
   { id: 'palette', section: 'appearance', label: 'next.settings.look.palette' },
-  { id: 'noticeColor', section: 'appearance', label: 'next.settings.look.noticeColor' },
   { id: 'voiceMic', section: 'voice', label: 'next.settings.voice.mic' },
   { id: 'voiceLang', section: 'voice', label: 'next.settings.voice.lang' },
   { id: 'voiceEngine', section: 'voice', label: 'next.settings.voice.engine' },
@@ -55,14 +54,12 @@ export const PERSON_KEY = 'person:';
 export const PERSON_FIELD = {
   enterSends: 'enterSends',
   textSize: 'textSize',
-  noticeColor: 'noticeColor',
 } as const;
 export type TPersonField = (typeof PERSON_FIELD)[keyof typeof PERSON_FIELD];
 
 const PERSON_OF: Readonly<Record<string, TPersonField>> = {
   enter: PERSON_FIELD.enterSends,
   textSize: PERSON_FIELD.textSize,
-  noticeColor: PERSON_FIELD.noticeColor,
 };
 
 const TEXT_SIZES = ['s', 'm', 'l'] as const;
@@ -86,9 +83,7 @@ export const personWidget = (
       options: values.map((v) => ({ value: v, label: label(v) })),
     },
   });
-  if (field === PERSON_FIELD.textSize)
-    return pick(person.textSize, TEXT_SIZES, (v) => t(`next.settings.general.textSize.${v}`));
-  return pick(person.noticeColor, NOTICE_COLORS, (v) => t(`next.settings.look.noticeColor.${v}`));
+  return pick(person.textSize, TEXT_SIZES, (v) => t(`next.settings.general.textSize.${v}`));
 };
 
 /** The patch a person's setting takes from a value of its control; null for a value it does not know. */
@@ -97,10 +92,6 @@ export const personPatch = (field: string, value: string): Partial<PersonSetting
   if (field === PERSON_FIELD.textSize) {
     const size = TEXT_SIZES.find((v) => v === value);
     return size ? { textSize: size } : null;
-  }
-  if (field === PERSON_FIELD.noticeColor) {
-    const color = NOTICE_COLORS.find((v) => v === value);
-    return color ? { noticeColor: color } : null;
   }
   return null;
 };

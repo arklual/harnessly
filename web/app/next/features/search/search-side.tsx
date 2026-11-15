@@ -7,7 +7,7 @@ import { partsOf } from '@/next/features/search/highlight';
 import type { ISearchRow } from '@/next/features/search/search-dialog';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import { Skeleton } from '@/next/ui/skeleton';
 
 export const SIDE_ACT = {
@@ -97,7 +97,7 @@ const SearchSide = ({
             <h3 className="hx-srch__side-title">{row.title}</h3>
           </div>
           {actions.length > 0 && (
-            <Menu.Root
+            <MenuRoot
               actionsRef={menuActions}
               open={menu.open}
               onOpenChange={(open) => onMenu(open ? { open, at: menu.at } : SIDE_MENU_CLOSED)}
@@ -130,7 +130,7 @@ const SearchSide = ({
                   </Menu.Item>
                 ))}
               </MenuPanel>
-            </Menu.Root>
+            </MenuRoot>
           )}
         </div>
         {shown?.cover && (

@@ -63,6 +63,20 @@ const chatWorkScanWait = 20 * time.Second
 type chatWork interface {
 	workObserver() *chatwork.Observer
 	localChats(ctx context.Context) []chatwork.Chat
+	// chatCwd is a chat's folder.
+	chatCwd(id string) (string, bool)
+	// chatSession is the tmux session a chat's agent runs in.
+	chatSession(id string) (string, bool)
+}
+
+func (v *v2Live) chatSession(id string) (string, bool) {
+	rec, ok := v.rt.Record(id)
+	return rec.Session, ok && rec.Session != ""
+}
+
+func (v *v2Live) chatCwd(id string) (string, bool) {
+	c, ok := v.chatOf(id)
+	return c.Cwd, ok
 }
 
 func (v *v2Live) workObserver() *chatwork.Observer { return v.work }

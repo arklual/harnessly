@@ -1,12 +1,14 @@
 // The parts the Settings pages are made of, after the design's .hx-set: a group with a title and a card of rows, a row
 // with its label, hint and control (a switch, side-by-side choices, a menu, a link), and the buttons. A row that waits
 // for the machine turns a ring and keeps the old value until the answer comes.
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { IChoice } from '@/next/features/settings/options';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
 import { usePresentFlag } from '@/next/ui/presence';
 import Switch from '@/next/ui/switch';
+import { usePhone } from '@/next/ui/use-media';
 
 /** A menu's exit, as long as hx-set-menu-out in settings.css. */
 const MENU_EXIT_MS = 150;
@@ -69,7 +71,14 @@ interface IChoiceProps<V extends string | number | null> {
   label: string;
   value: V;
   /** `icon`: a glyph before the label (side-by-side choices only). */
-  choices: readonly { value: V; label: string; sub?: string | null; icon?: string; disabled?: boolean }[];
+  choices: readonly {
+    value: V;
+    label: string;
+    sub?: string | null;
+    icon?: string;
+    art?: ReactNode;
+    disabled?: boolean;
+  }[];
   onPick: (value: V) => void;
   disabled?: boolean;
 }
@@ -92,6 +101,7 @@ export const SegControl = <V extends string | number>({
         disabled={disabled}
         onClick={() => choice.value !== value && onPick(choice.value)}
       >
+        {choice.art}
         {choice.icon && <Icon name={choice.icon} size="sm" />}
         {choice.label}
       </button>
@@ -99,7 +109,21 @@ export const SegControl = <V extends string | number>({
   </div>
 );
 
-/** One of a list, opened under its button (a sheet from the bottom edge on a phone). */
+/** Room the menu keeps from what lies over the page's foot (the Settings field), px. */
+const MENU_GAP = 8;
+
+/**
+ * True when the menu under its button would go under what lies over the page's foot (the agent's field of Settings,
+ * --hx-isle-h) or past the window's edge, and there is more room above («Как сейчас» opened and nothing
+ * showed).
+ */
+export const opensUp = (button: DOMRect, menuHeight: number, viewport: number, foot: number): boolean => {
+  const below = viewport - foot - button.bottom - MENU_GAP;
+  return below < menuHeight && button.top - MENU_GAP > below;
+};
+
+/** One of a list, opened under its button, or over it when there is no room under it; on a phone a sheet from the
+ *  bottom edge over everything (the field of Settings too), so it is never hidden behind it. */
 export const MenuControl = ({
   label,
   value,
@@ -110,12 +134,25 @@ export const MenuControl = ({
   const [open, setOpen] = useState(false);
   const menu = usePresentFlag(open, MENU_EXIT_MS);
   const root = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  const phone = usePhone();
+  const [up, setUp] = useState(false);
   const current = choices.find((choice) => choice.value === value);
+
+  // Before the frame is painted: the menu stands where it fits.
+  useLayoutEffect(() => {
+    const button = root.current;
+    const menuEl = list.current;
+    if (!open || phone || !button || !menuEl) return;
+    const foot = Number.parseFloat(getComputedStyle(button).getPropertyValue('--hx-isle-h') || '0');
+    setUp(opensUp(button.getBoundingClientRect(), menuEl.offsetHeight, window.innerHeight, foot));
+  }, [open, phone]);
 
   useEffect(() => {
     if (!open) return;
     const away = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (!root.current?.contains(target) && !list.current?.contains(target)) setOpen(false);
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setOpen(false);
@@ -141,33 +178,47 @@ export const MenuControl = ({
         <span>{current?.label ?? t('next.settings.unchosen')}</span>
         <Icon name="chevron-down" size="sm" />
       </button>
-      {menu.mounted && (
-        <div className="hx-set-menu" data-state={menu.state} role="listbox" aria-label={label}>
-          {choices.map((choice) => (
-            <button
-              key={String(choice.value)}
-              type="button"
-              className="hx-set-menu__item"
-              role="option"
-              aria-selected={choice.value === value}
-              disabled={choice.disabled}
-              onClick={() => {
-                setOpen(false);
-                if (choice.value !== value) onPick(choice.value);
-              }}
-            >
-              <span className="hx-set-menu__text">
-                <span>{choice.label}</span>
-                {choice.sub && <span className="hx-set-menu__sub">{choice.sub}</span>}
-              </span>
-              <Icon name="check" size="sm" />
-            </button>
-          ))}
-        </div>
-      )}
+      {menu.mounted &&
+        portal(
+          phone,
+          <div
+            ref={list}
+            className="hx-set-menu"
+            data-state={menu.state}
+            data-up={up || undefined}
+            data-sheet={phone || undefined}
+            role="listbox"
+            aria-label={label}
+          >
+            {choices.map((choice) => (
+              <button
+                key={String(choice.value)}
+                type="button"
+                className="hx-set-menu__item"
+                role="option"
+                aria-selected={choice.value === value}
+                disabled={choice.disabled}
+                onClick={() => {
+                  setOpen(false);
+                  if (choice.value !== value) onPick(choice.value);
+                }}
+              >
+                <span className="hx-set-menu__text">
+                  <span>{choice.label}</span>
+                  {choice.sub && <span className="hx-set-menu__sub">{choice.sub}</span>}
+                </span>
+                <Icon name="check" size="sm" />
+              </button>
+            ))}
+          </div>,
+        )}
     </div>
   );
 };
+
+/** On a phone the sheet goes to the page's body, over every layer of the screen; elsewhere it stays by its button. */
+const portal = (phone: boolean, node: ReactNode): ReactNode =>
+  phone && typeof document !== 'undefined' ? createPortal(node, document.body) : node;
 
 interface ISwitchRowProps {
   label: string;
@@ -188,7 +239,7 @@ interface ISegRowProps<V extends string | number> {
   label: string;
   hint?: string | null;
   value: V | null;
-  choices: readonly { value: V; label: string; icon?: string }[];
+  choices: readonly { value: V; label: string; icon?: string; art?: ReactNode }[];
   busy?: boolean;
   off?: boolean;
   mark?: ReactNode;

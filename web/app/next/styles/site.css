@@ -3706,6 +3706,18 @@
 .hx-browser__bar[data-compact='true'] .hx-browser__url {
   width: 100%;
 }
+/* A phone's bar is back, the board's name and «…»: the name reads whole, cut with «…» only when long. */
+.hx-browser__bar[data-compact='true'] .hx-browser__url {
+  justify-content: center;
+}
+.hx-browser__bar[data-compact='true'] .hx-browser__page-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+  font-weight: var(--hx-weight-semibold);
+}
 .hx-browser__bar[data-compact='true'] .hx-browser__tool-label {
   display: none;
 }

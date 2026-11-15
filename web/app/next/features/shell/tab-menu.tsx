@@ -3,7 +3,7 @@
 import { Menu } from '@base-ui/react/menu';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 
 /** Where the menu opens: a point of the window; a tab opened from the keys is its own box. */
 export interface ITabMenuAt {
@@ -43,7 +43,7 @@ const TabMenu = ({
     getBoundingClientRect: () => new DOMRect(at.x, at.y, 0, 0),
   };
   return (
-    <Menu.Root open={open} onOpenChange={onOpenChange} actionsRef={menuActions}>
+    <MenuRoot open={open} onOpenChange={onOpenChange} actionsRef={menuActions}>
       <MenuPanel
         actions={menuActions}
         className="hx-cmenu"
@@ -73,7 +73,7 @@ const TabMenu = ({
           <span className="hx-cmenu__txt">{t('next.tabs.menuCloseRight')}</span>
         </Menu.Item>
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };
 

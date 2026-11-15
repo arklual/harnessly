@@ -195,8 +195,10 @@ export const NOTICE_SOUNDS = ['wait', 'urgent', 'done'] as const;
 export type TNoticeSound = (typeof NOTICE_SOUNDS)[number];
 
 /** The version of the saved switches: before 2 the default place was the top right corner, saved with everything;
- *  before 3 the smart notice could be turned off in Settings (the switch is gone: «Что показывать» says what comes). */
-const NOTIFY_VERSION = 3;
+ *  before 3 the smart notice could be turned off in Settings (the switch is gone: «Что показывать» says what comes);
+ *  before 4 the default was the middle of the bottom, over the chat's field (it covered the field and the
+ *  page's content; the notices stand at the top in the middle now). */
+const NOTIFY_VERSION = 4;
 
 const versionOf = (s: Record<string, unknown>): number => (typeof s.v === 'number' ? s.v : 1);
 
@@ -224,7 +226,7 @@ export const DEFAULT_NOTIFY: INotifySettings = {
   system: false,
   cards: true,
   machine: true,
-  place: 'bottom-center',
+  place: 'top-center',
   summary: true,
 } as const;
 
@@ -232,6 +234,7 @@ const savedPlace = (s: Record<string, unknown>): TNoticePlace => {
   const place = NOTICE_PLACES.find((one) => one === s.place);
   // The old default was saved as if chosen: it moves to the new one; a place picked by hand stays.
   if (!place || (versionOf(s) < 2 && place === 'top-right')) return DEFAULT_NOTIFY.place;
+  if (versionOf(s) < 4 && place === 'bottom-center') return DEFAULT_NOTIFY.place;
   return place;
 };
 

@@ -1,6 +1,7 @@
 package transcript
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"regexp"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/codemode"
+	"github.com/ly-solutions/harnessly/internal/imagecard"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/wire"
@@ -464,8 +466,18 @@ func (s *codexState) responseItem(p *jsvalue.Object, ts float64) []*jsvalue.Obje
 				args = v
 			}
 		}
-		return []*jsvalue.Object{codexEntry("tool-call", ts, "toolUseId", callID, "toolName", name,
-			"summary", summarizeCodexCall(name, args), "status", "pending")}
+		call := codexEntry("tool-call", ts, "toolUseId", callID, "toolName", name,
+			"summary", summarizeCodexCall(name, args), "status", "pending")
+		if imagecard.IsGenerate(name) {
+			// harnessly's picture tool called straight, not from a code-mode script: the same card.
+			count := 1
+			if f, ok := prop(args, "count").(float64); ok && f >= 1 {
+				count = int(f)
+			}
+			call.Set("imageGen", jsvalue.NewObject("count", float64(count), "prompt", safeString(prop(args, "prompt")),
+				"shape", safeString(prop(args, "shape"))))
+		}
+		return []*jsvalue.Object{call}
 	case "function_call_output", "custom_tool_call_output":
 		callID := safeString(prop(p, "call_id"))
 		if callID == "" {
@@ -478,8 +490,17 @@ func (s *codexState) responseItem(p *jsvalue.Object, ts float64) []*jsvalue.Obje
 		if callID == s.imageCall {
 			s.imageCall = ""
 		}
-		return []*jsvalue.Object{codexEntry("tool-result", ts, "toolUseId", callID, "isError", false,
-			"summary", summarizeCodexOutput(safeString(prop(p, "output"))))}
+		text := codexOutputText(prop(p, "output"))
+		result := codexEntry("tool-result", ts, "toolUseId", callID, "isError", false, "summary", summarizeCodexOutput(text))
+		if rep, ok := codexPictureReport(text); ok {
+			// The answer of generate_images / wait_images, straight or printed by a script: the card's job and files.
+			paths := make([]any, len(rep.Paths))
+			for i, path := range rep.Paths {
+				paths[i] = path
+			}
+			result.Set("images", jsvalue.NewObject("jobId", rep.JobID, "state", rep.State, "paths", paths, "error", rep.Error))
+		}
+		return []*jsvalue.Object{result}
 	case "custom_tool_call":
 		callID, name := safeString(prop(p, "call_id")), safeString(prop(p, "name"))
 		if callID == "" || name == "" {
@@ -1041,4 +1062,44 @@ func parseCodexLines(lines []string, s *codexState, offsets []int64, shift int64
 	}
 	codexMergeToolResults(r.entries)
 	return r
+}
+
+// codexOutputText is a tool's output as text: a string, or the text items of a list ({type: input_text|output_text|text}).
+func codexOutputText(out any) string {
+	if str, ok := out.(string); ok {
+		return str
+	}
+	list, ok := out.([]any)
+	if !ok {
+		return ""
+	}
+	var b strings.Builder
+	for _, item := range list {
+		if text := safeString(prop(item, "text")); text != "" {
+			if b.Len() > 0 {
+				b.WriteByte('\n')
+			}
+			b.WriteString(text)
+		}
+	}
+	return b.String()
+}
+
+// codexPictureReport finds the report of harnessly's picture tool in an output: at its start (a direct call) or on a
+// line of its own after what a code-mode script printed before it («Script completed … Output:»).
+func codexPictureReport(text string) (imagecard.Report, bool) {
+	if strings.HasPrefix(text, "job_id:") {
+		return imagecard.ParseReport(text)
+	}
+	if at := strings.Index(text, "\njob_id:"); at >= 0 {
+		return imagecard.ParseReport(text[at+1:])
+	}
+	// A script that printed the tool's result as JSON: the report is a string literal in it.
+	if at := strings.Index(text, `"job_id:`); at >= 0 {
+		var report string
+		if err := json.NewDecoder(strings.NewReader(text[at:])).Decode(&report); err == nil {
+			return imagecard.ParseReport(report)
+		}
+	}
+	return imagecard.Report{}, false
 }

@@ -23,4 +23,17 @@ describe('watchLoads: a frame that loads a second document has navigated', () =>
     frame.dispatchEvent(new Event('load'));
     expect(navigated).not.toHaveBeenCalled();
   });
+
+  it('does not count a load of the empty document (HRN-1498)', () => {
+    const frame = new EventTarget();
+    const navigated = vi.fn();
+    let blank = true;
+    watchLoads(frame, navigated, () => blank);
+    frame.dispatchEvent(new Event('load'));
+    blank = false;
+    frame.dispatchEvent(new Event('load'));
+    expect(navigated).not.toHaveBeenCalled();
+    frame.dispatchEvent(new Event('load'));
+    expect(navigated).toHaveBeenCalledTimes(1);
+  });
 });

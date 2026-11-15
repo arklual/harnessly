@@ -467,7 +467,6 @@ const DesignlySiteInner = ({
     title: project?.design.title ?? '',
     pageUrl: boardHref(id, shownPath),
     port: project?.port ?? null,
-    onOpenDrawer,
     open,
   });
 

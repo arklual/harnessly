@@ -83,6 +83,15 @@ func statusHookCommand() string {
 	return ""
 }
 
+// voiceGuardCommand is the voice mode's PreToolUse hook of every Claude Code chat (`harnessly hook voice-guard`), the
+// same CLI as the status hook's; "" adds none.
+func voiceGuardCommand() string {
+	if bin := appCLIBin(); bin != "" {
+		return agents.ShellQuote(bin) + " hook voice-guard"
+	}
+	return ""
+}
+
 // besideRuntime is the harnessly CLI in the runtime's own folder, "" when there is none. The folder is the one the
 // runtime was started from (arg0, as a deployment's `current` link names it, so a chat outlives a release swap), or
 // its resolved executable when arg0 is not a path.

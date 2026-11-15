@@ -26,3 +26,23 @@ func (s Store) ReleaseLease(ctx context.Context, name, holder string) error {
 	_, err := s.q.Exec(ctx, `DELETE FROM job_leases WHERE name = ? AND holder = ?`, name, holder)
 	return err
 }
+
+// LiveLeases is the names of the leases that start with prefix (no % or _ in it) and have not run out at now:
+// a lease is also how a replica or a pipeline says for how long something lasts (internal/hub/rollout).
+func (s Store) LiveLeases(ctx context.Context, prefix string, now time.Time) ([]string, error) {
+	rows, err := s.q.Query(ctx, `SELECT name FROM job_leases WHERE name LIKE ? AND lease_until > ? ORDER BY name`,
+		prefix+"%", Ms(now))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			return nil, err
+		}
+		names = append(names, n)
+	}
+	return names, rows.Err()
+}

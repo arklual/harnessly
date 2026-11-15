@@ -287,7 +287,6 @@ const Viewer = ({
     title: 'Досье отеля — хакатон Островка',
     pageUrl: `/d/${DESIGN}/${path}`,
     port: 5555,
-    onOpenDrawer: () => {},
   });
   return (
     <SiteView

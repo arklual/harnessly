@@ -2,6 +2,7 @@
 // outbox of the confirmed person, machines and one socket per machine. A different person on this page is a clean
 // start: nothing of the previous one stays in memory, and an outbox is never sent under another's name.
 
+import { startPrefsSync } from '@/next/stores/synced-prefs';
 import { useSyncExternalStore } from 'react';
 import { pageClock } from '@/next/core/clock';
 import { getPage } from '@/next/core/net/http';
@@ -268,6 +269,8 @@ export function bootNext(o: BootOptions = {}): Promise<BootState> {
       await withinCacheWait(persistence.ready);
     }
     setMeSource(o.me ?? httpMeSource());
+    // The person's choices kept in the browser follow the settings from here (stores/synced-prefs.ts).
+    startPrefsSync();
     if (gone()) return bootStore.get();
     // The person's machines are asked alongside me: one after the other cost the first screen a round trip.
     const machinesAsked = loadMachines(gone);

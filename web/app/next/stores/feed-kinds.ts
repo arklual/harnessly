@@ -2,6 +2,7 @@
 // as the theme and the pane's own switch are. The plain files are off unless the person turns them on (what
 // the agent made matters, not that it wrote a file). `mrDone` is the block of the chat's merge requests under a
 // finished task; it is off until the person turns it on (Settings → Plugins → Code review).
+import { notePrefWrite } from '@/next/core/pref-write';
 import { useSyncExternalStore } from 'react';
 import { OUTPUT_KINDS } from '@/next/protocol/v2';
 
@@ -61,6 +62,7 @@ export const setFeedKind = (kind: FeedKind, on: boolean): void => {
     // Private mode or a full storage: the choice holds for this page.
   }
   for (const listener of [...listeners]) listener();
+  notePrefWrite(KEY);
 };
 
 export const useFeedKinds = (): FeedKinds =>

@@ -2,6 +2,7 @@ package imagegen
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -129,11 +130,40 @@ func (t Tools) Call(ctx context.Context, name string, args *jsvalue.Object) *jsv
 		}
 		req.CopyTo, req.SaveOK = to, t.Allowed
 	}
-	snap, err := t.S.Start(req)
+	snap, err := t.start(ctx, req)
+	if errors.Is(err, ErrBusy) {
+		return mcpserver.TextResult("busy: other pictures of this machine are being drawn and no slot freed up in time. "+
+			"Call generate_images again with the same brief in a minute; do not draw it with code instead.", true)
+	}
 	if err != nil {
 		return mcpserver.TextResult("refused: "+err.Error(), true)
 	}
 	return t.wait(ctx, snap.ID)
+}
+
+// BusyPoll is how often a call that found every slot drawing tries again.
+var BusyPoll = 2 * time.Second
+
+// start starts the job, waiting for a free slot while the machine draws MaxRunning jobs for others: a busy refusal
+// sent agents to retry in a loop or to draw with code. It waits at most half of what the call may wait,
+// so the drawing itself still has time.
+func (t Tools) start(ctx context.Context, req Request) (Snapshot, error) {
+	limit := WaitMax
+	if t.Codex {
+		limit = CodexWaitMax
+	}
+	deadline := time.Now().Add(limit / 2)
+	for {
+		snap, err := t.S.Start(req)
+		if !errors.Is(err, ErrBusy) || time.Now().Add(BusyPoll).After(deadline) {
+			return snap, err
+		}
+		select {
+		case <-ctx.Done():
+			return snap, err
+		case <-time.After(BusyPoll):
+		}
+	}
 }
 
 func (t Tools) wait(ctx context.Context, id string) *jsvalue.Object {

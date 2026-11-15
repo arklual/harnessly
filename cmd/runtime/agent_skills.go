@@ -116,6 +116,7 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 	b.WriteString("```bash\n" +
 		"harnessly open <link|file|port>   # show it to the person in the right pane (a document, a board, ./report.md, 4400)\n" +
 		"harnessly deliver <file|folder>   # hand a file to the person (any type; a folder as a zip): a card in the chat, downloaded at once\n" +
+		"harnessly design export <project> \"<page>\"   # a Sinopia Design page as one HTML file, handed to the person (--zip: the project)\n" +
 		"harnessly tab list                # the tabs of this workspace\n" +
 		"harnessly tab create -t codex-cli --prompt \"<the whole task>\" [--notify]   # hand a task to another agent: a chat nested under yours\n" +
 		"harnessly tab status <id>         # is it working or waiting\n" +
@@ -131,6 +132,8 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 		"A chat you start only to check something: create it with `--test` (`delegate_task` with `test: true`), so it stays out of the person's chat list; " +
 		"`harnessly chat test current` marks the chat you are in.\n" +
 		"A `claude` or `codex` command typed into a shell tab starts it without the workspace's hooks.\n\n")
+	b.WriteString(trackerPromptText())
+	b.WriteString(designPromptText)
 	if !strings.EqualFold(strings.TrimSpace(os.Getenv("RUNTIME_BROWSER")), "off") {
 		b.WriteString("## Browser\n\n")
 		b.WriteString("A Chrome of your own is already available, with or without the person's page: use `chrome_*` tools or " +
@@ -142,7 +145,9 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 	b.WriteString("## Pictures\n\n")
 	b.WriteString("You can draw. When the person asks for a picture, photo, poster, icon, logo, cover or illustration (\"нарисуй\", " +
 		"\"сгенерируй картинку\", \"сделай фото кота\", \"плакат A3\", \"make an icon\"), call the MCP tool `generate_images` in that same turn: " +
-		"write the brief yourself from what they said and do not ask first. It is already loaded (no ToolSearch needed). " +
+		"write the brief yourself from what they said and do not ask first. It is a tool of the harnessly MCP server, already loaded " +
+		"(no ToolSearch needed); call it by its full name as your tool list gives it, `mcp__harnessly__generate_images` in Claude Code, " +
+		"never by the bare name `generate_images`, which is not a tool there. " +
 		"Never draw with code instead (python, PIL, matplotlib, SVG, canvas), never answer that you cannot draw. " +
 		"The pictures appear in the chat as they are drawn, so do not deliver them or paste their paths; hand a file over with `deliver_file` " +
 		"only when the person asks for one (a PNG to download, a PDF for print), after the picture is in the chat. " +
@@ -191,6 +196,30 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 	b.WriteString(". Read a skill before its first use in a conversation.\n")
 	return b.String()
 }
+
+// trackerPromptText tells the agent that a task key or a merge request opens in the pane by itself, with no tracker
+// connection of its own; empty when the deployment names no tracker.
+func trackerPromptText() string {
+	if strings.TrimSpace(os.Getenv("RUNTIME_TRACKER_HOSTS")) == "" && strings.TrimSpace(os.Getenv("RUNTIME_TRACKER_URL")) == "" {
+		return ""
+	}
+	key := "PRJ-123"
+	if ex := strings.Fields(strings.ReplaceAll(os.Getenv("RUNTIME_TASK_EXAMPLES"), ",", " ")); len(ex) > 0 {
+		key = ex[0]
+	}
+	return "When the person asks to show, open or look at a tracker task (\"покажи задачу " + key + "\") or a merge request, run " +
+		"`harnessly open " + key + "` (or `harnessly open <link>`): the pane opens it in its own tab, with status, subtasks and comments. " +
+		"It needs no tracker connection or token of yours; do not give up because a search of the tracker finds nothing.\n\n"
+}
+
+// designPromptText is how to hand over and show Sinopia Design projects: the design library is not in the agent's
+// folder, so the library's own guide is not loaded.
+const designPromptText = "## Sinopia Design\n\n" +
+	"Design projects (boards, pages, decks) live in the design library, not in your folder; `harnessly design list` names them. " +
+	"When the person asks for a page as HTML or a file (\"дай HTML страницы\", \"скинь макет файлом\"), run " +
+	"`harnessly design export <project> \"<page>\"`: it builds one self-contained HTML (styles, fonts, pictures inside) and hands it over " +
+	"itself, as a card in the chat. A whole project goes with `--zip`. Do not copy or rewrite a board's HTML by hand, " +
+	"and do not search the machine for it. `harnessly --help` has the rest (open a board, check it, its history).\n\n"
 
 // checksPromptText is how to run builds, tests and linters on a machine other agents and people share.
 const checksPromptText = "## Checks on a shared machine\n\n" +

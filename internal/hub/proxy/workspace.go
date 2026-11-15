@@ -103,6 +103,9 @@ func (s *Service) serveWorkspace(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	if p == nil && api {
+		p = s.keyedFilePrincipal(r)
+	}
 	if p == nil {
 		if !api && isNavigation(r) {
 			http.Redirect(w, r, "/signin?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusFound)
@@ -442,7 +445,39 @@ func (p *pageRecorder) Flush() {}
 var storeFilePath = regexp.MustCompile(`^` + workspaceBase + `/api/[A-Za-z0-9_-]+/design/store/[^/]+/f/.`)
 
 // storeKeyedPath is the same file at the board's keyed address (designaccess filekey.go): <id>/k/<key>/f/….
-var storeKeyedPath = regexp.MustCompile(`^` + workspaceBase + `/api/[A-Za-z0-9_-]+/design/store/[^/]+/k/[0-9a-z]+\.[A-Za-z0-9_-]+/f/.`)
+var storeKeyedPath = regexp.MustCompile(`^` + workspaceBase + `/api/[A-Za-z0-9_-]+/design/store/[^/]+/k/[0-9a-z]+\.[0-9a-z]+\.[A-Za-z0-9_-]+/f/.`)
+
+// KeyedFiles is the design service's side of a board's keyed address: whose live key a request for a file there
+// carries, "" when it carries none.
+type KeyedFiles interface {
+	KeyedFileUser(r *http.Request) string
+}
+
+// keyedFilePrincipal: the board's own files come from its sandbox without the hub's session (the cookie is SameSite=Lax
+// and these requests are cross-site), so on the hub's own address every one was 401. The key at the address
+// is the hub's MAC of the person and the project, so it signs in as that person for this read only; the project's
+// access is then checked as theirs, as for any other read.
+func (s *Service) keyedFilePrincipal(r *http.Request) *auth.Principal {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return nil
+	}
+	if !storeKeyedPath.MatchString(r.URL.Path) {
+		return nil
+	}
+	kf, ok := s.design.(KeyedFiles)
+	if !ok {
+		return nil
+	}
+	id := kf.KeyedFileUser(r)
+	if id == "" {
+		return nil
+	}
+	u, err := s.db.S().UserByID(r.Context(), id)
+	if err != nil || u.DisabledAt != nil {
+		return nil
+	}
+	return &auth.Principal{User: u}
+}
 
 // sandboxStoreFile: a board shown from the hub's store loads its own files (support.js, styles, scripts). The board runs
 // sandboxed on an opaque origin, so the browser asks for them as «cross-site», and the cross-site refusal turned every

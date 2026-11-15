@@ -144,20 +144,48 @@ func (s *Service) upstream(err error) Reply {
 	return reply(http.StatusBadGateway, "docs_unavailable", "Сервис документов сейчас недоступен, попробуйте позже")
 }
 
-// acl handles the sharing calls of the agent's gateway route. Supported: .../acl/team {level} and .../access {public}.
+// acl handles the sharing calls of the agent's gateway route. Supported: .../acl/team {level}, .../access {public} and
+// .../trash {trashed} (into the trash and out of it).
 func (s *Service) acl(ctx context.Context, who Who, e aclEvent) Reply {
 	m, _, err := s.meta(ctx, e.Slug, reachMachine(who.SpaceID))
 	if err != nil {
 		return reply(http.StatusInternalServerError, "internal", "Что-то пошло не так")
 	}
-	if m == nil {
+	route := strings.TrimRight(e.Route, "/")
+	// Only the trash route sees a document in the trash: it is what takes the document out.
+	if m == nil || m.TrashedAt != 0 && !strings.HasSuffix(route, "/trash") {
 		return reply(http.StatusNotFound, "not_found", "Документ не найден")
 	}
-	if owner, ok := s.user(ctx, who.OwnerID); !ok || !strings.EqualFold(owner.Email, m.OwnerEmail) {
+	owner, ok := s.user(ctx, who.OwnerID)
+	if !ok || !strings.EqualFold(owner.Email, m.OwnerEmail) {
 		return reply(http.StatusForbidden, "forbidden", "Права меняет только владелец документа")
 	}
-	route := strings.TrimRight(e.Route, "/")
 	switch {
+	case strings.HasSuffix(route, "/trash"):
+		var b struct {
+			Trashed *bool `json:"trashed"`
+		}
+		if json.Unmarshal(e.Body, &b) != nil || b.Trashed == nil {
+			return reply(http.StatusBadRequest, "invalid", "Нужно trashed: true или false")
+		}
+		by := displayName(owner)
+		switch {
+		case *b.Trashed && m.TrashedAt == 0:
+			kind := m.Kind
+			if kind == "" {
+				kind = kindArtifact
+			}
+			out, err := s.toTrash(ctx, e.Slug, kind, by)
+			if err != nil {
+				return s.upstream(err)
+			}
+			return Reply{Status: http.StatusOK, Body: out}
+		case !*b.Trashed && m.TrashedAt != 0:
+			if err := s.fromTrash(ctx, m, by); err != nil {
+				return s.upstream(err)
+			}
+		}
+		return Reply{Status: http.StatusOK, Body: map[string]any{"slug": e.Slug, "trashed": *b.Trashed}}
 	case strings.HasSuffix(route, "/acl/team"):
 		var b struct {
 			Level string `json:"level"`

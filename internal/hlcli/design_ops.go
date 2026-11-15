@@ -441,3 +441,22 @@ func (c *cli) designRestore(args []string) error {
 		b.Board, rev, pos[0], b.Board)
 	return nil
 }
+
+// designDelete moves a project to the library's trash through the runtime, as «Удалить» in the library does: the hub
+// forgets the project for every person of the space, and its access rows and links go with it. Moving the
+// folder by hand leaves the others' rows behind, so this is the only way an agent deletes a project.
+func (c *cli) designDelete(args []string) error {
+	if len(args) != 1 {
+		return usageErr("design delete <project>")
+	}
+	raw, err := c.request("POST", designCLIPath, nil, map[string]any{"artifact": args[0], "delete": true})
+	if err != nil {
+		return err
+	}
+	if c.json {
+		c.printRaw(raw)
+		return nil
+	}
+	c.out("Deleted project %s for everyone with access to it: its folder is in the library's .trash/\n", args[0])
+	return nil
+}

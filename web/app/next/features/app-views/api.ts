@@ -40,6 +40,13 @@ export interface IAppView {
   objects?: string[];
   /** The app's tab in the pane beside a document of its type made of a site. */
   pinned?: boolean;
+  /**
+   * A stage view of the start page (`"height": "stage"`) may name the https address of the day's feed: the host then
+   * draws the page of the day itself from it, in place of the view's frame (features/day).
+   */
+  feed?: string;
+  /** The feed through the machine's runtime, which signs it in with the app's secret (`feedSecret`): read it there. */
+  feedPath?: string;
 }
 
 export interface IBranding {
@@ -106,6 +113,8 @@ export interface IInstalledApp {
   locked?: boolean;
   /** The person turned the environment's app off for themselves. */
   muted?: boolean;
+  /** When this version was put on the machine (unix ms): a new one starts its views anew. */
+  updatedAt?: number;
   /** The app has settings or secrets: «О приложении» draws their form. */
   setup?: boolean;
   /** The required secrets without a value: the app is «ждёт секрет». */
@@ -263,8 +272,19 @@ export const appSignInConnection = (
 ): Promise<{ connection: string }> =>
   runtimeJson<{ connection: string }>(m, platformPath('/apps/signin'), postJson({ app, server }));
 
+/** harnessly's own spaces wear a glyph of their own in every list, whatever their package names (one look per app). */
+export const BUILTIN_APP_ICON: Readonly<Record<string, string>> = {
+  'harnessly.boards': 'presentation',
+  'harnessly.docs': 'file-text',
+};
+
 export const loadInstalledApps = (m: MachineId): Promise<IInstalledApps> =>
-  runtimeJson<IInstalledApps>(m, platformPath('/installed-apps'));
+  runtimeJson<IInstalledApps>(m, platformPath('/installed-apps')).then((list) => ({
+    ...list,
+    apps: list.apps.map((a) =>
+      BUILTIN_APP_ICON[a.id] === undefined ? a : { ...a, icon: BUILTIN_APP_ICON[a.id] },
+    ),
+  }));
 
 /** The runtime's refusal says its code in `error`; a view gets it as the code of its HarnesslyError. */
 const asBridgeError = (e: unknown): BridgeError => {

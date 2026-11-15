@@ -13,6 +13,14 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-15',
+    items: [
+      { key: 'boardCards', icon: 'workflow' },
+      { key: 'boardInPane', icon: 'panel-right' },
+      { key: 'appsUpdate', icon: 'refresh-cw' },
+    ],
+  },
+  {
     id: '2026-11-13',
     items: [
       { key: 'reviewSeamless', icon: 'git-pull-request' },

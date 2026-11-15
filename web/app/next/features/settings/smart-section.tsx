@@ -43,7 +43,11 @@ export type TAgentModels = Readonly<Record<TSmartAgent, readonly { id: string; l
 const valueOf = (choice: ISmartChoice): string =>
   `${choice.provider}/${choice.model}${choice.effort ? `#${choice.effort}` : ''}`;
 
-/** What a feature may be given: «as now», every model of every provider, and its own choice if no list has it. */
+/** The menu's line that leads to the providers when a feature has no model to be given. */
+export const SMART_CONNECT = '#connect';
+
+/** What a feature may be given: «as now», every model of every provider, and its own choice if no list has it; with
+ *  no model at all, a line that leads to connecting a provider instead of a menu of one «as now». */
 export const smartChoices = (
   feature: ISmartFeature,
   providers: readonly ISmartProvider[],
@@ -51,16 +55,19 @@ export const smartChoices = (
 ): { choices: IChoice[]; byValue: ReadonlyMap<string, ISmartChoice> } => {
   const byValue = new Map<string, ISmartChoice>();
   const choices: IChoice[] = [{ value: null, label: t('next.smart.asNow'), sub: null }];
-  const add = (choice: ISmartChoice, label: string) => {
+  const add = (choice: ISmartChoice, label: string, sub: string | null = null) => {
     byValue.set(valueOf(choice), choice);
-    choices.push({ value: valueOf(choice), label, sub: null });
+    choices.push({ value: valueOf(choice), label, sub });
   };
-  if (feature.agents) {
-    add({ provider: SMART_OFF, model: '' }, t('next.smart.off'));
+  if (feature.offable) add({ provider: SMART_OFF, model: '' }, t('next.smart.off'));
+  if (feature.agents)
     for (const agent of SMART_AGENTS)
       for (const model of agentModels[agent])
-        add({ provider: agent, model: model.id }, `${t(`next.settings.section.${agent}`)} · ${model.label}`);
-  }
+        add(
+          { provider: agent, model: model.id },
+          `${t(`next.settings.section.${agent}`)} · ${model.label}`,
+          t('next.smart.agentSub'),
+        );
   for (const provider of providers)
     for (const model of provider.models) {
       add({ provider: provider.id, model: model.id }, `${provider.name} · ${model.label}`);
@@ -76,6 +83,8 @@ export const smartChoices = (
     const name = providers.find((p) => p.id === own.provider)?.name ?? own.provider;
     add(own, `${name} · ${own.model}`);
   }
+  if (choices.length === 1)
+    choices.push({ value: SMART_CONNECT, label: t('next.smart.connect'), sub: t('next.smart.connect.sub') });
   return { choices, byValue };
 };
 
@@ -140,9 +149,10 @@ const SmartSection = ({ state, busy, marks, agentModels, onPick, onOpenProviders
               choices={choices}
               busy={busy.has(feature.id)}
               mark={markOf(marks, smartKey(feature.id))}
-              onPick={(value) =>
-                onPick(feature.id, value === null ? null : (byValue.get(String(value)) ?? null))
-              }
+              onPick={(value) => {
+                if (value === SMART_CONNECT) onOpenProviders();
+                else onPick(feature.id, value === null ? null : (byValue.get(String(value)) ?? null));
+              }}
             />
           </div>
         );

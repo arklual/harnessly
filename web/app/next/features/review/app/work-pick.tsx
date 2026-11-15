@@ -2,7 +2,7 @@
 // have worked in several repositories and branches. A menu, not a native select.
 import { Menu } from '@base-ui/react/menu';
 import Icon from '@/next/ui/icon';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import { t } from '@/next/i18n';
 
 export interface IWorkOption {
@@ -38,7 +38,7 @@ export const WorkPick = ({ options, current, onPick }: IWorkPickProps) => {
   const shown = options.find((o) => o.key === current) ?? options[0];
   if (!shown) return null;
   return (
-    <Menu.Root actionsRef={actions}>
+    <MenuRoot actionsRef={actions}>
       <Menu.Trigger className="hx-rvapp__pick">
         <Icon name="git-branch" size="sm" />
         <span className="hx-rvapp__pick-name">{shown.branch ?? shown.name}</span>
@@ -64,6 +64,6 @@ export const WorkPick = ({ options, current, onPick }: IWorkPickProps) => {
           </Menu.Item>
         ))}
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };

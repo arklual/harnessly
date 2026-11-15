@@ -2,6 +2,7 @@ package envsetup
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -143,5 +144,63 @@ func TestRunOnlyScriptPullsAndKeysOnTheRealCommit(t *testing.T) {
 	f.r.Tick(context.Background())
 	if n := len(f.scriptRuns()); n != 2 || pulls == 0 {
 		t.Fatalf("runs %d, pulls %d", n, pulls)
+	}
+}
+
+// An app of a repository outside the list follows its branch every ten minutes: a new commit (a new app.json) is
+// installed by the next apply, with no request from anyone.
+func TestAppFollowsItsBranchWithinTenMinutes(t *testing.T) {
+	head, ls := "aaa", 0
+	f := newFixture(t)
+	clock := time.Unix(1_700_000_000, 0)
+	f.r.Now = func() time.Time { return clock }
+	apps := &fakeApps{installed: map[string]string{}, locked: map[string]bool{}}
+	f.r.Apps = apps
+	f.handle = func(c Cmd) reply {
+		if c.Name != "git" {
+			return reply{}
+		}
+		switch {
+		case c.Args[0] == "clone":
+			dir := c.Args[len(c.Args)-1]
+			_ = os.MkdirAll(filepath.Join(dir, "harnessly-app", "harnessly"), 0o755)
+			_ = os.WriteFile(filepath.Join(dir, "harnessly-app", "harnessly", "app.json"), []byte("{}"), 0o644)
+		case c.Args[0] == "ls-remote":
+			ls++
+			return reply{out: []string{head + "\trefs/heads/main\n"}}
+		}
+		return reply{}
+	}
+	f.setList(hubproto.EnvItem{ItemID: "b1", Kind: hubproto.EnvKindApp, Name: "Доски", Layer: "org",
+		Source: json.RawMessage(`{"from":"repo","repoUrl":"https://github.com/acme/boards","branch":"main","path":"harnessly-app"}`)})
+	f.r.Tick(context.Background())
+	if n := len(f.runsAll()); n != 1 {
+		t.Fatalf("first run: %d", n)
+	}
+	clock = clock.Add(5 * time.Minute)
+	f.r.Tick(context.Background())
+	if ls != 0 {
+		t.Fatalf("looked before ten minutes: %d", ls)
+	}
+	clock = clock.Add(6 * time.Minute)
+	f.r.Tick(context.Background())
+	if ls != 1 || len(f.runsAll()) != 1 {
+		t.Fatalf("the branch did not move: looks %d, runs %d", ls, len(f.runsAll()))
+	}
+	head = "bbb"
+	clock = clock.Add(11 * time.Minute)
+	f.r.Tick(context.Background())
+	runs := f.runsAll()
+	if len(runs) != 2 {
+		t.Fatalf("the branch moved, the app is installed again: %d runs", len(runs))
+	}
+	var latest hubproto.EnvRun
+	for _, r := range runs {
+		if r.StartedAt >= latest.StartedAt {
+			latest = r
+		}
+	}
+	if s := f.step(latest, "b1"); latest.Mode != hubproto.RunApply || s.Version != "1.2.0" {
+		t.Fatalf("%+v %+v", latest, s)
 	}
 }

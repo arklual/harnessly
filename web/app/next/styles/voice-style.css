@@ -1,0 +1,62 @@
+/* What the voice knows and how hard it thinks (features/voice-live/settings-session.tsx, effort.tsx). */
+.hx-vstyle__about {
+  display: grid;
+  gap: 6px;
+  padding: 10px 16px 12px;
+}
+.hx-vstyle__label {
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-vstyle__textarea {
+  height: auto;
+  min-height: 76px;
+  padding: 9px 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.hx-vstyle__hint {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  line-height: 1.5;
+}
+.hx-vstyle__effort {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 14px;
+  background: var(--hx-bg-hover);
+}
+.hx-vstyle__step {
+  width: 6px;
+  height: 12px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: var(--hx-fg-3);
+  opacity: 0.45;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease-out,
+    transform 160ms ease-out;
+}
+.hx-vstyle__step:hover {
+  transform: scaleY(1.2);
+}
+.hx-vstyle__step[data-on] {
+  background: var(--hx-accent);
+  opacity: 1;
+}
+.hx-vstyle__effort[data-top] .hx-vstyle__step[data-on] {
+  background: linear-gradient(180deg, var(--hx-accent), oklch(0.6 0.2 300));
+}
+.hx-vstyle__effort-label {
+  margin-left: 4px;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  white-space: nowrap;
+}

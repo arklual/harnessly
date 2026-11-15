@@ -157,7 +157,8 @@
   .hx-header__term {
     display: none;
   }
-  .hx-header__bell {
+  .hx-header__bell,
+  .hx-header__more {
     display: grid;
     position: relative;
   }
@@ -262,4 +263,104 @@
   .hx-header__title {
     font-size: var(--hx-text-lg);
   }
+}
+
+/* A narrow phone: the chat's title takes the bar and opens «Чаты»; beside it only the bell and «⋯». */
+.hx-header__switch {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+  height: 44px;
+  padding: 0 var(--hx-space-1);
+  border: 0;
+  border-radius: var(--hx-radius-md);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.hx-header__switch:active {
+  background: var(--hx-bg-active);
+}
+.hx-header__switch .hx-header__name {
+  margin: 0;
+  font-size: inherit;
+}
+.hx-header__switch-chev {
+  flex: none;
+  color: var(--hx-fg-3);
+}
+.hx-chats-sheet__head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--hx-space-3) var(--hx-space-2);
+}
+.hx-chats-sheet__glass {
+  position: absolute;
+  left: calc(var(--hx-space-3) + 10px);
+  color: var(--hx-fg-3);
+  pointer-events: none;
+}
+.hx-chats-sheet__search {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px 0 34px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-window);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: 16px;
+}
+.hx-chats-sheet__search:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: -1px;
+}
+.hx-chats-sheet__list {
+  margin: 0;
+  padding: 0 var(--hx-space-2) var(--hx-space-2);
+  list-style: none;
+}
+.hx-chats-sheet__row {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--hx-space-2);
+  border: 0;
+  border-radius: var(--hx-radius-md);
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hx-chats-sheet__row:active,
+.hx-chats-sheet__row[aria-current='true'] {
+  background: var(--hx-bg-active);
+}
+.hx-chats-sheet__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-chats-sheet__check {
+  flex: none;
+  color: var(--hx-accent);
+}
+.hx-chats-sheet__empty {
+  margin: 0;
+  padding: var(--hx-space-4) var(--hx-space-3);
+  color: var(--hx-fg-3);
+  text-align: center;
+}
+.hx-header__end .hx-header__more {
+  margin: 0;
+  opacity: 1;
 }

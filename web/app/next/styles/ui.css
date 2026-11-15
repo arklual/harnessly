@@ -627,6 +627,18 @@
   transform: translateX(-50%);
   pointer-events: none;
 }
+.hx-toasts__more {
+  align-self: center;
+  margin-top: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--hx-toast-bg);
+  box-shadow: var(--hx-toast-shadow);
+  color: var(--hx-toast-fg3);
+  font-size: var(--hx-text-xs);
+  line-height: 18px;
+  pointer-events: auto;
+}
 /* A notice's place in the stack: it opens as the notice comes and folds as it leaves, so the stack never jumps. */
 .hx-toast-slot {
   display: grid;
@@ -720,35 +732,21 @@
   outline-offset: 2px;
 }
 
-/* On the phone the notices stand above the chat's field (and the safe area under it), never over the field or the
-   header, as wide as the screen allows; the newest is the lowest, nearest the thumb, and a swipe sideways, up or down takes it away. */
+/* On the phone the notices stand at the top as on the wide window, as wide as the screen with 16px at each side
+   (HRN-1487: over the chat's field they covered what the person was typing); a swipe sideways or up takes one away. */
 @media (max-width: 900px) {
   .hx-toasts {
-    top: auto;
-    bottom: calc(16px + env(safe-area-inset-bottom));
-    width: calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right));
-  }
-  .hx-root:has(.hx-dock .hx-composer) .hx-toasts {
-    bottom: calc(132px + env(safe-area-inset-bottom));
+    top: calc(16px + env(safe-area-inset-top));
+    width: calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right));
   }
   .hx-toast {
     min-height: 52px;
     border-radius: 16px;
-    animation-name: hx-toast-up;
-  }
-  .hx-toast[data-leaving='true'] {
-    transform: translateY(8px) scale(0.98);
   }
   .hx-toast__action {
     min-height: 36px;
     padding: 0 14px;
     font-size: var(--hx-text-sm);
-  }
-}
-@keyframes hx-toast-up {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.98);
   }
 }
 
@@ -917,13 +915,6 @@ button[data-pic='true']:focus-visible {
   background: var(--hx-bg-hover);
 }
 /* «Пометить» beside the cross (features/image-edit): it opens the marks' tools. */
-.hx-imgview__act {
-  right: 56px;
-  color: var(--hx-fg-2);
-}
-.hx-imgview__act:hover {
-  color: var(--hx-fg-1);
-}
 .hx-imgview__pos {
   color: var(--hx-fg-3);
 }
@@ -958,6 +949,77 @@ button[data-pic='true']:focus-visible {
 }
 .hx-imgview__step:active {
   transform: translateY(-50%) scale(0.94);
+}
+/* The zoom: «−  NN%  +» and «Вписать», a pill at the top in the middle, beside the cross and clear of the picture. */
+.hx-imgview__zoom {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  translate: -50% 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 18px;
+  background: color-mix(in oklab, var(--hx-bg-raised) 92%, transparent);
+  color: var(--hx-fg-1);
+  box-shadow: var(--hx-shadow-overlay);
+  cursor: default;
+  animation: hx-in-fade 240ms var(--hx-ease-out) backwards;
+}
+.hx-imgview__zb {
+  height: 28px;
+  min-width: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    background var(--hx-dur-sm),
+    opacity var(--hx-dur-sm),
+    transform 120ms var(--hx-ease-out);
+}
+.hx-imgview__zb:hover:not(:disabled) {
+  background: var(--hx-bg-hover);
+}
+.hx-imgview__zb:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.hx-imgview__zb:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+.hx-imgview__zb:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 0;
+}
+.hx-imgview__zpct {
+  min-width: 52px;
+  padding: 0 6px;
+  font-weight: 600;
+}
+.hx-imgview__zfit {
+  margin-left: 2px;
+}
+/* A phone: a little tighter, still 36 px tall like the cross. */
+@media (max-width: 480px) {
+  .hx-imgview__zoom {
+    gap: 0;
+    padding: 0 3px;
+  }
+  .hx-imgview__zpct {
+    min-width: 46px;
+  }
 }
 /* On a touch screen a zoomed picture is the whole stage: the side buttons step aside so a pinch that starts at
    the edge reaches the picture (a swipe steps again once it is fitted). */

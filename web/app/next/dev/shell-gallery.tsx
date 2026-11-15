@@ -20,14 +20,24 @@
 //   &theme=light|dark&lang=ru|en       the look and the language of the texts that are keys
 //   &route=doc|board                   an app's object in Sinopia's stage (appstage-demo.tsx), the chat at
 //   &place=chat|right|float|island     the left edge (default), the right one, a window or the field
-import { useCallback, useEffect, useMemo, useState } from 'react';
+//   &voice=speak|listen|think          a talk going on in «Очередь сообщений v2» away from it: its row
+//                                      lit in the sidebar and the bar on top; &head=face the other head
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { FIELD_FLOOR, setVoiceField, type TFieldFloor } from '@/next/features/voice-live/field';
 import ChatHeader from '@/next/features/header/chat-header';
 import NotificationCenter, { type INotification } from '@/next/features/notifications/notification-center';
 import { notificationsFromChats } from '@/next/features/notifications/from-chats';
 import { notificationsFromMachines } from '@/next/features/notifications/from-machines';
 import { alertOf, cardOf, choiceOf } from '@/next/bindings/shell-model';
 import { pinLocale } from '@/next/i18n';
-import type { HealthIssue, HealthLevel, MachineId, MachineLoad, MessageHit } from '@/next/protocol/v2';
+import type {
+  ConvId,
+  HealthIssue,
+  HealthLevel,
+  MachineId,
+  MachineLoad,
+  MessageHit,
+} from '@/next/protocol/v2';
 import type { MachineView } from '@/next/stores/machines';
 import { toast, ToastHost } from '@/next/ui/toast';
 import SearchDialog from '@/next/features/search/search-dialog';
@@ -92,6 +102,12 @@ const TERM = params.get('term') === '1';
 const FAVS = params.get('favs');
 const TABS = params.get('tabs');
 const PANE_TABS_MANY = params.get('paneTabs') === 'many';
+const VOICE = params.get('voice');
+const VOICE_FLOOR: Record<string, TFieldFloor> = {
+  speak: FIELD_FLOOR.speaking,
+  listen: FIELD_FLOOR.listening,
+  think: FIELD_FLOOR.thinking,
+};
 const THEME = params.get('theme') === 'dark' ? 'dark' : 'light';
 const APP_ROUTES: Record<string, TDemoKind> = { doc: 'doc', board: 'board' };
 const APP_PLACES: Record<string, TDemoPlace> = { right: 'right', float: 'float', island: 'island' };
@@ -1120,7 +1136,7 @@ const Gallery = () => {
             scope={scope}
             onScope={setScope}
             results={[
-              ...searchChats(chats, projects, query),
+              ...searchChats(chats, query, undefined, now),
               ...messageGroups(
                 query.trim().length < 2
                   ? []
@@ -1134,7 +1150,7 @@ const Gallery = () => {
                 now,
               ),
             ]}
-            recent={recentChats(chats, projects)}
+            recent={recentChats(chats, false, now)}
             onPick={(row) => {
               setSearchOpen(false);
               setCurrentId(row.id);
@@ -1209,6 +1225,7 @@ const Gallery = () => {
           )}
         </ChatStage>
       )}
+      <GalleryVoice titleOf={(id) => chats.find((c) => c.id === id)?.title ?? null} onBack={setCurrentId} />
       {currentId !== null && TERM && (
         <AgentTerminal
           open
@@ -1220,6 +1237,41 @@ const Gallery = () => {
         />
       )}
     </AppFrame>
+  );
+};
+
+const VoiceBar = lazy(() => import('@/next/features/voice-live/voice-bar'));
+
+/** A talk emulated without a call: the field's state, as the voice publishes it. */
+const GalleryVoice = ({
+  titleOf,
+  onBack,
+}: {
+  titleOf: (id: string) => string | null;
+  onBack: (id: string) => void;
+}) => {
+  useEffect(() => {
+    const floor = VOICE ? VOICE_FLOOR[VOICE] : undefined;
+    if (!floor) return;
+    setVoiceField({
+      host: null,
+      conv: 'c-queue' as ConvId,
+      machine: 'gallery' as MachineId,
+      end: () => setVoiceField(null),
+      floor,
+      level: () => 0.6,
+      heard: '',
+      said: '',
+      typed: () => undefined,
+      head: params.get('head') === 'face' ? 'face' : 'h',
+      interrupted: false,
+    });
+    return () => setVoiceField(null);
+  }, []);
+  return (
+    <Suspense fallback={null}>
+      <VoiceBar titleOf={(id) => titleOf(id)} onBack={(id) => onBack(id)} at="gallery" />
+    </Suspense>
   );
 };
 

@@ -39,10 +39,9 @@ type TKitRoute = Extract<TRoute, { kind: typeof ROUTE.kit }>;
 /** The design page's slot: the kit and a design show the same library server, so they never fight over it. */
 const PAGE_SLOT = LIBRARY_PAGE_SLOT;
 
-interface IKitPageProps {
+export interface IKitPageProps {
   machine: MachineId;
   route: TKitRoute;
-  onOpenDrawer: () => void;
 }
 
 type TLoad = { k: 'loading' } | { k: 'failed'; message: string } | { k: 'ready'; canvas: IKitCanvas };
@@ -51,7 +50,7 @@ type TLoad = { k: 'loading' } | { k: 'failed'; message: string } | { k: 'ready';
 const DRAFT_BUSY_MS = 4000;
 const DRAFT_IDLE_MS = 15000;
 
-const KitPage = ({ machine, route, onOpenDrawer }: IKitPageProps) => {
+const KitPage = ({ machine, route }: IKitPageProps) => {
   const [load, setLoad] = useState<TLoad>({ k: 'loading' });
   const [attempt, setAttempt] = useState(0);
   // The editing mode: the screen shows the kit's draft with its chat; its edits are read again as they come.
@@ -265,7 +264,6 @@ const KitPage = ({ machine, route, onOpenDrawer }: IKitPageProps) => {
         fromChat={route.chat ?? null}
         chip={chip}
         onBusy={setAgentBusy}
-        onOpenDrawer={onOpenDrawer}
       />
     ) : undefined;
 

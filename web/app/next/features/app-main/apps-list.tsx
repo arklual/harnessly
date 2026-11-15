@@ -4,11 +4,12 @@
 // a few catalog apps under it.
 import type { ReactNode } from 'react';
 import { Menu } from '@base-ui/react/menu';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import AppTile, { whereOf } from '@/next/features/app-catalog/app-tile';
 import { matches } from '@/next/features/app-catalog/apps-catalog';
 import { toast } from '@/next/ui/toast';
 import Icon from '@/next/ui/icon';
+import { PINNED_APPS } from '@/next/features/sidebar/nav-layout';
 import Switch from '@/next/ui/switch';
 import { rowsOf, type ICatalogRow } from '@/next/features/app-catalog/model';
 import { Button } from '@/next/ui/button';
@@ -89,7 +90,7 @@ const MoreMenu = ({
     }
   };
   return (
-    <Menu.Root actionsRef={actions}>
+    <MenuRoot actionsRef={actions}>
       <Menu.Trigger className="hx-head-btn hx-appslist__more" aria-label={t('next.appslist.more')}>
         <Icon name="ellipsis" />
       </Menu.Trigger>
@@ -132,7 +133,7 @@ const MoreMenu = ({
           </Menu.CheckboxItem>
         )}
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };
 
@@ -177,7 +178,14 @@ const AppsList = ({
   safeMode,
   onSafeMode,
 }: IAppsListProps) => {
-  const found = (apps ?? []).filter((a) => matches(query, a.name, a.description));
+  // The boards and the documents stand first; the rest keep the machine's order.
+  const pinRank = (a: IInstalledApp): number => {
+    const i = PINNED_APPS.indexOf(a.id);
+    return i < 0 ? PINNED_APPS.length : i;
+  };
+  const found = (apps ?? [])
+    .filter((a) => matches(query, a.name, a.description))
+    .sort((a, b) => pinRank(a) - pinRank(b));
   const searching = query.trim() !== '';
   let body = null;
   if (error) body = <p className="hx-appslist__none">{error}</p>;

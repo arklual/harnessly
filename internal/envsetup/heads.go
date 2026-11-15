@@ -19,6 +19,12 @@ func repoURLScript(it hubproto.EnvItem, src source) bool {
 	return it.Kind == hubproto.EnvKindScript && (src.From == "" || src.From == "repo") && src.Repo == "" && src.RepoURL != ""
 }
 
+// appFromURL says whether an item is an app in a repository outside the list: a new commit of its branch (a new
+// version of app.json, a fix of its instructions) is a new version of the app, which reaches the machine by itself.
+func appFromURL(it hubproto.EnvItem, src source) bool {
+	return it.Kind == hubproto.EnvKindApp && (src.From == "" || src.From == "repo") && src.Repo == "" && src.RepoURL != ""
+}
+
 // packFromURL says whether an item is an environment pack in a repository outside the list: a new commit of that
 // repository is a new version of the pack, which is how a pack reaches the machines without a new harnessly.
 func packFromURL(it hubproto.EnvItem, src source) bool {
@@ -41,9 +47,17 @@ func (ex *execution) onceHash(i int, head string) string {
 func (r *Runner) headsMoved(ctx context.Context, st *hubproto.EnvSetupState, all []hubproto.EnvItem) bool {
 	type look struct{ id, url, branch string }
 	var looks []look
+	every := retryEvery
 	for _, it := range setupItems(all) {
 		var src source
-		if len(it.Source) == 0 || json.Unmarshal(it.Source, &src) != nil || !(repoURLScript(it, src) || packFromURL(it, src)) || gitURLOK(src.RepoURL) != nil {
+		if len(it.Source) == 0 || json.Unmarshal(it.Source, &src) != nil || gitURLOK(src.RepoURL) != nil {
+			continue
+		}
+		switch {
+		case appFromURL(it, src):
+			every = min(every, appHeadsEvery)
+		case repoURLScript(it, src), packFromURL(it, src):
+		default:
 			continue
 		}
 		looks = append(looks, look{it.ItemID, src.RepoURL, src.Branch})
@@ -52,7 +66,7 @@ func (r *Runner) headsMoved(ctx context.Context, st *hubproto.EnvSetupState, all
 	if since == 0 {
 		since = st.At // never looked: the run that cloned them saw them
 	}
-	if len(looks) == 0 || r.now().Sub(time.UnixMilli(since)) < retryEvery {
+	if len(looks) == 0 || r.now().Sub(time.UnixMilli(since)) < every {
 		return false
 	}
 	ex := &execution{r: r, ctx: ctx, home: r.Home}

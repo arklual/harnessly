@@ -136,6 +136,15 @@ func (s *Service) routeChat(w http.ResponseWriter, r *http.Request, id string, p
 		}
 		msg, err := s.Send(id, send)
 		answer(w, map[string]any{"message": msg}, err)
+	case len(p) == 1 && p[0] == "spoken" && m == http.MethodPost:
+		var in struct {
+			Lines []Spoken `json:"lines"`
+		}
+		if !readJSON(w, r, int64(textMax*4+smallBodyMax), &in) {
+			return
+		}
+		msgs, err := s.AppendSpoken(id, in.Lines)
+		answer(w, map[string]any{"messages": msgs}, err)
 	case len(p) == 1 && p[0] == "stop" && m == http.MethodPost:
 		writeJSON(w, http.StatusOK, map[string]bool{"stopped": s.Stop(id)})
 	case len(p) == 1 && p[0] == "stream" && m == http.MethodGet:

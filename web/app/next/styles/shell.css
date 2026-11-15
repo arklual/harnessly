@@ -385,6 +385,10 @@ html:has(.hx-app) body {
 .hx-pane[data-max='true'] {
   width: calc(100% - 24px);
 }
+/* The sheet's handle is the phone's only. */
+.hx-pane__grip {
+  display: none;
+}
 .hx-main__body[data-pdrag='true'] {
   cursor: col-resize;
   user-select: none;
@@ -587,6 +591,15 @@ html:has(.hx-app) body {
   color: var(--hx-fg-3);
   font-size: var(--hx-text-xs);
   font-weight: var(--hx-weight-medium);
+}
+/* A part of a group by time («Сегодня», «Вчера»): quieter than the group's own name. */
+.hx-srch__part {
+  padding: 10px 10px 2px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-srch__label + .hx-srch__part {
+  padding-top: 2px;
 }
 .hx-srch__row {
   width: 100%;
@@ -1605,16 +1618,12 @@ html:has(.hx-app) body {
 }
 @media (max-width: 900px) {
   .hx-app {
-    --dw: 0;
     position: fixed;
     left: 0;
     right: 0;
     top: var(--vvt, 0);
     height: var(--vvh, 100dvh);
     -webkit-tap-highlight-color: transparent;
-  }
-  .hx-app[data-drawer='open'] {
-    --dw: 1;
   }
   .hx-main,
   .hx-scrim {
@@ -1633,11 +1642,14 @@ html:has(.hx-app) body {
     inset: 0;
     z-index: 85;
     background: rgba(8, 8, 12, 0.4);
-    opacity: var(--dw);
+    opacity: 0;
     pointer-events: none;
     transition: opacity 340ms var(--hx-m-ease);
   }
+  /* The open state is written on the scrim and the drawer themselves (sidebar.css), not as a variable on the window:
+     a custom property changed on .hx-app restyled the whole page on every open and close (HRN-1449). */
   .hx-app[data-drawer='open'] .hx-scrim {
+    opacity: 1;
     pointer-events: auto;
   }
   /* Black on a dark window dims little: the drawer's backdrop is heavier there, so the window behind reads as shut. */
@@ -1679,29 +1691,76 @@ html:has(.hx-app) body {
   .hx-pane-scrim[data-sdrag] {
     transition: none;
   }
+  /* The right pane is a bottom sheet: as tall as the screen, set down by --pane-ty to its place (two
+     thirds, or the whole screen) and moved by the finger through --pane-dy; at two thirds its bottom padding keeps the
+     content above the screen's edge. It settles with a light spring and leaves downwards with an ease-out. */
   .hx-pane {
+    --pane-spring: linear(
+      0,
+      0.009 1%,
+      0.142 6%,
+      0.42 13%,
+      0.69 21%,
+      0.87 29%,
+      0.968 37%,
+      1.012 45%,
+      1.022 53%,
+      1.015 62%,
+      1.004 75%,
+      1
+    );
     position: fixed;
     inset: 0;
     z-index: 60;
     width: auto;
     padding-top: env(safe-area-inset-top);
+    padding-bottom: var(--pane-ty, 0px);
     flex-direction: column;
-    border-radius: 0;
+    border-radius: 16px 16px 0 0;
     overflow: hidden;
     background: var(--hx-bg-window);
-    box-shadow: -16px 0 40px rgba(0, 0, 0, 0.16);
-    transform: translate3d(var(--px, 0px), 0, 0);
-    transition: transform 380ms var(--hx-m-ease);
-    animation: hx-drawer-in 420ms var(--hx-m-ease) backwards;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.16);
+    transform: translate3d(0, calc(var(--pane-ty, 0px) + var(--pane-dy, 0px)), 0);
+    transition:
+      transform 560ms var(--pane-spring),
+      border-radius 300ms var(--hx-ease-out);
+    animation: hx-psheet-in 560ms var(--pane-spring) backwards;
+  }
+  .hx-pane[data-detent='full'] {
+    border-radius: 0;
   }
   .hx-pane[data-sdrag] {
     transition: none;
   }
   .hx-pane[data-state='closing'] {
-    animation: hx-drawer-out 300ms var(--hx-m-ease) forwards;
+    animation: hx-psheet-out 300ms var(--hx-ease-out) forwards;
   }
   .hx-pane[data-max='true'] {
     width: auto;
+  }
+  /* The handle: the grip in the middle, the way back to the chat at the end; the strip's own «Чат» gives way to it. */
+  .hx-pane__grip {
+    flex: none;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 36px;
+    padding: 0 calc(6px + env(safe-area-inset-right)) 0 0;
+    touch-action: none;
+  }
+  .hx-pane__grip-bar {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 36px;
+    height: 5px;
+    margin-left: -18px;
+    border-radius: 3px;
+    background: var(--hx-border-strong);
+  }
+  .hx-pane .hx-strip .hx-tochat {
+    display: none;
   }
 }
 @media (max-width: 900px) and (prefers-reduced-motion: reduce) {
@@ -1723,17 +1782,14 @@ html:has(.hx-app) body {
     -webkit-user-select: none;
   }
 }
-@keyframes hx-drawer-in {
+@keyframes hx-psheet-in {
   from {
-    transform: translate3d(100%, 0, 0);
+    transform: translate3d(0, 100%, 0);
   }
 }
-@keyframes hx-drawer-out {
-  from {
-    transform: translate3d(var(--px, 0px), 0, 0);
-  }
+@keyframes hx-psheet-out {
   to {
-    transform: translate3d(100%, 0, 0);
+    transform: translate3d(0, 100%, 0);
   }
 }
 @keyframes hx-gate-in {

@@ -7,7 +7,7 @@ import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
 import { useFitInViewport, useHoverIntent } from '@/next/ui/use-hover-intent';
 
-/** Claude compacts by itself at this share of the window (the card's mark). */
+/** The share of the window the agent compacts at when the runtime does not say (the card's mark). */
 const AUTO_COMPACT = 0.95;
 const WARN_PCT = 80;
 const MID_PCT = 60;
@@ -15,6 +15,8 @@ const MID_PCT = 60;
 export interface IContextRingProps {
   used: number;
   limit: number;
+  /** Where the agent compacts by itself, in tokens, by its settings (Claude's autoCompactWindow, Codex's limit). */
+  compactAt?: number;
   compacting: boolean;
   /** Compacting is offered while the agent waits; undefined while it works. */
   onCompact?: () => void;
@@ -31,23 +33,26 @@ const toneOf = (pct: number) => {
   return undefined;
 };
 
-const ContextRing = ({ used, limit, compacting, onCompact }: IContextRingProps) => {
+const ContextRing = ({ used, limit, compactAt, compacting, onCompact }: IContextRingProps) => {
   const chipRef = useRef<HTMLSpanElement>(null);
   const { open, setTrigger, setFloating, getFloating, triggerProps, floatingProps } = useHoverIntent();
   useFitInViewport(getFloating, open);
   const barRef = useRef<HTMLDivElement>(null);
   const pct = Math.min(100, Math.round((used / limit) * 100));
   const free = Math.max(0, limit - used);
-  const left = Math.max(0, Math.round((limit * AUTO_COMPACT - used) / 1000));
+  const at = compactAt && compactAt > 0 ? compactAt : limit * AUTO_COMPACT;
+  const atPct = Math.round((at / limit) * 100);
+  const left = Math.max(0, Math.round((at - used) / 1000));
 
   useLayoutEffect(() => {
     chipRef.current?.style.setProperty('--p', String(pct));
     const parts = barRef.current?.querySelectorAll<HTMLElement>('i');
     parts?.[0]?.style.setProperty('--w', `${(used / limit) * 100}%`);
     parts?.[1]?.style.setProperty('--w', `${(free / limit) * 100}%`);
-  }, [pct, used, free, limit]);
+    barRef.current?.style.setProperty('--at', `${Math.min(100, (at / limit) * 100)}%`);
+  }, [pct, used, free, limit, at]);
 
-  let foot = { state: 'idle', icon: 'gauge', text: t('next.ctx.autoCompact', { left }) };
+  let foot = { state: 'idle', icon: 'gauge', text: t('next.ctx.autoCompact', { left, at: atPct }) };
   if (compacting) foot = { state: 'live', icon: 'loader-circle', text: t('next.ctx.compacting') };
 
   const rows = [

@@ -66,6 +66,10 @@ func (f *fakeTmux) run(dir, program string, args ...string) result {
 	if f.broken[socket] {
 		return result{err: errors.New("exit status 1"), stderr: "protocol version mismatch\n"}
 	}
+	// A line of several commands (`a ; b`): the fake plays the first one, as the others only set options.
+	if end := slices.Index(args, ";"); end >= 0 {
+		args = args[:end]
+	}
 	var command string
 	for _, a := range args[i+2:] {
 		if slices.Contains([]string{"ls", "list-panes", "display-message", "has-session", "send-keys", "copy-mode", "new-session", "source-file", "kill-server", "kill-session", "capture-pane"}, a) {
@@ -522,14 +526,18 @@ func TestCreateSessionCommandLine(t *testing.T) {
 	if c.program != "tmux" || c.dir != "/work" || !reflect.DeepEqual(c.args, want) || !strings.HasPrefix(want[len(want)-1], "nice -n 10 env -i ") {
 		t.Fatalf("%s in %s: %q", c.program, c.dir, c.args)
 	}
-	if got := f.calls[1].args; !reflect.DeepEqual(got, []string{"-u", "-L", "main", "source-file", "/app/tmux.conf"}) {
+	if got := f.calls[1].args; !reflect.DeepEqual(got[:6], []string{"-u", "-L", "main", "source-file", "/app/tmux.conf", ";"}) || !slices.Contains(got, "set-titles-string") {
 		t.Fatalf("then %q", got)
 	}
 	f.reset()
 	plain := f.tmux(Config{Names: fakeNames, Env: []string{"HOME=/home/u"}})
 	_ = plain.CreateSession("nw-y", 80, 24, "")
-	if c := f.calls[0]; c.program != "tmux" || c.dir != "/home/u" || slices.Contains(c.args, "-f") || len(f.calls) != 1 || strings.HasPrefix(c.args[len(c.args)-1], "nice") {
+	if c := f.calls[0]; c.program != "tmux" || c.dir != "/home/u" || slices.Contains(c.args, "-f") || len(f.calls) != 2 || strings.HasPrefix(c.args[len(c.args)-1], "nice") {
 		t.Fatalf("%s in %s: %q (+%d)", c.program, c.dir, c.args, len(f.calls)-1)
+	}
+	// No config file: the scroll overlay alone.
+	if got := f.calls[1].args; got[3] != "set-option" || slices.Contains(got, "source-file") {
+		t.Fatalf("overlay %q", got)
 	}
 }
 
@@ -579,7 +587,12 @@ func TestApplyConfigAndKillServerTouchEveryServer(t *testing.T) {
 	tm.KillServer()
 	var got []string
 	for _, c := range f.calls {
-		got = append(got, strings.Join(c.args, " "))
+		line := strings.Join(c.args, " ")
+		// The config is read again with the scroll overlay after it, in the same tmux call.
+		if before, _, ok := strings.Cut(line, " ; set-option -g mouse on ;"); ok {
+			line = before
+		}
+		got = append(got, line)
 	}
 	slices.Sort(got)
 	want := []string{"-u -L main kill-server", "-u -L main source-file /c", "-u -L old kill-server", "-u -L old source-file /c"}
@@ -873,5 +886,36 @@ func TestCreateSessionReadsAnUnchangedConfigOnce(t *testing.T) {
 	_ = tm.CreateSession("nw-f", 80, 24, "")
 	if got := commands(); got != "kill-server kill-server new-session source-file" {
 		t.Fatalf("after the servers ended: %q", got)
+	}
+}
+
+// A deployment's own config may leave the mouse off or bind the wheel otherwise: the scroll overlay is set over it on
+// every server, and without a config file it is set alone, once per server.
+func TestApplyConfigSetsTheScrollOverlay(t *testing.T) {
+	f := newFake()
+	tm := f.tmux(Config{Names: fakeNames, ConfigFile: "/c"})
+	f.servers["main"] = nil
+	tm.ApplyConfig("main")
+	if len(f.calls) != 1 {
+		t.Fatalf("calls %d", len(f.calls))
+	}
+	line := strings.Join(f.calls[0].args, " ")
+	for _, want := range []string{"source-file /c ;", "set-option -g mouse on", "WheelUpPane if-shell -F -t = #{?pane_in_mode,1,#{mouse_any_flag}} send-keys -M copy-mode -e", "set-titles-string hx-scroll:#{pane_in_mode}"} {
+		if !strings.Contains(line, want) {
+			t.Fatalf("%q lacks %q", line, want)
+		}
+	}
+	bare := newFake()
+	tm = bare.tmux(Config{Names: fakeNames})
+	_ = tm.CreateSession("nw-a", 80, 24, "")
+	_ = tm.CreateSession("nw-b", 80, 24, "")
+	overlays := 0
+	for _, c := range bare.calls {
+		if strings.Contains(strings.Join(c.args, " "), "set-titles-string") {
+			overlays++
+		}
+	}
+	if overlays != 1 {
+		t.Fatalf("overlay set %d times without a config file", overlays)
 	}
 }

@@ -1,7 +1,7 @@
 // The search's rows beyond the chats: settings (changed in the row itself), the sections of Settings, the team's
 // documents, the designs of the library and what the connected systems found. Each builder answers a group, or null
 // when it has nothing for the words.
-import { formatAgo } from '@/next/i18n/format';
+import { formatWhen } from '@/next/i18n/format';
 import { matching, type ITerms } from '@/next/features/search/terms';
 import {
   ROW_GO,
@@ -172,9 +172,9 @@ export const settingsGroup = (
   return rows.length > 0 ? { id: SCOPE.settings, label: t('next.search.groupSettings'), rows } : null;
 };
 
-/** «вчера», «13 нояб.» for a time the catalog gave, in the page's language as the rest of it; '' for none. */
+/** «3 ч», «вчера», «ср», «13 нояб.» for a time the catalog gave, as the chats' rows say it; '' for none. */
 const dayOf = (at: number | null): string =>
-  at === null || Number.isNaN(at) ? '' : formatAgo(at, Date.now());
+  at === null || Number.isNaN(at) ? '' : formatWhen(at, Date.now());
 
 const docRow = (doc: ICatalogDoc): ISearchRow => ({
   id: `doc:${doc.slug}`,

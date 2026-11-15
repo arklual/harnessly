@@ -1,5 +1,8 @@
 // The field's prompts (the design's .hx-ph): what the person sent before (the last 50 texts) and the quick prompts they
-// saved under a /name. Both live in this browser's localStorage; the filtering and the selection are plain functions.
+// saved under a /name. Both live in this browser's localStorage, the quick prompts in the person's settings too
+// (stores/synced-prefs.ts); the filtering and the selection are plain functions.
+
+import { notePrefWrite } from '@/next/core/pref-write';
 
 const HISTORY_KEY = 'hx.next.promptHistory';
 const QUICK_KEY = 'hx.next.quickPrompts';
@@ -117,4 +120,7 @@ export const loadQuick = (): IQuickPrompt[] => {
   );
 };
 
-export const saveQuick = (quick: readonly IQuickPrompt[]) => write(QUICK_KEY, quick);
+export const saveQuick = (quick: readonly IQuickPrompt[]) => {
+  write(QUICK_KEY, quick);
+  notePrefWrite(QUICK_KEY);
+};

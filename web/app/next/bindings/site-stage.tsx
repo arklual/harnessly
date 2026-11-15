@@ -3,6 +3,10 @@
 // site (a window or an edge) it is the usual chat — the same feed, field, picker, queue and states as anywhere; folded
 // over the site it is the island: the field, and over it the agent's last line with what it does now and «Стоп». A
 // design without a chat gets one with its first message, which is in the column from the moment it is sent.
+import type { IAppObject } from '@/next/features/voice-live/api';
+import { nothingToSend } from '@/next/features/composer/nothing-to-send';
+import { sendModeNow } from '@/next/stores/chat-state';
+import { chatTitleOf } from '@/next/features/designly/chat-title';
 import { useTourFill } from '@/next/features/tour/use-tour-fill';
 import { useTourStep } from '@/next/features/tour/use-tour-step';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -37,10 +41,12 @@ import ScreenField from '@/next/features/composer/one-field';
 import { ChatSwitch } from '@/next/features/designly/chat-switch';
 import { DESIGN_CONV, designChats, designKey, type TDesignConv } from '@/next/features/designly/design-conv';
 import { chatStatusOf } from '@/next/features/sidebar/status';
-import { lastLineOf } from '@/next/features/designly/last-line';
+import { lastLineOf, linksOf } from '@/next/features/designly/last-line';
+import { cardKindOf } from '@/next/features/chat/link-card';
 import {
   firstFloat,
   IslandLast,
+  type IIslandCard,
   ISLAND_STATUS,
   SiteChat,
   SiteIsland,
@@ -54,6 +60,13 @@ import { requestContinue } from '@/next/stores/ui-requests';
 import { requestMoveVm, useMoveEnabled } from '@/next/stores/chat-move';
 import type { IFloat, TDock, TZone } from '@/next/features/designly/site-drag';
 import type { ISiteStage } from '@/next/features/designly/site-view';
+import {
+  clearSpaceLine,
+  gistOf,
+  questionOf,
+  showSpaceLine,
+  useSpaceLine,
+} from '@/next/features/space-field/line';
 import { formatAnnotation, withAnnotations } from '@/next/features/designly/annotation';
 import {
   DECK_CTX_ID,
@@ -120,11 +133,20 @@ const runOf = (status: TIslandStatus): ISiteStage['run'] => {
   return 'idle';
 };
 
-/** The last thing the agent said in a chat's feed, as one line. */
-const lastAnswer = (items: readonly FeedItem[] | null): string | null => {
+/** The agent's latest answer in a chat's feed, as markdown. */
+const lastAnswerMd = (items: readonly FeedItem[] | null): string | null => {
   for (let i = (items?.length ?? 0) - 1; i >= 0; i -= 1) {
     const item = items?.[i];
-    if (item?.kind === 'turn' && item.answer) return lastLineOf(item.answer.md);
+    if (item?.kind === 'turn' && item.answer) return item.answer.md;
+  }
+  return null;
+};
+
+/** The board or document the answer links to last, as a card; null when it links to none of ours. */
+const cardOf = (md: string): IIslandCard | null => {
+  for (const link of linksOf(md)) {
+    const kind = cardKindOf(link.href);
+    if (kind) return { kind, ...link };
   }
   return null;
 };
@@ -140,7 +162,25 @@ const ConvLast = ({
   onExpand: () => void;
 }) => {
   const items = useFeedItems(conv, machine);
-  return <IslandLast text={lastAnswer(items)} onExpand={onExpand} />;
+  const md = lastAnswerMd(items);
+  return <IslandLast text={md && lastLineOf(md)} card={md ? cardOf(md) : null} onExpand={onExpand} />;
+};
+
+/**
+ * A space's finished turn says its result as the field's one line: the gist of the answer, or the question it ends
+ * with, to be answered «Да» or «Нет». Said once per answer.
+ */
+const SpaceTurnLine = ({ conv, machine, done }: { conv: ConvId; machine: MachineId; done: boolean }) => {
+  const items = useFeedItems(conv, machine);
+  const md = done ? lastAnswerMd(items) : null;
+  const said = useRef<string | null>(null);
+  useEffect(() => {
+    if (md === null || said.current === md) return;
+    said.current = md;
+    const question = questionOf(md);
+    showSpaceLine({ text: question ?? gistOf(md), question: question !== null, toChat: true });
+  }, [md]);
+  return null;
 };
 
 /** The card of a note with its own microphone: what is dictated lands in the card's field; `onTextChange` keeps the
@@ -242,6 +282,8 @@ const NewDesignField = ({ machine, draftKey, creating, start, extra, onFirst }: 
       toast(t('next.composer.uploadingWait'), { tone: 'info' });
       return;
     }
+    // No words and nothing attached: the context alone is no message.
+    if (nothingToSend({ text, attached: uploads.ready.length })) return;
     const clientId = onFirst(extra.wrap(text.trim()), uploads.ready);
     if (!clientId) return;
     bindLaunch(clientId);
@@ -418,7 +460,6 @@ export interface IStageOptions {
   pageUrl: string;
   /** The library server's port; null while the library loads. */
   port: number | null;
-  onOpenDrawer: () => void;
   /** Where a link, a file or a card of the design's chat opens (the pane beside the design); without it they stay put. */
   open?: TChatOpeners;
   /** The design's own page keeps where its chat stands; the right pane's copy has its own choice (pane-chat.ts). */
@@ -428,7 +469,12 @@ export interface IStageOptions {
    * library nor asked of other machines, a pick of a chat leaves `?chat=` for `address`, and a chat made here is handed
    * to `onCreated` (the app turns itself on in it).
    */
-  app?: { address: TRoute; onCreated: (conv: ConvId) => void };
+  app?: {
+    address: TRoute;
+    onCreated: (conv: ConvId) => void;
+    /** The app's object on screen: the voice's quick edits go to it through the app. */
+    object?: IAppObject | null;
+  };
   /**
    * A space of the person's own (boards, documents; HRN-1391): the space takes the whole screen with the one field over
    * it; the first words or `@harnessly` open the chat in a window over the space, rising from the field. No chat comes
@@ -529,7 +575,6 @@ export const useSiteStage = ({
   title,
   pageUrl,
   port,
-  onOpenDrawer,
   open,
   keep = false,
   app,
@@ -627,7 +672,10 @@ export const useSiteStage = ({
     openPlainOnce(convId);
     goTo({ kind: ROUTE.chat, id: convId });
   };
-  const status = statusOf(conv, now, sawRun, creating !== undefined);
+  const turnStatus = statusOf(conv, now, sawRun, creating !== undefined);
+  // Over a space a finished turn says its result as the field's one line (SpaceTurnLine), not «Готово» beside it.
+  const status = space && turnStatus?.k === ISLAND_STATUS.done ? null : turnStatus;
+  const spaceLine = useSpaceLine();
 
   /** The typed words with the notes as the agent reads them. */
   const wrap = (typed: string) =>
@@ -646,6 +694,7 @@ export const useSiteStage = ({
     ]);
   const afterSend = () => {
     setSawRun(false);
+    if (space) clearSpaceLine();
     setNotes([]);
     setPicking(false);
   };
@@ -679,7 +728,7 @@ export const useSiteStage = ({
     if (!canSend) return;
     const words = wrap(text.trim());
     if (convId) {
-      sendMessage(machine, { conversationId: convId, text: words, mode: 'queue' });
+      sendMessage(machine, { conversationId: convId, text: words, mode: sendModeNow(convId) });
       clearDraft(convId);
       afterSend();
       return;
@@ -733,15 +782,8 @@ export const useSiteStage = ({
     leaveTo(opened === 'float' ? 'float' : 'chat');
     setMin(false);
   };
-  // `@harnessly` typed in the folded field calls the chat over the space, with the words in its field.
-  const called = space !== undefined && mode === 'island' && MENTION_RE.test(text);
-  const callRef = useRef(callOver);
-  useEffect(() => {
-    callRef.current = callOver;
-  });
-  useEffect(() => {
-    if (called) callRef.current();
-  }, [called]);
+  // `@harnessly` in the field over a space is the field itself: the words go to the agent and the window stays shut;
+  // the chat's window opens only by «В чат». The mention is taken out of the words as they go (wrap).
   // A lesson that edits the design keeps its chat docked beside the page: the field over the page hides what changes.
   const sideChat = useTourStep()?.sideChat === true;
   // Only when the step comes (adjusted while rendering): the person may move the chat back while it is on.
@@ -789,8 +831,13 @@ export const useSiteStage = ({
       </span>
     </button>
   ) : null;
+  // The board on screen as a file: the voice's quick edits write it.
+  const boardName = boardFileOf(design, pageUrl);
+  const boardPath = dir && boardName ? `${dir.replace(/\/project\/?$/, '')}/project/${boardName}` : null;
   const extra: IDockExtra = {
-    quotes: deckCtx ? [deckContextQuote(deckCtx)] : [],
+    // Over a space no chip ties the open board to the chat: what is open and selected goes with each message by itself
+    // (wrap), and another board opened is what the next message says.
+    quotes: deckCtx && !space ? [deckContextQuote(deckCtx)] : [],
     notes: {
       key: 'design',
       notes: notes.map(noteChip),
@@ -808,10 +855,24 @@ export const useSiteStage = ({
     wrap,
     onSent: () => {
       afterSend();
-      // The first words over a space open its chat: the answer is read where it was asked.
-      if (space) callOver();
     },
     tools: pickTool,
+    voiceContext: [
+      `Sinopia Design: «${title}»`,
+      pageUrl ? `open page: ${pageUrl}` : '',
+      notes.length > 0 ? `${notes.length} block(s) picked on the page` : '',
+    ]
+      .filter(Boolean)
+      .join('; '),
+    voiceEdit: app?.object
+      ? { file: '', app: app.object, selection: () => wrap('') }
+      : boardPath
+        ? {
+            file: boardPath,
+            selection: () => wrap(''),
+            tpl: () => deckCtx?.tpl ?? notes.at(-1)?.picked.id ?? null,
+          }
+        : null,
   };
 
   const rowsOf = designChats({ list: everywhere, found, fresh: creating?.conv ?? null });
@@ -861,18 +922,20 @@ export const useSiteStage = ({
           : []),
       ]
     : [];
-  // The switch names the chat; before it has one, what the new chat is about: the design, or the space.
-  const chatTitle = () => {
-    if (convId) return title;
-    if (space) return t('next.site.newSpaceChat', { name: title });
-    return t('next.site.newDesignChat');
-  };
+  // The switch names the chat (never the design); before it has one, what the new chat is about.
+  const headTitle = chatTitleOf({
+    convId,
+    convTitle: conv?.title ?? null,
+    rowTitle: rowsOf.find((c) => c.id === convId)?.title ?? null,
+    space: Boolean(space),
+    designTitle: title,
+  });
   const chat: ISiteChatProps = {
-    title,
+    title: headTitle,
     heading: (
       <ChatSwitch
         current={convId}
-        title={conv?.title ?? chatTitle()}
+        title={headTitle}
         rows={rows}
         onPick={pickChat}
         onOpen={() => setAsked((n) => n + 1)}
@@ -890,10 +953,10 @@ export const useSiteStage = ({
       leaveTo('island');
       setMin(empty);
     },
-    onOpenDrawer,
     onMode: changeMode,
     more,
     onOpenSite: () => setSview(true),
+    onToChat: convId ? openChatPage : undefined,
   };
 
   return {
@@ -987,23 +1050,29 @@ export const useSiteStage = ({
       ),
     ask: (words) => {
       if (convId) {
-        sendMessage(machine, { conversationId: convId, text: words, mode: 'queue' });
+        sendMessage(machine, { conversationId: convId, text: words, mode: sendModeNow(convId) });
         return;
       }
       sendFirst(words, []);
     },
     fill: (words) => {
-      setText(words);
-      // A space's view (a call written on the board) opens the chat over it, beside the place; a design's at its edge.
+      // A call written on a space (a comment's @harnessly) goes to the agent at once: the person asked already, and
+      // the answer comes as the field's line and in the comment's thread.
       if (space) {
-        callOver();
+        if (convId) sendMessage(machine, { conversationId: convId, text: words, mode: sendModeNow(convId) });
+        else sendFirst(words, []);
+        afterSend();
         return;
       }
+      setText(words);
       leaveTo('chat');
       setMin(false);
     },
     anchor: (rect) => {
       selection.current = rect;
+    },
+    fold: () => {
+      if (space && mode === 'float') leaveTo('island');
     },
     bindSection: (el) => {
       sectionEl.current = el;
@@ -1014,7 +1083,7 @@ export const useSiteStage = ({
       leaveTo('chat');
       setMin(false);
       if (convId) {
-        sendMessage(machine, { conversationId: convId, text: words, mode: 'queue' });
+        sendMessage(machine, { conversationId: convId, text: words, mode: sendModeNow(convId) });
         return;
       }
       sendFirst(words, []);
@@ -1073,7 +1142,24 @@ export const useSiteStage = ({
         mode={mode}
         onZone={onZone}
         notes={notes.length}
+        {...(space
+          ? {
+              space: {
+                line: spaceLine,
+                onAnswer: (words: string) => {
+                  if (convId)
+                    sendMessage(machine, { conversationId: convId, text: words, mode: sendModeNow(convId) });
+                  afterSend();
+                },
+                onDismissLine: () => clearSpaceLine(spaceLine),
+              },
+            }
+          : {})}
       />
     ),
+    spaceTurn:
+      space && convId ? (
+        <SpaceTurnLine conv={convId} machine={machine} done={turnStatus?.k === ISLAND_STATUS.done} />
+      ) : null,
   };
 };

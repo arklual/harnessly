@@ -201,3 +201,38 @@ func TestNetworkPolicyIsServedWhenValid(t *testing.T) {
 		}
 	}
 }
+
+func TestWebPageIsServedOnlyWhenTheHubHasOne(t *testing.T) {
+	webDir := t.TempDir()
+	mux := http.NewServeMux()
+	h := New(t.TempDir(), "https://hub.example.com", "1.2.3", "")
+	h.Mount(mux)
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	// Off (no HUB_WEB_PACKAGE_URL): 404, the machines keep their own page.
+	if res, _ := get(t, srv.URL+"/dl/web.json"); res.StatusCode != http.StatusNotFound {
+		t.Fatalf("off: %d", res.StatusCode)
+	}
+	h.WebDir = webDir
+	if res, _ := get(t, srv.URL+"/dl/web.tar.gz"); res.StatusCode != http.StatusNotFound {
+		t.Fatalf("nothing taken yet: %d", res.StatusCode)
+	}
+	sum := sha256.Sum256([]byte("page"))
+	pointer := `{"version":"1.2.3","sha256":"` + hex.EncodeToString(sum[:]) + `","size":4,"file":"web-1.2.3.tar.gz","pipeline":7}`
+	if err := os.WriteFile(filepath.Join(webDir, "web.json"), []byte(pointer), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(webDir, "web-1.2.3.tar.gz"), []byte("page"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, body := get(t, srv.URL+"/dl/web.json")
+	var p struct{ Version, SHA256 string }
+	if res.StatusCode != 200 || json.Unmarshal([]byte(body), &p) != nil || p.Version != "1.2.3" {
+		t.Fatalf("web.json: %d %s", res.StatusCode, body)
+	}
+	res, body = get(t, srv.URL+"/dl/web.tar.gz")
+	if res.StatusCode != 200 || body != "page" || res.Header.Get("X-Web-Sha256") != p.SHA256 {
+		t.Fatalf("web.tar.gz: %d %q %v", res.StatusCode, body, res.Header)
+	}
+}

@@ -78,5 +78,9 @@
   "next.limits.card.connect": "Подключить",
   "next.limits.card.left": "{left}%",
   "next.limits.card.pace": "Чтобы хватило до сброса, сейчас должно оставаться {pace}%",
-  "next.limits.card.spark": "Траты по дням за неделю"
+  "next.limits.card.spark": "Траты по дням за неделю",
+  "next.limits.alert.sevenDay": "Недельный лимит {provider}",
+  "next.limits.alert.fiveHour": "5-часовой лимит {provider}",
+  "next.limits.alert.text": "Осталось {left}%, сброс в {at}",
+  "next.limits.alert.textOut": "Исчерпан, сброс в {at}"
 }

@@ -315,3 +315,45 @@ func readEvents(ctx context.Context, r io.Reader, onDelta func(string)) error {
 	}
 	return fail(CodeIncomplete, http.StatusBadGateway, "the stream ended before response.completed")
 }
+
+// Complete is one answer to one prompt on the active account's plan, outside any chat: the voice's quick edits ask
+// with it. An empty model is the plan's lightest (a «Luna» when the plan has one), at its lowest depth.
+func (s *Service) Complete(ctx context.Context, model, instructions, prompt string) (string, error) {
+	key, err := s.accs.active()
+	if err != nil {
+		return "", err
+	}
+	if key == "" {
+		return "", fail(CodeSignedOut, http.StatusUnauthorized, "")
+	}
+	effort := ""
+	if list, err := s.listModels(ctx, key); err == nil && len(list) > 0 {
+		pick := list[len(list)-1]
+		for _, m := range list {
+			if model != "" && m.Slug == model || model == "" && strings.Contains(strings.ToLower(m.Slug), "luna") {
+				pick = m
+				break
+			}
+		}
+		model = pick.Slug
+		if len(pick.Efforts) > 0 {
+			effort = pick.Efforts[0]
+		}
+	}
+	if model == "" {
+		return "", fail(CodeBadRequest, http.StatusBadRequest, "model")
+	}
+	token, err := s.oauth.token(ctx, key)
+	if err != nil {
+		return "", err
+	}
+	req := turnRequest{Model: model, Instructions: instructions, Input: []inputItem{{
+		Type: "message", Role: "user", Content: []contentPart{{Type: "input_text", Text: prompt}},
+	}}}
+	if effort != "" {
+		req.Reasoning = &reasoningParam{Effort: effort}
+	}
+	var b strings.Builder
+	err = s.streamTurn(ctx, token, req, func(d string) { b.WriteString(d) })
+	return b.String(), err
+}

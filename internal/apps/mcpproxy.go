@@ -168,3 +168,7 @@ func (c rpcCall) unavailable(w http.ResponseWriter, name string) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(raw)
 }
+
+// Transport is the transport of a call an app makes from the machine to host (a feed of the start page, docs/apps/day-feed.md):
+// the same rules as the proxy's MCP calls.
+func Transport(host string) http.RoundTripper { return mcpProxyTransport(host) }

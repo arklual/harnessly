@@ -66,7 +66,53 @@ func PrepareEvalPackage(dir string, c EvalCase, bin string) (string, func(), err
 		cleanup()
 		return "", nil, err
 	}
+	if len(servers) > 0 {
+		if err := trustMocks(dir, pkg); err != nil {
+			cleanup()
+			return "", nil, fmt.Errorf("scenario %s: %w", c.Name, err)
+		}
+	}
+	// An address the installation gives (${install:boardsUrl}) has none here: without one the app is «не настроено» and
+	// not installed at all. The eval reaches no real backend, so each name gets an address that leads nowhere.
+	values := map[string]string{}
+	for _, name := range packageInstallNames(pkg) {
+		values[name] = "https://" + strings.ToLower(name) + ".eval.invalid"
+	}
+	if len(values) > 0 {
+		if _, err := fillInstallFiles(pkg, values); err != nil {
+			cleanup()
+			return "", nil, fmt.Errorf("scenario %s: %w", c.Name, err)
+		}
+	}
 	return pkg, cleanup, nil
+}
+
+// trustMocks lets the eval's copy run harnessly's own mock: the mock is a local command, which only a
+// trusted app may run, so every eval of a sandboxed app was refused at install. The copy is marked trusted only when
+// the author's package passes the check at the trust it declares: then it carries nothing a trusted app alone may (no
+// hooks, no local servers, no validators), and the one thing the mark lets in is the mock this function's caller wrote.
+// The author's manifest and what the app may do in a real install stay as they are.
+func trustMocks(dir, pkg string) error {
+	if own, ps := LoadPackage(dir); own == nil || len(ps.Errors()) > 0 {
+		return fmt.Errorf("%w: %s", ErrInvalid, ps.Errors().Error())
+	} else if own.Manifest.Trust == TrustTrusted {
+		return nil
+	}
+	path := filepath.Join(pkg, ManifestPath)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return fmt.Errorf("the manifest: %w", err)
+	}
+	m["trust"] = json.RawMessage(`"trusted"`)
+	out, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(out, '\n'), 0o600)
 }
 
 // ClaudeEval is the EvalAgent over Claude Code.
@@ -209,6 +255,11 @@ func CheckAppServers(pkgDir string, tr Transcript) error {
 				continue
 			}
 			found = true
+			// Claude Code connects a plugin's servers alongside the first turn and lists them as pending in its first
+			// event: a pending server the agent then called did come up.
+			if s.Status == "pending" && calledServer(tr, name) {
+				continue
+			}
 			if s.Status != "connected" {
 				return fmt.Errorf("the MCP server %q of the app did not start (%s): the agent ran without its tools", name, s.Status)
 			}
@@ -218,6 +269,16 @@ func CheckAppServers(pkgDir string, tr Transcript) error {
 		}
 	}
 	return nil
+}
+
+// calledServer says whether the run called a tool of the server (calls are `<server>.<tool>`, ToolName).
+func calledServer(tr Transcript, name string) bool {
+	for _, c := range tr.Calls {
+		if strings.HasPrefix(c.Name, name+".") {
+			return true
+		}
+	}
+	return false
 }
 
 // ClaudeJudge is the EvalJudge over Claude Code: one print-mode call that reads what the agent did and answers PASS or

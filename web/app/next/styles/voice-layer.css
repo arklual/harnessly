@@ -1,0 +1,436 @@
+/* The voice away from its chat (features/voice-live/voice-layer.tsx, voice-bar.tsx, mini-wave.tsx; harnessly design
+ * project → «Голос — в другом чате»). */
+
+/* The voices of chats not on screen: kept, not shown (their sound plays on). */
+.hx-voice-parking {
+  display: none;
+}
+.hx-voice-home,
+.hx-voice-slot {
+  display: contents;
+}
+
+/* The small wave: four bars; accent — the agent speaks, red — it listens, grey — it thinks. */
+.hx-mini-wave {
+  flex: none;
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  height: 14px;
+}
+.hx-mini-wave i {
+  width: 2px;
+  height: 12px;
+  border-radius: 1px;
+  background: var(--hx-accent);
+  transform: scaleY(0.35);
+  transition: background 0.3s;
+  animation: hx-mini-wave 700ms ease-in-out infinite alternate;
+}
+.hx-mini-wave i:nth-child(2) {
+  animation-delay: -250ms;
+}
+.hx-mini-wave i:nth-child(3) {
+  animation-delay: -500ms;
+}
+.hx-mini-wave i:nth-child(4) {
+  animation-delay: -120ms;
+}
+.hx-mini-wave[data-s='listen'] i {
+  background: var(--hx-danger);
+}
+.hx-mini-wave[data-s='think'] i {
+  background: var(--hx-fg-3);
+  animation-duration: 1400ms;
+}
+@keyframes hx-mini-wave {
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* The chat of the talk in the sidebar: accent 13 % (22 % when open), the head in place of the indent, the wave at the
+ * end in place of the status; it all goes in 0.3 s when the talk ends. */
+.hx-item[data-voice] {
+  transition:
+    background 0.3s var(--hx-ease-out),
+    color 0.3s;
+}
+.hx-item[data-voice='on'] {
+  background: color-mix(in srgb, var(--hx-accent) 13%, transparent);
+  color: var(--hx-fg-1);
+}
+.hx-item[data-voice='on'][aria-current='page'] {
+  background: color-mix(in srgb, var(--hx-accent) 22%, transparent);
+}
+.hx-item__voice-head {
+  flex: none;
+  display: inline-flex;
+  margin: 0 6px 0 -3px;
+  --hx-head-size: 18px;
+  animation: hx-voice-pop 0.3s var(--hx-ease-out) backwards;
+}
+.hx-item__end > .hx-mini-wave {
+  animation: hx-voice-pop 0.3s var(--hx-ease-out) backwards;
+  transition: opacity 0.2s;
+}
+.hx-item[data-voice] .hx-item__end > .hx-chat-status {
+  opacity: 0;
+}
+.hx-item[data-voice]:hover .hx-item__end > .hx-mini-wave,
+.hx-item[data-menu] .hx-item__end > .hx-mini-wave {
+  opacity: 0;
+}
+.hx-item[data-voice='out'] :is(.hx-item__voice-head, .hx-item__end > .hx-mini-wave) {
+  animation: hx-voice-pop-out 0.3s var(--hx-ease-out) forwards;
+}
+@keyframes hx-voice-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+@keyframes hx-voice-pop-out {
+  to {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+/* The bar: top centre, 44 high, over any screen but the chat of the talk; under the screen's header, so the open
+ * chat's title and its buttons stay seen. */
+.hx-voice-bar {
+  position: fixed;
+  z-index: 60;
+  top: calc(var(--hx-header-h) + 8px + env(safe-area-inset-top));
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: calc(100vw - 32px);
+  padding: 5px;
+  border-radius: 24px;
+  background: var(--hx-bg-raised);
+  border: 1px solid var(--hx-border-strong);
+  box-shadow: var(--hx-shadow-md);
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  animation: hx-voice-bar-in 240ms var(--hx-ease-out) backwards;
+  transition:
+    box-shadow 0.3s,
+    border-color 0.3s;
+}
+.hx-voice-bar[data-s='speak'] {
+  border-color: color-mix(in srgb, var(--hx-accent) 35%, var(--hx-border-strong));
+  box-shadow:
+    var(--hx-shadow-md),
+    0 0 0 3px var(--hx-accent-soft);
+}
+.hx-voice-bar[data-closing] {
+  animation: hx-voice-bar-out 200ms var(--hx-ease-out) forwards;
+  pointer-events: none;
+}
+@keyframes hx-voice-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+    filter: blur(4px);
+  }
+}
+@keyframes hx-voice-bar-out {
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+    filter: blur(4px);
+  }
+}
+.hx-voice-bar__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding-left: 4px;
+  --hx-head-size: 24px;
+}
+.hx-voice-bar__t {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--hx-fg-2);
+}
+.hx-voice-bar__t b {
+  font-weight: 500;
+  color: var(--hx-fg-1);
+}
+.hx-voice-bar__sep {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  margin: 0 2px;
+  background: var(--hx-border-strong);
+}
+.hx-voice-bar__b,
+.hx-voice-bar__i {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  cursor: pointer;
+  transition: background 160ms ease-out;
+}
+.hx-voice-bar__b {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 15px;
+}
+.hx-voice-bar__i {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--hx-fg-2);
+}
+.hx-voice-bar__b:hover,
+.hx-voice-bar__i:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-voice-bar__b:focus-visible,
+.hx-voice-bar__i:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: -2px;
+}
+.hx-voice-bar__i[data-on] {
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
+}
+.hx-voice-bar__b--end,
+.hx-voice-bar__i--end {
+  color: var(--hx-danger);
+}
+.hx-voice-bar__m {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 0 0 12px;
+  border-top: 1px solid var(--hx-border);
+  animation: hx-voice-bar-in 240ms var(--hx-ease-out) backwards;
+}
+.hx-voice-bar__in {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  outline: 0;
+}
+.hx-voice-bar__in::placeholder {
+  color: var(--hx-fg-3);
+}
+.hx-voice-bar__narrow {
+  display: none;
+}
+@media (max-width: 560px) {
+  .hx-voice-bar__wide {
+    display: none;
+  }
+  .hx-voice-bar__narrow {
+    display: grid;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-voice-bar,
+  .hx-voice-bar__m,
+  .hx-item__voice-head,
+  .hx-item__end > .hx-mini-wave,
+  .hx-mini-wave i {
+    animation: none !important;
+  }
+}
+
+/* The voice's head at the start of a field's line (over a board or a document): 26 px, comes and goes with the voice. */
+.hx-field-head {
+  flex: none;
+  display: inline-flex;
+  margin-right: 8px;
+  --hx-head-size: 26px;
+  animation: hx-voice-pop 0.3s var(--hx-ease-out) backwards;
+}
+
+/* Notices stand under the bar while it is on screen, not over it. */
+body:has(.hx-voice-bar:not([data-closing])) .hx-toasts {
+  top: calc(var(--hx-header-h) + 64px + env(safe-area-inset-top));
+  transition: top 0.24s var(--hx-ease-out);
+}
+
+/* «Послушать» of the day's digest (features/voice-live/digest-listen.tsx). */
+.hx-digest-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: 13px;
+  background: var(--hx-accent-soft);
+  color: var(--hx-accent);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 140ms ease;
+  animation: hx-voice-pop 0.24s var(--hx-ease-out) backwards;
+}
+.hx-digest-play:hover {
+  background: color-mix(in oklab, var(--hx-accent) 22%, transparent);
+}
+.hx-digest-ctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 3px 0 4px;
+  border-radius: 15px;
+  background: var(--hx-accent-soft);
+  --hx-head-size: 22px;
+  animation: hx-voice-bar-in 240ms var(--hx-ease-out) backwards;
+}
+.hx-digest-ctl[data-closing] {
+  animation: hx-voice-pop-out 0.2s var(--hx-ease-out) forwards;
+}
+.hx-digest-ctl > .hx-mini-wave {
+  margin: 0 4px 0 2px;
+}
+.hx-digest-ctl__b {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--hx-accent);
+  cursor: pointer;
+}
+.hx-digest-ctl__b:hover {
+  background: color-mix(in oklab, var(--hx-accent) 18%, transparent);
+}
+.hx-digest-ctl__b:focus-visible,
+.hx-digest-play:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 1px;
+}
+.hx-digest-phrase {
+  border-radius: 6px;
+  transition:
+    background 300ms var(--hx-ease-out),
+    color 300ms var(--hx-ease-out),
+    box-shadow 300ms var(--hx-ease-out);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+[data-digest-voice='true'] .hx-digest-phrase {
+  color: var(--hx-fg-2);
+}
+[data-digest-voice='true'] .hx-digest-phrase[data-cur='true'] {
+  color: var(--hx-fg-1);
+  background: var(--hx-accent-soft);
+  box-shadow: 0 0 0 3px var(--hx-accent-soft);
+}
+.hx-mini-wave[data-s='idle'] i {
+  animation: none;
+  opacity: 0.5;
+}
+
+/* «Разговор прервался · Продолжить» (cut-talk.ts): after a reload, in the field of the chat the talk was in. */
+.hx-voice-cut {
+  flex: none;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--hx-accent) 13%, transparent);
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  animation: hx-voice-pop 0.3s var(--hx-ease-out) backwards;
+  transition: background 0.2s var(--hx-ease-out);
+}
+.hx-voice-cut b {
+  font-weight: 500;
+  color: var(--hx-fg-1);
+}
+.hx-voice-cut:hover {
+  background: color-mix(in srgb, var(--hx-accent) 22%, transparent);
+}
+
+/* A talk about an item of the digest (features/voice-live/digest-line.tsx): one line under the summary. */
+.hx-digest-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 14.5px;
+  line-height: 23px;
+  color: var(--hx-fg-1);
+  --hx-head-size: 26px;
+  animation: hx-voice-bar-in 240ms var(--hx-ease-out) backwards;
+}
+.hx-digest-line .hx-head {
+  margin-top: -1px;
+}
+.hx-digest-line__b {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hx-digest-line__me,
+.hx-digest-line__say {
+  color: var(--hx-fg-3);
+}
+.hx-digest-line__say b {
+  font-weight: inherit;
+  color: var(--hx-fg-1);
+}
+.hx-digest-line__open {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--hx-fg-2);
+  text-decoration: underline;
+  text-decoration-color: var(--hx-border-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.hx-digest-line > .hx-wave {
+  flex: 1;
+  margin: 0;
+  height: 22px;
+}
+/* The item talked about: an accent outline. */
+.hx-digest-item {
+  transition: box-shadow 300ms var(--hx-ease-out);
+}
+.hx-digest-item[data-digest-voice='true'] {
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--hx-accent) 45%, transparent),
+    0 0 0 6px var(--hx-accent-soft);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-digest-play,
+  .hx-digest-ctl,
+  .hx-digest-line,
+  .hx-field-head,
+  .hx-item[data-voice='out'] :is(.hx-item__voice-head, .hx-item__end > .hx-mini-wave) {
+    animation: none !important;
+  }
+}

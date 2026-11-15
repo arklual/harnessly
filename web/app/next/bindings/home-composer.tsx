@@ -20,8 +20,7 @@ import { UI_REQUEST, requestUi } from '@/next/stores/ui-requests';
 import type { ISlashActions } from '@/next/features/composer/slash-model';
 import ScreenField from '@/next/features/composer/one-field';
 import type { IModelPickerProps } from '@/next/features/composer/model-picker';
-import { createChat as createGptChat } from '@/next/features/chatgpt/api';
-import { carryDraft, gptChatsChanged } from '@/next/features/chatgpt/store';
+import { useGptExtra } from '@/next/bindings/use-gpt-extra';
 import type { Conversation, ConvId, MachineId } from '@/next/protocol/v2';
 import { clearDraft, NEW_CHAT } from '@/next/stores/drafts';
 import { queueChat } from '@/next/commands/queued-chats';
@@ -65,8 +64,12 @@ export const startFolder = (
   machine: MachineId,
   defaultCwd: string | null = null,
 ): string | null => {
-  const latest = (convs ?? [])
-    .filter((c) => c.machineId === machine)
+  // A delegated chat works in its own folder (podchaty/<name>): the person's next chat does not follow it there, nor
+  // a chat that once started in such a folder by following it.
+  const own = (convs ?? []).filter((c) => c.machineId === machine);
+  const delegated = new Set(own.filter((c) => c.parentId).map((c) => c.cwd));
+  const latest = own
+    .filter((c) => !c.parentId && !delegated.has(c.cwd))
     .sort((a, b) => b.createdAt - a.createdAt)[0];
   return latest?.cwd ?? defaultCwd;
 };
@@ -114,6 +117,7 @@ const HomeComposer = ({
   // Arriving with something taken from the Apps screen, the person goes on in the field.
   const field = useRef<HTMLTextAreaElement>(null);
   const { text, files, refs, setText, read } = useDraftField(NEW_CHAT, field);
+  const gptExtra = useGptExtra(machine, text, () => setText(''));
   // The apps picked in «+» for the chat to be: turned on in it as soon as the machine has made it.
   const [apps, setApps] = useState<string[]>([]);
   const mentions = useMentions(NEW_CHAT);
@@ -436,24 +440,7 @@ const HomeComposer = ({
                 onChange: onPickOne,
                 multi,
                 machine: machines,
-                extra: machine
-                  ? {
-                      label: t('next.chatgpt.pick.label'),
-                      sub: t('next.chatgpt.pick.sub'),
-                      onPick: () => {
-                        const words = text;
-                        createGptChat(machine, '', '').then(
-                          (chat) => {
-                            carryDraft(chat.id, words);
-                            setText('');
-                            gptChatsChanged();
-                            goTo({ kind: ROUTE.chatgpt, id: chat.id, machine });
-                          },
-                          () => goTo({ kind: ROUTE.settings, section: 'accounts' }),
-                        );
-                      },
-                    }
-                  : null,
+                extra: gptExtra,
               }
             }
             slash={slash}

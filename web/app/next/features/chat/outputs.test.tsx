@@ -147,4 +147,70 @@ describe('what a turn made', () => {
     // The files the turn only wrote make no card of this kind.
     expect(screen.queryByText('turn.tsx')).toBeNull();
   });
+
+  it('shows a handed-over picture as a picture, not as a line of a file (HRN-1458)', () => {
+    const png: TurnOutput = {
+      kind: 'delivery',
+      op: 'created',
+      title: 'Плакат',
+      ref: '/w/out/poster.png',
+      name: 'poster.png',
+      mime: 'image/png',
+      size: 4096,
+    };
+    const pdf: TurnOutput = {
+      ...png,
+      title: 'Плакат A3',
+      ref: '/w/out/poster.pdf',
+      name: 'poster.pdf',
+      mime: 'application/pdf',
+    };
+    const { container } = render(
+      <OutputsContext value={{ shown: SHOWN_BY_DEFAULT, viewUrl: (path) => `/view?path=${path}` }}>
+        <Outputs item={item([png, pdf])} />
+      </OutputsContext>,
+    );
+    const img = container.querySelector('.hx-pic img');
+    expect(img?.getAttribute('src')).toBe('/view?path=/w/out/poster.png');
+    expect(screen.queryByText('PNG · 4 KB')).toBeNull();
+    expect(screen.getByText('PDF · 4 KB')).toBeTruthy();
+  });
+
+  it('keeps a picture a line where the file cannot be shown', () => {
+    const png: TurnOutput = {
+      kind: 'delivery',
+      op: 'created',
+      title: 'Иконка',
+      ref: '/w/icon.svg',
+      name: 'icon.svg',
+    };
+    const { container } = render(
+      <OutputsContext value={{ shown: SHOWN_BY_DEFAULT }}>
+        <Outputs item={item([png])} />
+      </OutputsContext>,
+    );
+    expect(container.querySelector('.hx-pic')).toBeNull();
+    expect(screen.getByText('Иконка')).toBeTruthy();
+  });
+
+  it('shows the pictures a finished turn drew under its answer, each once (HRN-1458)', () => {
+    const drawnItem = item([
+      {
+        kind: 'delivery',
+        op: 'created',
+        title: 'Кот',
+        ref: '/d/images/j1-1.png',
+        name: 'j1-1.png',
+        mime: 'image/png',
+      },
+    ]);
+    drawnItem.turn.pictures = ['/d/images/j1-1.png', '/d/images/j1-2.png'];
+    const { container } = render(
+      <OutputsContext value={{ shown: SHOWN_BY_DEFAULT, viewUrl: (path) => `/view?path=${path}` }}>
+        <Outputs item={drawnItem} />
+      </OutputsContext>,
+    );
+    const srcs = [...container.querySelectorAll('.hx-pic img')].map((img) => img.getAttribute('src'));
+    expect(srcs).toEqual(['/view?path=/d/images/j1-1.png', '/view?path=/d/images/j1-2.png']);
+  });
 });

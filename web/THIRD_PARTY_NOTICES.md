@@ -20,12 +20,16 @@ licences are kept in `node_modules/<package>/LICENSE`; `pnpm licenses list --pro
 | mermaid and its d3, dagre, cytoscape and khroma dependencies (diagrams)        | MIT, ISC, BSD-3-Clause, Apache-2.0                                          |
 | web-vitals                                                                     | Apache-2.0                                                                  |
 | @huggingface/transformers, onnxruntime-web (speech recognition in the browser) | Apache-2.0, MIT                                                             |
+| vosk-browser, uuid (the wake phrase, heard in the browser)                     | Apache-2.0, MIT                                                             |
 | react-icons (brand marks from Simple Icons)                                    | MIT (icons CC0-1.0)                                                         |
 | tailwindcss (generated styles), @tailwindcss/typography                        | MIT                                                                         |
 | @fontsource-variable/inter (Inter)                                             | SIL Open Font License 1.1, see `public/licenses/inter-OFL-1.1.txt`          |
 | @fontsource-variable/jetbrains-mono (JetBrains Mono)                           | SIL Open Font License 1.1, see `public/licenses/jetbrains-mono-OFL-1.1.txt` |
 
 The fonts' licence texts are copied into the built page under `licenses/`, next to the font files.
+
+The wake phrase's speech model (Vosk `vosk-model-small-ru-0.22`, Apache-2.0) is not bundled: the runtime fetches it
+from its publisher when the setting is turned on (`internal/voice/realtime/wake.go`).
 
 ## Test fixtures
 

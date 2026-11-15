@@ -33,7 +33,7 @@ import {
   muteSlotSource,
   useSlotNotices,
 } from '@/next/features/smart-notice/slot-api';
-import { firstToPing, soundOn } from '@/next/bindings/notices';
+import { firstToPing, outOfSight, soundOn, usePageVisible } from '@/next/bindings/notices';
 import { settled } from '@/next/bindings/outcome';
 import { answerQuestion, decidePermission, sendMessage } from '@/next/commands';
 import { useVoice } from '@/next/bindings/use-voice';
@@ -78,6 +78,7 @@ import {
   type IUiEvent,
 } from '@/next/features/smart-notice/metrics';
 import { platformPath } from '@/next/core/net/machine';
+import { goTo, isInAppPath, parseRoute } from '@/next/routes/routes';
 import { postJson, runtimeJson } from '@/next/core/net/runtime-json';
 import { toast } from '@/next/ui/toast';
 import { useFieldCovered } from '@/next/stores/field-cover';
@@ -559,6 +560,7 @@ const SmartNoticeHost = ({
     return detail.k === 'machine' ? (detail.heavy[0]?.name ?? null) : null;
   }, [stats, watchedNotice]);
   const topOf = useCallback<TTopOf>((id) => (id === watched ? topName : null), [watched, topName]);
+  const visible = usePageVisible();
   const all = useMemo(
     () =>
       settings.cards
@@ -567,7 +569,7 @@ const SmartNoticeHost = ({
               ...itemsOfCodes(codes.asks, codes.skew),
               ...(settings.machine ? itemsOfMachines(plateMachines, topOf) : []),
               ...itemsOfSlot(slot.notices),
-              ...itemsOfNotices(notices, byId, live),
+              ...itemsOfNotices(outOfSight(notices, currentId, visible), byId, live),
             ]),
           )
         : [],
@@ -580,6 +582,8 @@ const SmartNoticeHost = ({
       topOf,
       slot.notices,
       notices,
+      currentId,
+      visible,
       byId,
       live,
     ],
@@ -741,7 +745,9 @@ const SmartNoticeHost = ({
   const covered = useFieldCovered();
   const onPlate = quiet ? NO_ITEMS : items;
   if (quiet && open) setOpen(false);
-  const anchor = useFieldAnchor(settings.place === 'bottom-center' && onPlate.length > 0, currentId ?? '');
+  // On the phone the notice stands at the top whatever the place chosen on a wide window.
+  const place = phone ? 'top-center' : settings.place;
+  const anchor = useFieldAnchor(place === 'bottom-center' && onPlate.length > 0, currentId ?? '');
 
   // An urgent card (a machine about to fail its work) opens by itself for a few seconds and folds again, seldom
   // (auto-open.ts). Not over a card the person reads, and one they took into their hands is theirs to close.
@@ -993,7 +999,7 @@ const SmartNoticeHost = ({
       mainKey={main?.key ?? null}
       detail={detail}
       open={open && onPlate.length > 0}
-      place={settings.place}
+      place={place}
       anchor={anchor}
       covered={covered}
       now={now}
@@ -1005,7 +1011,9 @@ const SmartNoticeHost = ({
       onMain={setMainKey}
       onOpenChat={(item) => {
         setOpen(false);
-        if (item.href) window.location.assign(item.href);
+        // A place of this page (`/apps/harnessly.boards?o=…&th=…`, a mention on a board) opens in it; any other address loads.
+        if (item.href && isInAppPath(item.href)) goTo(parseRoute(item.href));
+        else if (item.href) window.location.assign(item.href);
         else if (item.chatId) onOpenChat(item.chatId);
       }}
       onAnswer={onAnswer}

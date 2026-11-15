@@ -88,6 +88,8 @@ type Deps struct {
 	// SlotKey signs the preview slot hosts' handles and cookies (slothost.go); with Config.PreviewSlotDomain it turns the
 	// slot hosts on, still subject to the «preview-slot-host» rollout switch. nil: there are none.
 	SlotKey []byte
+	// Rollout answers GET /api/v2/rollout: whether a rollout is under way (internal/hub/rollout); nil answers «no».
+	Rollout http.HandlerFunc
 }
 
 // Interceptor answers some requests of a signed-in person to a machine itself; false lets them through to it.
@@ -142,6 +144,7 @@ type Service struct {
 	switches switches.Gate
 	stale    staleBook
 	slotKey  []byte
+	rollout  http.HandlerFunc
 
 	mu         sync.Mutex
 	transports map[string]*http.Transport
@@ -175,7 +178,7 @@ type grantCall struct {
 // New makes the proxy.
 func New(d Deps) *Service {
 	s := &Service{
-		cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, tickets: d.Tickets, log: d.Log, now: d.Now, design: d.Design, gate: d.Features, web: d.Workspace, history: d.History, voiceTakes: d.VoiceTakes, fleetBus: d.Fleet, switches: d.Switches, slotKey: d.SlotKey,
+		cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, tickets: d.Tickets, log: d.Log, now: d.Now, design: d.Design, gate: d.Features, web: d.Workspace, history: d.History, voiceTakes: d.VoiceTakes, fleetBus: d.Fleet, switches: d.Switches, slotKey: d.SlotKey, rollout: d.Rollout,
 		clientLim: ratelimit.New(), transports: map[string]*http.Transport{}, grants: map[string]grantEntry{}, calls: map[string]*grantCall{},
 		authz: map[string]time.Time{}, access: map[string]time.Time{}, trust: map[string]time.Time{}, pages: map[string]workspaceConfig{}, asks: map[string]cardAsk{}, legacy: map[string]time.Time{}, tracked: map[string]map[uint64]context.CancelFunc{},
 	}

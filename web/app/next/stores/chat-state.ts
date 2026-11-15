@@ -19,6 +19,13 @@ const stamped = new Set<ConvId>();
 /** The chat's agent state; null while the list does not hold the chat. */
 export const agentStateOf = (conv: ConvId): AgentState | null => conversationsStore.get(conv)?.state ?? null;
 
+/**
+ * How a message the person sends right now goes: into the turn of an agent that works (steer, read at its
+ * next step, Claude Code and Codex alike), else the next thing it gets. Waiting for the turn to end is asked for apart.
+ */
+export const sendModeNow = (conv: ConvId): 'steer' | 'queue' =>
+  agentStateOf(conv)?.k === 'working' ? 'steer' : 'queue';
+
 /** `agentStateOf` for a component. */
 export const useAgentState = (conv: ConvId | null): AgentState | null => useConversation(conv)?.state ?? null;
 

@@ -26,8 +26,10 @@ export interface ISmartFeature {
   description: string;
   /** The feature already goes through the picked provider; one that is not keeps the choice for the day it does. */
   live: boolean;
-  /** The feature may also be given a model of an agent of the machine, or turned off (the summaries: HRN-1270). */
+  /** The feature may also be given a model of an agent of the machine, on its plan. */
   agents: boolean;
+  /** The feature may also be turned off (the summaries). */
+  offable: boolean;
   /** null: as now. */
   choice: ISmartChoice | null;
   /** Why the last call to the provider failed, in the runtime's words; null when it went well or was not made. */
@@ -75,6 +77,8 @@ const readFeature = (v: unknown): ISmartFeature => {
     description: str(o.description, 'description'),
     live: bool(o.live, 'live'),
     agents: o.agents === true,
+    // A runtime before HRN-1492 let the agents' models only to the summaries, which may be off too.
+    offable: o.offable === true || (o.offable === undefined && o.agents === true),
     choice:
       provider === ''
         ? null

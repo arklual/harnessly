@@ -424,10 +424,91 @@
 .hx-island__last:hover {
   color: var(--hx-fg-1);
 }
+/* A board or a document the last answer links to: the feed's link card, under the line. */
+.hx-island__card {
+  padding: 8px 8px 0;
+}
+.hx-island__card .hx-linkcard {
+  max-width: 100%;
+}
 /* The notes' chips (site-notes NoteChips) wherever they stand. */
 .hx-island__chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   padding: 4px 4px 6px;
+}
+
+/* Over a space: the result's one line wraps to two at most, the question whole; no pill. */
+.hx-island__now[hidden],
+.hx-island__mini[hidden] {
+  display: none;
+}
+.hx-island__line {
+  height: auto;
+  min-height: 38px;
+  padding-block: 5px;
+  animation: hx-island-line-in 220ms var(--hx-ease-out) backwards;
+}
+.hx-island__line .hx-island__step {
+  min-width: 0;
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: var(--hx-text-sm);
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.hx-island__line[data-question='true'] .hx-island__step {
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+@keyframes hx-island-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-island__line {
+    animation: none;
+  }
+}
+
+/* A phone: «Спросить агента» is a field across the foot, as in a chat. The page ends above it and is never
+   under it (only when there is a field: a board without a chat has none); the field does not float or move. */
+@media (max-width: 900px) {
+  .hx-site[data-phone='true'][data-mode='island']:has(.hx-island) .hx-browser__page {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+  .hx-site[data-phone='true'][data-mode='island']:not([data-min='true']):has(.hx-island) .hx-browser__page {
+    padding-bottom: calc(150px + env(safe-area-inset-bottom));
+  }
+  .hx-site[data-phone='true'] .hx-island,
+  .hx-site[data-phone='true'][data-mode='island'][data-scrolling='true'] .hx-island:not(:focus-within) {
+    left: 12px;
+    width: calc(100% - 24px);
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    opacity: 1;
+  }
+  .hx-site[data-phone='true'] .hx-island__mini {
+    left: 0;
+    right: 0;
+    height: 48px;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 0 16px 0 14px;
+    box-shadow: none;
+    color: var(--hx-fg-3);
+    font-weight: var(--hx-weight-regular, 400);
+    font-size: 15px;
+    translate: none !important;
+  }
+  .hx-site[data-phone='true'][data-min='true'] .hx-island__mini {
+    transform: none;
+  }
+  .hx-site[data-phone='true'] .hx-island__grab {
+    display: none;
+  }
 }

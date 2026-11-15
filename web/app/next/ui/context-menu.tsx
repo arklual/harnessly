@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from 'react';
 import Icon, { type TIconName } from '@/next/ui/icon';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import { afterTouchClick } from '@/next/ui/use-drag';
 
 export interface IMenuPoint {
@@ -188,7 +188,7 @@ export const PointMenu = ({ menu, label, kind, children }: IPointMenuProps) => {
   const actions = useMenuActions();
   if (menu.at === null) return null;
   return (
-    <Menu.Root open={menu.open} onOpenChange={menu.setOpen} actionsRef={actions}>
+    <MenuRoot open={menu.open} onOpenChange={menu.setOpen} actionsRef={actions}>
       <MenuPanel
         actions={actions}
         className="hx-cmenu"
@@ -199,7 +199,7 @@ export const PointMenu = ({ menu, label, kind, children }: IPointMenuProps) => {
       >
         {children}
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };
 

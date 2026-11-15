@@ -1,0 +1,15 @@
+{
+  "itemId": 104,
+  "title": "Renew the certificate",
+  "lead": "The certificate of the staging site was to end tomorrow. The agent renewed it and checked the site.",
+  "parts": [
+    {
+      "k": "text",
+      "h": "What was done",
+      "items": [
+        "A new certificate, valid for ninety days",
+        "The site answers, the old one is revoked"
+      ]
+    }
+  ]
+}

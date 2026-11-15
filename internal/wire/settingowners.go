@@ -44,6 +44,7 @@ var Settings = []Setting{
 	{Doc: SettingsDocMe, Key: "density", Owner: OwnerPerson},
 	{Doc: SettingsDocMe, Key: "textSize", Owner: OwnerPerson},
 	{Doc: SettingsDocMe, Key: "noticeColor", Owner: OwnerPerson},
+	{Doc: SettingsDocMe, Key: "voiceMascot", Owner: OwnerPerson},
 	{Doc: SettingsDocMe, Key: "enterSends", Owner: OwnerPerson},
 	{Doc: SettingsDocMe, Key: "defaultMachine", Owner: OwnerPerson},
 	{Doc: SettingsDocMe, Key: "notify", Owner: OwnerPerson},
@@ -51,6 +52,8 @@ var Settings = []Setting{
 	{Doc: SettingsDocMe, Key: "keys", Owner: OwnerPerson},
 	{Doc: SettingsDocMe, Key: "voice", Owner: OwnerPerson, Runtime: true},
 	{Doc: SettingsDocMe, Key: "dayStartHour", Owner: OwnerPerson},
+	{Doc: SettingsDocMe, Key: "nav", Owner: OwnerPerson},
+	{Doc: SettingsDocMe, Key: "prefs", Owner: OwnerPerson},
 
 	{Doc: SettingsDocRuntime, Key: "idleStop", Owner: OwnerMachine},
 	{Doc: SettingsDocRuntime, Key: "limitContinue", Owner: OwnerMachine},

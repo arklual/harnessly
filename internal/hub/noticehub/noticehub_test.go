@@ -88,3 +88,35 @@ func TestRing(t *testing.T) {
 		t.Fatalf("%+v %v", st, err)
 	}
 }
+
+// a mention on a board rings a person the hub found, by the switch for any of their machines.
+func TestRingMention(t *testing.T) {
+	db, err := sql.Open("sqlite", "file:"+t.TempDir()+"/h.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := notices.EnsureSchema(context.Background(), db); err != nil {
+		t.Fatal(err)
+	}
+	s := New(notices.Wrap(db, false), nil)
+	ctx := context.Background()
+	asked := ""
+	s.OnFor = func(_ context.Context, email, machine string) bool {
+		asked = email + "|" + machine
+		return email == "a@example.com"
+	}
+	if s.RingMention(ctx, "u2", "b@example.com", "mention:b:m1", "t", "x", "/apps/harnessly.boards?o=b") {
+		t.Fatal("switch off for b: not put")
+	}
+	if !s.RingMention(ctx, "u1", " A@example.com", "mention:b:m1", "Упоминание", "Вера: @Аня", "/apps/harnessly.boards?o=b&th=t1") || asked != "a@example.com|" {
+		t.Fatalf("not put, asked %q", asked)
+	}
+	if s.RingMention(ctx, "u1", "a@example.com", "mention:b:m1", "Упоминание", "again", "/l") {
+		t.Fatal("the same key shows twice")
+	}
+	st, err := s.Notices.State(ctx, "u1")
+	if err != nil || len(st.Items) != 1 || !strings.Contains(string(st.Items[0].Doc), `"icon":"at-sign"`) || !strings.Contains(string(st.Items[0].Doc), `"chatId":""`) {
+		t.Fatalf("%+v %v", st, err)
+	}
+}

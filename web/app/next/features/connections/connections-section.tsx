@@ -12,7 +12,7 @@ import { FormError, Group, SetButton } from '@/next/features/settings/rows';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
 import LoadFailed from '@/next/ui/load-failed';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import { useLeavingList } from '@/next/ui/presence';
 import { Delayed, Skeleton } from '@/next/ui/skeleton';
 import '@/next/styles/providers.css';
@@ -73,7 +73,7 @@ const RowMenu = ({ conn, canPrimary, disabled, onAction }: IRowMenuProps) => {
   const actions = useMenuActions();
   const label = t('next.connections.menu', { name: conn.name });
   return (
-    <Menu.Root actionsRef={actions}>
+    <MenuRoot actionsRef={actions}>
       <Menu.Trigger
         disabled={disabled}
         render={
@@ -107,7 +107,7 @@ const RowMenu = ({ conn, canPrimary, disabled, onAction }: IRowMenuProps) => {
           </>
         )}
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };
 

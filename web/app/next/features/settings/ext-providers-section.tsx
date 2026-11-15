@@ -31,7 +31,7 @@ import { FormError, SegControl, SetButton } from '@/next/features/settings/rows'
 import { plural, t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
 import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import { usePresence, usePresentFlag, type TPresenceState } from '@/next/ui/presence';
 import SecretField from '@/next/ui/secret-field';
 import { Skeleton } from '@/next/ui/skeleton';
@@ -604,7 +604,7 @@ const CardMenu = ({ provider, onAnother, onOpen }: ICardMenuProps) => {
   const actions = useMenuActions();
   const label = t('next.extProviders.menu', { name: provider.name });
   return (
-    <Menu.Root actionsRef={actions}>
+    <MenuRoot actionsRef={actions}>
       <Menu.Trigger
         render={
           <button type="button" className="hx-extp__more" aria-label={label}>
@@ -639,7 +639,7 @@ const CardMenu = ({ provider, onAnother, onOpen }: ICardMenuProps) => {
           </>
         )}
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };
 

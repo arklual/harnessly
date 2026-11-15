@@ -164,17 +164,15 @@ func (s *Service) Chat(id string) (Chat, bool, error) {
 // chatsMax is how many conversations a machine keeps.
 const chatsMax = 2000
 
-// CreateChat starts an empty conversation.
+// CreateChat starts an empty conversation, or gives back the one that stands empty: a new chat is one draft, however
+// many times «New chat» is pressed.
 func (s *Service) CreateChat(model, effort string) (Chat, error) {
 	if s.chats.count() >= chatsMax {
 		return Chat{}, fail(CodeTooMany, http.StatusConflict, "")
 	}
 	now := nowMs(s.now())
 	ch := &Chat{ID: newKey(), Model: strings.TrimSpace(model), Effort: strings.TrimSpace(effort), CreatedAt: now, UpdatedAt: now, Messages: []Message{}}
-	if err := s.chats.create(ch); err != nil {
-		return Chat{}, err
-	}
-	return *ch, nil
+	return s.chats.createOrReuse(ch, func(id string) bool { return s.runOf(id) == nil })
 }
 
 // Rename names a conversation.
@@ -275,6 +273,12 @@ func (s *Service) Send(id string, in SendInput) (Message, error) {
 		model = ch.Model
 	}
 	if model == "" {
+		// The page sent before the plan's models came: the plan's first one answers.
+		if list, err := s.listModels(context.Background(), key); err == nil && len(list) > 0 {
+			model = list[0].Slug
+		}
+	}
+	if model == "" {
 		return Message{}, fail(CodeBadRequest, http.StatusBadRequest, "model")
 	}
 	effort := strings.TrimSpace(in.Effort)
@@ -319,6 +323,58 @@ func (s *Service) Send(id string, in SendInput) (Message, error) {
 	}
 	go s.answer(id, key, model, effort, r)
 	return msg, nil
+}
+
+// Spoken is one line of a voice conversation kept in a chat's history.
+type Spoken struct {
+	Role string `json:"role"` // user | assistant
+	Text string `json:"text"`
+}
+
+// AppendSpoken keeps what was said in the voice mode in the chat, as its messages; nothing is sent to
+// ChatGPT for it. Empty lines are skipped; a chat with no title takes it from the first thing the person said.
+func (s *Service) AppendSpoken(id string, lines []Spoken) ([]Message, error) {
+	var add []Message
+	now := nowMs(s.now())
+	size := 0
+	for _, l := range lines {
+		text := strings.TrimSpace(l.Text)
+		if text == "" || l.Role != "user" && l.Role != "assistant" {
+			continue
+		}
+		size += utf8.RuneCountInString(text)
+		m := Message{ID: newKey(), Role: l.Role, Text: text, At: now + int64(len(add))}
+		if l.Role == "assistant" {
+			m.Status = "done"
+		}
+		add = append(add, m)
+	}
+	if len(add) == 0 || size > textMax {
+		return nil, fail(CodeBadRequest, http.StatusBadRequest, "")
+	}
+	err := s.chats.change(id, func(c *Chat) error {
+		if len(c.Messages)+len(add) > messageMax {
+			return fail(CodeTooMany, http.StatusConflict, "")
+		}
+		c.Messages = append(c.Messages, add...)
+		c.UpdatedAt = now
+		if c.Title == "" {
+			for _, m := range add {
+				if m.Role == "user" {
+					c.Title = titleOf(m.Text)
+					break
+				}
+			}
+		}
+		return nil
+	})
+	if errors.Is(err, errNoChat) {
+		return nil, fail(CodeNotFound, http.StatusNotFound, "")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return add, nil
 }
 
 // Stop ends the answer being written; what it wrote stays.

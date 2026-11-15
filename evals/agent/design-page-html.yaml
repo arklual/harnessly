@@ -1,0 +1,42 @@
+id: design-page-html
+title: «Дай HTML страницы» — экспорт страницы Sinopia карточкой файла
+tags: [design, files]
+timeout_s: 420
+setup:
+  design: [fixtures/shop]
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/hlcli/design*.go'
+  - 'internal/design/**'
+  - 'internal/delivery/**'
+prompt: Дай мне HTML страницы «Каталог» из проекта Sinopia Design «shop» одним файлом, хочу открыть у себя.
+expect:
+  - name: exported the page with the project's exporter (it hands the file over itself)
+    called: Bash
+    args: {command: '(?s).*harnessly design export\s+\S*shop\S*\s.*Каталог.*'}
+  - name: did not hand over a page written by hand
+    not_called: Write
+    args: {file_path: '(?i).*\.html?$'}
+  - name: did not hand over a path in words only
+    not_called: Bash
+    args: {command: '(?s).*harnessly design export.*--no-deliver.*'}
+variants:
+  - id: v1
+    kind: short
+    text: "HTML страницы «Каталог» Sinopia Design «shop» одним файлом, открыть у себя"
+  - id: v2
+    kind: long
+    text: "Слушай, мне тут нужно разобраться, как устроена страница «Каталог» в проекте Sinopia Design «shop», поэтому дай, пожалуйста, её HTML одним файлом. Хочу открыть у себя и посмотреть."
+  - id: v3
+    kind: typos
+    text: "дай мне html страницы каталог из проекта sinopia design shop одним фаилом хачу отркыть у себя"
+  - id: v4
+    kind: english
+    text: "Give me the HTML of the page «Каталог» from the Sinopia Design project «shop» as a single file, I want to open it on my own machine."
+  - id: v5
+    kind: formal
+    text: "Здравствуйте. Будьте добры, предоставьте HTML-код страницы «Каталог» из проекта Sinopia Design «shop» в виде одного файла, поскольку я хотел бы открыть его на своём компьютере."
+  - id: v6
+    kind: indirect
+    text: "Нужна версия страницы «Каталог» из Sinopia Design «shop» в виде HTML, всё в одном файле, чтобы у меня на компьютере она заработала."

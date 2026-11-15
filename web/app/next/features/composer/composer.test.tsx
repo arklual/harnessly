@@ -44,13 +44,13 @@ const props = (over: Partial<IComposerProps> = {}): IComposerProps => ({
 });
 
 describe('Composer while the agent works', () => {
-  it('shows one button: the arrow queues a written message, no stop or «Now» beside it', () => {
+  it('shows one button: the arrow sends a written message into the turn, no stop or «Now» beside it', () => {
     const onSubmit = vi.fn();
     render(<Composer {...props({ onSubmit })} />);
     expect(screen.queryByRole('button', { name: 'Now' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Stop the agent' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Queue it · ⌃↵ straight into the turn' }));
-    expect(onSubmit).toHaveBeenLastCalledWith('queue');
+    fireEvent.click(screen.getByRole('button', { name: 'Into the turn now · ⌃↵ — after the turn' }));
+    expect(onSubmit).toHaveBeenLastCalledWith('now');
   });
 
   it('shows the stop instead of the arrow while the field is empty', () => {
@@ -61,17 +61,17 @@ describe('Composer while the agent works', () => {
     expect(screen.getByRole('button', { name: 'Send' })).toBeTruthy();
   });
 
-  it('Ctrl+Enter sends into the turn, Enter into the queue', () => {
+  it('Enter sends into the turn, Ctrl+Enter after the turn (the queue)', () => {
     const onSubmit = vi.fn();
     render(<Composer {...props({ onSubmit })} />);
     const field = screen.getByRole('textbox');
     fireEvent.keyDown(field, { key: 'Enter', ctrlKey: true });
-    expect(onSubmit).toHaveBeenLastCalledWith('now');
-    fireEvent.keyDown(field, { key: 'Enter' });
     expect(onSubmit).toHaveBeenLastCalledWith('queue');
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(onSubmit).toHaveBeenLastCalledWith('now');
   });
 
-  it('every Ctrl/Cmd+Enter sends into the turn while «send now» keeps its shortcut (GitHub #53)', () => {
+  it('every Ctrl/Cmd+Enter queues the message after the turn (GitHub #53)', () => {
     const onSubmit = vi.fn();
     render(<Composer {...props({ onSubmit })} />);
     const field = screen.getByRole('textbox');
@@ -82,7 +82,7 @@ describe('Composer while the agent works', () => {
     ]) {
       onSubmit.mockClear();
       fireEvent.keyDown(field, press);
-      expect(onSubmit, JSON.stringify(press)).toHaveBeenLastCalledWith('now');
+      expect(onSubmit, JSON.stringify(press)).toHaveBeenLastCalledWith('queue');
     }
   });
 });
@@ -182,7 +182,7 @@ describe('Queue rows', () => {
     expect(onEdit).toHaveBeenCalledWith('c1');
   });
 
-  it('a message typed into the turn is on its way, not waiting: no pencil, and it says the agent reads it after the step', () => {
+  it('a message typed into the turn is on its way, not waiting: no pencil and no note', () => {
     render(
       <Queue
         rows={[{ ...row, steer: true, handed: true, state: { k: 'in-input' } }]}
@@ -194,7 +194,7 @@ describe('Queue rows', () => {
         onRetry={vi.fn()}
       />,
     );
-    expect(screen.getByText("In the agent's queue — read after the current step")).toBeTruthy();
+    expect(screen.queryByText('In the agent’s turn')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
   });
 
@@ -717,7 +717,8 @@ describe('files dropped on the window', () => {
     Object.defineProperty(event, 'dataTransfer', { value: { types: ['Files'], files } });
     window.dispatchEvent(event);
   };
-  const file = (bytes: number[], name: string) => new File([new Uint8Array(bytes)], name, { type: 'image/png' });
+  const file = (bytes: number[], name: string) =>
+    new File([new Uint8Array(bytes)], name, { type: 'image/png' });
 
   it('are one attachment when the same file comes twice', async () => {
     const onFiles = vi.fn();

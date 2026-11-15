@@ -11,6 +11,19 @@ import { useTry } from './sandbox';
 import { metaOf, same } from './scope';
 import { Foot, Title } from './sheet';
 
+/** «0.5.0 · обновлено 14 нояб., 23:50»: the version the machines have and when it came; updates come by themselves. */
+const versionLine = (version: string, at: string | undefined): string => {
+  const t = at ? Date.parse(at) : NaN;
+  if (Number.isNaN(t)) return version;
+  const when = new Date(t).toLocaleString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return `${version} · обновлено ${when}`;
+};
+
 export const ItemBody = ({ ctx, entryId, edit }: { ctx: SheetCtx; entryId: string; edit: boolean }) => {
   const layer = ctx.layers.find((l) => l.items.some((r) => r.entryId === entryId));
   const row = layer?.items.find((r) => r.entryId === entryId);
@@ -27,6 +40,7 @@ export const ItemBody = ({ ctx, entryId, edit }: { ctx: SheetCtx; entryId: strin
             ['Вид', KIND[row.kind].one],
             ['Откуда', 'Встроено в платформу'],
             ['Для людей', 'По желанию — человек может выключить у себя'],
+            ...(row.appVersion ? [['Версия', versionLine(row.appVersion, row.appUpdatedAt)]] : []),
           ].map(([k, v]) => (
             <div key={k}>
               <dt>{k}</dt>

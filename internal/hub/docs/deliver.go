@@ -105,6 +105,7 @@ func (s *Service) agentReply(ctx context.Context, machineID string, r hubproto.D
 		if _, err := s.addComment(ctx, r.ThreadID, author{Kind: "agent", Name: "Агент"}, body); err != nil {
 			return err
 		}
+		s.ringDocAnswer(ctx, slug, r.ThreadID, body)
 	}
 	if r.Resolve {
 		return s.setStatus(ctx, r.ThreadID, "resolved")
@@ -177,12 +178,19 @@ func (s *Service) deliver(ctx context.Context, id string, local bool) {
 	}
 	params := map[string]any{"tabId": nullable(p.tabID), "sessionName": nullable(p.session), "agentSessionId": nullable(p.agentSession),
 		"cwd": nullable(p.cwd), "message": msg}
-	_, err = s.links.Do(ctx, p.machine, hubproto.OpDocsDeliver, params, deliverTimeout)
+	answer, err := s.links.Do(ctx, p.machine, hubproto.OpDocsDeliver, params, deliverTimeout)
 	q := s.db.S().Q()
 	switch {
 	case err == nil:
+		if p.board {
+			s.keepBoardTab(ctx, p.slug, answer)
+		} else {
+			s.keepDocTab(ctx, p.slug, answer)
+		}
 		_, err = q.Exec(ctx, `UPDATE doc_comments SET delivered_at = ? WHERE id = ?`, s.now().UnixMilli(), id)
 	case retryable(err) && s.now().Sub(time.UnixMilli(p.created)) < deliverGiveUp:
+		// The person hears once that the agent waits for the machine (board_call.go).
+		s.ringAwaited(ctx, p)
 		return
 	default:
 		_, err = q.Exec(ctx, `UPDATE doc_comments SET delivery_error = ? WHERE id = ?`, deliveryText(err), id)
@@ -241,11 +249,10 @@ func (s *Service) RunHealth(ctx context.Context) { s.runHealth(ctx) }
 
 // RunSweep tries the comments not yet handed over again every minute until ctx ends: with several replicas only the
 // leader does it (docs/hub/replicas.md).
+// It also sends the documents service the trash it has not confirmed yet (trashsync.go), at start and every minute.
 func (s *Service) RunSweep(ctx context.Context) {
 	s.reportLoose(ctx)
-	if s.links == nil {
-		return
-	}
+	s.syncTrash(ctx)
 	t := time.NewTicker(sweepEvery)
 	defer t.Stop()
 	for {
@@ -253,7 +260,10 @@ func (s *Service) RunSweep(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			s.sweep(ctx)
+			s.syncTrash(ctx)
+			if s.links != nil {
+				s.sweep(ctx)
+			}
 		}
 	}
 }
@@ -324,6 +334,9 @@ func (s *Service) message(ctx context.Context, p *pending) (string, error) {
 		earlier = append([]string{"— " + name + ": " + oneLine(body, 500)}, earlier...)
 	}
 	_ = rows.Close()
+	if p.board && strings.HasPrefix(p.slug, docKeyPrefix) {
+		return formatDocCallMessage(p, s.docCallURL(p.slug), earlier), nil
+	}
 	if p.board {
 		return formatBoardMessage(p, s.boardURL(p.slug), s.boardCommand(), earlier), nil
 	}

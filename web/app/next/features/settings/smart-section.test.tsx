@@ -10,7 +10,16 @@ import { readSmartView, type ISmartView } from '@/next/features/settings/smart-a
 import SmartSection from '@/next/features/settings/smart-section';
 import { pinLocale } from '@/next/i18n';
 
-beforeAll(() => pinLocale('en'));
+beforeAll(() => {
+  pinLocale('en');
+  // A wide window: the menu stays by its button (on a phone it is a sheet in the page's body).
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  })) as unknown as typeof window.matchMedia;
+});
 afterEach(cleanup);
 
 const NOW = 1_800_000_000_000;

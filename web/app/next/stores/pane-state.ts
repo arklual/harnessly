@@ -178,10 +178,23 @@ export interface IPruneContext {
   exists: (conv: string) => boolean;
 }
 
+/**
+ * The key a pane is kept by: the chat, and the view it stands beside when that is not the chat's own page (an app on the
+ * whole screen, a design). Each view has a pane of its own: the documents' pane is never the boards'.
+ */
+export const paneKeyOf = (conv: string | null, view: string | null): string | null =>
+  conv === null ? null : view === null ? conv : `${conv}#${view}`;
+
+/** The chat a pane's key is of. */
+export const convOfPaneKey = (key: string): string => {
+  const at = key.indexOf('#');
+  return at < 0 ? key : key.slice(0, at);
+};
+
 /** Without the chats their machine no longer lists; the same map when nothing went. */
 export const pruneKept = (kept: TKept, ctx: IPruneContext): TKept => {
   const gone = [...kept].filter(
-    ([conv, pane]) => pane.machine !== null && ctx.listed(pane.machine) && !ctx.exists(conv),
+    ([key, pane]) => pane.machine !== null && ctx.listed(pane.machine) && !ctx.exists(convOfPaneKey(key)),
   );
   if (gone.length === 0) return kept;
   const next = new Map(kept);

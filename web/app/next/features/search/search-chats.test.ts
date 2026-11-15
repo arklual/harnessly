@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { messageGroups } from '@/next/features/search/search-chats';
+import { messageGroups, orderChats, recentChats, searchChats } from '@/next/features/search/search-chats';
 import { pinLocale } from '@/next/i18n';
-import { formatAgo } from '@/next/i18n/format';
+import { formatAgo, formatWhen } from '@/next/i18n/format';
 import type { ISidebarChat } from '@/next/features/sidebar/types';
 import type { MessageHit } from '@/next/protocol/v2';
 
@@ -75,5 +75,69 @@ describe('the dates of the found messages (HRN-1447)', () => {
     expect(groups[0]?.rows[0]?.meta).toBe(formatAgo(at, now));
     expect(groups[0]?.rows[0]?.meta).not.toMatch(/[A-Za-z]/);
     pinLocale(null);
+  });
+});
+
+// A Sunday evening by the device's clock: the week before it is Mon 9 – Sat 14 Nov.
+const NOW = new Date(2026, 10, 15, 18, 0).getTime();
+const used = (id: string, title: string, at: Date, parentId?: string): ISidebarChat => ({
+  ...chat(id, title),
+  lastPromptAt: at.getTime(),
+  ...(parentId ? { parentId } : {}),
+});
+
+describe('the «when» of a search row (HRN-1508)', () => {
+  it('says minutes and hours today, «вчера», the weekday, the date, the year when it is another', () => {
+    pinLocale('ru');
+    expect(formatWhen(NOW - 12 * 60_000, NOW)).toBe('12 мин');
+    expect(formatWhen(NOW - 3 * 3_600_000, NOW)).toBe('3 ч');
+    expect(formatWhen(new Date(2026, 10, 14, 23, 0).getTime(), NOW)).toBe('вчера');
+    expect(formatWhen(new Date(2026, 10, 11, 10, 0).getTime(), NOW)).toBe('ср');
+    expect(formatWhen(new Date(2026, 10, 5, 10, 0).getTime(), NOW)).toBe('5 нояб.');
+    expect(formatWhen(new Date(2026, 9, 12, 10, 0).getTime(), NOW)).toBe('12 окт.');
+    expect(formatWhen(new Date(2025, 9, 12, 10, 0).getTime(), NOW)).toBe('12 окт. 2025');
+    pinLocale(null);
+  });
+});
+
+describe('the chats of the search, by when they were used (HRN-1508)', () => {
+  const chats = [
+    used('old', 'Аналитика v2', new Date(2026, 9, 2)),
+    used('today', 'Деплой', new Date(2026, 10, 15, 16)),
+    used('sub', 'Аналитика подчат', new Date(2026, 10, 15, 17), 'today'),
+    used('week', 'Аналитика', new Date(2026, 10, 11)),
+    used('month', 'Аналитика доски', new Date(2026, 10, 3)),
+    used('yesterday', 'Вёрстка', new Date(2026, 10, 14, 9)),
+    used('week2', 'Аналитика ревью', new Date(2026, 10, 12)),
+  ];
+
+  it('orders by the last use', () => {
+    expect(orderChats(chats, NOW).map((c) => c.id)).toEqual([
+      'sub',
+      'today',
+      'yesterday',
+      'week2',
+      'week',
+      'month',
+      'old',
+    ]);
+  });
+
+  it('lifts a title named just as the words inside its day group, parts the rows by days, never finds a subchat', () => {
+    pinLocale('ru');
+    const [group] = searchChats(chats, 'аналитика', undefined, NOW);
+    expect(group?.rows.map((r) => [r.id, r.section, r.meta])).toEqual([
+      ['week', 'На этой неделе', 'ср'],
+      ['week2', 'На этой неделе', 'чт'],
+      ['month', 'В этом месяце', '3 нояб.'],
+      ['old', 'Раньше', '2 окт.'],
+    ]);
+    pinLocale(null);
+  });
+
+  it('leaves the delegated chats and their messages out', () => {
+    expect(recentChats(chats, true, NOW).map((c) => c.id)).not.toContain('sub');
+    expect(recentChats(chats, false, NOW).every((r) => r.section === undefined)).toBe(true);
+    expect(messageGroups([hit('sub' as MessageHit['convId'], 1, 'user', 'x')], chats, NOW)).toEqual([]);
   });
 });

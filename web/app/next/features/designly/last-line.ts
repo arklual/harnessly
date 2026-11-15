@@ -21,3 +21,33 @@ export const lastLineOf = (md: string): string | null => {
   }
   return last;
 };
+
+const MD_LINK = /\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g;
+const BARE = /(^|[\s(])(https?:\/\/[^\s)<>]+)/g;
+
+export interface ILastLink {
+  href: string;
+  text: string;
+}
+
+/**
+ * The links of an answer's prose, last first: a markdown link with its words, or a bare address. Code is
+ * not prose. Which of them is one of our pages the caller decides (link-card cardKindOf).
+ */
+export const linksOf = (md: string): ILastLink[] => {
+  let code = false;
+  const out: ILastLink[] = [];
+  for (const raw of md.split('\n')) {
+    const line = raw.trim();
+    if (line.startsWith('```')) {
+      code = !code;
+      continue;
+    }
+    if (code) continue;
+    const prose = line.replace(/`[^`]*`/g, '');
+    for (const m of prose.matchAll(MD_LINK)) out.push({ href: m[2], text: m[1] });
+    for (const m of prose.replace(MD_LINK, '').matchAll(BARE))
+      out.push({ href: m[2].replace(/[.,;:!?]+$/, ''), text: '' });
+  }
+  return out.reverse();
+};

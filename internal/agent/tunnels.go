@@ -33,8 +33,12 @@ const (
 	maxTunnels    = 512
 	openTimeout   = 5 * time.Second
 	tunnelRead    = 32 * 1024
-	// tunnelWrites bounds the frames waiting for a slow local socket before the link itself waits.
+	// tunnelWrites bounds the frames waiting for a slow local socket.
 	tunnelWrites = 1024
+	// tunnelStall is how long the link's reader waits for a tunnel whose queue is full. Past it the tunnel is given up:
+	// a reader that waited longer would stop answering the hub's pings, and the hub would drop the whole machine for
+	// one slow connection.
+	tunnelStall = 2 * time.Second
 )
 
 var tunnelIDPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
@@ -260,19 +264,46 @@ func (t *tunnels) Frame(raw []byte) {
 		}
 		return
 	}
+	var b []byte // nil: the cluster ended the connection
 	if kind == FrameData {
-		select {
-		case tn.writes <- append([]byte(nil), payload...):
-		case <-tn.done:
-		case <-tn.link.done:
-		}
-		return
+		b = append([]byte(nil), payload...)
 	}
 	select {
-	case tn.writes <- nil:
+	case tn.writes <- b:
+		return
+	case <-tn.done:
+		return
+	case <-tn.link.done:
+		return
+	default:
+	}
+	timer := time.NewTimer(tunnelStall)
+	defer timer.Stop()
+	select {
+	case tn.writes <- b:
 	case <-tn.done:
 	case <-tn.link.done:
+	case <-timer.C:
+		t.stalled(id, tn)
 	}
+}
+
+// stalled gives up a tunnel whose local socket has not taken the cluster's bytes for tunnelStall: it is closed here and
+// the cluster is told, so the link's reader goes on with every other tunnel and with the hub's pings.
+func (t *tunnels) stalled(id string, tn *tunnel) {
+	t.mu.Lock()
+	mine := t.open[id] == tn
+	if mine {
+		delete(t.open, id)
+	}
+	t.mu.Unlock()
+	tn.close()
+	if !mine {
+		return
+	}
+	Log("warn", "a tunnel did not take the cluster's bytes in time, closing it", F{"tunnel", id})
+	// The link's reader must not wait for the link's own queue either.
+	go tn.link.sendBinary(EncodeFrame(FrameClose, id, nil))
 }
 
 // DropLink closes every connection the gone link carried.

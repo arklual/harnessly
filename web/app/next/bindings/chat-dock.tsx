@@ -18,6 +18,7 @@ import type { INoteChipGroup } from '@/next/ui/notes/note-chips';
 import { useContextWindow } from '@/next/bindings/use-context-window';
 import { useAgentLimits } from '@/next/bindings/use-limits';
 import { limitsOwnerOf } from '@/next/features/limits/model';
+import { useLimitAlerts } from '@/next/features/limits/alerts';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   answerQuestion,
@@ -35,6 +36,8 @@ import { deviceId } from '@/next/core/device';
 import { HOME, ROUTE, goTo } from '@/next/routes/routes';
 import { UI_REQUEST, requestContinue, requestUi } from '@/next/stores/ui-requests';
 import { useSlashSource } from '@/next/bindings/slash-source';
+import { VoiceSlot } from '@/next/features/voice-live/voice-layer';
+import type { IAppObject } from '@/next/features/voice-live/api';
 import { appCommandsOf } from '@/next/features/composer/app-commands';
 import { AppButtons, AppStarters, appButtonsOf, appStartersOf } from '@/next/features/composer/app-parts';
 import type { ISlashActions } from '@/next/features/composer/slash-model';
@@ -117,6 +120,7 @@ import { useEnterSends } from '@/next/stores/me';
 import { takeBackMessage } from '@/next/bindings/take-back';
 import { useDelayed } from '@/next/ui/skeleton';
 import { countRender } from '@/next/core/perf-journal';
+import { nothingToSend } from '@/next/features/composer/nothing-to-send';
 
 const rowOf = (m: MessageView): QueueRow => ({
   clientId: m.clientId,
@@ -149,6 +153,16 @@ export interface IDockExtra {
   tools?: ReactNode;
   /** The field's placeholder in place of the usual one (a deck's: what to change on the slide). */
   placeholder?: string;
+  /** A line for the voice mode about what is open beside the chat (a design and its page). */
+  voiceContext?: string;
+  /** The file open beside the chat (a design's board): the voice's small edits go to it fast (quickEdit). */
+  voiceEdit?: {
+    file: string;
+    selection: () => string;
+    tpl?: () => number | null;
+    /** An app's object open instead of a file (a board, a document; HRN-1469): the app changes it (quickEditApp). */
+    app?: IAppObject;
+  } | null;
 }
 
 interface IChatDockProps {
@@ -321,6 +335,8 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
     machine,
     limitsOwnerOf(record ? { provider: record.provider, profile: record.model?.profile } : null),
   );
+  // A limit running out is told at the top as it reaches each step.
+  useLimitAlerts(limits);
   const compacting = chatState?.k === 'working' && chatState.compacting;
   const idle = chatState?.k === 'idle' || chatState?.k === 'ready';
   const compact = useMemo(
@@ -419,6 +435,10 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
       // A command an installed app answers to (`activation.on: ["command:/x"]`) turns the app on in this chat first: the
       // resting agent is stopped, and this message brings it back with the app.
       const text = read();
+      // No words and nothing attached: the context alone (the board, the page) is no message.
+      const attached =
+        uploads.ready.length + quotes.length + designNotes.length + carried.length + (fileChip ? 1 : 0);
+      if (nothingToSend({ text, attached })) return;
       const word = text.trim().split(/\s/, 1)[0] ?? '';
       const byCommand =
         provider === 'claude' && word.startsWith('/')
@@ -451,7 +471,8 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
           ]),
           attachments: uploads.ready,
           refs,
-          mode: sendMode === 'now' ? straightTo(working) : 'queue',
+          // ↵ and the voice go into the working agent's turn; only ⌃↵ (or the menu) waits for the turn to end.
+          mode: sendMode === 'now' && working ? 'steer' : 'queue',
         });
       if (byCommand) void chatApps.turn(byCommand.id, true).finally(send);
       // The bubble of this message grows out of the place the text left (ui/flight.ts).
@@ -687,12 +708,11 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
           else removeQuote(conv, id);
         }}
         tools={
-          extra?.tools || appButtons.length > 0 ? (
-            <>
-              {extra?.tools}
-              <AppButtons buttons={appButtons} onField={intoField} />
-            </>
-          ) : undefined
+          <>
+            {extra?.tools}
+            {appButtons.length > 0 && <AppButtons buttons={appButtons} onField={intoField} />}
+            <VoiceSlot machine={machine} conv={conv} extra={extra} />
+          </>
         }
         {...voice}
         limits={limits}
@@ -700,6 +720,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
           window && {
             used: window.usedTokens,
             limit: window.limitTokens,
+            compactAt: window.compactAtTokens,
             compacting,
             onCompact: compact,
           }

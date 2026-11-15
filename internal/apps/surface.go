@@ -101,7 +101,7 @@ var surfaceTargets = []SurfaceTarget{
 	{Name: TargetObjectAction, Doc: "A button at an object (a machine, a chat) that opens the view.", Slot: true},
 	{Name: TargetHubSettings, Doc: "A page in the settings of a Hub.", Slot: true},
 	{Name: TargetBranding, Doc: "The product's name and accent; declared values, no view.", Slot: true},
-	{Name: TargetHome, Doc: "A block on the start page, under the field of a new chat; with `\"height\": \"stage\"` the view takes the whole stage under the field and may put its own greeting over it (hl.slot.greet).", Slot: true},
+	{Name: TargetHome, Doc: "A block on the start page, under the field of a new chat; with `\"height\": \"stage\"` the view takes the whole stage under the field and may put its own greeting over it (hl.slot.greet); with `\"feed\"` (docs/apps/day-feed.md) the host draws the day itself from that feed instead of the frame.", Slot: true},
 }
 
 var surfacePermissions = []SurfacePermission{

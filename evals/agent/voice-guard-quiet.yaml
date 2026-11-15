@@ -1,0 +1,25 @@
+id: voice-guard-quiet
+title: Без голосового разговора хук голоса молчит — обычная команда идёт сразу, без вопроса
+tags: [voice, hooks]
+timeout_s: 240
+setup:
+  files:
+    notes.txt: |
+      alpha
+      beta
+      gamma
+covers:
+  - 'internal/hlcli/voiceguard.go'
+  - 'internal/hlcli/help.go'
+  - 'internal/hlcli/design.go'
+  - 'internal/hooksetup/**'
+  - 'internal/voice/consent/**'
+prompt: сколько строк в notes.txt? посчитай командой wc
+expect:
+  - name: ran the command
+    called: Bash
+    args: {command: '(?s).*wc\b.*'}
+  - name: did not stop to ask
+    not_called: AskUserQuestion
+  - name: answered the count
+    text: '\b3\b'

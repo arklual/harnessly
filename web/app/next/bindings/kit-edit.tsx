@@ -216,13 +216,12 @@ export interface IKitChatProps {
   chip: IKitChip | null;
   /** The agent of the draft's chat is working (its edits are read while it does) or has just ended. */
   onBusy: (busy: boolean) => void;
-  onOpenDrawer: () => void;
 }
 
 const NO_CHATS: readonly string[] = [];
 
 /** The draft's chat beside the canvas: a Sinopia project's design chat, over the draft's project. */
-export const KitChat = ({ machine, project, fromChat, chip, onBusy, onOpenDrawer }: IKitChatProps) => {
+export const KitChat = ({ machine, project, fromChat, chip, onBusy }: IKitChatProps) => {
   const [library, setLibrary] = useState<IDesignLibrary | null>(null);
   useEffect(() => {
     const ac = new AbortController();
@@ -240,7 +239,6 @@ export const KitChat = ({ machine, project, fromChat, chip, onBusy, onOpenDrawer
     title: design?.title ?? '',
     pageUrl: `kit:${project}`,
     port: library?.port ?? null,
-    onOpenDrawer,
     keep: true,
   });
   const { context } = stage;

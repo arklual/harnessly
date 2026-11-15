@@ -1,0 +1,41 @@
+id: file-as-card
+title: «Скинь файлом» — карточка файла в чате, а не путь текстом
+tags: [files]
+setup:
+  files:
+    report.md: |
+      # Отчёт за неделю
+
+      Продажи выросли на 12%, возвратов два.
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/delivery/**'
+  - 'internal/hlcli/hlcli.go'
+prompt: скинь мне report.md файлом, хочу скачать
+expect:
+  - name: handed the file over
+    any_of:
+      - called: harnessly\.deliver_file
+        args: {path: 'report\.md'}
+      - called: Bash
+        args: {command: 'harnessly deliver\b.*report\.md'}
+variants:
+  - id: v1
+    kind: short
+    text: "кинь report.md файлом, скачать"
+  - id: v2
+    kind: long
+    text: "Слушай, мне потом надо будет открыть этот отчёт, поэтому скинь мне report.md файлом, хочу его скачать."
+  - id: v3
+    kind: typos
+    text: "скинь мне report.md файлм хачу скачаь"
+  - id: v4
+    kind: english
+    text: "send me report.md as a file, I want to download it"
+  - id: v5
+    kind: formal
+    text: "Не могли бы вы, пожалуйста, отправить мне файл report.md? Я хотел бы его скачать."
+  - id: v6
+    kind: indirect
+    text: "Мне нужен report.md в виде файла, чтобы я мог забрать его себе на компьютер."

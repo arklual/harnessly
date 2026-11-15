@@ -1,7 +1,18 @@
 // An app's view in a sandboxed frame: shown through a preview slot (so it runs on an origin of its own, never the
 // page's, and the preview's DevTools see it), and talked to only through the bridge (bridge.ts).
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { watchQuickEdits } from '@/next/features/app-views/quick-edit-flash';
 import { slotLeases } from '@/next/features/pane/slot-lease';
+import { appStamp, watchAppUpdate } from '@/next/features/app-views/app-updates';
 import { openPreview } from '@/next/core/net/preview';
 import {
   callFiles,
@@ -73,7 +84,8 @@ import {
 import { pageOffer } from '@/next/features/app-views/page-tools';
 import { askConfirm } from '@/next/features/app-views/confirm';
 import { hostKeys } from '@/next/features/app-views/host-keys';
-import { watchLoads } from '@/next/features/app-views/frame-loads';
+import { isBlankDocument, watchLoads } from '@/next/features/app-views/frame-loads';
+import { isSpaceApp } from '@/next/features/app-views/service-health';
 import { chatOf, useHostHandlers } from '@/next/features/app-views/host-handlers';
 import { conversationsStore, useConversation } from '@/next/stores/conversations';
 import { openAppTerminal } from '@/next/features/app-views/app-terminal';
@@ -124,6 +136,15 @@ export const withNonce = (src: string, nonce: string): string => {
   u.hash = rest === '' ? `hl-nonce=${nonce}` : `${rest}&hl-nonce=${nonce}`;
   return u.href;
 };
+/**
+ * Whether the frame's document that shook hands is still the one shown: a bridge made for it now would never hear a
+ * handshake (the view sends one per document), so the frame must load the view anew instead.
+ */
+export const shookAlready = <F,>(
+  shook: { frame: F; src: string } | null,
+  frame: F,
+  src: string | null,
+): boolean => shook !== null && src !== null && shook.frame === frame && shook.src === src;
 /** A sandboxed frame's messages carry this origin. */
 const OPAQUE = 'null';
 const MIN_HEIGHT = 48;
@@ -258,6 +279,8 @@ const AppFrame = ({
   // bridge's calls need) is asked for beside it. A bridge call waits for it; the page never does.
   const heldSession = useRef<{ key: string; made: Promise<string> } | null>(null);
   const [lateSession, setLateSession] = useState<{ key: string; session: string } | null>(null);
+  // The chat the site's session was asked for; undefined until the first one.
+  const sessionChat = useRef<string | null | undefined>(undefined);
   // This frame among the views of the chat that offer page tools.
   const frameId = useId();
   // A slot view holds a slot of its own: two views of one app on a page would share one cookie, and the second
@@ -266,7 +289,8 @@ const AppFrame = ({
   // An app that waits (for permission, a secret…) has no view to start: the card says so at once, and the key changes
   // when it stops waiting, so the view then starts anew.
   const waits = app.state === APP_STATE.waiting;
-  const key = `${machine}|${app.id}|${view.id}|${viewPort}|${reload}|${reloadToken}|${waits ? 'w' : ''}`;
+  // A new version of the app starts the view anew; it reopens what it had open from `data`.
+  const key = `${machine}|${app.id}|${appStamp(app)}|${view.id}|${viewPort}|${reload}|${reloadToken}|${waits ? 'w' : ''}`;
   const state: TFrameState = health.key === key ? health.state : LOADING;
   // The frame's key, by a name the bridge's effect does not shadow.
   const frameKey = key;
@@ -295,6 +319,8 @@ const AppFrame = ({
   const on = inChat || turnedOn || (conversation !== null && target === 'pane');
   const chat = on ? conversation : null;
   const work = useHostHandlers(machine, conversation, app, on);
+  // The bridge is rebuilt only when the set of the chat's handlers changes, never for another chat.
+  const workKeys = Object.keys(work).sort().join(',');
 
   // What the frame was last opened for, and on which slot: a view shown again after waiting out of sight (a kept screen
   // under Activity) runs the effect below again, and must not open a new session and load the view anew
@@ -307,7 +333,9 @@ const AppFrame = ({
   // Each app holds a slot of its own: a slot is one origin, and two apps on one would share it.
   useEffect(() => {
     let live = true;
-    const sign = [key, view.url, view.path, lease, target, chat, doc, waits].join('|');
+    // A view on the app's own server does not start anew for another chat: its frame holds no session, the page asks
+    // the session for the new chat beside it (below). A view the machine serves has its session in its address.
+    const sign = [key, view.url, view.path, lease, target, view.url ? '' : chat, doc, waits].join('|');
     const was = openedFor.current;
     if (
       openedNow.current?.key === key &&
@@ -361,6 +389,7 @@ const AppFrame = ({
         ...(doc === undefined ? {} : { document: doc }),
       }).then((m) => m.session);
       heldSession.current = { key, made };
+      sessionChat.current = chat;
       made.then(
         (sid) => {
           if (live) setLateSession({ key, session: sid });
@@ -432,6 +461,38 @@ const AppFrame = ({
     doc,
   ]);
 
+  // A new version of the app reaches the machine by itself: while the view is up, the page looks for it.
+  const stamp = appStamp(app);
+  const latestApp = useRef(app);
+  useEffect(() => {
+    latestApp.current = app;
+  });
+  useEffect(() => watchAppUpdate(machine, { ...latestApp.current }), [machine, app.id, stamp]);
+
+  // A site's frame stays when the chat changes (the first message made it): only its session follows the chat.
+  useEffect(() => {
+    if (!view.url || waits || sessionChat.current === undefined || sessionChat.current === chat) return;
+    sessionChat.current = chat;
+    const made = createViewSession(machine, {
+      app: app.id,
+      view: view.id,
+      target,
+      conversation: chat,
+      ...(doc === undefined ? {} : { document: doc }),
+    }).then((m) => m.session);
+    heldSession.current = { key, made };
+    let live = true;
+    made.then(
+      (sid) => {
+        if (live) setLateSession({ key, session: sid });
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [view.url, view.id, waits, chat, machine, app.id, target, doc, key]);
+
   // The slot went to a page used less recently: ask again, and get another.
   useEffect(
     () =>
@@ -488,10 +549,14 @@ const AppFrame = ({
     const mount = mountOf(key);
     const tags = { app: app.id, view: view.id, trace: mount.trace, ...(chat === null ? {} : { chat }) };
     const onLoad = () => {
-      if (seenNow.loadedAt !== null) return;
+      // The empty document is not the site: a site «up» on it would leave a white frame and no card.
+      if (seenNow.loadedAt !== null || isBlankDocument(frame)) return;
       seenNow.loadedAt = Date.now();
-      // A site is up when its page loaded: it shows its own states, and owes the host no handshake to be seen.
-      if (remote) send({ k: 'handshake' });
+      // A site is up when its page loaded: it shows its own states, and owes the host no handshake to be seen. A built-in
+      // service's view (Доски, Документы) always shakes hands through its bridge shim: a load is not enough for it, since
+      // a frame the site refused (frame-ancestors, a gateway's error page) loads too, white, and the card never came
+      // 
+      if (remote && !isSpaceApp(app.id)) send({ k: 'handshake' });
       journal(
         {
           level: 'info',
@@ -529,15 +594,33 @@ const AppFrame = ({
   useEffect(() => {
     navigated.current = false;
     if (!frame || src === null) return;
-    return watchLoads(frame, () => {
-      navigated.current = true;
-      bridge.current?.dispose();
-      bridge.current = null;
-    });
+    return watchLoads(
+      frame,
+      () => {
+        navigated.current = true;
+        bridge.current?.dispose();
+        bridge.current = null;
+      },
+      () => isBlankDocument(frame),
+    );
   }, [frame, src]);
 
+  // What depends on the chat lives beside the bridge, not in it: a view that shook hands keeps its bridge's
+  // port, so the chat made by the first message, or another chat, must not make the bridge (and with it the frame) anew.
+  // The bridge reads these refs when it is called.
+  const chatNow = useRef({ chat, conversation, on, work });
+  useLayoutEffect(() => {
+    chatNow.current = { chat, conversation, on, work };
+  });
+  const offerRef = useRef<ReturnType<typeof pageOffer> | null>(null);
+  // What the view offered the chat last: given again to the chat that comes later.
+  const offered = useRef<{
+    tools?: Parameters<ReturnType<typeof pageOffer>['tools']>[0];
+    hooks?: boolean;
+    context?: unknown;
+  }>({});
   useEffect(() => {
-    if (!frame || !ready || navigated.current) return;
+    if (!frame || !ready) return;
     // Page tools and the published context reach the agent of the chat the app is on in; elsewhere they are refused.
     const offer =
       chat === null
@@ -569,6 +652,51 @@ const AppFrame = ({
               });
             },
           );
+    offerRef.current = offer;
+    if (offer) {
+      const was = offered.current;
+      if (was.tools) void Promise.resolve(offer.tools(was.tools)).catch(() => undefined);
+      if (was.hooks !== undefined) void Promise.resolve(offer.hooks(was.hooks)).catch(() => undefined);
+      if (was.context !== undefined) void Promise.resolve(offer.publish(was.context)).catch(() => undefined);
+    }
+    // The chat's events reach the view only for the kinds it subscribed to and holds events:<kind> for.
+    const offChat =
+      chat === null ? null : watchChatEvents(chat, (kind, params) => bridge.current?.event(kind, params));
+    // A voice quick edit of the app's object: the view lights up what changed.
+    const offEdits = watchQuickEdits(app.id, (flash) => bridge.current?.quickEdit(flash));
+    return () => {
+      offChat?.();
+      offEdits();
+      if (offerRef.current === offer) offerRef.current = null;
+      offer?.drop();
+    };
+  }, [frame, ready, machine, chat, frameId, app.id, app.name]);
+
+  // The document that shook hands, and where: a bridge made anew for it would wait for a handshake it never sends again.
+  const shook = useRef<{ frame: HTMLIFrameElement; src: string } | null>(null);
+  useEffect(() => {
+    if (!frame || !ready || navigated.current) return;
+    // The app as it is now: a fresh object of the same app (the list read again) is no reason for a new bridge.
+    const app = latestApp.current;
+    // The view's document already shook hands with a bridge of this frame and lives on: its port went with that bridge.
+    // A new bridge for it would be dead (a comment's @harnessly never reached the agent), so the frame loads
+    // the view anew, and the new document shakes hands with the new bridge.
+    if (shookAlready(shook.current, frame, src)) {
+      shook.current = null;
+      journal(
+        {
+          level: 'warn',
+          src: journalSource(app.id),
+          ev: 'bridge.rebuilt',
+          app: app.id,
+          view: view.id,
+          text: 'reload',
+        },
+        machine,
+      );
+      setReload((n) => n + 1);
+      return;
+    }
     let offFiles: (() => void) | null = null;
     const noChat = () => {
       throw new BridgeError('host_unavailable', 'page tools work in a chat the app is on in');
@@ -588,12 +716,22 @@ const AppFrame = ({
       }
     };
     const host: IBridgeHandlers = {
-      pageTools: (tools) => (offer ? offer.tools(tools) : noChat()),
-      pageToolResult: (id, answer) => offer?.result(id, answer),
-      hooks: (on) => (offer ? offer.hooks(on) : noChat()),
+      pageTools: (tools) => {
+        offered.current.tools = tools;
+        const offer = offerRef.current;
+        return offer ? offer.tools(tools) : noChat();
+      },
+      pageToolResult: (id, answer) => offerRef.current?.result(id, answer),
+      hooks: (want) => {
+        offered.current.hooks = want;
+        const offer = offerRef.current;
+        return offer ? offer.hooks(want) : noChat();
+      },
       publish: (data) => {
         const page = publishTo.current;
         page?.(data, frame.getBoundingClientRect());
+        offered.current.context = data;
+        const offer = offerRef.current;
         if (offer) return offer.publish(data);
         // The page around the view took it: nothing to refuse while there is no chat yet.
         if (page) return undefined;
@@ -686,11 +824,13 @@ const AppFrame = ({
       elevate: (method, detail) =>
         askConfirm(app.name, t('next.appview.agentElevate', { action: elevationAction(method), detail })),
       pick: (accept) => {
+        const chat = chatNow.current.chat;
         if (chat === null)
           throw new BridgeError('host_unavailable', 'a file is picked in a chat the app is on in');
         return askFile(app.name, machine, chat, accept);
       },
       chatSend: async (text) => {
+        const { conversation, on } = chatNow.current;
         sendMessage(machine, { conversationId: chatOf(conversation, on), text: fromApp(app.name, text) });
       },
       agents: async () => agentRows(machine),
@@ -728,25 +868,40 @@ const AppFrame = ({
         void toast(app.name, { tone, description: description ? `${text} — ${description}` : text }),
       ...hostKeys(() => document.activeElement === frame),
       resize: (h) => setHeight(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, h))),
-      ...work,
+      // The chat's own (read, cards): the chat of the moment, through the ref.
+      ...(Object.fromEntries(
+        workKeys
+          .split(',')
+          .map((name) => [
+            name,
+            (...args: unknown[]) =>
+              (chatNow.current.work as Record<string, ((...a: unknown[]) => unknown) | undefined>)[name]?.(
+                ...args,
+              ),
+          ]),
+      ) as IBridgeHandlers),
       // The host's own come last: the chat binding may read the chat or run a flow where a default has no way to.
       ...handlers,
     };
     // A remote view speaks from its own origin, and is answered only there.
     const remoteOrigin = remote && src !== null ? new URL(src).origin : null;
-    const key = logKey(app.id, chat);
+    // The chat is read when a line is written: the bridge outlives a change of it.
+    const keyNow = () => logKey(app.id, chatNow.current.chat);
     // What the view reports goes to the debug section here and to the machine, where the CLI reads it.
     const report = (line: ReturnType<typeof bridgeLine>) =>
       line && queueViewLog(machine, app.id, view.id, line);
     const jsrc = journalSource(app.id);
     const mount = mountOf(frameKey);
-    const tags = { app: app.id, view: view.id, trace: mount.trace, ...(chat === null ? {} : { chat }) };
+    const tagsNow = () => {
+      const c = chatNow.current.chat;
+      return { app: app.id, view: view.id, trace: mount.trace, ...(c === null ? {} : { chat: c }) };
+    };
     host.debugLog = (level, text) => {
       const at = Date.now();
-      logCall(key, { method: `console.${level}`, permission: '', ok: false, message: text, at });
+      logCall(keyNow(), { method: `console.${level}`, permission: '', ok: false, message: text, at });
       report(consoleLine(level, text, at));
       if (level === 'error' || level === 'warn')
-        journal({ at, level, src: jsrc, ev: 'view.console', text, ...tags }, machine);
+        journal({ at, level, src: jsrc, ev: 'view.console', text, ...tagsNow() }, machine);
     };
     const b = new AppBridge({
       frame: () => frame.contentWindow,
@@ -757,15 +912,16 @@ const AppFrame = ({
       handlers: host,
       hostVersion: HOST_VERSION,
       onReady: () => {
+        if (src !== null) shook.current = { frame, src };
         journal(
-          { level: 'info', src: jsrc, ev: 'ui.initialize', dur: Date.now() - mount.at, ...tags },
+          { level: 'info', src: jsrc, ev: 'ui.initialize', dur: Date.now() - mount.at, ...tagsNow() },
           machine,
         );
         send({ k: 'handshake' });
       },
       ...(nonce === null ? {} : { nonce }),
       onCall: (entry) => {
-        logCall(key, entry);
+        logCall(keyNow(), entry);
         report(bridgeLine(entry));
         if (!entry.ok && !entry.method.startsWith('console.'))
           journal(
@@ -776,7 +932,7 @@ const AppFrame = ({
               ev: 'bridge',
               tool: entry.method,
               text: [entry.code, entry.message].filter(Boolean).join(': '),
-              ...tags,
+              ...tagsNow(),
             },
             machine,
           );
@@ -784,8 +940,6 @@ const AppFrame = ({
       },
     });
     bridge.current = b;
-    // The chat's events reach the view only for the kinds it subscribed to and holds events:<kind> for.
-    const offChat = chat === null ? null : watchChatEvents(chat, (kind, params) => b.event(kind, params));
     const onMessage = (event: MessageEvent) => void b.onMessage(event);
     window.addEventListener('message', onMessage);
     // A view that never connects shows nothing of why: the debug section says so, with the cause the machine's journal
@@ -794,10 +948,13 @@ const AppFrame = ({
       if (b.ready || bridge.current !== b) return;
       const known = seen.current?.key === mount.key ? seen.current.failure.detail : '';
       const asked =
-        known === '' ? journalReason(machine, app.id, chat, mount.at, mount.trace) : Promise.resolve(known);
+        known === ''
+          ? journalReason(machine, app.id, chatNow.current.chat, mount.at, mount.trace)
+          : Promise.resolve(known);
       // The machine saw nothing of the view: the page says what it saw of the frame (a gateway, its own policy).
       const told = asked.then(async (why) => {
-        if (why !== '' || b.ready || bridge.current !== b) return why;
+        // A site's page never passes the machine: «the machine did not see the request» would be about nothing there.
+        if (why !== '' || b.ready || bridge.current !== b || remote) return why;
         const shownFrame = frameSeen.current;
         const r = await frameReason(shownFrame, mount.trace);
         if (r.text !== '')
@@ -809,7 +966,7 @@ const AppFrame = ({
               url: cleanUrl(shownFrame?.src ?? ''),
               text: r.text,
               ...(r.status === undefined ? {} : { status: r.status }),
-              ...tags,
+              ...tagsNow(),
             },
             machine,
           );
@@ -820,7 +977,7 @@ const AppFrame = ({
         const base = `ui/initialize — host_unavailable: no handshake in ${HANDSHAKE_WAIT_MS / 1000} s`;
         const message =
           t('next.inspector.noHandshake', { s: HANDSHAKE_WAIT_MS / 1000 }) + (why === '' ? '' : ` — ${why}`);
-        logCall(key, {
+        logCall(keyNow(), {
           method: 'ui/initialize',
           permission: '',
           ok: false,
@@ -836,7 +993,7 @@ const AppFrame = ({
             ev: 'ui.initialize',
             text: why === '' ? base : `${base} — ${why}`,
             dur: Date.now() - mount.at,
-            ...tags,
+            ...tagsNow(),
           },
           machine,
         );
@@ -847,14 +1004,12 @@ const AppFrame = ({
     return () => {
       window.clearTimeout(watchdog);
       window.removeEventListener('message', onMessage);
-      offChat?.();
       if (offFiles !== null && session !== null) {
         offFiles();
         void callFilesMore(machine, session, 'unwatch', {}).catch(() => undefined);
       }
       b.dispose();
       bridge.current = null;
-      offer?.drop();
     };
   }, [
     frame,
@@ -862,13 +1017,11 @@ const AppFrame = ({
     session,
     nonce,
     machine,
-    app,
+    app.id,
+    stamp,
     target,
-    conversation,
-    on,
-    chat,
     handlers,
-    work,
+    workKeys,
     frameId,
     remote,
     src,
@@ -1028,7 +1181,10 @@ const AppFrame = ({
   // is over it, and when it did not start the card takes its place (the frame stays, hidden, in case it connects late).
   return (
     <div className="hx-appview__box" data-fit={fit || undefined} data-state={state.k}>
+      {/* A frame of its own for each mount (HRN-1498): the same frame given the view's address again with only another
+          #hl-nonce does not load a new document, and Chromium leaves it on about:blank — a white frame, no handshake. */}
       <iframe
+        key={frameKey}
         ref={setFrame}
         className="hx-appview"
         data-state={state.k}

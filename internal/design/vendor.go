@@ -11,7 +11,7 @@ import (
 	"sync"
 )
 
-// React, ReactDOM and Babel come from the runtime, not from unpkg: a board then does not wait for a third-party CDN
+// React, ReactDOM and Babel come from the runtime, not from unpkg or jsDelivr: a board then does not wait for a third-party CDN
 // (nor fail without one). The engine (support.js) asks window.__resources[url] before it builds a <script src=url>, so
 // a script placed before the engine maps the three exact URLs it asks for to /__vendor/ files; any other URL (a release
 // engine on other versions) still goes to unpkg as before. The files are the unpkg bytes, their sha384 is the engine's
@@ -52,10 +52,27 @@ var vendorFiles = map[string]*vendorFile{
 	},
 }
 
+// vendorMirrors are the other addresses engines ask for the same files at: a newer engine names jsDelivr, with the
+// same SRI, and a board on it fetched React and Babel from the CDN on every opening.
+var vendorMirrors = map[string]string{
+	"https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js":         "https://unpkg.com/react@18.3.1/umd/react.production.min.js",
+	"https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js": "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js",
+	"https://cdn.jsdelivr.net/npm/@babel/standalone@7.29.0/babel.min.js":            "https://unpkg.com/@babel/standalone@7.29.0/babel.min.js",
+}
+
 func init() {
 	for url, f := range vendorFiles {
 		f.URL = url
 	}
+}
+
+// vendorFor is the vendored file an engine's address names, at either of its addresses.
+func vendorFor(url string) (*vendorFile, bool) {
+	if to, ok := vendorMirrors[url]; ok {
+		url = to
+	}
+	f, ok := vendorFiles[url]
+	return f, ok
 }
 
 func (f *vendorFile) load() {
@@ -84,9 +101,12 @@ func resourcesScript() string {
 }
 
 func resourcesScriptAt(prefix string) string {
-	m := make(map[string]string, len(vendorFiles))
+	m := make(map[string]string, len(vendorFiles)+len(vendorMirrors))
 	for url, f := range vendorFiles {
 		m[url] = prefix + f.Name
+	}
+	for url, to := range vendorMirrors {
+		m[url] = prefix + vendorFiles[to].Name
 	}
 	b, _ := json.Marshal(m) // sorted keys
 	return `<script>(function(){var m=` + string(b) + `,seen=false;Object.defineProperty(window,"__resources",{configurable:true,` +

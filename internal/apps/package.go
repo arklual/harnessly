@@ -399,6 +399,17 @@ func (p *Package) checkFiles() Problems {
 		}
 	}
 
+	if q := m.QuickEdit; q != nil {
+		for _, t := range []struct{ field, tool string }{{"quickEdit.read", q.Read}, {"quickEdit.apply", q.Apply}, {"quickEdit.undo", q.Undo}} {
+			if t.tool == "" {
+				continue
+			}
+			if _, _, err := p.CanCallTool(t.tool); err != nil {
+				ps = append(ps, Problem{Path: t.field, Message: err.Error()})
+			}
+		}
+	}
+
 	if sin, err := m.SinopiaOf(); err == nil {
 		if sin.Bindings != nil && sin.Bindings.Schema != "" {
 			p.checkJSON("sinopia.bindings.schema", sin.Bindings.Schema, &ps)

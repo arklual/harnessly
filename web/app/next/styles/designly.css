@@ -1494,18 +1494,22 @@ html[data-card-dragging='true'] {
 /* the design is shown from the hub's last snapshot; its machine did not answer. */
 .hx-snapshot {
   position: fixed;
-  top: 12px;
+  /* Under the window's tab strip and over everything, like «Нет связи» (.hx-net): never behind the tabs. */
+  top: calc(var(--hx-tabs-h, 42px) + 14px);
   left: 50%;
   transform: translateX(-50%);
-  z-index: 40;
+  z-index: 8990;
   max-width: calc(100vw - 32px);
-  padding: 6px 14px;
+  padding: 8px 14px;
   border-radius: var(--hx-radius-full);
-  background: var(--hx-bg-raised);
-  color: var(--hx-fg-2);
-  border: 1px solid var(--hx-border-strong);
+  background: var(--hx-ink-bg);
+  color: var(--hx-ink-fg);
+  box-shadow: var(--hx-ink-shadow);
   font-size: var(--hx-text-sm);
   line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: none;
   animation: hx-snapshot-in 0.18s ease-out;
 }

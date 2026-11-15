@@ -24,6 +24,7 @@ import useWorkspaceStore, { type IWorkspaceInitialData } from '@/hooks/use-works
 import useConfigStore, { type IConfigInitialData } from '@/hooks/use-config-store';
 import PushBridge from '@/components/agents/push-bridge';
 import { captureInstallPrompt } from '@/hooks/use-install-prompt';
+import { reloadOnStaleChunks } from '@/lib/stale-chunks';
 
 // The sign-in and the docs page are drawn with the old stylesheets, which come with them (styles/legacy.ts).
 const SignIn = lazy(() => import('@/styles/legacy').then(() => import('@/components/auth/sign-in')));
@@ -41,6 +42,7 @@ const GALLERIES: Record<string, ComponentType> = Object.fromEntries(
   ),
 );
 
+reloadOnStaleChunks();
 dayjs.extend(relativeTime);
 dayjs.locale(locale());
 document.documentElement.lang = locale();

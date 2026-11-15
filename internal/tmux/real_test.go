@@ -321,3 +321,37 @@ func TestRealTwoServers(t *testing.T) {
 		t.Fatalf("config not applied on the legacy server: %q", v)
 	}
 }
+
+// A deployment's config that leaves the mouse off and titles the window its own way: the overlay set over it turns the
+// mouse on, gives the wheel to copy mode and titles the window for the page's "Down".
+func TestRealApplyConfigSetsTheScrollOverlayOverAForeignConfig(t *testing.T) {
+	r := newRealRig(t)
+	conf := filepath.Join(t.TempDir(), "tmux.conf")
+	foreign := "set -g mouse off\nset -g set-titles-string \"#{pane_current_command}\"\nunbind-key -aq\n"
+	if err := os.WriteFile(conf, []byte(foreign), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tm := NewConfig(Config{Names: r.names(), ConfigFile: conf})
+	if err := tm.CreateSession("hs-overlay", 80, 24, t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	show := func(args ...string) string {
+		out, err := exec.Command("tmux", append([]string{"-L", r.main}, args...)...).CombinedOutput()
+		if err != nil {
+			t.Fatalf("%v: %v %s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	if got := show("show-options", "-gv", "mouse"); got != "on" {
+		t.Fatalf("mouse %q", got)
+	}
+	if got := show("show-options", "-gv", "set-titles-string"); got != "hx-scroll:#{pane_in_mode}" {
+		t.Fatalf("title %q", got)
+	}
+	if keys := show("list-keys", "-T", "root"); !strings.Contains(keys, "WheelUpPane") || !strings.Contains(keys, "copy-mode -e") {
+		t.Fatalf("root keys %q", keys)
+	}
+	if keys := show("list-keys", "-T", "copy-mode"); !strings.Contains(keys, "scroll-up") {
+		t.Fatalf("copy-mode keys %q", keys)
+	}
+}

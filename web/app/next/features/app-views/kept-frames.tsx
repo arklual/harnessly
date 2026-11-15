@@ -7,11 +7,20 @@
 // it was when it comes back, with no new load. One is let go when its tab is closed, its chat is forgotten, the app's
 // own page opens it (one player, not two), or the page's budget of frames out of sight is spent (features/shell/
 // kept-budget: shared with the kept screens, the least recent goes).
-import { Activity, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  Activity,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { createPortal } from 'react-dom';
 import AppFrame from '@/next/features/app-views/app-frame';
 import { ConsentStage } from '@/next/features/app-consent/consent-ask';
 import { useInstalledApps } from '@/next/features/app-views/api';
+import { spaceCleared, spaceContextOf } from '@/next/features/app-views/space-context';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { chatPaneOf, chatPanes } from '@/next/stores/pane-state';
 import { keptBudget } from '@/next/features/shell/kept-budget';
@@ -35,6 +44,8 @@ export interface IKeptFrame {
   tab: string;
   app: string;
   view: string | null;
+  /** The app's object the view was asked to open (a board's slug); null or absent: its home. */
+  object?: string | null;
   /** The inspector's «reload». */
   reload: number;
   /** Its place in the pane while on screen. */
@@ -120,12 +131,21 @@ interface IKeptSlotProps extends TKeptInput {
 }
 
 /** The place of a kept view in the pane: an empty box the layer puts the view over. */
-export const KeptSlot = ({ className, machine, conversation, tab, app, view, reload }: IKeptSlotProps) => {
+export const KeptSlot = ({
+  className,
+  machine,
+  conversation,
+  tab,
+  app,
+  view,
+  object = null,
+  reload,
+}: IKeptSlotProps) => {
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
     if (!slot) return;
-    keptFrames.show({ machine, conversation, tab, app, view, reload }, slot);
-  }, [slot, machine, conversation, tab, app, view, reload]);
+    keptFrames.show({ machine, conversation, tab, app, view, object, reload }, slot);
+  }, [slot, machine, conversation, tab, app, view, object, reload]);
   useLayoutEffect(() => {
     if (!slot) return;
     return () => keptFrames.hide(conversation, tab, slot);
@@ -263,8 +283,31 @@ const KeptBrowser = ({ frame }: { frame: IKeptFrame }) => {
   );
 };
 
+// What each kept view has open inside itself: a board the person went to in the view, so the view opens it
+// again when its frame starts anew (a new version of the app, the slot taken back) rather than its home.
+const openInFrame = new Map<string, string>();
+
 const KeptFrame = ({ frame }: { frame: IKeptFrame }) => {
   const { list } = useInstalledApps(frame.machine);
+  const asked = frame.object ?? null;
+  const [inView, setInView] = useState<{ asked: string | null; slug: string | null }>(() => ({
+    asked,
+    slug: openInFrame.get(frame.key) ?? null,
+  }));
+  // A new object asked from outside (a link clicked in the chat) wins over what the view had open.
+  if (inView.asked !== asked) setInView({ asked, slug: null });
+  const opens = inView.asked !== asked ? asked : (inView.slug ?? asked);
+  const onPublish = useCallback(
+    (data: unknown) => {
+      const ctx = spaceContextOf(data);
+      const slug = ctx?.object ?? (spaceCleared(data) ? null : undefined);
+      if (slug === undefined) return;
+      if (slug === null) openInFrame.delete(frame.key);
+      else openInFrame.set(frame.key, slug);
+      setInView((was) => (was.slug === slug ? was : { ...was, slug }));
+    },
+    [frame.key],
+  );
   const box = useBoxOf(frame.slot);
   const ref = useRef<HTMLDivElement>(null);
   const shown = frame.slot !== null && box.left !== OUT.left;
@@ -299,6 +342,9 @@ const KeptFrame = ({ frame }: { frame: IKeptFrame }) => {
             viewPort={list.viewPort}
             conversation={frame.conversation}
             reloadToken={frame.reload}
+            key={asked ?? ''}
+            data={opens ? { object: opens } : undefined}
+            onPublish={onPublish}
           />
         </ConsentStage>
       )}

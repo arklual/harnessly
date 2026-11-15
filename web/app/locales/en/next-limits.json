@@ -74,5 +74,9 @@
   "next.limits.card.connect": "Connect",
   "next.limits.card.left": "{left}%",
   "next.limits.card.pace": "To last until the reset, {pace}% should be left now",
-  "next.limits.card.spark": "Spend by day this week"
+  "next.limits.card.spark": "Spend by day this week",
+  "next.limits.alert.sevenDay": "Weekly {provider} limit",
+  "next.limits.alert.fiveHour": "5-hour {provider} limit",
+  "next.limits.alert.text": "{left}% left, resets at {at}",
+  "next.limits.alert.textOut": "Used up, resets at {at}"
 }

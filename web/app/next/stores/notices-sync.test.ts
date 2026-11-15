@@ -46,6 +46,27 @@ describe('notices sync (HRN-1421)', () => {
     dismissAllNotices();
   });
 
+  it('a base with the machine in its query keeps the paths before the query (no ?machine=X/items?person=)', async () => {
+    const urls: string[] = [];
+    const s = setup();
+    const fetchImpl = (async (url: string, init?: RequestInit) => {
+      urls.push(url);
+      return s.fetchImpl(url, init);
+    }) as unknown as typeof fetch;
+    const streams: string[] = [];
+    const stop = startNoticesSync({
+      base: '/n?machine=m1',
+      person: 'p@x',
+      fetchImpl,
+      stream: (url) => (streams.push(url), s.stream()),
+      device: 'A',
+    });
+    await settle();
+    stop();
+    expect(urls[0]).toBe('/n?machine=m1&person=p%40x');
+    expect(streams).toEqual(['/n/stream?machine=m1&person=p%40x']);
+  });
+
   it('loads what the database holds, and a notice read on another device goes from this one', async () => {
     const n = notice('k1');
     const s = setup([{ key: 'k1', chatId: 'c1', at: 1, doc: n }]);

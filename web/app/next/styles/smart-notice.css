@@ -384,12 +384,25 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* One line, cut at a word with «…»: a clamp of wrapped words, not text-overflow, which cuts mid-word. */
 .hx-sn__text {
+  display: -webkit-box;
   min-width: 0;
   overflow: hidden;
   font-size: var(--hx-text-md);
   color: var(--sn-fg2);
-  text-overflow: ellipsis;
+  overflow-wrap: normal;
+  word-break: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
+.hx-sn__more {
+  flex: none;
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--sn-fg3);
+  font-size: var(--hx-text-xs);
   white-space: nowrap;
 }
 .hx-sn__ann {
@@ -458,7 +471,7 @@
 
 /* ── The card ──────────────────────────────────────── */
 .hx-sn__card {
-  width: min(420px, var(--sn-max));
+  width: min(380px, var(--sn-max));
   max-height: 70vh;
   overflow-y: auto;
   padding: 14px 16px 10px;
@@ -1289,13 +1302,22 @@
 }
 
 /* A finished chat's recap in its card, and the field under it: whole, never cut — the open card is where the recap is read (the card scrolls when it is long). */
+/* The gist of a finished turn: two lines at most; the words are cut at a word before (clip-words.ts). */
 .hx-sn__summary {
-  margin: 0 0 12px;
+  display: -webkit-box;
+  margin: 0 0 8px;
+  overflow: hidden;
   color: var(--sn-fg2);
   font-size: var(--hx-text-sm);
-  line-height: 1.5;
+  line-height: 1.45;
   white-space: pre-line;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.hx-sn__summary + .hx-sn__link {
+  margin-bottom: 4px;
 }
 .hx-sn__reply[data-rec] {
   gap: 8px;
@@ -1426,4 +1448,18 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
+}
+
+/* The phone: at the top, as wide as the screen with 16px at each side, whatever the place on a wide window. */
+@media (max-width: 900px) {
+  .hx-sn {
+    --sn-edge: 16px;
+    --sn-max: calc(100vw - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+  }
+  .hx-sn__body,
+  .hx-sn__pill,
+  .hx-sn__card {
+    width: var(--sn-max);
+    max-width: var(--sn-max);
+  }
 }

@@ -7,7 +7,7 @@
    "resume": "425055ec-bbc8-4e3c-87d0-36fa74c1cccb",
    "workspaceId": "ws-a"
   },
-  "line": "$EDITOR_VAR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/$EDITOR_NAME' EDITOR='$DATA/bin/$EDITOR_NAME' DISABLE_AUTOUPDATER=1 claude --resume 425055ec-bbc8-4e3c-87d0-36fa74c1cccb --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md",
+  "line": "$EDITOR_VAR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/$EDITOR_NAME' EDITOR='$DATA/bin/$EDITOR_NAME' DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 claude --resume 425055ec-bbc8-4e3c-87d0-36fa74c1cccb --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md",
   "error": null
  },
  {
@@ -20,7 +20,7 @@
    "model": "opus",
    "effort": "high"
   },
-  "line": "$EDITOR_VAR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/$EDITOR_NAME' EDITOR='$DATA/bin/$EDITOR_NAME' DISABLE_AUTOUPDATER=1 claude --resume 425055ec-bbc8-4e3c-87d0-36fa74c1cccb --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md --dangerously-skip-permissions --model 'opus' --effort high",
+  "line": "$EDITOR_VAR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/$EDITOR_NAME' EDITOR='$DATA/bin/$EDITOR_NAME' DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 claude --resume 425055ec-bbc8-4e3c-87d0-36fa74c1cccb --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md --dangerously-skip-permissions --model 'opus' --effort high",
   "error": null
  },
  {
@@ -32,7 +32,7 @@
    "model": "sonnet",
    "launcher": "/opt/agents/claude launcher"
   },
-  "line": "$EDITOR_VAR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/$EDITOR_NAME' EDITOR='$DATA/bin/$EDITOR_NAME' DISABLE_AUTOUPDATER=1 '/opt/agents/claude launcher' --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-b/claude-prompt.md --model 'sonnet'",
+  "line": "$EDITOR_VAR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/$EDITOR_NAME' EDITOR='$DATA/bin/$EDITOR_NAME' DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 '/opt/agents/claude launcher' --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-b/claude-prompt.md --model 'sonnet'",
   "error": null
  },
  {
@@ -41,7 +41,7 @@
   "input": {
    "provider": "claude"
   },
-  "line": "$EDITOR_VAR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/$EDITOR_NAME' EDITOR='$DATA/bin/$EDITOR_NAME' DISABLE_AUTOUPDATER=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json",
+  "line": "$EDITOR_VAR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/$EDITOR_NAME' EDITOR='$DATA/bin/$EDITOR_NAME' DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json",
   "error": null
  },
  {

@@ -250,7 +250,7 @@
     [
      "send",
      "tk-ws-a-pane-a-tab-id0001",
-     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md --model 'opus' --effort high -- $'Fix the build\\nnow \\'quoted\\''"
+     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md --model 'opus' --effort high -- $'Fix the build\\nnow \\'quoted\\''"
     ],
     [
      "register",
@@ -339,7 +339,7 @@
     [
      "send",
      "tk-ws-a-pane-a-tab-id0005",
-     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md -- \"$(cat -- '$DATA/launch-prompts/initial-UUID.txt' && rm -f -- '$DATA/launch-prompts/initial-UUID.txt')\""
+     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md -- \"$(cat -- '$DATA/launch-prompts/initial-UUID.txt' && rm -f -- '$DATA/launch-prompts/initial-UUID.txt')\""
     ],
     [
      "register",
@@ -575,7 +575,7 @@
     [
      "send",
      "tk-ws-a-pane-a-tab-id0006",
-     "ACME_RUN_ID='r-1' ACME_RESULT_TOKEN='abc.DEF_9' ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md --model 'sonnet' -- $'Nightly check'"
+     "ACME_RUN_ID='r-1' ACME_RESULT_TOKEN='abc.DEF_9' ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md --model 'sonnet' -- $'Nightly check'"
     ],
     [
      "register",
@@ -766,7 +766,7 @@
     [
      "send",
      "tk-ws-a-pane-a-tab-id0007",
-     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 claude --resume 7a1c2d3e-4f50-4617-8899-aabbccddeeff --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md"
+     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 claude --resume 7a1c2d3e-4f50-4617-8899-aabbccddeeff --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md"
     ],
     [
      "register",
@@ -807,7 +807,7 @@
     [
      "send",
      "tk-ws-a-pane-a-tab-id0008",
-     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md -- $'From outside'"
+     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md -- $'From outside'"
     ],
     [
      "register",
@@ -1315,7 +1315,7 @@
     [
      "send",
      "tk-ws-b-pane-id0002-tab-id0009",
-     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-b/claude-prompt.md --model 'sonnet' -- $'From the CLI'"
+     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-b/claude-prompt.md --model 'sonnet' -- $'From the CLI'"
     ],
     [
      "register",
@@ -1379,7 +1379,7 @@
     [
      "send",
      "tk-ws-id000a-pane-id000b-tab-id000c",
-     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 claude --resume 425055ec-bbc8-4e3c-87d0-36fa74c1cccb --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-id000a/claude-prompt.md --model 'opus'"
+     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 claude --resume 425055ec-bbc8-4e3c-87d0-36fa74c1cccb --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-id000a/claude-prompt.md --model 'opus'"
     ],
     [
      "launch",
@@ -1443,7 +1443,7 @@
    [
     "sendSeparated",
     "tk-ws-a-pane-a-tab-4",
-    "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 claude --resume 7a1c2d3e-4f50-4617-8899-aabbccddeeff --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md"
+    "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 claude --resume 7a1c2d3e-4f50-4617-8899-aabbccddeeff --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md"
    ],
    [
     "launch",

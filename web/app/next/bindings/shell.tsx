@@ -110,18 +110,29 @@ import { PeopleBlock } from '@/next/bindings/asks';
 import { useShellTabs, wantsNewTab } from '@/next/bindings/tabs';
 import { useShellKeys } from '@/next/bindings/shell-keys';
 import { keepScreensOnPhone, TabScopeContext, useTabs, useTopTabs } from '@/next/stores/tabs';
-import { keptScreens, keptScreensMax } from '@/next/features/shell/kept-screens';
+import { deviceKeptScreensMax, keptScreens } from '@/next/features/shell/kept-screens';
 import { keptBudget } from '@/next/features/shell/kept-budget';
 import { usePhone } from '@/next/ui/use-media';
 import Sidebar from '@/next/features/sidebar/sidebar';
 import { useSidebarApps } from '@/next/bindings/use-sidebar-apps';
-import AppMainPage from '@/next/bindings/app-main';
-import ReviewAppPage from '@/next/bindings/review-app';
+import {
+  AppAboutPage,
+  AppDocPage,
+  AppMainPage,
+  AppsListPage,
+  AppsScreen,
+  DesignlySite,
+  DesignlyView,
+  HelpPage,
+  InviteAccept,
+  KitPage,
+  ReviewAppPage,
+  SettingsScreen,
+  isWarmPage,
+  warmPage,
+  type TWarmPage,
+} from '@/next/bindings/later-pages';
 import { appStageDesign } from '@/next/features/app-main/app-stage';
-import AppAboutPage from '@/next/bindings/app-page';
-import AppDocPage from '@/next/bindings/app-doc';
-import AppsListPage from '@/next/bindings/apps-list';
-import HelpPage from '@/next/bindings/help';
 import { AppConfirmHost } from '@/next/features/app-views/confirm';
 import { AppFilePickHost } from '@/next/features/app-views/file-pick';
 import LegacyScreen, { LEGACY_SCREEN, ManageScreen } from '@/next/legacy/screens';
@@ -138,37 +149,36 @@ import LazyView from '@/next/ui/lazy-view';
 import { usePresentFlag } from '@/next/ui/presence';
 import { t } from '@/next/i18n';
 import { goTo, HOME, parseRoute, ROUTE, routePath, useRoute, type TRoute } from '@/next/routes/routes';
-import AppsScreen from '@/next/bindings/apps';
-import SettingsScreen from '@/next/bindings/settings';
 import { BrandingHost, HomeSlots, useHomeStage } from '@/next/features/app-views/slot-pages';
-import DesignlyView from '@/next/bindings/designly';
-import { DESIGN_KIND } from '@/next/features/designly/designly-home';
+import { DESIGN_KIND } from '@/next/features/designly/design-kind';
 import { useWorkingDesigns } from '@/next/bindings/working-designs';
 import { useDesignBound } from '@/next/bindings/design-conv';
 import { designKey } from '@/next/features/designly/design-conv';
-import DesignlySite from '@/next/bindings/designly-site';
-import KitPage from '@/next/bindings/kit-page';
 import SiteWait from '@/next/features/designly/site-wait';
-import InviteAccept from '@/next/features/designly/access/invite-accept';
 import { useProjectDialog, useProjectSettingsDialog, useResumeDialog } from '@/next/bindings/shell-dialogs';
 import { useAppUpdate } from '@/next/bindings/use-app-update';
 import { useRelease } from '@/next/bindings/use-release';
 import ReleaseNotice from '@/next/features/update/release-notice';
 import UpdateBanner from '@/next/features/update/update-banner';
+import RolloutBanner from '@/next/features/rollout/rollout-banner';
 import LearnPage from '@/next/features/learn/learn-page';
-import { createChat as createGptChat } from '@/next/features/chatgpt/api';
 import ChatGptScreen from '@/next/features/chatgpt/chat-screen';
+import { askVoiceStart, markWakeStart, voiceNow } from '@/next/features/voice-live/field';
+import VoiceLayer from '@/next/features/voice-live/voice-layer';
 import { gptChatsChanged, useGptChats, useGptSignedIn } from '@/next/features/chatgpt/store';
+import { gptIdOf } from '@/next/features/chatgpt/voice-bridge';
+import { deleteChat as deleteGptChat, renameChat as renameGptChat } from '@/next/features/chatgpt/api';
 import LearnWelcome from '@/next/features/learn/learn-welcome';
 import TourOverlay from '@/next/features/tour/tour-overlay';
 import WhatsNew from '@/next/features/whats-new/whats-new';
 import { REFS_MAX, type Conversation, type ConvId, type MachineId } from '@/next/protocol/v2';
 import { chatRef } from '@/next/features/composer/chat-sources';
 import { addDraftRef } from '@/next/stores/drafts';
-import { useConversation, useConvsAnswered } from '@/next/stores/conversations';
+import { conversationsStore, useConversation, useConvsAnswered } from '@/next/stores/conversations';
+import NextChatPull from '@/next/features/chat/next-chat-pull';
+import usePaneEdgeSwipe from '@/next/features/shell/use-pane-edge-swipe';
 import { linkReason, useConnection } from '@/next/stores/connection';
-import { DEFAULT_SETTINGS, useMe } from '@/next/stores/me';
-import { useNoticeColor } from '@/next/bindings/notice-color';
+import { useMe } from '@/next/stores/me';
 import { useHomeMachine, useMachineLoad } from '@/next/stores/machines';
 import { useCentral } from '@/next/stores/central';
 import { useFeed } from '@/next/stores/conversation';
@@ -183,6 +193,11 @@ import { ToastHost, toast } from '@/next/ui/toast';
 import { useDeadline } from '@/next/ui/use-deadline';
 import { FLY_FIELD, flyComposer } from '@/next/ui/fly-composer';
 import { countRender } from '@/next/core/perf-journal';
+
+/** ⌥ Space away from a chat: the voice's field over the screen, loaded when asked. */
+const VoiceFloat = lazy(() => import('@/next/features/voice-live/voice-float'));
+const VoiceBar = lazy(() => import('@/next/features/voice-live/voice-bar'));
+const WakeWord = lazy(() => import('@/next/features/voice-live/wake-word'));
 
 const CHAT_LEAVE_MS = 180;
 const NO_CHATS: readonly ISidebarChat[] = [];
@@ -256,7 +271,9 @@ const screenOfPath = (path: string): TRoute => designPlaceOf(parseRoute(path));
  */
 const keptScreenOf = (route: TRoute): string | null => {
   if (route.kind === ROUTE.site) return `site:${route.id}`;
-  if (route.kind === ROUTE.app) return `app:${route.id}/${route.object ?? ''}/${route.chat ?? ''}`;
+  // The spaces are one screen whatever is open in them: a board, a document, their lists.
+  if (route.kind === ROUTE.app)
+    return isSpaceApp(route.id) ? 'app:spaces' : `app:${route.id}/${route.object ?? ''}/${route.chat ?? ''}`;
   if (route.kind === ROUTE.appDoc) return `doc:${route.id}`;
   if (route.kind === ROUTE.review && route.url !== undefined)
     return `review:${route.url}/${route.chat ?? ''}`;
@@ -265,11 +282,7 @@ const keptScreenOf = (route: TRoute): string | null => {
 };
 const isKeptPath = (path: string) => keptScreenOf(screenOfPath(path)) !== null;
 /** How many screens this device keeps mounted (features/shell/kept-screens). */
-const KEPT_MAX = keptScreensMax(
-  typeof navigator === 'undefined'
-    ? undefined
-    : (navigator as Navigator & { deviceMemory?: number }).deviceMemory,
-);
+const KEPT_MAX = deviceKeptScreensMax();
 // The phone shows no tabs: a screen left for another place waits in a tab of its own, and «Назад» finds it standing.
 keepScreensOnPhone({ keeps: isKeptPath, max: KEPT_MAX + 1 });
 
@@ -329,10 +342,11 @@ const KeptPage = ({
   if (route.kind === ROUTE.app)
     return (
       <AppMainPage
-        key={`${route.id}/${route.object ?? ''}/${route.chat ?? ''}`}
+        key={isSpaceApp(route.id) ? 'spaces' : `${route.id}/${route.object ?? ''}/${route.chat ?? ''}`}
         machine={machine}
         id={route.id}
         object={route.object ?? null}
+        thread={route.thread ?? null}
         chat={route.chat ?? null}
         open={open}
         toolPane={toolPane}
@@ -373,7 +387,6 @@ const KeptPage = ({
         key={`${machine}/${route.id}/${route.version ?? ''}/${route.theme ?? ''}`}
         machine={machine}
         route={route}
-        onOpenDrawer={onOpenDrawer}
       />
     );
   return null;
@@ -524,6 +537,121 @@ const legacyChatId = (search: string): string | null => {
 
 const isConvId = (id: string): id is ConvId => id.startsWith('tab-');
 
+/**
+ * How many chats stay mounted after they are left: enough for going back and forth between a few on a
+ * computer. A phone, a device that keeps two screens or one with little memory keeps only the chat on view:
+ * in Safari every hidden chat's feed weighed on each open and close of the drawer (worst frame 123 → 460 ms).
+ */
+const KEPT_CHATS_WIDE = 3;
+const LOW_MEMORY_GB = 4;
+/** A phone, a device that keeps two screens or one with little memory: it spends nothing ahead. */
+const weakDevice = (): boolean => {
+  if (typeof window === 'undefined' || KEPT_MAX <= 2) return true;
+  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  return window.matchMedia(PHONE_QUERY).matches || (memory !== undefined && memory <= LOW_MEMORY_GB);
+};
+const keptChatsMax = (): number => (weakDevice() ? 1 : KEPT_CHATS_WIDE);
+
+/** A computer fetches Settings and Sinopia a while after the start, once idle: long enough not to slow the first chat. */
+const WARM_IDLE_MS = 5000;
+const IDLE_PAGES: readonly TWarmPage[] = ['settings', 'designly'];
+/**
+ * The pages the sidebar opens come ahead of the first click: on a computer when the page is idle, everywhere
+ * when the person points at the item (hover, a touch, focus). A phone fetches only on such an intent: in idle time its
+ * parse would cost the frames of whatever moves next.
+ */
+const useWarmPages = () => {
+  useEffect(() => {
+    const onIntent = (event: Event) => {
+      const name = (event.target as Element | null)?.closest?.<HTMLElement>('[data-warm]')?.dataset.warm;
+      if (isWarmPage(name)) warmPage(name);
+    };
+    const events = ['pointerover', 'pointerdown', 'focusin'] as const;
+    for (const type of events) document.addEventListener(type, onIntent, { capture: true, passive: true });
+    let timer = 0;
+    if (!weakDevice())
+      timer = window.setTimeout(() => {
+        const idle = (run: () => void) => {
+          if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(run);
+          else setTimeout(run, 0);
+        };
+        const next = (at: number) => {
+          if (at >= IDLE_PAGES.length) return;
+          idle(() => {
+            warmPage(IDLE_PAGES[at]);
+            next(at + 1);
+          });
+        };
+        next(0);
+      }, WARM_IDLE_MS);
+    return () => {
+      window.clearTimeout(timer);
+      for (const type of events) document.removeEventListener(type, onIntent, { capture: true });
+    };
+  }, []);
+};
+
+interface IKeptChat {
+  id: ConvId;
+  machine: MachineId;
+  /** When it was on the stage last, in the order of opening: the one seen longest ago leaves first. */
+  seen: number;
+}
+
+/** The kept chats with this one on the stage. Their order stays: moving a hidden chat's node lays it out anew. */
+const keepChat = (
+  kept: readonly IKeptChat[],
+  chat: { id: ConvId; machine: MachineId },
+  seen: number,
+): readonly IKeptChat[] => {
+  const now = { ...chat, seen };
+  const max = keptChatsMax();
+  // A window that became a phone lets go of the chats it kept beyond its share, the ones seen longest ago first.
+  const newest = [...kept]
+    .filter((k) => k.id !== chat.id)
+    .sort((a, b) => b.seen - a.seen)
+    .slice(0, max - 1);
+  const stays = new Set([...newest.map((k) => k.id), chat.id]);
+  const left = kept.filter((k) => stays.has(k.id)).map((k) => (k.id === chat.id ? now : k));
+  if (left.some((k) => k.id === chat.id)) return left;
+  if (left.length < kept.length) {
+    // Into the place of one that left: the order of the rest stays.
+    const at = kept.findIndex((k) => !stays.has(k.id));
+    const placed = kept
+      .map((k, index) => (index === at ? now : k))
+      .filter((k) => stays.has(k.id) || k === now);
+    return placed;
+  }
+  return [...left, now];
+};
+
+interface IChatCalls {
+  openFile: ComponentProps<typeof ChatView>['onOpenFile'];
+  openOutput: ComponentProps<typeof ChatView>['onOpenOutput'];
+  openRef: ComponentProps<typeof ChatView>['onOpenRef'];
+  showBackground: ComponentProps<typeof ChatView>['onShowBackground'];
+  openTerminal: ComponentProps<typeof ChatView>['onOpenTerminal'];
+}
+
+/** One kept chat: its props do not change while it waits hidden, so the shell drawing again leaves it be. */
+const KeptChat = memo(
+  ({ conv, machine, calls }: { conv: ConvId; machine: MachineId; calls: { current: IChatCalls | null } }) => (
+    <ChatView
+      conv={conv}
+      machine={machine}
+      onOpenFile={(...args) => calls.current?.openFile?.(...args)}
+      onOpenOutput={(...args) => calls.current?.openOutput?.(...args)}
+      onOpenRef={(...args) => calls.current?.openRef?.(...args)}
+      onShowBackground={(...args) => calls.current?.showBackground?.(...args)}
+      onOpenTerminal={() => calls.current?.openTerminal?.()}
+      onRetryLoad={() => {
+        // The channel is asked again: the feed's own error is cleared by the next snapshot.
+        hub.client(machine)?.reconnectNow();
+      }}
+    />
+  ),
+);
+
 /** The chat whose right pane is beside the screen: the open chat, or the open design's chat. */
 const paneConvOf = (
   route: TRoute,
@@ -532,6 +660,16 @@ const paneConvOf = (
 ): Conversation | null => {
   if (route.kind === ROUTE.chat) return chat;
   if (route.kind === ROUTE.site || route.kind === ROUTE.app) return design;
+  return null;
+};
+
+/**
+ * The view the right pane stands beside, when it is not the chat's own page: each has a pane of its own —
+ * the documents' is not the boards', a design's is not its chat's.
+ */
+const paneViewOf = (route: TRoute): string | null => {
+  if (route.kind === ROUTE.site) return `site:${route.id}`;
+  if (route.kind === ROUTE.app) return `app:${route.id}`;
   return null;
 };
 
@@ -623,13 +761,13 @@ const Shell = ({ owner }: IShellProps) => {
   // chat with the sidebar flashes, and the address follows.
   // useRoute keeps the object while the address is the same: the address is what moves these.
   const route = useMemo(() => designPlaceOf(asked), [asked]);
+  useWarmPages();
   useEffect(() => {
     clearPlain(asked.kind === ROUTE.chat ? asked.id : null);
     if (route !== asked) goTo(route, { replace: true });
   }, [asked, route]);
   const me = useMe();
   // The colour of what pops up, the person's setting: until it comes, the default.
-  useNoticeColor(me.k === 'ready' ? me.me.settings.noticeColor : DEFAULT_SETTINGS.noticeColor);
   const now = useClock();
   useCentralList();
   const update = useAppUpdate();
@@ -667,6 +805,43 @@ const Shell = ({ owner }: IShellProps) => {
   const person = personName === null ? null : { name: personName };
 
   const { navigate, openInNewTab } = tabs;
+  // ⌥ Space from anywhere: the voice in the field of the chat on screen; elsewhere the same field rises over the screen
+  // and what is said goes to the last chat.
+  const lastChat = useMemo(
+    () =>
+      [...(model.conversations ?? [])]
+        .filter((c) => !c.parentId)
+        .sort((a, b) => b.lastActivityAt - a.lastActivityAt)[0] ?? null,
+    [model.conversations],
+  );
+  const [voiceFloat, setVoiceFloat] = useState<{ machine: MachineId; conv: ConvId } | null>(null);
+  // «Привет, harnessly» (wake-word.tsx) starts it the same way.
+  const startVoice = useCallback(
+    (byWake: boolean) => {
+      if (byWake) markWakeStart();
+      const inChat = route.kind === ROUTE.chat || route.kind === ROUTE.chatgpt;
+      if (inChat) return askVoiceStart();
+      if (lastChat) setVoiceFloat((was) => was ?? { machine: lastChat.machineId, conv: lastChat.id });
+    },
+    [route.kind, lastChat],
+  );
+  const startByWake = useCallback(() => startVoice(true), [startVoice]);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!event.altKey || event.ctrlKey || event.metaKey || event.code !== 'Space') return;
+      event.preventDefault();
+      // During a talk ⌥ Space goes back to its chat (it belongs to the chat it was started in).
+      const talk = voiceNow();
+      if (talk?.conv) {
+        if (!talk.host || talk.host.getClientRects().length === 0)
+          navigate({ kind: ROUTE.chat, id: talk.conv });
+        return;
+      }
+      startVoice(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [startVoice, navigate]);
   const openChat = useCallback(
     (id: string) => {
       navigate({ kind: ROUTE.chat, id });
@@ -747,6 +922,22 @@ const Shell = ({ owner }: IShellProps) => {
   const term = useAgentTerminal(route.kind === ROUTE.chat ? (record ?? null) : (designRecord ?? null));
   const bg = useChatBackground(stageId && isConvId(stageId) ? stageId : null, chatMachine, now, openChat);
   const present = stageId !== null && chatMachine !== null;
+  // The last chats opened stay mounted, hidden (<Activity>): back to one of them, its feed and field are already drawn
+  // and only show again.
+  const [keptChats, setKeptChats] = useState<readonly IKeptChat[]>([]);
+  const keptSeen = keptChats.reduce((most, kept) => Math.max(most, kept.seen), 0);
+  const onStage =
+    route.kind === ROUTE.chat && queuedOpen === null && stageId !== null && isConvId(stageId) && chatMachine
+      ? { id: stageId, machine: chatMachine }
+      : null;
+  if (onStage) {
+    const was = keptChats.find((kept) => kept.id === onStage.id);
+    const last = was !== undefined && was.seen === keptSeen;
+    if (!last || was.machine !== onStage.machine)
+      setKeptChats(keepChat(keptChats, onStage, last ? keptSeen : keptSeen + 1));
+  }
+  // What a kept chat calls, read when called: a new function each shell render would draw every hidden chat again.
+  const chatCalls = useRef<IChatCalls | null>(null);
 
   // The machine of the open chat holds the open conversation's channel. With the one list of every machine,
   // the start page is the machine the person works on again, so a new chat starts there and not on the last one opened.
@@ -773,6 +964,7 @@ const Shell = ({ owner }: IShellProps) => {
   // (the list the browser kept draws at once, but only the machine's own answer says a chat is not in it)
   const listed = useConvsAnswered(model.active);
   const [missing, setMissing] = useState<string | null>(null);
+  const chatMissing = missing === currentId && !present && queuedOpen === null;
   useEffect(() => {
     if (!currentId || present || !listed) return;
     const timer = setTimeout(() => setMissing(currentId), CHAT_WAIT_MS);
@@ -875,7 +1067,6 @@ const Shell = ({ owner }: IShellProps) => {
     query,
     scope,
     chats: shownChats,
-    projects: model.projects ?? NO_PROJECTS,
     appsGroup,
     now,
   });
@@ -990,14 +1181,44 @@ const Shell = ({ owner }: IShellProps) => {
         {bg.header && <BackgroundButton background={bg.header} />}
       </>
     ) : null;
+  // The pane stays what it was while a page without one is on screen (settings, home, a list): it waits hidden with
+  // its frames (a board of Sinopia, a browser) and comes back at once, not opened anew, which met a frame whose
+  // address had gone stale («hub refused to connect»).
+  const paneLive = route.kind === ROUTE.chat || route.kind === ROUTE.site || route.kind === ROUTE.app;
+  const paneNow = {
+    conv: paneConvOf(route, record ?? null, designRecord ?? null),
+    beside: route.kind === ROUTE.site || route.kind === ROUTE.app,
+    design: route.kind === ROUTE.site ? route.id : null,
+    view: paneViewOf(route),
+  };
+  const [paneHeld, setPaneHeld] = useState(paneNow);
+  if (
+    paneLive &&
+    (paneHeld.conv !== paneNow.conv ||
+      paneHeld.beside !== paneNow.beside ||
+      paneHeld.design !== paneNow.design ||
+      paneHeld.view !== paneNow.view)
+  )
+    setPaneHeld(paneNow);
+  const paneArgs = paneLive ? paneNow : paneHeld;
   const pane = useRightPane(
-    paneConvOf(route, record ?? null, designRecord ?? null),
+    paneArgs.conv,
     machineName,
     term.reveal,
     paneStrip,
-    route.kind === ROUTE.site || route.kind === ROUTE.app,
-    route.kind === ROUTE.site ? route.id : null,
+    paneArgs.beside,
+    paneArgs.design,
+    paneArgs.view,
   );
+  useLayoutEffect(() => {
+    chatCalls.current = {
+      openFile: pane.openFile,
+      openOutput: pane.openOutput,
+      openRef: pane.openRef,
+      showBackground: bg.show,
+      openTerminal: term.reveal,
+    };
+  });
   // A full-screen design has no chat page around it: its chat opens links, files and cards in the pane beside it.
   const designOpeners = {
     onOpenRef: pane.openRef,
@@ -1028,6 +1249,9 @@ const Shell = ({ owner }: IShellProps) => {
     conversations: model.conversations,
     enabled: boot.k !== 'failed' && !noV2 && route.kind === ROUTE.home,
   });
+  // On the phone a swipe from the chat's right side towards the middle brings the right pane up.
+  const paneHeader = route.kind === ROUTE.chat ? pane.header : null;
+  usePaneEdgeSwipe(phone && paneHeader && !paneHeader.open ? paneHeader.onToggle : null);
   // A view of an app that takes the start page's stage under the field: the page of the day it brings.
   const homeStage = useHomeStage(startOn);
   // Not one machine can take a new chat: the field says so instead of a pill with nothing in it.
@@ -1067,16 +1291,12 @@ const Shell = ({ owner }: IShellProps) => {
             navigate({ kind: ROUTE.chatgpt, id });
             setDrawerOpen(false);
           },
-          onNew: () => {
-            setDrawerOpen(false);
-            createGptChat(gptMachine, '', '').then(
-              (chat) => {
-                gptChatsChanged();
-                navigate({ kind: ROUTE.chatgpt, id: chat.id });
-              },
-              () => navigate({ kind: ROUTE.settings, section: 'accounts' }),
-            );
-          },
+          onRename: (id: string, title: string) => renameGptChat(gptMachine, id, title).then(gptChatsChanged),
+          onDelete: (id: string) =>
+            deleteGptChat(gptMachine, id).then(() => {
+              gptChatsChanged();
+              if (route.kind === ROUTE.chatgpt && route.id === id) navigate({ kind: ROUTE.home });
+            }),
         }
       : null;
   const openAppScreen = useCallback(
@@ -1184,6 +1404,7 @@ const Shell = ({ owner }: IShellProps) => {
       onManageMachines={() => openScreen({ kind: ROUTE.settings, section: 'machines' })}
       people={<PeopleBlock machine={noV2 ? null : model.active} />}
       apps={sidebarApps}
+      nav={me.k === 'ready' ? me.me.settings.nav : undefined}
       gpt={sidebarGpt}
       designs={
         workingDesigns && {
@@ -1408,11 +1629,41 @@ const Shell = ({ owner }: IShellProps) => {
       />
       <SecretAskHost machine={boot.k === 'ready' ? model.active : null} />
       <ToastHost />
+      <RolloutBanner />
       <UpdateBanner available={update.available} onReload={update.reload} onDismiss={update.dismiss} />
       <ReleaseNotice release={update.available ? null : release.release} onDismiss={release.dismiss} />
       <WhatsNew ready={boot.k === 'ready'} updating={update.available} />
       <LearnWelcome fresh={boot.k === 'ready' && model.chats !== null && model.chats.length === 0} />
       <TourOverlay />
+      <VoiceLayer />
+      <Suspense fallback={null}>
+        <VoiceBar
+          titleOf={(id) => {
+            const gpt = gptIdOf(id);
+            if (gpt !== null) return gptChats?.find((c) => c.id === gpt)?.title ?? null;
+            return model.conversations?.find((c) => c.id === id)?.title ?? null;
+          }}
+          onBack={(id) => {
+            const gpt = gptIdOf(id);
+            navigate(gpt === null ? { kind: ROUTE.chat, id } : { kind: ROUTE.chatgpt, id: gpt });
+          }}
+          at={JSON.stringify(route)}
+        />
+      </Suspense>
+      {home && (
+        <Suspense fallback={null}>
+          <WakeWord machine={home} onWake={startByWake} />
+        </Suspense>
+      )}
+      {voiceFloat && (
+        <Suspense fallback={null}>
+          <VoiceFloat
+            machine={voiceFloat.machine}
+            conv={voiceFloat.conv}
+            onClose={() => setVoiceFloat(null)}
+          />
+        </Suspense>
+      )}
       {keysHelp}
     </>
   );
@@ -1446,11 +1697,12 @@ const Shell = ({ owner }: IShellProps) => {
       sidebar={sidebar}
       tabs={tabs.strip}
       aside={
-        boot.k !== 'failed' &&
-        !noV2 &&
-        (route.kind === ROUTE.chat || route.kind === ROUTE.site || route.kind === ROUTE.app)
-          ? pane.drawer
-          : homePane.drawer || null
+        <>
+          <Activity mode={boot.k !== 'failed' && !noV2 && paneLive ? 'visible' : 'hidden'}>
+            {pane.drawer}
+          </Activity>
+          {!(boot.k !== 'failed' && !noV2 && paneLive) && (homePane.drawer || null)}
+        </>
       }
       overlays={overlays}
       textSize={me.k === 'ready' ? me.me.settings.textSize : undefined}
@@ -1493,8 +1745,20 @@ const Shell = ({ owner }: IShellProps) => {
               open: notifications !== null,
               onToggle: (anchor) => toggleNotifications(anchor, 'bottom'),
             }}
+            chats={{ list: shownChats, onOpen: openChat }}
           />
         )}
+      {/* The chat read to its end and pulled further: the next active chat, as in Telegram (HRN-1491). */}
+      <NextChatPull
+        enabled={phone && route.kind === ROUTE.chat}
+        chats={shownChats}
+        currentId={currentId}
+        contextOf={(id) => {
+          const conv = conversationsStore.get(id as ConvId);
+          return conv?.recap?.text ?? conv?.lastTurn?.snippet ?? null;
+        }}
+        onOpen={openChat}
+      />
       {(boot.k === 'failed' || noV2) && <BootNotice kind={boot.k === 'failed' ? 'failed' : 'no-v2'} />}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.home && (
         <Greeting
@@ -1547,28 +1811,15 @@ const Shell = ({ owner }: IShellProps) => {
           fromHome={arrival.fromHome}
           side={bg.panel}
           paneOpen={pane.open}
-          missing={
-            missing === currentId && !present && queuedOpen === null ? { onHome: () => goTo(HOME) } : null
-          }
+          missing={chatMissing ? { onHome: () => goTo(HOME) } : null}
         >
           {queuedOpen !== null && <QueuedChatScreen itemId={queuedOpen} />}
-          {queuedOpen === null && present && isConvId(stageId) && chatMachine ? (
-            <ChatView
-              conv={stageId}
-              machine={chatMachine}
-              onOpenFile={pane.openFile}
-              onOpenOutput={pane.openOutput}
-              onOpenRef={pane.openRef}
-              onShowBackground={bg.show}
-              onOpenTerminal={term.reveal}
-              onRetryLoad={() => {
-                // The channel is asked again: the feed's own error is cleared by the next snapshot.
-                hub.client(chatMachine)?.reconnectNow();
-              }}
-            />
-          ) : (
-            queuedOpen === null && <QuietChat />
-          )}
+          {keptChats.map((kept) => (
+            <Activity key={kept.id} mode={kept.id === onStage?.id ? 'visible' : 'hidden'}>
+              <KeptChat conv={kept.id} machine={kept.machine} calls={chatCalls} />
+            </Activity>
+          ))}
+          {queuedOpen === null && !onStage && !chatMissing && <QuietChat />}
         </ChatStage>
       )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.chat && term.panel}

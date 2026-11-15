@@ -1,5 +1,6 @@
 // The model a new chat starts on: what the person picked on this page, else the default of the agent's settings file
 // (Settings → the CLI's page), else the last pick (kept in the browser), and only else the agent's first model.
+import { notePrefWrite } from '@/next/core/pref-write';
 import {
   agentKey,
   choiceAgentKey,
@@ -51,6 +52,7 @@ export const rememberChoice = (choice: IModelChoice) => {
   } catch {
     // Private mode or full storage: the pick lives for this page only.
   }
+  notePrefWrite(LAST_KEY);
 };
 
 /** The fast and permission modes of a choice made in a running chat become the next new chat's, its model staying

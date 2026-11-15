@@ -140,6 +140,57 @@ func TestMeDayStartHour(t *testing.T) {
 	}
 }
 
+// The menu's layout: empty lists by default and for a record written before it, keys of the menu taken, else refused.
+func TestMeNav(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "v2", "me.json")
+	_ = os.MkdirAll(filepath.Dir(file), 0o755)
+	_ = os.WriteFile(file, []byte(`{"settings":{"uiVersion":"next","locale":"en","textSize":"m","enterSends":true},"rev":4}`), 0o600)
+	srv := &wire.Server{Me: &wire.FileMe{Path: file}}
+	_, me := meCall(t, srv, "GET", "/api/v2/me", "")
+	settings, _ := me["settings"].(map[string]any)
+	nav, _ := settings["nav"].(map[string]any)
+	if order, ok := nav["order"].([]any); !ok || len(order) != 0 {
+		t.Fatalf("an older record: %v", me)
+	}
+	for _, bad := range []string{`{"order":null,"hidden":[],"apps":[]}`, `{"order":["a b"],"hidden":[],"apps":[]}`, `{"order":[],"hidden":[],"apps":[],"x":1}`, `[]`} {
+		if code, _ := meCall(t, srv, "PATCH", "/api/v2/me/settings", `{"rev":4,"patch":{"nav":`+bad+`}}`); code == 200 {
+			t.Fatalf("%s taken", bad)
+		}
+	}
+	code, me := meCall(t, srv, "PATCH", "/api/v2/me/settings", `{"rev":4,"patch":{"nav":{"order":["newChat","app:harnessly.boards","apps"],"hidden":["search"],"apps":["harnessly.docs"]}}}`)
+	settings, _ = me["me"].(map[string]any)["settings"].(map[string]any)
+	nav, _ = settings["nav"].(map[string]any)
+	if order, _ := nav["order"].([]any); code != 200 || len(order) != 3 || order[1] != "app:harnessly.boards" {
+		t.Fatalf("patch: %d %v", code, me)
+	}
+}
+
+// The browser-kept choices: empty and not synced for an older record; a known key taken, an unknown one or a missing
+// map refused.
+func TestMePrefs(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "v2", "me.json")
+	_ = os.MkdirAll(filepath.Dir(file), 0o755)
+	_ = os.WriteFile(file, []byte(`{"settings":{"uiVersion":"next","locale":"en","textSize":"m","enterSends":true},"rev":4}`), 0o600)
+	srv := &wire.Server{Me: &wire.FileMe{Path: file}}
+	_, me := meCall(t, srv, "GET", "/api/v2/me", "")
+	settings, _ := me["settings"].(map[string]any)
+	prefs, _ := settings["prefs"].(map[string]any)
+	if values, ok := prefs["values"].(map[string]any); !ok || len(values) != 0 || prefs["synced"] != false {
+		t.Fatalf("an older record: %v", me)
+	}
+	for _, bad := range []string{`{"synced":true,"values":null}`, `{"synced":true,"values":{"evil":"1"}}`, `{"synced":true,"values":{},"x":1}`, `[]`} {
+		if code, _ := meCall(t, srv, "PATCH", "/api/v2/me/settings", `{"rev":4,"patch":{"prefs":`+bad+`}}`); code == 200 {
+			t.Fatalf("%s taken", bad)
+		}
+	}
+	code, me := meCall(t, srv, "PATCH", "/api/v2/me/settings", `{"rev":4,"patch":{"prefs":{"synced":true,"values":{"hl-theme":"dark","voice.lang":"en"}}}}`)
+	settings, _ = me["me"].(map[string]any)["settings"].(map[string]any)
+	prefs, _ = settings["prefs"].(map[string]any)
+	if values, _ := prefs["values"].(map[string]any); code != 200 || prefs["synced"] != true || values["hl-theme"] != "dark" {
+		t.Fatalf("patch: %d %v", code, me)
+	}
+}
+
 // The notices' colour: contrast by default and for a record written before it, contrast or theme taken, else refused.
 func TestMeNoticeColor(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "v2", "me.json")

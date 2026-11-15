@@ -1449,20 +1449,42 @@ html[data-theme='dark'] .hx-dock,
   }
 }
 
-/* an app's view takes the stage under the field (the page of the day it brings). The greeting and the field
-   stand at the top, the view fills the rest of the stage under the dock (greeting.tsx measures it) and scrolls inside
-   itself. */
+/* an app's view takes the stage under the field (the page of the day it brings). The view fills the whole
+   stage and its page starts under the greeting and the field (greeting.tsx measures the dock: --hx-home-under). The
+   greeting and the field scroll away with the page (--hx-home-scroll); once the field is over the top it comes up at the
+   stage's bottom (data-docked) and the page fades out above it, as in the design. */
 .hx-stage[data-home='stage'] {
   --hx-home-top: 136px;
 }
-.hx-stage[data-phase='home'][data-home='stage'] > .hx-dock {
+.hx-stage[data-phase='home'][data-home='stage']:not([data-docked]) > .hx-dock {
   top: var(--hx-home-top);
   bottom: auto;
+  transform: translateY(calc(-1 * var(--hx-home-scroll, 0px)));
+  transition: none;
+}
+.hx-stage[data-phase='home'][data-home='stage'][data-docked] > .hx-dock {
   transform: none;
+}
+.hx-stage[data-phase='home'][data-home='stage'][data-dockpre] > .hx-dock {
+  transform: translateY(calc(100% + 24px));
+  transition: none;
+}
+.hx-stage[data-phase='home'][data-home='stage'][data-dockmove] > .hx-dock {
+  transition: transform 560ms cubic-bezier(0.22, 0.9, 0.3, 1);
+}
+/* The greeting lets the page under it be scrolled (only its links and buttons take a press); docked, it is gone. */
+.hx-stage[data-home='stage'] .hx-dock > .hx-hello {
+  pointer-events: none;
+}
+.hx-stage[data-home='stage'] .hx-dock > .hx-hello :is(a, button) {
+  pointer-events: auto;
+}
+.hx-stage[data-home='stage'][data-docked] .hx-dock > .hx-hello {
+  visibility: hidden;
 }
 .hx-home-stage {
   position: absolute;
-  inset: calc(var(--hx-home-under, calc(var(--hx-home-top) + var(--hx-dock-rest))) + var(--hx-space-3)) 0 0;
+  inset: 0;
   z-index: 1;
   display: flex;
   flex-direction: column;
@@ -1473,9 +1495,34 @@ html[data-theme='dark'] .hx-dock,
   display: flex;
   flex-direction: column;
 }
+/* A view with no page to scroll (its own frame, the day while it loads) stands under the dock. */
+.hx-home-stage > :not(:has([data-home-scroll])) {
+  margin-top: calc(var(--hx-home-under, calc(var(--hx-home-top) + var(--hx-dock-rest))) + var(--hx-space-3));
+}
+.hx-home-stage [data-home-scroll] {
+  padding-top: calc(var(--hx-home-under, calc(var(--hx-home-top) + var(--hx-dock-rest))) + var(--hx-space-5));
+  /* The end of the page scrolls up over the field docked at the bottom. */
+  padding-bottom: calc(var(--hx-home-dock, var(--hx-dock-rest)) + var(--hx-space-5) + 48px);
+}
+.hx-stage[data-home='stage'][data-docked] .hx-home-stage [data-home-scroll] {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - var(--hx-home-dock, var(--hx-dock-rest)) - 72px),
+    transparent calc(100% - var(--hx-home-dock, var(--hx-dock-rest)) - 12px)
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - var(--hx-home-dock, var(--hx-dock-rest)) - 72px),
+    transparent calc(100% - var(--hx-home-dock, var(--hx-dock-rest)) - 12px)
+  );
+}
 @media (max-width: 900px) {
   .hx-stage[data-home='stage'] {
     --hx-home-top: 104px;
+  }
+  /* The greeting over the field is taller with a second line: the field stands under all of it (greeting.tsx measures). */
+  .hx-stage[data-phase='home'][data-home='stage']:not([data-docked]) > .hx-dock {
+    top: max(var(--hx-home-top), calc(var(--hx-home-hello, 0px) + var(--hx-space-8)));
   }
 }
 
@@ -1690,7 +1737,7 @@ html[data-theme='dark'] .hx-dock,
 }
 .hx-ctx__limit {
   position: absolute;
-  left: 95%;
+  left: var(--at, 95%);
   top: -3px;
   bottom: -3px;
   width: 2px;

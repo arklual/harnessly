@@ -2,7 +2,7 @@
 // «Машина …» label, a menu of the machines (one that does not answer says why and cannot be picked).
 import { Menu } from '@base-ui/react/menu';
 import Icon from '@/next/ui/icon';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import type { IMachineChoice } from '@/next/features/sidebar/types';
 import { t } from '@/next/i18n';
 
@@ -16,7 +16,7 @@ const MachinePick = ({ current, choices, onPick }: IMachinePickProps) => {
   const actions = useMenuActions();
   const label = t('next.review.pickMachine');
   return (
-    <Menu.Root actionsRef={actions}>
+    <MenuRoot actionsRef={actions}>
       <Menu.Trigger
         render={
           <button type="button" className="hx-tl__pick" aria-label={label}>
@@ -43,7 +43,7 @@ const MachinePick = ({ current, choices, onPick }: IMachinePickProps) => {
           </Menu.Item>
         ))}
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };
 

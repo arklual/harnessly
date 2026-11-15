@@ -19,10 +19,12 @@ export interface IAgentTerminalProps {
   cwd: string;
   title: string;
   provider: Provider;
+  /** The chat's model: a GPT model run by Claude Code's harness shows GPT's mark, as the field's chip does. */
+  model?: string;
   onClose: () => void;
 }
 
-const AgentTerminal = ({ open, url, cwd, title, provider, onClose }: IAgentTerminalProps) => {
+const AgentTerminal = ({ open, url, cwd, title, provider, model = '', onClose }: IAgentTerminalProps) => {
   const [height, setHeight] = useState(DEFAULT_H);
   const [drag, setDrag] = useState(false);
   const rootRef = useRef<HTMLElement>(null);
@@ -83,11 +85,15 @@ const AgentTerminal = ({ open, url, cwd, title, provider, onClose }: IAgentTermi
         </div>
         <div className="hx-term__head">
           <Icon name="square-terminal" size="sm" />
-          <span className="hx-term__title">{t('next.term.title')}</span>
+          <span className="hx-term__title">{t('next.term.label')}</span>
           <span className="hx-term__path">{cwd}</span>
           <span className="hx-spacer" />
           <span className="hx-term__session">
-            <i className="hx-agent" data-agent={provider} aria-hidden="true" />
+            <i
+              className="hx-agent"
+              data-agent={model.startsWith('gpt-') ? 'gpt' : provider}
+              aria-hidden="true"
+            />
             {title}
           </span>
           <button

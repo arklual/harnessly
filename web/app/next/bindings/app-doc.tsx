@@ -27,7 +27,7 @@ import { t } from '@/next/i18n';
 
 const isConvId = (id: string): id is ConvId => id.startsWith('tab-');
 
-interface IAppDocPageProps {
+export interface IAppDocPageProps {
   machine: MachineId;
   id: string;
   /** The chat the document was opened from: its mode is that chat's (design-mode); null: the address's. */
@@ -151,7 +151,6 @@ const AppDocPage = ({
     title: id,
     pageUrl: '',
     port: null,
-    onOpenDrawer,
     keep: true,
     app: { address, onCreated: () => undefined },
   });

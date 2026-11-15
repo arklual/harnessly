@@ -16,7 +16,7 @@ Everything an app can use, from the one table the manifest check and the bridge 
 | `object-action` | A button at an object (a machine, a chat) that opens the view. |
 | `hub-settings` | A page in the settings of a Hub. |
 | `branding` | The product's name and accent; declared values, no view. |
-| `home` | A block on the start page, under the field of a new chat; with `"height": "stage"` the view takes the whole stage under the field and may put its own greeting over it (hl.slot.greet). |
+| `home` | A block on the start page, under the field of a new chat; with `"height": "stage"` the view takes the whole stage under the field and may put its own greeting over it (hl.slot.greet); with `"feed"` (docs/apps/day-feed.md) the host draws the day itself from that feed instead of the frame. |
 | `sinopia.<kind>` | The editor of one Sinopia document type: panels, selection items, checks, bindings. An alias of the screen of `harnessly.sinopia`. |
 | `sinopia.*` | The editor of every Sinopia document type. An alias of the screen of `harnessly.sinopia`. |
 

@@ -7,6 +7,7 @@ import '@/next/styles/order';
 import { useEffect } from 'react';
 import Shell, { type IShellProps } from '@/next/bindings/shell';
 import { bootNext, shutdownNext } from '@/next/boot';
+import { installPhoneFocusGuard } from '@/next/ui/phone-focus-guard';
 
 const NextEntry = (props: IShellProps) => {
   // Booted once per mount: the owner may arrive after the first draw (a home machine slow to give the start data), and
@@ -15,6 +16,8 @@ const NextEntry = (props: IShellProps) => {
     void bootNext();
     return () => void shutdownNext();
   }, []);
+  // A sheet on the phone never raises the keyboard by itself: only a tap on its field does.
+  useEffect(() => installPhoneFocusGuard(), []);
   return <Shell {...props} />;
 };
 

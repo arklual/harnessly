@@ -177,6 +177,7 @@
       "type": "array",
       "uniqueItems": true
     },
+    "quickEdit": {},
     "secrets": {},
     "settings": {},
     "sinopia": {},
@@ -218,7 +219,7 @@
           },
           {
             "const": "home",
-            "description": "A block on the start page, under the field of a new chat; with `\"height\": \"stage\"` the view takes the whole stage under the field and may put its own greeting over it (hl.slot.greet)."
+            "description": "A block on the start page, under the field of a new chat; with `\"height\": \"stage\"` the view takes the whole stage under the field and may put its own greeting over it (hl.slot.greet); with `\"feed\"` (docs/apps/day-feed.md) the host draws the day itself from that feed instead of the frame."
           },
           {
             "description": "The editor of one Sinopia document type: panels, selection items, checks, bindings.",

@@ -5,6 +5,8 @@ import { usePresence } from '@/next/ui/presence';
 
 /** How long the project chip stays after it is cleared, leaving. */
 const INTO_EXIT_MS = 200;
+/** How long the field takes to come up to the stage's bottom (the design's 560 ms). */
+const DOCK_MOVE_MS = 560;
 
 export interface IGreetingProps {
   /** The person's name; without it the question goes without one. */
@@ -26,8 +28,8 @@ export interface IGreetingProps {
    * up to the top and the view fills the rest.
    */
   stage?: ReactNode;
-  /** The greeting that view put in place of the question; null keeps the host's. */
-  greeting?: { title: string; sub: string } | null;
+  /** The greeting that view put in place of the question; null keeps the host's. Its second line may carry links. */
+  greeting?: { title: string; sub: ReactNode } | null;
 }
 
 /** The start page (`/`): the question in the middle of the stage, the way to continue a terminal session, the field. */
@@ -44,19 +46,73 @@ const Greeting = ({
   const chip = usePresence(into, INTO_EXIT_MS);
   const stageRef = useRef<HTMLDivElement>(null);
   const hasStage = stage !== null;
-  // The view of the stage starts where the dock ends (the field and the tools under it), however tall they grow.
+  // The view of the stage takes the whole stage and its page starts where the dock ends (the field and the tools under
+  // it), however tall they grow. As in the design, the greeting and the field scroll away with the page; once the field
+  // has gone over the top it comes up at the stage's bottom and waits there, and goes back under the greeting when the
+  // page is scrolled back up.
   useEffect(() => {
     const el = stageRef.current;
     const dock = el?.querySelector<HTMLElement>(':scope > .hx-dock');
     if (!hasStage || !el || !dock) return;
-    const place = () => el.style.setProperty('--hx-home-under', `${dock.offsetTop + dock.offsetHeight}px`);
+    const hello = dock.querySelector<HTMLElement>(':scope > .hx-hello');
+    let under = 0;
+    const place = () => {
+      el.style.setProperty('--hx-home-dock', `${dock.offsetHeight}px`);
+      // Docked at the bottom the dock stands elsewhere: the page keeps the place measured under the greeting.
+      if (el.dataset.docked !== undefined) return;
+      // On a narrow screen the field goes down as far as the greeting over it needs (a second line, the way back to a
+      // terminal session), so its first line is never cut; then the page starts where the dock ends.
+      if (hello) el.style.setProperty('--hx-home-hello', `${hello.offsetHeight}px`);
+      under = dock.offsetTop + dock.offsetHeight;
+      el.style.setProperty('--hx-home-under', `${under}px`);
+    };
+    let frame = 0;
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    const dockTo = (down: boolean) => {
+      if ((el.dataset.docked !== undefined) === down) return;
+      clearTimeout(settle);
+      cancelAnimationFrame(frame);
+      if (!down) {
+        delete el.dataset.docked;
+        delete el.dataset.dockpre;
+        delete el.dataset.dockmove;
+        return;
+      }
+      // The field comes up from under the stage's bottom edge, as the design's does.
+      el.dataset.docked = '';
+      el.dataset.dockpre = '';
+      frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(() => {
+          delete el.dataset.dockpre;
+          el.dataset.dockmove = '';
+          settle = setTimeout(() => delete el.dataset.dockmove, DOCK_MOVE_MS);
+        });
+      });
+    };
+    // The page of the stage view says where it is scrolled: the one scroller inside the view that scrolls the page.
+    const onScroll = (e: Event) => {
+      const page = e.target;
+      if (!(page instanceof HTMLElement) || !page.matches('[data-home-scroll]')) return;
+      const y = Math.max(0, page.scrollTop);
+      el.style.setProperty('--hx-home-scroll', `${Math.min(y, under)}px`);
+      dockTo(y > under);
+    };
     place();
     const watch = new ResizeObserver(place);
     watch.observe(dock);
     watch.observe(el);
+    if (hello) watch.observe(hello);
+    el.addEventListener('scroll', onScroll, true);
     return () => {
       watch.disconnect();
-      el.style.removeProperty('--hx-home-under');
+      el.removeEventListener('scroll', onScroll, true);
+      clearTimeout(settle);
+      cancelAnimationFrame(frame);
+      delete el.dataset.docked;
+      delete el.dataset.dockpre;
+      delete el.dataset.dockmove;
+      for (const v of ['--hx-home-under', '--hx-home-hello', '--hx-home-dock', '--hx-home-scroll'])
+        el.style.removeProperty(v);
     };
   }, [hasStage]);
   const hello = (

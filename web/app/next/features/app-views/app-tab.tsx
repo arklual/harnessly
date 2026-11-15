@@ -19,11 +19,21 @@ interface IAppTabProps {
   app: string;
   /** null: the app's first view for the pane. */
   view: string | null;
+  /** One of the app's objects to open (a board's slug); null: the app's home. */
+  object?: string | null;
   /** The inspector under the view: the pane's «Отладка» of a dev install turns it on. */
   inspect?: boolean;
 }
 
-const AppTab = ({ tab, machine, conversation, app: id, view: viewId, inspect = false }: IAppTabProps) => {
+const AppTab = ({
+  tab,
+  machine,
+  conversation,
+  app: id,
+  view: viewId,
+  object = null,
+  inspect = false,
+}: IAppTabProps) => {
   const { list, error } = useInstalledApps(machine);
   const [reload, setReload] = useState(0);
   if (error) return <p className="hx-appview__error">{error}</p>;
@@ -39,6 +49,7 @@ const AppTab = ({ tab, machine, conversation, app: id, view: viewId, inspect = f
         tab={tab}
         app={id}
         view={viewId}
+        object={object}
         reload={reload}
       />
       {inspect && (

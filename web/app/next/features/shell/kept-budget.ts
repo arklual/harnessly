@@ -2,7 +2,7 @@
 // bindings/shell.tsx) and the pane's views and browser tabs (features/app-views/kept-frames.tsx). Each owner tells what
 // it keeps, which of it is on screen and when the rest was last seen; the ones out of sight beyond the device's count
 // go, the least recent first, whoever owns them. What is on screen is never let go.
-import { keptScreensMax } from '@/next/features/shell/kept-screens';
+import { deviceKeptScreensMax, keptScreensMax } from '@/next/features/shell/kept-screens';
 
 export interface IKeptEntry {
   key: string;
@@ -12,7 +12,8 @@ export interface IKeptEntry {
 }
 
 /** Out-of-sight frames the page keeps: the device's count of kept screens less the one on screen. */
-export const keptHiddenMax = (deviceMemory: number | undefined): number => keptScreensMax(deviceMemory) - 1;
+export const keptHiddenMax = (deviceMemory: number | undefined, touch = false): number =>
+  keptScreensMax(deviceMemory, touch) - 1;
 
 /** The keys over the budget: the hidden ones beyond `max`, the least recent first to go. */
 export const overBudget = (entries: readonly IKeptEntry[], max: number): ReadonlySet<string> => {
@@ -49,10 +50,4 @@ export const makeKeptBudget = (max: number) => {
   };
 };
 
-export const keptBudget = makeKeptBudget(
-  keptHiddenMax(
-    typeof navigator === 'undefined'
-      ? undefined
-      : (navigator as Navigator & { deviceMemory?: number }).deviceMemory,
-  ),
-);
+export const keptBudget = makeKeptBudget(deviceKeptScreensMax() - 1);

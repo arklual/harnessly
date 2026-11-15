@@ -887,6 +887,8 @@ export interface Task {
 export interface ConvContext {
   usedTokens: number;
   limitTokens: number;
+  /** Where the agent compacts by itself by its settings; absent where the runtime cannot say. */
+  compactAtTokens?: number;
 }
 /** What the runtime knows of a message by its clientId (GET /api/v2/conversations/{id}/messages?ids=a,b). */
 export const MESSAGE_STATUS_KINDS = ['known', 'unknown', 'expired'] as const;
@@ -1571,6 +1573,8 @@ export interface Turn {
   files: { path: string; op: FileOp }[];
   /** Absent when the turn made nothing to open. */
   outputs?: TurnOutput[];
+  /** The paths of the pictures the turn drew, oldest first; absent when it drew none. */
+  pictures?: string[];
 }
 export interface TurnFailure {
   code: TurnFailureCode;
@@ -2556,6 +2560,7 @@ const turn: Decoder<Turn> = (v, p) => {
           { name: str, mime: str, size: int, sha256: str },
         ),
       ),
+      pictures: array(str),
     },
   )(v, p);
   if ((t.status === 'failed') !== (t.failure !== null))
@@ -2694,7 +2699,7 @@ const designlyChat: Decoder<DesignlyChat> = object({ id, conv: convId });
 
 const taskStatus = oneOf(TASK_STATUSES);
 const task: Decoder<Task> = object({ id, subject: str, status: taskStatus });
-const convContext: Decoder<ConvContext> = object({ usedTokens: int, limitTokens: int });
+const convContext: Decoder<ConvContext> = object({ usedTokens: int, limitTokens: int }, { compactAtTokens: int });
 const messageHit: Decoder<MessageHit> = object({
   convId,
   entryId,

@@ -5,7 +5,7 @@ import { Menu } from '@base-ui/react/menu';
 import { useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react';
 import { openOutside } from '@/next/features/chat/pane-sites';
 import Icon from '@/next/ui/icon';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import { toast } from '@/next/ui/toast';
 import { afterTouchClick } from '@/next/ui/use-drag';
 import { t } from '@/next/i18n';
@@ -101,7 +101,7 @@ export const useLinkMenu = ({ href, onPane, outside }: ILinkMenuActions) => {
   const held = (): boolean => heldClick.current;
 
   const menu = at && (
-    <Menu.Root open={open} onOpenChange={setOpen} actionsRef={actions}>
+    <MenuRoot open={open} onOpenChange={setOpen} actionsRef={actions}>
       <MenuPanel
         actions={actions}
         className="hx-cmenu"
@@ -127,7 +127,7 @@ export const useLinkMenu = ({ href, onPane, outside }: ILinkMenuActions) => {
           <span className="hx-cmenu__txt">{t('next.link.copy')}</span>
         </Menu.Item>
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 
   return { handlers, held, menu };

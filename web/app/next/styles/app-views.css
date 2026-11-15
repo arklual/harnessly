@@ -363,6 +363,18 @@
   gap: var(--hx-space-4);
   width: 100%;
   height: 100%;
+  /* A view that is up within ~300 ms never shows its skeleton: no flash between the boards and the documents. */
+  animation: hx-spacewait-in 0.2s ease-out 0.3s both;
+}
+@keyframes hx-spacewait-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-spacewait {
+    animation-duration: 0.01s;
+  }
 }
 .hx-spacewait__page {
   height: 100%;
@@ -409,4 +421,18 @@
 /* The place of a kept browser tab: the pane's body is a block, and the tab takes its whole height, as it did in it. */
 .hx-keptslot--browser {
   height: 100%;
+}
+
+/* The spaces' windows on one stage: the one on screen in the flow, the others kept alive under it, out of
+   sight, so going back to them loads nothing. */
+.hx-spaceframe {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.hx-spaceframe[data-on='false'] {
+  visibility: hidden;
+  pointer-events: none;
 }

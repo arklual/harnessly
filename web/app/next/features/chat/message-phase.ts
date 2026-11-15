@@ -8,6 +8,12 @@ import type { LocalMessageState, Ms } from '@/next/features/chat/types';
 import { usePresentFlag, type TPresenceState } from '@/next/ui/presence';
 
 export const SEND_SLOW_MS = 3000;
+/**
+ * A message the runtime still has not confirmed after this long says why, honestly: the machine is busy and
+ * the agent is still starting. It is not a failure — the runtime is still at it and says «не отправлено» with its own
+ * «Повторить» if it gives up; a retry from the page now would only send it twice.
+ */
+export const SEND_STALLED_MS = 60_000;
 /** A sent message that still stands in the feed on its own (its turn does not show it) goes this long after it was sent. */
 export const SENT_FADE_MS = 10_000;
 /** How long it takes to leave (hx-msg-out in chat.css). */
@@ -17,6 +23,8 @@ export const MESSAGE_PHASE = {
   draft: 'draft',
   sending: 'sending',
   slow: 'slow',
+  /** Still not confirmed after SEND_STALLED_MS: the machine is busy, the agent is still starting. */
+  stalled: 'stalled',
   waitingNet: 'waiting-net',
   /** The machine did not answer (or is not there): the message waits for it and goes by itself. */
   waitingMachine: 'waiting-machine',
@@ -58,6 +66,7 @@ export const messagePhase = (
   if (offline && (state.k === 'submitting' || state.k === 'uploading')) return MESSAGE_PHASE.waitingNet;
   if (waitsMachine && state.k === 'submitting') return MESSAGE_PHASE.waitingMachine;
   // «Not confirmed» is the runtime's to say, by its own deadline (failed{unconfirmed}); the page has no term of its own.
+  if (now - since >= SEND_STALLED_MS) return MESSAGE_PHASE.stalled;
   if (now - since >= SEND_SLOW_MS) return MESSAGE_PHASE.slow;
   return MESSAGE_PHASE.sending;
 };
@@ -73,6 +82,7 @@ export const nextPhaseIn = (
 ): number | null => {
   const phase = messagePhase(state, since, now, offline, handed, waitsMachine);
   if (phase === MESSAGE_PHASE.sending) return since + SEND_SLOW_MS - now;
+  if (phase === MESSAGE_PHASE.slow) return since + SEND_STALLED_MS - now;
   return null;
 };
 

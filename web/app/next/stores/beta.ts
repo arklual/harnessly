@@ -1,5 +1,6 @@
 // «Бета» (Settings → Beta): features that are not ready for everyone, off until the person turns them on. This
 // browser's, as the theme and the feed's cards are.
+import { notePrefWrite } from '@/next/core/pref-write';
 import { useSyncExternalStore } from 'react';
 
 export const BETA_FLAGS = ['retitle', 'multiModel', 'hubFirst', 'chatNav', 'chatShare'] as const;
@@ -53,6 +54,7 @@ export const setBeta = (flag: BetaFlag, on: boolean): void => {
     // Private mode or a full storage: the choice holds for this page.
   }
   for (const listener of [...listeners]) listener();
+  notePrefWrite(KEY);
 };
 
 export const useBeta = (): BetaFlags =>

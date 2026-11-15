@@ -66,6 +66,11 @@ type meta struct {
 	TeamLevel  string
 	CreatedAt  int64
 	UpdatedAt  int64
+	// Kind is artifact or board, "" for a record made before the hub kept it.
+	Kind string
+	// TrashedAt (ms) and TrashedBy: the record is in the trash, 0 when it is not; such a record opens for nobody.
+	TrashedAt int64
+	TrashedBy string
 }
 
 func ts(ms int64) string { return time.UnixMilli(ms).UTC().Format(time.RFC3339) }
@@ -131,12 +136,14 @@ func (s *Service) reachOf(ctx context.Context, p *auth.Principal) reach {
 	return reachPerson(p.User.ID, p.User.Email, proved)
 }
 
-const metaCols = `slug, COALESCE(space_id, ''), owner_email, owner_name, machine_id, source_path, title, team_level, created_at, updated_at`
+const metaCols = `slug, COALESCE(space_id, ''), owner_email, owner_name, machine_id, source_path, title, team_level, created_at, updated_at,
+	COALESCE(kind, ''), COALESCE(trashed_at, 0), COALESCE(trashed_by, '')`
 
 func scanMeta(row interface{ Scan(...any) error }) (meta, error) {
 	var m meta
 	var machine, src sql.NullString
-	err := row.Scan(&m.Slug, &m.SpaceID, &m.OwnerEmail, &m.OwnerName, &machine, &src, &m.Title, &m.TeamLevel, &m.CreatedAt, &m.UpdatedAt)
+	err := row.Scan(&m.Slug, &m.SpaceID, &m.OwnerEmail, &m.OwnerName, &machine, &src, &m.Title, &m.TeamLevel, &m.CreatedAt, &m.UpdatedAt,
+		&m.Kind, &m.TrashedAt, &m.TrashedBy)
 	m.MachineID, m.SourcePath = machine.String, src.String
 	return m, err
 }

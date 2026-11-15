@@ -4,6 +4,7 @@
 // screen, the panel's mode and tab, the selected and hovered block, the open popover or sheet — and talks to the board
 // on screen through the deck bridge: it turns the board's deck mode on, writes hand edits (text, style, move) into the
 // board's source through the patch route, and shows the frame, grip and guides of the blocks.
+import { useLiveHint, useLiveMark } from '@/next/features/voice-live/live-mark';
 import { tourSignal } from '@/next/stores/tour';
 import { placeOf } from '@/next/features/keys/chord';
 import { pressKey } from '@/next/features/designly/sdk/keys';
@@ -353,7 +354,9 @@ const DeckView = (props: IDeckViewProps) => {
         : null,
     );
   }, [onPick, sel, pickedPath, edit]);
-  const ctx: IDeckContext | null = drawn ? { slide: n, label: sel?.label ?? null } : null;
+  const ctx: IDeckContext | null = drawn
+    ? { slide: n, label: sel?.label ?? null, tpl: sel?.tpl ?? null }
+    : null;
   const ctxLabel = sel
     ? `${t('next.deck.stage.slide', { n })} · ${sel.label}`
     : t('next.deck.stage.slide', { n });
@@ -590,6 +593,24 @@ const DeckView = (props: IDeckViewProps) => {
     // post reads the frame on screen through a ref; the runs and the slide say when to tell the board.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runs, slide?.id, id, painted]);
+
+  // The ring of the voice's quick edit on its block of the slide (live-mark.ts).
+  const live = useLiveMark();
+  const liveTpl = useRef<number | null>(null);
+  useEffect(() => {
+    const tpl = live?.tpl ?? liveTpl.current;
+    liveTpl.current = live?.tpl ?? null;
+    if (tpl !== null) post({ type: 'tk:live', tpl, phase: live?.phase ?? null });
+    // post reads the frame on screen through a ref; the mark and the slide say when to tell the board.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live, slide?.id, painted]);
+
+  const liveHint = useLiveHint();
+  useEffect(() => {
+    if (liveHint) post({ type: 'tk:live-find', hint: liveHint.hint });
+    // post reads the frame on screen through a ref; a new hint says when to tell the board.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveHint]);
 
   /** A block's move as written: board px, in px where the block sits in a container of its own. */
   const movePatch = (d: IDeckDrag): TDeckPatch =>

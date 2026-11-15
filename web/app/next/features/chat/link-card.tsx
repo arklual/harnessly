@@ -4,6 +4,7 @@
 // ⌘/Ctrl-click opens it in a new tab of the browser, and a right click or a held finger opens the link's menu.
 import { useContext } from 'react';
 import { useLinkMenu } from '@/next/features/chat/link-menu';
+import { previewSrc, useLinkCardMeta, whenText } from '@/next/features/chat/link-card-meta';
 import { openOutside } from '@/next/features/chat/pane-sites';
 import { isOutsideClick, RefContext } from '@/next/features/chat/ref-chip';
 import { appConfig, type IAppConfig } from '@/platform/config';
@@ -52,6 +53,31 @@ export const cardKindOf = (
   return null;
 };
 
+/** The slug of a link to a board of the installation's boards service; null for any other link. */
+export const boardSlugOf = (
+  href: string,
+  config: Pick<IAppConfig, 'boardsUrl'> = appConfig(),
+): string | null => {
+  const url = parse(href);
+  const boards = parse(config.boardsUrl);
+  if (!url || !boards || url.origin !== boards.origin) return null;
+  const m = BOARD_PATH.exec(url.pathname);
+  return m && m[1] !== 'api' && m[1] !== 'app' ? m[1] : null;
+};
+
+/** The slug of a link to one of our documents or boards: what the hub's card is asked by; null for any other. */
+export const cardSlugOf = (
+  href: string,
+  config: Pick<IAppConfig, 'artifactsUrl' | 'boardsUrl' | 'readerUrl'> = appConfig(),
+): string | null => {
+  const kind = cardKindOf(href, config);
+  const url = parse(href);
+  if (kind === null || url === null) return null;
+  if (kind === 'board') return boardSlugOf(href, config);
+  const last = url.pathname.split('/').filter(Boolean).pop() ?? '';
+  return new RegExp(String.raw`^${SLUG}$`).test(last) ? last : null;
+};
+
 const ICONS = { doc: 'file-text', board: 'workflow' } as const satisfies Record<TCardKind, string>;
 
 /** The name the card shows: the link's text, else the last part of its path. */
@@ -74,14 +100,31 @@ interface ILinkCardProps {
 const LinkCard = ({ kind, href, text }: ILinkCardProps) => {
   const { onOpen } = useContext(RefContext);
   const host = new URL(href).host;
+  // What the hub says of it, for a person who may read it: the name, who changed it last and when.
+  const slug = cardSlugOf(href);
+  const meta = useLinkCardMeta(slug);
+  const line = meta
+    ? [t(`next.rich.link.${kind}`), meta.editor, whenText(meta.editedAt)].filter(Boolean).join(' · ')
+    : `${t(`next.rich.link.${kind}`)} · ${host}`;
   const body = (
     <>
-      <span className="hx-file__ico" data-tone="accent">
-        <Icon name={ICONS[kind]} />
-      </span>
+      {meta?.preview && slug ? (
+        <span className="hx-file__ico hx-linkcard__thumb">
+          <img src={previewSrc(slug)} alt="" loading="lazy" decoding="async" />
+        </span>
+      ) : meta?.page && slug ? (
+        <span className="hx-file__ico hx-linkcard__thumb hx-linkcard__thumb--page" aria-hidden="true">
+          <iframe src={previewSrc(slug)} title="" sandbox="allow-scripts" loading="lazy" tabIndex={-1} />
+        </span>
+      ) : (
+        <span className="hx-file__ico" data-tone="accent">
+          <Icon name={ICONS[kind]} />
+        </span>
+      )}
       <span className="hx-file__text">
-        <span className="hx-file__name">{cardTitle(href, text)}</span>
-        <span className="hx-file__meta">{`${t(`next.rich.link.${kind}`)} · ${host}`}</span>
+        <span className="hx-file__name">{meta?.title ?? cardTitle(href, text)}</span>
+        <span className="hx-file__meta">{line}</span>
+        {meta?.excerpt ? <span className="hx-linkcard__excerpt">{meta.excerpt}</span> : null}
       </span>
     </>
   );

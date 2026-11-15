@@ -22,6 +22,8 @@ import { SCOPE, connScope, countIn, inScope, scopeEmpty } from '@/next/features/
 import { matching, termsOf } from '@/next/features/search/terms';
 import { isQuestion } from '@/next/features/search/terms';
 import { pinLocale, t } from '@/next/i18n';
+import { recentChats, searchChats } from '@/next/features/search/search-chats';
+import type { ISidebarChat } from '@/next/features/sidebar/types';
 import { PortalContext } from '@/next/ui/portal';
 import { ToastHost, toast } from '@/next/ui/toast';
 import '@/next/styles/order';
@@ -44,29 +46,48 @@ const row = (
   more: Partial<ISearchRow> = {},
 ): ISearchRow => ({ id, kind, icon, title, meta: '', ...more });
 
-const CHATS: ISearchRow[] = [
-  row('tab-a1', 'chat', 'message-square', 'Корзина: скидка не применяется к подарочным наборам', {
-    meta: 'Магазин',
-    preview: { kind: 'Чат', text: '' },
-    subject: { k: 'chat', id: 'tab-a1' },
-  }),
-  row('tab-a2', 'chat', 'message-square', 'Экспорт отчёта в PDF: поля и нумерация страниц', {
-    meta: 'Отчёты',
-    preview: { kind: 'Чат', text: '' },
-    subject: { k: 'chat', id: 'tab-a2' },
-  }),
-  row(
-    'tab-a3',
-    'chat',
-    'message-square',
-    'Очень длинное название чата, которое не помещается в строку списка и обрезается многоточием, а справа видно целиком',
-    { meta: 'Магазин', preview: { kind: 'Чат', text: '' }, subject: { k: 'chat', id: 'tab-a3' } },
+const NOW = Date.now();
+const MIN = 60_000;
+const HOUR = 60 * MIN;
+const DAY_MS = 24 * HOUR;
+const seedChat = (id: string, title: string, ago: number, parentId?: string): ISidebarChat => ({
+  id,
+  title,
+  status: 'none',
+  pinned: false,
+  projectId: null,
+  createdAt: NOW - ago,
+  lastPromptAt: NOW - ago,
+  lastActivityAt: NOW - ago,
+  terminal: false,
+  canStopTerminal: false,
+  ...(parentId ? { parentId } : {}),
+});
+
+/** The person's chats over two months and two an agent delegated (the search leaves those out): ordered and parted by use. */
+const CHAT_SEED: readonly ISidebarChat[] = [
+  seedChat('tab-a1', 'Корзина: скидка не применяется к подарочным наборам', 12 * MIN),
+  seedChat(
+    'tab-a5',
+    'Проверить скидку на наборах в мобильной корзине (подчат — в поиске не виден)',
+    40 * MIN,
+    'tab-a1',
   ),
-  row('tab-a4', 'chat', 'message-square', 'Миграция таблицы заказов', {
-    preview: { kind: 'Чат', text: '' },
-    subject: { k: 'chat', id: 'tab-a4' },
-  }),
+  seedChat('tab-a2', 'Экспорт отчёта в PDF: поля и нумерация страниц', 3 * HOUR),
+  seedChat(
+    'tab-a3',
+    'Очень длинное название чата, которое не помещается в строку списка и обрезается многоточием, а справа видно целиком',
+    DAY_MS + 2 * HOUR,
+  ),
+  seedChat('tab-a4', 'Миграция таблицы заказов', 3 * DAY_MS),
+  seedChat('tab-a6', 'Аналитика v2 — фильтры по периодам и сравнение с прошлым годом', 4 * DAY_MS),
+  seedChat('tab-a7', 'Тесты оплаты: повторный платёж после отказа банка', 5 * DAY_MS, 'tab-a4'),
+  seedChat('tab-a8', 'Скидка по промокоду не суммируется с бонусами', 9 * DAY_MS),
+  seedChat('tab-a9', 'Онбординг: письмо после регистрации', 20 * DAY_MS),
+  seedChat('tab-a10', 'Ревью вёрстки страницы заказа', 45 * DAY_MS),
+  seedChat('tab-a11', 'Справочник складов и остатков', 400 * DAY_MS),
 ];
+const CHATS = recentChats(CHAT_SEED, true, NOW);
 
 const DESIGNS: ISearchRow[] = [
   row('design:shop', 'board', 'pen-tool', 'Магазин — корзина и оплата', {
@@ -310,7 +331,7 @@ const SearchGallery = () => {
     const settings = settingRows(limitOn, stop);
     return [
       { id: SCOPE.settings, label: 'Настройки', rows: settings },
-      { id: SCOPE.chats, label: 'Чаты', rows: CHATS },
+      { id: SCOPE.chats, label: '', rows: CHATS },
       { id: SCOPE.designs, label: 'Макеты', rows: DESIGNS },
       { id: SCOPE.docs, label: 'Документы', rows: DOCS },
       { id: SCOPE.apps, label: 'Приложения', rows: APPS },
@@ -322,10 +343,11 @@ const SearchGallery = () => {
   const found = useMemo(() => {
     const terms = termsOf(query);
     return all
-      .map((group) => ({
-        ...group,
-        rows: matching(group.rows, terms, (item) => [item.title, item.snippet ?? '']),
-      }))
+      .flatMap((group) =>
+        group.id === SCOPE.chats
+          ? searchChats(CHAT_SEED, query, terms, NOW)
+          : [{ ...group, rows: matching(group.rows, terms, (item) => [item.title, item.snippet ?? '']) }],
+      )
       .filter((group) => group.rows.length > 0);
   }, [all, query]);
 
@@ -337,7 +359,9 @@ const SearchGallery = () => {
         {
           id: 'go-on',
           label: 'Продолжить',
-          rows: [...CHATS.slice(0, 3), DESIGNS[0], DOCS[0]].flatMap((r) => r ?? []),
+          rows: [...recentChats(CHAT_SEED, false, NOW).slice(0, 3), DESIGNS[0], DOCS[0]].flatMap(
+            (r) => r ?? [],
+          ),
         },
       ];
     const label = scope.startsWith('conn:') ? 'Открыто сейчас' : undefined;

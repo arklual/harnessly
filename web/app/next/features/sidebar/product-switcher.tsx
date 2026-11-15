@@ -3,7 +3,7 @@
 import { Menu } from '@base-ui/react/menu';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 
 interface IProductSwitcherProps {
   brand: string;
@@ -14,7 +14,7 @@ interface IProductSwitcherProps {
 const ProductSwitcher = ({ brand, hubHref }: IProductSwitcherProps) => {
   const menuActions = useMenuActions();
   return (
-    <Menu.Root actionsRef={menuActions}>
+    <MenuRoot actionsRef={menuActions}>
       <Menu.Trigger className="hx-brand__name hx-brand__switch" aria-label={t('next.sidebar.switcher')}>
         <span>{brand}</span>
         <Icon name="chevrons-up-down" size="sm" className="hx-brand__chev" />
@@ -43,7 +43,7 @@ const ProductSwitcher = ({ brand, hubHref }: IProductSwitcherProps) => {
           <Icon name="check" size="sm" className="hx-cmenu__check" />
         </Menu.Item>
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };
 

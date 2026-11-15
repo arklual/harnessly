@@ -85,6 +85,9 @@ func (b *hubBackoff) nextReplaced() time.Duration {
 	return window/2 + time.Duration(b.random()*float64(window/2))
 }
 
+// planned is told the hub ended the link on purpose: the next pause is the shortest again.
+func (b *hubBackoff) planned() { b.window = 0 }
+
 // ended is told how long a link lived: only one that settled brings the pauses back to the shortest.
 func (b *hubBackoff) ended(lived time.Duration) {
 	if lived >= hubLinkSettled {
@@ -192,6 +195,10 @@ func (h *hub) dialOnce(ctx context.Context, pause *hubBackoff) (time.Duration, b
 	case hubproto.CloseReplaced:
 		// A newer link of this machine took over: call again, later each time it happens in a row.
 		return pause.nextReplaced(), false
+	case websocket.StatusGoingAway:
+		// The hub closed the link on purpose (a replica that stops moves its machines): it is no failure, and the next
+		// call goes out within a second however short this link was.
+		pause.planned()
 	}
 	return 0, false
 }

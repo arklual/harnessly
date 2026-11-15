@@ -12,6 +12,8 @@ export const DECK_MODE = { edit: 'edit', show: 'show', rec: 'rec', guest: 'guest
 export type TDeckMode = (typeof DECK_MODE)[keyof typeof DECK_MODE];
 
 /** Host → board. */
+import type { TLivePhase } from '@/next/features/voice-live/live-mark';
+
 export type TDeckHostMessage =
   | { type: 'tk:deck'; on: boolean; mode: TDeckMode }
   | { type: 'tk:deck-step'; n: number }
@@ -24,6 +26,10 @@ export type TDeckHostMessage =
   | { type: 'tk:deck-pointer'; on: boolean }
   /** A veil over the element while a picture is drawn into it (works on a canvas board too). */
   | { type: 'tk:gen'; tpl: number; on: boolean }
+  /** The ring of the voice's quick edit on a block (live-mark.ts); null takes it away. */
+  | { type: 'tk:live'; tpl: number; phase: TLivePhase | null }
+  /** The changed lines of an edit without a picked block: the board flashes the block they make. */
+  | { type: 'tk:live-find'; hint: string }
   /** Whether the page draws its buttons on pictures («Изменить», «Сгенерировать»): on while the person may change them. */
   | { type: 'tk:images'; on: boolean; scale: number }
   /** Ends the edit in place (the phone sheet's «Готово», the host's Esc): the board says the text and deselects. */

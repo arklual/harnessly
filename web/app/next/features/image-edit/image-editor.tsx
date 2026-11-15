@@ -41,13 +41,10 @@ import {
   type TTool,
 } from '@/next/features/image-edit/tool-rules';
 import type { IMarkupTarget } from '@/next/features/image-edit/to-composer';
+import { MARKUP_TOOL } from '@/next/features/image-edit/markup';
 import { useMarkup } from '@/next/features/image-edit/use-markup';
 import { t } from '@/next/i18n';
-import ImageView, {
-  IMAGE_VIEW_EXIT_MS,
-  type IImageViewEdit,
-  type IImageViewItem,
-} from '@/next/ui/image-view';
+import ImageView, { IMAGE_VIEW_EXIT_MS, type IImageViewItem } from '@/next/ui/image-view';
 import { usePresence } from '@/next/ui/presence';
 
 /** A new version comes in from blur over this long (image-edit.css). */
@@ -186,6 +183,7 @@ const Editor = ({
     natural: s.natural,
     onClose,
     switcher,
+    startTool: MARKUP_TOOL.pen,
   });
 
   // The versions the host knows (a chat's come from the machine, so they outlive a reload); a run that was going on
@@ -306,6 +304,7 @@ const Editor = ({
         busy: running,
         fresh: s.fresh,
         locked: marking ? markup.locked : drawing,
+        steps: marking,
         layer: marking ? markup.layer : overlay || undefined,
         onLoad: (natural) => patch({ natural }),
         onBack: () => {
@@ -354,14 +353,11 @@ const Editor = ({
   );
 };
 
-/** The marks' tools leave over this long (image-edit.css .hx-ie__in). */
-const MARKUP_EXIT_MS = 160;
-
 const NO_TARGET: IMarkupTarget = { replacing: false, give: () => undefined };
 
 /**
- * A picture only the person marks (no model to change it): the plain viewer with «Пометить» by the cross, which puts the
- * marks' tools under the picture; Esc with no tool on goes back to looking.
+ * A picture only the person marks (no model to change it): the viewer with the marks' tools under the picture from the
+ * start, the pen on, so the first stroke marks it. Stepping and closing keep the unsent marks as the picture's draft.
  */
 const MarkupEditor = ({
   item,
@@ -371,43 +367,33 @@ const MarkupEditor = ({
   annotate,
 }: IImageEditViewProps & { annotate: IMarkupTarget }) => {
   const [natural, setNatural] = useState<{ src: string; w: number; h: number } | null>(null);
-  const [marking, setMarking] = useState<string | null>(null);
   // The picture it shows, kept through the viewer's exit so the layout does not change while it leaves.
   const [last, setLast] = useState<IImageViewItem | null>(item);
-  if (item !== null && item !== last) {
-    // Opened again: it opens for looking.
-    if (last === null) setMarking(null);
-    setLast(item);
-  }
+  if (item !== null && item !== last) setLast(item);
   const shownItem = item ?? last;
   const src = shownItem?.src ?? '';
-  // Another picture (a step): back to looking.
-  const on = marking !== null && marking === src;
-  const tools = usePresence(on ? src : null, MARKUP_EXIT_MS);
   const size = natural !== null && natural.src === src ? natural : null;
-  const markup = useMarkup({ src, name: shownItem?.name ?? '', target: annotate, natural: size, onClose });
-  const edit: IImageViewEdit = {
-    ...markup,
-    dock: (
-      <div className="hx-ie__in" data-state={tools.state}>
-        {markup.dock}
-      </div>
-    ),
-    onLoad: (loaded) => setNatural({ src, ...loaded }),
-    onBack: () => {
-      if (markup.onBack?.() === true) return true;
-      setMarking(null);
-      return true;
-    },
-  };
+  const markup = useMarkup({
+    src,
+    name: shownItem?.name ?? '',
+    target: annotate,
+    natural: size,
+    onClose,
+    startTool: MARKUP_TOOL.pen,
+  });
   return (
     <ImageView
       item={item}
       onClose={onClose}
       position={position}
       onStep={onStep}
-      edit={tools.value !== null ? edit : undefined}
-      action={{ icon: 'pencil', label: t('next.imageEdit.part.markup'), onClick: () => setMarking(src) }}
+      edit={{
+        ...markup,
+        steps: true,
+        onLoad: (loaded) => setNatural({ src, ...loaded }),
+        // Esc closes; the marks stay as the draft.
+        onBack: () => false,
+      }}
     />
   );
 };

@@ -207,6 +207,38 @@ func MessageHash(text string) string {
 	return hex.EncodeToString(sum[:8])
 }
 
+// JoinedIn: a user entry of the transcript holds this message as one of several. Claude reads the messages waiting in
+// its queue at once, as one prompt of their texts one after another, a line apart (14.11, HRN-1470: two steered messages
+// came as one `queued_command`). The message is a whole run of the entry's lines — not merely a part of a line — and
+// not the whole entry (that is SameMessage's case).
+func JoinedIn(entry, text string) bool {
+	m := noSpace(claudeImageRE.ReplaceAllString(text, " "))
+	if m == "" || !strings.Contains(entry, "\n") {
+		return false
+	}
+	lines := strings.Split(entry, "\n")
+	norm := make([]string, len(lines))
+	for i, l := range lines {
+		norm[i] = noSpace(claudeImageRE.ReplaceAllString(l, " "))
+	}
+	for i := range norm {
+		if norm[i] == "" || !strings.HasPrefix(m, norm[i]) {
+			continue
+		}
+		rest := m
+		for j := i; j < len(norm); j++ {
+			if !strings.HasPrefix(rest, norm[j]) {
+				break
+			}
+			rest = rest[len(norm[j]):]
+			if rest == "" {
+				return m != strings.Join(norm, "")
+			}
+		}
+	}
+	return false
+}
+
 // CutShort: a user entry of the transcript is the start of this message and not all of it — Claude took the box while
 // the paste was still coming in (a loaded machine) and read the rest as gone. Long enough not to be a coincidence.
 func CutShort(entry, text string) bool {

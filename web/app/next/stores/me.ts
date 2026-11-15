@@ -29,6 +29,10 @@ export interface VoiceSettings {
 export const NOTICE_COLORS = ['contrast', 'theme'] as const;
 export type TNoticeColor = (typeof NOTICE_COLORS)[number];
 
+export const VOICE_MASCOTS = ['h', 'face'] as const;
+/** The voice agent's head in the field: `h` — the «h» (the default), `face` — «Головка». */
+export type TVoiceMascot = (typeof VOICE_MASCOTS)[number];
+
 export interface PersonSettings {
   uiVersion: 'legacy' | 'next';
   locale: 'ru' | 'en';
@@ -37,6 +41,8 @@ export interface PersonSettings {
   /** What pops up (notices, toasts): `contrast` — the other of the theme (dark on light, light on dark); `theme` — the
    *  theme's own. */
   noticeColor: TNoticeColor;
+  /** The voice agent's head in the field while the voice is on. */
+  voiceMascot: TVoiceMascot;
   enterSends: boolean;
   defaultMachine: MachineId | null;
   notify: { types: string[]; sound: boolean; dnd: boolean };
@@ -46,6 +52,26 @@ export interface PersonSettings {
   voice: VoiceSettings;
   /** The Moscow hour the person's day starts at (0–23): «today» of the agent's spend counts from it. */
   dayStartHour: number;
+  /** The sidebar menu's layout (features/sidebar/nav-layout): empty lists are the default one. */
+  nav: NavSettings;
+  /** The choices a page keeps in its browser too, for every device (stores/synced-prefs.ts). */
+  prefs: PrefsSettings;
+}
+
+/** The browser-kept choices: the browser's own value of each by its key; `synced` once a page moved its ones in. */
+export interface PrefsSettings {
+  synced: boolean;
+  values: Record<string, string>;
+}
+
+/** The sidebar menu's layout: a key is an item («newChat», «search», «designly», «apps») or an app («app:<id>»). */
+export interface NavSettings {
+  /** The top level, in order; an app's key here stands at the top level instead of under «Приложения». */
+  order: string[];
+  /** The keys not shown, at the top level or under «Приложения». */
+  hidden: string[];
+  /** The order of the apps under «Приложения» (ids), above the ones it does not name. */
+  apps: string[];
 }
 
 export interface Me {
@@ -69,7 +95,8 @@ export const DEFAULT_SETTINGS: PersonSettings = {
   locale: 'ru',
   density: 'compact',
   textSize: 'm',
-  noticeColor: 'contrast',
+  noticeColor: 'theme',
+  voiceMascot: 'h',
   enterSends: true,
   defaultMachine: null,
   notify: { types: ['turn-finished', 'question', 'permission'], sound: false, dnd: false },
@@ -77,6 +104,8 @@ export const DEFAULT_SETTINGS: PersonSettings = {
   keys: {},
   voice: { engine: 'local', words: [] },
   dayStartHour: 3,
+  nav: { order: [], hidden: [], apps: [] },
+  prefs: { synced: false, values: {} },
 };
 
 export type PatchResult =
@@ -180,6 +209,13 @@ export const useEnterSends = (): boolean => {
 export const useDayStartHour = (): number => {
   const me = useMe();
   return me.k === 'ready' ? me.me.settings.dayStartHour : DEFAULT_SETTINGS.dayStartHour;
+};
+
+/** The voice agent's head (Settings → Voice); until the settings are known, the default one. */
+export const useVoiceMascot = (): TVoiceMascot => {
+  const me = useMe();
+  const kind = me.k === 'ready' ? me.me.settings.voiceMascot : DEFAULT_SETTINGS.voiceMascot;
+  return VOICE_MASCOTS.includes(kind) ? kind : DEFAULT_SETTINGS.voiceMascot;
 };
 
 /** The dictation's settings: the model and the person's words; until the settings are known, the machine's own model. */

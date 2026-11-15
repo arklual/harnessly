@@ -233,3 +233,16 @@ func replicaKeyCheck(cfg *config.Config) error {
 	}
 	return nil
 }
+
+// appTokenSubject checks a platform token of a person the hub signed for an app's backend at audience and answers the
+// person's id: what lets the documents and boards services act for the person who opened them (docs/manage.go).
+func (h *Hub) appTokenSubject(token, audience string) (string, error) {
+	if h.appTokens == nil {
+		return "", errors.New("app tokens are off")
+	}
+	c, err := apptoken.Verify(token, h.appTokens.signer.JWKS(), h.appTokens.signer.Issuer(), audience, time.Now())
+	if err != nil {
+		return "", err
+	}
+	return c.Subject, nil
+}

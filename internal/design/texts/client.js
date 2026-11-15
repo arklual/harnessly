@@ -2618,6 +2618,111 @@
     if (!parentWin || event.source !== parentWin || event.origin !== hostOrigin || !data || typeof data !== 'object') return;
     if (data.type === 'tk:gen' && typeof data.tpl === 'number' && data.tpl >= 0 && data.tpl % 1 === 0 && typeof data.on === 'boolean') genVeil(data.tpl, data.on);
   });
+  // A quick edit said out loud, on the board (`tk:live {tpl, phase}` from the host): the block it is about is found —
+  // a dashed ring; it is being changed — a solid ring with a sweep of light; it is done — one flash, then nothing.
+  // `phase: null` takes the ring away.
+  var liveMark = null;
+  var liveCss = null;
+  var liveFrame = 0;
+  var liveTimer = 0;
+  function liveStyle() {
+    if (liveCss) return;
+    liveCss = document.createElement('style');
+    liveCss.setAttribute('data-tk-library-mark', '');
+    liveCss.textContent = '[data-tk-live]{position:fixed;z-index:2147483001;pointer-events:none;overflow:hidden;box-sizing:border-box;opacity:0;'
+      + 'transition:opacity 260ms cubic-bezier(.22,1,.36,1),border-color 260ms,box-shadow 420ms cubic-bezier(.22,1,.36,1);border:2px dashed rgba(10,132,255,.9);border-radius:6px}'
+      + '[data-tk-live][data-on]{opacity:1}'
+      + '[data-tk-live][data-phase=editing]{border-style:solid}'
+      + '[data-tk-live][data-phase=editing]::after{content:"";position:absolute;inset:-40%;background:linear-gradient(115deg,transparent 40%,rgba(10,132,255,.22) 50%,transparent 60%);'
+      + 'animation:tk-live-sweep 1.4s cubic-bezier(.45,0,.2,1) infinite}'
+      + '[data-tk-live][data-phase=done]{border-style:solid;animation:tk-live-flash 900ms cubic-bezier(.22,1,.36,1) forwards}'
+      + '@keyframes tk-live-sweep{from{transform:translateX(-60%)}to{transform:translateX(60%)}}'
+      + '@keyframes tk-live-flash{0%{background:rgba(10,132,255,.28);box-shadow:0 0 0 0 rgba(10,132,255,.5)}100%{background:transparent;box-shadow:0 0 0 14px rgba(10,132,255,0)}}'
+      + '@media (prefers-reduced-motion:reduce){[data-tk-live]::after,[data-tk-live][data-phase=done]{animation:none}}';
+    document.documentElement.appendChild(liveCss);
+  }
+  function livePlace() {
+    liveFrame = 0;
+    if (!liveMark) return;
+    var el = deckSame(liveMark.tpl)[0];
+    if (!el) { liveMark.node.setAttribute('hidden', ''); }
+    else {
+      liveMark.node.removeAttribute('hidden');
+      var r = el.getBoundingClientRect();
+      liveMark.node.style.cssText = 'left:' + (r.left - 4) + 'px;top:' + (r.top - 4) + 'px;width:' + (r.width + 8) + 'px;height:' + (r.height + 8) + 'px';
+    }
+    liveFrame = requestAnimationFrame(livePlace);
+  }
+  function liveOff() {
+    clearTimeout(liveTimer);
+    if (!liveMark) return;
+    var node = liveMark.node;
+    liveMark = null;
+    cancelAnimationFrame(liveFrame);
+    liveFrame = 0;
+    node.removeAttribute('data-on');
+    setTimeout(function () { node.remove(); }, 280);
+  }
+  function liveSet(tpl, phase) {
+    if (phase === null) { liveOff(); return; }
+    if (liveMark && liveMark.tpl !== tpl) liveOff();
+    clearTimeout(liveTimer);
+    if (!liveMark) {
+      liveStyle();
+      var node = document.createElement('div');
+      node.setAttribute('data-tk-live', '');
+      document.documentElement.appendChild(node);
+      liveMark = { tpl: tpl, node: node };
+      livePlace();
+      requestAnimationFrame(function () { node.setAttribute('data-on', ''); });
+    }
+    liveMark.node.setAttribute('data-phase', phase);
+    if (phase === 'done') liveTimer = setTimeout(liveOff, 1100);
+  }
+  window.addEventListener('message', function (event) {
+    var data = event.data;
+    if (!parentWin || event.source !== parentWin || event.origin !== hostOrigin || !data || typeof data !== 'object') return;
+    if (data.type === 'tk:live' && typeof data.tpl === 'number' && data.tpl >= 0 && data.tpl % 1 === 0 &&
+      (data.phase === null || data.phase === 'found' || data.phase === 'editing' || data.phase === 'done')) liveSet(data.tpl, data.phase);
+  });
+  // Without a picked block the host gives the changed lines of the board (`tk:live-find {hint}`): the block they make is
+  // found by a style it now wears or a text it now says, and flashes.
+  function liveNorm(s) { return String(s).replace(/\s+/g, ' ').replace(/\s*([:;])\s*/g, '$1').trim().toLowerCase(); }
+  function liveFind(hint) {
+    var found = null;
+    var decls = String(hint).match(/[a-z-]+\s*:\s*[^;"'{}<>]+/gi) || [];
+    if (decls.length) {
+      var styled = document.querySelectorAll('[data-dc-tpl][style]');
+      for (var i = 0; i < styled.length && !found; i += 1) {
+        var own = liveNorm(styled[i].getAttribute('style') || '');
+        for (var k = 0; k < decls.length; k += 1) {
+          var d = liveNorm(decls[k]);
+          if (d.length >= 6 && own.indexOf(d) >= 0) { found = styled[i]; break; }
+        }
+      }
+    }
+    if (!found) {
+      var words = String(hint).replace(/<[^>]*>/g, '\n').replace(/\{\{[^}]*\}\}/g, '\n').split('\n')
+        .map(function (w) { return w.replace(/\s+/g, ' ').trim(); })
+        .filter(function (w) { return w.length >= 3 && !/[{};=]/.test(w); })
+        .sort(function (a, b) { return b.length - a.length; });
+      if (words.length) {
+        var all = document.querySelectorAll('[data-dc-tpl]');
+        for (var j = all.length - 1; j >= 0 && !found; j -= 1) {
+          var text = (all[j].textContent || '').replace(/\s+/g, ' ');
+          if (text.indexOf(words[0]) >= 0) found = all[j];
+        }
+      }
+    }
+    if (!found) return;
+    var tpl = Number(found.getAttribute('data-dc-tpl'));
+    if (isFinite(tpl) && tpl >= 0) { liveSet(tpl, 'editing'); requestAnimationFrame(function () { liveSet(tpl, 'done'); }); }
+  }
+  window.addEventListener('message', function (event) {
+    var data = event.data;
+    if (!parentWin || event.source !== parentWin || event.origin !== hostOrigin || !data || typeof data !== 'object') return;
+    if (data.type === 'tk:live-find' && typeof data.hint === 'string' && data.hint.length <= 2000) setTimeout(function () { liveFind(data.hint); }, 0);
+  });
   // Pictures on the page, where the host says the person may change them (`tk:images {on}`; a guest's or a shared link's
   // page is never told). A picture under the pointer (an <img>, or a block with a background image the board's source
   // names) shows a small button inside it, «Edit»; a touch on one shows it too (there is no hover). An empty place for a

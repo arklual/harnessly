@@ -1,0 +1,40 @@
+.hx-voice-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  min-height: 100vh;
+  padding: 40px;
+  background: var(--hx-bg-app);
+  color: var(--hx-fg-1);
+}
+.hx-voice-gallery__row {
+  display: flex;
+  gap: 28px;
+  align-items: flex-end;
+}
+.hx-voice-gallery__cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+}
+.hx-voice-gallery__s96 {
+  --hx-head-size: 96px;
+}
+.hx-voice-gallery__s48 {
+  --hx-head-size: 48px;
+}
+.hx-voice-gallery__set {
+  width: 640px;
+}
+.hx-voice-gallery__field {
+  position: relative;
+  width: 640px;
+  height: 140px;
+}
+.hx-voice-gallery__composer {
+  height: 56px;
+}

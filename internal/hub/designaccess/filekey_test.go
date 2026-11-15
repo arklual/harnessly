@@ -1,7 +1,9 @@
 package designaccess
 
 import (
+	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 )
@@ -49,5 +51,33 @@ func TestKeyedLocationResolvesBesideTheBoard(t *testing.T) {
 	}
 	if want := "/agents/api/platform/design/store/shop/k/mz0.AbC/f/dir/Главная.dc.html"; to.Path != want || to.RawQuery != "rev=3" {
 		t.Errorf("%s -> %s ?%s, want %s", loc, to.Path, to.RawQuery, want)
+	}
+}
+
+// The board's files come from its sandbox without the hub's session: the key itself says whose read it is,
+// and only a live key of that project names anyone.
+func TestKeyedFileUserIsTheKeysPerson(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	s := &Service{files: newFileKeyer([]byte("master")), now: func() time.Time { return now }}
+	key := s.files.mint("tyqhce6nuauhwtzi3eoi", "shop", now)
+	path := "/agents/api/platform/design/store/shop/k/" + key + "/f/lib/support.js"
+	if got := s.KeyedFileUser(httptest.NewRequest("GET", path, nil)); got != "tyqhce6nuauhwtzi3eoi" {
+		t.Fatalf("own key: %q", got)
+	}
+	end, rest, _ := strings.Cut(key, ".")
+	_, sum, _ := strings.Cut(rest, ".")
+	for name, c := range map[string]struct{ method, path string }{
+		"another person in the key": {"GET", "/agents/api/platform/design/store/shop/k/" + end + ".u2." + sum + "/f/lib/support.js"},
+		"another project":           {"GET", "/agents/api/platform/design/store/shop-2/k/" + key + "/f/lib/support.js"},
+		"a write":                   {"POST", path},
+		"not a file":                {"GET", "/agents/api/platform/design/store/shop/k/" + key + "/head"},
+		"the old shape":             {"GET", "/agents/api/platform/design/store/shop/k/" + end + "." + sum + "/f/lib/support.js"},
+	} {
+		if got := s.KeyedFileUser(httptest.NewRequest(c.method, c.path, nil)); got != "" {
+			t.Errorf("%s: signed in as %q", name, got)
+		}
+	}
+	if got := (&Service{now: s.now}).KeyedFileUser(httptest.NewRequest("GET", path, nil)); got != "" {
+		t.Errorf("a hub without its secret: %q", got)
 	}
 }

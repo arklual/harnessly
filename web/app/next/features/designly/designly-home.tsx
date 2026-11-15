@@ -16,7 +16,7 @@ import {
   type RefObject,
 } from 'react';
 import { Menu } from '@base-ui/react/menu';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import LibraryBar from '@/next/features/designly/library-bar';
 import { usePackExport, usePackImport } from '@/next/features/designly/pack-dialogs';
 import {
@@ -80,8 +80,8 @@ import { plural, t } from '@/next/i18n';
 import { formatAgoFull } from '@/next/i18n/format';
 import '@/next/styles/designly.css';
 
-export const DESIGN_KIND = { site: 'site', slides: 'slides', video: 'video', ds: 'ds' } as const;
-export type TDesignKind = (typeof DESIGN_KIND)[keyof typeof DESIGN_KIND];
+import { DESIGN_KIND, type TDesignKind } from '@/next/features/designly/design-kind';
+export { DESIGN_KIND, type TDesignKind };
 
 const KINDS = [DESIGN_KIND.site, DESIGN_KIND.slides, DESIGN_KIND.video, DESIGN_KIND.ds] as const;
 
@@ -581,7 +581,7 @@ const CardMenu = ({
 >) => {
   const actions = useMenuActions();
   return (
-    <Menu.Root actionsRef={actions}>
+    <MenuRoot actionsRef={actions}>
       <Menu.Trigger
         className="hx-dl-card__del"
         aria-label={t('next.designly.cardMenu', { title: card.title })}
@@ -648,7 +648,7 @@ const CardMenu = ({
           </>
         )}
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };
 

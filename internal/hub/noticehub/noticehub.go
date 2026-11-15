@@ -47,12 +47,30 @@ func (s *Service) Ring(ctx context.Context, machineID, email, key, title, text, 
 	if !ok || id == "" {
 		return false
 	}
+	return s.put(ctx, id, "key-round", key, title, text, link)
+}
+
+// RingMention is Ring for a person the hub already found, called by @ in a comment on a board, with an `@`
+// icon. No machine of theirs is named, so it asks the switch for any machine (a row for every machine, `*`).
+func (s *Service) RingMention(ctx context.Context, userID, email, key, title, text, link string) bool {
+	if s == nil || s.Notices == nil || s.OnFor == nil {
+		return false
+	}
+	email = strings.ToLower(strings.TrimSpace(email))
+	if userID == "" || email == "" || key == "" || !s.OnFor(ctx, email, "") {
+		return false
+	}
+	return s.put(ctx, userID, "at-sign", key, title, text, link)
+}
+
+// put adds the notice of kind `access` to the person's hub notices; the same key never twice.
+func (s *Service) put(ctx context.Context, id, icon, key, title, text, link string) bool {
 	now := time.Now()
 	if s.Notices.Now != nil {
 		now = s.Notices.Now()
 	}
 	at := now.UnixMilli()
-	doc, err := json.Marshal(map[string]any{"key": key, "chatId": "", "kind": "access", "icon": "key-round",
+	doc, err := json.Marshal(map[string]any{"key": key, "chatId": "", "kind": "access", "icon": icon,
 		"title": title, "text": text, "at": at, "link": link})
 	if err != nil {
 		return false
@@ -98,4 +116,46 @@ func (c Chain) ServeMachine(w http.ResponseWriter, r *http.Request, u store.User
 		}
 	}
 	return false
+}
+
+// The proxy asks its design interceptor for more than ServeMachine (proxy HomeServer, Anchor, KeyedFiles): a chain has
+// to pass those on to the member that has them, or the proxy's type check fails on the chain and each of them silently
+// stops working on a hub (the board's keyed files were 401).
+
+// ServeHome is the first member's that answers Sinopia's home itself.
+func (c Chain) ServeHome(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine, ask func(ctx context.Context, w http.ResponseWriter)) bool {
+	for _, i := range c {
+		if h, ok := i.(interface {
+			ServeHome(http.ResponseWriter, *http.Request, store.User, store.Machine, func(context.Context, http.ResponseWriter)) bool
+		}); ok && h.ServeHome(w, r, u, m, ask) {
+			return true
+		}
+	}
+	return false
+}
+
+// AnchorMachines is the first member's that names the machines of a project's space.
+func (c Chain) AnchorMachines(ctx context.Context, spaceIDs []string, rest string) []string {
+	for _, i := range c {
+		if a, ok := i.(interface {
+			AnchorMachines(context.Context, []string, string) []string
+		}); ok {
+			if ids := a.AnchorMachines(ctx, spaceIDs, rest); len(ids) > 0 {
+				return ids
+			}
+		}
+	}
+	return nil
+}
+
+// KeyedFileUser is the first member's that knows whose key a board's file address carries.
+func (c Chain) KeyedFileUser(r *http.Request) string {
+	for _, i := range c {
+		if k, ok := i.(interface{ KeyedFileUser(*http.Request) string }); ok {
+			if id := k.KeyedFileUser(r); id != "" {
+				return id
+			}
+		}
+	}
+	return ""
 }

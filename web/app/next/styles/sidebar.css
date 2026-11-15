@@ -414,12 +414,14 @@ a.hx-brand__name {
   color: var(--hx-warning);
 }
 /* A finished answer the person has not read: one accent dot. A read one has no mark at all. */
-.hx-item .hx-chat-status[data-status='done'] {
+.hx-item .hx-chat-status[data-status='done'],
+.hx-chats-sheet__row .hx-chat-status[data-status='done'] {
   color: var(--hx-accent);
   -webkit-mask: radial-gradient(circle at center, #000 3.5px, transparent 4px);
   mask: radial-gradient(circle at center, #000 3.5px, transparent 4px);
 }
-.hx-item[data-status='done'] .hx-item__title {
+.hx-item[data-status='done'] .hx-item__title,
+.hx-chats-sheet__row[data-status='done'] .hx-chats-sheet__title {
   font-weight: var(--hx-weight-medium);
 }
 [data-status='thinking'] > .hx-item__title {
@@ -1303,11 +1305,25 @@ button.hx-nav__add {
     box-shadow:
       0 0 0 1px var(--hx-border),
       0 24px 60px rgba(0, 0, 0, 0.18);
-    transform: translate3d(calc((var(--dw) - 1) * 100% - 1px), 0, 0);
-    transition: transform 340ms var(--hx-m-ease);
+    transform: translate3d(calc(-100% - 1px), 0, 0);
+    /* Shut, it stays drawn until it has slid out, then hides (visibility after the slide). */
+    transition:
+      transform 340ms var(--hx-m-ease),
+      visibility 0s linear 340ms;
     animation: none !important;
     visibility: hidden;
     overscroll-behavior: contain;
+  }
+  .hx-app[data-drawer='open'] .hx-sidebar {
+    transform: translate3d(-1px, 0, 0);
+    transition:
+      transform 340ms var(--hx-m-ease),
+      visibility 0s;
+  }
+  /* Its own layer while it is out or moving, so the slide is the compositor's alone. */
+  .hx-app:not([data-drawer='closed']) .hx-sidebar,
+  .hx-app[data-ddrag] .hx-sidebar {
+    will-change: transform;
   }
   .hx-sidebar .hx-sidebar__list {
     overflow-y: auto;
@@ -1771,6 +1787,10 @@ button.hx-project__add {
   position: relative;
   flex: none;
   margin-left: auto;
+}
+/* The folded rail keeps only the avatar at the bottom: the bell lives in the open sidebar. */
+.hx-app[data-side='closed'] .hx-user__bell {
+  display: none;
 }
 /* Something in the notification centre is unread: one accent dot on the bell. */
 .hx-user__dot {

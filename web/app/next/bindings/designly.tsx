@@ -289,7 +289,7 @@ export const DesignlyLibrary = ({ machine, onOpen }: IDesignlyLibraryProps) => {
   );
 };
 
-interface IDesignlyViewProps {
+export interface IDesignlyViewProps {
   machine: MachineId;
   /** The machines a design can be made on, for a person with several; picking one makes it the open machine. */
   machines?: IModelPickerProps['machine'];

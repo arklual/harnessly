@@ -41,7 +41,7 @@ const EXIT_MS = 220;
 /** The card's times are minutes: they move once in this long. */
 const TICK_MS = 30_000;
 
-const useNow = (): number => {
+export const useNow = (): number => {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), TICK_MS);
@@ -177,52 +177,28 @@ export interface ILimitsChipProps {
   view: LimitsView;
 }
 
+/** A machine that pays Claude by the API: no windows, the chip tells the day's spend. */
+export const paysBySpend = (view: LimitsView): boolean =>
+  view.state === 'ready' && view.spend !== null && showsSpend(view.limits, view.spend.spend);
+
 // the chip sits in the field, which renders on each key; its view changes only with the limits.
 const LimitsChip = memo(({ view }: ILimitsChipProps) =>
-  view.state === 'ready' && view.spend && showsSpend(view.limits, view.spend.spend) ? (
+  view.state === 'ready' && view.spend && paysBySpend(view) ? (
     <SpendChip view={view.spend} />
   ) : (
     <WindowsChip view={view} />
   ),
 );
 
-const WindowsChip = ({ view }: ILimitsChipProps) => {
-  const { open, pinned, setTrigger, setFloating, getFloating, triggerProps, floatingProps } =
-    useHoverIntent();
-  const { mounted, state } = usePresentFlag(open, EXIT_MS);
+/** The card of the chat's limits: both windows with their resets and forecast, the balance, the other subscriptions.
+ *  The chip opens it, and so does the model pill's popover (on the pill the limit is its outline). */
+export const LimitsCard = ({ view }: ILimitsChipProps) => {
   const now = useNow();
-  useFitInViewport(getFloating, mounted);
-
-  const provider = view.profile ? profileName(view.profile) : t(`next.agent.${view.provider}`);
+  const provider = providerOf(view);
   const limits = view.state === 'ready' ? view.limits : null;
   const windows = windowsOf(limits, now / 1000);
   const balance = limits?.balance ? money(limits.balance) : null;
   const others = view.state === 'ready' ? (view.others ?? []) : [];
-  const lefts = windows.map((w) => leftOf(w.window));
-  const least = windows.length > 1 ? lefts.indexOf(Math.min(...lefts)) : -1;
-  const summary =
-    windows
-      .map((w) =>
-        t('next.limits.summaryItem', {
-          window: windowShort(w.kind),
-          left: leftOf(w.window),
-          span: span(w.window.resetsAt - now / 1000),
-        }),
-      )
-      .join('; ') ||
-    (balance ? t('next.limits.balanceItem', { sum: balance }) : t('next.limits.summaryNone'));
-
-  // Another chat's limits (or a new reading) change the chip's numbers: they fade in (keyed) and the chip eases to its
-  // new width instead of jumping.
-  const [chip, setChip] = useState<HTMLButtonElement | null>(null);
-  useGlide(chip, `${lefts.join(',')}|${balance ?? ''}`, 'width');
-  const chipRef = useCallback(
-    (node: HTMLButtonElement | null) => {
-      setTrigger(node);
-      setChip(node);
-    },
-    [setTrigger],
-  );
 
   let note: string | null = null;
   if (view.state === 'failed' && !view.onRetry) note = t('next.limits.failed');
@@ -237,6 +213,90 @@ const WindowsChip = ({ view }: ILimitsChipProps) => {
   ]
     .filter(Boolean)
     .join(' · ');
+
+  return (
+    <>
+      <div className="hx-lim__title">{t('next.limits.title', { provider })}</div>
+      {windows.map((w) => (
+        <Gauge key={w.kind} kind={w.kind} window={w.window} provider={provider} now={now} />
+      ))}
+      {balance && (
+        <div className="hx-lim__spend">
+          <b>{balance}</b>
+          <span>{t('next.limits.balance')}</span>
+        </div>
+      )}
+      {view.state === 'failed' && view.onRetry && (
+        <LoadFailed
+          size={LOAD_FAILED_SIZE.inline}
+          title={t('next.load.limits')}
+          reason={t('next.limits.failed')}
+          onRetry={view.onRetry}
+        />
+      )}
+      {note && <p className="hx-lim__note">{note}</p>}
+      {others.length > 0 && (
+        <ul className="hx-lim__others" aria-label={t('next.limits.others')}>
+          {others.map((other) => (
+            <li key={other.key}>
+              <span>{other.name ?? t(`next.agent.${other.provider ?? view.provider}`)}</span>
+              <LimitsLine limits={other.limits} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {limits?.error && <p className="hx-lim__note">{limits.error}</p>}
+      {foot && <p className="hx-lim__foot">{foot}</p>}
+    </>
+  );
+};
+
+const providerOf = (view: LimitsView): string =>
+  view.profile ? profileName(view.profile) : t(`next.agent.${view.provider}`);
+
+/** The chat's limits in one line, for the chip's and the pill's label: «5 ч: осталось 40%, …; неделя: …». */
+export const limitsSummary = (view: LimitsView, nowSec: number): string => {
+  const limits = view.state === 'ready' ? view.limits : null;
+  const balance = limits?.balance ? money(limits.balance) : null;
+  return (
+    windowsOf(limits, nowSec)
+      .map((w) =>
+        t('next.limits.summaryItem', {
+          window: windowShort(w.kind),
+          left: leftOf(w.window),
+          span: span(w.window.resetsAt - nowSec),
+        }),
+      )
+      .join('; ') || (balance ? t('next.limits.balanceItem', { sum: balance }) : t('next.limits.summaryNone'))
+  );
+};
+
+const WindowsChip = ({ view }: ILimitsChipProps) => {
+  const { open, pinned, setTrigger, setFloating, getFloating, triggerProps, floatingProps } =
+    useHoverIntent();
+  const { mounted, state } = usePresentFlag(open, EXIT_MS);
+  const now = useNow();
+  useFitInViewport(getFloating, mounted);
+
+  const provider = providerOf(view);
+  const limits = view.state === 'ready' ? view.limits : null;
+  const windows = windowsOf(limits, now / 1000);
+  const balance = limits?.balance ? money(limits.balance) : null;
+  const lefts = windows.map((w) => leftOf(w.window));
+  const least = windows.length > 1 ? lefts.indexOf(Math.min(...lefts)) : -1;
+  const summary = limitsSummary(view, now / 1000);
+
+  // Another chat's limits (or a new reading) change the chip's numbers: they fade in (keyed) and the chip eases to its
+  // new width instead of jumping.
+  const [chip, setChip] = useState<HTMLButtonElement | null>(null);
+  useGlide(chip, `${lefts.join(',')}|${balance ?? ''}`, 'width');
+  const chipRef = useCallback(
+    (node: HTMLButtonElement | null) => {
+      setTrigger(node);
+      setChip(node);
+    },
+    [setTrigger],
+  );
 
   return (
     <div className="hx-lim">
@@ -279,37 +339,7 @@ const WindowsChip = ({ view }: ILimitsChipProps) => {
           aria-label={t('next.limits.title', { provider })}
           {...floatingProps}
         >
-          <div className="hx-lim__title">{t('next.limits.title', { provider })}</div>
-          {windows.map((w) => (
-            <Gauge key={w.kind} kind={w.kind} window={w.window} provider={provider} now={now} />
-          ))}
-          {balance && (
-            <div className="hx-lim__spend">
-              <b>{balance}</b>
-              <span>{t('next.limits.balance')}</span>
-            </div>
-          )}
-          {view.state === 'failed' && view.onRetry && (
-            <LoadFailed
-              size={LOAD_FAILED_SIZE.inline}
-              title={t('next.load.limits')}
-              reason={t('next.limits.failed')}
-              onRetry={view.onRetry}
-            />
-          )}
-          {note && <p className="hx-lim__note">{note}</p>}
-          {others.length > 0 && (
-            <ul className="hx-lim__others" aria-label={t('next.limits.others')}>
-              {others.map((other) => (
-                <li key={other.key}>
-                  <span>{other.name ?? t(`next.agent.${other.provider ?? view.provider}`)}</span>
-                  <LimitsLine limits={other.limits} />
-                </li>
-              ))}
-            </ul>
-          )}
-          {limits?.error && <p className="hx-lim__note">{limits.error}</p>}
-          {foot && <p className="hx-lim__foot">{foot}</p>}
+          <LimitsCard view={view} />
         </div>
       )}
     </div>

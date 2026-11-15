@@ -1,5 +1,6 @@
 // The drawing layer over the picture: a canvas the size of the stage that shows the marks the person draws (a pen, a
 // brush, a frame). The marks are data (marks.ts); a gesture is kept here and committed when the finger lifts.
+import { useZoomCanvas } from '@/next/features/image-edit/use-zoom-canvas';
 import { useEffect, useRef, type PointerEvent } from 'react';
 import {
   BRUSH_WIDTH,
@@ -41,26 +42,13 @@ const MarkLayer = ({ kind, marks, color, brush, onChange, onFramed, label }: IMa
     paintMarks(ctx, el.width, el.height, kind, draft.current ?? latest.current, LOOK.show);
   };
 
+  const painter = useRef(paint);
   useEffect(() => {
-    const el = canvas.current;
-    if (!el) return;
-    const fit = () => {
-      const ratio = window.devicePixelRatio || 1;
-      const w = Math.max(1, Math.round(el.clientWidth * ratio));
-      const h = Math.max(1, Math.round(el.clientHeight * ratio));
-      if (el.width !== w || el.height !== h) {
-        el.width = w;
-        el.height = h;
-      }
-      paint();
-    };
-    fit();
-    const observer = new ResizeObserver(fit);
-    observer.observe(el);
-    return () => observer.disconnect();
-    // paint reads refs and `kind`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kind]);
+    painter.current = paint;
+  });
+  // Sharp at any zoom; a second finger is a pinch (the viewer zooms) and drops the stroke.
+  const pointers = useZoomCanvas(canvas, painter, kind);
+  const pinched = useRef(false);
   useEffect(paint);
 
   const at = (event: PointerEvent): IPoint => {
@@ -72,6 +60,13 @@ const MarkLayer = ({ kind, marks, color, brush, onChange, onFramed, label }: IMa
   };
   const down = (event: PointerEvent<HTMLCanvasElement>) => {
     if (event.button !== 0) return;
+    pointers.current.add(event.pointerId);
+    if (pointers.current.size > 1) {
+      pinched.current = true;
+      cancelDraft();
+      return;
+    }
+    pinched.current = false;
     event.currentTarget.setPointerCapture(event.pointerId);
     const p = at(event);
     if (kind === MARK_KIND.note) {
@@ -100,6 +95,13 @@ const MarkLayer = ({ kind, marks, color, brush, onChange, onFramed, label }: IMa
     paint();
   };
   const up = (event: PointerEvent<HTMLCanvasElement>) => {
+    pointers.current.delete(event.pointerId);
+    if (pinched.current) {
+      if (pointers.current.size === 0) pinched.current = false;
+      if (event.currentTarget.hasPointerCapture(event.pointerId))
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      return;
+    }
     const done = draft.current;
     draft.current = null;
     if (!done) return;
@@ -108,9 +110,14 @@ const MarkLayer = ({ kind, marks, color, brush, onChange, onFramed, label }: IMa
     onChange(done);
     if (done.box && onFramed) onFramed();
   };
-  const cancel = () => {
+  const cancelDraft = () => {
     draft.current = null;
     paint();
+  };
+  const cancel = (event: PointerEvent<HTMLCanvasElement>) => {
+    pointers.current.delete(event.pointerId);
+    if (pointers.current.size === 0) pinched.current = false;
+    cancelDraft();
   };
 
   return (

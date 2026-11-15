@@ -548,6 +548,9 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(extProviderRoutes(d)...)
 	f.Add(codexLoginRoutes(d)...)
 	f.Add(chatgptRoutes(d)...)
+	f.Add(voiceLiveRoutes(d)...)
+	f.Add(voiceEditRoutes(d)...)
+	f.Add(spaceDirRoutes(d)...)
 	f.Add(backgroundRoutes(d)...)
 	f.Add(searchRoutes(d)...)
 	f.Add(uiAgentRoutes(d)...)
@@ -654,6 +657,8 @@ func run(ctx context.Context, cfg gate.Config) error {
 	links := newHubLinks(hubLinkDirs(cfg.DataDir, os.Getenv("AGENT_HUB_OBSERVE_FILE")))
 	links.apply()
 	go links.watch(ctx, hubLinksEvery)
+	webHubOn := webFromHubOn()
+	webHubDir := useWebFromHub(cfg.DataDir) // before build: the page is set up there
 	f, err := build(cfg)
 	if err != nil {
 		_ = ln.Close()
@@ -669,6 +674,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 		go alone.cleanUp(f.home, env("RUNTIME_UPLOADS_DIR", filepath.Join(cfg.DataDir, "uploads")))
 	}
 	f.startUpdateCheck(ctx)
+	startWebFromHub(ctx, cfg.DataDir, webHubDir, webHubOn)
 	f.startEnvSetup(ctx)
 	go watchAppsConsent(ctx, apps.Open(cfg.DataDir), appsPolicyEvery)
 	defer f.startStore(ctx, cfg)()

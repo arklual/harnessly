@@ -36,7 +36,10 @@ func (ex *execution) app(i int) {
 		return
 	}
 	defer w.cleanup()
-	id, changed, missing, err := ex.r.Apps.Install(ex.hostPath(w.file), it.ItemID, it.Pinned, src.Install, ex.appItems())
+	id, version, changed, missing, err := ex.r.Apps.Install(ex.hostPath(w.file), it.ItemID, it.Pinned, src.Install, ex.appItems())
+	if err == nil {
+		ex.run.Steps[i].Version = version
+	}
 	switch {
 	case err != nil:
 		ex.fail(i, "приложение не поставлено: "+err.Error())

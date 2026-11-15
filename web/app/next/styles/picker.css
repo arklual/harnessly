@@ -167,6 +167,14 @@
   line-height: 14px;
   color: var(--hx-fg-3);
 }
+.hx-picker__about {
+  padding: 0 var(--hx-space-3);
+  margin-top: var(--hx-space-2);
+  text-align: center;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--hx-fg-2);
+}
 .hx-picker__head {
   display: flex;
   align-items: center;
@@ -750,4 +758,83 @@
     width: 32px;
     height: 32px;
   }
+}
+/* OpenAI's ways of working under its tab (picker-groups.ts): one quiet row, the chosen one raised. */
+.hx-picker__modes {
+  display: flex;
+  justify-content: center;
+  gap: var(--hx-space-1);
+  margin-top: var(--hx-space-2);
+  padding: 0 var(--hx-space-3);
+}
+.hx-picker__mode {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: var(--hx-radius-full, 999px);
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--hx-dur-sm, 120ms) var(--hx-ease-out),
+    color var(--hx-dur-sm, 120ms) var(--hx-ease-out);
+}
+.hx-picker__mode:hover {
+  color: var(--hx-fg-1);
+}
+.hx-picker__mode[aria-pressed='true'] {
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  box-shadow: inset 0 0 0 1px var(--hx-border);
+}
+
+/* The limit on the pill: its outline fills clockwise from the top as the five-hour window is spent, in the
+   level's colour; the pill's border is the track under it. The card of both windows sits under the depth. */
+.hx-model__ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  fill: none;
+  stroke: var(--hx-fg-3);
+  stroke-width: 2;
+  stroke-linecap: round;
+  transition: stroke var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-model__ring path {
+  stroke-dasharray: 100 100;
+  stroke-dashoffset: calc(100 - var(--hx-ring-used, 0));
+  transition: stroke-dashoffset 700ms var(--hx-ease-out);
+}
+.hx-model__ring[data-level='low'] {
+  stroke: var(--hx-warning);
+}
+.hx-model__ring[data-level='out'] {
+  stroke: var(--hx-danger);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-model__ring path {
+    transition: none;
+  }
+}
+.hx-picker__limits {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 -10px -10px;
+  padding: 10px 12px 10px;
+  border-top: 1px solid var(--hx-border);
+}
+.hx-picker__limits .hx-gauge {
+  padding: 6px 0;
+}
+.hx-picker__limits .hx-lim__others li {
+  gap: 10px;
 }

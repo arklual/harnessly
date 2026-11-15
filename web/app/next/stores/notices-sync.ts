@@ -52,7 +52,9 @@ export interface INoticesSyncOptions {
 export const startNoticesSync = (o: INoticesSyncOptions): (() => void) => {
   const f = o.fetchImpl ?? ((...a: Parameters<typeof fetch>) => fetch(...a));
   const device = o.device ?? deviceId();
-  const q = `?person=${encodeURIComponent(o.person)}`;
+  // The base may carry the machine's query (runtimePath adds `?machine=`): the paths go before it, the person after.
+  const [root, baseQuery] = o.base.split('?', 2) as [string, string | undefined];
+  const q = `?${baseQuery ? `${baseQuery}&` : ''}person=${encodeURIComponent(o.person)}`;
   let live = true;
   let rev = 0;
   /** Keys the database holds as unread: what leaves the list while in this set is a read to send. */
@@ -60,7 +62,7 @@ export const startNoticesSync = (o: INoticesSyncOptions): (() => void) => {
   let applying = false;
 
   const send = (path: string, method: string, body: unknown) =>
-    f(`${o.base}${path}${q}`, {
+    f(`${root}${path}${q}`, {
       method,
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -95,7 +97,7 @@ export const startNoticesSync = (o: INoticesSyncOptions): (() => void) => {
 
   const onSettings = () => {
     if (applying || !live) return;
-    void f(`${o.base}/settings${q}`, {
+    void f(`${root}/settings${q}`, {
       method: 'PUT',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -108,7 +110,7 @@ export const startNoticesSync = (o: INoticesSyncOptions): (() => void) => {
       .catch(() => undefined);
   };
 
-  void f(`${o.base}${q}`, { credentials: 'include' })
+  void f(`${root}${q}`, { credentials: 'include' })
     .then((r) => (r.ok ? (r.json() as Promise<IState>) : null))
     .then((st) => {
       if (!st || !live) return;
@@ -128,10 +130,10 @@ export const startNoticesSync = (o: INoticesSyncOptions): (() => void) => {
   let es: INoticesStream | null = null;
   try {
     es =
-      o.stream?.(`${o.base}/stream${q}`) ??
+      o.stream?.(`${root}/stream${q}`) ??
       (typeof EventSource === 'undefined'
         ? null
-        : (new EventSource(`${o.base}/stream${q}`, { withCredentials: true }) as unknown as INoticesStream));
+        : (new EventSource(`${root}/stream${q}`, { withCredentials: true }) as unknown as INoticesStream));
   } catch {
     es = null;
   }

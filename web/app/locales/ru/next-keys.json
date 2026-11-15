@@ -35,7 +35,7 @@
   "next.keys.cmd.global.stepOn": "Вперёд: слайд, сцена, картинка",
   "next.keys.cmd.composer.dictate": "Начать или закончить диктовку",
   "next.keys.cmd.composer.cancelDictation": "Отменить диктовку",
-  "next.keys.cmd.composer.send": "Отправить сразу, в ход агента",
+  "next.keys.cmd.composer.send": "В очередь — после хода агента",
   "next.keys.cmd.composer.stopAgent": "Остановить агента",
   "next.keys.cmd.composer.attach": "Прикрепить файл",
   "next.keys.cmd.deck.next": "Следующий слайд",

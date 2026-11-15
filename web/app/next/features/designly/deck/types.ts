@@ -354,6 +354,8 @@ export type TDeckLayout = (typeof DECK_LAYOUT)[keyof typeof DECK_LAYOUT];
 export interface IDeckContext {
   slide: number;
   label: string | null;
+  /** The selected block's template number (the voice's quick edit rings it); null without one. */
+  tpl?: number | null;
 }
 
 /** The left panel's props (WP3's shell renders WP4's panel with these). */

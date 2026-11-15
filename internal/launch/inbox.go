@@ -26,6 +26,9 @@ type Inbox struct {
 	// Submit types a text into a Claude pane and submits it.
 	Submit func(session, text string) error
 	Log    func(level, msg string, kv ...any)
+	// SpaceCwd is the neutral folder a conversation starts in when the hub names none (a board's or a document's first
+	// comment that calls the agent): no project's CLAUDE.md or memory around it. Nil or "": the root.
+	SpaceCwd func() string
 	// Every is how often queued messages are tried (3 s); MaxWait how long one may wait for its tab (6 h).
 	Every, MaxWait time.Duration
 	Now            func() time.Time
@@ -184,8 +187,9 @@ func (b *Inbox) Deliver(in Delivery) (*jsvalue.Object, error) {
 		b.enqueue(target.TabID, in.Message)
 		return jsvalue.NewObject("mode", "queued", "tabId", target.TabID), nil
 	}
+	cwd, roots := deliveryCwd(in, b.SpaceCwd)
 	start := func(cwd string) (Result, error) {
-		o := Options{Provider: agents.Claude, Cwd: cwd}
+		o := Options{Provider: agents.Claude, Cwd: cwd, CwdRoots: roots}
 		if in.AgentSessionID != "" {
 			o.ResumeSessionID = in.AgentSessionID
 		} else {
@@ -195,8 +199,8 @@ func (b *Inbox) Deliver(in Delivery) (*jsvalue.Object, error) {
 		return b.Starter.Start(o)
 	}
 	// The document's folder may lie outside the project root; the root is always allowed.
-	started, err := start(in.Cwd)
-	if err == nil && !started.OK && in.Cwd != "" {
+	started, err := start(cwd)
+	if err == nil && !started.OK && cwd != "" {
 		started, err = start("")
 	}
 	if err != nil {
@@ -210,6 +214,18 @@ func (b *Inbox) Deliver(in Delivery) (*jsvalue.Object, error) {
 		b.enqueue(id, in.Message)
 	}
 	return jsvalue.NewObject("mode", "resumed", "tabId", id), nil
+}
+
+// deliveryCwd is the folder a delivered comment's new conversation starts in, and the roots that folder may be in: the
+// hub's when it named one, the spaces' neutral folder when it did not and no session is resumed.
+func deliveryCwd(in Delivery, space func() string) (string, []string) {
+	if in.Cwd != "" || in.AgentSessionID != "" || space == nil {
+		return in.Cwd, nil
+	}
+	if dir := space(); dir != "" {
+		return dir, []string{dir}
+	}
+	return "", nil
 }
 
 // ResolvePane is the tab of this runtime a publishing shell's pane id belongs to. One id may name a pane on each tmux

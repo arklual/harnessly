@@ -137,23 +137,23 @@ describe('a send leaves an empty field', () => {
     await expectEmptyEverywhere(CONV);
   });
 
-  it('Enter into the queue of a working agent', async () => {
+  it('Enter into the turn of a working agent', async () => {
     render(<ChatDock conv={CONV} machine={machine} />);
     await composed(CONV);
     working();
     fireEvent.keyDown(field(), { key: 'Enter' });
     await settle();
-    expect(sent().at(-1)?.body).toMatchObject({ mode: 'queue' });
+    expect(sent().at(-1)?.body).toMatchObject({ mode: 'steer' });
     await expectEmptyEverywhere(CONV);
   });
 
-  it('Ctrl+Enter, straight into the working turn', async () => {
+  it('Ctrl+Enter, into the queue after the working turn', async () => {
     render(<ChatDock conv={CONV} machine={machine} />);
     await composed(CONV);
     working();
     fireEvent.keyDown(field(), { key: 'Enter', ctrlKey: true });
     await settle();
-    expect(sent().at(-1)?.body).toMatchObject({ mode: 'steer' });
+    expect(sent().at(-1)?.body).toMatchObject({ mode: 'queue' });
     await expectEmptyEverywhere(CONV);
   });
 

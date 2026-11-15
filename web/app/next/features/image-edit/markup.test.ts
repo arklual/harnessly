@@ -11,6 +11,7 @@ import {
   freshHistory,
   hasMarkup,
   itemOfDrag,
+  markScale,
   markedName,
   paintMarkup,
   pushMarkup,
@@ -157,5 +158,73 @@ describe('paintMarkup', () => {
     expect(calls).not.toContain('clear');
     expect(calls.some((call) => call.startsWith('shade'))).toBe(false);
     expect(calls).toContain('outline Здесь');
+  });
+});
+
+describe('marks made on a zoomed picture (HRN-1500)', () => {
+  it('keep their width on the screen: a share of the usual at the zoom they were made', () => {
+    expect(markScale(1)).toBeUndefined();
+    expect(markScale(0.5)).toBeUndefined();
+    expect(markScale(4)).toBe(0.25);
+    expect(itemOfDrag(MARKUP_TOOL.arrow, '#fff', { x: 0.1, y: 0.1 }, { x: 0.2, y: 0.2 }, 0.25)).toEqual({
+      kind: 'arrow',
+      color: '#fff',
+      from: { x: 0.1, y: 0.1 },
+      to: { x: 0.2, y: 0.2 },
+      scale: 0.25,
+    });
+  });
+
+  it('count a small drag as a mark when zoomed in, which fitted is a stray press', () => {
+    const from = { x: 0.5, y: 0.5 };
+    const to = { x: 0.505, y: 0.505 };
+    expect(itemOfDrag(MARKUP_TOOL.frame, '#fff', from, to)).toBeNull();
+    expect(itemOfDrag(MARKUP_TOOL.frame, '#fff', from, to, 1 / 8)).not.toBeNull();
+    expect(cropOfDrag(from, to, 1 / 8)).not.toBeNull();
+  });
+
+  it('draw the line thinner in the picture by their share', () => {
+    const widths: number[] = [];
+    const ctx = {
+      beginPath() {},
+      moveTo() {},
+      lineTo() {},
+      closePath() {},
+      stroke() {
+        widths.push(this.lineWidth);
+      },
+      fill() {},
+      strokeRect() {},
+      fillRect() {},
+      clearRect() {},
+      strokeText() {},
+      fillText() {},
+      save() {},
+      restore() {},
+      lineWidth: 0,
+      strokeStyle: '',
+      fillStyle: '',
+      lineCap: 'round',
+      lineJoin: 'round',
+      font: '',
+      textBaseline: 'middle',
+    } as TMarkupContext;
+    const pen = (scale?: number): IMarkup => ({
+      items: [
+        {
+          kind: 'pen',
+          color: '#f00',
+          points: [
+            { x: 0, y: 0 },
+            { x: 1, y: 1 },
+          ],
+          scale,
+        },
+      ],
+      crop: null,
+    });
+    paintMarkup(ctx, 4000, 1000, pen(), MARKUP_LOOK.export);
+    paintMarkup(ctx, 4000, 1000, pen(0.25), MARKUP_LOOK.export);
+    expect(widths[1]).toBeCloseTo(widths[0] / 4);
   });
 });

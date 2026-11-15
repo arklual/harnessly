@@ -106,14 +106,12 @@ type Service struct {
 	opens         func(ctx context.Context, userID string, m store.Machine) bool
 	homeOn        func(ctx context.Context, email, machineID string) bool
 	ownerOn       func(ctx context.Context, email, machineID string) bool
-	// viewMu guards view: ServeHome's store goroutine outlives the handler, so a
-	// view swap (UseView) must not race with a listing already in flight.
-	viewMu        sync.RWMutex
 	search        searchindex.Index
 	searchOn      func(ctx context.Context, email, machineID string) bool
 	appKinds      AppKinder
 	appsCatalogOn func(ctx context.Context, email, machineID string) bool
 	view          Viewer
+	sheets        *sheetCache // the store's stylesheets with their fonts inside, by revision (sheetcache.go)
 	// cover is the count of the recorded projects the store has (coverage.go).
 	cover     coverage
 	warm      warmState
@@ -142,7 +140,7 @@ func New(d Deps) *Service {
 		transport: d.Transport, seal: newSealer(d.LinkKey), files: newFileKeyer(d.LinkKey), notice: d.Notice, bell: d.Bell, shared: d.Shared, opens: d.Opens, homeOn: d.HomeOn, ownerOn: d.OwnerOn, view: d.View, kits: d.Kits,
 		serving: map[string]bool{}, prefixes: map[string]string{}, timers: map[string]*time.Timer{},
 		events: map[string]*dayCount{}, tokens: map[string]cachedToken{}, budget: newBudget(),
-		teamLevel: roleEdit, closed: d.ClosedUnrecorded,
+		teamLevel: roleEdit, closed: d.ClosedUnrecorded, sheets: newSheetCache(sheetCacheMax),
 	}
 	if l := strings.ToLower(strings.TrimSpace(d.TeamLevel)); teamLevelOK(l) {
 		s.teamLevel = l

@@ -516,7 +516,7 @@ A video (a project of the kind video) is a deck whose boards are scenes; its com
 The shared library, from the shell:
 
 ` + designOpsHelp,
-	"hook": `harnessly hook status EVENT | design-guard | design-release
+	"hook": `harnessly hook status EVENT | design-guard | design-release | voice-guard [--agent codex]
 
 status is the lifecycle hook the runtime gives Claude Code (EVENT: session-start, prompt-submit, stop, ...): the event
 is written to the spool of the data folder and told to the runtime, which reads the spool when a delivery did not
@@ -527,6 +527,9 @@ the chat's lease on a board (*.dc.html) the call writes, and refuses with the ho
 or when this chat's own lease was gone meanwhile (read the file again). Prints nothing otherwise.
 design-release is the Stop hook: the turn ended, the chat lets go of its leases. See docs/design-pages.md for the
 settings.json entries.
+voice-guard is the voice mode's PreToolUse hook: while the person talks to this chat by voice, a tool call that reaches
+outside (a push, a merge, a message to people, a task made, a publication, a deletion, a payment) is asked about
+first; with --agent codex it is refused with words telling the agent to ask «Делаем?». Prints nothing otherwise.
 `,
 	"peers": `harnessly peers [list] | harnessly peers send REF TEXT...
 

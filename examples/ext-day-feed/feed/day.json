@@ -1,0 +1,251 @@
+{
+  "tz": "UTC",
+  "name": "Alex",
+  "headline": {
+    "rich": [
+      "Start with ",
+      { "t": "the export review", "item": 101 },
+      ", then ",
+      { "t": "«Planning»", "slot": "planning" },
+      " at 11:00"
+    ]
+  },
+  "digest": {
+    "rich": [
+      "Overnight the agent read the export merge request and left two comments worth your eyes. Dana waits for a word about the venue, the draft is ready. ",
+      { "t": "Three things", "jump": "pri" },
+      " need you today, and the afternoon is ",
+      { "t": "free of meetings", "jump": "cal" },
+      " until four."
+    ]
+  },
+  "tomorrow": {
+    "title": "Tomorrow, Friday",
+    "rich": [
+      "A light day: one meeting before noon and ",
+      { "t": "the board numbers", "item": 103 },
+      " are due by the evening."
+    ],
+    "meetings": [
+      {
+        "time": "10:00",
+        "title": "Release review",
+        "sub": "Kim, Lee · room Birch"
+      },
+      { "time": "15:30", "title": "One to one with Sam" }
+    ],
+    "promises": [
+      {
+        "time": "18:00",
+        "title": "Board numbers",
+        "sub": "The agent finishes the deck",
+        "itemId": 103
+      }
+    ]
+  },
+  "calendar": {
+    "from": "2026-03-12T08:00:00Z",
+    "to": "2026-03-12T20:00:00Z",
+    "slots": [
+      {
+        "id": "standup",
+        "kind": "meet",
+        "title": "Standup",
+        "start": "2026-03-12T09:30:00Z",
+        "end": "2026-03-12T09:45:00Z",
+        "place": "call"
+      },
+      {
+        "id": "planning",
+        "kind": "meet",
+        "title": "Planning",
+        "start": "2026-03-12T11:00:00Z",
+        "end": "2026-03-12T12:00:00Z",
+        "place": "room Birch",
+        "url": "https://example.com/meet/planning",
+        "prep": {
+          "ctx": [
+            "The team picks what goes into the April release. Two things are still argued about."
+          ],
+          "cols": [
+            {
+              "title": "Agreed",
+              "tone": "good",
+              "lines": ["Export to a file", "New sign-in page"]
+            },
+            {
+              "title": "Open",
+              "tone": "bad",
+              "lines": ["Offline mode: no estimate", "Who owns the migration"]
+            }
+          ],
+          "mats": [
+            {
+              "icon": "file-text",
+              "label": "Release plan",
+              "url": "https://example.com/docs/release-plan"
+            },
+            { "icon": "chart-column", "label": "Load figures" }
+          ]
+        }
+      },
+      {
+        "id": "design-sync",
+        "kind": "meet",
+        "title": "Design sync",
+        "start": "2026-03-12T11:30:00Z",
+        "end": "2026-03-12T12:00:00Z",
+        "place": "call",
+        "prep": {
+          "ctx": [
+            "Overlaps with Planning. Robin can go on without you, the notes will come after."
+          ]
+        }
+      },
+      {
+        "id": "focus",
+        "kind": "focus",
+        "title": "Focus",
+        "start": "2026-03-12T13:00:00Z",
+        "end": "2026-03-12T15:00:00Z"
+      },
+      {
+        "id": "venue-call",
+        "kind": "meet",
+        "title": "Venue call",
+        "start": "2026-03-12T16:00:00Z",
+        "end": "2026-03-12T16:30:00Z",
+        "place": "call",
+        "itemId": 102,
+        "prep": {
+          "ctx": ["Dana asks whether Friday still stands."],
+          "quote": "Can you confirm forty seats and the projector by noon?",
+          "draft": "Yes, forty seats and the projector. We arrive at 9:30."
+        }
+      },
+      {
+        "id": "numbers-walk",
+        "kind": "meet",
+        "title": "Numbers with Lee",
+        "start": "2026-03-12T17:00:00Z",
+        "end": "2026-03-12T17:30:00Z",
+        "offer": true,
+        "why": "Lee owns two of the figures in the board deck and is free at five. Half an hour today saves a round of letters tomorrow."
+      }
+    ],
+    "flags": [
+      {
+        "itemId": 103,
+        "who": "agent",
+        "kind": "run",
+        "title": "Board numbers",
+        "due": "2026-03-12T12:30:00Z",
+        "prep": {
+          "ctx": [
+            "The agent gathers the quarter's figures into the deck. The first version comes by half past twelve."
+          ]
+        }
+      },
+      {
+        "who": "me",
+        "kind": "promise",
+        "title": "Send the contract to Kim",
+        "short": "Contract",
+        "due": "2026-03-12T15:00:00Z",
+        "where": "the team chat"
+      },
+      {
+        "itemId": 102,
+        "who": "me",
+        "kind": "reply",
+        "title": "Dana about the venue",
+        "short": "Dana",
+        "where": "mail",
+        "icon": "mail",
+        "prep": {
+          "quote": "Can you confirm forty seats and the projector by noon?",
+          "draft": "Yes, forty seats and the projector. We arrive at 9:30."
+        }
+      },
+      {
+        "who": "me",
+        "kind": "reply",
+        "title": "Sam about the budget",
+        "short": "Sam",
+        "where": "mail",
+        "icon": "mail"
+      }
+    ],
+    "days": [
+      {
+        "from": "2026-03-13T08:00:00Z",
+        "to": "2026-03-13T20:00:00Z",
+        "slots": [
+          {
+            "id": "release-review",
+            "kind": "meet",
+            "title": "Release review",
+            "start": "2026-03-13T10:00:00Z",
+            "end": "2026-03-13T11:00:00Z",
+            "place": "room Birch"
+          },
+          {
+            "id": "one-to-one",
+            "kind": "meet",
+            "title": "One to one with Sam",
+            "start": "2026-03-13T15:30:00Z",
+            "end": "2026-03-13T16:00:00Z"
+          }
+        ],
+        "flags": [
+          {
+            "itemId": 103,
+            "who": "agent",
+            "kind": "promise",
+            "title": "Board deck",
+            "due": "2026-03-13T18:00:00Z"
+          }
+        ]
+      },
+      {
+        "from": "2026-03-14T08:00:00Z",
+        "to": "2026-03-14T20:00:00Z",
+        "off": true
+      }
+    ]
+  },
+  "priorities": [
+    {
+      "itemId": 101,
+      "title": "Review the export merge request",
+      "due": "by 11:00",
+      "soon": true,
+      "sub": "Robin waits for your word before Planning.",
+      "points": [
+        "Nine files, the tests pass",
+        "Two comments from the agent need your decision"
+      ],
+      "cta": "Look at the review"
+    },
+    {
+      "itemId": 102,
+      "title": "Answer Dana about the venue",
+      "due": "by noon",
+      "sub": "The draft is ready: forty seats, the projector, arrival at 9:30.",
+      "cta": "Read the draft"
+    },
+    {
+      "itemId": 103,
+      "title": "Board numbers for the quarter",
+      "due": "tomorrow, 18:00",
+      "sub": "The agent is building the deck. One figure does not match the report.",
+      "cta": "See what is ready"
+    },
+    {
+      "itemId": 104,
+      "title": "Renew the certificate",
+      "sub": "The agent renewed it this morning.",
+      "done": true
+    }
+  ]
+}

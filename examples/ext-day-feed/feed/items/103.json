@@ -1,0 +1,111 @@
+{
+  "itemId": 103,
+  "title": "Board numbers for the quarter",
+  "whenText": "tomorrow, 18:00",
+  "lead": "The agent is putting the quarter into a deck for the board. Most of it is ready; one figure does not match the finance report.",
+  "parts": [
+    {
+      "k": "rich",
+      "v": [
+        ["h", "Where it stands"],
+        [
+          "p",
+          "Revenue and new accounts are in. **Churn differs**: the product says 3.1%, the finance report 3.6%. The gap is the accounts paused in February."
+        ],
+        [
+          "ul",
+          [
+            "Six slides of eight are drawn",
+            "The appendix table waits for Lee's two figures"
+          ]
+        ]
+      ]
+    },
+    {
+      "k": "chart",
+      "h": "New accounts by month",
+      "src": "product analytics",
+      "v": [
+        ["Oct", 212],
+        ["Nov", 240],
+        ["Dec", 198],
+        ["Jan", 265],
+        ["Feb", 301],
+        ["Mar", 148, true]
+      ],
+      "note": "March is the first twelve days."
+    },
+    {
+      "k": "kpi",
+      "h": "The quarter so far",
+      "v": [
+        ["Revenue", "1.84M", "+12% to plan"],
+        ["New accounts", "714"],
+        ["Churn", "3.1%", "3.6% in finance"]
+      ]
+    },
+    {
+      "k": "data",
+      "h": "Churn, two sources",
+      "cols": ["Month", "Product", "Finance"],
+      "rows": [
+        { "c": ["January", "2.9%", "2.9%"] },
+        { "c": ["February", "3.1%", "3.6%"], "hot": true },
+        { "c": ["March", "3.0%", "3.1%"] }
+      ],
+      "note": "February differs by the paused accounts."
+    },
+    {
+      "k": "slides",
+      "h": "The deck",
+      "src": "8 slides",
+      "v": [
+        ["Quarter in brief", "title"],
+        ["Revenue", "chart"],
+        ["1.84M", "num"],
+        ["New accounts", "chart"],
+        ["Churn", "chart", true],
+        ["What is next", "text"]
+      ]
+    },
+    {
+      "k": "doc",
+      "title": "Notes for the board",
+      "meta": "Draft, two pages",
+      "url": "https://example.com/docs/board-notes",
+      "body": [
+        ["h", "The quarter in one paragraph"],
+        [
+          "p",
+          "Revenue is twelve percent over the plan, carried by the larger accounts that came in January."
+        ],
+        ["h", "What to decide"],
+        [
+          "p",
+          "Whether paused accounts count as churn. The answer changes one figure on the fifth slide."
+        ]
+      ]
+    },
+    {
+      "k": "file",
+      "icon": "file-text",
+      "name": "quarter-figures.csv",
+      "meta": "Table · 48 rows"
+    }
+  ],
+  "go": {
+    "icon": "sparkles",
+    "title": "The agent's chat about the deck",
+    "meta": "Working now",
+    "chat": "tab-day-example"
+  },
+  "chips": [
+    {
+      "label": "Count paused as churn",
+      "kind": "ask",
+      "say": "Count the paused accounts as churn and redraw the fifth slide."
+    },
+    { "label": "Tell it something else", "kind": "say" },
+    { "label": "Done", "kind": "done" }
+  ]
+}

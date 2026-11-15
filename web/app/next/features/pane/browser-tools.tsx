@@ -8,7 +8,7 @@ import {
   type TBrowserDevice,
 } from '@/next/features/pane/browser-device';
 import Icon from '@/next/ui/icon';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import { t } from '@/next/i18n';
 
 const DEVICE_ICONS: Record<TBrowserDevice, string> = {
@@ -27,7 +27,7 @@ export const DeviceMenu = ({ screen, onScreen }: IDeviceMenuProps) => {
   const actions = useMenuActions();
   const label = t('next.pane.device');
   return (
-    <Menu.Root actionsRef={actions}>
+    <MenuRoot actionsRef={actions}>
       <Menu.Trigger
         render={
           <button
@@ -67,7 +67,7 @@ export const DeviceMenu = ({ screen, onScreen }: IDeviceMenuProps) => {
           </Menu.Item>
         )}
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };
 
@@ -83,7 +83,7 @@ export const VaultMenu = ({ entries, busy, onLogin }: IVaultView) => {
   const actions = useMenuActions();
   const label = t('next.pane.vault');
   return (
-    <Menu.Root actionsRef={actions}>
+    <MenuRoot actionsRef={actions}>
       <Menu.Trigger
         render={
           <button
@@ -116,7 +116,7 @@ export const VaultMenu = ({ entries, busy, onLogin }: IVaultView) => {
           </Menu.Item>
         ))}
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };
 
@@ -149,7 +149,7 @@ export const MoreMenu = ({
   const actions = useMenuActions();
   const label = t('next.pane.more');
   return (
-    <Menu.Root actionsRef={actions}>
+    <MenuRoot actionsRef={actions}>
       <Menu.Trigger
         render={
           <button type="button" className="hx-head-btn hx-tbrowser__narrow" aria-label={label}>
@@ -204,6 +204,6 @@ export const MoreMenu = ({
           <span className="hx-cmenu__txt">{t('next.pane.newBrowserTab')}</span>
         </Menu.Item>
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };

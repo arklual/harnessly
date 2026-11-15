@@ -168,11 +168,48 @@ type usageTheme struct {
 	sums map[[32]byte]string
 }
 
+// usageThemesKept are the themes of a kits folder, read once for its signature: every open of a board asks for its kit
+// link, and reading the canvas of every installed theme and hashing each version's manifest took up to a second
+// An installed version does not change once sealed, so the folder's signature tells when to read again.
+var usageThemesKept = struct {
+	sync.Mutex
+	by map[string]usageThemesEntry
+}{by: map[string]usageThemesEntry{}}
+
+type usageThemesEntry struct {
+	sig    string
+	themes []usageTheme
+}
+
 func (l *Library) usageThemes(only string) []usageTheme {
 	dir := l.KitsDir()
+	sig := kitsSignature(dir)
+	usageThemesKept.Lock()
+	e, ok := usageThemesKept.by[dir]
+	usageThemesKept.Unlock()
+	if !ok || e.sig != sig {
+		e = usageThemesEntry{sig: sig, themes: readUsageThemes(dir)}
+		usageThemesKept.Lock()
+		usageThemesKept.by[dir] = e
+		usageThemesKept.Unlock()
+	}
+	if only == "" {
+		return e.themes
+	}
+	var out []usageTheme
+	for _, t := range e.themes {
+		if t.kit == only {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// readUsageThemes reads the latest version's themes of every kit of the folder; the themes are read only after.
+func readUsageThemes(dir string) []usageTheme {
 	var out []usageTheme
 	for _, k := range designkit.List(dir) {
-		if (only != "" && k.ID != only) || len(k.Versions) == 0 {
+		if len(k.Versions) == 0 {
 			continue
 		}
 		latest := k.Versions[0].Version

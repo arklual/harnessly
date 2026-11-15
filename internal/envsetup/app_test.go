@@ -19,9 +19,9 @@ type fakeApps struct {
 	wants  []string
 }
 
-func (a *fakeApps) Install(dir, itemID string, locked bool, install map[string]string, _ []string) (string, bool, []string, error) {
+func (a *fakeApps) Install(dir, itemID string, locked bool, install map[string]string, _ []string) (string, string, bool, []string, error) {
 	if _, err := os.Stat(filepath.Join(dir, "harnessly", "app.json")); err != nil {
-		return "", false, nil, err
+		return "", "", false, nil, err
 	}
 	changed := a.installed[itemID] != dir || a.locked[itemID] != locked
 	a.installed[itemID], a.locked[itemID] = dir, locked
@@ -34,7 +34,7 @@ func (a *fakeApps) Install(dir, itemID string, locked bool, install map[string]s
 			missing = append(missing, n)
 		}
 	}
-	return "acme.kit", changed, missing, nil
+	return "acme.kit", "1.2.0", changed, missing, nil
 }
 func (a *fakeApps) Has(itemID string) bool { _, ok := a.installed[itemID]; return ok }
 func (a *fakeApps) Prune(keep []string) ([]string, error) {
@@ -61,7 +61,7 @@ func TestAnAppIsInstalledFromTheFolderOfARepositoryAndPrunedAfterAFullRun(t *tes
 	f.setList(app, noPath)
 	f.r.Tick(context.Background())
 	run := f.onlyRun()
-	if s := f.step(run, "a1"); s.Status != hubproto.EnvOK || s.Message != "поставлено: acme.kit" {
+	if s := f.step(run, "a1"); s.Status != hubproto.EnvOK || s.Message != "поставлено: acme.kit" || s.Version != "1.2.0" {
 		t.Fatalf("a1: %+v", s)
 	}
 	if !apps.locked["a1"] || filepath.Base(apps.installed["a1"]) != "kit" {

@@ -94,6 +94,24 @@ request for it then waits up to 3 s for the next link instead of answering 502 �
 link ended within the last 5 s (given up by a replica that stops, or a lease run out); a machine away for longer is
 answered at once (`link.Registry.Await`).
 
+## The pages hear about a rollout
+
+While the hub or the runtimes are being rolled out, the pages show «An update is under way — connections to machines
+may drop for a moment» at the top of the window and «Update complete» for a moment once it is over
+(`internal/hub/rollout`, `web/app/next/features/rollout`). The hub is the one source, a lease `rollout:*` in
+`job_leases`:
+
+- a replica that gets SIGTERM marks `rollout:drain:<replica>` before step 1 above, for `HUB_SHUTDOWN_GRACE` + 20 s, and
+  shortens it to 20 s when it exits: every replica answers «under way» while one of them stops;
+- the pipeline marks the start and the end of a rollout with `POST /api/rollout` and `Authorization: Bearer
+  $HUB_ROLLOUT_TOKEN` (32 characters or more; empty keeps the route shut), body `{"state": "start" | "end", "what":
+  "hub" | "runtime", "minutes": 15}`; a start without an end runs out after `minutes`.
+
+A page asks `GET /api/v2/rollout` (`{"active": bool}`) when a machine's link drops, once a minute while open and every
+4 s during a rollout. A 502/503/504 without JSON there (nothing behind the balancer) reads as a rollout too. Meanwhile
+the page's requests that meet the gap are sent again instead of failing (a change only when it surely never reached the
+machine), a socket that was live is tried again within a second, and «Нет связи» stays away unless the person must act.
+
 ## What crosses between replicas
 
 - **Event streams.** What one replica tells its streams (a space's events, the workspace page's pokes, an

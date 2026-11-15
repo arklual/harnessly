@@ -337,11 +337,23 @@ func TestWorkspaceLetsASandboxedStoreBoardLoadItsFiles(t *testing.T) {
 	}
 	// Chrome sends a sandboxed board's requests without any Referer: they come at the board's keyed address, whose key
 	// designaccess checks once the person is known.
-	keyed := "/agents/api/platform/design/store/shop/k/mz0b1c2.AbC-d_e/f/lib/support.js"
+	keyed := "/agents/api/platform/design/store/shop/k/mz0b1c2.u1.AbC-d_e/f/lib/support.js"
 	for _, dest := range []string{"script", "style", "image"} {
 		if r := w.owner.Do("GET", keyed, nil, "Sec-Fetch-Site", "cross-site", "Sec-Fetch-Mode", "no-cors", "Sec-Fetch-Dest", dest); r.Code == 403 && r.Err() == "cross_site" {
 			t.Errorf("the board's own %s at its keyed address: %s", dest, r)
 		}
+	}
+	// Without a session only a live key of the hub's own signs the request in: a forged one is still unauthenticated.
+	anon, err := http.NewRequest("GET", w.s.URL+keyed, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	anon.Header.Set("Sec-Fetch-Site", "cross-site")
+	anon.Header.Set("Sec-Fetch-Dest", "script")
+	if res, err := http.DefaultClient.Do(anon); err != nil || res.StatusCode != 401 {
+		t.Errorf("a forged key without a session: %v %v", res, err)
+	} else {
+		res.Body.Close()
 	}
 	for name, c := range map[string]struct {
 		method, path string

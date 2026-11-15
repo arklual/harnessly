@@ -1409,6 +1409,54 @@ func TestContextLimitIsTheWindowTheAgentReports(t *testing.T) {
 	}
 }
 
+// Claude set to a smaller auto-compact window (autoCompactWindow) counts from it: the ring shows that window and the
+// point it compacts at (the window less Claude's 33k reserve), not the model's 1M.
+func TestContextFollowsClaudesAutoCompactWindow(t *testing.T) {
+	r := newRig(t)
+	var asked struct{ cwd, model string }
+	r.deps = func(d *Deps) {
+		d.Window = func(p wire.Provider, sid, path string) (int64, int64) { return 0, 1_000_000 }
+		d.Compact = func(p wire.Provider, cwd, model string) (int64, int64) {
+			asked.cwd, asked.model = cwd, model
+			return 400_000, 0
+		}
+	}
+	r.rt = r.runtime()
+	r.user("hi")
+	r.line(`"type":"assistant","message":{"role":"assistant","model":"claude-opus-5-5","content":[{"type":"text","text":"Hello"}],"usage":{"input_tokens":12,"cache_creation_input_tokens":1000,"cache_read_input_tokens":40000,"output_tokens":5}}`)
+	r.open()
+	r.settle(wire.StateWorking)
+	got, err := r.rt.Context(context.Background(), r.id)
+	if err != nil || got.LimitTokens != 400_000 || got.CompactAtTokens != 367_000 {
+		t.Fatalf("context: %+v %v", got, err)
+	}
+	if asked.model != "claude-opus-5-5" {
+		t.Fatalf("asked for model %q", asked.model)
+	}
+}
+
+func TestContextOf(t *testing.T) {
+	for _, c := range []struct {
+		name                     string
+		p                        wire.Provider
+		used, limit, window, at  int64
+		wantLimit, wantCompactAt int64
+	}{
+		{"claude, nothing set", wire.ProviderClaude, 10, 200_000, 0, 0, 200_000, 167_000},
+		{"claude, 1M capped to 400k", wire.ProviderClaude, 289_000, 1_000_000, 400_000, 0, 400_000, 367_000},
+		{"claude, window above the model's is the model's", wire.ProviderClaude, 10, 200_000, 400_000, 0, 200_000, 167_000},
+		{"claude, already past the setting keeps the real window", wire.ProviderClaude, 450_000, 1_000_000, 400_000, 0, 1_000_000, 967_000},
+		{"codex, limit set", wire.ProviderCodex, 10, 272_000, 0, 200_000, 272_000, 200_000},
+		{"codex, nothing set", wire.ProviderCodex, 10, 272_000, 0, 0, 272_000, 0},
+		{"codex, limit above the window", wire.ProviderCodex, 10, 272_000, 0, 300_000, 272_000, 0},
+	} {
+		got := contextOf(c.p, c.used, c.limit, c.window, c.at)
+		if got.LimitTokens != c.wantLimit || got.CompactAtTokens != c.wantCompactAt || got.UsedTokens != c.used {
+			t.Errorf("%s: %+v", c.name, got)
+		}
+	}
+}
+
 // A send the page repeats — its answer was lost, a gateway answered 502 in front of the runtime, the runtime restarted
 // in a rollout — is the same message: the same answer, no second copy in the queue, no second event. A refusal that is
 // only «no time» or «not now» (timeout, internal) is not kept as the answer, so the repeat is tried again.

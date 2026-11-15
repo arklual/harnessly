@@ -119,7 +119,9 @@ async function steerInStrip() {
   act(() => applyMessage(machine, record()));
   render(<ChatDock conv={CONV} machine={machine} />);
   await act(settle);
-  expect(standing()?.textContent).toContain(t('next.message.handed'));
+  // A steer in the agent's input line stands in the strip with no note: it is in the turn.
+  expect(standing()).toBeDefined();
+  expect(standing()?.textContent).not.toContain(t('next.queue.sending'));
 }
 
 /** The row leaves with its closing animation: first on its way out, then gone. */
@@ -190,6 +192,45 @@ describe('a steered message in the strip over the field', () => {
   });
 });
 
+// the runtime's word on the message came while the page did not hear it (a socket dropped, the runtime started
+// over). The snapshot of the reconnect is the truth: the strip is taken from it, never kept from what the page held.
+describe('a steered message in the strip, by the snapshot of a reconnect', () => {
+  /** Gone after the reconnect, its closing animation over within it. */
+  async function gone() {
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(rows()).toHaveLength(0);
+    expect(connectionStore.get(machine)?.k).toBe('live');
+  }
+
+  async function reconnect() {
+    rt.restart();
+    await act(() => vi.advanceTimersByTimeAsync(5000));
+    await act(settle);
+  }
+
+  it('leaves when the snapshot says the agent read it in its turn', async () => {
+    await steerInStrip();
+    rt.convs.get(CONV)!.messages = [record({ state: { k: 'in-turn', turnId: TURN }, rev: 9 })];
+    await reconnect();
+    await gone();
+  });
+
+  it('leaves when the snapshot no longer lists it: it ended while the page was away', async () => {
+    await steerInStrip();
+    rt.convs.get(CONV)!.messages = [];
+    await reconnect();
+    await gone();
+  });
+
+  it('stays when the snapshot still has it in the agent’s queue', async () => {
+    await steerInStrip();
+    rt.convs.get(CONV)!.messages = [record()];
+    await reconnect();
+    expect(standing()).toBeDefined();
+    expect(standing()?.textContent).not.toContain(t('next.queue.sending'));
+  });
+});
+
 describe('what stands in the strip, by the runtime’s state of the message', () => {
   const wait = () => ({ slowAt: machineNow(machine) + 3000, deadlineAt: machineNow(machine) + 30_000 });
   const cases: [string, () => Partial<Message>, string | null][] = [
@@ -199,11 +240,7 @@ describe('what stands in the strip, by the runtime’s state of the message', ()
       '',
     ],
     ['a steer being typed', () => ({ state: { k: 'typing', wait: wait() } }), 'next.queue.sending'],
-    [
-      'a steer in the agent’s queue',
-      () => ({ state: { k: 'in-input', wait: wait() } }),
-      'next.message.handed',
-    ],
+    ['a steer in the agent’s queue', () => ({ state: { k: 'in-input', wait: wait() } }), ''],
     [
       'a steer that did not reach the agent',
       () => ({ state: { k: 'queued', position: 1, reason: 'stalled', wait: null } }),

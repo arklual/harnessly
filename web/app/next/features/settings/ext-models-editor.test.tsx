@@ -81,11 +81,46 @@ describe('the models of a provider', () => {
 
   it('offers a model of a smart feature at each of its levels', () => {
     const { choices } = smartChoices(
-      { id: 'f', title: 'F', description: '', live: true, agents: false, choice: null, failure: null },
+      {
+        id: 'f',
+        title: 'F',
+        description: '',
+        live: true,
+        agents: false,
+        offable: false,
+        choice: null,
+        failure: null,
+      },
       [{ id: 'ds', name: 'DeepSeek', models: [{ id: 'r1', label: 'R1', efforts: ['low', 'high'] }] }],
       { claude: [], codex: [] },
     );
     expect(choices.map((c) => c.value)).toEqual([null, 'ds/r1', 'ds/r1#low', 'ds/r1#high']);
     expect(choices[3]?.label).toBe('DeepSeek · R1 · High');
+  });
+
+  it("offers the machine's agents' models on their plan to any feature, and «off» only where it may be off (HRN-1492)", () => {
+    const agentModels = {
+      claude: [{ id: 'haiku', label: 'Haiku' }],
+      codex: [{ id: 'gpt-5-mini', label: 'GPT-5 mini' }],
+    };
+    const feature = {
+      id: 'search-answer',
+      title: 'S',
+      description: '',
+      live: true,
+      agents: true,
+      offable: false,
+      choice: null,
+      failure: null,
+    };
+    const { choices } = smartChoices(feature, [], agentModels);
+    expect(choices.map((c) => c.value)).toEqual([null, 'claude/haiku', 'codex/gpt-5-mini']);
+    expect(choices[1]?.sub).toBeTruthy();
+    const summary = smartChoices(
+      { ...feature, id: 'notify-summary', offable: true },
+      [],
+      agentModels,
+    ).choices;
+    expect(summary.map((c) => c.value)).toContain('off/');
   });
 });

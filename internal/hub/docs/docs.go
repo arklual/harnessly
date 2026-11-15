@@ -37,6 +37,11 @@ type Deps struct {
 	Notice Notice
 	// Gate says whether the rollout switch of the comments on boards is on for a person (boards.go); nil: off for everyone.
 	Gate Gate
+	// Bell rings a person's bell for a mention on a board (board_mentions.go); nil: nobody is told.
+	Bell Bell
+	// AppToken checks the platform's token of a person for an app's backend (the hub's signature, issuer, the audience
+	// given and the expiry) and answers whose it is; nil: a service cannot act for a person (manage.go).
+	AppToken func(token, audience string) (sub string, err error)
 }
 
 // Service serves documents and boards.
@@ -57,15 +62,17 @@ type Service struct {
 	// lim holds the people search of one person to a pace.
 	lim *ratelimit.Limiter
 	// health is the last answer of the documents and boards services (health.go).
-	health *health
-	gate   Gate
+	health   *health
+	gate     Gate
+	bell     Bell
+	appToken func(token, audience string) (string, error)
 }
 
 // Notice mails a short notice to a person (a mention); nil keeps the hub silent.
 type Notice func(ctx context.Context, to, subject, body, link string) error
 
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, log: d.Log, now: d.Now, hc: d.HTTP, links: d.Links, notice: d.Notice, health: newHealth(), gate: d.Gate}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, log: d.Log, now: d.Now, hc: d.HTTP, links: d.Links, notice: d.Notice, health: newHealth(), gate: d.Gate, bell: d.Bell, appToken: d.AppToken}
 	if s.now == nil {
 		s.now = time.Now
 	}

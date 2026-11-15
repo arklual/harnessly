@@ -382,6 +382,15 @@ func (s *Service) serveFleet(w http.ResponseWriter, r *http.Request) {
 // fleetCall answers /api/v2/… for a signed-in person; onHub is the workspace's way in (workspace.go), where only the
 // machines that may answer on the hub's own origin are there.
 func (s *Service) fleetCall(w http.ResponseWriter, r *http.Request, u store.User, onHub bool) {
+	if r.URL.Path == "/api/v2/rollout" && r.Method == http.MethodGet && r.URL.Query().Get("machine") == "" {
+		// Whether the hub or the runtimes are being rolled out: the page says so over its losses of connection.
+		if s.rollout == nil {
+			httpx.WriteJSON(w, http.StatusOK, map[string]bool{"active": false})
+			return
+		}
+		s.rollout(w, r)
+		return
+	}
 	if r.URL.Path == "/api/v2/web-vitals" {
 		// the page's own timings (Sinopia's home, LCP) are the hub's numbers, whatever machine the page shows.
 		webvitals.Serve(w, r, webVitalLimit, u.ID, func(v webvitals.Sample) { metrics.ObserveWebVital(v.Name, v.Seconds) })

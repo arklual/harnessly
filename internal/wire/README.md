@@ -823,3 +823,7 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
     (`{kind: stand, up, title}`: a redirect to a sign-in is up, no answer or a 5xx is down). Which addresses are
     stands, the tracker, GitLab, documents and boards is the organization's word when the hub sends it
     (`env.set` `links`, hubproto.LinkSettings), the machine's environment otherwise.
+73. **The pictures a turn drew.** `Turn.pictures` lists the paths of the pictures the turn drew
+    (`generate_images`, `wait_images`, Codex's image tool), oldest first, at most 24. The page shows them under the
+    answer, so a folded turn still shows what it drew; the steps keep their cards for the unfolded view. A page that
+    does not know the field drops it.

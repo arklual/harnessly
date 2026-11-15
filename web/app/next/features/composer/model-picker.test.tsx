@@ -239,7 +239,7 @@ describe('a handoff from the picker', () => {
     act(() => view.container.querySelector<HTMLButtonElement>('.hx-model')?.click());
     act(() => view.container.querySelector<HTMLButtonElement>('.hx-picker__center')?.click());
     const segments = [...view.container.querySelectorAll<HTMLButtonElement>('.hx-seg__item')];
-    expect(segments.map((s) => s.textContent)).toEqual(['Claude', 'Codex']);
+    expect(segments.map((s) => s.textContent)).toEqual(['Claude', 'OpenAI']);
     const handoff = view.container.querySelector<HTMLButtonElement>('.hx-option[data-handoff]');
     expect(handoff?.textContent).toContain('Continue in Codex');
     act(() => handoff?.click());
@@ -253,5 +253,87 @@ describe('a handoff from the picker', () => {
     act(() => view.container.querySelector<HTMLButtonElement>('.hx-picker__center')?.click());
     expect(view.container.querySelector('.hx-seg')).toBeNull();
     expect(view.container.querySelector('.hx-option[data-handoff]')).toBeNull();
+  });
+});
+
+describe('ChatGPT beside the agents', () => {
+  const show = (extra: Parameters<typeof ModelPicker>[0]['extra']) => {
+    const view = render(
+      <ModelPicker value={choice()} agents={[agent]} locked={false} onChange={vi.fn()} extra={extra} />,
+    );
+    act(() => view.container.querySelector<HTMLButtonElement>('.hx-model')?.click());
+    act(() => view.container.querySelector<HTMLButtonElement>('.hx-picker__vm')?.click());
+    return view;
+  };
+
+  it('is a tab of its own with the plan models, a line on what it is, and a pick hands the model over', () => {
+    const onPick = vi.fn();
+    const view = show({
+      label: 'ChatGPT',
+      sub: 'просто чат',
+      models: [{ id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol' }],
+      signIn: null,
+      onPick,
+    });
+    // ChatGPT is OpenAI's «Чат»: the only way of OpenAI here, so its tab opens it with no row of ways.
+    const tab = [...view.container.querySelectorAll<HTMLButtonElement>('.hx-seg__item')].at(-1);
+    expect(tab?.textContent).toBe('OpenAI');
+    act(() => tab?.click());
+    expect(tab?.getAttribute('aria-pressed')).toBe('true');
+    expect(view.container.querySelector('.hx-picker__modes')).toBeNull();
+    expect(view.container.querySelector('.hx-picker__about')?.textContent).toBeTruthy();
+    act(() => view.getByText('GPT-6.1 Sol').click());
+    expect(onPick).toHaveBeenCalledWith('gpt-6.1-sol');
+  });
+
+  it('shows the sign-in in place of the models while nobody is signed in', () => {
+    const view = show({
+      label: 'ChatGPT',
+      sub: 'просто чат',
+      models: null,
+      signIn: <button type="button">Войти</button>,
+      onPick: vi.fn(),
+    });
+    expect(view.getByText('Войти')).toBeTruthy();
+  });
+});
+
+describe('the limit on the pill (HRN-1496)', () => {
+  const now = Math.floor(Date.now() / 1000);
+  const limits = {
+    state: 'ready',
+    provider: 'claude',
+    limits: {
+      fiveHour: { usedPct: 82, resetsAt: now + 3600, forecast: null },
+      sevenDay: { usedPct: 49, resetsAt: now + 3 * 86400, forecast: null },
+      month: null,
+      balance: null,
+      estimate: false,
+      unofficial: false,
+      updatedAt: null,
+      plan: null,
+      error: null,
+      rejected: false,
+    },
+    spend: null,
+  } as const;
+
+  it('fills the outline by the spent five hours and shows both windows in the popover', () => {
+    const view = render(
+      <ModelPicker value={choice()} agents={[agent]} locked onChange={vi.fn()} limits={limits} />,
+    );
+    const pill = view.container.querySelector<HTMLButtonElement>('.hx-model');
+    expect(pill?.dataset.ring).toBe('low');
+    const ring = view.container.querySelector<SVGElement>('.hx-model__ring');
+    expect(ring?.style.getPropertyValue('--hx-ring-used')).toBe('82');
+    act(() => pill?.click());
+    const gauges = view.container.querySelectorAll('.hx-picker__limits .hx-gauge');
+    expect(gauges).toHaveLength(2);
+  });
+
+  it('draws a plain border without limits', () => {
+    const view = render(<ModelPicker value={choice()} agents={[agent]} locked onChange={vi.fn()} />);
+    expect(view.container.querySelector('.hx-model__ring')).toBeNull();
+    expect(view.container.querySelector('.hx-model')?.hasAttribute('data-ring')).toBe(false);
   });
 });

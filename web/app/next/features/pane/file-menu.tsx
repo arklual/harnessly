@@ -5,7 +5,7 @@ import type { ReactElement } from 'react';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
 import { toast } from '@/next/ui/toast';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { downloadHref, saveFrom } from '@/next/features/pane/download';
 import { previewUrl } from '@/next/features/pane/delivered';
@@ -61,7 +61,7 @@ const FileMenu = ({
     toast(t('next.fileMenu.asked'), { tone: 'success' });
   };
   return (
-    <Menu.Root actionsRef={actions}>
+    <MenuRoot actionsRef={actions}>
       <Menu.Trigger render={trigger} />
       <MenuPanel
         actions={actions}
@@ -124,7 +124,7 @@ const FileMenu = ({
           </Menu.Item>
         )}
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };
 

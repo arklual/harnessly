@@ -66,16 +66,17 @@ export const useGptSignedIn = (machine: MachineId | null): boolean => {
   return on !== null && on.machine === machine && on.on;
 };
 
-let carried: { chat: string; text: string } | null = null;
+let carried: { chat: string; text: string; send: boolean } | null = null;
 
-/** The words the start page's field held when ChatGPT was picked: the new chat's field starts with them. */
-export const carryDraft = (chat: string, text: string) => {
-  carried = text.trim() ? { chat, text } : null;
+/** The words the start page's field held when ChatGPT was picked: the new chat starts with them, sent at once when
+ *  `send` says so (a model picked with words in the field is a question asked). */
+export const carryDraft = (chat: string, text: string, send = false) => {
+  carried = text.trim() ? { chat, text, send } : null;
 };
 
-export const takeDraft = (chat: string): string => {
-  if (carried?.chat !== chat) return '';
-  const text = carried.text;
+export const takeDraft = (chat: string): { text: string; send: boolean } => {
+  if (carried?.chat !== chat) return { text: '', send: false };
+  const out = { text: carried.text, send: carried.send };
   carried = null;
-  return text;
+  return out;
 };

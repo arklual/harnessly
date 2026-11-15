@@ -1191,8 +1191,41 @@ func (r *Runtime) Context(ctx context.Context, id string) (wire.ConvContext, err
 		if used > limit {
 			limit = max(wire.ContextWindowLong, used)
 		}
-		return wire.ConvContext{UsedTokens: used, LimitTokens: limit}, nil
+		var model string
+		if m := c.rec.Model; m != nil {
+			model = m.ID
+		}
+		var window, at int64
+		if r.d.Compact != nil {
+			window, at = r.d.Compact(c.rec.Provider, c.rec.Cwd, model)
+		}
+		return contextOf(c.rec.Provider, used, limit, window, at), nil
 	})
+}
+
+// claudeCompactReserve is what Claude Code keeps below the window it counts compaction from: room for the answer
+// (the model's output, at most 20k) and a 13k buffer — it compacts once the context passes window − 33k.
+const claudeCompactReserve = 20_000 + 13_000
+
+// contextOf is the window the person is shown and where the agent compacts by itself. Claude with autoCompactWindow
+// below its model's window counts from that window, so that is the window shown; Codex compacts at its token limit.
+// CompactAtTokens is 0 where the runtime cannot say (the page then keeps its own share).
+func contextOf(p wire.Provider, used, limit, window, at int64) wire.ConvContext {
+	out := wire.ConvContext{UsedTokens: used, LimitTokens: limit}
+	switch p {
+	case wire.ProviderClaude:
+		if window > 0 && window < limit && used <= window {
+			out.LimitTokens = window
+		}
+		if out.LimitTokens > claudeCompactReserve {
+			out.CompactAtTokens = out.LimitTokens - claudeCompactReserve
+		}
+	case wire.ProviderCodex:
+		if at > 0 && at < limit {
+			out.CompactAtTokens = at
+		}
+	}
+	return out
 }
 
 // sendLost: a send was answered «I have it», and the conversation knows nothing of that message now — not waiting, not

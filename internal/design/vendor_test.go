@@ -45,7 +45,7 @@ func TestVendorFilesMatchEngineSRI(t *testing.T) {
 	src := string(raw)
 	for _, prefix := range []string{"REACT", "REACT_DOM", "BABEL"} {
 		url, sri := engineConst(t, src, prefix+"_URL"), engineConst(t, src, prefix+"_SRI")
-		f, ok := vendorFiles[url]
+		f, ok := vendorFor(url)
 		if !ok {
 			t.Fatalf("%s is not vendored", url)
 		}
@@ -105,5 +105,19 @@ func TestBoardHTMLHasResourcesBeforeEngine(t *testing.T) {
 	}
 	if strings.Contains(html, "unpkg.com/react@17") {
 		t.Fatal("unexpected mapping")
+	}
+}
+
+// an engine naming jsDelivr gets the same vendored files as one naming unpkg.
+func TestVendorMirrorsMapToTheSameFiles(t *testing.T) {
+	script := resourcesScript()
+	for mirror, to := range vendorMirrors {
+		f, ok := vendorFor(mirror)
+		if !ok || f != vendorFiles[to] {
+			t.Fatalf("%s maps to nothing vendored", mirror)
+		}
+		if !strings.Contains(script, `"`+mirror+`":"`+vendorPrefix+f.Name+`"`) {
+			t.Fatalf("the board's resources miss %s: %s", mirror, script)
+		}
 	}
 }

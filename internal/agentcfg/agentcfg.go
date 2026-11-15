@@ -41,6 +41,8 @@ type Config struct {
 type Store struct {
 	cfg Config
 	mu  sync.Mutex
+	// compactFiles keeps the settings files CompactOf reads (compact.go).
+	compactFiles fileCache
 }
 
 var _ wire.AgentSettingsSource = (*Store)(nil)

@@ -27,7 +27,7 @@ const (
 
 func (c *cli) design(args []string) error {
 	if len(args) == 0 {
-		return usageErr("design needs a subcommand: check, code, page, notes, export, migrate, kit, pack, layouts, engine, timeline, moment, video, list, state, logs, panel, claim, release, who, history, restore")
+		return usageErr("design needs a subcommand: check, code, page, notes, export, migrate, kit, pack, layouts, engine, timeline, moment, video, list, state, logs, panel, claim, release, who, history, restore, delete")
 	}
 	switch args[0] {
 	case "check":
@@ -58,6 +58,8 @@ func (c *cli) design(args []string) error {
 		return c.designVideo(args[1:])
 	case "list", "state", "logs", "panel", "claim", "release", "who", "history", "restore":
 		return c.designOps(args[0], args[1:])
+	case "delete", "remove", "rm":
+		return c.designDelete(args[1:])
 	}
 	return usageErr("unknown design command %q", args[0])
 }
@@ -446,12 +448,18 @@ func (c *cli) hook(args []string) error {
 	if len(args) == 5 && args[0] == "app-validate" && args[1] == "--policy" && args[3] == "--event" {
 		return c.appValidateHook(args[2], args[4])
 	}
+	if len(args) == 1 && args[0] == "voice-guard" {
+		return c.voiceGuard(false)
+	}
+	if len(args) == 3 && args[0] == "voice-guard" && args[1] == "--agent" && args[2] == "codex" {
+		return c.voiceGuard(true)
+	}
 	if len(args) == 2 && args[0] == "status" {
 		c.hookStatus(args[1])
 		return nil
 	}
 	if len(args) != 1 || (args[0] != "design-guard" && args[0] != "design-release") {
-		return usageErr("hook status <event>|design-guard|design-release|app-guard --policy <file> [--agent codex]|app-context --policy <file>|app-context --live|app-validate --policy <file> --event PostToolUse|Stop")
+		return usageErr("hook status <event>|design-guard|design-release|voice-guard [--agent codex]|app-guard --policy <file> [--agent codex]|app-context --policy <file>|app-context --live|app-validate --policy <file> --event PostToolUse|Stop")
 	}
 	if args[0] == "design-release" {
 		c.releaseLeases()

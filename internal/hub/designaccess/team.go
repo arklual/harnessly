@@ -119,12 +119,34 @@ func (s *Service) storeRoute(w http.ResponseWriter, r *http.Request, u store.Use
 				w.WriteHeader(http.StatusFound)
 				return nil
 			}
-			if isStylesheet(segs) && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
-				return serveSheet(isolated(w, r), r, segs, func(w http.ResponseWriter, r *http.Request, segs []string) error {
-					return s.view.Serve(w, r, m.SpaceID, project, head, segs, nil, false)
-				})
+			sourced := false
+			read := func(w http.ResponseWriter, r *http.Request, segs []string) error {
+				fell, err := s.serveOrSource(w, r, t, u, m.SpaceID, project, head, segs)
+				sourced = sourced || fell
+				return err
 			}
-			return s.view.Serve(isolated(w, r), r, m.SpaceID, project, head, segs, nil, false)
+			if isStylesheet(segs) && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
+				// A revision decides its sheet: worked out once per replica, not on every open of every board.
+				key := sheetKey(m.SpaceID, project, head, segs)
+				if out := s.sheets.get(key); out != nil {
+					out.write(isolated(w, r), r)
+					return nil
+				}
+				out, pass, err := buildSheet(r, segs, read)
+				if err != nil {
+					return err
+				}
+				if pass != nil {
+					copyAnswer(isolated(w, r), r, pass)
+					return nil
+				}
+				if !sourced {
+					s.sheets.put(key, out)
+				}
+				out.write(isolated(w, r), r)
+				return nil
+			}
+			return read(isolated(w, r), r, segs)
 		}
 		return fail("not_found", "Маршрут не найден")
 	}

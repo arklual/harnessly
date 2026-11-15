@@ -107,11 +107,28 @@ describe('the page asks the runtime where a late message is', () => {
     expect(rt.commands.filter((c) => c.op === 'send')).toHaveLength(1);
   });
 
-  it('the runtime does not know it: back to the queue over the field, not lost, not sent again by itself; Retry sends it', async () => {
+  it('the runtime does not know it after a break of the road: sent again once by itself, delivered, no duplicate', async () => {
+    const { rt, m } = await openChat();
+    // The first send never reached the runtime (a gateway's 502 for a second answered for it from memory).
+    answerFromMemory(rt, () => null);
+    const id = sendMessage(m, { conversationId: CONV, text: 'тут криво' });
+    await settle();
+    rt.handlers.set('send', (cmd, r) => r.defaultSend(cmd as Extract<typeof cmd, { op: 'send' }>));
+    await vi.advanceTimersByTimeAsync(1600);
+    await settle();
+    expect(rt.commands.filter((c) => c.op === 'send').map((c) => c.body.opId)).toEqual([id, id]);
+    expect(msg(id).state.k).not.toBe('failed');
+    expect([...messagesStore.values()].filter((v) => v.text === 'тут криво')).toHaveLength(1);
+  });
+
+  it('still unknown after its own second try: back to the queue over the field with Повторить, not lost; Retry sends it anew', async () => {
     const { rt, m } = await openChat();
     answerFromMemory(rt, () => null);
     const id = sendMessage(m, { conversationId: CONV, text: 'как дела' });
     await vi.advanceTimersByTimeAsync(1600);
+    // Sent again by itself once, under the same clientId: the runtime takes one clientId once, however often it comes.
+    expect(rt.commands.filter((c) => c.op === 'send').map((c) => c.body.opId)).toEqual([id, id]);
+    await vi.advanceTimersByTimeAsync(STATUS_EVERY_MS + 2000);
     expect(msg(id)).toMatchObject({
       rev: 0,
       held: true,
@@ -119,17 +136,9 @@ describe('the page asks the runtime where a late message is', () => {
     });
     expect(waitsInQueue(msg(id), 'idle')).toBe(true);
     await vi.advanceTimersByTimeAsync(5 * 60_000);
-    expect(rt.commands.filter((c) => c.op === 'send')).toHaveLength(1);
-    // What became of the message is not known for certain, so Повторить sends it under the same clientId first: the
-    // runtime takes one clientId once, however often it comes.
-    retryMessage(id);
-    await settle();
-    expect(msg(id)).toMatchObject({ rev: 0, state: { k: 'submitting' }, attempts: 1 });
-    expect(rt.commands.filter((c) => c.op === 'send').map((c) => c.body.opId)).toEqual([id, id]);
-    // This runtime answers from its memory of the opId and still has no message; its status says so again. Only then do
-    // the words go as a new message, and the old one goes.
-    await vi.advanceTimersByTimeAsync(STATUS_EVERY_MS + 2000);
-    expect(msg(id).state).toMatchObject({ k: 'failed', code: 'unconfirmed' });
+    expect(rt.commands.filter((c) => c.op === 'send')).toHaveLength(2);
+    // This runtime answers from its memory of the opId and still has no message: Повторить sends the words as a new
+    // message, and the old one goes.
     rt.handlers.set('send', (cmd, r) => r.defaultSend(cmd as Extract<typeof cmd, { op: 'send' }>));
     retryMessage(id);
     await settle();
@@ -153,7 +162,8 @@ describe('the page asks the runtime where a late message is', () => {
     // asked about, and its own 30 s count from its turn — it is not «unconfirmed» the moment its first try fails.
     expect(rt.statusAsks.flat()).toContain(first);
     expect(rt.statusAsks.flat()).not.toContain(second);
-    expect(msg(first).state).toMatchObject({ k: 'failed', code: 'unconfirmed' });
+    // The runtime did not know it: it went again once by itself (the same clientId), and waits for the road.
+    expect(msg(first).state.k).toBe('submitting');
     expect(msg(second).state.k).toBe('submitting');
   });
 

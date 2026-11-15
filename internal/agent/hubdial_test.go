@@ -69,3 +69,18 @@ func TestReplacedLinkWaitsLongerEachTime(t *testing.T) {
 		t.Errorf("after a settled link = %v, want %v", d, hubPauseMin/2)
 	}
 }
+
+func TestHubBackoffStartsOverAfterAPlannedClose(t *testing.T) {
+	b := &hubBackoff{rnd: func() float64 { return 0.999999 }}
+	for range 5 {
+		b.next()
+	}
+	b.ended(10 * time.Second) // a short link: the window stays wide
+	if d := b.next(); d < 10*time.Second {
+		t.Fatalf("window started over too early: %v", d)
+	}
+	b.planned()
+	if d := b.next(); d >= hubPauseMin {
+		t.Fatalf("after a planned close the pause is %v, want under %v", d, hubPauseMin)
+	}
+}

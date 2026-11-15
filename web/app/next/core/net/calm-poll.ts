@@ -21,13 +21,25 @@ export interface ICalmPoll {
 /** How much longer each quiet step is than the one before. */
 export const CALM_FACTOR = 1.6;
 
+/**
+ * The step while agents work. Working agents move the conversations many times a second, all the time; at
+ * the base step every poll asked every 2–3 s and a phone sent 150–190 requests a minute, each answered in 3–10 s by a
+ * busy runtime. A move of the conversations brings a poll back to this step, not to its base: an ask of an agent shows
+ * within it. The page itself coming back (shown, focused, online) still looks at once.
+ */
+export const BUSY_STEP = 8000;
+
 const nudges = new Set<() => void>();
 let unConvs: (() => void) | null = null;
 
-/** Everything that polls goes back to its base step (the conversations moved, the page came back). */
+/** Everything that polls goes back to its busy step (the conversations moved). */
 export const nudgePolls = (): void => {
   for (const n of nudges) n();
 };
+
+/** The step after a move of the conversations: the busy step, or the base when the poll is slower than that anyway. */
+export const busyStep = (step: number, o: Pick<ICalmPoll, 'base' | 'max'>): number =>
+  Math.min(step, Math.max(o.base, BUSY_STEP));
 
 /** The next step after a look. */
 export const nextStep = (step: number, o: Pick<ICalmPoll, 'base' | 'max'>, changed: boolean): number =>
@@ -71,12 +83,19 @@ export const calmPoll = (o: ICalmPoll): (() => void) => {
         if (live) schedule(step);
       });
   }
+  /** The conversations moved: not sooner than the busy step after the last look, a busy chat moves many times a second. */
   const wake = () => {
     if (!live) return;
     const was = step;
+    step = busyStep(step, o);
+    if (was > step && !looking && timer !== null) schedule(Math.max(0, lastLook + step - clock.now()));
+  };
+  /** The window was focused: back to the base step, not sooner than it after the last look. */
+  const focus = () => {
+    if (!live) return;
+    const was = step;
     step = o.base;
-    // Not sooner than the base step after the last look: a busy chat moves many times a second.
-    if (was > o.base && !looking) schedule(Math.max(0, lastLook + o.base - clock.now()));
+    if (was > o.base && !looking && timer !== null) schedule(Math.max(0, lastLook + o.base - clock.now()));
   };
   /** The page came back (shown again, the network back): a look at once. */
   const now = () => {
@@ -92,7 +111,7 @@ export const calmPoll = (o: ICalmPoll): (() => void) => {
   if (unConvs === null) unConvs = conversationsStore.subscribeAll(nudgePolls);
   if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisible);
   if (typeof window !== 'undefined') {
-    window.addEventListener('focus', wake);
+    window.addEventListener('focus', focus);
     window.addEventListener('online', now);
     if (o.wakeOn) window.addEventListener(o.wakeOn, now);
   }
@@ -107,7 +126,7 @@ export const calmPoll = (o: ICalmPoll): (() => void) => {
     }
     if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible);
     if (typeof window !== 'undefined') {
-      window.removeEventListener('focus', wake);
+      window.removeEventListener('focus', focus);
       window.removeEventListener('online', now);
       if (o.wakeOn) window.removeEventListener(o.wakeOn, now);
     }

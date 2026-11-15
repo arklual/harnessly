@@ -30,9 +30,12 @@ import {
 } from '@/next/features/designly/site-drag';
 import { PANE_CHATS, type TPaneChat } from '@/next/features/designly/pane-chat';
 import { ChatTerminalButton } from '@/next/features/terminal/chat-terminal';
+import LinkCard, { type TCardKind } from '@/next/features/chat/link-card';
 import Icon from '@/next/ui/icon';
 import { plural, t } from '@/next/i18n';
+import FieldHead from '@/next/features/voice-live/field-head';
 import '@/next/styles/island.css';
+import type { ISpaceLine } from '@/next/features/space-field/line';
 
 export const SITE_MODES = ['island', 'float', 'chat', 'notes'] as const;
 export type TSiteMode = (typeof SITE_MODES)[number];
@@ -267,13 +270,14 @@ export interface ISiteChatProps {
   /** The chat was dragged to a place: an edge, a window, the field. */
   onZone: TDropZone;
   onHide: () => void;
-  onOpenDrawer: () => void;
   /** Where the chat stands, picked in its head; `section` is the design's area, a first window's room. */
   onMode: (mode: TSiteMode, section: { width: number; height: number }) => void;
   /** The «⋯» of the chat: going on in another model or on another machine; empty without a chat yet. */
   more: readonly IChatMoreItem[];
   /** On a phone: the site over the chat. */
   onOpenSite: () => void;
+  /** «К чату»: out of the full screen to the chat's own page; absent while the design has no chat yet. */
+  onToChat?: () => void;
 }
 
 /** The chat's fade, as long as .hx-site__chat's opacity transition in site.css. */
@@ -292,10 +296,10 @@ export const SiteChat = ({
   onWidth,
   onZone,
   onHide,
-  onOpenDrawer,
   onMode,
   more,
   onOpenSite,
+  onToChat,
 }: ISiteChatProps) => {
   const shown = mode === 'chat' || mode === 'float';
   // The feed and its field are there while the chat is open and while it fades away, not under the folded island: one
@@ -319,14 +323,6 @@ export const SiteChat = ({
     <>
       <aside className="hx-site__chat" aria-hidden={!shown} ref={asideRef}>
         <div className="hx-site__chat-head" onPointerDown={moveBy}>
-          <button
-            type="button"
-            className="hx-head-btn hx-site__menu"
-            aria-label={t('next.header.openMenu')}
-            onClick={onOpenDrawer}
-          >
-            <Icon name="menu" />
-          </button>
           {heading ?? <span className="hx-site__chat-title">{title}</span>}
           <span className="hx-spacer" />
           <button
@@ -337,6 +333,19 @@ export const SiteChat = ({
           >
             <Icon name="app-window" />
           </button>
+          {onToChat && (
+            <button
+              type="button"
+              className="hx-head-btn hx-tipped hx-site__to-chat"
+              aria-label={t('next.site.toChat')}
+              onClick={onToChat}
+            >
+              <Icon name="message-square" />
+              <span className="hx-tip" data-pos="below" data-align="end">
+                {t('next.site.toChat')}
+              </span>
+            </button>
+          )}
           <ChatPlacement mode={mode} onMode={place} />
           {more.length > 0 && <ChatMore items={more} />}
           <ChatTerminalButton />
@@ -371,6 +380,8 @@ export const SiteChat = ({
   );
 };
 
+const noFold = () => undefined;
+
 export const ISLAND_STATUS = { run: 'run', wait: 'wait', done: 'done' } as const;
 
 /** The agent's state over the folded chat's field. */
@@ -401,22 +412,129 @@ export interface ISiteIslandProps {
   onZone: TDropZone;
   /** How many notes go with the words: the folded pill says so. */
   notes: number;
+  /**
+   * Over a space (boards, documents; HRN-1469): only the field, never folded into a pill, and the result as one line
+   * (features/space-field/line.ts) with «Отменить» and «В чат»; an agent's question is answered «Да» or «Нет» here.
+   */
+  space?: {
+    line: ISpaceLine | null;
+    onAnswer: (words: string) => void;
+    onDismissLine: () => void;
+  };
 }
 
 /** The status's fold, as long as .hx-island__status's transition in island.css. */
 const STATUS_EXIT_MS = 420;
 const BLUR_MS = 140;
+/** A result line goes by itself after this; a question stays until it is answered or dismissed. */
+const LINE_MS = 6_000;
 
-/** The agent's last line in the folded chat; a press opens the chat. */
-export const IslandLast = ({ text, onExpand }: { text: string | null; onExpand: () => void }) =>
-  text ? (
-    <button type="button" className="hx-island__last" onClick={onExpand}>
-      {text}
-    </button>
-  ) : null;
+/** The space's one line: the result or the agent's question, with what can be done about it. */
+const SpaceLineRow = ({
+  line,
+  head,
+  onAnswer,
+  onDismiss,
+  onExpand,
+}: {
+  line: ISpaceLine;
+  /** The voice's head while the voice of this field is on. */
+  head: ReactNode;
+  onAnswer: (words: string) => void;
+  onDismiss: () => void;
+  onExpand: () => void;
+}) => {
+  useEffect(() => {
+    if (line.question) return;
+    const id = window.setTimeout(onDismiss, LINE_MS);
+    return () => window.clearTimeout(id);
+  }, [line, onDismiss]);
+  const answer = (words: string) => {
+    onDismiss();
+    onAnswer(words);
+  };
+  return (
+    <div className="hx-island__now hx-island__line" data-question={line.question === true}>
+      {head}
+      <span className="hx-island__step">{line.text}</span>
+      <span className="hx-spacer" />
+      {line.question && (
+        <>
+          <button type="button" className="hx-island__act" onClick={() => answer(t('next.space.yes'))}>
+            {t('next.space.yes')}
+          </button>
+          <button type="button" className="hx-island__act" onClick={() => answer(t('next.space.no'))}>
+            {t('next.space.no')}
+          </button>
+        </>
+      )}
+      {line.undo && (
+        <button
+          type="button"
+          className="hx-island__act"
+          onClick={() => {
+            onDismiss();
+            void line.undo?.();
+          }}
+        >
+          {t('next.space.undo')}
+        </button>
+      )}
+      {line.toChat !== false && (
+        <button type="button" className="hx-island__act" onClick={onExpand}>
+          {t('next.space.toChat')}
+        </button>
+      )}
+      <button type="button" className="hx-island__x" aria-label={t('next.site.dismiss')} onClick={onDismiss}>
+        <Icon name="x" size="sm" />
+      </button>
+    </div>
+  );
+};
+
+export interface IIslandCard {
+  kind: TCardKind;
+  href: string;
+  text: string;
+}
+
+/**
+ * The agent's last line in the folded chat; a press opens the chat. A board or a document the answer links to comes
+ * under it as a live card, as in the feed; a line that is only that address is not said twice.
+ */
+export const IslandLast = ({
+  text,
+  card = null,
+  onExpand,
+}: {
+  text: string | null;
+  card?: IIslandCard | null;
+  onExpand: () => void;
+}) => {
+  const line = card && text?.trim() === card.href ? null : text;
+  if (!line && !card) return null;
+  return (
+    <>
+      {line && (
+        <button type="button" className="hx-island__last" onClick={onExpand}>
+          {line}
+        </button>
+      )}
+      {card && (
+        <div className="hx-island__card">
+          <LinkCard kind={card.kind} href={card.href} text={card.text} />
+        </div>
+      )}
+    </>
+  );
+};
 
 export const SiteIsland = (props: ISiteIslandProps) => {
-  const { status, min, onMin, mode, holding } = props;
+  const { status, mode, holding, space } = props;
+  // Over a space the field never folds into a pill: the pill covered the space's own tools.
+  const min = space ? false : props.min;
+  const onMin = space ? noFold : props.onMin;
+  const spaceLine = space && status === null ? space.line : null;
   const rootRef = useRef<HTMLDivElement>(null);
   // The status folds away with what it said: its words stay while it leaves.
   const { value: held } = usePresence(status, STATUS_EXIT_MS);
@@ -472,12 +590,22 @@ export const SiteIsland = (props: ISiteIslandProps) => {
     <div className="hx-island" ref={rootRef}>
       <div
         className="hx-island__status"
-        data-shown={status !== null}
+        data-shown={status !== null || spaceLine !== null}
         data-done={held?.k === ISLAND_STATUS.done}
       >
         <div className="hx-island__status-in">
-          {props.last}
-          <div className="hx-island__now">
+          {!space && props.last}
+          {space && spaceLine && (
+            <SpaceLineRow
+              line={spaceLine}
+              head={<FieldHead root={rootRef} />}
+              onAnswer={space.onAnswer}
+              onDismiss={space.onDismissLine}
+              onExpand={props.onExpand}
+            />
+          )}
+          <div className="hx-island__now" hidden={spaceLine !== null}>
+            <FieldHead root={rootRef} />
             <span className="hx-island__ic">
               <Icon name="loader-circle" size="sm" className="hx-island__spin" />
               <Icon name="circle-check" size="sm" className="hx-island__ok" />
@@ -491,7 +619,7 @@ export const SiteIsland = (props: ISiteIslandProps) => {
             )}
             {held?.k === ISLAND_STATUS.wait && (
               <button type="button" className="hx-island__act" onClick={props.onExpand}>
-                {t('next.site.answerInChat')}
+                {t(space ? 'next.space.toChat' : 'next.site.answerInChat')}
               </button>
             )}
             {held?.k === ISLAND_STATUS.done && (
@@ -520,6 +648,7 @@ export const SiteIsland = (props: ISiteIslandProps) => {
       <button
         type="button"
         className="hx-island__mini"
+        hidden={space !== undefined}
         tabIndex={min ? 0 : -1}
         onPointerDown={(event) => dragPill(event, expand)}
         onClick={onPillClick}

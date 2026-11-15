@@ -3,7 +3,7 @@
 // The menu's Root passes `actionsRef` (useMenuActions) so the swipe can close it.
 import { Menu } from '@base-ui/react/menu';
 import '@/next/styles/menu.css';
-import { useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useRef, useState, type ComponentProps, type ReactNode, type RefObject } from 'react';
 import { usePortalContainer } from '@/next/ui/portal';
 import { SheetGrip, useSheetDrag } from '@/next/ui/sheet';
 import { usePhone } from '@/next/ui/use-media';
@@ -12,6 +12,17 @@ export type TMenuActions = RefObject<Menu.Root.Actions | null>;
 
 /** What the menu's Root takes as `actionsRef`, and MenuPanel as `actions`. */
 export const useMenuActions = (): TMenuActions => useRef<Menu.Root.Actions | null>(null);
+
+/**
+ * The Root of a menu drawn with MenuPanel. On the phone the panel is a sheet over its own scrim, and the menu is not
+ * modal: a modal menu of Base UI adds an inner backdrop that measures the trigger while it renders (a forced layout of
+ * the whole page), measures the positioner for a scroll lock and marks every other node of the document, which made the
+ * open of «⋯» freeze on a phone. The scrim takes the taps outside and the menu closes on them as before.
+ */
+export const MenuRoot = ({ modal, ...props }: ComponentProps<typeof Menu.Root>) => {
+  const phone = usePhone();
+  return <Menu.Root {...props} modal={phone ? false : modal} />;
+};
 
 interface IMenuPanelProps {
   actions: TMenuActions;

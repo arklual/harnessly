@@ -630,3 +630,8 @@
   left: auto;
   right: -4px;
 }
+
+/* A space keeps its bottom free for the field over it: the board's and the document's own tools stay in sight. */
+.hx-appstage[data-space='true'][data-mode='island'] .hx-appstage__body {
+  padding-bottom: var(--hx-space-field, 84px);
+}

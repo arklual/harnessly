@@ -6,7 +6,7 @@ import { Menu } from '@base-ui/react/menu';
 import { Fragment, type ReactElement } from 'react';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import type { MachineId } from '@/next/protocol/v2';
 import { runDeckExport } from '@/next/features/designly/deck/exports';
 import { DECK_EXPORT, type TDeckExport } from '@/next/features/designly/deck/types';
@@ -135,7 +135,7 @@ export const ProjectDownloadMenu = ({
 }: IProjectDownloadMenuProps) => {
   const actions = useMenuActions();
   return (
-    <Menu.Root actionsRef={actions} open={open} onOpenChange={onOpenChange}>
+    <MenuRoot actionsRef={actions} open={open} onOpenChange={onOpenChange}>
       {trigger && <Menu.Trigger render={trigger} />}
       <MenuPanel
         actions={actions}
@@ -163,6 +163,6 @@ export const ProjectDownloadMenu = ({
           </Fragment>
         ))}
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };

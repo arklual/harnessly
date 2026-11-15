@@ -1,22 +1,26 @@
 // A picture opened from its square: full size over a scrim, it grows in and shrinks out; Esc, the scrim and the cross close it.
 // With its neighbours (the other pictures of the same message) ← and →, the side buttons and a swipe sideways step
 // through them (a swipe is a touch or a pen moving mostly sideways by at least SWIPE_PX, and only while the picture
-// is fitted). The picture zooms: wheel, pinch, double click or tap, and a drag pans it (ui/use-image-zoom.ts).
+// is fitted). The picture zooms: Ctrl/⌘ + wheel or a trackpad pinch, two fingers, a double click or tap, the «− NN% +»
+// buttons and the keys + − 0; a drag (or two fingers on a trackpad) pans it (ui/use-image-zoom.ts). In the editor the
+// stage zooms whole, the picture with its marks, and a drawing tool keeps one finger for drawing.
 import { KEY_SCOPE } from '@/next/features/keys/commands';
 import { useKeys } from '@/next/features/keys/use-keys';
 import {
   useEffect,
   useLayoutEffect,
   useRef,
+  useState,
   type MouseEvent,
   type PointerEvent,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
 import { usePortalContainer } from '@/next/ui/portal';
 import { usePresence } from '@/next/ui/presence';
-import useImageZoom from '@/next/ui/use-image-zoom';
+import useImageZoom, { type IZoomControls, type IZoomState } from '@/next/ui/use-image-zoom';
 import { createPortal } from 'react-dom';
 
 export const IMAGE_VIEW_EXIT_MS = 200;
@@ -47,8 +51,10 @@ export interface IImageViewEdit {
   busy?: boolean;
   /** A new version has just arrived: it comes in from blur. */
   fresh?: boolean;
-  /** A tool that draws is on: zoom and swiping to the next picture are off. */
+  /** A tool that draws is on: one finger draws, two zoom; swiping to the next picture is off. */
   locked?: boolean;
+  /** The arrows and «2 / 3» stay while a tool is on (the marks keep as a draft). */
+  steps?: boolean;
   download?: { href: string; name: string; label: string };
   /** Esc: true when it was taken (a tool was left), false lets the viewer close. */
   onBack?: () => boolean;
@@ -64,14 +70,56 @@ interface IImageViewProps {
   onStep?: (delta: 1 | -1) => void;
   /** The editor's slots; absent: a plain viewer. */
   edit?: IImageViewEdit;
-  /** A button beside the cross of the plain viewer (the editor's «Пометить»). */
-  action?: { icon: string; label: string; onClick: () => void };
 }
 
 /** What a press on must neither close the viewer nor pan or swipe the picture: the editor's own controls. */
 const KEEP = '.hx-imgview__keep';
+/** Below fitted the picture may get this small (a share of fitted). */
+const ZOOM_OUT_MIN = 0.5;
 
-const ImageView = ({ item, onClose, position, onStep, edit, action }: IImageViewProps) => {
+/** «−  NN%  +» and «Вписать» at the top: the percent is of the picture's own pixels, a press on it goes to 100% and back. */
+const ZoomBar = ({ state, controls }: { state: IZoomState; controls: RefObject<IZoomControls | null> }) => (
+  <div className="hx-imgview__zoom hx-imgview__keep" role="group" aria-label={t('next.imageView.zoom')}>
+    <button
+      type="button"
+      className="hx-imgview__zb"
+      aria-label={t('next.imageView.zoomOut')}
+      disabled={state.atMin}
+      onClick={() => controls.current?.zoomOut()}
+    >
+      <Icon name="minus" size="sm" />
+    </button>
+    <button
+      type="button"
+      className="hx-imgview__zb hx-imgview__zpct"
+      aria-label={state.fitted ? t('next.imageView.zoomReal') : t('next.imageView.zoomFit')}
+      onClick={() => controls.current?.toggleReal()}
+    >
+      {`${Math.round(state.real * 100)}%`}
+    </button>
+    <button
+      type="button"
+      className="hx-imgview__zb"
+      aria-label={t('next.imageView.zoomIn')}
+      disabled={state.atMax}
+      onClick={() => controls.current?.zoomIn()}
+    >
+      <Icon name="plus" size="sm" />
+    </button>
+    <button
+      type="button"
+      className="hx-imgview__zb hx-imgview__zfit"
+      aria-label={t('next.imageView.zoomFit')}
+      title={t('next.imageView.zoomFit')}
+      disabled={state.fitted}
+      onClick={() => controls.current?.fit()}
+    >
+      <Icon name="minimize-2" size="sm" />
+    </button>
+  </div>
+);
+
+const ImageView = ({ item, onClose, position, onStep, edit }: IImageViewProps) => {
   const { value, state } = usePresence(item, IMAGE_VIEW_EXIT_MS);
   const container = usePortalContainer();
   const ref = useRef<HTMLDivElement>(null);
@@ -79,7 +127,25 @@ const ImageView = ({ item, onClose, position, onStep, edit, action }: IImageView
   const open = item !== null;
   const stageRef = useRef<HTMLDivElement>(null);
   const locked = edit?.locked === true;
-  const zoom = useImageZoom(ref, imgRef, value !== null && !locked, value?.src);
+  const [zoomState, setZoomState] = useState<IZoomState | null>(null);
+  // In the editor the stage zooms whole (the picture and its marks together), in the plain viewer the picture.
+  const zoom = useImageZoom(ref, edit ? stageRef : imgRef, value !== null, value?.src, {
+    drawing: locked,
+    min: ZOOM_OUT_MIN,
+    wheelPans: true,
+    keys: true,
+    // Only what the buttons show: a pinch moves many frames within one percent.
+    onChange: (next) =>
+      setZoomState((now) =>
+        now !== null &&
+        Math.round(now.real * 100) === Math.round(next.real * 100) &&
+        now.fitted === next.fitted &&
+        now.atMin === next.atMin &&
+        now.atMax === next.atMax
+          ? now
+          : next,
+      ),
+  });
   const start = useRef<{ x: number; y: number } | null>(null);
   // The click that ends a swipe is not a tap on the scrim.
   const swiped = useRef(false);
@@ -123,7 +189,7 @@ const ImageView = ({ item, onClose, position, onStep, edit, action }: IImageView
   const onUp = (event: PointerEvent) => {
     const from = start.current;
     start.current = null;
-    if (!from || !many || locked || !zoom.current.swipeOk) return;
+    if (!from || !many || locked || !zoom.flags.current.swipeOk) return;
     const dx = event.clientX - from.x;
     const dy = event.clientY - from.y;
     if (Math.abs(dx) < SWIPE_PX || Math.abs(dx) < Math.abs(dy) * 1.5) return;
@@ -134,7 +200,7 @@ const ImageView = ({ item, onClose, position, onStep, edit, action }: IImageView
     // The picture itself is for zooming (a double click is two clicks), the scrim around it closes.
     const onPicture =
       event.target instanceof Element && event.target.closest(`.hx-imgview__img, ${KEEP}`) !== null;
-    if (swiped.current || zoom.current.dragged || onPicture) {
+    if (swiped.current || zoom.flags.current.dragged || onPicture) {
       swiped.current = false;
       return;
     }
@@ -199,7 +265,7 @@ const ImageView = ({ item, onClose, position, onStep, edit, action }: IImageView
       )}
       {edit?.versions}
       {edit && <div className="hx-imgview__dock hx-imgview__keep">{edit.dock}</div>}
-      {many && !locked && (
+      {many && (!locked || edit?.steps === true) && (
         <>
           <button
             type="button"
@@ -227,20 +293,7 @@ const ImageView = ({ item, onClose, position, onStep, edit, action }: IImageView
           </button>
         </>
       )}
-      {!edit && action && (
-        <button
-          type="button"
-          className="hx-imgview__x hx-imgview__act"
-          aria-label={action.label}
-          title={action.label}
-          onClick={(event) => {
-            event.stopPropagation();
-            action.onClick();
-          }}
-        >
-          <Icon name={action.icon} />
-        </button>
-      )}
+      {zoomState && <ZoomBar state={zoomState} controls={zoom.controls} />}
       {edit?.download && (
         <a
           className="hx-imgview__x hx-imgview__dl"

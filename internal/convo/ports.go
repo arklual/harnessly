@@ -362,6 +362,10 @@ type Deps struct {
 	// model_context_window for Codex — and the tokens its last answer was asked with (0 where it says nothing). nil: the
 	// window is guessed from the model id.
 	Window func(p wire.Provider, sessionID, transcriptPath string) (used, limit int64)
+	// Compact is what the agent is set to compact at in a chat of the folder on the model, by its settings: Claude's
+	// autoCompactWindow (window, the window it counts compaction from) and Codex's model_auto_compact_token_limit (at,
+	// the tokens it compacts at); 0 where nothing is set. nil: nothing is ever set.
+	Compact func(p wire.Provider, cwd, model string) (window, at int64)
 	// LimitReset is when the provider's usage limit resets by the limits it last reported — the window it ran out of —
 	// for a notice that names no time; 0 when they say nothing. nil: never known.
 	LimitReset func(p wire.Provider, now time.Time) wire.Ms

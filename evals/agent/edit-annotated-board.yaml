@@ -1,0 +1,25 @@
+id: edit-annotated-board
+title: Комментарий на открытой доске — правит её, не спрашивает «где»
+tags: [design]
+timeout_s: 420
+setup:
+  design: [fixtures/shop]
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/hlcli/design*.go'
+  - 'internal/design/**'
+prompt: |
+  <annotation>
+  template: shop/project/Каталог.dc.html:18
+  element: div
+  html: <div style="border: 1px solid #ddd; border-radius: 12px; padding: 16px">Кружка «Утро» · 590 ₽</div>
+  comment: сделай цены жирными и добавь четвёртый товар — «Стикеры · 190 ₽»
+  </annotation>
+expect:
+  - name: edited that board
+    file: {glob: 'design:shop/project/Каталог.dc.html', contains: 'Стикеры'}
+  - name: did not ask which board
+    text_not: '(?i)(какую|какой|which) (доску|board|файл|file)'
+  - name: made no copy of the board
+    file: {glob: 'design:shop/project/*вариант*', absent: true}

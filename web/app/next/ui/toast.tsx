@@ -1,8 +1,9 @@
 // Quiet notices at the top of the window (after lib/hx/toast.js of the design): at most three on screen, 4 s each by
 // default, an optional action, and an exit animation. The store lives outside React so anything may call toast().
-// On the phone they stand above the chat's field and the safe area instead (styles/ui.css). A swipe takes one away:
-// a finger, a held mouse button or a trackpad's two fingers, sideways or up (and down on the phone).
+// On the phone they stand at the top too, as wide as the screen with 16px at each side (styles/ui.css). A swipe takes one away:
+// a finger, a held mouse button or a trackpad's two fingers, sideways or up.
 import { useSyncExternalStore, type MouseEvent, type PointerEvent, type WheelEvent } from 'react';
+import { t } from '@/next/i18n';
 import Icon, { type TIconName } from '@/next/ui/icon';
 import '@/next/styles/ui.css';
 
@@ -28,7 +29,37 @@ let seq = 0;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((listener) => listener());
 
+/** Each notice's clock: what is left of its time, paused while the pointer is over the notices. */
+const clocks = new Map<
+  number,
+  { left: number; started: number; handle: ReturnType<typeof setTimeout> | null }
+>();
+let held = false;
+
+const run = (id: number) => {
+  const clock = clocks.get(id);
+  if (!clock || clock.handle !== null) return;
+  clock.started = Date.now();
+  clock.handle = setTimeout(() => dismiss(id), clock.left);
+};
+
+/** While the pointer is over the notices none of them goes; it lets go, each takes up what was left of its time. */
+export const holdToasts = (on: boolean) => {
+  if (held === on) return;
+  held = on;
+  for (const [id, clock] of clocks) {
+    if (on && clock.handle !== null) {
+      clearTimeout(clock.handle);
+      clock.handle = null;
+      clock.left = Math.max(0, clock.left - (Date.now() - clock.started));
+    } else if (!on) run(id);
+  }
+};
+
 const dismiss = (id: number) => {
+  const clock = clocks.get(id);
+  if (clock?.handle) clearTimeout(clock.handle);
+  clocks.delete(id);
   toasts = toasts.map((item) => (item.id === id ? { ...item, leaving: true } : item));
   emit();
   setTimeout(() => {
@@ -60,7 +91,12 @@ export const toast = (
     },
   ];
   emit();
-  setTimeout(() => dismiss(id), options.ms ?? (options.action ? TOAST_ACTION_MS : TOAST_MS));
+  clocks.set(id, {
+    left: options.ms ?? (options.action ? TOAST_ACTION_MS : TOAST_MS),
+    started: 0,
+    handle: null,
+  });
+  if (!held) run(id);
   return () => dismiss(id);
 };
 
@@ -72,11 +108,8 @@ const DRAG_SLOP = 6;
 /** A trackpad's two-finger swipe has no end event: it ends when the wheel is quiet this long, ms. */
 const WHEEL_IDLE_MS = 140;
 
-/** On the phone the notices stand at the foot of the screen, so a swipe down takes them away too. */
-const atFoot = () => window.matchMedia('(max-width: 900px)').matches;
-
-/** Where a pull may go: sideways always, up always, down only where the notices stand at the foot. */
-const allowed = (x: number, y: number) => ({ x, y: y > 0 && !atFoot() ? 0 : y });
+/** Where a pull may go: sideways and up (the notices stand at the top everywhere). */
+const allowed = (x: number, y: number) => ({ x, y: y > 0 ? 0 : y });
 
 const place = (el: HTMLElement, at: { x: number; y: number }) => {
   el.style.setProperty('--hx-toast-dx', `${at.x}px`);
@@ -102,7 +135,7 @@ const release = (el: HTMLElement, id: number, at: { x: number; y: number }, ms: 
 };
 
 /**
- * Takes a notice away with a gesture: a finger or a held mouse button pulls it sideways or up (and down on the phone),
+ * Takes a notice away with a gesture: a finger or a held mouse button pulls it sideways or up,
  * a trackpad's two-finger swipe does the same. The move goes straight into --hx-toast-dx/-dy, no state per frame.
  */
 const swipeAway = (id: number) => {
@@ -190,8 +223,15 @@ export const ToastHost = () => {
     () => toasts,
     () => toasts,
   );
+  // At most three stand; the rest wait folded into one line, «ещё N».
+  const more = list.filter((item) => !item.leaving).length - VISIBLE;
   return (
-    <ol className="hx-toasts" aria-live="polite">
+    <ol
+      className="hx-toasts"
+      aria-live="polite"
+      onPointerEnter={() => holdToasts(true)}
+      onPointerLeave={() => holdToasts(false)}
+    >
       {list.slice(-VISIBLE).map((item) => (
         // The slot folds to nothing as its notice leaves, so the ones under it slide up instead of jumping.
         <li key={item.id} className="hx-toast-slot" data-leaving={item.leaving || undefined}>
@@ -223,6 +263,7 @@ export const ToastHost = () => {
           </div>
         </li>
       ))}
+      {more > 0 && <li className="hx-toasts__more">{t('next.notices.more', { n: more })}</li>}
     </ol>
   );
 };

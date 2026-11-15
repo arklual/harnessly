@@ -4,6 +4,7 @@
 //   ?dev=notifs                    a mock window of the app (chats, a chat, its field) and the buttons in its side
 //   &set=pile                      a code, a question and a permission at once; &set=one a question; &set=many ten
 //                                  The side lists the metrics' events as the chat would send them.
+//   &set=done                      a finished turn, its gist longer than the card shows
 //   &set=drops                     every kind put away into the drops of the right column, long names among them
 //   &open=1                        the card open
 //   &place=top-right|…             where it stands (the middle of the top edge by default); the side switches it
@@ -180,7 +181,7 @@ const SAMPLES: Record<TSample, Omit<ISmartItem, 'key' | 'at' | 'until'> & { deta
     detail: {
       k: 'done',
       summary:
-        'Добавил раздел «Сезонное» с тремя позициями, пометил их в общем меню и обновил цены. Проверил вёрстку на телефоне — всё на месте. Осталось решить, показывать ли раздел зимой.',
+        'Добавил раздел «Сезонное» с тремя позициями, пометил их в общем меню и обновил цены. Проверил вёрстку на телефоне — всё на месте. Осталось решить, показывать ли раздел зимой, и отдал подчату проверку ссылок во всех разделах меню.',
       canReply: true,
     },
   },
@@ -285,6 +286,7 @@ const firstItems = (): readonly TGalleryItem[] => {
   if (set === 'pile') return byRank((['question', 'permission', 'code'] as const).map(made));
   if (set === 'drops') return allDrops();
   if (set === 'one') return [made('question')];
+  if (set === 'done') return [made('done')];
   if (set === 'many') return many();
   return [];
 };

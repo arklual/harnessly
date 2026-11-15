@@ -98,7 +98,25 @@ func openChats(dir string) *chats {
 			c.byID[id] = &ch
 		}
 	}
+	c.dropEmpty()
 	return c
+}
+
+// dropEmpty removes the chats nobody wrote in, but the newest: they were drafts left by «New chat».
+func (c *chats) dropEmpty() {
+	var keep *Chat
+	for _, ch := range c.byID {
+		if len(ch.Messages) == 0 && (keep == nil || ch.UpdatedAt > keep.UpdatedAt) {
+			keep = ch
+		}
+	}
+	for id, ch := range c.byID {
+		if len(ch.Messages) == 0 && ch != keep {
+			_ = os.Remove(c.path(id))
+			_ = os.RemoveAll(filepath.Join(c.dir, "files", id))
+			delete(c.byID, id)
+		}
+	}
 }
 
 func (c *chats) path(id string) string { return filepath.Join(c.dir, "chats", id+".json") }
@@ -166,14 +184,31 @@ func (c *chats) get(id string) (Chat, error) {
 	return cp, nil
 }
 
-func (c *chats) create(ch *Chat) error {
+// createOrReuse keeps a new chat, unless one stands empty and idle: then that one, with the new chat's model, is it.
+func (c *chats) createOrReuse(ch *Chat, idle func(id string) bool) (Chat, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	for _, was := range c.byID {
+		if len(was.Messages) != 0 || !idle(was.ID) {
+			continue
+		}
+		next := *was
+		next.Messages = []Message{}
+		if ch.Model != "" {
+			next.Model, next.Effort = ch.Model, ch.Effort
+		}
+		next.UpdatedAt = ch.UpdatedAt
+		if err := c.write(&next); err != nil {
+			return Chat{}, err
+		}
+		c.byID[next.ID] = &next
+		return next, nil
+	}
 	if err := c.write(ch); err != nil {
-		return err
+		return Chat{}, err
 	}
 	c.byID[ch.ID] = ch
-	return nil
+	return *ch, nil
 }
 
 // change edits a chat under the lock and keeps it.

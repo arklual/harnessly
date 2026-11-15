@@ -107,6 +107,19 @@ type Manifest struct {
 	Kind string `json:"kind,omitempty"`
 	// Data is the version of the app's own data in hl.storage and the steps that bring older data to it.
 	Data *DataSpec `json:"data,omitempty"`
+	// QuickEdit is how the app's objects take a quick edit by voice: the app's own tools that read an object as
+	// text, apply exact replacements to it and take the last edit back. The host plans the edit, the app applies it.
+	QuickEdit *QuickEdit `json:"quickEdit,omitempty"`
+}
+
+// QuickEdit names the app's tools of a quick edit, each as `<server>.<tool>` of its backend.
+type QuickEdit struct {
+	// Read answers {text, version} of an object: {object, selection?}.
+	Read string `json:"read"`
+	// Apply takes {object, version, edits: [{old, new}], confirmed?} and answers {changed, version, hint, ids?}.
+	Apply string `json:"apply"`
+	// Undo takes {object, version}: the apply that answered that version is put back; empty: no undo.
+	Undo string `json:"undo,omitempty"`
 }
 
 // Activation is how the app turns on and what it opens when it does.
@@ -206,6 +219,13 @@ type View struct {
 	// Pinned: the view is the app's tab in the chat's right pane beside a document of its type made of a Sinopia site
 	// the first tab, never closed, shown only in the app's own documents.
 	Pinned bool `json:"pinned,omitempty"`
+	// Feed is the https address of a day feed (docs/apps/day-feed.md) for a view of the start page's stage: the host draws
+	// the page of the day itself from what the feed answers, in its own interface, and the entry stays for a host that
+	// cannot. Its host must be in network.connect.
+	Feed string `json:"feed,omitempty"`
+	// FeedSecret names a secret of the app the machine sends to the feed as a bearer token: the page then reads the feed
+	// through its own runtime (the feedPath of the list of apps), signed in already, and never shows the feed's own sign-in.
+	FeedSecret string `json:"feedSecret,omitempty"`
 }
 
 // Branding is the product's name and accent as an app sets them, for the `branding` target. Declared values, no code: the
@@ -702,6 +722,20 @@ func (m *Manifest) Check() Problems {
 		} else if v.Height != "" {
 			notYet(path + ".height")
 		}
+		if v.Feed != "" {
+			if v.Height != HeightStage {
+				add(path+".feed", "a feed is for a view that takes the stage (\"height\": \"stage\")")
+			} else if _, ok := m.FeedURL(v.Feed); !ok {
+				add(path+".feed", "%q must be https:// with its host in network.connect", v.Feed)
+			}
+		}
+		if v.FeedSecret != "" {
+			if v.Feed == "" {
+				add(path+".feedSecret", "is for a view with a feed")
+			} else if !m.hasSecret(v.FeedSecret) {
+				add(path+".feedSecret", "%q is not in secrets", v.FeedSecret)
+			}
+		}
 		if len(v.Targets) == 0 {
 			add(path+".targets", "is required: where the view shows")
 		}
@@ -752,6 +786,16 @@ func (m *Manifest) Check() Problems {
 		m.checkChatHost(c, add)
 		if (len(c.Commands) > 0 || len(c.Cards) > 0 || len(c.Starters) > 0 || len(c.Buttons) > 0 || len(c.Links) > 0 || c.Mentions != nil) && !targets[TargetChat] {
 			add("chat", "chat contributions need the chat target")
+		}
+	}
+	if q := m.QuickEdit; q != nil {
+		for _, t := range []struct {
+			field, tool string
+			need        bool
+		}{{"quickEdit.read", q.Read, true}, {"quickEdit.apply", q.Apply, true}, {"quickEdit.undo", q.Undo, false}} {
+			if (t.need || t.tool != "") && !mentionToolRe.MatchString(t.tool) {
+				add(t.field, "%q: a tool of the app's MCP server, <server>.<tool>", t.tool)
+			}
 		}
 	}
 	if len(m.Sinopia) > 0 && !hasSinopia(targets) {
@@ -905,6 +949,16 @@ func checkToolPattern(p string) string {
 func (m *Manifest) FrameURL(entry string) (string, bool) {
 	u, err := url.Parse(entry)
 	if err != nil || u.Scheme != "https" || u.User != nil || u.Hostname() == "" || m.Network == nil || !hostListed(m.Network.Frames, entry) {
+		return "", false
+	}
+	return u.String(), true
+}
+
+// FeedURL is the address of a view's day feed when the page may read it: https, no credentials in it, and its host listed
+// in network.connect.
+func (m *Manifest) FeedURL(feed string) (string, bool) {
+	u, err := url.Parse(feed)
+	if err != nil || u.Scheme != "https" || u.User != nil || u.Hostname() == "" || m.Network == nil || !hostListed(m.Network.Connect, "https://"+u.Hostname()) {
 		return "", false
 	}
 	return u.String(), true

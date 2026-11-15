@@ -126,3 +126,21 @@ func TestInboxWaitsForTheTurnToEnd(t *testing.T) {
 		t.Fatal("a message for a gone tab is dropped")
 	}
 }
+
+func TestDeliveryCwdIsNeutralForANewBoardChat(t *testing.T) {
+	space := func() string { return "/home/p/harnessly-spaces" }
+	if cwd, roots := deliveryCwd(Delivery{Message: "m"}, space); cwd != "/home/p/harnessly-spaces" || len(roots) != 1 || roots[0] != cwd {
+		t.Fatalf("new board chat: %q %v", cwd, roots)
+	}
+	// The document's own folder (its publishing chat) stays.
+	if cwd, roots := deliveryCwd(Delivery{Cwd: "/w/proj", Message: "m"}, space); cwd != "/w/proj" || roots != nil {
+		t.Fatalf("doc folder: %q %v", cwd, roots)
+	}
+	// A resumed session keeps the folder it was made in.
+	if cwd, _ := deliveryCwd(Delivery{AgentSessionID: "s", Message: "m"}, space); cwd != "" {
+		t.Fatalf("resume: %q", cwd)
+	}
+	if cwd, _ := deliveryCwd(Delivery{Message: "m"}, nil); cwd != "" {
+		t.Fatalf("no space: %q", cwd)
+	}
+}

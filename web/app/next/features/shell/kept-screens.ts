@@ -11,13 +11,24 @@ export const MAX_KEPT_SCREENS = 5;
 /**
  * How many screens a device keeps (measured with CPU x4 on a real project: a kept design costs about 5.5 MB
  * of JS heap and 10–15 MB of memory, no process of its own, and no CPU while hidden): five, three on a device with
- * 4 GB or less, two with 2 GB or less. Without `navigator.deviceMemory` (Safari, Firefox) five.
+ * 4 GB or less, two with 2 GB or less. Without `navigator.deviceMemory` (Safari, Firefox) five on a computer and two on a
+ * touch device: an iPhone tells nothing of its memory, and Safari kept six frames and three chats and lagged.
  */
-export const keptScreensMax = (deviceMemory: number | undefined): number => {
-  if (deviceMemory === undefined || !Number.isFinite(deviceMemory)) return MAX_KEPT_SCREENS;
+export const keptScreensMax = (deviceMemory: number | undefined, touch = false): number => {
+  if (deviceMemory === undefined || !Number.isFinite(deviceMemory)) return touch ? 2 : MAX_KEPT_SCREENS;
   if (deviceMemory <= 2) return 2;
   if (deviceMemory <= 4) return 3;
   return MAX_KEPT_SCREENS;
+};
+
+/** keptScreensMax of this device. */
+export const deviceKeptScreensMax = (): number => {
+  if (typeof navigator === 'undefined') return MAX_KEPT_SCREENS;
+  const touch =
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(pointer: coarse)').matches
+      : false;
+  return keptScreensMax((navigator as Navigator & { deviceMemory?: number }).deviceMemory, touch);
 };
 
 /**

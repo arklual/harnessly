@@ -190,8 +190,13 @@ func ReloadAsked(r *http.Request) bool {
 }
 
 // ServeReload asks the pane to open the path again in the frame's slot; the page holds nothing of the hub.
+//
+// The hub's own frame ban (securityHeaders: X-Frame-Options DENY on every path outside /m/ and /agents/) is lifted: this
+// page is for a frame and holds nothing, and with the ban the browser showed «hub refused to connect» in place of the
+// board whose page navigated to the library's address (/a/<project>/p/<board>) past its slot.
 func ServeReload(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
+	h.Del("X-Frame-Options")
 	h.Set("Content-Type", "text/html; charset=utf-8")
 	h.Set("Cache-Control", "no-store")
 	h.Set("Referrer-Policy", "no-referrer")

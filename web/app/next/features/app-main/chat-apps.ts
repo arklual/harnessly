@@ -47,13 +47,12 @@ export const opensOwnView = (a: IInstalledApp): boolean =>
   a.targets.includes('app') &&
   a.views.some((v) => v.targets.includes('app'));
 
+/** An app of the organization's environment that the person did not turn off: every chat has it. */
+export const envAppOn = (a: IInstalledApp): boolean =>
+  a.env === true && a.muted !== true && a.off !== true && a.state !== APP_STATE.disabled;
+
 /** An app of the organization's environment that has a page of its own and that the person did not turn off. */
-const envAppForMenu = (a: IInstalledApp): boolean =>
-  a.env === true &&
-  a.muted !== true &&
-  a.off !== true &&
-  a.state !== APP_STATE.disabled &&
-  a.targets.includes('app');
+const envAppForMenu = (a: IInstalledApp): boolean => envAppOn(a) && a.targets.includes('app');
 
 /**
  * «Приложения» of the sidebar: the apps on in some chat (activeApps), then the organization's environment apps with a
@@ -74,3 +73,10 @@ export const sidebarApps = (
 /** The apps a chat can turn on or off: the installed ones that work in a chat. */
 export const offeredApps = (installed: readonly IInstalledApp[]): IInstalledApp[] =>
   installed.filter((a) => a.targets.includes('chat'));
+
+/**
+ * The apps the menu may hold (Settings → «Меню слева»): the ones that open a page of their own, and the environment's.
+ * The sidebar lists one of them when it is on in a chat, or when the person ordered or raised it.
+ */
+export const menuApps = (installed: readonly IInstalledApp[]): IInstalledApp[] =>
+  installed.filter((a) => opensOwnView(a) || envAppForMenu(a));

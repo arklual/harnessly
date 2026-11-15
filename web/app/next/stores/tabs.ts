@@ -8,6 +8,7 @@
 // merges it by tab id against the list it last saw there, so a tab opened in one window appears in the other and a tab
 // closed in one goes in the other. What is a window's own (which tab is active, each tab's scroll and view state)
 // is kept per window, in sessionStorage, and survives a reload of that window.
+import { notePrefWrite } from '@/next/core/pref-write';
 import { PHONE_QUERY } from '@/next/features/shell/gestures';
 import { createContext, useCallback, useContext, useEffect, useState, useSyncExternalStore } from 'react';
 import { parseRoute, placeKeyOf, ROUTE } from '@/next/routes/routes';
@@ -595,14 +596,23 @@ export const setTopTabs = (on: boolean) => {
   topTabs = on;
   storage.write(TOP_TABS_KEY, on ? '1' : '0');
   for (const listener of [...prefListeners]) listener();
+  notePrefWrite(TOP_TABS_KEY);
 };
 
 export const useTopTabs = (): boolean =>
   useSyncExternalStore(
     (listener) => {
       prefListeners.add(listener);
+      // The person's settings brought another device's choice (stores/synced-prefs.ts).
+      const onStorage = (event: StorageEvent) => {
+        if (event.key !== TOP_TABS_KEY) return;
+        topTabs = null;
+        listener();
+      };
+      window.addEventListener('storage', onStorage);
       return () => {
         prefListeners.delete(listener);
+        window.removeEventListener('storage', onStorage);
       };
     },
     topTabsSnapshot,

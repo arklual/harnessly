@@ -43,11 +43,21 @@ export const TEXT_OUTLINE = 'rgba(0, 0, 0, 0.6)';
 export const CROP_SHADE = 'rgba(0, 0, 0, 0.55)';
 export const CROP_EDGE = '#ffffff';
 
-export type TMarkupItem =
+export type TMarkupItem = (
   | { kind: 'pen'; color: string; points: readonly IPoint[] }
   | { kind: 'frame'; color: string; box: IBox }
   | { kind: 'arrow'; color: string; from: IPoint; to: IPoint }
-  | { kind: 'text'; color: string; at: IPoint; text: string };
+  | { kind: 'text'; color: string; at: IPoint; text: string }
+) & {
+  /**
+   * The line and the words as a share of the usual size: a mark made on a zoomed picture is as thick on the screen as
+   * one made fitted (1 / the zoom), so it stays that thin in the picture. Absent: 1.
+   */
+  scale?: number;
+};
+
+/** The share of the usual size for a mark made at this zoom (ui/use-image-zoom.ts; below fitted, the usual). */
+export const markScale = (zoom: number): number | undefined => (zoom > 1 ? 1 / zoom : undefined);
 
 export interface IMarkup {
   items: readonly TMarkupItem[];
@@ -81,8 +91,8 @@ export const addItem = (markup: IMarkup, item: TMarkupItem): IMarkup => ({
 
 export const hasMarkup = (markup: IMarkup): boolean => markup.items.length > 0 || markup.crop !== null;
 
-const dragCounts = (from: IPoint, to: IPoint): boolean =>
-  Math.abs(to.x - from.x) >= MIN_DRAG || Math.abs(to.y - from.y) >= MIN_DRAG;
+const dragCounts = (from: IPoint, to: IPoint, min: number): boolean =>
+  Math.abs(to.x - from.x) >= min || Math.abs(to.y - from.y) >= min;
 
 /** A drag of the frame, the arrow or the crop as what it leaves; null for a stray press. */
 export const itemOfDrag = (
@@ -90,26 +100,31 @@ export const itemOfDrag = (
   color: string,
   from: IPoint,
   to: IPoint,
+  scale?: number,
 ): TMarkupItem | null => {
-  if (!dragCounts(from, to)) return null;
-  if (tool === MARKUP_TOOL.arrow) return { kind: 'arrow', color, from, to };
+  // Zoomed in, a stray press is smaller on the picture too.
+  const min = MIN_DRAG * (scale ?? 1);
+  if (!dragCounts(from, to, min)) return null;
+  const sized = scale === undefined ? {} : { scale };
+  if (tool === MARKUP_TOOL.arrow) return { kind: 'arrow', color, from, to, ...sized };
   if (tool === MARKUP_TOOL.frame) {
     const box = normalizedBox({ x0: from.x, y0: from.y, x1: to.x, y1: to.y });
-    if (box.x1 - box.x0 < MIN_DRAG || box.y1 - box.y0 < MIN_DRAG) return null;
-    return { kind: 'frame', color, box };
+    if (box.x1 - box.x0 < min || box.y1 - box.y0 < min) return null;
+    return { kind: 'frame', color, box, ...sized };
   }
   return null;
 };
 
 /** The crop a drag chooses; null for a drag too small to be one. */
-export const cropOfDrag = (from: IPoint, to: IPoint): IBox | null => {
+export const cropOfDrag = (from: IPoint, to: IPoint, scale?: number): IBox | null => {
+  const min = MIN_DRAG * (scale ?? 1);
   const box = normalizedBox({
     x0: clamp01(from.x),
     y0: clamp01(from.y),
     x1: clamp01(to.x),
     y1: clamp01(to.y),
   });
-  if (box.x1 - box.x0 < MIN_DRAG || box.y1 - box.y0 < MIN_DRAG) return null;
+  if (box.x1 - box.x0 < min || box.y1 - box.y0 < min) return null;
   return box;
 };
 
@@ -180,10 +195,12 @@ export interface IPendingText {
   at: IPoint;
   text: string;
   color: string;
+  scale?: number;
 }
 
 const paintItem = (ctx: TMarkupContext, w: number, h: number, item: TMarkupItem): void => {
-  const line = Math.max(2, LINE_WIDTH * w);
+  const share = item.scale ?? 1;
+  const line = Math.max(2, LINE_WIDTH * w * share);
   ctx.lineWidth = line;
   ctx.strokeStyle = item.color;
   ctx.fillStyle = item.color;
@@ -221,7 +238,7 @@ const paintItem = (ctx: TMarkupContext, w: number, h: number, item: TMarkupItem)
       return;
     }
     case 'text': {
-      const size = Math.max(10, TEXT_SIZE * w);
+      const size = Math.max(10, TEXT_SIZE * w * share);
       ctx.font = `600 ${size}px system-ui, -apple-system, 'Segoe UI', sans-serif`;
       ctx.textBaseline = 'middle';
       ctx.lineWidth = Math.max(2, size / 6);
@@ -269,7 +286,13 @@ export const paintMarkup = (
   ctx.lineJoin = 'round';
   for (const item of markup.items) paintItem(ctx, w, h, item);
   if (pending !== null && pending.text.trim() !== '')
-    paintItem(ctx, w, h, { kind: 'text', color: pending.color, at: pending.at, text: pending.text });
+    paintItem(ctx, w, h, {
+      kind: 'text',
+      color: pending.color,
+      at: pending.at,
+      text: pending.text,
+      scale: pending.scale,
+    });
   ctx.restore();
   if (look === MARKUP_LOOK.show && markup.crop !== null) paintCrop(ctx, w, h, markup.crop);
 };

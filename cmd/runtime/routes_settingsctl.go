@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/bgmodel"
 	"github.com/ly-solutions/harnessly/internal/extproviders"
 	"github.com/ly-solutions/harnessly/internal/gate"
@@ -329,8 +330,8 @@ func settingsItems(d deps) []settingsctl.Item {
 		}
 		items = append(items, settingsctl.Item{Key: "background." + feature.ID, Section: background, Kind: settingsctl.KindEnum,
 			Title: feature.Title,
-			Description: feature.Description + " " + locale.Pick("The value is «default» (as now: no model of a provider is used) or «<provider>/<model>» of a connected provider.",
-				"Значение — «default» (как сейчас: модель провайдера не используется) или «<провайдер>/<модель>» подключённого провайдера."),
+			Description: feature.Description + " " + locale.Pick("The value is «default» (as now: no model of a provider is used), «claude/<model>» or «codex/<model>» for a model of the machine's agent on its plan, or «<provider>/<model>» of a connected provider.",
+				"Значение — «default» (как сейчас: модель провайдера не используется), «claude/<модель>» или «codex/<модель>» для модели агента машины по её подписке, либо «<провайдер>/<модель>» подключённого провайдера."),
 			Options: func() []settingsctl.Option {
 				out := []settingsctl.Option{{Value: backgroundAsNow, Label: locale.Pick("as now", "как сейчас")}}
 				views, _ := providers.List()
@@ -341,14 +342,16 @@ func settingsItems(d deps) []settingsctl.Item {
 				}
 				return out
 			},
-			// A model the provider does not list may still be named, as on the Settings screen.
+			// A model the provider does not list may still be named, as on the Settings screen; an agent's model too.
 			Free: func(v string) bool {
 				c, ok := bgmodel.ParseChoice(v)
 				if !ok {
 					return false
 				}
-				_, err := providers.Get(c.Provider)
-				return err == nil && !strings.ContainsAny(c.Model, " \t\r\n")
+				if _, err := providers.Get(c.Provider); err == nil {
+					return !strings.ContainsAny(c.Model, " \t\r\n")
+				}
+				return bgmodel.IsAgent(c.Provider) && runner.Agent != nil && agents.ModelIDRe.MatchString(c.Model)
 			},
 			Get: func() (string, error) {
 				if c, ok := runner.Store.Get(feature.ID); ok {

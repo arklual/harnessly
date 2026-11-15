@@ -574,3 +574,52 @@ func TestStopKeepsWhatWasWritten(t *testing.T) {
 		t.Fatal("stopped a finished answer")
 	}
 }
+
+func TestAppendSpokenKeepsTheVoiceConversation(t *testing.T) {
+	f := newFake(t)
+	s, _ := newTestService(t, f)
+	ch, _ := s.CreateChat("gpt-mini", "")
+	msgs, err := s.AppendSpoken(ch.ID, []Spoken{
+		{Role: "user", Text: " Как дела? "}, {Role: "system", Text: "x"}, {Role: "assistant", Text: "Хорошо."}, {Role: "user", Text: " "},
+	})
+	if err != nil || len(msgs) != 2 {
+		t.Fatalf("append %v %+v", err, msgs)
+	}
+	got, _, _ := s.Chat(ch.ID)
+	if len(got.Messages) != 2 || got.Messages[0].Text != "Как дела?" || got.Messages[1].Status != "done" || got.Title == "" {
+		t.Fatalf("chat %+v", got)
+	}
+	if _, err := s.AppendSpoken(ch.ID, nil); err == nil {
+		t.Fatal("empty append accepted")
+	}
+	if _, err := s.AppendSpoken("nochat", []Spoken{{Role: "user", Text: "a"}}); err == nil {
+		t.Fatal("unknown chat accepted")
+	}
+}
+
+func TestNewChatIsOneDraft(t *testing.T) {
+	f := newFake(t)
+	s, _ := newTestService(t, f)
+	signIn(t, s, f)
+	a, _ := s.CreateChat("", "")
+	b, _ := s.CreateChat("gpt-mini", "low")
+	if a.ID != b.ID || b.Model != "gpt-mini" || len(s.Chats()) != 1 {
+		t.Fatalf("drafts %s %s %+v", a.ID, b.ID, s.Chats())
+	}
+	f.respBody = streamOf("ok")
+	if _, err := s.Send(a.ID, SendInput{Text: "hi"}); err != nil {
+		t.Fatal(err)
+	}
+	waitDone(t, s, a.ID)
+	if c, _ := s.CreateChat("", ""); c.ID == a.ID || len(s.Chats()) != 2 {
+		t.Fatalf("a written chat was reused: %+v", s.Chats())
+	}
+	// Empty chats left by an older page go when the chats are read again, but the newest.
+	dir := s.chats.dir
+	for i := 0; i < 3; i++ {
+		_ = s.chats.write(&Chat{ID: newKey(), UpdatedAt: int64(i), Messages: []Message{}})
+	}
+	if got := len(openChats(dir).byID); got != 2 {
+		t.Fatalf("after cleanup %d chats", got)
+	}
+}

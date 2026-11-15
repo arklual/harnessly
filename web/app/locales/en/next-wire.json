@@ -38,5 +38,7 @@
   "next.connection.now": "Reconnect",
   "next.connection.nowShort": "Now",
   "next.connection.retrying": "Reconnecting",
-  "next.connection.back": "Back online"
+  "next.connection.back": "Back online",
+  "next.rollout.active": "An update is under way — connections to machines may drop for a moment",
+  "next.rollout.done": "Update complete"
 }

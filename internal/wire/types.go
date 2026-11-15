@@ -731,7 +731,14 @@ type Turn struct {
 	// Outputs are the things the turn made that the person opens: a published document, a design, a document of the
 	// repository, a merge request, a stand. Absent when there are none.
 	Outputs []TurnOutput `json:"outputs,omitempty"`
+	// Pictures are the paths of the pictures the turn drew (harnessly's generate_images, Codex's image tool), oldest
+	// first, at most TurnPicturesMax: the page shows them under the answer, where the folded work would hide them
+	// Absent when there are none.
+	Pictures []string `json:"pictures,omitempty"`
 }
+
+// TurnPicturesMax is how many pictures a turn lists, at most.
+const TurnPicturesMax = 24
 
 // TurnAuthor is who answered in a turn.
 type TurnAuthor struct {

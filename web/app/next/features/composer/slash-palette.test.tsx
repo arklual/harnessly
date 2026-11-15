@@ -163,7 +163,7 @@ describe('the slash palette', () => {
     render(<Harness slash={source()} onSubmit={onSubmit} />);
     type('/compact');
     key('Enter');
-    expect(onSubmit).toHaveBeenCalledWith('queue');
+    expect(onSubmit).toHaveBeenCalledWith('now');
   });
 
   it('Esc closes it, and typing opens it again', async () => {
@@ -190,7 +190,7 @@ describe('the slash palette', () => {
     type('/zzzz');
     expect(screen.queryByRole('listbox')).toBeNull();
     key('Enter');
-    expect(onSubmit).toHaveBeenCalledWith('queue');
+    expect(onSubmit).toHaveBeenCalledWith('now');
   });
 
   it('a path is not a command', () => {

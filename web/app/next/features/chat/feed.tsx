@@ -204,6 +204,8 @@ export interface IFeedProps extends THandlers {
   /** The chat the chips ask where a merge request opens; without it they ask nothing. */
   /** What stands over the bottom of the feed: questions, queue, composer. */
   dock?: ReactNode;
+  /** What stands before the first turn, scrolling with them: the thing a chat is about, when a host shows it there. */
+  lead?: ReactNode;
 }
 
 /**
@@ -375,6 +377,7 @@ const Feed = (props: IFeedProps) => {
   const feedMenu = useContextMenu({ hold: false });
   const scrollerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
+  const leadRef = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
   const [heights] = useState(() => new HeightCache());
   const [toggled, setToggled] = useState<ReadonlySet<string>>(() => new Set());
@@ -538,7 +541,13 @@ const Feed = (props: IFeedProps) => {
       const list = (latest.current.items ?? []).map((item) => item.key);
       // On the way back to the reader's place the window is the place's, not the bottom's the feed opened at.
       if (!scroller || list.length < VIRTUAL_FROM || goingBack.current) return;
-      const next = feedWindow(list, heights.view(), scroller.scrollTop, scroller.clientHeight);
+      const next = feedWindow(
+        list,
+        heights.view(),
+        scroller.scrollTop,
+        scroller.clientHeight,
+        leadRef.current?.offsetHeight ?? 0,
+      );
       const nextRange: IKeyWindow = {
         startKey: list[next.start],
         endKey: next.end >= list.length ? null : list[next.end - 1],
@@ -925,6 +934,11 @@ const Feed = (props: IFeedProps) => {
         onKeyDown={onKeyDown}
       >
         <div ref={innerRef} className="hx-feed__inner">
+          {props.lead && (
+            <div ref={leadRef} className="hx-feed__lead">
+              {props.lead}
+            </div>
+          )}
           {items === null && !failed && <FeedLoading />}
           {items === null && failed && onRetryLoad && (
             <LoadFailed

@@ -120,6 +120,8 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("POST "+p+"/_board-events", http.HandlerFunc(s.boardEvents))
 	mux.Handle("GET "+p+"/people", s.guard(s.peopleRoute))
 	mux.Handle("GET "+p+"/{slug}", s.guard(s.detail))
+	mux.Handle("GET "+p+"/{slug}/card", s.guard(s.card))
+	mux.Handle("GET "+p+"/{slug}/preview", s.guard(s.preview))
 	mux.Handle("POST "+p+"/{slug}/threads", s.guard(s.newThread))
 	mux.Handle("POST "+p+"/{slug}/threads/{id}/comments", s.guard(s.reply))
 	mux.Handle("POST "+p+"/{slug}/threads/{id}/status", s.guard(s.threadStatus))
@@ -130,6 +132,7 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("GET "+p+"/{slug}/access", s.guard(s.getAccess))
 	mux.Handle("POST "+p+"/{slug}/access", s.guard(s.postAccess))
 	s.mountAccess(mux)
+	s.mountManage(mux)
 	mux.Handle("GET "+p+"/{slug}/source", s.guard(s.source))
 	mux.Handle("PUT "+p+"/{slug}/source", s.guard(s.saveSource))
 	mux.Handle("PUT "+p+"/{slug}/source/block", s.guard(func(http.ResponseWriter, *http.Request, *auth.Principal) error {
@@ -180,6 +183,9 @@ type summary struct {
 	LastActivityAt string  `json:"lastActivityAt"`
 	// author is who the documents or boards service says made it; it places a document the hub has no record of.
 	author string
+	// editor and edited: who changed it last and when (a document's current version, a board's last edit), "" when
+	// the service does not say (a link card).
+	editor, edited string
 }
 
 type board struct {
@@ -188,6 +194,11 @@ type board struct {
 	URL       string `json:"url"`
 	Author    string `json:"author"`
 	UpdatedAt any    `json:"updatedAt"`
+	// Preview is the board's thumbnail on the boards service (with its key), "" when it has none.
+	Preview string `json:"preview"`
+	// EditedBy and EditedAt: who changed the scene last and when; absent on a board nobody changed since.
+	EditedBy string `json:"editedBy"`
+	EditedAt string `json:"editedAt"`
 }
 
 func (s *Service) boards(ctx context.Context) ([]board, error) {
@@ -222,7 +233,7 @@ func (s *Service) contentPath(slug string) string {
 
 func (s *Service) summaries(ctx context.Context, p *auth.Principal, only string) ([]summary, error) {
 	type item struct {
-		slug, kind, title, url, updated, author string
+		slug, kind, title, url, updated, author, editor, edited string
 	}
 	var items []item
 	arts, err := s.art.list(ctx)
@@ -231,7 +242,11 @@ func (s *Service) summaries(ctx context.Context, p *auth.Principal, only string)
 	}
 	for _, a := range arts {
 		if only == "" || only == a.Slug {
-			items = append(items, item{a.Slug, "artifact", a.Title, s.contentPath(a.Slug), a.UpdatedAt, a.Author})
+			it := item{slug: a.Slug, kind: "artifact", title: a.Title, url: s.contentPath(a.Slug), updated: a.UpdatedAt, author: a.Author}
+			if v := a.CurrentVersion; v != nil {
+				it.editor, it.edited = v.Author, v.CreatedAt
+			}
+			items = append(items, it)
 		}
 	}
 	if bs, err := s.boards(ctx); err != nil {
@@ -239,7 +254,7 @@ func (s *Service) summaries(ctx context.Context, p *auth.Principal, only string)
 	} else {
 		for _, b := range bs {
 			if only == "" || only == b.Slug {
-				items = append(items, item{b.Slug, "board", b.Title, b.URL, timeOf(b.UpdatedAt), b.Author})
+				items = append(items, item{slug: b.Slug, kind: "board", title: b.Title, url: b.URL, updated: timeOf(b.UpdatedAt), author: b.Author, editor: b.EditedBy, edited: b.EditedAt})
 			}
 		}
 	}
@@ -265,10 +280,13 @@ func (s *Service) summaries(ctx context.Context, p *auth.Principal, only string)
 		if m, ok := metas[it.slug]; ok {
 			mp = &m
 		}
+		if mp != nil && mp.TrashedAt != 0 {
+			continue
+		}
 		if s.rank(ctx, it.slug, mp, it.author, p, c) < levelRank[levelView] {
 			continue
 		}
-		sm := summary{author: it.author, Slug: it.slug, Kind: it.kind, Title: it.title, URL: it.url, OpenThreads: open[it.slug], Unread: unread[it.slug], LastActivityAt: it.updated}
+		sm := summary{author: it.author, editor: it.editor, edited: it.edited, Slug: it.slug, Kind: it.kind, Title: it.title, URL: it.url, OpenThreads: open[it.slug], Unread: unread[it.slug], LastActivityAt: it.updated}
 		if mp != nil {
 			sm.Bound = mp.MachineID != ""
 			sm.Owner = &author{Kind: "person", Email: mp.OwnerEmail, Name: firstNonEmpty(mp.OwnerName, mp.OwnerEmail)}
@@ -321,6 +339,10 @@ func (s *Service) open(r *http.Request, p *auth.Principal, need int) (summary, *
 	}
 	if elsewhere {
 		return summary{}, nil, errNoAccess
+	}
+	if m != nil && m.TrashedAt != 0 {
+		// In the trash: it opens for nobody until it is taken out (manage.go).
+		return summary{}, nil, errNoDoc
 	}
 	if m == nil {
 		// Who may read a document the hub has no record of depends on its author, whom only the list names; the list
@@ -384,7 +406,7 @@ func (s *Service) peopleRoute(w http.ResponseWriter, r *http.Request, p *auth.Pr
 }
 
 func (s *Service) newThread(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	doc, _, err := s.open(r, p, levelRank[levelComment])
+	doc, m, err := s.open(r, p, levelRank[levelComment])
 	if err != nil {
 		return err
 	}
@@ -406,6 +428,8 @@ func (s *Service) newThread(w http.ResponseWriter, r *http.Request, p *auth.Prin
 	if err != nil {
 		return err
 	}
+	// Only who may edit the document binds it to a machine of theirs: a commenter would draw everyone's comments there.
+	s.bindCalledDoc(r.Context(), doc.Slug, p.User.ID, body, s.rank(r.Context(), doc.Slug, m, doc.author, p, nil) >= levelRank[levelEdit])
 	s.Deliver(cid)
 	s.mention(r.Context(), doc, cid, body, p)
 	return s.threadAnswer(w, r, doc.Slug, id, http.StatusCreated)
@@ -424,7 +448,7 @@ func (s *Service) threadAnswer(w http.ResponseWriter, r *http.Request, slug, id 
 }
 
 func (s *Service) reply(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	doc, _, err := s.open(r, p, levelRank[levelComment])
+	doc, m, err := s.open(r, p, levelRank[levelComment])
 	if err != nil {
 		return err
 	}
@@ -448,6 +472,8 @@ func (s *Service) reply(w http.ResponseWriter, r *http.Request, p *auth.Principa
 	if err != nil {
 		return err
 	}
+	// Only who may edit the document binds it to a machine of theirs: a commenter would draw everyone's comments there.
+	s.bindCalledDoc(r.Context(), doc.Slug, p.User.ID, body, s.rank(r.Context(), doc.Slug, m, doc.author, p, nil) >= levelRank[levelEdit])
 	s.Deliver(cid)
 	s.mention(r.Context(), doc, cid, body, p)
 	return s.threadAnswer(w, r, doc.Slug, id, http.StatusOK)

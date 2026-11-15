@@ -1,0 +1,15 @@
+# The agent's surface: what an agent is told and given. A change of these files changes what agents do, so it comes
+# with a new or updated scenario of this folder (docs/agent-evals.md, «New features»). One glob per line, ** for any
+# depth, !glob takes a path back.
+cmd/runtime/agent_skills*.go
+internal/prompts/**
+internal/hooksetup/**
+internal/agentskills/**
+skills/upstream/agent-skills/plugins/harnessly/**
+internal/*/tools.go
+internal/design/kittools.go
+internal/mcpserver/**
+internal/codemode/**
+internal/hlcli/**
+!**/*_test.go
+!internal/hlcli/eval*.go

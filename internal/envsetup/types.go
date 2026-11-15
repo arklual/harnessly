@@ -95,6 +95,9 @@ const (
 	pruneEvery    = time.Hour
 	// retryEvery: a machine whose last apply left something undone is tried again this often, and only such a machine.
 	retryEvery = 30 * time.Minute
+	// appHeadsEvery: the branches of the list's apps are looked at this often, so a new version of an app reaches the
+	// machine within minutes without anyone pressing anything.
+	appHeadsEvery = 10 * time.Minute
 	// requestTTL: a request nobody took up in this time is answered with an error rather than run late.
 	requestTTL = 10 * time.Minute
 	// minFree is what a clone or a sandbox run needs on the disk.
@@ -147,8 +150,9 @@ type Apps interface {
 	// Install puts the app in dir on the machine as the environment item's, with the installation's values the hub
 	// gave (${install:<name>}); changed is false when the same version from the same files is already there. missing
 	// are the values the app asks for and the hub has none of: the app is there but not configured. keep are the app
-	// items of the list: an app whose item left it is taken over by the item that brings it now.
-	Install(dir, itemID string, locked bool, install map[string]string, keep []string) (id string, changed bool, missing []string, err error)
+	// items of the list: an app whose item left it is taken over by the item that brings it now. version is the
+	// manifest's version now on the machine, which the run tells the hub («Окружение» shows it).
+	Install(dir, itemID string, locked bool, install map[string]string, keep []string) (id, version string, changed bool, missing []string, err error)
 	// Has: the item's app is installed.
 	Has(itemID string) bool
 	// Prune takes off the environment's apps whose item is not among keep.

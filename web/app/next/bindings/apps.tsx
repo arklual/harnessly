@@ -21,7 +21,7 @@ const FAILS_BEFORE_TOLD = 2;
 /** The «2 hours ago» of the rows move on with this clock. */
 const CLOCK_MS = 60_000;
 
-interface IAppsScreenProps {
+export interface IAppsScreenProps {
   machine: MachineId;
   onOpenDrawer: () => void;
 }

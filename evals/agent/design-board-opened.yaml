@@ -1,0 +1,39 @@
+id: design-board-opened
+title: Новая доска Sinopia — открыта человеку именно она
+tags: [design, pane]
+timeout_s: 600
+setup:
+  design: [fixtures/shop]
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/hlcli/hlcli.go'
+  - 'internal/hlcli/preview.go'
+  - 'internal/paneintents/**'
+  - 'internal/hlcli/design*.go'
+  - 'internal/design/**'
+prompt: Сделай в проекте Sinopia Design «shop» новую доску «Оплата» — форма оплаты заказа с суммой и кнопкой «Оплатить». Покажи мне её, когда будет готово.
+expect:
+  - name: the board exists
+    file: {glob: 'design:shop/project/*.dc.html', contains: 'Оплатить'}
+  - name: opened the design on that board
+    pane: {tab: design, target: shop, place: '(?i)оплат'}
+variants:
+  - id: v1
+    kind: short
+    text: "Sinopia Design, «shop»: новая доска «Оплата», форма оплаты заказа с суммой и кнопкой «Оплатить». Покажи, когда будет готово."
+  - id: v2
+    kind: long
+    text: "Слушай, в проекте Sinopia Design, в части «shop», нам не хватает отдельной доски «Оплата». Там должна быть форма оплаты заказа с суммой и кнопкой «Оплатить». Очень нужно, чтобы она появилась, так что как только будет готово, покажи мне её."
+  - id: v3
+    kind: typos
+    text: "в проекте sinopia desgin в части «shop» новую дксу «оплата» форма оплаты заказа с суммой и кнопкой «оплатить» покажы мне её как будет готово"
+  - id: v4
+    kind: english
+    text: "In the Sinopia Design project, in «shop», add a new board «Оплата»: an order payment form with an amount field and an «Оплатить» button. Show it to me when it's ready."
+  - id: v5
+    kind: formal
+    text: "Будьте добры, в проекте Sinopia Design в разделе «shop» создайте, пожалуйста, новую доску «Оплата» — форму оплаты заказа с указанием суммы и кнопкой «Оплатить». Покажите её мне, пожалуйста, по готовности."
+  - id: v6
+    kind: indirect
+    text: "В проекте Sinopia Design, в разделе «shop», мне нужна ещё одна доска под названием «Оплата»: экран, где клиент видит сумму заказа и жмёт «Оплатить». Как только всё будет на месте, дай знать и покажи."

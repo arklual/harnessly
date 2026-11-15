@@ -27,7 +27,9 @@ const EXIT_MS = 170;
 const SHEET_EXIT_MS = 240;
 
 /** The chip of the chat's field and the words the agent reads with the next message. */
-export const deckChatContext = (ctx: IDeckContext): { label: string; text: string; selected: boolean } => {
+export const deckChatContext = (
+  ctx: IDeckContext,
+): { label: string; text: string; selected: boolean; tpl: number | null } => {
   const label =
     ctx.label === null
       ? t('next.deck.chat.context', { n: ctx.slide })
@@ -36,6 +38,7 @@ export const deckChatContext = (ctx: IDeckContext): { label: string; text: strin
     label,
     text: ctx.label === null ? `slide ${ctx.slide}` : `slide ${ctx.slide}, block «${ctx.label}»`,
     selected: ctx.label !== null,
+    tpl: ctx.tpl ?? null,
   };
 };
 

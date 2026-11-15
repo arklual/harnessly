@@ -1,7 +1,8 @@
 // What the UI slots put on the screens that exist: the «Extensions» page of Settings (the settings views and the
 // onboarding steps), the action row at an object and the blocks of the start page. Every piece here is empty without HARNESSLY_UI_SLOTS=on.
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { useInstalledApps } from '@/next/features/app-views/api';
+import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { platformPath, runtimePath } from '@/next/core/net/machine';
+import { useInstalledApps, type IAppView } from '@/next/features/app-views/api';
 import {
   applyBranding,
   brandingOf,
@@ -15,6 +16,9 @@ import { Group } from '@/next/features/settings/rows';
 import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
+
+// The page of the day the host draws from a stage view's feed: loaded only for a person who has such a view.
+const DayStage = lazy(() => import('@/next/features/day/day'));
 
 const DONE_KEY = 'hl.slot.done';
 
@@ -155,13 +159,25 @@ export const HomeSlots = ({ machine }: { machine: MachineId | null }) => {
 
 export interface IHomeGreeting {
   title: string;
-  sub: string;
+  /** A line of words from a view; the host's own page of the day puts links to its things in it. */
+  sub: ReactNode;
 }
 
 /**
  * The view that takes the start page's stage under the field (the first by order when several apps ask for it), and the
- * greeting it put over the field. Null when no app asks for the stage: the page stays as it was.
+ * greeting it put over the field. Null when no app asks for the stage: the page stays as it was. A stage view that
+ * names a feed of the day (`view.feed`) is drawn by the host itself, natively, from that feed; without one the view's
+ * own frame is drawn, as before.
  */
+/**
+ * Where the page reads a view's feed: through its own runtime when the machine signs the feed in (`feedPath`), so no
+ * sign-in of the feed's site shows on the page; otherwise the feed's address itself, with the person's cookie there.
+ */
+export const feedOf = (view: IAppView, machine: MachineId): string | undefined =>
+  view.feedPath?.startsWith('/')
+    ? runtimePath(platformPath(view.feedPath as `/${string}`), machine)
+    : view.feed;
+
 export const useHomeStage = (
   machine: MachineId | null,
 ): { stage: ReactNode; greeting: IHomeGreeting | null } => {
@@ -169,23 +185,36 @@ export const useHomeStage = (
   const entry = slotViews(list, 'home').find(isStageView) ?? null;
   const key = entry ? keyOf(entry) : null;
   const [greeting, setGreeting] = useState<{ key: string; value: IHomeGreeting } | null>(null);
-  const onGreet = (title: string, sub: string) => {
+  const onGreet = (title: string, sub: ReactNode) => {
     if (key !== null) setGreeting(title === '' ? null : { key, value: { title, sub } });
   };
   if (machine === null || list === null || entry === null) return { stage: null, greeting: null };
+  const feed = feedOf(entry.view, machine);
   return {
     stage: (
       <div className="hx-home-stage">
-        <UiSlot
-          key={keyOf(entry)}
-          machine={machine}
-          app={entry.app}
-          view={entry.view}
-          target="home"
-          viewPort={list.viewPort}
-          onGreet={onGreet}
-          fill
-        />
+        {feed ? (
+          <Suspense fallback={null}>
+            <DayStage
+              key={feed}
+              app={{ id: entry.app.id, name: entry.app.name }}
+              feed={feed}
+              onGreet={onGreet}
+              machine={machine}
+            />
+          </Suspense>
+        ) : (
+          <UiSlot
+            key={keyOf(entry)}
+            machine={machine}
+            app={entry.app}
+            view={entry.view}
+            target="home"
+            viewPort={list.viewPort}
+            onGreet={onGreet}
+            fill
+          />
+        )}
       </div>
     ),
     // A greeting is the view's own: another view, or the same one gone, leaves the host's question.

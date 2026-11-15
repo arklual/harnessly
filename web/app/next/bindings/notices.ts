@@ -3,7 +3,7 @@
 // on its icon, and with the page hidden a notification of the system. What the list showed before the machine's own
 // snapshot (the browser's cache) and what a chat stood at when first seen are no news. Opening the chat clears its
 // notice; so does the chat moving past it (the question answered elsewhere, the answer read on another device).
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { appBasePath } from '@/platform/config';
 import { noticeEventOf } from '@/next/features/notifications/notice-events';
 import {
@@ -72,7 +72,28 @@ export const louder = (a: TNoticeSound | null, b: TNoticeSound | null): TNoticeS
 export const soundOn = (settings: INotifySettings, sound: TNoticeSound | null): sound is TNoticeSound =>
   sound !== null && settings.sound && settings.sounds[sound];
 
-const pageInFront = (): boolean => document.visibilityState === 'visible' && document.hasFocus();
+/**
+ * The page is on screen. Not document.hasFocus(): on a phone, and while the focus is in a frame of the right pane (a
+ * browser tab, a board), the page has no focus though the person looks at it, and the open chat got a notice of its own
+ * turn.
+ */
+export const pageVisible = (): boolean => document.visibilityState === 'visible';
+
+const onVisibility = (notify: () => void) => {
+  document.addEventListener('visibilitychange', notify);
+  return () => document.removeEventListener('visibilitychange', notify);
+};
+
+/** pageVisible, kept current. */
+export const usePageVisible = (): boolean => useSyncExternalStore(onVisibility, pageVisible, () => true);
+
+/** A notice of the chat in sight while the page is on screen is no news: its turn is right there. Its
+ *  notices are kept away from the plate, also the ones that came from another device through the sync. */
+export const outOfSight = <T extends { chatId: string | null }>(
+  items: readonly T[],
+  inSight: string | null,
+  visible: boolean,
+): readonly T[] => (inSight === null || !visible ? items : items.filter((item) => item.chatId !== inSight));
 
 /**
  * A notice whose chat stands at another event goes only once the chat has stood there this long: a sync that shows the
@@ -155,7 +176,7 @@ export const useNotices = ({ person, currentId, onOpenChat }: INoticesOptions) =
       seen.current.set(conv.id, event?.key ?? null);
       if (before === undefined || !event || event.key === before) continue;
       if (!settings.kinds[event.kind]) continue;
-      if (conv.id === current.current && pageInFront()) continue;
+      if (conv.id === current.current && pageVisible()) continue;
       // Back at an event it still shows (it only looked away for a moment): no new notice, no sound.
       if (noticesSnapshot().some((n) => n.key === event.key)) continue;
       sound = louder(sound, soundOf(event.kind, conv));
@@ -198,7 +219,7 @@ export const useNotices = ({ person, currentId, onOpenChat }: INoticesOptions) =
   useEffect(() => {
     if (!currentId) return;
     const clear = () => {
-      if (pageInFront()) clearChatNotices(currentId);
+      if (pageVisible()) clearChatNotices(currentId);
     };
     clear();
     window.addEventListener('focus', clear);

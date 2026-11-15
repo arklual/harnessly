@@ -35,7 +35,7 @@
   "next.keys.cmd.global.stepOn": "Forward: slide, scene, picture",
   "next.keys.cmd.composer.dictate": "Start or finish dictation",
   "next.keys.cmd.composer.cancelDictation": "Cancel dictation",
-  "next.keys.cmd.composer.send": "Send now, into the agent's turn",
+  "next.keys.cmd.composer.send": "Queue — after the agent’s turn",
   "next.keys.cmd.composer.stopAgent": "Stop the agent",
   "next.keys.cmd.composer.attach": "Attach a file",
   "next.keys.cmd.deck.next": "Next slide",

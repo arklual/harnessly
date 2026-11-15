@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import AppStage, { appStageDesign, type IAppStageProps } from '@/next/features/app-main/app-stage';
+import AppStage, {
+  appStageDesign,
+  SPACES_STAGE,
+  type IAppStageProps,
+} from '@/next/features/app-main/app-stage';
 import type { ISiteStage } from '@/next/features/designly/site-view';
 
 beforeEach(() => {
@@ -55,9 +59,12 @@ const props = (over: Partial<IAppStageProps> = {}): IAppStageProps => ({
 });
 
 describe('an app in Sinopia’s stage', () => {
-  it('keys the home and each object apart', () => {
-    expect(appStageDesign('harnessly.docs', null)).toBe('app:harnessly.docs');
-    expect(appStageDesign('harnessly.docs', 'plan-x1')).toBe('app:harnessly.docs/plan-x1');
+  it('keys the home and each object apart; the spaces share one stage (HRN-1469)', () => {
+    expect(appStageDesign('acme.cashback', null)).toBe('app:acme.cashback');
+    expect(appStageDesign('acme.cashback', 'plan-x1')).toBe('app:acme.cashback/plan-x1');
+    expect(appStageDesign('harnessly.docs', null)).toBe(SPACES_STAGE);
+    expect(appStageDesign('harnessly.docs', 'plan-x1')).toBe(SPACES_STAGE);
+    expect(appStageDesign('harnessly.boards', 'b1')).toBe(SPACES_STAGE);
   });
 
   it('stands in the design’s section, with the chat, the view and the field', () => {

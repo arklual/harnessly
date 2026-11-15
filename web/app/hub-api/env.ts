@@ -111,6 +111,8 @@ export type EnvEntryRow = {
   // An app of the platform itself («Доски», «Документы»): the one thing an admin changes in it is `off`.
   builtIn?: boolean;
   off?: boolean; // an app the organization turned off for everybody
+  appVersion?: string; // an app: the version the machines have now (HRN-1478)
+  appUpdatedAt?: string; // when a machine last put that version on (ISO)
 };
 
 // A group of a layer's entries (docs/hub/environment.md, «Groups»). Required: its items are pinned. Optional: each

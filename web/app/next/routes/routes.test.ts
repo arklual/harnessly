@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { HOME, ROUTE, SETTINGS_SECTIONS, parseRoute, placeKeyOf, routePath } from '@/next/routes/routes';
+import {
+  HOME,
+  ROUTE,
+  SETTINGS_SECTIONS,
+  isInAppPath,
+  parseRoute,
+  placeKeyOf,
+  routePath,
+} from '@/next/routes/routes';
 
 describe('routes', () => {
   it('reads a chat address and writes it back the same', () => {
@@ -117,6 +125,37 @@ describe('routes', () => {
     // Not an object: the app's home.
     expect(parseRoute('/apps/harnessly.docs?o=a%2Fb')).toEqual({ kind: ROUTE.app, id: 'harnessly.docs' });
     expect(placeKeyOf('/apps/harnessly.docs?o=plan-x1')).toBe('app:harnessly.docs/plan-x1');
+  });
+
+  it('reads a thread on an object only with the object, and writes it back (HRN-1469)', () => {
+    expect(parseRoute('/apps/harnessly.boards?o=plan-x1&th=a1b2c3d4e5')).toEqual({
+      kind: ROUTE.app,
+      id: 'harnessly.boards',
+      object: 'plan-x1',
+      thread: 'a1b2c3d4e5',
+    });
+    expect(parseRoute('/apps/harnessly.boards?th=a1b2c3d4e5')).toEqual({
+      kind: ROUTE.app,
+      id: 'harnessly.boards',
+    });
+    expect(parseRoute('/apps/harnessly.boards?o=plan-x1&th=a%2Fb')).toEqual({
+      kind: ROUTE.app,
+      id: 'harnessly.boards',
+      object: 'plan-x1',
+    });
+    expect(routePath({ kind: ROUTE.app, id: 'harnessly.boards', object: 'b1', thread: 't9' })).toBe(
+      '/apps/harnessly.boards?o=b1&th=t9',
+    );
+    expect(routePath({ kind: ROUTE.app, id: 'harnessly.boards', thread: 't9' })).toBe(
+      '/apps/harnessly.boards',
+    );
+  });
+
+  it('tells a path of this page from an address elsewhere', () => {
+    expect(isInAppPath('/apps/harnessly.boards?o=b1&th=t9')).toBe(true);
+    expect(isInAppPath('//evil.example/x')).toBe(false);
+    expect(isInAppPath('https://hub.example/m/1/designly/x')).toBe(false);
+    expect(isInAppPath('/\\evil.example')).toBe(false);
   });
 
   it('reads Settings with or without a section and writes it back the same', () => {

@@ -38,6 +38,17 @@ const (
 
 var boardSlugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{2,120}$`)
 
+// docSlugRe is a slug of the documents service (its isValidSlug).
+var docSlugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,79}$`)
+
+// eventSlugOK checks a slug by its kind: a key doc/<slug> by the documents' rule, any other by the boards'.
+func eventSlugOK(key string) bool {
+	if slug, ok := strings.CutPrefix(key, docKeyPrefix); ok {
+		return docSlugRe.MatchString(slug)
+	}
+	return boardSlugRe.MatchString(key)
+}
+
 var boardEventNames = map[string]bool{
 	"thread.created": true, "thread.replied": true, "thread.resolved": true, "thread.reopened": true, "thread.removed": true,
 }
@@ -48,8 +59,11 @@ type Gate interface {
 }
 
 type boardEvent struct {
+	// Kind "doc": a comment of the documents service, in the same shape (board_call.go); "" or "board": a board's.
+	Kind   string `json:"kind"`
 	Event  string `json:"event"`
 	Slug   string `json:"slug"`
+	Title  string `json:"title"`
 	Thread struct {
 		ID       string `json:"id"`
 		Resolved bool   `json:"resolved"`
@@ -66,6 +80,9 @@ type boardEvent struct {
 		Author      string  `json:"author"`
 		AuthorEmail *string `json:"authorEmail"`
 		AuthorKind  string  `json:"authorKind"`
+		// AuthorID and Mentions: the people of the board by a stable id (board_mentions.go).
+		AuthorID string          `json:"authorId"`
+		Mentions json.RawMessage `json:"mentions"`
 	} `json:"message"`
 }
 
@@ -87,7 +104,14 @@ func (s *Service) boardEvents(w http.ResponseWriter, r *http.Request) {
 		writeEventAnswer(w, http.StatusBadRequest, map[string]string{"error": "bad json"})
 		return
 	}
-	if !boardEventNames[ev.Event] || !boardSlugRe.MatchString(ev.Slug) || ev.Thread.ID == "" {
+	// A document's comments live beside the boards' under their own key: doc/<slug> (board_call.go).
+	if ev.Kind == eventKindDoc && !strings.Contains(ev.Slug, "/") {
+		ev.Slug = docKeyPrefix + ev.Slug
+	} else if ev.Kind != "" && ev.Kind != "board" {
+		writeEventAnswer(w, http.StatusBadRequest, map[string]string{"error": "kind is board or doc"})
+		return
+	}
+	if !boardEventNames[ev.Event] || !eventSlugOK(ev.Slug) || ev.Thread.ID == "" {
 		writeEventAnswer(w, http.StatusBadRequest, map[string]string{"error": "event, slug and thread.id are required"})
 		return
 	}
@@ -97,6 +121,8 @@ func (s *Service) boardEvents(w http.ResponseWriter, r *http.Request) {
 		writeEventAnswer(w, http.StatusInternalServerError, map[string]string{"error": "not applied"})
 		return
 	}
+	// Whoever drew the board and whatever the switch of the owner, the people a comment calls hear of it.
+	s.ringBoardMentions(r.Context(), ev)
 	writeEventAnswer(w, http.StatusAccepted, map[string]string{"outcome": outcome})
 }
 
@@ -110,25 +136,29 @@ func writeEventAnswer(w http.ResponseWriter, status int, body any) {
 // boardBinding is the conversation a board was drawn in.
 type boardBinding struct {
 	Slug, Machine, Owner, Title string
+	// Called: the board was bound by a call of the agent on it (board_call.go): the hub takes its events by itself.
+	Called bool
 }
 
 func (s *Service) boardBinding(ctx context.Context, slug string) (*boardBinding, error) {
 	var b boardBinding
-	err := s.db.S().Q().QueryRow(ctx, `SELECT slug, machine_id, owner_email, title FROM board_bindings WHERE slug = ?`, slug).
-		Scan(&b.Slug, &b.Machine, &b.Owner, &b.Title)
+	var session sql.NullString
+	err := s.db.S().Q().QueryRow(ctx, `SELECT slug, machine_id, owner_email, title, session_name FROM board_bindings WHERE slug = ?`, slug).
+		Scan(&b.Slug, &b.Machine, &b.Owner, &b.Title, &session)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
+	b.Called = session.String == newBoardTab
 	return &b, nil
 }
 
 // bindBoard records the conversation a board was drawn in; a later publish from another conversation of the same space
 // moves it. The board's key is not kept.
 func (s *Service) bindBoard(ctx context.Context, mc store.Machine, b hubproto.DocBinding) error {
-	if !boardSlugRe.MatchString(b.Slug) {
+	if !eventSlugOK(b.Slug) {
 		return nil
 	}
 	owner, _ := s.user(ctx, mc.CreatedBy)
@@ -151,9 +181,21 @@ func (s *Service) applyBoardEvent(ctx context.Context, ev boardEvent, raw []byte
 	if err != nil {
 		return "", err
 	}
-	if b == nil || b.Owner == "" || s.gate == nil || !s.gate.On(ctx, SwitchBoardEvents, b.Owner, b.Machine) {
+	// @harnessly on a board no conversation drew: the caller's machine takes it (board_call.go).
+	called := calledAgent(ev)
+	if b == nil && called {
+		if b, err = s.bindCalledBoard(ctx, ev); err != nil {
+			return "", err
+		}
+	}
+	if !s.callersOwn(ctx, b, ev) {
 		return s.forwardBoardEvent(ctx, raw), nil
 	}
+	taken := called || (b != nil && b.Called) || (b != nil && s.gate != nil && s.gate.On(ctx, SwitchBoardEvents, b.Owner, b.Machine))
+	if b == nil || b.Owner == "" || !taken {
+		return s.forwardBoardEvent(ctx, raw), nil
+	}
+	defer s.ringAgentAnswer(ctx, b, ev)
 	externalID := clip(ev.Thread.ID, 128)
 	q := s.db.S().Q()
 	var threadID string

@@ -1,0 +1,20 @@
+id: design-project-zip
+title: «Скинь проект zip» — архив проекта Sinopia карточкой файла
+tags: [design, files]
+timeout_s: 420
+setup:
+  design: [fixtures/shop]
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/hlcli/design*.go'
+  - 'internal/design/**'
+  - 'internal/delivery/**'
+prompt: скинь мне проект shop из Sinopia Design zip-архивом
+expect:
+  - name: exported the project as a zip with the project's exporter
+    called: Bash
+    args: {command: '(?s).*harnessly design export\s+\S*shop\S*.*--(zip|all).*'}
+  - name: did not zip it by hand
+    not_called: Bash
+    args: {command: '(?s).*(^|[;&| ])(zip|tar -c)\s.*'}

@@ -1,0 +1,33 @@
+id: open-task
+title: «Покажи задачу» — вкладка задачи правой панели
+tags: [pane]
+timeout_s: 240
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/hlcli/hlcli.go'
+  - 'internal/hlcli/preview.go'
+  - 'internal/paneintents/**'
+prompt: покажи мне задачу PRJ-128 в панели
+expect:
+  - name: opened the task tab on PRJ-128
+    pane: {tab: task, target: PRJ-128}
+variants:
+  - id: v1
+    kind: short
+    text: "глянь PRJ-128 в панели"
+  - id: v2
+    kind: long
+    text: "слушай, мне тут надо разобраться с задачей PRJ-128, она у меня где-то в панели, можешь её мне вывести пожалуйста"
+  - id: v3
+    kind: typos
+    text: "пакажи мне задачу PRJ-128 в пенели"
+  - id: v4
+    kind: english
+    text: "show me task PRJ-128 in the panel"
+  - id: v5
+    kind: formal
+    text: "Не могли бы вы, пожалуйста, открыть для меня задачу PRJ-128 в панели?"
+  - id: v6
+    kind: indirect
+    text: "интересует, что сейчас написано в задаче PRJ-128 на панели"

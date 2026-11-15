@@ -2,6 +2,7 @@ package feed
 
 import (
 	"os"
+	"slices"
 	"testing"
 
 	"github.com/ly-solutions/harnessly/internal/wire"
@@ -69,6 +70,10 @@ func TestHarnesslyPicturesCardFollowsItsJob(t *testing.T) {
 	if toolByName(t, f, "mcp__harnessly__wait_images").Images != nil {
 		t.Fatal("the wait step is not a card of its own")
 	}
+	// the turn lists what it drew, so the folded turn shows the pictures under its answer.
+	if got := f.b.turns[len(f.b.turns)-1].rec.Pictures; !slices.Equal(got, []string{"/d/images/j1-1.png", "/d/images/j1-2.png", "/d/images/j1-3.png"}) {
+		t.Fatalf("turn pictures: %v", got)
+	}
 }
 
 func TestAFailedPictureCallIsAFailedCard(t *testing.T) {
@@ -81,5 +86,33 @@ func TestAFailedPictureCallIsAFailedCard(t *testing.T) {
 	img := toolByName(t, f, "mcp__harnessly__generate_images").Images
 	if img.State != "failed" || img.Failed == nil || *img.Failed != "model refused" || img.Count != 1 {
 		t.Fatalf("card: %+v", img)
+	}
+}
+
+// harnessly's generate_images from Codex makes the card whichever way it is called — as a tool of its own
+// (function_call) or from a code-mode script — and its answer fills the card with the files.
+func TestCodexHarnesslyPicturesMakeTheCard(t *testing.T) {
+	user := `{"timestamp":"2026-10-31T13:56:40.000Z","type":"event_msg","payload":{"type":"user_message","message":"нарисуй кота","images":[],"local_images":[]}}` + "\n"
+	report := `job_id: j9\nDone: 2 picture(s).\n1. /d/images/j9-1.png\n2. /d/images/j9-2.png\nThe person already sees these pictures in the chat; do not paste the paths back unless asked.`
+	cases := []struct {
+		name, tool, lines string
+	}{
+		{"direct", "mcp__harnessly__generate_images",
+			`{"timestamp":"2026-10-31T13:56:50.000Z","type":"response_item","payload":{"type":"function_call","name":"mcp__harnessly__generate_images","arguments":"{\"prompt\":\"a cat\",\"count\":2,\"shape\":\"square\"}","call_id":"call_g"}}` + "\n" +
+				`{"timestamp":"2026-10-31T13:57:30.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_g","output":"` + report + `"}}` + "\n"},
+		{"script", "mcp__harnessly__generate_images",
+			`{"timestamp":"2026-10-31T13:56:50.000Z","type":"response_item","payload":{"type":"custom_tool_call","id":"ctc_1","status":"completed","call_id":"call_s","name":"exec","input":"text(await tools.harnessly__generate_images({prompt:\"a cat\",count:2}));"}}` + "\n" +
+				`{"timestamp":"2026-10-31T13:57:30.000Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"call_s","output":[{"type":"input_text","text":"Script completed\nWall time 40.1 seconds\nOutput:\n` + report + `"}]}}` + "\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := New("c1", wire.ProviderCodex, &CodexSource{Path: write(t, user+tc.lines)})
+			f.Load()
+			validate(t, f)
+			img := toolByName(t, f, tc.tool).Images
+			if img == nil || img.State != "done" || img.Count != 2 || img.Prompt != "a cat" || len(img.Done) != 2 || img.Done[1] != "/d/images/j9-2.png" {
+				t.Fatalf("card: %+v", img)
+			}
+		})
 	}
 }

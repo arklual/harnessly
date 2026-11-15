@@ -38,5 +38,7 @@
   "next.connection.now": "Переподключиться",
   "next.connection.nowShort": "Сейчас",
   "next.connection.retrying": "Подключаемся",
-  "next.connection.back": "Снова на связи"
+  "next.connection.back": "Снова на связи",
+  "next.rollout.active": "Идёт обновление — возможны перебои с подключением к машинам",
+  "next.rollout.done": "Обновление завершено"
 }

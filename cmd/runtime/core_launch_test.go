@@ -116,7 +116,7 @@ func TestLaunchSliceStartsAConversation(t *testing.T) {
 	}
 	flat := paneText(screen)
 	// The line is typed as `sh -c '…'`, so each quote of the sh line shows as '\''.
-	if !strings.Contains(flat, paneText(`exec env DISABLE_AUTOUPDATER=1 '\''`+agentBin+`'\'' --settings `+filepath.Join(dir, "hooks.json"))) ||
+	if !strings.Contains(flat, paneText(`exec env DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 '\''`+agentBin+`'\'' --settings `+filepath.Join(dir, "hooks.json"))) ||
 		!strings.Contains(flat, paneText("fake agent started:")) || !strings.Contains(flat, paneText(`-- "$(printf %b '\''hello there'\'')"`)) ||
 		!strings.Contains(flat, paneText("key=[it's secret]")) {
 		t.Fatalf("the launch line was not typed and run:\n%s", screen)
@@ -154,7 +154,7 @@ func TestLaunchSliceStartsAConversation(t *testing.T) {
 	}
 	time.Sleep(300 * time.Millisecond)
 	screen, _ = tm.Capture(info.TmuxSession)
-	if flat := paneText(screen); !strings.Contains(flat, paneText(`exec env DISABLE_AUTOUPDATER=1 '\''`+agentBin+`'\'' --resume `+sid+" --settings")) ||
+	if flat := paneText(screen); !strings.Contains(flat, paneText(`exec env DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 '\''`+agentBin+`'\'' --resume `+sid+" --settings")) ||
 		!strings.Contains(flat, paneText("fake agent started: --resume "+sid)) || !strings.Contains(flat, paneText("key=[it's secret]")) {
 		t.Fatalf("the reset did not resume the agent:\n%s", screen)
 	}

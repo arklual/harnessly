@@ -29,7 +29,9 @@ func (a *API) Library(r *http.Request) Answer {
 	if _, no := a.Guard(r, http.MethodGet); no != nil {
 		return *no
 	}
-	h := noStore()
+	// Polled every few seconds by an open library (156 KB on prod): kept by the browser and asked again by
+	// its ETag, so an unchanged list comes back as 304, not the whole list again.
+	h := http.Header{"Cache-Control": {"private, no-cache"}}
 	var self *string
 	if tab := QueryString(r, "tab"); tabIDRe.MatchString(tab) {
 		self = &tab
@@ -404,6 +406,22 @@ func (a *API) CLIDesign(r *http.Request) Answer {
 	artifact, ok := strField(body, "artifact")
 	if !ok || !IsLibraryID(artifact) {
 		return JSON(r, 400, errorBody(locale.Pick("Unknown design", "Неизвестный макет")), h)
+	}
+	// POST {artifact, delete: true}: the project goes to the trash the way the library's «Удалить» sends it, so the
+	// hub forgets its rows and every person of the space loses it, not only this runtime's. An agent that
+	// moved the folder by hand left the others' rows behind.
+	if del, _ := Field(body, "delete").(bool); del {
+		if no := a.gateDelete(r, artifact); no != nil {
+			return *no
+		}
+		if err := a.L.DeleteProject(artifact); err != nil {
+			if de, ok := err.(*ProjectDeleteError); ok {
+				return JSON(r, de.Status, errorBody(de.Msg), h)
+			}
+			a.warn("design project not deleted", err)
+			return JSON(r, 500, errorBody(locale.Pick("Could not delete the project", "Не удалось удалить проект")), h)
+		}
+		return JSON(r, 200, map[string]any{"ok": true, "project": artifact}, h)
 	}
 	if no := a.gate(r, artifact, RoleEdit); no != nil {
 		return *no

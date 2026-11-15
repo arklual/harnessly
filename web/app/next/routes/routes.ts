@@ -95,7 +95,7 @@ export type TRoute =
   | { kind: typeof ROUTE.apps }
   /** An app opened as the main thing: `/apps/:id`, `?chat=` the chat it works in (its column shows it), `?o=` one of
    *  the app's objects open (a document, a board) instead of the app's home. */
-  | { kind: typeof ROUTE.app; id: string; chat?: string; object?: string }
+  | { kind: typeof ROUTE.app; id: string; chat?: string; object?: string; thread?: string }
   /** The page about an app, installed or not: `/apps/:id/about`. */
   | { kind: typeof ROUTE.appAbout; id: string }
   /**
@@ -141,6 +141,9 @@ const LEARN_RE = /^\/learn\/?$/;
 const SETTINGS_RE = /^\/settings(?:\/([a-z]+))?\/?$/;
 
 /** One parameter of an address's query, when it names one. */
+/** A path of this page (`/apps/…`), not an address of another site or a protocol-relative one. */
+export const isInAppPath = (href: string): boolean => /^\/(?!\/)/.test(href) && !href.includes('\\');
+
 const queryParam = (path: string, name: string): string | null => {
   const query = path.split('#')[0]?.split('?')[1];
   if (!query) return null;
@@ -211,10 +214,14 @@ export const parseRoute = (path: string): TRoute => {
   if (app?.[1]) {
     const chat = queryParam(path, 'chat');
     const object = queryParam(path, 'o');
+    const thread = queryParam(path, 'th');
+    const opens = object !== null && APP_OBJECT_RE.test(object);
     return {
       kind: ROUTE.app,
       id: app[1],
-      ...(object && APP_OBJECT_RE.test(object) ? { object } : {}),
+      ...(opens ? { object } : {}),
+      // A comment thread on the object (`?th=`, a mention in the bell): only with an object.
+      ...(opens && thread && APP_OBJECT_RE.test(thread) ? { thread } : {}),
       ...(chat ? { chat } : {}),
     };
   }
@@ -333,6 +340,7 @@ export const routePath = (route: TRoute): string => {
     case ROUTE.app: {
       const query = new URLSearchParams({
         ...(route.object ? { o: route.object } : {}),
+        ...(route.object && route.thread ? { th: route.thread } : {}),
         ...(route.chat ? { chat: route.chat } : {}),
       }).toString();
       return query ? `/apps/${route.id}?${query}`.replace(/%3A/gi, ':') : `/apps/${route.id}`;

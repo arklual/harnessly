@@ -2,9 +2,9 @@ import { Dialog } from '@base-ui/react/dialog';
 import { Menu } from '@base-ui/react/menu';
 import { isMac } from '@/next/features/keys/chord';
 import { useKeyHint } from '@/next/features/keys/keys-help';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import Icon from '@/next/ui/icon';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import Switch from '@/next/ui/switch';
 import { t } from '@/next/i18n';
 import { usePortalContainer } from '@/next/ui/portal';
@@ -86,8 +86,10 @@ export interface ISearchRow {
   title: string;
   /** The words around the match, for a message. */
   snippet?: string;
-  /** Where it is: a chat's project, a file's chat, a date. */
+  /** When or where it is: a chat's last use, a document's change, a setting's value. */
   meta: string;
+  /** The part of its group the row is in («Сегодня», «Вчера»…): a line over the first row of each part. */
+  section?: string;
   /** For a message: the chat it is in and the place in it that opens. */
   target?: { chatId: string; entryId: string; turnId: string | null };
   go?: TSearchGo;
@@ -284,7 +286,7 @@ interface IPickProps {
 const RowPick = ({ row, widget, open, busy, onOpen, onPick }: IPickProps) => {
   const actions = useMenuActions();
   return (
-    <Menu.Root actionsRef={actions} open={open} onOpenChange={onOpen}>
+    <MenuRoot actionsRef={actions} open={open} onOpenChange={onOpen}>
       <Menu.Trigger
         render={
           <button type="button" className="hx-srch__pick" disabled={busy} aria-label={row.title}>
@@ -309,7 +311,7 @@ const RowPick = ({ row, widget, open, busy, onOpen, onPick }: IPickProps) => {
           </Menu.Item>
         ))}
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };
 
@@ -667,79 +669,89 @@ const SearchDialog = ({
                     aria-label={group.label}
                     data-stale={stale || undefined}
                   >
-                    <div className="hx-srch__label">{group.label}</div>
+                    {group.label !== '' && <div className="hx-srch__label">{group.label}</div>}
                     {group.rows.map((row, rowIndex) => {
                       const mine = (starts[groupIndex] ?? 0) + rowIndex;
+                      const part =
+                        row.section !== undefined && row.section !== group.rows[rowIndex - 1]?.section
+                          ? row.section
+                          : null;
                       const settingKey = row.go?.k === ROW_GO.setting ? row.go.key : null;
                       const widget = smart ? row.widget : undefined;
                       return (
-                        <div
-                          key={row.id}
-                          role="option"
-                          tabIndex={-1}
-                          aria-selected={mine === at}
-                          className="hx-srch__row"
-                          data-row={mine}
-                          data-sel={mine === at}
-                          data-kind={row.kind}
-                          onClick={() => {
-                            // A row with a control is changed by its control; the row itself only takes the selection.
-                            if (widget) selectAt(mine);
-                            else onPick(row);
-                          }}
-                          onPointerMove={() => {
-                            if (mine !== at) selectAt(mine);
-                          }}
-                          onContextMenu={(event) => {
-                            // A right click selects the row and opens what can be done with it, where it was clicked.
-                            if (!smart) return;
-                            event.preventDefault();
-                            selectAt(mine);
-                            setSideMenu({
-                              row: row.id,
-                              menu: { open: true, at: { x: event.clientX, y: event.clientY } },
-                            });
-                          }}
-                        >
-                          <span className="hx-srch__ic">
-                            <Icon name={row.icon} size="sm" />
-                          </span>
-                          <span className="hx-srch__text">
-                            <span className="hx-srch__title" title={row.title}>
-                              <Highlighted text={row.title} query={lit} />
+                        <Fragment key={row.id}>
+                          {part !== null && (
+                            <div className="hx-srch__part" role="presentation">
+                              {part}
+                            </div>
+                          )}
+                          <div
+                            role="option"
+                            tabIndex={-1}
+                            aria-selected={mine === at}
+                            className="hx-srch__row"
+                            data-row={mine}
+                            data-sel={mine === at}
+                            data-kind={row.kind}
+                            onClick={() => {
+                              // A row with a control is changed by its control; the row itself only takes the selection.
+                              if (widget) selectAt(mine);
+                              else onPick(row);
+                            }}
+                            onPointerMove={() => {
+                              if (mine !== at) selectAt(mine);
+                            }}
+                            onContextMenu={(event) => {
+                              // A right click selects the row and opens what can be done with it, where it was clicked.
+                              if (!smart) return;
+                              event.preventDefault();
+                              selectAt(mine);
+                              setSideMenu({
+                                row: row.id,
+                                menu: { open: true, at: { x: event.clientX, y: event.clientY } },
+                              });
+                            }}
+                          >
+                            <span className="hx-srch__ic">
+                              <Icon name={row.icon} size="sm" />
                             </span>
-                            {row.snippet && (
-                              <span className="hx-srch__snip">
-                                <Highlighted text={row.snippet} query={lit} />
+                            <span className="hx-srch__text">
+                              <span className="hx-srch__title" title={row.title}>
+                                <Highlighted text={row.title} query={lit} />
                               </span>
+                              {row.snippet && (
+                                <span className="hx-srch__snip">
+                                  <Highlighted text={row.snippet} query={lit} />
+                                </span>
+                              )}
+                            </span>
+                            {settingKey !== null && savedKey === settingKey && (
+                              <span className="hx-srch__saved">{t('next.search.saved')}</span>
                             )}
-                          </span>
-                          {settingKey !== null && savedKey === settingKey && (
-                            <span className="hx-srch__saved">{t('next.search.saved')}</span>
-                          )}
-                          {widget?.kind === ROW_WIDGET.toggle && (
-                            <Switch
-                              label={row.title}
-                              checked={widget.on}
-                              disabled={busyKey !== null}
-                              onChange={(on) => change(row, on ? SETTING_ON : SETTING_OFF)}
-                            />
-                          )}
-                          {widget?.kind === ROW_WIDGET.pick && (
-                            <RowPick
-                              row={row}
-                              widget={widget}
-                              open={pickOpen === row.id}
-                              busy={busyKey !== null}
-                              onOpen={(next) => setPickOpen(next ? row.id : null)}
-                              onPick={(value) => change(row, value)}
-                            />
-                          )}
-                          {!widget && <span className="hx-srch__meta">{row.meta}</span>}
-                          {!widget && !smart && (
-                            <Icon name="corner-down-left" size="sm" className="hx-srch__go" />
-                          )}
-                        </div>
+                            {widget?.kind === ROW_WIDGET.toggle && (
+                              <Switch
+                                label={row.title}
+                                checked={widget.on}
+                                disabled={busyKey !== null}
+                                onChange={(on) => change(row, on ? SETTING_ON : SETTING_OFF)}
+                              />
+                            )}
+                            {widget?.kind === ROW_WIDGET.pick && (
+                              <RowPick
+                                row={row}
+                                widget={widget}
+                                open={pickOpen === row.id}
+                                busy={busyKey !== null}
+                                onOpen={(next) => setPickOpen(next ? row.id : null)}
+                                onPick={(value) => change(row, value)}
+                              />
+                            )}
+                            {!widget && <span className="hx-srch__meta">{row.meta}</span>}
+                            {!widget && !smart && (
+                              <Icon name="corner-down-left" size="sm" className="hx-srch__go" />
+                            )}
+                          </div>
+                        </Fragment>
                       );
                     })}
                   </div>

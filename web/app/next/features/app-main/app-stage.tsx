@@ -4,6 +4,7 @@
 // home and the object open in it (a document, a board); the right pane of the chat opens beside it as beside a design.
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { AppMenu, type IAppMenuItem } from '@/next/features/app-main/app-menu';
+import { isSpaceApp } from '@/next/features/app-views/service-health';
 import { ChatPlacement } from '@/next/features/designly/site-chat';
 import type { ISiteStage } from '@/next/features/designly/site-view';
 import Icon from '@/next/ui/icon';
@@ -14,9 +15,17 @@ import '@/next/styles/site.css';
 import '@/next/styles/site-tools.css';
 import '@/next/styles/app-main.css';
 
-/** The stage's key among the designs' (their chats, their layouts): the app's home, or one of its objects. */
-export const appStageDesign = (app: string, object: string | null): string =>
-  object ? `app:${app}/${object}` : `app:${app}`;
+/** The one stage of the person's spaces (boards, documents): one chat, one field and one draft over all of them. */
+export const SPACES_STAGE = 'app:spaces';
+
+/**
+ * The stage's key among the designs' (their chats, their layouts): the app's home, or one of its objects. The spaces
+ * share one: going from a board to a document or to a list, the island, its draft and its chat stay.
+ */
+export const appStageDesign = (app: string, object: string | null): string => {
+  if (isSpaceApp(app)) return SPACES_STAGE;
+  return object ? `app:${app}/${object}` : `app:${app}`;
+};
 
 export interface IAppStageProps {
   /** What is open (a merge request, a document, the app's start): never the app's own name. */
@@ -100,6 +109,7 @@ const AppStage = ({
       data-full={false}
       data-dev={false}
       data-sview={stage.sview && stage.mode === 'chat'}
+      data-space={space}
     >
       {stage.chat}
       <div className="hx-site__view">
@@ -206,6 +216,7 @@ const AppStage = ({
         </div>
       </div>
       {stage.island}
+      {stage.spaceTurn}
       {stage.overlay}
     </section>
   );

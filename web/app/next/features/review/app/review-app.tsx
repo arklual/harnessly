@@ -63,7 +63,7 @@ import { useViewed, type IViewedIo } from '@/next/features/review/viewed';
 import { personKey, useMe } from '@/next/stores/me';
 import { Button, RoundButton } from '@/next/ui/button';
 import Icon from '@/next/ui/icon';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import { usePresentFlag } from '@/next/ui/presence';
 import Segmented from '@/next/ui/segmented';
 import { toast } from '@/next/ui/toast';
@@ -163,7 +163,7 @@ const ViewMenu = ({ whole, onWhole }: { whole: boolean; onWhole: (whole: boolean
     </Menu.CheckboxItem>
   );
   return (
-    <Menu.Root actionsRef={actions}>
+    <MenuRoot actionsRef={actions}>
       <Menu.Trigger className="hx-rvapp__barbtn">
         <Icon name="sliders-horizontal" size="sm" />
         <span className="hx-rvapp__barlabel">{t('next.reviewApp.view')}</span>
@@ -183,7 +183,7 @@ const ViewMenu = ({ whole, onWhole }: { whole: boolean; onWhole: (whole: boolean
         )}
         {item(whole, t('next.review.wholeFile'), onWhole)}
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };
 

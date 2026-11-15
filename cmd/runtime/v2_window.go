@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/ly-solutions/harnessly/internal/agentcfg"
 	"github.com/ly-solutions/harnessly/internal/history"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/transcript"
@@ -31,4 +32,13 @@ func windowNum(o *jsvalue.Object, k string) int64 {
 		return int64(f)
 	}
 	return 0
+}
+
+// v2Compact is what a chat's agent is set to compact at, by the CLI's settings files of this machine (and the chat's
+// project for Claude); the files are read again only when they change.
+func v2Compact(files *agentcfg.Store) func(p wire.Provider, cwd, model string) (window, at int64) {
+	return func(p wire.Provider, cwd, model string) (int64, int64) {
+		c := files.CompactOf(p, cwd, model)
+		return c.Window, c.At
+	}
 }

@@ -21,7 +21,7 @@ import {
   type RefObject,
 } from 'react';
 import { isStashKey, KEY_ACTION, keyAction } from '@/next/features/composer/keys';
-import LimitsChip from '@/next/features/limits/limits-chip';
+import LimitsChip, { paysBySpend } from '@/next/features/limits/limits-chip';
 import { useHeld } from '@/next/ui/use-held';
 import type { LimitsView } from '@/next/features/limits/model';
 import ModelPicker, { type IModelPickerProps } from '@/next/features/composer/model-picker';
@@ -56,7 +56,9 @@ import usePending, { isBusy, PENDING } from '@/next/ui/use-pending';
 import { t } from '@/next/i18n';
 import { usePresence } from '@/next/ui/presence';
 import { DictationMirror, RecordingTime, RecordingWave } from '@/next/features/composer/recording';
-import { chordOf } from '@/next/features/keys/chord';
+import { FIELD_FLOOR, useVoiceField } from '@/next/features/voice-live/field';
+import VoiceHead, { HEAD, headOf } from '@/next/features/voice-live/voice-head';
+import { chordOf, isMac } from '@/next/features/keys/chord';
 import { KEY_SCOPE } from '@/next/features/keys/commands';
 import { useKeyHint } from '@/next/features/keys/keys-help';
 import { commandsOfChord, isDefault } from '@/next/features/keys/keymap';
@@ -80,6 +82,8 @@ const SHORT_PLACEHOLDER_KEYS: Partial<Record<ComposerMode, string>> = {
   stopped: 'next.composer.placeholderStoppedShort',
   working: 'next.composer.placeholderWorkingShort',
 };
+/** The key that sends into the running turn, as the hints write it: ⌘ on a Mac, ⌃ elsewhere (keys.ts takes both). */
+const SEND_NOW_MOD = isMac() ? '⌘' : '⌃';
 /** Narrower than this, the field's own text box takes the short placeholder. */
 const NARROW_FIELD_PX = 480;
 /** A file this big shows its percent, speed and time left on its chip; a small one only its bar. */
@@ -201,6 +205,10 @@ const REC_EXIT_MS = 180;
 
 export { RecordingTime, RecordingWave };
 
+/** A line said aloud, as long as the field shows: its latest words. */
+const LINE_SHOWN = 90;
+const lineTail = (text: string) => (text.length > LINE_SHOWN ? `…${text.slice(-LINE_SHOWN)}` : text);
+
 /** The text that left the field fades up and away over this long, while the bubble takes it over. */
 /** The pastes a field has taken. */
 const pasted = new WeakSet<Event>();
@@ -219,6 +227,7 @@ const Composer = (props: IComposerProps) => {
   countRender('field');
   const { value, onChange, onSubmit, mode, picker, attachments, recording, maxText } = props;
   const rootRef = useRef<HTMLDivElement>(null);
+  const voice = useVoiceField(rootRef);
   const rowRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef<HTMLTextAreaElement | null>(null);
   // ⇧Esc (features/keys): the cursor to the end of the latest field on screen.
@@ -404,6 +413,12 @@ const Composer = (props: IComposerProps) => {
   });
   const { remember: rememberPrompt } = history;
   const send = (sendMode: TSendMode) => {
+    // While the voice is on, the typed words are said to it: it answers out loud (and in the feed).
+    if (voice && value.trim()) {
+      voice.typed(value.trim());
+      onChange('');
+      return;
+    }
     rememberPrompt(value);
     const row = rowRef.current;
     // Where the text stands, for the bubble that grows out of it; a send that is refused leaves the text and the place unused.
@@ -417,7 +432,7 @@ const Composer = (props: IComposerProps) => {
   const { sendRef } = props;
   useEffect(() => {
     if (!sendRef) return;
-    sendRef.current = () => submit('queue');
+    sendRef.current = () => submit('now');
     return () => {
       sendRef.current = null;
     };
@@ -430,7 +445,7 @@ const Composer = (props: IComposerProps) => {
     const now = props.recognized ?? 0;
     if (now === recognizedSeen.current) return;
     recognizedSeen.current = now;
-    if (sendAfter && canSend) send('queue');
+    if (sendAfter && canSend) send('now');
   });
   // Every recording starts without the wish to send (state adjusted during render, not in an effect).
   const [recordingNow, setRecordingNow] = useState(false);
@@ -497,12 +512,12 @@ const Composer = (props: IComposerProps) => {
     else if (sendNow && action !== KEY_ACTION.send) action = KEY_ACTION.sendNow;
     if (action === KEY_ACTION.send) {
       event.preventDefault();
-      if (!recording) submit('queue');
+      if (!recording) submit('now');
       else if (!recording.busy) stopAndSend();
     }
     if (action === KEY_ACTION.sendNow) {
       event.preventDefault();
-      submit('now');
+      submit('queue');
     }
   };
 
@@ -519,17 +534,20 @@ const Composer = (props: IComposerProps) => {
     void distinctFiles(pastedFiles(files)).then(onFiles);
   };
 
-  let fullPlaceholder = props.placeholder ?? t(PLACEHOLDER_KEYS[mode]);
+  let fullPlaceholder = props.placeholder ?? t(PLACEHOLDER_KEYS[mode], { mod: SEND_NOW_MOD });
   if (bar) fullPlaceholder = t(bar.preparing ? 'next.voice.preparing' : 'next.voice.listening');
   const shortKey = SHORT_PLACEHOLDER_KEYS[mode];
-  const placeholder =
+  let placeholder =
     narrowField && !bar && props.placeholder === undefined && shortKey ? t(shortKey) : fullPlaceholder;
+  // The voice's wave stands where the placeholder would.
+  if (voice) placeholder = '';
 
   return (
     <div
       ref={rootRef}
       className="hx-composer"
       data-rec={bar ? 'true' : undefined}
+      data-live={voice?.floor}
       data-mode={dropping ? 'drop' : undefined}
       data-quiet={props.quiet || undefined}
       data-chat-drop={props.acceptsChats || undefined}
@@ -665,6 +683,28 @@ const Composer = (props: IComposerProps) => {
               onPaste={onPaste}
             />
             {bar && <DictationMirror text={value} ref={mirrorRef} />}
+            {voice && (
+              <div
+                className="hx-composer__voice"
+                data-floor={voice.floor}
+                data-typed={value ? 'true' : undefined}
+              >
+                <VoiceHead
+                  state={voice.interrupted ? HEAD.barged : headOf(voice.floor)}
+                  kind={voice.head}
+                  level={voice.level}
+                />
+                {!value && (voice.heard || voice.said) && (
+                  <span className="hx-composer__heard" data-said={voice.heard ? undefined : 'true'}>
+                    {lineTail(voice.heard || voice.said)}
+                  </span>
+                )}
+                <RecordingWave
+                  level={voice.level}
+                  listening={voice.floor !== FIELD_FLOOR.thinking && voice.floor !== FIELD_FLOOR.starting}
+                />
+              </div>
+            )}
           </div>
         </div>
         {tooLong && (
@@ -732,15 +772,25 @@ const Composer = (props: IComposerProps) => {
             )}
             {shownPicker.value && (
               <span className="hx-composer__held" inert={shownPicker.held || undefined}>
-                <ModelPicker {...shownPicker.value} />
+                <ModelPicker
+                  {...shownPicker.value}
+                  limits={shownLimits.value && !paysBySpend(shownLimits.value) ? shownLimits.value : null}
+                />
               </span>
             )}
-            {shownLimits.value && <LimitsChip view={shownLimits.value} />}
+            {/* The limit is the pill's outline and its popover's card (HRN-1496); a chip of its own only for a machine
+                that pays by the API (the day's spend), or where no pill stands. */}
+            {shownLimits.value && (!shownPicker.value || paysBySpend(shownLimits.value)) && (
+              <LimitsChip view={shownLimits.value} />
+            )}
             <span className="hx-spacer" />
             {shownRing.value && <ContextRing {...shownRing.value} />}
             {props.tools}
-            {props.onMic && (
+            {/* Dictation (the mic) always stays; the live voice is its own button beside it (the wave). Only during a
+                call the call's own mic (mute) stands here instead, so the field never shows two mics. */}
+            {props.onMic && !voice && (
               <RoundButton
+                className="hx-dictate-btn"
                 icon="mic"
                 label={t('next.composer.voice')}
                 keys={dictateHint ? [dictateHint] : undefined}
@@ -764,10 +814,14 @@ const Composer = (props: IComposerProps) => {
               <RoundButton
                 icon="arrow-up"
                 variant="accent"
-                label={working ? t('next.composer.queueTip') : (props.sendLabel ?? t('next.composer.send'))}
+                label={
+                  working
+                    ? t('next.composer.queueTip', { mod: SEND_NOW_MOD })
+                    : (props.sendLabel ?? t('next.composer.send'))
+                }
                 keys={['↵']}
                 disabled={!canSend}
-                onClick={() => submit('queue')}
+                onClick={() => submit('now')}
               />
             )}
           </div>

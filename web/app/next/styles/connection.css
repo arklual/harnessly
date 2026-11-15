@@ -157,7 +157,8 @@
 }
 /* Under «Нет связи» when both are up. */
 .hx-net ~ .hx-net[data-kind='update'],
-.hx-net ~ .hx-net[data-kind='release'] {
+.hx-net ~ .hx-net[data-kind='release'],
+.hx-net ~ .hx-net[data-kind='rollout'] {
   top: 58px;
 }
 /* «Доступна версия»: the same pill, quieter than «Вышла новая версия»: links, not a button. */
@@ -197,4 +198,8 @@
 .hx-net__x:hover {
   background: var(--hx-ink-fill);
   color: var(--hx-ink-fg);
+}
+/* «Идёт обновление»: the same pill; the text may be long, so on a narrow screen it ellipsizes instead of wrapping. */
+.hx-net[data-kind='rollout'] .hx-net__text {
+  max-width: calc(100vw - 80px);
 }

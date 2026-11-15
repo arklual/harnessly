@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePillWidth } from '@/next/ui/use-pill-width';
 import { createPortal } from 'react-dom';
 import { secondsToRetry } from '@/next/stores/connection';
+import { ROLLOUT, useRollout } from '@/next/features/rollout/rollout';
 import type { Connection } from '@/next/protocol/v2';
 import Icon, { type TIconName } from '@/next/ui/icon';
 import { usePortalContainer } from '@/next/ui/portal';
@@ -87,7 +88,9 @@ const ConnectionBanner = ({ connection, machineName, onRetryNow }: IBannerProps)
   const loud = down?.k === 'offline' && LOUD_CAUSES.has(down.cause);
   // Counted from the last moment the link was live: the tries in between (connecting) do not start it over.
   const late = useDelayed(connection !== undefined && connection.k !== 'live', LOSS_GRACE_MS);
-  const trouble = down && (loud || late) ? down : null;
+  // While the hub says an update is under way its own pill explains the losses; a refusal that needs the person still shows.
+  const updating = useRollout() !== ROLLOUT.idle;
+  const trouble = down && (loud || (late && !updating)) ? down : null;
   // Once the connection was lost, the way back is shown too: «Подключаемся», then «Снова на связи» for a moment.
   const [lost, setLost] = useState(false);
   const [back, setBack] = useState(false);

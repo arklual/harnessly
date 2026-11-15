@@ -102,7 +102,7 @@ const Home = ({ machine, onOpenDrawer }: { machine: MachineId; onOpenDrawer: () 
 
 // ── the page ──
 
-interface IReviewAppPageProps {
+export interface IReviewAppPageProps {
   machine: MachineId;
   url: string | null;
   chat: string | null;
@@ -154,7 +154,6 @@ const ReviewStagePage = ({
     title,
     pageUrl: '',
     port: null,
-    onOpenDrawer,
     open,
     keep: true,
     app: { address, onCreated: () => undefined },

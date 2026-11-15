@@ -14,6 +14,7 @@ import { getPage } from '@/next/core/net/http';
 import { machineApi } from '@/next/core/net/machine';
 import { batch } from '@/next/core/store';
 import { waitsItsTurn } from '@/next/commands/send-line';
+import { retryMessage } from '@/next/commands/messages';
 import { connectionStore } from '@/next/stores/connection';
 import { limitsOf } from '@/next/stores/machines';
 import {
@@ -79,6 +80,9 @@ function dueAt(m: MessageView): number | null {
   return last === undefined ? at : Math.max(at, last + STATUS_EVERY_MS);
 }
 
+/** The messages the status check already sent again by itself: once each, never a loop. */
+const sentAgain = new Set<ClientId>();
+
 /** The runtime's answer for a machine's messages, each taken as it is. */
 export function applyStatuses(machine: MachineId, statuses: readonly MessageStatus[]): void {
   batch(() => {
@@ -87,7 +91,16 @@ export function applyStatuses(machine: MachineId, statuses: readonly MessageStat
       if (!m || m.machineId !== machine) continue;
       if (s.k === 'known') applyMessage(machine, s.message);
       else if (s.k === 'expired') forgetMessage(s.clientId);
-      else if (!isTerminal(m.state) && m.state.k !== 'failed') returnToQueue(s.clientId, machineNow(machine));
+      else if (!isTerminal(m.state) && m.state.k !== 'failed') {
+        returnToQueue(s.clientId, machineNow(machine));
+        // A short break of the road (a gateway's 502 for a second) is the usual cause: the send never reached the
+        // runtime. It goes again once by itself under the same clientId, which the runtime takes once however many
+        // times it comes; only when that too is unknown does the row wait for the person's Повторить (не дошло).
+        if (!sentAgain.has(s.clientId)) {
+          sentAgain.add(s.clientId);
+          retryMessage(s.clientId);
+        }
+      }
     }
   });
 }

@@ -3,6 +3,10 @@ import { useAppsFeed, useSignIn } from '@/next/bindings/settings-data';
 import type { ISettingChangesHandle } from '@/next/bindings/settings-changes';
 import type { Pending } from '@/next/bindings/settings-agents';
 import AppearanceSection from '@/next/features/settings/appearance-section';
+import NavMenuGroup, { type INavEntry } from '@/next/features/settings/nav-menu-group';
+import { NAV_ITEM, appKey, navLayout, type TNavItem } from '@/next/features/sidebar/nav-layout';
+import { useInstalledApps } from '@/next/features/app-views/api';
+import { menuApps } from '@/next/features/app-main/chat-apps';
 import AppsSection from '@/next/features/settings/apps-section';
 import BetaSection from '@/next/features/settings/beta-section';
 import GeneralSection from '@/next/features/settings/general-section';
@@ -211,29 +215,65 @@ const useBaseSkipped = (machine: MachineId) => {
 };
 
 /** «Оформление»: the theme and the palette are this browser's, the text size is the person's (pessimistic). */
-export const AppearancePage = ({ pending }: { pending: Pending }) => {
+/** The menu's items the settings page lists: what the sidebar of the new interface has, Sinopia Design included. */
+const NAV_ENTRIES: readonly { key: TNavItem; icon: string; label: () => string }[] = [
+  { key: NAV_ITEM.newChat, icon: 'square-pen', label: () => t('next.sidebar.newChat') },
+  { key: NAV_ITEM.search, icon: 'search', label: () => t('next.sidebar.search') },
+  { key: NAV_ITEM.designly, icon: 'palette', label: () => t('next.sidebar.designly') },
+  { key: NAV_ITEM.apps, icon: 'layout-grid', label: () => t('next.sidebar.apps') },
+];
+
+/** «Меню слева»: the sidebar's layout over the menu's items and the apps that can stand in it (features/sidebar/nav-layout). */
+const NavMenuPage = ({ machine, pending }: { machine: MachineId; pending: Pending }) => {
+  const me = useMe();
+  const installed = useInstalledApps(machine).list;
+  const { run, pending: waiting } = pending;
+  if (me.k !== 'ready' || installed === null) return null;
+  const nav = me.me.settings.nav;
+  const entries: Record<string, INavEntry> = {};
+  for (const item of NAV_ENTRIES) entries[item.key] = { label: item.label(), icon: item.icon };
+  entries[appKey('review')] = { label: t('next.reviewApp.title'), icon: 'git-pull-request' };
+  const apps = menuApps(installed.apps);
+  for (const a of apps) entries[appKey(a.id)] = { label: a.name, icon: a.icon || 'layout-grid' };
+  const layout = navLayout(
+    nav,
+    NAV_ENTRIES.map((e) => e.key),
+    ['review', ...apps.map((a) => a.id)],
+  );
+  const save = (next: PersonSettings['nav']) =>
+    run('nav', t('next.settings.failed'), () => savePerson({ nav: next }));
+  return (
+    <NavMenuGroup
+      layout={layout}
+      entries={entries}
+      busy={waiting.has('nav')}
+      onSave={save}
+      onReset={() => void save(DEFAULT_SETTINGS.nav)}
+    />
+  );
+};
+
+export const AppearancePage = ({ machine, pending }: { machine: MachineId; pending: Pending }) => {
   const me = useMe();
   const { theme, resolvedTheme, setTheme, palette, setPalette } = useTheme();
   const settings = me.k === 'ready' ? me.me.settings : DEFAULT_SETTINGS;
   const { run, pending: waiting } = pending;
   return (
-    <AppearanceSection
-      theme={theme}
-      mode={resolvedTheme}
-      palette={palette}
-      textSize={settings.textSize}
-      textBusy={waiting.has('textSize')}
-      noticeColor={settings.noticeColor}
-      noticeBusy={waiting.has('noticeColor')}
-      onTheme={setTheme}
-      onPalette={setPalette}
-      onTextSize={(textSize) =>
-        void run('textSize', t('next.settings.failed'), () => savePerson({ textSize }))
-      }
-      onNoticeColor={(noticeColor) =>
-        void run('noticeColor', t('next.settings.failed'), () => savePerson({ noticeColor }))
-      }
-    />
+    <>
+      <AppearanceSection
+        theme={theme}
+        mode={resolvedTheme}
+        palette={palette}
+        textSize={settings.textSize}
+        textBusy={waiting.has('textSize')}
+        onTheme={setTheme}
+        onPalette={setPalette}
+        onTextSize={(textSize) =>
+          void run('textSize', t('next.settings.failed'), () => savePerson({ textSize }))
+        }
+      />
+      <NavMenuPage machine={machine} pending={pending} />
+    </>
   );
 };
 

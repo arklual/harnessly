@@ -8,7 +8,7 @@ import { folderChoices } from '@/next/features/designly/library-model';
 import { Modal } from '@/next/features/designly/sdk/ui';
 import { Button } from '@/next/ui/button';
 import Icon from '@/next/ui/icon';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import { usePresence } from '@/next/ui/presence';
 import { t } from '@/next/i18n';
 
@@ -73,7 +73,7 @@ const FolderTile = ({ folder, onOpen, onRename, onDelete }: ITileProps) => {
         <Icon name="folder" />
         <span className="hx-dl-folder__name">{folder.name}</span>
       </button>
-      <Menu.Root actionsRef={actions}>
+      <MenuRoot actionsRef={actions}>
         <Menu.Trigger
           className="hx-dl-folder__more"
           aria-label={t('next.designly.folderMenu', { name: folder.name })}
@@ -97,7 +97,7 @@ const FolderTile = ({ folder, onOpen, onRename, onDelete }: ITileProps) => {
             <span className="hx-cmenu__txt">{t('next.designly.deleteFolder')}</span>
           </Menu.Item>
         </MenuPanel>
-      </Menu.Root>
+      </MenuRoot>
     </div>
   );
 };

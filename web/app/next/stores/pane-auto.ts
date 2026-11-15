@@ -1,6 +1,7 @@
 // «Открывать то, над чем работает агент» (Settings → General → Look): whether the pane opens by itself the design the
 // agent edits, the document or board it publishes. This browser's, as the theme and the tabs over the window are; the
 // key is the one Legacy's pane keeps the same switch under, so both interfaces of a browser agree.
+import { notePrefWrite } from '@/next/core/pref-write';
 import { useSyncExternalStore } from 'react';
 
 const KEY = 'hl:pane-auto-open';
@@ -28,6 +29,7 @@ export const setPaneAuto = (next: boolean): void => {
     // Private mode or a full storage: the switch holds for this page.
   }
   for (const listener of [...listeners]) listener();
+  notePrefWrite(KEY);
 };
 
 export const usePaneAuto = (): boolean =>

@@ -70,26 +70,11 @@
   min-height: 0;
 }
 
-.hx-gpt__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--hx-space-2);
+/* The greeting of the start page stands in the thread here, not over a docked field. */
+.hx-hello.hx-gpt__hello {
+  position: static;
   margin: 18vh auto 0;
-  max-width: 420px;
   text-align: center;
-  animation: hx-gpt-in var(--hx-dur-md) var(--hx-ease-out);
-}
-
-.hx-gpt__empty b {
-  color: var(--hx-fg-1);
-  font-size: var(--hx-text-xl);
-  font-weight: var(--hx-weight-semibold);
-}
-
-.hx-gpt__empty span {
-  color: var(--hx-fg-3);
-  font-size: var(--hx-text-sm);
 }
 
 .hx-gpt__answer[data-live] {

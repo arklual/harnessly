@@ -155,14 +155,14 @@ func (t *Tmux) CreateSession(name string, cols, rows int, cwd string) error {
 	t.watchSoon(socket)
 	// The server has the config already unless the file changed since it last read it: one stat instead of a second
 	// tmux process for every session.
-	if stamp := t.configStamp(); stamp == "" || t.appliedStamp(socket) != stamp {
+	if t.appliedStamp(socket) != t.configStamp()+overlayMark {
 		t.ApplyConfig(socket)
 	}
 	return nil
 }
 
 // configStamp tells one content of the config file from the next (its time and size); "" when there is no file to
-// tell by.
+// tell by (the overlay alone is then applied once per server).
 func (t *Tmux) configStamp() string {
 	if t.cfg.ConfigFile == "" {
 		return ""
@@ -180,19 +180,51 @@ func (t *Tmux) appliedStamp(socket string) string {
 	return t.applied[socket]
 }
 
-// ApplyConfig re-reads the config file on one server, or on every server when socket is "". A server that is not
-// running yet reads it when its first session starts.
-func (t *Tmux) ApplyConfig(socket string) {
-	if t.cfg.ConfigFile == "" {
-		return
+// overlayMark tells a server that has the scroll overlay (below) on top of its config from one that has not.
+const overlayMark = "+scroll-1"
+
+// scrollOverlay is set on every server after its config, whoever wrote that config (a deployment's RUNTIME_TMUX_CONF, the
+// standalone default, none): the page's terminal is xterm over a tmux client, and the wheel must scroll the pane's
+// output (copy mode) or go to a program that asked for the mouse, never reach the program as ↑/↓. The
+// window title tells the page the pane is scrolled back, for its "Down". Setting it again on a live server touches no
+// session.
+var scrollOverlay = [][]string{
+	{"set-option", "-g", "mouse", "on"},
+	{"bind-key", "-T", "root", "WheelUpPane", "if-shell", "-F", "-t", "=", "#{?pane_in_mode,1,#{mouse_any_flag}}", "send-keys -M", "copy-mode -e"},
+	{"bind-key", "-T", "root", "WheelDownPane", "send-keys", "-M"},
+	{"bind-key", "-T", "copy-mode", "WheelUpPane", "send-keys", "-X", "-N", "3", "scroll-up"},
+	{"bind-key", "-T", "copy-mode", "WheelDownPane", "send-keys", "-X", "-N", "3", "scroll-down"},
+	{"bind-key", "-T", "copy-mode-vi", "WheelUpPane", "send-keys", "-X", "-N", "3", "scroll-up"},
+	{"bind-key", "-T", "copy-mode-vi", "WheelDownPane", "send-keys", "-X", "-N", "3", "scroll-down"},
+	{"set-option", "-g", "set-titles", "on"},
+	{"set-option", "-g", "set-titles-string", "hx-scroll:#{pane_in_mode}"},
+}
+
+// configArgs is one tmux command line: the config file read again when there is one, then the scroll overlay.
+func (t *Tmux) configArgs() []string {
+	var args []string
+	if t.cfg.ConfigFile != "" {
+		args = append(args, "source-file", t.cfg.ConfigFile, ";")
 	}
+	for i, c := range scrollOverlay {
+		if i > 0 {
+			args = append(args, ";")
+		}
+		args = append(args, c...)
+	}
+	return args
+}
+
+// ApplyConfig re-reads the config file on one server, or on every server when socket is "", and sets the scroll
+// overlay over it. A server that is not running yet gets them when its first session starts.
+func (t *Tmux) ApplyConfig(socket string) {
 	sockets := t.Sockets()
 	if socket != "" {
 		sockets = []string{socket}
 	}
-	stamp := t.configStamp()
+	stamp := t.configStamp() + overlayMark
 	t.each(sockets, func(_ int, s string) {
-		r := t.tmux(s, "source-file", t.cfg.ConfigFile)
+		r := t.tmux(s, t.configArgs()...)
 		t.mu.Lock()
 		defer t.mu.Unlock()
 		if r.err != nil {

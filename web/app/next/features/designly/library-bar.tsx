@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import type { TDesignKind } from '@/next/features/designly/designly-home';
 import { SORT, SORTS, isNarrowed, type ILibraryFilters } from '@/next/features/designly/library-model';
 import Icon from '@/next/ui/icon';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import { t } from '@/next/i18n';
 
 // Literals, not DESIGN_KIND: the home imports this file, and a value import back would be a cycle.
@@ -48,7 +48,7 @@ const LibraryBar = ({ filters, onFilters, systems, tools }: ILibraryBarProps) =>
   const changed = isNarrowed(filters) || filters.sort !== SORT.changed;
   return (
     <>
-      <Menu.Root actionsRef={filterActions}>
+      <MenuRoot actionsRef={filterActions}>
         <Menu.Trigger
           className="hx-dl__ibtn hx-tipped"
           data-on={changed || undefined}
@@ -119,9 +119,9 @@ const LibraryBar = ({ filters, onFilters, systems, tools }: ILibraryBarProps) =>
             ))}
           </Group>
         </MenuPanel>
-      </Menu.Root>
+      </MenuRoot>
       {tools && (
-        <Menu.Root actionsRef={moreActions}>
+        <MenuRoot actionsRef={moreActions}>
           <Menu.Trigger
             className="hx-dl__ibtn hx-tipped"
             data-on={tools.selecting || undefined}
@@ -161,7 +161,7 @@ const LibraryBar = ({ filters, onFilters, systems, tools }: ILibraryBarProps) =>
               <span className="hx-cmenu__txt">{t('next.designly.trash')}</span>
             </Menu.Item>
           </MenuPanel>
-        </Menu.Root>
+        </MenuRoot>
       )}
     </>
   );

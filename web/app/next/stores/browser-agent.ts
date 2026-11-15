@@ -1,6 +1,7 @@
 // «Агент в браузере» (Settings → General): the sites the person blocked for the agent in the pane's browser. Anywhere
 // else the agent acts without asking: the person sees its cursor on the page. Kept in this browser, as the
 // list of the pane's sites is.
+import { notePrefWrite } from '@/next/core/pref-write';
 import { useSyncExternalStore } from 'react';
 
 const KEY = 'hl:browser-agent';
@@ -43,6 +44,7 @@ const save = (next: IBrowserAgentChoice): void => {
     // Private mode or a full storage: the list holds for this page.
   }
   for (const listener of [...listeners]) listener();
+  notePrefWrite(KEY);
 };
 
 /** Blocks a site for the agent, or lets it act there again. */

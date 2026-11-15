@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ISitePage } from '@/next/features/designly/site-view';
 import { pageFileNote, pagesFound, rowAfter, SEARCH_FROM } from '@/next/features/designly/page-pick';
 import Icon from '@/next/ui/icon';
+import { PHONE_QUERY } from '@/next/ui/use-media';
 import { SheetGrip } from '@/next/ui/sheet';
 import { t } from '@/next/i18n';
 
@@ -74,8 +75,9 @@ const PagePicker = ({
     return () => window.removeEventListener('resize', fit);
   }, [place]);
 
+  // On the phone the search waits for a tap: the keyboard does not come up over the list.
   useEffect(() => {
-    if (searchable) input.current?.focus({ preventScroll: true });
+    if (searchable && !matchMedia(PHONE_QUERY).matches) input.current?.focus({ preventScroll: true });
     else box.current?.focus({ preventScroll: true });
   }, [searchable]);
 

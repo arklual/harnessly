@@ -33,5 +33,8 @@ describe('kept screens', () => {
     expect(keptScreensMax(4)).toBe(3);
     expect(keptScreensMax(2)).toBe(2);
     expect(keptScreensMax(0.5)).toBe(2);
+    // An iPhone tells nothing of its memory.
+    expect(keptScreensMax(undefined, true)).toBe(2);
+    expect(keptScreensMax(8, true)).toBe(MAX_KEPT_SCREENS);
   });
 });

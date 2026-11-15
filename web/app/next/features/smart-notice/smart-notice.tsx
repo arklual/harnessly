@@ -26,6 +26,7 @@ import { STACK_DEPTH } from './pager';
 import { NOTICE_ACTION, NOTICE_INPUT, noteInput, noticeEvent } from './metrics';
 import { RecordingTime, RecordingWave } from '@/next/features/composer/recording';
 import type { Recording } from '@/next/features/composer/types';
+import { clipWords, NOTICE_TEXT_MAX } from './clip-words';
 import SlotBody, { sourceLabel, type ISlotNotice, type ISlotSource, type TSlotAnswer } from './slot-body';
 
 export const SMART_KIND = {
@@ -391,6 +392,43 @@ const ReplyField = ({
   );
 };
 
+/** A finished turn: the gist in two lines at most, cut at a word; the field to write to the agent only when asked
+ *  for (always there, it made the card as big as a chat's own column). */
+const DoneBody = ({
+  text,
+  canReply,
+  reply,
+  busy,
+  onSend,
+}: {
+  text: string;
+  canReply: boolean;
+  reply: ISmartReply;
+  busy: boolean;
+  onSend: (text: string) => void;
+}) => {
+  const [writing, setWriting] = useState(reply.text !== '' || reply.recording !== null);
+  const box = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (writing) box.current?.querySelector<HTMLInputElement>('input')?.focus();
+  }, [writing]);
+  return (
+    <>
+      <p className="hx-sn__summary">{clipWords(text, NOTICE_TEXT_MAX, Number.POSITIVE_INFINITY)}</p>
+      {canReply && writing && (
+        <div ref={box}>
+          <ReplyField reply={reply} busy={busy} placeholder={t('next.smart.reply')} onSend={onSend} />
+        </div>
+      )}
+      {canReply && !writing && (
+        <button type="button" className="hx-sn__link" data-sn-write onClick={() => setWriting(true)}>
+          {t('next.smart.write')}
+        </button>
+      )}
+    </>
+  );
+};
+
 /** The open card's body for its main item. */
 const Body = ({
   item,
@@ -569,17 +607,13 @@ const Body = ({
     );
   if (detail.k === 'done')
     return (
-      <>
-        <p className="hx-sn__summary">{detail.summary ?? item.text}</p>
-        {detail.canReply && (
-          <ReplyField
-            reply={reply}
-            busy={busy}
-            placeholder={t('next.smart.reply')}
-            onSend={(text) => run(() => onReply(item, text))}
-          />
-        )}
-      </>
+      <DoneBody
+        text={detail.summary ?? item.text}
+        canReply={detail.canReply}
+        reply={reply}
+        busy={busy}
+        onSend={(text) => run(() => onReply(item, text))}
+      />
     );
   return <p className="hx-sn__why">{item.text}</p>;
 };
@@ -700,6 +734,8 @@ const SmartNotice = ({
   // The stack goes round from the front plate: the one after it is first behind, the one paged away goes to the back.
   const front = shown ? items.findIndex((item) => item.key === shown.key) : -1;
   const others = front < 0 ? [] : [...items.slice(front + 1), ...items.slice(0, front)];
+  // Three stand at most (the front one and two behind); the rest is told as «ещё N».
+  const hidden = Math.max(0, others.length - STACK_DEPTH);
   useFitShape(host, body, `${shown?.key ?? ''}:${open}:${announcing}:${detail.k}:${others.length}`);
   const bodyKey = folded ? `f:${announcing}:${shown?.key ?? ''}` : `o:${shown?.key ?? ''}`;
   useGhost(ghosts, body, bodyKey);
@@ -1107,6 +1143,7 @@ const SmartNotice = ({
                 <Chip item={shown} now={now} sent={isSent} />
                 <b className="hx-sn__title">{shown.title}</b>
                 <span className="hx-sn__text">{isSent ? t(SENT_TEXT[shown.kind]) : shown.text}</span>
+                {hidden > 0 && <span className="hx-sn__more">{t('next.notices.more', { n: hidden })}</span>}
               </button>
             )}
             {folded && announcing && (
@@ -1122,6 +1159,7 @@ const SmartNotice = ({
                     <b className="hx-sn__title">{shown.title}</b>
                     <span className="hx-sn__text">{shown.text}</span>
                   </span>
+                  {hidden > 0 && <span className="hx-sn__more">{t('next.notices.more', { n: hidden })}</span>}
                 </button>
                 {(WAITING_KINDS.has(shown.kind) || shown.kind === SMART_KIND.machine) && (
                   <button type="button" className="hx-sn__btn" onClick={() => onOpen(true)}>

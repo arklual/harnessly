@@ -1,6 +1,7 @@
 // An open design as the design draws it (.hx-site): a browser with the design's pages in tabs, its bar — history,
 // the address with the pages, the device and size, more — and the page itself in the chosen viewport, in a case when
 // the device has one. The page is the board on the machine's library server, opened in a preview slot of its own.
+import { useLiveHint, useLiveMark } from '@/next/features/voice-live/live-mark';
 import { tourSignal } from '@/next/stores/tour';
 import { ChatTerminalSlotContext } from '@/next/features/terminal/chat-terminal';
 import {
@@ -86,6 +87,7 @@ import { useDomBridge } from '@/next/features/designly/use-dom-bridge';
 import TourAnchor, { TOUR_ANCHOR } from '@/next/features/tour/tour-anchor';
 import { useTourStep } from '@/next/features/tour/use-tour-step';
 import SiteLoader, { SiteHeld } from '@/next/features/designly/site-loader';
+import { useFrameRetry } from '@/next/features/designly/frame-retry';
 import { loadStageOf, type ILoadProgress } from '@/next/features/designly/site-load';
 import { useSiteLoad } from '@/next/features/designly/use-site-load';
 import SiteTweaks from '@/next/features/designly/site-tweaks';
@@ -304,6 +306,8 @@ export interface ISiteStage {
   chatW: number;
   chat: ReactNode;
   island: ReactNode;
+  /** A space's finished turn, said as the field's one line (renders nothing itself; HRN-1469). */
+  spaceTurn?: ReactNode;
   /** Over the page: the note at a picked block, the bar of the edits. */
   overlay: ReactNode;
   /** On the page, in its viewport's pixels: the pins of the notes. */
@@ -356,6 +360,8 @@ export interface ISiteStage {
    * rises from the field.
    */
   anchor?: (rect: { x: number; y: number; w: number; h: number } | null) => void;
+  /** A space's view went back to its list: a chat window open over it folds to its island, never covering it. */
+  fold?: () => void;
   /** The section the stage stands in: the window's place is counted from it. */
   bindSection?: (el: HTMLElement | null) => void;
 }
@@ -509,11 +515,19 @@ const SiteView = ({
   useEffect(() => {
     if (mode?.editing) tourSignal('site:edit');
   }, [mode?.editing]);
+  // A phone only looks: a design opened for editing there goes back to looking.
+  const leaveEdit = compact && mode?.editing === true && mode.action !== null && !mode.action.ask;
+  const toLooking = useEffectEvent(() => mode?.action?.onClick());
+  useEffect(() => {
+    if (leaveEdit) toLooking();
+  }, [leaveEdit]);
   // The address reads the page and where it is; a site named by its own address shows it once.
   const addrName = page?.name ?? title;
   const addrPath = pagePath ? `${title}/${pagePath}` : title;
   // The full screen shows the page as «Адаптивно» does, over the whole box; the device chosen comes back after it.
-  const device = deviceOf(full ? 'fill' : deviceId);
+  // A phone shows the page at its own width, never a device drawn inside it.
+  const fitted = full || compact;
+  const device = deviceOf(fitted ? 'fill' : deviceId);
   // The page's tree for DevTools' «Elements», read through the board's own script while that tab is in view.
   const dom = useDomBridge(
     frameRef,
@@ -537,8 +551,8 @@ const SiteView = ({
     ? viewportOf(
         device,
         area,
-        full ? null : size,
-        !full && rot && canRotate(device),
+        fitted ? null : size,
+        !fitted && rot && canRotate(device),
         dockShown ? VP_PAD + paneRoom : VP_PAD,
       )
     : null;
@@ -1076,6 +1090,28 @@ const SiteView = ({
     // sendVeils reads the frame of this src and the latest stage; the set's key says when it changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [veilsKey, src, reloadKey]);
+  // The ring of the voice's quick edit on its block (live-mark.ts): told again when the board reloads.
+  const live = useLiveMark();
+  const liveTpl = useRef<number | null>(null);
+  useEffect(() => {
+    const slot = slotOf();
+    if (!slot) return;
+    const tpl = live?.tpl ?? liveTpl.current;
+    liveTpl.current = live?.tpl ?? null;
+    if (tpl === null) return;
+    slot.frame.contentWindow?.postMessage({ type: 'tk:live', tpl, phase: live?.phase ?? null }, slot.origin);
+    // slotOf reads the frame of this src; the mark and the reload say when to tell the board.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live, src, reloadKey]);
+  // An edit without a picked block: the board flashes the block its changed lines make.
+  const liveHint = useLiveHint();
+  useEffect(() => {
+    const slot = slotOf();
+    if (!slot || !liveHint) return;
+    slot.frame.contentWindow?.postMessage({ type: 'tk:live-find', hint: liveHint.hint }, slot.origin);
+    // slotOf reads the frame of this src; a new hint says when to tell the board.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveHint]);
   // The blocks the pins stand on: the set goes again whenever it changes.
   const anchorsKey = JSON.stringify([stage?.anchors ?? [], tourFrame]);
   useEffect(() => {
@@ -1184,6 +1220,8 @@ const SiteView = ({
   };
 
   const frameKey = `${src}#${reloadKey}`;
+  // Something else than the board in the frame: it opens anew by itself, and the machine's journal says so.
+  useFrameRetry({ frameRef, src, frameKey, loadedFor, libReadyFor, onRetry });
   const tweaks = offer?.key === frameKey ? offer.controls : null;
   const noTweaks = tweaks === null || tweaks.length === 0;
   const tweaksPanel = usePresentFlag(tweaksOpen, TWEAKS_OUT_MS);
@@ -1252,7 +1290,7 @@ const SiteView = ({
     compact
       ? {
           id: 'drawer',
-          icon: 'menu',
+          icon: 'panel-left',
           label: t('next.header.openMenu'),
           pick: () => {
             pop.close();
@@ -1386,12 +1424,15 @@ const SiteView = ({
           },
         }
       : null,
-    qr && {
-      id: 'phone',
-      icon: 'qr-code',
-      label: t('next.site.phone'),
-      pick: () => pop.open(POP.phone),
-    },
+    // A QR to open the page on a phone means nothing on the phone itself.
+    qr && !phone
+      ? {
+          id: 'phone',
+          icon: 'qr-code',
+          label: t('next.site.phone'),
+          pick: () => pop.open(POP.phone),
+        }
+      : null,
     // The zoom pill hidden from its own menu comes back from here.
     pillHidden && !pane && !phone
       ? {
@@ -1444,7 +1485,27 @@ const SiteView = ({
       },
     }),
   );
-  const moreItems = offered.filter((item) => item != null);
+  // A phone's «…» holds what looking needs: the versions, sharing, the link, the other device, the menu.
+  const versionsItem: IMoreItem | null =
+    compact && mode?.versions
+      ? {
+          id: 'versions',
+          icon: 'history',
+          label: t('next.versions.title'),
+          on: mode.versions.open,
+          pick: () => {
+            pop.close();
+            mode.versions?.onToggle();
+          },
+        }
+      : null;
+  const PHONE_MORE = ['versions', 'share', 'link', 'phone', 'outside', 'drawer'];
+  const moreItems = compact
+    ? [versionsItem, ...offered]
+        .filter((item): item is IMoreItem => item != null && PHONE_MORE.includes(item.id))
+        .sort((a, b) => PHONE_MORE.indexOf(a.id) - PHONE_MORE.indexOf(b.id))
+        .map((item) => (item.id === 'drawer' ? { ...item, sep: true } : item))
+    : offered.filter((item) => item != null);
   // On the phone the bar's menus (pages, device, «…») are bottom sheets: a scrim under them, a swipe down closes them.
   const barMenu = pop.shownPop === POP.pages || pop.shownPop === POP.device || pop.shownPop === POP.more;
   const barMenuOf = useCallback(
@@ -1465,6 +1526,7 @@ const SiteView = ({
       data-variant={pane ? 'pane' : 'site'}
       data-dock={phone ? 'left' : (stage?.dock ?? 'left')}
       data-min={stage?.min ?? false}
+      data-phone={compact}
       data-run={stage?.run ?? 'idle'}
       data-pick={pick}
       data-full={full}
@@ -1477,16 +1539,6 @@ const SiteView = ({
         <div className="hx-browser">
           {!pane && !compact && (
             <div className="hx-strip">
-              {!guest && (
-                <button
-                  type="button"
-                  className="hx-head-btn hx-site__menu"
-                  aria-label={t('next.header.openMenu')}
-                  onClick={onOpenDrawer}
-                >
-                  <Icon name="menu" />
-                </button>
-              )}
               {stage && !guest && (
                 <button
                   type="button"
@@ -1665,7 +1717,7 @@ const SiteView = ({
                 {keys && reloadHint && <kbd>{reloadHint}</kbd>}
               </span>
             </button>
-            {mode && <ModeButton mode={mode} compact={compact} />}
+            {mode && !compact && <ModeButton mode={mode} />}
             <div className="hx-browser__addr">
               <button
                 type="button"
@@ -1702,7 +1754,7 @@ const SiteView = ({
                 />
               )}
             </div>
-            {compact && stage && (
+            {compact && stage && stage.mode === 'chat' && (
               <button
                 type="button"
                 className="hx-head-btn hx-site__swap"
@@ -1714,7 +1766,7 @@ const SiteView = ({
                 <Icon name={stage.mode === 'chat' ? 'maximize-2' : 'message-square'} />
               </button>
             )}
-            {stage && (
+            {stage && !compact && (
               <button
                 type="button"
                 className="hx-browser__tool hx-tipped"

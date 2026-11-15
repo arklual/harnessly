@@ -44,6 +44,8 @@ export interface Turn {
   files: { path: string; op: FileOp }[];
   /** What the turn made to open; absent when nothing. */
   outputs?: TurnOutput[];
+  /** The paths of the pictures the turn drew, oldest first. */
+  pictures?: string[];
 }
 
 export interface AttachmentRef {

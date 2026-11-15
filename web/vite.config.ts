@@ -74,6 +74,42 @@ const preloadDictionary = (): Plugin => ({
   },
 });
 
+// The interface (next/entry.tsx) is imported only once the page's first module has run, and that module waits for the
+// dictionary (top-level await): on a phone the 1.2 MB of the shell started after the 200 KB of the dictionary had come
+// and run, 0.6 s later than it could. Preloads for the interface's chunks and styles start them together with
+// the first module. A person who turns out to be signed out has them in the cache, as main.tsx already accepts.
+const preloadShell = (): Plugin => ({
+  name: 'harnessly-preload-shell',
+  apply: 'build',
+  transformIndexHtml: {
+    order: 'post',
+    handler(html, { bundle, filename }) {
+      if (!bundle || !filename.endsWith('index.html')) return html;
+      const chunks = Object.values(bundle).filter((item) => item.type === 'chunk');
+      const entry = chunks.find((chunk) => chunk.facadeModuleId?.endsWith('/app/next/entry.tsx'));
+      if (!entry) return html;
+      const byName = new Map(chunks.map((chunk) => [chunk.fileName, chunk]));
+      const js = new Set<string>();
+      const css = new Set<string>();
+      const walk = [entry.fileName];
+      while (walk.length > 0) {
+        const name = walk.pop() as string;
+        if (js.has(name)) continue;
+        js.add(name);
+        const chunk = byName.get(name);
+        for (const file of chunk?.viteMetadata?.importedCss ?? []) css.add(file);
+        walk.push(...(chunk?.imports ?? []));
+      }
+      const present = (file: string) => html.includes(`/${file}"`);
+      const links = [
+        ...[...css].filter((file) => !present(file)).map((file) => `<link rel="preload" as="style" crossorigin href="./${file}">`),
+        ...[...js].filter((file) => !present(file)).map((file) => `<link rel="modulepreload" crossorigin href="./${file}">`),
+      ];
+      return links.length === 0 ? html : html.replace('</head>', `${links.join('\n')}\n</head>`);
+    },
+  },
+});
+
 // What pdf.js reads at run time by address and not by import: the character maps, the standard fonts and its decoders. Put
 // beside the chunks, where the PDF view's engine asks for them (next/features/pane/pdf/pdf-engine.ts); nothing comes from outside.
 const pdfAssets = (): Plugin => ({
@@ -232,6 +268,7 @@ export default defineConfig({
     tailwindcss(),
     dictionaries(),
     preloadDictionary(),
+    preloadShell(),
     collectShell(),
     orderShellStyles(),
     pdfAssets(),

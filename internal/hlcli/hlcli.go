@@ -255,6 +255,8 @@ func (c *cli) run(args []string) error {
 		return c.site(rest)
 	case "app", "apps":
 		return c.app(rest)
+	case "eval", "evals":
+		return c.eval(rest)
 	case "chat", "chats":
 		return c.chat(rest)
 	case "connections", "connection":

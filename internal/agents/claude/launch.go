@@ -57,8 +57,11 @@ type LaunchConfig struct {
 var ErrNoProfiles = errors.New("Backend profiles are not available on this machine")
 
 // LaunchEnv keeps a Claude the runtime starts from updating itself mid-session: the machine installs new versions
-// ahead of time, and the next session starts on them.
-const LaunchEnv = "DISABLE_AUTOUPDATER=1"
+// ahead of time, and the next session starts on them. It also keeps Claude on the terminal's own screen: in its
+// fullscreen mode (the "tui": "fullscreen" setting, or a trial of it) Claude takes the alternate screen and the mouse,
+// the pane has no history, and the wheel in the page's terminal scrolls Claude's own list of messages instead of the
+// terminal's output.
+const LaunchEnv = "DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1"
 
 // LauncherCommand is what runs Claude: `claude`, or the managed launcher single-quoted, after LaunchEnv.
 func LauncherCommand(launcher string) (string, error) {

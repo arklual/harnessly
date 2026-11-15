@@ -7,7 +7,7 @@ import { goTo, ROUTE } from '@/next/routes/routes';
 import { t } from '@/next/i18n';
 import '@/next/styles/design-access.css';
 
-interface IInviteAcceptProps {
+export interface IInviteAcceptProps {
   token: string;
   /** Where the project opens; the screen navigates there by default. */
   onOpen?: (project: string) => void;

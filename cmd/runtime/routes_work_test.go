@@ -16,6 +16,8 @@ type fakeChatWork struct {
 
 func (f fakeChatWork) workObserver() *chatwork.Observer           { return f.o }
 func (f fakeChatWork) localChats(context.Context) []chatwork.Chat { return f.chats }
+func (f fakeChatWork) chatSession(string) (string, bool)          { return "", false }
+func (f fakeChatWork) chatCwd(string) (string, bool)              { return "", false }
 
 // The chat's own records and those of the chats it delegated, at any depth; a stranger's stay out; every chat of the
 // subtree has its transcript looked through once.

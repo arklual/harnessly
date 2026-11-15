@@ -109,3 +109,10 @@ export const followAnswer = (m: MachineId, id: string, on: IAnswerHandlers): (()
     source.close();
   };
 };
+
+/** Keeps what was said in the voice mode as the chat's messages. */
+export const appendSpoken = (
+  m: MachineId,
+  id: string,
+  lines: readonly { role: 'user' | 'assistant'; text: string }[],
+) => runtimeJson<{ messages: IGptMessage[] }>(m, path(`/chats/${id}/spoken`), postJson({ lines }));

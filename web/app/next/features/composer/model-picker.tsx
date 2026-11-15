@@ -11,7 +11,14 @@
 // segments (plan, ask, ask nothing), and under them one row of chips: the fast mode on the models that run it
 // and ultracode, each a switch whose hint (on hover, above it) says what it does or that an ask waits for the agent;
 // both show what the agent was last seen running.
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react';
 import {
   agentKey,
   choiceAgentKey,
@@ -34,6 +41,9 @@ import {
   type PermissionMode,
 } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
+import PillRing from '@/next/features/composer/pill-ring';
+import { LimitsCard, useNow } from '@/next/features/limits/limits-chip';
+import { leftOf, ringOf, windowShort, windowsOf, type LimitsView } from '@/next/features/limits/model';
 import Tooltip from '@/next/ui/tooltip';
 import { usePresentFlag } from '@/next/ui/presence';
 import { useGlide } from '@/next/ui/use-glide';
@@ -43,6 +53,14 @@ import { useCoverField } from '@/next/stores/field-cover';
 // The trigger's own look (.hx-model) is the composer's: a picker outside the field brings it along.
 import '@/next/styles/composer.css';
 import '@/next/styles/picker.css';
+import {
+  groupOfKey,
+  modelHint,
+  openAIMode,
+  OPENAI_MODE,
+  pickerGroups,
+  type IPickerGroup,
+} from '@/next/features/composer/picker-groups';
 
 const EXIT_MS = 240;
 
@@ -91,11 +109,37 @@ export interface IModelPickerProps {
     onPick: (id: string) => void;
   } | null;
   /**
-   * Another kind of chat beside the agents' («ChatGPT», a plain chat on the person's own plan): a row under
-   * the models; a pick closes the picker and hands over. Absent: no row.
+   * Another kind of chat beside the agents' («ChatGPT», a plain chat on the person's own plan): a tab after
+   * the agents' with its plan's models, and a row under the depth that opens it. A model picked closes the picker and
+   * hands over; `signIn` stands in the tab while no account is signed in. Absent: neither shows.
    */
-  extra?: { label: string; sub: string; onPick: () => void } | null;
+  extra?: IPickerExtra | null;
+  /**
+   * The chat's limits: the pill's outline fills as the five-hour window is spent, and the popover shows the
+   * windows with their resets under the depth. Absent: a plain border and no card.
+   */
+  limits?: LimitsView | null;
 }
+
+export interface IPickerExtra {
+  label: string;
+  sub: string;
+  /** The plan's models; null while they come or while nobody is signed in. */
+  models: readonly { id: string; label: string }[] | null;
+  /** The sign-in, right in the tab, while no account is signed in; null when one is. */
+  signIn: ReactNode;
+  onPick: (model: string | null) => void;
+}
+
+/** The key of the extra tab among the agents'. */
+const EXTRA_KEY = '~chat';
+
+/** One line under the tabs on what the browsed kind is, in plain words; null for the vendors' own groups. */
+const aboutOf = (a: IPickerAgent): string | null => {
+  if (a.vendor === 'gpt') return t('next.picker.about.gpt');
+  if (a.profile) return null;
+  return a.provider === 'codex' ? t('next.picker.about.codex') : t('next.picker.about.claude');
+};
 
 /** The stops of a model's slider, in the order of the protocol's efforts. */
 const stopsOf = (model: AgentModel | null): Effort[] =>
@@ -130,6 +174,7 @@ const ModelPicker = ({
   handoff = null,
   machine = null,
   extra = null,
+  limits = null,
 }: IModelPickerProps) => {
   const [open, setOpen] = useState(false);
   useCoverField(open);
@@ -153,19 +198,35 @@ const ModelPicker = ({
   const effort = value.effort;
   const stops = stopsOf(model);
   const step = effort ? stops.indexOf(effort) : -1;
-  const browseIndex = Math.max(
-    0,
-    listed.findIndex((a) => agentKey(a) === browse),
-  );
+  const browseIndex =
+    extra && browse === EXTRA_KEY
+      ? listed.length
+      : Math.max(
+          0,
+          listed.findIndex((a) => agentKey(a) === browse),
+        );
+  const browsed = browseIndex < listed.length ? listed[browseIndex] : null;
+  let about: string | null = null;
+  if (browsed) about = aboutOf(browsed);
+  else if (extra) about = t('next.picker.about.chat');
+  // The tabs are vendors; OpenAI's ways of working are a row under its tab (picker-groups.ts).
+  const groups = pickerGroups(listed, agentKey, extra ? EXTRA_KEY : null);
+  const group = groupOfKey(groups, browse) ?? groups[0];
+  const groupIndex = Math.max(0, groups.indexOf(group));
+  const openGroup = (g: IPickerGroup) => {
+    if (g.members.some((m) => m.key === browse)) return;
+    const first = g.members[0];
+    if (first) setBrowse(first.key);
+  };
   // The agent strip scrolls when the agents do not fit: the backing is placed by measure and the chosen one is brought in.
   useLayoutEffect(() => {
     const seg = segRef.current;
-    const item = seg?.querySelectorAll<HTMLElement>('.hx-seg__item')[browseIndex];
+    const item = seg?.querySelectorAll<HTMLElement>('.hx-seg__item')[groupIndex];
     if (!seg || !item) return;
     seg.style.setProperty('--gx', `${item.offsetLeft}px`);
     seg.style.setProperty('--gw', `${item.offsetWidth}px`);
     seg.scrollLeft = Math.max(0, item.offsetLeft - (seg.clientWidth - item.offsetWidth) / 2);
-  }, [browseIndex, listed.length, view]);
+  }, [groupIndex, groups.length, view]);
   const frozen = !!blocked || !!busy;
   const ultracodeOffered = offersUltracode && model?.ultracode === true;
   const ultracode = ultracodeOffered && value.ultracode;
@@ -300,6 +361,16 @@ const ModelPicker = ({
     'width',
   );
 
+  // The limit on the pill: its outline.
+  const nowSec = useNow() / 1000;
+  const ring = ringOf(limits, nowSec);
+  const limitsTip =
+    limits?.state === 'ready'
+      ? windowsOf(limits.limits, nowSec)
+          .map((w) => `${windowShort(w.kind)} ${leftOf(w.window)}%`)
+          .join(' · ')
+      : '';
+
   const hint = (): string => {
     if (blocked) return blocked;
     if (stops.length === 0) return t('next.picker.effortNone');
@@ -313,12 +384,18 @@ const ModelPicker = ({
         type="button"
         className="hx-model hx-tipped"
         data-ultracode={ultracode || undefined}
+        data-ring={ring ? ring.level : undefined}
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-busy={busy || undefined}
         onClick={toggle}
       >
-        {!open && <span className="hx-tip">{t('next.composer.modelTip')}</span>}
+        {!open && (
+          <span className="hx-tip">
+            {limitsTip ? `${t('next.composer.modelTip')} · ${limitsTip}` : t('next.composer.modelTip')}
+          </span>
+        )}
+        {ring && <PillRing host={pill} used={ring.used} level={ring.level} />}
         <i className="hx-agent" data-agent={agent.vendor ?? value.provider} aria-hidden="true" />
         {ultracode && (
           <i
@@ -506,8 +583,8 @@ const ModelPicker = ({
                   type="button"
                   className="hx-picker__vm"
                   onClick={() => {
-                    setOpen(false);
-                    extra.onPick();
+                    setBrowse(EXTRA_KEY);
+                    setView(VIEW.models);
                   }}
                 >
                   <i className="hx-agent hx-picker__vm-ic" data-agent="codex" aria-hidden="true" />
@@ -526,6 +603,11 @@ const ModelPicker = ({
                   <Icon name="chevron-right" size="sm" className="hx-picker__vm-chev" />
                 </button>
               )}
+              {limits && (
+                <div className="hx-picker__limits">
+                  <LimitsCard view={limits} />
+                </div>
+              )}
             </div>
 
             <div className="hx-picker__pane" data-pane="models" data-active={view === VIEW.models}>
@@ -543,20 +625,40 @@ const ModelPicker = ({
               {segmented && (
                 <div className="hx-seg" ref={segRef}>
                   <span className="hx-seg__glider" />
-                  {listed.map((a) => (
+                  {groups.map((g) => (
                     <button
-                      key={agentKey(a)}
+                      key={g.key}
                       type="button"
                       className="hx-seg__item"
-                      aria-pressed={agentKey(a) === browse}
-                      onClick={() => setBrowse(agentKey(a))}
+                      aria-pressed={g === group}
+                      onClick={() => openGroup(g)}
                     >
-                      <i className="hx-agent" data-agent={a.vendor ?? a.provider} aria-hidden="true" />
-                      {a.short}
+                      <i
+                        className="hx-agent"
+                        data-agent={g.agent ? (g.agent.vendor ?? g.agent.provider) : 'codex'}
+                        aria-hidden="true"
+                      />
+                      {g.agent ? g.agent.short : t('next.picker.openai')}
                     </button>
                   ))}
                 </div>
               )}
+              {segmented && group && group.members.length > 1 && (
+                <div className="hx-picker__modes" role="group" aria-label={t('next.picker.modeTitle')}>
+                  {group.members.map((m) => (
+                    <button
+                      key={m.key}
+                      type="button"
+                      className="hx-picker__mode"
+                      aria-pressed={m.key === browse}
+                      onClick={() => setBrowse(m.key)}
+                    >
+                      {t(`next.picker.mode.${m.mode ?? OPENAI_MODE.harnessly}`)}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {segmented && about && <div className="hx-picker__about">{about}</div>}
               <div className="hx-carousel">
                 <div
                   className="hx-carousel__track"
@@ -568,6 +670,8 @@ const ModelPicker = ({
                     return (
                       <div key={agentKey(a)} className="hx-options" data-active={active} role="listbox">
                         {!a.available && <div className="hx-options__note">{unavailableNote(a)}</div>}
+                        {/* One sign-in for all of OpenAI (the ChatGPT login), right here. */}
+                        {!a.available && openAIMode(a) && extra?.signIn}
                         {a.available && across && (
                           <div className="hx-options__note">
                             {t('next.handoff.pickNote', { agent: a.short })}
@@ -609,7 +713,9 @@ const ModelPicker = ({
                                       {t('next.handoff.pickOption', { agent: a.short })}
                                     </span>
                                   )}
-                                  {!across && m.hint && <span className="hx-option__desc">{m.hint}</span>}
+                                  {!across && modelHint(m.id, m.hint) && (
+                                    <span className="hx-option__desc">{modelHint(m.id, m.hint)}</span>
+                                  )}
                                 </span>
                                 {across ? (
                                   <Icon name="arrow-left-right" size="sm" className="hx-option__go" />
@@ -622,6 +728,35 @@ const ModelPicker = ({
                       </div>
                     );
                   })}
+                  {extra && (
+                    <div className="hx-options" data-active={browse === EXTRA_KEY} role="listbox">
+                      {extra.signIn}
+                      {!extra.signIn && extra.models === null && (
+                        <div className="hx-options__note">{t('next.picker.chatLoading')}</div>
+                      )}
+                      {!extra.signIn &&
+                        extra.models?.map((m) => (
+                          <div key={m.id} className="hx-option-row">
+                            <button
+                              type="button"
+                              role="option"
+                              className="hx-option"
+                              tabIndex={browse === EXTRA_KEY ? 0 : -1}
+                              aria-selected={false}
+                              onClick={() => {
+                                setOpen(false);
+                                extra.onPick(m.id);
+                              }}
+                            >
+                              <span className="hx-option__text">
+                                <span className="hx-option__name">{m.label}</span>
+                              </span>
+                              <Icon name="arrow-right" size="sm" className="hx-option__go" />
+                            </button>
+                          </div>
+                        ))}
+                    </div>
+                  )}
                 </div>
               </div>
               {multi && <div className="hx-picker__hint">{t('next.picker.multiHint')}</div>}

@@ -1,0 +1,14 @@
+id: open-document
+title: «Открой документ» — документ во вкладке документов, не в браузере
+tags: [pane]
+timeout_s: 240
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/hlcli/hlcli.go'
+  - 'internal/hlcli/preview.go'
+  - 'internal/paneintents/**'
+prompt: открой справа документ https://docs.example.test/a/release-notes-2-4
+expect:
+  - name: opened the document in the documents tab
+    pane: {tab: artifacts, target: release-notes-2-4}

@@ -72,16 +72,33 @@ export interface ILazyViewProps<P> {
 // fallback in between. A retry replaces it, because a rejected import is not asked twice by the same lazy component.
 const views = new WeakMap<object, unknown>();
 
+// The views whose chunk is already in (opened once, or fetched ahead by preloadView): drawn at once, not through
+// Suspense, which would wait a turn even for a module that is there.
+const ready = new WeakMap<object, unknown>();
+
+const remember = <P,>(load: TLoad<P>) =>
+  load().then((loaded) => {
+    ready.set(load, loaded.default);
+    return loaded;
+  });
+
 const viewOf = <P,>(load: TLoad<P>): LazyExoticComponent<ComponentType<P>> => {
   const have = views.get(load) as LazyExoticComponent<ComponentType<P>> | undefined;
   if (have) return have;
-  const made = lazy(load);
+  const made = lazy(() => remember(load));
   views.set(load, made);
   return made;
 };
 
 const renew = <P,>(load: TLoad<P>): void => {
   views.delete(load);
+  ready.delete(load);
+};
+
+/** Fetches a view's chunk ahead of its first opening: the opening then draws it in the same frame. */
+export const preloadView = async <P,>(load: TLoad<P>): Promise<void> => {
+  if (ready.has(load)) return;
+  await remember(load);
 };
 
 const LazyView = <P extends object>({
@@ -94,7 +111,9 @@ const LazyView = <P extends object>({
   onFail,
 }: ILazyViewProps<P>) => {
   const [round, setRound] = useState(0);
-  const View = viewOf(load);
+  // Taken once, when the view is first drawn: switching from the lazy one to the loaded one later would mount it anew.
+  const [loaded] = useState(() => (ready.get(load) as ComponentType<P> | undefined) ?? null);
+  const View = loaded ?? viewOf(load);
   return (
     <Boundary
       key={round}

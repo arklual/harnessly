@@ -130,7 +130,7 @@ describe('the picker with profile groups', () => {
     const { view } = open();
     act(() => view.container.querySelector<HTMLButtonElement>('.hx-picker__center')?.click());
     const segs = [...view.container.querySelectorAll('.hx-seg__item')].map((el) => el.textContent);
-    expect(segs).toEqual(['Claude', 'Codex', 'Kimi', 'Grok']);
+    expect(segs).toEqual(['Claude', 'OpenAI', 'Kimi', 'Grok']);
     const kimi = view.container.querySelectorAll<HTMLButtonElement>('.hx-seg__item')[2];
     act(() => kimi.click());
     const rows = view.container.querySelectorAll<HTMLElement>('.hx-options[data-active="true"] .hx-option');

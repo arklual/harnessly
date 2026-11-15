@@ -29,6 +29,7 @@ import { SafePage } from '@/next/bindings/settings-safe';
 import { useSettingChanges } from '@/next/bindings/settings-changes';
 import { ExtProvidersPage } from '@/next/bindings/settings-ext-providers';
 import ChatGptSettings from '@/next/features/chatgpt/settings-card';
+import VoiceLiveSettings from '@/next/features/voice-live/settings';
 import { SmartPage } from '@/next/bindings/settings-smart';
 import { smartKey } from '@/next/features/settings/smart-section';
 import SettingsAgent from '@/next/bindings/settings-agent';
@@ -57,7 +58,7 @@ const useClock = () => {
   return now;
 };
 
-interface ISettingsScreenProps {
+export interface ISettingsScreenProps {
   /** The machine whose files and apps the pages are about: the one the person has open. */
   machine: MachineId;
   /** The section in the address; null: the list (a wide window shows the first section beside it). */
@@ -95,7 +96,7 @@ const SettingsScreen = ({ machine, section, connect, name }: ISettingsScreenProp
   let body = null;
   if (active === 'general')
     body = <GeneralPage machine={machine} name={name} pending={pending} changes={changes} />;
-  else if (active === 'appearance') body = <AppearancePage pending={pending} />;
+  else if (active === 'appearance') body = <AppearancePage machine={machine} pending={pending} />;
   else if (active === 'keys') body = <KeysPage pending={pending} />;
   else if (active === 'voice') body = <VoicePage machine={machine} />;
   else if (active === 'notifications')
@@ -118,6 +119,7 @@ const SettingsScreen = ({ machine, section, connect, name }: ISettingsScreenProp
           onOpen={(provider) => goTo({ kind: ROUTE.settings, section: provider })}
         />
         <ChatGptSettings machine={machine} />
+        <VoiceLiveSettings machine={machine} />
         <ExtProvidersPage machine={machine} />
       </>
     );

@@ -308,7 +308,9 @@ const SelBar = ({ conv, aside = false, machine = null }: ISelBarProps) => {
           draw();
         });
     };
-    const feed = document.querySelector('.hx-feed');
+    // Chats kept hidden have feeds of their own (bindings/shell.tsx): the one on view is watched.
+    const feed =
+      [...document.querySelectorAll('.hx-feed')].find((node) => node.checkVisibility?.() !== false) ?? null;
     const changes = new MutationObserver(later);
     if (feed) changes.observe(feed, { subtree: true, childList: true, characterData: true });
     document.addEventListener('scroll', later, true);

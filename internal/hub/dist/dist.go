@@ -19,6 +19,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/egress"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
+	"github.com/ly-solutions/harnessly/internal/hub/webpkg"
 )
 
 // maxInstaller bounds the installer script the hub is willing to read and serve.
@@ -34,6 +35,8 @@ type Handler struct {
 	Version string
 	// Image is the machine image of the container profile (HUB_CONTAINER_IMAGE); empty when the hub has none.
 	Image string
+	// WebDir holds the machines' page the hub hands out (internal/hub/webpkg, HUB_WEB_PACKAGE_URL); empty: none.
+	WebDir string
 
 	mu   sync.Mutex
 	sums map[string]cachedSum
@@ -58,7 +61,55 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.Handle("GET /dl/release.json", httpx.Handler(h.releaseFile("release.json", "application/json")))
 	mux.Handle("GET /dl/release.json.sig", httpx.Handler(h.releaseFile("release.json.sig", "application/json")))
 	mux.Handle("GET /dl/network.json", httpx.Handler(h.network))
+	mux.Handle("GET /dl/web.json", httpx.Handler(h.webPointer))
+	mux.Handle("GET /dl/web.tar.gz", httpx.Handler(h.webArchive))
 	mux.Handle("GET /dl/{name}", httpx.Handler(h.binary))
+}
+
+// webPage is the page the hub hands out; ErrNotFound when it has none (no HUB_WEB_PACKAGE_URL, or nothing taken yet).
+func (h *Handler) webPage() (webpkg.Page, error) {
+	if h.WebDir == "" {
+		return webpkg.Page{}, httpx.New(http.StatusNotFound, "not_found", "Этот хаб не раздаёт страницу машинам отдельно")
+	}
+	p, err := webpkg.Current(h.WebDir)
+	if err != nil || p.Version == "" {
+		return webpkg.Page{}, httpx.New(http.StatusNotFound, "not_found", "Этот хаб ещё не получил страницу для машин")
+	}
+	return p, nil
+}
+
+// webPointer serves web.json: the version and the SHA-256 of the page the machines may take.
+func (h *Handler) webPointer(w http.ResponseWriter, r *http.Request) error {
+	p, err := h.webPage()
+	if err != nil {
+		return err
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	httpx.WriteJSON(w, http.StatusOK, p)
+	return nil
+}
+
+// webArchive serves the archive web.json names.
+func (h *Handler) webArchive(w http.ResponseWriter, r *http.Request) error {
+	p, err := h.webPage()
+	if err != nil {
+		return err
+	}
+	f, err := os.Open(filepath.Join(h.WebDir, p.File))
+	if err != nil {
+		return httpx.ErrNotFound
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil || !info.Mode().IsRegular() {
+		return httpx.ErrNotFound
+	}
+	w.Header().Set("Content-Type", "application/gzip")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Web-Version", p.Version)
+	w.Header().Set("X-Web-Sha256", p.SHA256)
+	http.ServeContent(w, r, p.File, info.ModTime(), f)
+	return nil
 }
 
 // shellQuote quotes a value for sh in single quotes.

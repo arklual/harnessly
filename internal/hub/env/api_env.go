@@ -3,11 +3,13 @@ package env
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/authz"
@@ -25,6 +27,8 @@ type req struct {
 	w   *world
 	rt  *rights
 	s   *Service
+	// versions are the apps' versions read for this request (appVersion).
+	versions map[string][2]*string
 }
 
 // open resolves the organization of the path, checks the feature is on and reads the organization.
@@ -233,6 +237,7 @@ func (q *req) row(e store.EnvEntry, edit bool, c cover, use *usageIndex, rs []En
 		Pinned: e.Pinned, Enabled: e.Enabled, GroupID: e.GroupID, Position: e.Position}
 	if it.Kind == store.CatalogApp {
 		row.BuiltIn, row.Off = hubproto.IsBuiltInEnvItem(it.ID), appOff(it.Source)
+		row.AppVersion, row.AppUpdatedAt = q.appVersion(it.ID)
 	}
 	row.LockedReason = lockedReason(edit, above, e)
 	row.Locked = row.LockedReason != nil
@@ -399,8 +404,59 @@ func (s *Service) getCard(w http.ResponseWriter, r *http.Request, p *auth.Princi
 			card.Unused = unusedOf(e, st, use)
 		}
 	}
+	if it.Kind == hubproto.EnvKindApp {
+		card.AppVersion, card.AppUpdatedAt = appVersionOf(q.ctx, q.st, q.w.org.ID, it.ID, s.now())
+	}
 	httpx.WriteJSON(w, http.StatusOK, card)
 	return nil
+}
+
+// appVersion is appVersionOf for a row of the view, read once per request.
+func (q *req) appVersion(itemID string) (*string, *string) {
+	if q.versions == nil {
+		q.versions = map[string][2]*string{}
+	}
+	if v, ok := q.versions[itemID]; ok {
+		return v[0], v[1]
+	}
+	ver, at := appVersionOf(q.ctx, q.st, q.w.org.ID, itemID, q.s.now())
+	q.versions[itemID] = [2]*string{ver, at}
+	return ver, at
+}
+
+// appVersionRuns is how many of the organization's latest runs tell an app's version.
+const appVersionRuns = 200
+
+// appVersionOf reads, from the machines' runs of the last two weeks, the version of an app they have now (the newest
+// run that names it) and when a machine last put that version on («поставлено», not «уже стоит»). nil, nil when no
+// run named it: the card then says nothing of a version.
+func appVersionOf(ctx context.Context, st store.Store, orgID, itemID string, now time.Time) (*string, *string) {
+	runs, err := st.EnvRunsOf(ctx, store.EnvRunQuery{OrgID: orgID, Since: now.Add(-14 * 24 * time.Hour), Limit: appVersionRuns})
+	if err != nil {
+		return nil, nil
+	}
+	version := ""
+	for _, r := range runs { // the newest first
+		var steps []hubproto.EnvStep
+		if json.Unmarshal([]byte(r.Steps), &steps) != nil {
+			continue
+		}
+		for _, step := range steps {
+			if step.ItemID != itemID || step.Version == "" || step.Status != hubproto.EnvOK && step.Status != hubproto.EnvSkipped {
+				continue
+			}
+			if version == "" {
+				version = step.Version
+			}
+			if step.Version == version && step.Status == hubproto.EnvOK && !r.FinishedAt.IsZero() {
+				return strp(version), msStr(r.FinishedAt.UnixMilli())
+			}
+		}
+	}
+	if version == "" {
+		return nil, nil
+	}
+	return strp(version), nil
 }
 
 // entryIn is the body of POST …/env/entries.

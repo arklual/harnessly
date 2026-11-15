@@ -1,0 +1,32 @@
+{
+  "itemId": 102,
+  "title": "Answer Dana about the venue",
+  "where": "mail",
+  "whenText": "by noon",
+  "lead": "Dana asks to confirm Friday. The agent checked the list of guests and the order for the hall and wrote an answer.",
+  "parts": [
+    {
+      "k": "message",
+      "h": "Letter from Dana",
+      "icon": "mail",
+      "src": "mail",
+      "from": "Dana, Birch Hall",
+      "quote": "Can you confirm forty seats and the projector by noon? After that the hall goes to another booking.",
+      "draft": "Dana, yes: forty seats and the projector. We arrive at 9:30 to set up. Thank you for holding the hall."
+    },
+    {
+      "k": "kpi",
+      "h": "Friday in figures",
+      "v": [
+        ["Guests", "38", "of 40 seats"],
+        ["Speakers", "4"],
+        ["Starts", "10:00"]
+      ]
+    }
+  ],
+  "chips": [
+    { "label": "Send", "kind": "send" },
+    { "label": "Change the answer", "kind": "say" },
+    { "label": "Not mine", "kind": "not-mine" }
+  ]
+}

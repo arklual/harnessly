@@ -22,7 +22,10 @@ type PersonSettings struct {
 	TextSize  string `json:"textSize"`  // s | m | l
 	// NoticeColor is the colour of what pops up (notices, toasts): contrast — the other of the theme (dark on light, light
 	// on dark); theme — the theme's own.
-	NoticeColor    string         `json:"noticeColor"`
+	NoticeColor string `json:"noticeColor"`
+	// VoiceMascot is the voice agent's head in the field while the voice is on: h — the «h» (the default), face —
+	// «Головка».
+	VoiceMascot    string         `json:"voiceMascot"`
 	EnterSends     bool           `json:"enterSends"`
 	DefaultMachine *string        `json:"defaultMachine"`
 	Notify         NotifySettings `json:"notify"`
@@ -33,12 +36,91 @@ type PersonSettings struct {
 	Voice VoiceSettings       `json:"voice"`
 	// DayStartHour is the Moscow hour the person's day starts at (0–23): «today» of the spend is counted from it.
 	DayStartHour int `json:"dayStartHour"`
+	// Nav is how the person laid out the sidebar's menu: the order of its items, the hidden ones, the apps raised to the
+	// top level and the order of the apps under «Приложения». Empty lists are the default layout.
+	Nav NavSettings `json:"nav"`
+	// Prefs are the person's choices a page keeps in its browser too (the theme, Beta, the feed's cards, the
+	// notices…), so every device has the same: the browser's own value of each, by its key.
+	Prefs PrefsSettings `json:"prefs"`
+}
+
+// PrefsSettings are the browser-kept choices of the person (PersonSettings.Prefs). Synced says a page has put its
+// browser's values here once: until then the first page the person opens moves its own ones in.
+type PrefsSettings struct {
+	Synced bool              `json:"synced"`
+	Values map[string]string `json:"values"`
+}
+
+// PrefKeys are the choices Prefs may hold: the browser's storage key of each (voice.lang is the dictation's language
+// out of the voice's record, whose microphone stays the device's).
+var PrefKeys = []string{
+	"hl-theme", "hl-palette", "hl:beta", "hl:feed-kinds", "hl:pane-auto-open", "hl:browser-agent",
+	"hx-show-test-chats", "voice.lang", "hx-next-new-chat-choice", "hx.next.quickPrompts", "hx-top-tabs",
+}
+
+// Limit of one value of Prefs.
+const MaxPrefLen = 32 << 10
+
+func validPrefs(p PrefsSettings) bool {
+	if p.Values == nil {
+		return false
+	}
+	for k, v := range p.Values {
+		if !slices.Contains(PrefKeys, k) || len(v) > MaxPrefLen {
+			return false
+		}
+	}
+	return true
+}
+
+// NavSettings are the sidebar menu's layout (PersonSettings.Nav). A key is an item of the menu («newChat», «search»,
+// «designly», «apps») or an app («app:<id>»).
+type NavSettings struct {
+	// Order is the top level, in order; an app's key here stands at the top level instead of under «Приложения».
+	Order []string `json:"order"`
+	// Hidden are the keys not shown, at the top level or under «Приложения».
+	Hidden []string `json:"hidden"`
+	// Apps is the order of the apps under «Приложения» (ids, no «app:»), above the ones it does not name.
+	Apps []string `json:"apps"`
+}
+
+// Limits of the menu's layout.
+const (
+	MaxNavKeys   = 100
+	maxNavKeyLen = 128
+)
+
+func validNavList(l []string) bool {
+	if l == nil || len(l) > MaxNavKeys {
+		return false
+	}
+	for _, k := range l {
+		if k == "" || len(k) > maxNavKeyLen {
+			return false
+		}
+		for _, r := range k {
+			if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '.' || r == '-' || r == '_' || r == ':') {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func validNav(n NavSettings) bool {
+	return validNavList(n.Order) && validNavList(n.Hidden) && validNavList(n.Apps)
 }
 
 // The colours of what pops up (PersonSettings.NoticeColor).
 const (
 	NoticeColorContrast = "contrast"
 	NoticeColorTheme    = "theme"
+)
+
+// The voice agent's heads (PersonSettings.VoiceMascot).
+const (
+	VoiceMascotH    = "h"
+	VoiceMascotFace = "face"
 )
 
 // VoiceEngines are the recognition models a person may pick for dictation: the machine's own, the ChatGPT plan's, OpenAI's,
@@ -102,10 +184,11 @@ type Me struct {
 
 // DefaultSettings are the settings of a person who changed nothing.
 func DefaultSettings() PersonSettings {
-	return PersonSettings{UIVersion: "next", Locale: "ru", Density: "compact", TextSize: "m", NoticeColor: NoticeColorContrast, EnterSends: true,
+	return PersonSettings{UIVersion: "next", Locale: "ru", Density: "compact", TextSize: "m", NoticeColor: NoticeColorContrast, VoiceMascot: VoiceMascotH, EnterSends: true,
 		Notify:       NotifySettings{Types: []string{"turn-finished", "question", "permission"}},
 		QuickPrompts: []string{}, Keys: map[string][]string{}, Voice: VoiceSettings{Engine: VoiceEngineLocal, Words: []VoiceWord{}},
-		DayStartHour: DefaultDayStartHour}
+		DayStartHour: DefaultDayStartHour, Nav: NavSettings{Order: []string{}, Hidden: []string{}, Apps: []string{}},
+		Prefs: PrefsSettings{Values: map[string]string{}}}
 }
 
 // Limits of the settings a page may write.
@@ -208,9 +291,26 @@ func NormalizeSettings(st *PersonSettings) {
 	if st.NoticeColor == "" {
 		st.NoticeColor = NoticeColorContrast
 	}
+	// A record from before the voice's head: the default one.
+	if st.VoiceMascot == "" {
+		st.VoiceMascot = VoiceMascotH
+	}
 	// A record from before the shortcuts has none of them.
 	if st.Keys == nil {
 		st.Keys = map[string][]string{}
+	}
+	// A record from before the menu's layout: the default one.
+	if st.Prefs.Values == nil {
+		st.Prefs.Values = map[string]string{}
+	}
+	if st.Nav.Order == nil {
+		st.Nav.Order = []string{}
+	}
+	if st.Nav.Hidden == nil {
+		st.Nav.Hidden = []string{}
+	}
+	if st.Nav.Apps == nil {
+		st.Nav.Apps = []string{}
 	}
 }
 
@@ -259,6 +359,8 @@ func applySettingsPatch(cur PersonSettings, patch json.RawMessage) (PersonSettin
 			ok = oneOf(raw, &next.TextSize, "s", "m", "l")
 		case "noticeColor":
 			ok = oneOf(raw, &next.NoticeColor, NoticeColorContrast, NoticeColorTheme)
+		case "voiceMascot":
+			ok = oneOf(raw, &next.VoiceMascot, VoiceMascotH, VoiceMascotFace)
 		case "enterSends":
 			ok = one(raw, &next.EnterSends)
 		case "defaultMachine":
@@ -294,6 +396,14 @@ func applySettingsPatch(cur PersonSettings, patch json.RawMessage) (PersonSettin
 			var h int
 			ok = one(raw, &h) && h >= 0 && h <= 23
 			next.DayStartHour = h
+		case "nav":
+			var n NavSettings
+			ok = one(raw, &n) && validNav(n)
+			next.Nav = n
+		case "prefs":
+			var p PrefsSettings
+			ok = one(raw, &p) && validPrefs(p)
+			next.Prefs = p
 		}
 		if !ok {
 			return cur, ErrMeBadPatch

@@ -54,9 +54,19 @@
 .hx-imgview__stage[data-pending] {
   opacity: 0;
 }
-/* Zoomed, the picture may grow out of its frame, as in the plain viewer. */
-.hx-imgview[data-zoomed] .hx-imgview__stage {
-  overflow: visible;
+/* The stage zooms whole, the picture with its marks (ui/use-image-zoom.ts writes its translate and scale); zoomed in, it
+   is seen through its own area and stays clear of the tools and the top bar. */
+.hx-imgview[data-edit][data-zoomed] .hx-imgview__wrap {
+  overflow: hidden;
+}
+.hx-imgview__stage[data-ease] {
+  transition:
+    --hx-r 240ms var(--hx-ease-out),
+    translate 200ms var(--hx-ease-out),
+    scale 200ms var(--hx-ease-out);
+}
+.hx-imgview[data-zoomed] .hx-imgview__img {
+  cursor: grab;
 }
 .hx-imgview__stage[data-clear] {
   background: repeating-conic-gradient(#2c2c30 0 25%, #1c1c20 0 50%) 0 0 / 20px 20px;
@@ -74,9 +84,7 @@
   user-select: none;
   transition:
     filter 500ms var(--hx-ease-out),
-    transform 500ms var(--hx-ease-out),
-    translate 180ms var(--hx-ease-out),
-    scale 180ms var(--hx-ease-out);
+    transform 500ms var(--hx-ease-out);
 }
 .hx-imgview[data-edit] .hx-imgview__stage[data-clear] .hx-imgview__img {
   object-fit: contain;
@@ -551,17 +559,4 @@
   .hx-ie__finish {
     min-height: 44px;
   }
-}
-/* The marks' tools come in under the picture and leave the same way (Esc back to looking). */
-.hx-ie__in {
-  width: 100%;
-  animation: hx-in-fade 200ms var(--hx-ease-out) backwards;
-  transition:
-    opacity 160ms var(--hx-ease-out),
-    translate 160ms var(--hx-ease-out);
-}
-.hx-ie__in[data-state='closing'] {
-  opacity: 0;
-  translate: 0 6px;
-  pointer-events: none;
 }

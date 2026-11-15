@@ -1,5 +1,6 @@
 // Test chats: chats an agent made to check something. The sidebar and the search leave them out unless the
 // person asks to see them; a chat that is open is never taken away from under the person.
+import { notePrefWrite } from '@/next/core/pref-write';
 import { useSyncExternalStore } from 'react';
 import type { ISidebarChat } from './types';
 
@@ -18,8 +19,16 @@ const read = (): boolean => {
 
 const subscribe = (listener: () => void) => {
   listeners.add(listener);
+  // The person's settings brought another device's choice (stores/synced-prefs.ts).
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== KEY) return;
+    shown = null;
+    listener();
+  };
+  window.addEventListener('storage', onStorage);
   return () => {
     listeners.delete(listener);
+    window.removeEventListener('storage', onStorage);
   };
 };
 
@@ -36,6 +45,7 @@ export const toggleShowTestChats = () => {
     // Private mode or full storage: the choice holds for this page.
   }
   for (const listener of [...listeners]) listener();
+  notePrefWrite(KEY);
 };
 
 /** The chats the sidebar and the search list: without the test chats, unless they are shown or one is open. */

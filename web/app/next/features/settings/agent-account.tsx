@@ -16,7 +16,7 @@ import { FormError, Group, Row, SegControl, SetButton } from '@/next/features/se
 import { t } from '@/next/i18n';
 import type { AgentSettings } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
-import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import { usePresence, type TPresenceState } from '@/next/ui/presence';
 import '@/next/styles/agent-page.css';
 
@@ -52,7 +52,7 @@ interface IAccountMenuProps {
 const AccountMenu = ({ label, onChange, onLeave }: IAccountMenuProps) => {
   const actions = useMenuActions();
   return (
-    <Menu.Root actionsRef={actions}>
+    <MenuRoot actionsRef={actions}>
       <Menu.Trigger
         render={
           <button type="button" className="hx-apage__more" aria-label={label}>
@@ -71,7 +71,7 @@ const AccountMenu = ({ label, onChange, onLeave }: IAccountMenuProps) => {
           <span className="hx-cmenu__txt">{t('next.settings.agentPage.leave')}</span>
         </Menu.Item>
       </MenuPanel>
-    </Menu.Root>
+    </MenuRoot>
   );
 };
 

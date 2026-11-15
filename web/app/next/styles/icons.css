@@ -17,6 +17,9 @@
 .hx-icon[data-i='app-window'] {
   --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Crect x=%222%22 y=%224%22 width=%2220%22 height=%2216%22 rx=%222%22 /%3E%3Cpath d=%22M10 4v4%22 /%3E%3Cpath d=%22M2 8h20%22 /%3E%3Cpath d=%22M6 4v4%22 /%3E%3C/svg%3E');
 }
+.hx-icon[data-i='audio-lines'] {
+  --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M2 10v3%22 /%3E%3Cpath d=%22M6 6v11%22 /%3E%3Cpath d=%22M10 3v18%22 /%3E%3Cpath d=%22M14 8v7%22 /%3E%3Cpath d=%22M18 5v13%22 /%3E%3Cpath d=%22M22 10v3%22 /%3E%3C/svg%3E');
+}
 .hx-icon[data-i='arrow-down'] {
   --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M12 5v14%22 /%3E%3Cpath d=%22m19 12-7 7-7-7%22 /%3E%3C/svg%3E');
 }
@@ -223,6 +226,9 @@
 }
 .hx-icon[data-i='mic'] {
   --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M12 19v3%22 /%3E%3Cpath d=%22M19 10v2a7 7 0 0 1-14 0v-2%22 /%3E%3Crect x=%229%22 y=%222%22 width=%226%22 height=%2213%22 rx=%223%22 /%3E%3C/svg%3E');
+}
+.hx-icon[data-i='mic-off'] {
+  --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cline x1=%222%22 x2=%2222%22 y1=%222%22 y2=%2222%22 /%3E%3Cpath d=%22M18.89 13.23A7.12 7.12 0 0 0 19 12v-2%22 /%3E%3Cpath d=%22M5 10v2a7 7 0 0 0 12 5%22 /%3E%3Cpath d=%22M15 9.34V5a3 3 0 0 0-5.68-1.33%22 /%3E%3Cpath d=%22M9 9v3a3 3 0 0 0 5.12 2.12%22 /%3E%3Cline x1=%2212%22 x2=%2212%22 y1=%2219%22 y2=%2222%22 /%3E%3C/svg%3E');
 }
 .hx-icon[data-i='moon'] {
   --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401%22 /%3E%3C/svg%3E');

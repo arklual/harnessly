@@ -2222,6 +2222,22 @@
         {
           "name": "space_id",
           "type": "TEXT"
+        },
+        {
+          "name": "kind",
+          "type": "TEXT"
+        },
+        {
+          "name": "trashed_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "trashed_by",
+          "type": "TEXT"
+        },
+        {
+          "name": "trash_sync",
+          "type": "BIGINT"
         }
       ],
       "primaryKey": [

@@ -10,6 +10,8 @@ export interface IDeckChatContext {
   text: string;
   /** A block is selected (the field asks what to do with it). */
   selected: boolean;
+  /** The selected block's template number, when there is one. */
+  tpl?: number | null;
   /** `text` is a whole `<annotation>` block already (a video's stretch): it goes as it is, numbered in the message. */
   block?: boolean;
 }

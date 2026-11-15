@@ -254,3 +254,26 @@ func TestToolsAreAlwaysLoaded(t *testing.T) {
 		t.Errorf("instructions do not name the asks and the python detour: %s", in)
 	}
 }
+
+// a call that finds every slot drawing waits for one instead of refusing, so the agent does not retry in a
+// loop or draw with code.
+func TestABusyCallWaitsForASlot(t *testing.T) {
+	old := BusyPoll
+	BusyPoll = 100 * time.Millisecond
+	defer func() { BusyPoll = old }()
+	home := t.TempDir()
+	s := &Service{Dir: t.TempDir(), CodexHome: home, Binary: fakeCodex(t, home, 2, "done")}
+	for i := 0; i < MaxRunning; i++ {
+		if _, err := s.Start(Request{Prompt: "a cat"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.Start(Request{Prompt: "a dog"}); !errors.Is(err, ErrBusy) {
+		t.Fatalf("a fifth job should find the machine busy, got %v", err)
+	}
+	out := Tools{S: s}.Call(context.Background(), ToolGenerate, jsvalue.NewObject("prompt", "a dog"))
+	text := string(jsvalue.Stringify(out, ""))
+	if strings.Contains(text, "busy") || !strings.Contains(text, "Done: ") {
+		t.Fatalf("the call should have waited for a slot and drawn: %s", text)
+	}
+}

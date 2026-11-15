@@ -7,6 +7,7 @@ import type { Conversation } from '@/next/protocol/v2';
 import { STATUS_LOOK, chatStatusOf } from '@/next/features/sidebar/status';
 import { CHAT_STATUS } from '@/next/features/sidebar/types';
 import { NOTICE_KIND, type TNoticeKind } from '@/next/stores/notices';
+import { clipWords } from '@/next/features/smart-notice/clip-words';
 
 export interface INoticeEvent {
   key: string;
@@ -47,7 +48,7 @@ export const noticeEventOf = (conv: Conversation, machineOnline: boolean): INoti
       key: `${conv.id}:${turn.id}:done`,
       kind: NOTICE_KIND.done,
       icon: 'circle-check',
-      text: turn.snippet.trim() || look.label,
+      text: clipWords(turn.snippet) || look.label,
     };
   if (status === CHAT_STATUS.failed && turn.failure === 'rate-limit')
     return {

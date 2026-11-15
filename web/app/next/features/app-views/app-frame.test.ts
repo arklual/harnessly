@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { frameSrc, fromApp, withNonce } from '@/next/features/app-views/app-frame';
+import { frameSrc, fromApp, shookAlready, withNonce } from '@/next/features/app-views/app-frame';
 
 describe('fromApp: the chat always shows the real app', () => {
   it('puts the app’s name first on one line', () => {
@@ -36,5 +36,19 @@ describe('withNonce: a remote view gets the nonce in its fragment', () => {
     expect(withNonce('https://views.acme.test/main?q=1#tab', 'n1')).toBe(
       'https://views.acme.test/main?q=1#tab&hl-nonce=n1',
     );
+  });
+});
+
+describe('shookAlready: a bridge made anew for a document that shook hands is dead', () => {
+  const frame = { id: 'f' };
+  const src = 'https://views.example.test/b/app#hl-nonce=n1';
+  it('the same frame and document: the view will not shake hands again, so the frame loads anew', () => {
+    expect(shookAlready({ frame, src }, frame, src)).toBe(true);
+  });
+  it('a new document or another frame shakes hands by itself', () => {
+    expect(shookAlready(null, frame, src)).toBe(false);
+    expect(shookAlready({ frame, src }, frame, 'https://views.example.test/b/app#hl-nonce=n2')).toBe(false);
+    expect(shookAlready({ frame, src }, { id: 'g' }, src)).toBe(false);
+    expect(shookAlready({ frame, src }, frame, null)).toBe(false);
   });
 });

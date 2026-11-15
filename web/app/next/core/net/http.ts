@@ -25,8 +25,67 @@ const headers = (json: boolean): Record<string, string> => ({
   ...(json ? { 'Content-Type': 'application/json' } : {}),
 });
 
+/**
+ * What may wait out a failure instead of answering it: given how long the request has gone on and may go on, it says
+ * whether to send it again (after waiting as long as it likes). The page's rollout watch sets it (features/rollout):
+ * while the hub or a runtime is being replaced, a request that met the gap is sent again until the link is back.
+ */
+export type Hold = (elapsedMs: number, budgetMs: number) => Promise<boolean>;
+let hold: Hold | null = null;
+
+export function setHold(next: Hold | null): void {
+  hold = next;
+}
+
+/** How long a request may be held in all, whatever its own term. */
+export const HOLD_MAX_MS = 30_000;
+
+/**
+ * A failure that is the gap of a rollout rather than an answer: no answer at all, or the gateway's — a 502/503/504
+ * that is not the runtime's own refusal. A request that changes something is sent again only when it surely never
+ * reached the machine: the hub had no link to it, or nothing stood behind the balancer.
+ */
+export async function isGap(method: string, res: Response | 'timeout' | 'network'): Promise<boolean> {
+  if (res === 'timeout') return false;
+  const safe = method === 'GET' || method === 'HEAD';
+  if (res === 'network') return safe;
+  if (res.status !== 502 && res.status !== 503 && res.status !== 504) return false;
+  const body: unknown = await res
+    .clone()
+    .json()
+    .catch(() => undefined);
+  if (body === undefined) return safe || res.status === 503;
+  const code = typeof body === 'object' && body !== null && 'error' in body ? body.error : null;
+  if (code === 'machine_offline') return true;
+  return safe && code === 'machine_error';
+}
+
+/** A request, sent again across the gap of a rollout while the hold says so. */
+export async function held(
+  send: () => Promise<Response | 'timeout' | 'network'>,
+  method: string,
+  timeoutMs: number,
+): Promise<Response | 'timeout' | 'network'> {
+  const clock = pageClock();
+  const start = clock.now();
+  const budget = Math.min(HOLD_MAX_MS, Math.max(timeoutMs, 10_000));
+  for (;;) {
+    const res = await send();
+    if (!hold || !(await isGap(method, res))) return res;
+    if (!(await hold(clock.now() - start, budget))) return res;
+  }
+}
+
+/** Races a request against timeoutMs on the core's clock, held across a rollout's gap. */
+const timed = (
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response | 'timeout' | 'network'> =>
+  held(() => timedOnce(url, init, timeoutMs), init.method ?? 'GET', timeoutMs);
+
 /** Races a request against timeoutMs on the core's clock. */
-async function timed(
+async function timedOnce(
   url: string,
   init: RequestInit,
   timeoutMs: number,

@@ -89,7 +89,17 @@ import { toast } from '@/next/ui/toast';
 import { usePresence } from '@/next/ui/presence';
 import { plural, t } from '@/next/i18n';
 import { isLegacyTab, useLegacyPane, type ILegacyPane, type TLegacyHandoff } from '@/next/legacy/pane';
-import { MACHINE, browserAt, placeRequest, type IPaneTabs, type TTab } from '@/next/features/pane/pane-tabs';
+import {
+  MACHINE,
+  browserAt,
+  placeAppObject,
+  placeRequest,
+  type IPaneTabs,
+  type TTab,
+} from '@/next/features/pane/pane-tabs';
+import { boardPlaceOf } from '@/next/features/pane/board-link';
+import { claimedBySpace } from '@/next/features/pane/space-claim';
+import { docPlaceOf } from '@/next/features/pane/doc-link';
 import {
   liftedTitle,
   requestOf,
@@ -99,11 +109,21 @@ import {
 } from '@/next/features/pane/intents';
 import { liftedFrom, liftedFromLegacy, markLifted } from '@/next/features/pane/lifted-from';
 import { usePaneIntents } from '@/next/bindings/pane-intents';
+import { designWorksOf, NO_WORKS, sameWorks, useDesignFull } from '@/next/bindings/design-full';
+import type { IDesignWork } from '@/next/features/designly/edit-ask';
 import { usePhone } from '@/next/ui/use-media';
 import { KEY_SCOPE } from '@/next/features/keys/commands';
 import { useKeys } from '@/next/features/keys/use-keys';
 import { useKeyHint } from '@/next/features/keys/keys-help';
-import { chatPaneOf, chatPanes, markUsed, useChatPane, type IChatPane } from '@/next/stores/pane-state';
+import { envAppOn } from '@/next/features/app-main/chat-apps';
+import {
+  chatPaneOf,
+  chatPanes,
+  markUsed,
+  paneKeyOf,
+  useChatPane,
+  type IChatPane,
+} from '@/next/stores/pane-state';
 import { conversationsStore, convsLoadedStore } from '@/next/stores/conversations';
 import { useAppsDebug } from '@/next/features/app-views/debug-mode';
 
@@ -119,12 +139,13 @@ const DesignlyPane = later(() => import('@/next/bindings/designly-pane'));
 
 /** A design opened beside the chat, full screen: Sinopia Design with this chat; a document of an app's type, its own page.
  *  Without a chat (the start page's pane) the design opens on its own. */
-export const openDesignFull = async (machine: MachineId, design: string, chat?: ConvId) => {
+export const openDesignFull = async (machine: MachineId, design: string, chat?: ConvId, edit = false) => {
   const docs = await loadKindDocs(machine).catch(() => []);
+  const editing = edit ? { edit: true } : {};
   goTo(
     docs.some((d) => d.document === design)
-      ? { kind: ROUTE.appDoc, id: design, chat }
-      : { kind: ROUTE.site, id: design, chat, machine },
+      ? { kind: ROUTE.appDoc, id: design, chat, ...editing }
+      : { kind: ROUTE.site, id: design, chat, machine, ...editing },
   );
 };
 const FilesView = later(() => import('@/next/features/pane/files-view'));
@@ -565,6 +586,8 @@ export const FilesTab = ({
 
 interface IPaneBodyProps {
   conv: Conversation;
+  /** An address typed in the pane that an app opens (a document of the hub): true when it took it. */
+  onAppAddress?: (text: string) => boolean;
   machineName: string;
   tabs: TTab[];
   /** The tabs opened behind the one on screen and not looked at yet. */
@@ -636,9 +659,10 @@ const PaneBody = (props: IPaneBodyProps) => {
     { id: 'apps', label: t('next.pane.appsGroup') },
     { id: 'links', label: t('next.pane.linksGroup') },
   ];
-  // The apps on in this chat that have a view for the pane: a tile each, which opens (or brings forward) its tab.
+  // The apps on in this chat, and the environment's own (the boards, the documents: every chat has them since they
+  // came with the organization), that have a view for the pane: a tile each, which opens its tab.
   const paneApps = (installed.list?.apps ?? []).filter(
-    (a) => conv.apps?.includes(a.id) && a.views.some((v) => v.targets.includes('pane')),
+    (a) => (conv.apps?.includes(a.id) || envAppOn(a)) && a.views.some((v) => v.targets.includes('pane')),
   );
   const tools: ITool[] = [
     // The side chat forks the conversation's Claude session: Codex has none to fork.
@@ -1066,6 +1090,7 @@ const PaneBody = (props: IPaneBodyProps) => {
           }
           onOpen={openTool}
           onAddress={(address) => {
+            if (props.onAppAddress?.(address.text)) return;
             // An address already open in a tab is that tab, not a second one.
             const have = tabs.find((x) => browserAt(x, address.text));
             if (have) setActive(have.id);
@@ -1107,6 +1132,7 @@ const PaneBody = (props: IPaneBodyProps) => {
           conversation={conv.id}
           app={tab.app}
           view={tab.view}
+          object={tab.object ?? null}
           inspect={inspecting.has(tab.id)}
         />
       )}
@@ -1193,26 +1219,31 @@ export const useRightPane = (
   besideDesign = false,
   /** The design it stands beside: its app's pinned tab. */
   design: string | null = null,
+  /** The view on screen beside the pane when it is not the chat's page (`app:<id>`, `site:<id>`): its own pane. */
+  view: string | null = null,
 ) => {
   useMachines();
   const side = useSideChat(conv?.machineId ?? null, conv?.id ?? null);
   const convId = conv?.id ?? null;
   const machineId = conv?.machineId ?? null;
+  // The machine's apps: a board link opens in the boards app when it is there.
+  const apps = useInstalledApps(machineId ?? ('' as MachineId), 0, machineId !== null);
   // The chat's pane is read as the chat is: the first frame of another chat already draws its own pane.
-  const state = useChatPane(convId);
+  const paneKey = paneKeyOf(convId, view);
+  const state = useChatPane(paneKey);
   // Beside a design the pane opens at its side, never over it: the chat's own «wide» is for the chat's page (a pane
   // widened there must not cover the design opened from it). Widened here, it stays so only while the design is open.
   const [wideBeside, setWideBeside] = useState(false);
   const maxed = besideDesign ? wideBeside : state.maxed;
   const setState = (change: (pane: IChatPane) => IChatPane) => {
-    if (convId) chatPanes.update(convId, machineId, change);
+    if (paneKey) chatPanes.update(paneKey, machineId, change);
   };
   // Beside a design the pane is out only once it is opened there (pane-beside).
   const [open, setOpen] = usePaneOpenBeside(
     state.open,
     (next) => setState((s) => (s.open === next ? s : { ...s, open: next })),
     besideDesign,
-    convId,
+    paneKey,
   );
   // The chat on screen now, for what answers after the person went to another one.
   const shownConv = useRef(convId);
@@ -1308,10 +1339,10 @@ export const useRightPane = (
   const linkBack = useLinkRestored(conv?.machineId ?? null);
   useEffect(() => {
     if (!open || !conv || !hasFeature(conv.machineId, 'terminal')) return;
-    const asked = `${conv.id}|${terminalsAttempt}|${linkBack}`;
+    const asked = `${paneKey ?? conv.id}|${terminalsAttempt}|${linkBack}`;
     if (restored.current === asked) return;
     restored.current = asked;
-    const forConv = conv.id;
+    const forConv = paneKey ?? conv.id;
     const ours = new Set(chatPaneOf(forConv).tabs.flatMap((x) => (x.kind === 'shell' ? [x.terminal] : [])));
     void loadTerminals(conv.machineId, conv.id).then((res) => {
       if (!('ok' in res)) {
@@ -1339,7 +1370,7 @@ export const useRightPane = (
         return { ...s, tabs, active, unread: s.unread.filter((id) => tabs.some((x) => x.id === id)) };
       });
     });
-  }, [open, conv, terminalsAttempt, linkBack]);
+  }, [open, conv, paneKey, terminalsAttempt, linkBack]);
 
   useEffect(() => {
     if (!open) return;
@@ -1457,7 +1488,14 @@ export const useRightPane = (
     let show = false;
     for (const request of requests) {
       const still = quiet.has(request);
-      const placed = placeRequest(tabs, request, { busy: busy || still, cwd: conv.cwd, nextId });
+      // A document of the hub opens in the documents app's view, as on the whole screen.
+      const doc =
+        (request.k === 'legacy' && request.kind === 'artifacts') || request.k === 'browser'
+          ? request.target && docPlaceOf(request.target, apps.list?.apps, window.location.origin)
+          : null;
+      const placed = doc
+        ? placeAppObject(tabs, doc.app, doc.view, doc.slug, { busy: busy || still, cwd: conv.cwd, nextId })
+        : placeRequest(tabs, request, { busy: busy || still, cwd: conv.cwd, nextId });
       tabs = placed.next;
       show = show || (placed.show && !still);
       const effect = placed.effect;
@@ -1498,7 +1536,11 @@ export const useRightPane = (
     }
     bumpMarks((n) => n + 1);
   };
-  const applyIntents = (intents: IPaneIntent[]) => {
+  const applyIntents = (all: IPaneIntent[]) => {
+    // A board or a document the space on screen opens itself never comes here.
+    const intents = conv
+      ? all.filter(({ command }) => !(command.kind === 'open' && claimedBySpace(conv.id, command.target)))
+      : all;
     for (const { command } of intents)
       if (command.kind === 'open' && command.target && command.place) {
         // A board of a design opens the design on that board; any other place is a file's (a range, a time, a page).
@@ -1509,22 +1551,34 @@ export const useRightPane = (
     const { asked, quiet } = requestsOf(intents);
     applyRequests([...quiet, ...asked], false, new Set(quiet));
   };
-  usePaneIntents(conv?.machineId ?? null, legacy.tabId, applyIntents, markIntents);
+  // The designs the chat's agent works on: with the person's words asking to edit one, it opens full screen.
+  const [works, setWorks] = useState<{ conv: string | null; works: readonly IDesignWork[] }>(NO_WORKS);
+  const listIntents = (intents: IPaneIntent[]) => {
+    markIntents(intents);
+    const next = designWorksOf(intents);
+    setWorks((was) =>
+      was.conv === convId && sameWorks(was.works, next) ? was : { conv: convId, works: next },
+    );
+  };
+  usePaneIntents(conv?.machineId ?? null, legacy.tabId, applyIntents, listIntents);
   // What was asked for this chat while the person was in another one is placed now that they are back; a tab of
   // Legacy's pane waits for it to come.
   const applyPending = useEffectEvent(applyRequests);
   const legacyOn = legacy.on;
   useEffect(() => {
-    if (!convId) return;
+    if (!convId || !paneKey) return;
     // After the chat's first frame, which draws the pane as it was kept; what waited then moves in like a request.
+    // What waited is kept with the chat (an agent asks for its chat, not for a view): the view on screen takes it.
     const timer = setTimeout(() => {
-      const now = chatPaneOf(convId).pending.filter((x) => x.k !== 'legacy' || legacyOn);
+      const keys = paneKey === convId ? [convId] : [convId, paneKey];
+      const now = keys.flatMap((key) => chatPaneOf(key).pending.filter((x) => x.k !== 'legacy' || legacyOn));
       if (now.length === 0) return;
-      chatPanes.update(convId, null, (s) => ({ ...s, pending: s.pending.filter((x) => !now.includes(x)) }));
+      for (const key of keys)
+        chatPanes.update(key, null, (s) => ({ ...s, pending: s.pending.filter((x) => !now.includes(x)) }));
       applyPending(now);
     }, 0);
     return () => clearTimeout(timer);
-  }, [convId, legacyOn]);
+  }, [convId, paneKey, legacyOn]);
 
   // A subagent the feed or the column names opens in the pane's own tab of subagents, on its card.
   const showSubagent = useEffectEvent((taskId: string) => {
@@ -1638,6 +1692,22 @@ export const useRightPane = (
   // fits several places opens the best; a merge request chip asks the person first (its own list, before this).
   const openRef = (ref: string) => {
     if (!conv) return;
+    // A board opens in the boards app's view of the pane, on the board; a document of the hub in the
+    // documents app's.
+    const board =
+      boardPlaceOf(ref, apps.list?.apps) ?? docPlaceOf(ref, apps.list?.apps, window.location.origin);
+    if (board) {
+      setOpen(true);
+      setState((s) => {
+        const placed = placeAppObject(s, board.app, board.view, board.slug, {
+          busy: false,
+          cwd: conv.cwd,
+          nextId,
+        });
+        return { ...s, ...placed.next };
+      });
+      return;
+    }
     const forConv = conv.id;
     const forMachine = conv.machineId;
     void loadOpenTarget(conv.machineId, conv.id, ref).then((res) => {
@@ -1678,6 +1748,13 @@ export const useRightPane = (
       return { ...s, tabs: [...s.tabs, added], active: added.id };
     });
   };
+  // Asked in words to edit a design: Sinopia Design on the whole screen with this chat, in «Редактирование»;
+  // on the phone the design's sheet, which covers the whole screen.
+  useDesignFull(conv, works.conv === convId ? works.works : NO_WORKS.works, (design) => {
+    if (!conv) return;
+    if (phone) openDesign(design);
+    else void openDesignFull(conv.machineId, design, conv.id, true);
+  });
   // A card of what a turn made opens where its kind lives: a design in Designly, a document of the repository in the
   // Files, a page, a merge request or a stand where the runtime says (the catalogue's tab, GitLab, the browser).
   const openOutput = (output: TurnOutput) => {
@@ -1717,9 +1794,19 @@ export const useRightPane = (
       wide={maxed}
       width={state.width}
       onWidth={(width) => setState((s) => (s.width === width ? s : { ...s, width }))}
+      full={state.tabs.find((x) => x.id === state.active)?.kind === 'designly'}
     >
       <PaneBody
         conv={conv}
+        onAppAddress={(text) => {
+          const doc = docPlaceOf(text, apps.list?.apps, window.location.origin);
+          if (!doc) return false;
+          setState((s) => ({
+            ...s,
+            ...placeAppObject(s, doc.app, doc.view, doc.slug, { busy: false, cwd: conv.cwd, nextId }).next,
+          }));
+          return true;
+        }}
         machineName={machineName}
         tabs={state.tabs}
         unread={state.unread}

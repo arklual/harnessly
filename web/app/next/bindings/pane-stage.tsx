@@ -2,6 +2,7 @@
 // that edits the design, so a block picked on the page becomes a note whose chip lands in that chat's field (the notes
 // live in stores/design-notes.ts and the field sends them), and the words of the page's tools are added to that
 // chat's draft. The page itself changes when the agent writes the board's file.
+import { sendModeNow } from '@/next/stores/chat-state';
 import { useState } from 'react';
 import { NoteCard, useSiteStage, type IStageOptions } from '@/next/bindings/site-stage';
 import { anchorItems } from '@/next/features/designly/note-anchor';
@@ -87,11 +88,11 @@ export const usePaneStage = ({ machine, design, fromChat, pageUrl, port }: IStag
         ];
       }),
     ask: (words) => {
-      sendMessage(machine, { conversationId: conv, text: words, mode: 'queue' });
+      sendMessage(machine, { conversationId: conv, text: words, mode: sendModeNow(conv) });
     },
     // The chat the pane sits beside is on screen: the error goes to it.
     report: (words) => {
-      sendMessage(machine, { conversationId: conv, text: words, mode: 'queue' });
+      sendMessage(machine, { conversationId: conv, text: words, mode: sendModeNow(conv) });
     },
     onMode: () => undefined,
     min: false,
