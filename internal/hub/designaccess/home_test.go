@@ -27,6 +27,11 @@ func TestHomeFromTheMachineOrTheStore(t *testing.T) {
 	serve := func(ask func(ctx context.Context, w http.ResponseWriter)) *httptest.ResponseRecorder {
 		t.Helper()
 		req := httptest.NewRequest(http.MethodGet, "/m/"+r.owner.ID+"/api/platform/design/home?machine="+r.owner.ID, nil)
+		// ServeHome's machine and store goroutines may outlive the handler (an answered machine
+		// returns without the store's); stop them with the ask's context once the answer is written.
+		askCtx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		req = req.WithContext(askCtx)
 		w := httptest.NewRecorder()
 		if !r.svc.ServeHome(w, req, r.ownerU, r.owner, ask) {
 			t.Fatal("the hub did not take the home")

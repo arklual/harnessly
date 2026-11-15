@@ -106,6 +106,9 @@ type Service struct {
 	opens         func(ctx context.Context, userID string, m store.Machine) bool
 	homeOn        func(ctx context.Context, email, machineID string) bool
 	ownerOn       func(ctx context.Context, email, machineID string) bool
+	// viewMu guards view: ServeHome's store goroutine outlives the handler, so a
+	// view swap (UseView) must not race with a listing already in flight.
+	viewMu        sync.RWMutex
 	search        searchindex.Index
 	searchOn      func(ctx context.Context, email, machineID string) bool
 	appKinds      AppKinder

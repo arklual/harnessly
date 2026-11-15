@@ -38,7 +38,19 @@ type Viewer interface {
 }
 
 // UseView makes guest links read their projects from the store; it is set once, before the hub serves.
-func (s *Service) UseView(v Viewer) { s.view = v }
+// The lock keeps a swap from racing with a store listing ServeHome left in flight.
+func (s *Service) UseView(v Viewer) {
+	s.viewMu.Lock()
+	s.view = v
+	s.viewMu.Unlock()
+}
+
+// currentView reads the store view; use it from goroutines that can outlive the caller.
+func (s *Service) currentView() Viewer {
+	s.viewMu.RLock()
+	defer s.viewMu.RUnlock()
+	return s.view
+}
 
 // storeRev is the revision the store answers a scope at: the pinned one, or the project's newest; false when the
 // store cannot answer it.
