@@ -10,6 +10,8 @@ import { menuApps } from '@/next/features/app-main/chat-apps';
 import AppsSection from '@/next/features/settings/apps-section';
 import BetaSection from '@/next/features/settings/beta-section';
 import GeneralSection from '@/next/features/settings/general-section';
+import PeopleGroup from '@/next/features/settings/people-group';
+import { setWhoami, useWhoami } from '@/next/stores/whoami';
 import UpdateGroup from '@/next/features/settings/update-group';
 import MachineMoveCard from '@/next/bindings/machine-move-card';
 import ChecksGroup from '@/next/features/settings/checks-group';
@@ -298,6 +300,7 @@ export const GeneralPage = ({ machine, name, pending, changes }: IGeneralPagePro
   const update = useUpdateInfo(machine);
   const machineChecks = useMachineChecks(machine);
   const baseSkipped = useBaseSkipped(machine);
+  const whoami = useWhoami();
   const settings = me.k === 'ready' ? me.me.settings : DEFAULT_SETTINGS;
   const email = me.k === 'ready' ? me.me.email : null;
   const { run, pending: waiting } = pending;
@@ -313,6 +316,23 @@ export const GeneralPage = ({ machine, name, pending, changes }: IGeneralPagePro
       topTabs={topTabs}
       paneAuto={paneAuto.on}
       paneAutoKinds={paneAuto.kinds}
+      people={
+        <PeopleGroup
+          people={settings.people}
+          me={whoami}
+          busy={waiting.has('people')}
+          onMe={setWhoami}
+          onAdd={(name) =>
+            void run('people', failure, () => savePerson({ people: [...settings.people, name] }))
+          }
+          onRemove={(name) => {
+            if (name === whoami) setWhoami(null);
+            void run('people', failure, () =>
+              savePerson({ people: settings.people.filter((p) => p !== name) }),
+            );
+          }}
+        />
+      }
       links={
         <>
           <PaneSitesGroup

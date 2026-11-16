@@ -1005,7 +1005,7 @@ func (s *Service) Do(ctx context.Context, device string, cmd wire.Command) wire.
 	case wire.ProjectCreateCmd:
 		if c.Path == "" && s.defaultCwd != "" {
 			p := wire.Project{ID: projectID(s.opt.Machine, "name:"+strings.TrimSpace(c.Name)), MachineID: s.opt.Machine,
-				Path: s.defaultCwd, Name: strings.TrimSpace(c.Name), CreatedAt: s.now()}
+				Path: s.defaultCwd, Name: strings.TrimSpace(c.Name), CreatedAt: s.now(), Owner: c.Owner}
 			if _, ok := s.projects[p.ID]; !ok {
 				s.addProject(p)
 			}
@@ -1020,7 +1020,7 @@ func (s *Service) Do(ctx context.Context, device string, cmd wire.Command) wire.
 		p, ok := s.projects[projectID(s.opt.Machine, path)]
 		if !ok {
 			p = wire.Project{ID: projectID(s.opt.Machine, path), MachineID: s.opt.Machine, Path: path, Name: filepath.Base(path),
-				CreatedAt: s.now()}
+				CreatedAt: s.now(), Owner: c.Owner}
 			s.addProject(p)
 		}
 		res := wire.Accepted(wire.ChannelConvs, s.pub(wire.ChannelConvs, wire.ProjectUpsertEv{Project: p}))
@@ -1036,6 +1036,9 @@ func (s *Service) Do(ctx context.Context, device string, cmd wire.Command) wire.
 		}
 		if name := strings.TrimSpace(c.Name); name != "" {
 			p.Name = name
+		}
+		if c.Owner != nil {
+			p.Owner = *c.Owner
 		}
 		s.projects[p.ID] = p
 		return wire.Accepted(wire.ChannelConvs, s.pub(wire.ChannelConvs, wire.ProjectUpsertEv{Project: p}))

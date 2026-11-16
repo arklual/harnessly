@@ -1,0 +1,32 @@
+{
+  "next.people.shared": "Общие",
+  "next.people.mine": "Мои",
+  "next.people.projects": {
+    "one": "{n} проект",
+    "few": "{n} проекта",
+    "many": "{n} проектов",
+    "other": "{n} проекта"
+  },
+  "next.people.chats": {
+    "one": "{n} чат",
+    "few": "{n} чата",
+    "many": "{n} чатов",
+    "other": "{n} чата"
+  },
+  "next.people.owner": "Чей проект",
+  "next.people.everyone": "Общий",
+  "next.people.ownerHint": "Чужие проекты у остальных свёрнуты под именем владельца. Чаты общего проекта видят все.",
+  "next.people.title": "Люди",
+  "next.people.foot": "Список общий для машины, а кто вы — помнит только этот браузер. Проекты и чаты другого человека сворачиваются под его именем, а уведомление о чате получает тот, кто писал в него последним.",
+  "next.people.me": "На этом устройстве",
+  "next.people.meHint": "Кто сидит за этим браузером. «Никто» — видно всё, как раньше.",
+  "next.people.nobody": "Никто — видно всё",
+  "next.people.itsMe": "Это вы на этом устройстве",
+  "next.people.remove": "Убрать",
+  "next.people.add.label": "Добавить человека",
+  "next.people.add.placeholder": "Имя, например Маша",
+  "next.people.add": "Добавить",
+  "next.people.tooLong": "Не длиннее {n} символов",
+  "next.people.twice": "Такое имя уже есть",
+  "next.people.tooMany": "Не больше {n} человек"
+}

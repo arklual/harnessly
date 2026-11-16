@@ -123,7 +123,7 @@ export const projectsOf = (
   listed: readonly Project[] = [],
 ): ISidebarProject[] => {
   const byId = new Map<string, ISidebarProject>();
-  for (const p of listed) byId.set(p.id, { id: p.id, name: p.name });
+  for (const p of listed) byId.set(p.id, { id: p.id, name: p.name, ...(p.owner ? { owner: p.owner } : {}) });
   for (const c of convs) {
     if (c.projectId && !byId.has(c.projectId))
       byId.set(c.projectId, { id: c.projectId, name: baseName(c.cwd) });
@@ -622,6 +622,8 @@ export function useShellModel(): IShellModel {
         ...(several ? { machine: nameOf(c.machineId) } : {}),
         ...(!projectIndex && c.machineId !== here ? { projectsElsewhere: true } : {}),
         ...(c.parentId ? { parentId: c.parentId } : {}),
+        ...(c.startedBy ? { startedBy: c.startedBy } : {}),
+        ...(c.by ? { by: c.by } : {}),
         pinned: c.pinned,
         ...(c.test ? { test: true } : {}),
         ...(c.from ? { from: { app: c.from.app, label: c.from.label } } : {}),

@@ -173,7 +173,7 @@ func (r *Runtime) fork(m wire.ConversationForkCmd) wire.CmdResult {
 		Provider: src.Provider, Model: src.Model, Title: src.Title, TitleSource: wire.TitleFromFirstMessage, CreatedAt: ms(now),
 		LastActivityAt: ms(now), LastPromptAt: ms(now), SeenAt: ms(now), State: wire.AgentState{K: wire.StateUnknown, Since: ms(now)},
 		Rev: 1, Origin: &wire.Origin{K: wire.OriginFork, FromID: src.ID, FromTitle: src.Title, FromProvider: src.Provider,
-			FromModel: src.Model, AtTurn: &keep, Via: wire.ViaSession, At: ms(now)}}
+			FromModel: src.Model, AtTurn: &keep, Via: wire.ViaSession, At: ms(now)}, StartedBy: src.StartedBy, By: src.By}
 	req := LaunchRequest{Cwd: src.Cwd, Provider: src.Provider, Model: src.Model}
 	switch {
 	case src.Provider == wire.ProviderClaude:
@@ -251,7 +251,7 @@ func (r *Runtime) handoff(m wire.ConversationHandoffCmd) wire.CmdResult {
 		Provider: m.Provider, Model: m.Model, Title: src.Title, TitleSource: wire.TitleFromFirstMessage, CreatedAt: ms(now),
 		LastActivityAt: ms(now), LastPromptAt: ms(now), SeenAt: ms(now), State: wire.AgentState{K: wire.StateUnknown, Since: ms(now)},
 		Rev: 1, Origin: &wire.Origin{K: wire.OriginHandoff, FromID: src.ID, FromTitle: src.Title, FromProvider: src.Provider,
-			FromModel: src.Model, Via: via, At: ms(now)}}
+			FromModel: src.Model, Via: via, At: ms(now)}, StartedBy: src.StartedBy, By: src.By}
 	firstText := handoff.Handoff(fromOf(src), m.Mode, false, m.Text)
 	if m.Mode == wire.HandoffHistory {
 		firstText = handoff.Bootstrap(fromOf(src), m.Mode, false, artifactPath)

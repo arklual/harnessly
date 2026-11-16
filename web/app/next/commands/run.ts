@@ -9,6 +9,7 @@ import { uuidv7 } from '@/next/core/ids';
 import { postCommand } from '@/next/core/net/http';
 import { machineApi } from '@/next/core/net/machine';
 import { hub } from '@/next/core/realtime/hub';
+import { pagePerson } from '@/next/features/people/use-people';
 import { limitsOf } from '@/next/stores/machines';
 import { opsStore, type OpFailure, type OpState } from '@/next/stores/ops';
 import {
@@ -87,6 +88,15 @@ export const unsupportedAntigravityCommand = (op: Op, body: Record<string, unkno
   return (first?.attachmentIds?.length ?? 0) > 0;
 };
 
+/** A message or a new chat names who wrote it, when this browser named its person (features/people); a body that names
+ *  someone already keeps them. */
+const withAuthor = <K extends Op>(op: K, body: Body<K>): Body<K> => {
+  if (op !== 'send' && op !== 'conversation.create') return body;
+  if ((body as { by?: string }).by !== undefined) return body;
+  const by = pagePerson();
+  return by === null ? body : { ...body, by };
+};
+
 /** Sends op to machine; opId defaults to a new UUIDv7 (send passes its clientId). */
 export function runCommand<K extends Op>(
   machine: MachineId,
@@ -94,7 +104,7 @@ export function runCommand<K extends Op>(
   body: Body<K>,
   opId: string = uuidv7(),
 ): OpHandle {
-  const full = { ...body, opId } as Record<string, unknown>;
+  const full = { ...withAuthor(op, body), opId } as Record<string, unknown>;
   const id = full.conversationId ?? full.id;
   const conversationId = typeof id === 'string' && id.startsWith('tab-') ? (id as ConvId) : null;
   const provider =

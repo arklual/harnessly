@@ -17,6 +17,7 @@ import { editProfileSidebar } from '@/next/stores/profile-sidebar';
 import ResumeDialog, { type IResumeSession } from '@/next/features/shell/resume-dialog';
 import type { AgentSession, ConvId, Conversation, MachineId } from '@/next/protocol/v2';
 import { plural, t } from '@/next/i18n';
+import { usePeopleList } from '@/next/features/people/use-people';
 
 const sessionOf = (session: AgentSession, machine: string): IResumeSession => ({
   id: session.sessionId,
@@ -50,6 +51,7 @@ const sameCounts = (a: Map<string, TChatCount>, b: Map<string, TChatCount>) =>
 /** «Новый проект»: on the machine, or the person's, whose folders come on a machine as its chats do. */
 export const useProjectDialog = (machine: MachineId | null, person: boolean) => {
   const [open, setOpen] = useState(false);
+  const people = usePeopleList();
 
   const show = () => {
     if (machine) setOpen(true);
@@ -59,12 +61,13 @@ export const useProjectDialog = (machine: MachineId | null, person: boolean) => 
     <NewProjectDialog
       open={open}
       onClose={() => setOpen(false)}
-      onCreate={async (name) => {
+      people={person ? undefined : people}
+      onCreate={async (name, owner) => {
         if (person) {
           await editProfileSidebar((doc) => withProject(doc, name, newProfileProjectId(), Date.now()));
           return;
         }
-        await settled(createProject(machine, name));
+        await settled(createProject(machine, name, owner));
       }}
     />
   );
@@ -81,10 +84,12 @@ export const useProjectSettingsDialog = (machine: MachineId | null, person: bool
   // Keep the persisted values stable while the dialog maintains its editable draft.
   const name = project?.name;
   const path = project?.path;
+  const owner = project?.owner ?? '';
   const current = useMemo(
-    () => (name === undefined || path === undefined ? null : { name, path }),
-    [name, path],
+    () => (name === undefined || path === undefined ? null : { name, path, owner }),
+    [name, path, owner],
   );
+  const people = usePeopleList();
 
   const [folders, setFolders] = useState<IProjectFolder[] | null>(null);
   // the chats of every project as the sidebar has them, what «Удалить проект» asks about; counted for all projects, as
@@ -117,6 +122,7 @@ export const useProjectSettingsDialog = (machine: MachineId | null, person: bool
       }
       folders={folders}
       chats={chats}
+      people={people}
       onClose={() => setOpenId(null)}
       onSave={async (change) => {
         if (!project) return;

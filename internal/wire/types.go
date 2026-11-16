@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Proto is the protocol version of this package.
@@ -138,6 +139,9 @@ type Project struct {
 	Name      string `json:"name"`
 	Git       bool   `json:"git"`
 	CreatedAt Ms     `json:"createdAt"`
+	// Owner is the person of the machine the project is theirs (one of PersonSettings.People); empty: a project of
+	// everyone. The page shows another person's projects folded away; the runtime keeps the name as it is.
+	Owner string `json:"owner,omitempty"`
 }
 
 // Dir is a folder the person may make a project: one the machine offers under its default folder. Branch is the checked
@@ -273,7 +277,13 @@ type Conversation struct {
 	// ParentID is the conversation whose agent delegated this one (an agent's delegate_task): the sidebar nests it under
 	// that one, the parent's feed shows it as a card. Absent for a chat the person started.
 	ParentID *string `json:"parentId,omitempty"`
-	Rev      int64   `json:"rev"`
+	// StartedBy is the person of the machine who started the conversation, By the one whose message came last (both
+	// one of PersonSettings.People, as the page that sent it named its person): a chat outside any project is its
+	// starter's, and what it answers is news for the one who wrote last. Absent: nobody named (a chat from before, an
+	// agent's or a CLI's). A delegated chat takes its parent's person.
+	StartedBy string `json:"startedBy,omitempty"`
+	By        string `json:"by,omitempty"`
+	Rev       int64  `json:"rev"`
 
 	// Server only: the tmux session, the transcript and the agent's session id.
 	Session        string `json:"-"`
@@ -830,6 +840,18 @@ func FailureCode(t Turn) TurnFailureCode {
 
 // SnippetMax is the longest TurnSummary.Snippet, in characters.
 const SnippetMax = 160
+
+// PersonNameMax is the longest name of a person of the machine (PersonSettings.People, Project.Owner,
+// Conversation.By), in characters; PeopleMax how many people the settings name.
+const (
+	PersonNameMax = 40
+	PeopleMax     = 8
+)
+
+// ValidPersonName: one line of 1–PersonNameMax characters with no spaces around it.
+func ValidPersonName(s string) bool {
+	return s != "" && strings.TrimSpace(s) == s && utf8.RuneCountInString(s) <= PersonNameMax && !strings.ContainsAny(s, "\r\n\t\x00")
+}
 
 // ProjectNameMax is the longest name of a project, in characters.
 const ProjectNameMax = 120
@@ -1870,6 +1892,9 @@ type SendCmd struct {
 	Kind           MessageKind `json:"kind"`
 	// Refs are the places the message points at; the runtime appends their block to Text. Absent when none.
 	Refs []MessageRef `json:"refs,omitempty"`
+	// By is the person of the machine who wrote it (Conversation.By); absent: not a person's page, the record keeps
+	// the last one named.
+	By string `json:"by,omitempty"`
 }
 
 // CancelCmd takes a queued message out of the queue.
@@ -1978,6 +2003,8 @@ type ConversationCreateCmd struct {
 	Title string `json:"title,omitempty"`
 	// Test starts the conversation as a test chat (see Conversation.Test).
 	Test bool `json:"test,omitempty"`
+	// By is the person of the machine who starts it (Conversation.StartedBy).
+	By string `json:"by,omitempty"`
 }
 
 // ChatFrom is the app that started a conversation for the person (an inbox, a trigger): App is its id, Label how the
@@ -2239,15 +2266,19 @@ type ProjectCreateCmd struct {
 	OpID string `json:"opId"`
 	Path string `json:"path,omitempty"`
 	Name string `json:"name,omitempty"`
+	// Owner makes it one person's (Project.Owner); empty: everyone's. A folder that is a project already keeps its own.
+	Owner string `json:"owner,omitempty"`
 }
 
 // ProjectUpdateCmd changes a project: Path, the folder its new chats start in (chats already made stay where they
-// are); Name, what the person calls it. An empty field is left as it is, one of them is needed.
+// are); Name, what the person calls it; Owner, whose it is ("" makes it everyone's). An empty Path or Name and an
+// absent Owner are left as they are, one of them is needed.
 type ProjectUpdateCmd struct {
-	OpID string `json:"opId"`
-	ID   string `json:"id"`
-	Path string `json:"path,omitempty"`
-	Name string `json:"name,omitempty"`
+	OpID  string  `json:"opId"`
+	ID    string  `json:"id"`
+	Path  string  `json:"path,omitempty"`
+	Name  string  `json:"name,omitempty"`
+	Owner *string `json:"owner,omitempty"`
 }
 
 // ProjectDeleteCmd removes a project. Chats says what becomes of its chats: keep moves them out to the common list,
