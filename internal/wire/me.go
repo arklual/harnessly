@@ -42,6 +42,10 @@ type PersonSettings struct {
 	// Prefs are the person's choices a page keeps in its browser too (the theme, Beta, the feed's cards, the
 	// notices…), so every device has the same: the browser's own value of each, by its key.
 	Prefs PrefsSettings `json:"prefs"`
+	// People are the people who share this machine, by the names they gave themselves (ValidPersonName, unique, at
+	// most PeopleMax): a page names its person among them (in its browser alone), a project may be one's
+	// (Project.Owner). Empty: nobody named, every page sees everything as before.
+	People []string `json:"people"`
 }
 
 // PrefsSettings are the browser-kept choices of the person (PersonSettings.Prefs). Synced says a page has put its
@@ -190,7 +194,7 @@ func DefaultSettings() PersonSettings {
 		Notify:       NotifySettings{Types: []string{"turn-finished", "question", "permission"}},
 		QuickPrompts: []string{}, Keys: map[string][]string{}, Voice: VoiceSettings{Engine: VoiceEngineLocal, Words: []VoiceWord{}},
 		DayStartHour: DefaultDayStartHour, Nav: NavSettings{Order: []string{}, Hidden: []string{}, Apps: []string{}},
-		Prefs: PrefsSettings{Values: map[string]string{}}}
+		Prefs: PrefsSettings{Values: map[string]string{}}, People: []string{}}
 }
 
 // Limits of the settings a page may write.
@@ -314,6 +318,10 @@ func NormalizeSettings(st *PersonSettings) {
 	if st.Nav.Apps == nil {
 		st.Nav.Apps = []string{}
 	}
+	// A record from before the people of the machine names none.
+	if st.People == nil {
+		st.People = []string{}
+	}
 }
 
 // ApplySettingsPatch applies a patch ({"<setting>": value, …}) to the settings: ErrMeBadPatch when a key is not a
@@ -406,12 +414,29 @@ func applySettingsPatch(cur PersonSettings, patch json.RawMessage) (PersonSettin
 			var p PrefsSettings
 			ok = one(raw, &p) && validPrefs(p)
 			next.Prefs = p
+		case "people":
+			var p []string
+			ok = one(raw, &p) && validPeople(p)
+			next.People = p
 		}
 		if !ok {
 			return cur, ErrMeBadPatch
 		}
 	}
 	return next, nil
+}
+
+// validPeople: a list (not null) of at most PeopleMax names, each a valid one and none twice.
+func validPeople(p []string) bool {
+	if p == nil || len(p) > PeopleMax {
+		return false
+	}
+	for i, name := range p {
+		if !ValidPersonName(name) || slices.Contains(p[:i], name) {
+			return false
+		}
+	}
+	return true
 }
 
 // validKeyAction: an action's id is «scope.name», as the page's list has them.

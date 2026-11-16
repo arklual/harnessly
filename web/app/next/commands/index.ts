@@ -160,10 +160,15 @@ export const stopBackground = (m: MachineId, conversationId: ConvId, taskId: str
 /** The session's /goal (Claude only); an empty text clears it. */
 export const setGoal = (m: MachineId, id: ConvId, text: string) => runCommand(m, 'goal', { id, text });
 /** A project of a name alone: its chats start in the machine's default folder. */
-export const createProject = (m: MachineId, name: string) => runCommand(m, 'project.create', { name });
+/** A project of a name alone; `owner` makes it one person's of the machine (features/people), '' everyone's. */
+export const createProject = (m: MachineId, name: string, owner = '') =>
+  runCommand(m, 'project.create', owner === '' ? { name } : { name, owner });
 /** The folder a project's next chats start in (the chats it has stay where they are), and its name. */
-export const updateProject = (m: MachineId, id: string, change: { path?: string; name?: string }) =>
-  runCommand(m, 'project.update', { id, ...change });
+export const updateProject = (
+  m: MachineId,
+  id: string,
+  change: { path?: string; name?: string; owner?: string },
+) => runCommand(m, 'project.update', { id, ...change });
 /** The project goes; its chats move out to the common list (keep) or are deleted with it (delete). */
 export const deleteProject = (m: MachineId, id: string, chats: ProjectChats) =>
   runCommand(m, 'project.delete', { id, chats });

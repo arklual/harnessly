@@ -3,12 +3,15 @@ import { plural, t } from '@/next/i18n';
 import type { ProjectChats } from '@/next/protocol/v2';
 import Modal from '@/next/features/shell/modal';
 import Icon from '@/next/ui/icon';
+import OwnerPick from '@/next/features/people/owner-pick';
 import { GIVE_UP_MS, SLOW_MS } from '@/next/ui/use-pending-list';
 
 export interface IProjectSettings {
   name: string;
   /** The folder the project's new chats start in. */
   path: string;
+  /** Whose it is among the people of the machine (features/people); '' everyone's. */
+  owner?: string;
 }
 
 /** A folder the machine offers: one level below its default folder, and the git folders below those. */
@@ -31,6 +34,8 @@ export interface IProjectSettingsDialogProps {
   };
   /** The project's chats now: how many, and how many of them have an agent at work. */
   chats: { count: number; working: number };
+  /** The people of the machine: with any, «Чей проект» picks everyone or one of them. */
+  people?: readonly string[];
   onClose: () => void;
   /** Resolves once the server has the change; a rejection is said under the fields. Only what changed is passed. */
   onSave: (change: Partial<IProjectSettings>) => Promise<void>;
@@ -71,6 +76,8 @@ const useWork =
     }
   };
 
+const NO_PEOPLE: readonly string[] = [];
+
 /** «Настройки проекта»: its name and the folder its new chats start in. The chats it has stay where they started. */
 const FOLDERS_SHOWN = 6;
 
@@ -80,6 +87,7 @@ const ProjectSettingsDialog = ({
   browserSettings,
   secretAccess,
   chats,
+  people = NO_PEOPLE,
   onClose,
   onSave,
   onDelete,
@@ -88,6 +96,7 @@ const ProjectSettingsDialog = ({
   const keepRef = useRef<HTMLButtonElement>(null);
   const [name, setName] = useState('');
   const [path, setPath] = useState('');
+  const [owner, setOwner] = useState('');
   const [state, setState] = useState<TState>(STATE.idle);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<TStep>(STEP.edit);
@@ -102,6 +111,7 @@ const ProjectSettingsDialog = ({
     if (project === null || shown === null) {
       setName(project?.name ?? '');
       setPath(project?.path ?? '');
+      setOwner(project?.owner ?? '');
       setError(null);
       setState(STATE.idle);
     }
@@ -127,6 +137,7 @@ const ProjectSettingsDialog = ({
     const change: Partial<IProjectSettings> = {};
     if (nextName !== project.name) change.name = nextName;
     if (nextPath !== project.path) change.path = nextPath;
+    if (owner !== (project.owner ?? '')) change.owner = owner;
     setError(null);
     setState(STATE.busy);
     let slow: ReturnType<typeof setTimeout> | undefined;
@@ -137,7 +148,7 @@ const ProjectSettingsDialog = ({
         return;
       }
       slow = setTimeout(() => setState(STATE.slow), SLOW_MS);
-      if (change.name !== undefined || change.path !== undefined) {
+      if (change.name !== undefined || change.path !== undefined || change.owner !== undefined) {
         try {
           await Promise.race([
             onSave(change),
@@ -333,6 +344,7 @@ const ProjectSettingsDialog = ({
               ))}
             </div>
           )}
+          <OwnerPick people={people} value={owner} disabled={busy} onPick={setOwner} />
           {(browserSettings || secretAccess) && (
             <section className="hx-project-access" aria-label={t('next.safe.project.access')}>
               <h3>{t('next.safe.project.access')}</h3>

@@ -54,6 +54,7 @@ var Settings = []Setting{
 	{Doc: SettingsDocMe, Key: "dayStartHour", Owner: OwnerPerson},
 	{Doc: SettingsDocMe, Key: "nav", Owner: OwnerPerson},
 	{Doc: SettingsDocMe, Key: "prefs", Owner: OwnerPerson},
+	{Doc: SettingsDocMe, Key: "people", Owner: OwnerPerson},
 
 	{Doc: SettingsDocRuntime, Key: "idleStop", Owner: OwnerMachine},
 	{Doc: SettingsDocRuntime, Key: "limitContinue", Owner: OwnerMachine},

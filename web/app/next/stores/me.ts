@@ -56,6 +56,9 @@ export interface PersonSettings {
   nav: NavSettings;
   /** The choices a page keeps in its browser too, for every device (stores/synced-prefs.ts). */
   prefs: PrefsSettings;
+  /** The people who share this machine (features/people): each browser names its own (stores/whoami.ts). Empty:
+   *  nobody named, every page sees everything. */
+  people: string[];
 }
 
 /** The browser-kept choices: the browser's own value of each by its key; `synced` once a page moved its ones in. */
@@ -106,6 +109,7 @@ export const DEFAULT_SETTINGS: PersonSettings = {
   dayStartHour: 3,
   nav: { order: [], hidden: [], apps: [] },
   prefs: { synced: false, values: {} },
+  people: [],
 };
 
 export type PatchResult =

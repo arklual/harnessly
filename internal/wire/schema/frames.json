@@ -561,9 +561,11 @@
         "path": {"type": "string"},
         "name": {"type": "string"},
         "git": {"type": "boolean"},
-        "createdAt": {"type": "integer", "minimum": 0}
+        "createdAt": {"type": "integer", "minimum": 0},
+        "owner": {"$ref": "#/$defs/PersonName"}
       }
     },
+    "PersonName": {"type": "string", "minLength": 1, "maxLength": 40},
     "Dir": {
       "type": "object",
       "required": ["path", "name", "git", "branch", "empty"],
@@ -1660,6 +1662,8 @@
         "limited": {"$ref": "#/$defs/LimitHold"},
         "autoContinues": {"type": "array", "maxItems": 20, "items": {"$ref": "#/$defs/AutoContinue"}},
         "parentId": {"$ref": "#/$defs/ConvId"},
+        "startedBy": {"$ref": "#/$defs/PersonName"},
+        "by": {"$ref": "#/$defs/PersonName"},
         "rev": {"type": "integer", "minimum": 1}
       }
     },
@@ -2794,7 +2798,8 @@
         "attachmentIds": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "mode": {"$ref": "#/$defs/MessageMode"},
         "kind": {"$ref": "#/$defs/MessageKind"},
-        "refs": {"type": "array", "maxItems": 10, "items": {"$ref": "#/$defs/MessageRef"}}
+        "refs": {"type": "array", "maxItems": 10, "items": {"$ref": "#/$defs/MessageRef"}},
+        "by": {"$ref": "#/$defs/PersonName"}
       }
     },
     "Cmd_cancel": {
@@ -2934,6 +2939,7 @@
             "parentId": {"$ref": "#/$defs/ConvId"},
             "title": {"type": "string", "minLength": 1, "maxLength": 200},
             "test": {"type": "boolean"},
+            "by": {"$ref": "#/$defs/PersonName"},
             "first": {
               "type": "object",
               "required": ["clientId", "text", "attachmentIds"],
@@ -2961,6 +2967,7 @@
             "parentId": {"$ref": "#/$defs/ConvId"},
             "title": {"type": "string", "minLength": 1, "maxLength": 200},
             "test": {"type": "boolean"},
+            "by": {"$ref": "#/$defs/PersonName"},
             "first": {
               "type": "object",
               "required": ["clientId", "text", "attachmentIds"],
@@ -3225,7 +3232,8 @@
       "properties": {
         "opId": {"type": "string", "minLength": 1},
         "path": {"type": "string", "minLength": 1},
-        "name": {"type": "string", "minLength": 1, "maxLength": 120}
+        "name": {"type": "string", "minLength": 1, "maxLength": 120},
+        "owner": {"$ref": "#/$defs/PersonName"}
       }
     },
     "Cmd_project_update": {
@@ -3236,7 +3244,8 @@
         "opId": {"type": "string", "minLength": 1},
         "id": {"type": "string", "minLength": 1},
         "path": {"type": "string", "minLength": 1},
-        "name": {"type": "string", "minLength": 1, "maxLength": 120}
+        "name": {"type": "string", "minLength": 1, "maxLength": 120},
+        "owner": {"type": "string", "maxLength": 40}
       }
     },
     "Cmd_project_delete": {

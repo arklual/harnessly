@@ -133,9 +133,11 @@ export interface INoticesOptions {
   /** The chat on screen, if any. */
   currentId: string | null;
   onOpenChat: (id: string) => void;
+  /** Whether what the chat answers is news for this person (features/people); absent: every chat's is. */
+  forMe?: (conv: Conversation) => boolean;
 }
 
-export const useNotices = ({ person, currentId, onOpenChat }: INoticesOptions) => {
+export const useNotices = ({ person, currentId, onOpenChat, forMe }: INoticesOptions) => {
   setNoticesPerson(person);
   const notices = useNoticeList();
   // The person's notices, reads and switches live in a database: the cache above follows it.
@@ -153,10 +155,12 @@ export const useNotices = ({ person, currentId, onOpenChat }: INoticesOptions) =
   useEffect(() => () => window.clearTimeout(settleTimer.current), []);
   const current = useRef(currentId);
   const open = useRef(onOpenChat);
+  const mine = useRef(forMe);
   // Before the effects below, which read them.
   useEffect(() => {
     current.current = currentId;
     open.current = onOpenChat;
+    mine.current = forMe;
   });
 
   useEffect(() => unlockSound(), []);
@@ -176,6 +180,8 @@ export const useNotices = ({ person, currentId, onOpenChat }: INoticesOptions) =
       seen.current.set(conv.id, event?.key ?? null);
       if (before === undefined || !event || event.key === before) continue;
       if (!settings.kinds[event.kind]) continue;
+      // Another person's turn: their news, not this page's.
+      if (mine.current && !mine.current(conv)) continue;
       if (conv.id === current.current && pageVisible()) continue;
       // Back at an event it still shows (it only looked away for a moment): no new notice, no sound.
       if (noticesSnapshot().some((n) => n.key === event.key)) continue;

@@ -35,6 +35,9 @@ export interface ISidebarChat {
   projectId: string | null;
   /** The chat whose agent delegated this one: it is drawn under that chat. Absent for a chat the person started. */
   parentId?: string;
+  /** The person of the machine who started it, and the one who wrote last (features/people); absent: nobody named. */
+  startedBy?: string;
+  by?: string;
   /** Unix ms the chat was created. */
   createdAt: number;
   /**
@@ -77,6 +80,10 @@ export interface ISidebarLaunch {
 export interface ISidebarProject {
   id: string;
   name: string;
+  /** The person of the machine it is theirs (features/people); absent: everyone's. */
+  owner?: string;
+  /** The heading it stands under while the people view is on («Общие», «Мои», another person's name). */
+  band?: string;
 }
 
 /** A group inside the favorites, the ids of its chats in the order shown. */

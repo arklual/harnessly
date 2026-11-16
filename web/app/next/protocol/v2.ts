@@ -668,6 +668,8 @@ export interface Project {
   name: string;
   git: boolean;
   createdAt: Ms;
+  /** The person of the machine it is theirs (one of PersonSettings.people); absent: everyone's. */
+  owner?: string;
 }
 /** A named group inside the favorites; chats are the ids of its conversations in the order shown. */
 export interface FavGroup {
@@ -1438,6 +1440,9 @@ export interface Conversation {
   limited?: LimitHold; // the last turn ended on the usage limit and the chat waits for its reset; absent otherwise
   autoContinues?: AutoContinue[]; // the times the runtime went on by itself, oldest first (the last 20); absent when none
   parentId?: ConvId; // the chat whose agent delegated this one; absent for a chat the person started
+  /** The person of the machine who started it, and the one whose message came last; absent: nobody named. */
+  startedBy?: string;
+  by?: string;
   test?: boolean; // a chat an agent made to check something: the sidebar leaves it out unless the person shows test chats
   from?: ChatFrom; // an app started the chat for the person: it sits in the app's folder until the person moves it
   rev: number;
@@ -2069,6 +2074,8 @@ export interface CommandBodies {
     kind: MessageKind;
     /** The places it points at; the runtime appends their block to the text. */
     refs?: MessageRef[];
+    /** The person of the machine who wrote it (commands/run.ts names the page's own). */
+    by?: string;
   };
   cancel: OpBody & { conversationId: ConvId; clientId: ClientId };
   retry: OpBody & { conversationId: ConvId; clientId: ClientId };
@@ -2090,6 +2097,8 @@ export interface CommandBodies {
     launch?: Launch;
     /** Starts the chat on a backend profile of the provider's CLI, with one of its models; needs a saved key. */
     profile?: ProfileId;
+    /** The person of the machine who starts it (commands/run.ts names the page's own). */
+    by?: string;
   } & ({ projectId: string } | { cwd: string });
   'conversation.rename': OpBody & { id: ConvId; title: string };
   'conversation.retitle': OpBody & { id: ConvId };
@@ -2115,9 +2124,10 @@ export interface CommandBodies {
     permission?: PermissionMode;
   };
   'bg.stop': OpBody & { conversationId: ConvId; taskId: string };
-  'project.create': OpBody & { path?: string; name?: string };
-  // path: the folder the project's next chats start in; name: what it is called. Absent keeps it; one is needed.
-  'project.update': OpBody & { id: string; path?: string; name?: string };
+  'project.create': OpBody & { path?: string; name?: string; owner?: string };
+  // path: the folder the project's next chats start in; name: what it is called; owner: whose it is ('' everyone's).
+  // Absent keeps it; one is needed.
+  'project.update': OpBody & { id: string; path?: string; name?: string; owner?: string };
   'project.delete': OpBody & { id: string; chats: ProjectChats };
   'favorites.group.create': OpBody & { name: string };
   'favorites.group.rename': OpBody & { id: string; name: string };
@@ -2609,14 +2619,17 @@ const turnSummary: Decoder<TurnSummary> = object(
 const turnCounts: Decoder<TurnCounts> = object({ toolCount: int, stepCount: int });
 const queuePause: Decoder<QueuePause> = object({ reason: oneOf(PAUSE_REASONS), at: ms });
 
-const project: Decoder<Project> = object({
-  id,
-  machineId: id,
-  path: str,
-  name: str,
-  git: bool,
-  createdAt: ms,
-});
+const project: Decoder<Project> = object(
+  {
+    id,
+    machineId: id,
+    path: str,
+    name: str,
+    git: bool,
+    createdAt: ms,
+  },
+  { owner: id },
+);
 
 const FAV_GROUP_ID = /^fg-[A-Za-z0-9]{4,40}$/;
 const favGroupId: Decoder<string> = (v, p) =>
@@ -3062,6 +3075,8 @@ const conversation: Decoder<Conversation> = object(
     parentId: convId,
     test: bool,
     from: chatFrom,
+    startedBy: id,
+    by: id,
   },
 );
 
@@ -3517,7 +3532,7 @@ const commandBodies: { [K in Op]: Decoder<CommandBodies[K]> } = {
         mode: oneOf(MESSAGE_MODES),
         kind: oneOf(MESSAGE_KINDS),
       },
-      { refs: messageRefs },
+      { refs: messageRefs, by: id },
     )(v, p);
     return body.opId === body.clientId ? body : fail(`${p}.opId`, 'not the clientId');
   },
@@ -3539,10 +3554,13 @@ const commandBodies: { [K in Op]: Decoder<CommandBodies[K]> } = {
   }),
   'conversation.create': byKey(
     'cwd',
-    object({ ...createBase, cwd: id }, { first: firstMessage, worktree: bool, launch, profile: profileId }),
+    object(
+      { ...createBase, cwd: id },
+      { first: firstMessage, worktree: bool, launch, profile: profileId, by: id },
+    ),
     object(
       { ...createBase, projectId: id },
-      { first: firstMessage, worktree: bool, launch, profile: profileId },
+      { first: firstMessage, worktree: bool, launch, profile: profileId, by: id },
     ),
   ),
   'conversation.rename': object({ opId: id, id: convId, title: str }),
@@ -3567,8 +3585,8 @@ const commandBodies: { [K in Op]: Decoder<CommandBodies[K]> } = {
     ),
   ),
   'bg.stop': object({ ...scoped, taskId: id }),
-  'project.create': object({ opId: id }, { path: id, name: id }),
-  'project.update': object({ opId: id, id }, { path: id, name: id }),
+  'project.create': object({ opId: id }, { path: id, name: id, owner: id }),
+  'project.update': object({ opId: id, id }, { path: id, name: id, owner: str }),
   'project.delete': object({ opId: id, id, chats: oneOf(PROJECT_CHATS) }),
   'favorites.group.create': object({ opId: id, name: favName }),
   'favorites.group.rename': object({ opId: id, id: favGroupId, name: favName }),

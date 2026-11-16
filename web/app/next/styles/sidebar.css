@@ -1823,3 +1823,56 @@ button.hx-project__add {
   background: var(--hx-shell-active);
   color: var(--hx-fg-1);
 }
+
+/* The people of the machine (features/people): a heading over everyone's projects, one's own and an unfolded
+   person's, and a row of another person's name that folds their things away at the end of the projects. */
+.hx-people__band,
+.hx-people__fold {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  width: 100%;
+  padding: var(--hx-space-2) var(--hx-space-2) 2px;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+  user-select: none;
+}
+.hx-people__fold {
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  text-align: left;
+  cursor: pointer;
+}
+.hx-people__fold[aria-expanded='false'] {
+  margin-top: var(--hx-space-2);
+  padding: 6px var(--hx-space-2);
+  color: var(--hx-fg-2);
+}
+.hx-people__fold:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-people__fold:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hx-accent) 16%, transparent);
+}
+.hx-people__name {
+  font-weight: 500;
+}
+.hx-people__count {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--hx-fg-3);
+}
+.hx-people__chev {
+  margin-left: auto;
+  flex: none;
+}
+.hx-app[data-side='closed'] :is(.hx-people__band, .hx-people__fold) {
+  color: transparent;
+  pointer-events: none;
+}

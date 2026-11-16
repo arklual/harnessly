@@ -315,6 +315,11 @@ func (c *conv) send(m wire.SendCmd, now time.Time) wire.CmdResult {
 	ch, code := c.box.Send(d, c.rec.State, now)
 	r := c.result(ch, code, wire.ResultQueued, now)
 	if code == "" {
+		// A person of the machine wrote it: what the chat answers is news for them now.
+		if m.By != "" && m.By != c.rec.By {
+			c.rec.By = m.By
+			c.touch()
+		}
 		// The person wrote: the chat rises in the sidebar now, not when the transcript shows the line.
 		c.promptedAt(ms(now))
 		if p := c.box.Paused(); p != nil && p.Reason == wire.PausedInterrupted {

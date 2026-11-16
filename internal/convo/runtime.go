@@ -1633,14 +1633,14 @@ func (r *Runtime) project(id string) (wire.Project, bool) {
 // its own record published again, so the page waits for the same event either way.
 func (r *Runtime) createProject(m wire.ProjectCreateCmd) wire.CmdResult {
 	if m.Path == "" {
-		return r.createGroup(strings.TrimSpace(m.Name))
+		return r.createGroup(strings.TrimSpace(m.Name), m.Owner)
 	}
 	path := filepath.Clean(m.Path)
 	st, err := os.Stat(path)
 	if err != nil || !st.IsDir() {
 		return wire.Refused(wire.RefuseNotFound)
 	}
-	p, seq := r.addProject(wire.Project{Path: path, Name: strings.TrimSpace(m.Name)})
+	p, seq := r.addProject(wire.Project{Path: path, Name: strings.TrimSpace(m.Name), Owner: m.Owner})
 	res := wire.Accepted(wire.ChannelConvs, seq)
 	res.ID = &p.ID
 	return res
@@ -1648,12 +1648,12 @@ func (r *Runtime) createProject(m wire.ProjectCreateCmd) wire.CmdResult {
 
 // createGroup makes a project of a name alone: its chats start in the default folder, and its id is its own, so several
 // such projects share that folder the way the ones taken over from Legacy do.
-func (r *Runtime) createGroup(name string) wire.CmdResult {
+func (r *Runtime) createGroup(name, owner string) wire.CmdResult {
 	if r.d.DefaultCwd == "" {
 		return wire.Refused(wire.RefuseUnsupported)
 	}
 	sum := sha256.Sum256([]byte(name + "\x00" + strconv.FormatInt(r.d.Clock.Now().UnixNano(), 10)))
-	p, seq := r.addProject(wire.Project{ID: "prj-" + hex.EncodeToString(sum[:6]), Path: r.d.DefaultCwd, Name: name})
+	p, seq := r.addProject(wire.Project{ID: "prj-" + hex.EncodeToString(sum[:6]), Path: r.d.DefaultCwd, Name: name, Owner: owner})
 	res := wire.Accepted(wire.ChannelConvs, seq)
 	res.ID = &p.ID
 	return res
@@ -1686,6 +1686,9 @@ func (r *Runtime) updateProject(m wire.ProjectUpdateCmd) wire.CmdResult {
 	}
 	if name := strings.TrimSpace(m.Name); name != "" {
 		p.Name = name
+	}
+	if m.Owner != nil {
+		p.Owner = *m.Owner
 	}
 	r.projects[i] = p
 	saved := slices.Clone(r.projects)
@@ -1754,7 +1757,8 @@ func (r *Runtime) addProject(want wire.Project) (wire.Project, int64) {
 		}
 	}
 	if p.ID == "" {
-		p = wire.Project{ID: want.ID, MachineID: r.d.MachineID, Path: want.Path, Name: want.Name, CreatedAt: ms(r.d.Clock.Now())}
+		p = wire.Project{ID: want.ID, MachineID: r.d.MachineID, Path: want.Path, Name: want.Name, Owner: want.Owner,
+			CreatedAt: ms(r.d.Clock.Now())}
 		if p.ID == "" {
 			sum := sha256.Sum256([]byte(want.Path))
 			p.ID = "prj-" + hex.EncodeToString(sum[:6])
@@ -1802,6 +1806,7 @@ func (r *Runtime) create(m wire.ConversationCreateCmd, person string) wire.CmdRe
 		cwd, projectID = p.Path, &p.ID
 	}
 	var parentID *string
+	by := m.By
 	if m.ParentID != "" {
 		parent, ok := r.Record(m.ParentID)
 		if !ok {
@@ -1810,6 +1815,10 @@ func (r *Runtime) create(m wire.ConversationCreateCmd, person string) wire.CmdRe
 		parentID = &m.ParentID
 		// A delegated chat works for the person of the chat that delegated it, whoever's session asked.
 		person = parent.Person
+		// …and for the one who drives that chat now: its news are theirs.
+		if by == "" {
+			by = parent.By
+		}
 	}
 	if r.d.Launcher == nil {
 		return wire.Refused(wire.RefuseUnsupported)
@@ -1840,7 +1849,7 @@ func (r *Runtime) create(m wire.ConversationCreateCmd, person string) wire.CmdRe
 	rec := wire.Conversation{ID: id, MachineID: r.d.MachineID, ProjectID: projectID, Cwd: cwd, Launch: m.Launch,
 		Provider: m.Provider, Model: m.Model, TitleSource: wire.TitleFromFirstMessage, CreatedAt: ms(now),
 		LastActivityAt: ms(now), LastPromptAt: ms(now), SeenAt: ms(now), State: wire.AgentState{K: wire.StateUnknown, Since: ms(now)},
-		ParentID: parentID, Test: m.Test, Rev: 1, Person: person}
+		ParentID: parentID, Test: m.Test, Rev: 1, Person: person, StartedBy: by, By: by}
 	if r.d.AlwaysApps != nil {
 		if ids := r.d.AlwaysApps(); len(ids) > 0 && (r.d.AppsOK == nil || r.d.AppsOK(ids) == "") {
 			rec.Apps = append([]string(nil), ids...)
