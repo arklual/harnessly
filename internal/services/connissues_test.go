@@ -228,6 +228,8 @@ func TestTaskCardAndLinkMetaOfAConnection(t *testing.T) {
 	is[1].Description = "Do it\r\nnow"
 	is[1].Priority = "Low"
 	is[1].Comments = []connections.Comment{{Author: &connections.Person{Name: "Bob"}, Text: "ok", Created: time.UnixMilli(1790000000000)}, {Text: "anon"}}
+	is[1].Fields = []connections.IssueField{{Name: "Story points", Value: "3", Kind: "number"}, {Name: "Empty", Value: " "},
+		{Name: "Epic", Value: "JR-1", Kind: "link", URL: "https://jira.test/browse/JR-1"}}
 	setFakeIssues(t, is, nil)
 	cs, c := connService(t)
 	h := &Handlers{S: New(Config{Connections: cs}), Session: func(*http.Request) bool { return true }}
@@ -244,6 +246,11 @@ func TestTaskCardAndLinkMetaOfAConnection(t *testing.T) {
 	}
 	if _, ok := task["children"].([]any); !ok {
 		t.Fatalf("children %v", task["children"])
+	}
+	fields := task["fields"].([]any)
+	if len(fields) != 2 || fields[0].(map[string]any)["value"] != "3" || fields[0].(map[string]any)["url"] != nil ||
+		fields[1].(map[string]any)["url"] != "https://jira.test/browse/JR-1" || fields[1].(map[string]any)["kind"] != "link" {
+		t.Fatalf("fields %v", fields)
 	}
 	// Kept: a second look does not ask again.
 	setFakeIssues(t, is, nil)

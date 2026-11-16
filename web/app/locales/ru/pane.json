@@ -50,6 +50,7 @@
   "pane.taskTab.type": "Тип",
   "pane.taskTab.state": "Состояние",
   "pane.taskTab.priority": "Приоритет",
+  "pane.taskTab.fields": "Поля",
   "pane.taskTab.unassigned": "Без исполнителя",
   "pane.taskTab.updated": "обновлена {time}",
   "pane.taskTab.open": "Открыть {key}",

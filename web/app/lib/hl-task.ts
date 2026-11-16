@@ -63,6 +63,16 @@ export interface ITaskComment {
   text: string;
 }
 
+/** A field of the tracker beyond the common ones (story points, a team, a sprint), its value already in words. */
+export interface ITaskField {
+  name: string;
+  value: string;
+  /** text, user, date, number, list or link; null is text. */
+  kind: string | null;
+  /** An http(s) address that makes the value a link. */
+  url: string | null;
+}
+
 export interface ITask {
   key: string;
   title: string;
@@ -76,6 +86,8 @@ export interface ITask {
   children: ITaskChild[];
   description: string;
   comments: ITaskComment[];
+  /** The tracker's other fields, in its order; a tracker that has none leaves it out. */
+  fields?: ITaskField[];
   updated: number | null;
 }
 

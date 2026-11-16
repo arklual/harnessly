@@ -31,6 +31,9 @@ import (
 // The capabilities the adapter lists in describe are `detect`, `link`, `issues`, `pages`; a call of a capability that is
 // not listed is not sent. The code capability (merge requests) has no source interface in the core yet: an adapter may
 // list `code` in the detection's capabilities, and the connection keeps it, but the core asks nothing of it.
+//
+// An Issue may carry `fields`, the product's other fields with their values already in people's words; an adapter that
+// sends none works as before. The core keeps what CleanFields keeps of them.
 const ConnectionProtocol = "harnessly.connection/v1"
 
 // linkWait bounds the call of Link: the contract says no network, so an adapter that is slow is treated as "not a
@@ -224,6 +227,9 @@ func (c *extClient) Search(ctx context.Context, q Query) ([]Issue, error) {
 	if err := c.call(ctx, "issues", "/v1/issues/search", map[string]any{"query": q}, &out); err != nil {
 		return nil, err
 	}
+	for i := range out.Issues {
+		out.Issues[i].Fields = CleanFields(out.Issues[i].Fields)
+	}
 	return out.Issues, nil
 }
 
@@ -232,6 +238,7 @@ func (c *extClient) Issue(ctx context.Context, key string) (*Issue, error) {
 	if err := c.call(ctx, "issues", "/v1/issues/get", map[string]any{"key": key}, &is); err != nil {
 		return nil, err
 	}
+	is.Fields = CleanFields(is.Fields)
 	return &is, nil
 }
 

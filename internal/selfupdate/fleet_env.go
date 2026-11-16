@@ -134,6 +134,27 @@ func GapFromEnv(raw string, def time.Duration) time.Duration {
 	return d
 }
 
+// MinInterval is the shortest time between checks an environment can ask for: a check is a request to the hub, and a
+// fleet of machines checking every few seconds would be a load of its own.
+const MinInterval = 30 * time.Second
+
+// IntervalFromEnv reads RUNTIME_UPDATE_INTERVAL ("2m", "1h"): the time between checks; def when unset or unreadable,
+// MinInterval when shorter than that.
+func IntervalFromEnv(raw string, def time.Duration) time.Duration {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return def
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d <= 0 {
+		return def
+	}
+	if d < MinInterval {
+		return MinInterval
+	}
+	return d
+}
+
 // probeHealth reads what a service reports at url: its version, and how far its chats are when it says.
 func probeHealth(ctx context.Context, url string) (Health, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

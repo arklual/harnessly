@@ -265,4 +265,9 @@ func TestFleetServicesFromEnv(t *testing.T) {
 			t.Errorf("GapFromEnv(%q) = %v, want %v", raw, got, want)
 		}
 	}
+	for raw, want := range map[string]time.Duration{"": time.Hour, "2m": 2 * time.Minute, "5s": MinInterval, "0": time.Hour, "-1m": time.Hour, "soon": time.Hour} {
+		if got := IntervalFromEnv(raw, time.Hour); got != want {
+			t.Errorf("IntervalFromEnv(%q) = %v, want %v", raw, got, want)
+		}
+	}
 }

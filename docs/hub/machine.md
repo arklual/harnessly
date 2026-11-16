@@ -516,7 +516,7 @@ machine answers `ownerId` in `GET /api/machines/{id}`.
 ## Upgrade, move and remove
 
 - **Updates by themselves**: the runtime compares its programs (`harnessly-runtime`, `harnessly-agent`, the `harnessly`
-  command) with the hub's `/dl/manifest.json` two minutes after a start and then every hour. Where it may write the
+  command) with the hub's `/dl/manifest.json` two minutes after a start and then every hour (`RUNTIME_UPDATE_INTERVAL`, `1h`; not under `30s`). Where it may write the
   folder they are in (the `full` profile, `~/.local/bin`) it downloads what differs, checks it against the manifest's
   SHA-256, puts it in place with a rename and restarts; tmux and the agents in it keep working. Settings → General →
   Updates shows the state and has «Update now». `RUNTIME_AUTO_UPDATE=0` in `runtime.env` leaves it to the button.

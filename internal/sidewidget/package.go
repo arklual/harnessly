@@ -90,6 +90,10 @@ func Package(s Spec, now time.Time) (*apps.Manifest, map[string]string, error) {
 	js := s.JS
 	if strings.TrimSpace(js) == "" {
 		js = defaultJS
+	} else if !strings.Contains(js, "harnessly.connect") {
+		// A widget's own script that never connects would leave the card on «не запустило SDK»: it connects first and
+		// its code runs after, so a script that only draws (a canvas, a clock) works as written.
+		js = "window.harnessly.connect().then(function () {\n" + js + "\n});\n"
 	}
 	files := map[string]string{
 		"ui/index.html": `<!doctype html>

@@ -1143,6 +1143,27 @@
   margin: 0;
   font-size: 12.5px;
 }
+.tw-task-fields {
+  display: grid;
+  grid-template-columns: minmax(90px, max-content) 1fr;
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 12.5px;
+}
+.tw-task-fields div {
+  display: contents;
+}
+.tw-task-fields dt {
+  color: var(--t-text-muted);
+  overflow-wrap: anywhere;
+}
+.tw-task-fields dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--t-text);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
 .tw-task-person {
   display: inline-flex;
   align-items: center;

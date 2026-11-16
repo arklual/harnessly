@@ -187,3 +187,21 @@ func TestANameNeverLeadsOutOfTheWidgetsFolder(t *testing.T) {
 		t.Fatalf("the link was removed: %v", err)
 	}
 }
+
+func TestAWidgetScriptThatNeverConnectsIsConnectedFirst(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	_, files, err := Package(Spec{Name: "snow", Title: "Снег", HTML: "<canvas></canvas>", JS: "draw();"}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if js := files["ui/main.js"]; !strings.HasPrefix(js, "window.harnessly.connect().then(") || !strings.Contains(js, "draw();") {
+		t.Fatalf("main.js = %q", js)
+	}
+	_, files, err = Package(Spec{Name: "snow", Title: "Снег", HTML: "<canvas></canvas>", JS: "window.harnessly.connect().then(go);"}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if js := files["ui/main.js"]; js != "window.harnessly.connect().then(go);" {
+		t.Fatalf("a script that connects is kept as written: %q", js)
+	}
+}

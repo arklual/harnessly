@@ -11,8 +11,11 @@ package connections
 
 import (
 	"errors"
+	"net/url"
 	"regexp"
+	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Kind names a product.
@@ -182,6 +185,62 @@ type Issue struct {
 	// Description is plain text or Markdown, converted from the product's own markup (ADF, wiki markup, HTML).
 	Description string    `json:"description,omitempty"`
 	Comments    []Comment `json:"comments,omitempty"`
+	// Fields are the product's other fields (story points, team, sprint, a custom select), in the product's order.
+	Fields []IssueField `json:"fields,omitempty"`
+}
+
+// IssueField is one field of an issue beyond the common ones, already in people's words: a name, not an id.
+type IssueField struct {
+	ID    string `json:"id,omitempty"`
+	Name  string `json:"name"`
+	Value string `json:"value"`
+	// Kind hints how the value reads: text (the default), user, date, number, list or link.
+	Kind string `json:"kind,omitempty"`
+	// URL makes the value a link.
+	URL string `json:"url,omitempty"`
+}
+
+const (
+	// IssueFieldsMax bounds the fields of one issue.
+	IssueFieldsMax = 50
+	// IssueFieldValueMax bounds a field's value, in characters; a field's id and name get issueFieldNameMax.
+	IssueFieldValueMax = 2000
+	issueFieldNameMax  = 200
+)
+
+var fieldKinds = map[string]bool{"text": true, "user": true, "date": true, "number": true, "list": true, "link": true}
+
+// CleanFields is the fields worth showing: one with no name or no value is dropped, text is clipped, an unknown kind
+// is plain text, a URL that is not http(s) is dropped, and no more than IssueFieldsMax are kept.
+func CleanFields(fs []IssueField) []IssueField {
+	var out []IssueField
+	for _, f := range fs {
+		if len(out) == IssueFieldsMax {
+			break
+		}
+		f.Name = clipRunes(strings.TrimSpace(f.Name), issueFieldNameMax)
+		f.Value = clipRunes(strings.TrimSpace(f.Value), IssueFieldValueMax)
+		if f.Name == "" || f.Value == "" {
+			continue
+		}
+		f.ID = clipRunes(f.ID, issueFieldNameMax)
+		if !fieldKinds[f.Kind] {
+			f.Kind = ""
+		}
+		if u, err := url.Parse(f.URL); f.URL != "" && (err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "") {
+			f.URL = ""
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
+// clipRunes cuts s to n characters, the last one an ellipsis.
+func clipRunes(s string, n int) string {
+	if utf8.RuneCountInString(s) <= n {
+		return s
+	}
+	return string([]rune(s)[:n-1]) + "…"
 }
 
 // Project is a Jira project, a YouTrack project, a Linear team, a GitLab project, a GitHub repository.

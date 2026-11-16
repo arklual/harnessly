@@ -21,7 +21,16 @@ const description = {
 };
 
 const issues = [
-  { key: "EX-1", title: "Connect the tracker", status: { name: "Open", category: "todo" }, description: "A first issue." },
+  {
+    key: "EX-1",
+    title: "Connect the tracker",
+    status: { name: "Open", category: "todo" },
+    description: "A first issue.",
+    fields: [
+      { id: "points", name: "Story points", value: "3", kind: "number" },
+      { id: "epic", name: "Epic", value: "EX-2", kind: "link", url: "https://tracker.example.com/issue/EX-2" },
+    ],
+  },
   { key: "EX-2", title: "Write the docs", status: { name: "Done", category: "done" }, description: "A second issue." },
 ].map((i) => ({ ...i, url: `https://${HOST}/issue/${i.key}`, project: "EX" }));
 

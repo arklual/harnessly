@@ -46,13 +46,36 @@ Every other call is `POST` with a JSON body. `404` means "not this" or "no such 
 | `/v1/me` | `{conn, credentials}` | the person: `{login, name, email}` |
 | `/v1/projects` | `{conn, credentials}` | `{projects: [{key, name, url}]}` |
 | `/v1/issues/search` | `{conn, credentials, query}` | `{issues: [issue]}`; `query` is `{text, mine, open, project, native, limit}` |
-| `/v1/issues/get` | `{conn, credentials, key}` | one issue, with the description and the last comments |
+| `/v1/issues/get` | `{conn, credentials, key}` | one issue, with the description, the last comments and its fields |
 | `/v1/pages/search` | `{conn, credentials, query}` | `{pages: [page]}` |
 | `/v1/pages/get` | `{conn, credentials, id}` | one page, with the body |
 
 `conn` is `{id, baseUrl, apiUrl, deployment, method, extra}`; `credentials` maps field ids (`token`, `email`, …) to the
 values the person gave. The shapes of the issue, page, person and detection are the JSON of `Issue`, `Page`, `Person`
 and `Detection` in [`internal/connections/model.go`](../internal/connections/model.go).
+
+### Issue fields
+
+An issue may carry `fields`: the product's other fields (story points, a team, an epic, a sprint, a custom select, user
+or date field) in the order the product shows them. The field is optional; an adapter that sends none works as before.
+
+```json
+"fields": [
+  {"id": "customfield_10016", "name": "Story points", "value": "5", "kind": "number"},
+  {"id": "customfield_10014", "name": "Epic", "value": "EX-7", "kind": "link", "url": "https://tracker.example.com/issue/EX-7"}
+]
+```
+
+| Key | | |
+| --- | --- | --- |
+| `name` | required | the field's name as people see it |
+| `value` | required | the value already in people's words: a name, not an id; a date as the product shows it |
+| `id` | optional | the product's id of the field |
+| `kind` | optional | `text` (the default), `user`, `date`, `number`, `list` or `link`; anything else reads as `text` |
+| `url` | optional | an `http(s)` address that makes the value a link; any other address is dropped |
+
+The core keeps at most 50 fields of an issue, drops a field with an empty name or value, and clips a value to 2000
+characters. The task card shows the fields under the issue's main properties.
 
 `/v1/link` is asked with a two-second wait and its answer is kept for a minute: the core wants a link read without a
 slow network, so a slow adapter reads as "not a link".

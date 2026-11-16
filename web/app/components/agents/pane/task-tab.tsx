@@ -10,7 +10,14 @@ import useConnPage from '@/hooks/use-conn-page';
 import { parseConnTarget } from '@/lib/conn-target';
 import { issueTone, ISSUE_TONE_LABEL } from '@/lib/link-meta';
 import remarkIssueKeys from '@/lib/remark-issue-keys';
-import { cleanTaskText, isTaskKey, type ITask, type ITaskComment, type TTaskError } from '@/lib/hl-task';
+import {
+  cleanTaskText,
+  isTaskKey,
+  type ITask,
+  type ITaskComment,
+  type ITaskField,
+  type TTaskError,
+} from '@/lib/hl-task';
 import { issueUrl } from '@/lib/tracker-keys';
 import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
@@ -57,6 +64,24 @@ const Comment = ({ comment }: { comment: ITaskComment }) => (
   </li>
 );
 
+/** The tracker's other fields as name and value; a value with an address opens like any link of the conversation. */
+const Fields = ({ fields }: { fields: ITaskField[] }) => (
+  <dl className="tw-task-fields" aria-label={t('pane.taskTab.fields')}>
+    {fields.map((field, index) => (
+      <div key={`${field.name}-${index}`}>
+        <dt>{field.name}</dt>
+        <dd>
+          {field.url && /^https?:\/\//i.test(field.url) ? (
+            <MessageLink href={field.url}>{field.value}</MessageLink>
+          ) : (
+            field.value
+          )}
+        </dd>
+      </div>
+    ))}
+  </dl>
+);
+
 const Skeleton = () => (
   <div className="tw-task" aria-busy="true" aria-label={t('pane.taskTab.loading')}>
     <span className="tw-skeleton tw-task-skeleton-key" />
@@ -69,6 +94,7 @@ const Skeleton = () => (
 );
 
 const TaskView = ({ task, onOpenTask }: { task: ITask; onOpenTask: ITaskTabProps['onOpenTask'] }) => {
+  const fields = (task.fields ?? []).filter((field) => field.name.trim() && field.value.trim());
   return (
     <article className="tw-task">
       <header className="tw-task-head">
@@ -127,6 +153,7 @@ const TaskView = ({ task, onOpenTask }: { task: ITask; onOpenTask: ITaskTabProps
           </span>
         )}
       </p>
+      {fields.length > 0 && <Fields fields={fields} />}
       {task.parent && (
         <button
           type="button"

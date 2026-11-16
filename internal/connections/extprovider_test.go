@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/ly-solutions/harnessly/internal/hub/ext"
 )
@@ -233,5 +235,68 @@ func TestLoadAdaptersDeclaredOnly(t *testing.T) {
 	}
 	if _, errs := LoadAdapters(context.Background(), filepath.Join(dir, "none.json")); len(errs) != 1 {
 		t.Fatal("a missing file is one error")
+	}
+}
+
+func TestAdapterIssueFields(t *testing.T) {
+	withRegistry(t)
+	many := make([]IssueField, 0, IssueFieldsMax+10)
+	for i := range IssueFieldsMax + 10 {
+		many = append(many, IssueField{Name: fmt.Sprintf("f%d", i), Value: "v"})
+	}
+	answers := map[string]any{
+		// An adapter of before the fields: no key at all.
+		"OLD-1": map[string]any{"key": "OLD-1", "title": "Old", "url": "https://tracker.example.com/issue/OLD-1"},
+		"NEW-1": Issue{Key: "NEW-1", Title: "New", Fields: []IssueField{
+			{ID: "customfield_1", Name: "Story points", Value: "5", Kind: "number"},
+			{Name: "  ", Value: "no name"},
+			{Name: "No value", Value: " "},
+			{Name: "Team", Value: "Core", Kind: "squad"},
+			{Name: "Epic", Value: "EX-7", Kind: "link", URL: "https://tracker.example.com/issue/EX-7"},
+			{Name: "Script", Value: "x", URL: "javascript:alert(1)"},
+			{Name: "Notes", Value: strings.Repeat("я", IssueFieldValueMax+5)},
+		}},
+		"MANY-1": Issue{Key: "MANY-1", Title: "Many", Fields: many},
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /v1/describe", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(ext.Description{Protocol: ConnectionProtocol, Name: "fields-tracker", Version: "1", Capabilities: []string{"detect", "issues"}})
+	})
+	mux.HandleFunc("POST /v1/issues/get", func(w http.ResponseWriter, r *http.Request) {
+		var in struct{ Key string }
+		_ = json.NewDecoder(r.Body).Decode(&in)
+		_ = json.NewEncoder(w).Encode(answers[in.Key])
+	})
+	mux.HandleFunc("POST /v1/issues/search", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"issues": []any{answers["MANY-1"]}})
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	p := register(t, srv)
+	src := p.Open(Conn{ID: "c1", Kind: "fields-tracker", BaseURL: "https://tracker.example.com"}, Credentials{}, nil).(IssueSource)
+
+	if is, err := src.Issue(context.Background(), "OLD-1"); err != nil || is.Title != "Old" || is.Fields != nil {
+		t.Fatalf("an issue with no fields: %+v %v", is, err)
+	}
+	is, err := src.Issue(context.Background(), "NEW-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(is.Fields) != 5 {
+		t.Fatalf("fields: %+v", is.Fields)
+	}
+	f := is.Fields
+	if f[0] != (IssueField{ID: "customfield_1", Name: "Story points", Value: "5", Kind: "number"}) || f[1].Name != "Team" || f[1].Kind != "" ||
+		f[2].URL != "https://tracker.example.com/issue/EX-7" || f[3].Name != "Script" || f[3].URL != "" {
+		t.Fatalf("fields: %+v", f)
+	}
+	if n := utf8.RuneCountInString(f[4].Value); n != IssueFieldValueMax || !strings.HasSuffix(f[4].Value, "…") {
+		t.Fatalf("a long value is clipped to %d characters, got %d", IssueFieldValueMax, n)
+	}
+	if is, err := src.Issue(context.Background(), "MANY-1"); err != nil || len(is.Fields) != IssueFieldsMax || is.Fields[0].Name != "f0" {
+		t.Fatalf("many fields: %d %v", len(is.Fields), err)
+	}
+	if found, err := src.Search(context.Background(), Query{Text: "x"}); err != nil || len(found) != 1 || len(found[0].Fields) != IssueFieldsMax {
+		t.Fatalf("search keeps the bound too: %v", err)
 	}
 }

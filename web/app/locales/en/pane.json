@@ -50,6 +50,7 @@
   "pane.taskTab.type": "Type",
   "pane.taskTab.state": "Status",
   "pane.taskTab.priority": "Priority",
+  "pane.taskTab.fields": "Fields",
   "pane.taskTab.unassigned": "Unassigned",
   "pane.taskTab.updated": "updated {time}",
   "pane.taskTab.open": "Open {key}",

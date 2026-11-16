@@ -68,7 +68,9 @@ func newSelfUpdater(dataDir string) *selfupdate.Updater {
 		Sudo:    strings.HasPrefix(dir, "/usr/"),
 		Applied: restartAfterUpdate,
 		// RUNTIME_UPDATE_MIN_GAP ("24h", "90m", 0 for none): the machine does not update itself more often than that.
-		MinGap:    selfupdate.GapFromEnv(os.Getenv("RUNTIME_UPDATE_MIN_GAP"), selfupdate.DefaultMinGap),
+		MinGap: selfupdate.GapFromEnv(os.Getenv("RUNTIME_UPDATE_MIN_GAP"), selfupdate.DefaultMinGap),
+		// RUNTIME_UPDATE_INTERVAL ("2m", "1h"): the time between checks, an hour unless told; never under 30 s.
+		Interval:  selfupdate.IntervalFromEnv(os.Getenv("RUNTIME_UPDATE_INTERVAL"), selfupdate.DefaultInterval),
 		StateFile: filepath.Join(dataDir, "selfupdate.json"),
 		Log: func(msg string, err error) {
 			agent.Log("warn", msg, agent.F{K: "error", V: err.Error()})

@@ -276,10 +276,22 @@ func connTask(i *connections.Issue) *jsvalue.Object {
 		comments = append(comments, obj("author", or(author, locale.Pick("Unnamed", "Без имени")), "at", millisOrNull(c.Created),
 			"text", cleanTaskText(c.Text, taskCommentMax)))
 	}
+	fields := []any{}
+	for _, f := range connections.CleanFields(i.Fields) {
+		var kind, link any
+		if f.Kind != "" {
+			kind = f.Kind
+		}
+		if isWebLink(f.URL) {
+			link = f.URL
+		}
+		fields = append(fields, obj("name", or(shortText(f.Name), f.Name), "value", cleanTaskText(f.Value, connections.IssueFieldValueMax),
+			"kind", kind, "url", link))
+	}
 	return obj("key", i.Key, "title", title, "project", shortText(i.Project), "type", shortText(i.Type), "state", shortText(i.Status.Name),
 		"priority", shortText(i.Priority), "resolved", connDone(*i), "assignee", assignee, "parent", parent,
 		"children", []any{}, "description", cleanTaskText(i.Description, taskDescMax), "comments", comments,
-		"updated", millisOrNull(i.Updated))
+		"fields", fields, "updated", millisOrNull(i.Updated))
 }
 
 func (s *Service) loadConnTask(ctx context.Context, c connections.Conn, key string) taskResult {
