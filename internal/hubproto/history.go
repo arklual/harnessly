@@ -1,6 +1,10 @@
 package hubproto
 
-import "encoding/json"
+import (
+	"crypto/ed25519"
+	"encoding/json"
+	"time"
+)
 
 // The person's chats in the hub (docs/hub/history.md): the agent forwards the events of the runtime's
 // conversation channels (`convs`, `conv:<id>`) to the hub, and the hub keeps the chat list and every chat's feed, so
@@ -18,8 +22,34 @@ const (
 	// EventHistoryBackfill carries events made from what the runtime holds now: HistoryBackfill.
 	EventHistoryBackfill = "history.backfill"
 	// FeatureHistory is in `hello` when the agent reads the runtime's replica socket and answers history.start/ack.
-	FeatureHistory = "history"
+	FeatureHistory  = "history"
+	HistoryReadPath = "/agent/history/read"
 )
+
+const HistoryDomain = "harnessly-agent-history-v1"
+
+type HistoryRead struct {
+	Conversation string `json:"conversation"`
+	Before       string `json:"before,omitempty"`
+	Limit        int    `json:"limit,omitempty"`
+}
+
+type HistoryPage struct {
+	MachineID    string            `json:"machineId"`
+	Conversation json.RawMessage   `json:"conversation"`
+	Turns        []json.RawMessage `json:"turns"`
+	Entries      []json.RawMessage `json:"entries"`
+	BeforeTurnID *string           `json:"beforeTurnId"`
+	Complete     bool              `json:"complete"`
+}
+
+func SignHistory(priv ed25519.PrivateKey, machineID string, now time.Time, host string) (string, error) {
+	return signHeader(HistoryDomain, priv, machineID, now, host)
+}
+
+func VerifyHistory(pub ed25519.PublicKey, a DialAuth, host string, now time.Time) error {
+	return verifyHeader(HistoryDomain, pub, a, host, now)
+}
 
 // HistoryCursor is how far the hub stored a channel: the last seq of an epoch.
 type HistoryCursor struct {

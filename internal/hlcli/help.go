@@ -41,6 +41,8 @@ TABS OF THIS WORKSPACE
                                     the person's sidebar leaves out (use it for a chat made only to check something).
                                     Run from a plain terminal
                                     (no chat), it makes a separate tab and says why. Prints the new id.
+  harnessly chat read ID|URL [--before TURN] [-n N]
+                                                  read the owner's central copy, including another machine's offline chat
   harnessly chat test ID|current [--off]
                                     mark a chat (current: the one this tab runs) as a test chat, hidden from the sidebar
                                     unless the person shows test chats; --off takes the mark off
@@ -172,8 +174,11 @@ SETTINGS (harnessly's own settings, changed when the person asks you to)
 
 THEME (the person's own look: colours, the chats' background, animated scenes, per folder or chat)
   harnessly theme presets           the ready looks (matrix, stars, aurora, rain, synthwave, tokyo…)
+  harnessly theme fx-presets        the live effects: snowplay (Снежная игра), nightlamp (Ночник), laser (Лазер)
   harnessly theme preset ID [--scope all|folder|chat] --why "…"
   harnessly theme set '<look JSON>' [--scope all|folder|chat] --why "…"   harnessly theme --help: the look's fields
+                                    (a live effect: "fx":{"preset":"snowplay|nightlamp|laser"} or {"script":"<sha256>"}, "back":bool,
+                                    "power":0-100; your own effect code: --fx-file effect.js, only against the page's sandbox SDK hx)
   harnessly theme get | reset [--scope …]
 
 HEAVY CHECKS (the machine is shared with other agents and people's chats)
@@ -290,7 +295,10 @@ Exit codes: 0 done, 1 refused or failed (the reason is printed), 2 wrong usage.
 `
 
 var commandHelp = map[string]string{
-	"chat": `harnessly chat test ID|current [--off]
+	"chat": `harnessly chat read ID|URL [--before TURN] [-n N]
+    Read the owner's synchronised central history by id or hub URL. --before reads the older page.
+
+harnessly chat test ID|current [--off]
 harnessly chat delete ID
 
 Marks a chat as a test chat: one made to check something, not for the person to read. The sidebar and the search leave
@@ -544,8 +552,9 @@ design-guard is a Claude Code PreToolUse hook: reads the hook's JSON on stdin an
 that writes project/canvas.json of a design project, telling the agent to use "design page". It also takes (or renews)
 the chat's lease on a board (*.dc.html) the call writes, and refuses with the holder's name when another chat holds it,
 or when this chat's own lease was gone meanwhile (read the file again). Prints nothing otherwise.
-design-release is the Stop hook: the turn ended, the chat lets go of its leases. See docs/design-pages.md for the
-settings.json entries.
+design-release is the Stop hook: the turn ended, the chat lets go of its leases. When the chat wrote boards of a
+strict project this turn, it also runs "design check --strict" once and, with findings, blocks the stop once with them
+(a second stop goes through). See docs/design-pages.md for the settings.json entries.
 voice-guard is the voice mode's PreToolUse hook: while the person talks to this chat by voice, a tool call that reaches
 outside (a push, a merge, a message to people, a task made, a publication, a deletion, a payment) is asked about
 first; with --agent codex it is refused with words telling the agent to ask «Делаем?». Prints nothing otherwise.

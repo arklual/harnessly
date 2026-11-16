@@ -11,7 +11,8 @@ covers:
   - 'cmd/runtime/agent_skills*.go'
   - 'skills/upstream/agent-skills/plugins/harnessly/**'
   - 'internal/delegation/**'
-prompt: Поручи это другому агенту в отдельном чате, сам не считай — пусть посчитает, сколько всего строк в файлах папки src, и принеси мне его ответ.
+  - 'internal/hlcli/**'
+prompt: Поручи это другому агенту в отдельном чате, сам не считай — пусть посчитает, сколько всего строк в файлах папки src. После его ответа прочитай его чат через read_conversation сначала по raw id, затем по полному Hub URL этого же чата, и принеси мне результат.
 expect:
   # Both ways the workspace prompt names give the person a chat under theirs.
   - name: delegated to a chat
@@ -19,5 +20,7 @@ expect:
       - called: harnessly\.delegate_task
       - called: Bash
         args: {command: 'harnessly tab create\b.*--prompt'}
+  - name: read delegated conversation by central reference
+    called: harnessly\.read_conversation
   - name: brought the answer back
     text: '\b5\b'

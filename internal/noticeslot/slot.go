@@ -163,6 +163,8 @@ type Slot struct {
 	Now func() time.Time
 	// Muted tells a source the person turned off; nil for none.
 	Muted func(Source) bool
+	// FirstOption answers every choice notice with its first option at once (an eval stand has no person; HRN-1561).
+	FirstOption bool
 	// Changed is told when the list changes (the page refreshes); nil for none.
 	Changed func()
 	// Journal is told when a notice opens ("open") and when it ends ("end", with its status), for the store to keep
@@ -353,6 +355,9 @@ func (s *Slot) Open(src Source, conv string, sp Spec) (Notice, error) {
 	s.journal("open", n, "")
 	s.mu.Unlock()
 	s.changed()
+	if s.FirstOption && sp.Kind == KindChoice && len(sp.Options) > 0 {
+		_ = s.Answer(n.ID, json.RawMessage(`{"choice":0}`))
+	}
 	return n, nil
 }
 

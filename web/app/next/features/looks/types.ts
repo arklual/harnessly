@@ -28,6 +28,9 @@ export const TURNS = ['plain', 'card', 'glass'] as const;
 export const COMPOSERS = ['solid', 'glass', 'outline'] as const;
 export const SIDEBARS = ['plain', 'tinted', 'glass'] as const;
 export const FITS = ['cover', 'tile'] as const;
+/** The built-in live effects (features/looks/fx/*.js). */
+export const FX_PRESETS = ['snowplay', 'nightlamp', 'laser'] as const;
+export type TFxPreset = (typeof FX_PRESETS)[number];
 
 export type TLookMode = (typeof LOOK_MODES)[number];
 export type TBgKind = (typeof BG_KINDS)[number];
@@ -56,6 +59,19 @@ export interface ILookParts {
   sidebar?: (typeof SIDEBARS)[number];
 }
 
+/** A live effect over the chat (docs/looks.md, «Живые эффекты»): a built-in one or the hash of the person's own script,
+ *  kept like a picture. Its code runs only in a sandboxed frame that sees the pointer, the blocks' boxes and the agent's
+ *  state, never the page or the chat's text (fx-layer.tsx). */
+export interface ILookFx {
+  preset?: TFxPreset;
+  /** The sha256 of a script kept by /api/v2/me/looks. */
+  script?: string;
+  /** Also run under the chat, as a background (hx.layer «back»). */
+  back?: boolean;
+  /** How much of it, 0–100 (60 when absent). */
+  power?: number;
+}
+
 export interface ILook {
   v: 1;
   name?: string;
@@ -71,6 +87,7 @@ export interface ILook {
   density?: (typeof DENSITIES)[number];
   font?: (typeof FONTS)[number];
   parts: ILookParts;
+  fx?: ILookFx;
 }
 
 /** Everything the prefs keep under hx-looks. */
@@ -109,6 +126,19 @@ const readHue = (v: unknown): IHue | null => {
 };
 
 const HASH_RE = /^[0-9a-f]{64}$/;
+
+/** The live effect of a look; undefined for none or for one that does not read. */
+export const readFx = (raw: unknown): ILookFx | undefined => {
+  if (!isObj(raw)) return undefined;
+  const preset = oneOf(FX_PRESETS, raw.preset);
+  const script = typeof raw.script === 'string' && HASH_RE.test(raw.script) ? raw.script : undefined;
+  if ((preset === undefined) === (script === undefined)) return undefined;
+  const fx: ILookFx = preset ? { preset } : { script };
+  if (raw.back === true) fx.back = true;
+  const power = num(raw.power, 0, 100);
+  if (power !== null) fx.power = power;
+  return fx;
+};
 
 /** A look out of anything (the prefs, an agent's request); null when it is none. Unknown fields are dropped. */
 export const readLook = (raw: unknown): ILook | null => {
@@ -159,6 +189,8 @@ export const readLook = (raw: unknown): ILook | null => {
     font: oneOf(FONTS, raw.font),
   };
   if (accent) look.accent = accent;
+  const fx = readFx(raw.fx);
+  if (fx) look.fx = fx;
   if (typeof raw.name === 'string' && raw.name.trim())
     look.name = [...raw.name.trim()].slice(0, MAX_NAME).join('');
   return look;

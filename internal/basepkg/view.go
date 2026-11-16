@@ -53,16 +53,11 @@ type Look struct {
 	HasService bool
 	Inbox      Inbox
 	Voice      Voice
+	// Snap as in Installer.
+	Snap func(string) bool
 }
 
-func (l Look) present(it Item) bool {
-	for _, b := range it.Bins {
-		if _, err := l.LookPath(b); err == nil {
-			return true
-		}
-	}
-	return false
-}
+func (l Look) present(it Item) bool { return onPath(it, l.LookPath, l.Snap) }
 
 // MakeView puts together the card's lines. What is on PATH now wins over what the service wrote.
 func MakeView(l Look) View {

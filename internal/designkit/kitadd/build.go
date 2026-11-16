@@ -52,7 +52,7 @@ func analyze(o *Options, dir, entry string) (*Analysis, error) {
 	}
 	run := o.Node
 	if run == nil {
-		run = func(dir string, args ...string) ([]byte, error) { return runCmd(dir, nil, "node", args...) }
+		run = func(dir string, args ...string) ([]byte, error) { return o.runCmd(dir, "node", args...) }
 	}
 	out, err := run(dir, script, entry)
 	if err != nil {
@@ -617,7 +617,7 @@ func tailwindCompile(o *Options, dir, pkg, spec string, n int) (string, error) {
 	out := filepath.Join(dir, fmt.Sprintf(".kit-pkg-%d.css", n))
 	run := o.Node
 	if run == nil {
-		run = func(dir string, args ...string) ([]byte, error) { return runCmd(dir, nil, "node", args...) }
+		run = func(dir string, args ...string) ([]byte, error) { return o.runCmd(dir, "node", args...) }
 	}
 	if _, err := run(dir, cli, "-i", in, "-o", out, "--minify"); err != nil {
 		return "", err

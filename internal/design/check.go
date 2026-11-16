@@ -218,6 +218,10 @@ func (l *Library) launchBrowser(bin string) (*browser, error) {
 		"--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows"}
 	// RUNTIME_DESIGN_CHROME_ARGS adds the browser's switches a machine needs, such as --no-sandbox in a container
 	// that gives no user namespaces to an unprivileged user (the image sets it).
+	if l.cfg.Offline {
+		args = append(args, "--proxy-server=http://127.0.0.1:9", "--proxy-bypass-list=127.0.0.1;localhost;[::1]",
+			"--force-webrtc-ip-handling-policy=disable_non_proxied_udp", "--webrtc-ip-handling-policy=disable_non_proxied_udp")
+	}
 	args = append(append(args, strings.Fields(os.Getenv("RUNTIME_DESIGN_CHROME_ARGS"))...), "about:blank")
 	cmd := exec.Command(bin, args...)
 	cmd.ExtraFiles = []*os.File{toChrome, fromChrome}

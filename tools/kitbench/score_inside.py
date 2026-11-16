@@ -19,6 +19,14 @@ except OSError:
 if port:
     env["HARNESSLY_URL"] = "http://127.0.0.1:" + port
 out = {"project": PROJECT}
+if len(sys.argv) > 2:  # keep the boards and the screenshots: the stand is deleted after the run
+    import shutil
+    dst = os.path.join(sys.argv[2], os.environ.get("EVAL_STARTED_AT", "0"))
+    try:
+        shutil.copytree(stand + "/design/" + PROJECT, dst, symlinks=True, ignore=shutil.ignore_patterns("node_modules"))
+        out["kept"] = dst
+    except OSError as e:
+        out["kept"] = "failed: %s" % e
 
 
 def sh(cmd, timeout, stdin=None):

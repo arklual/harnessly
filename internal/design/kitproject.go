@@ -197,12 +197,14 @@ func (l *Library) KitBrief(project string) string {
 		return "UI kit of this project: " + where + " (ds/" + mount + "/, " + ns + ".*" + rootSuffix(root) + "). Draw ONLY from it: no own HTML, colours or sizes.\n" +
 			"- Read it first: kit_index {kit:\"" + pin.ID + "\"}, then kit_component for every component you use (when to use / not, props, sampleJsx), kit_tokens for variables, kit_templates for a known kind of page.\n" +
 			"- Boards are <x-import component-from-global-scope=\"" + ns + ".Name\" …>" + providerNote(root) + ".\n" +
-			"- After an edit: `" + cli + " design check " + project + " --strict` must say ok; then `" + cli + " design check " + project + " --board FILE` takes a screenshot (.check/): open the screenshot and look at it, fix what is off. Strict mode is on for this project."
+			"- After an edit: `" + cli + " design check " + project + " --strict` must say ok; then `" + cli + " design check " + project + " --board FILE` takes a screenshot (.check/): open the screenshot and look at it, fix what is off. Strict mode is on for this project.\n" +
+			"- The work is NOT done until `" + cli + " design check " + project + " --strict` says ok: fix every finding and run it again. Layout, text and icons come from the kit too (Stack, Grid, Text, Glyph, DataTable, TextField, SelectField where the kit has them: kit_index): no <div>, <table>, <input>, no px or colours of your own."
 	}
 	return "UI-кит проекта: " + where + " (ds/" + mount + "/, " + ns + ".*" + rootSuffix(root) + "). Рисуй ТОЛЬКО из него: свой HTML, цвета и размеры не придумывай.\n" +
 		"- Сначала прочитай кит: kit_index {kit:\"" + pin.ID + "\"}, затем kit_component на каждый нужный компонент (когда и когда не, props, sampleJsx), kit_tokens — переменные, kit_templates — страница известного вида.\n" +
 		"- Доска — <x-import component-from-global-scope=\"" + ns + ".Имя\" …>" + providerNoteRu(root) + ".\n" +
-		"- После правки: `" + cli + " design check " + project + " --strict` должен сказать ok; затем `" + cli + " design check " + project + " --board ФАЙЛ` снимает скриншот (.check/): открой скриншот и посмотри глазами, поправь, что не так. Строгий режим у проекта включён."
+		"- После правки: `" + cli + " design check " + project + " --strict` должен сказать ok; затем `" + cli + " design check " + project + " --board ФАЙЛ` снимает скриншот (.check/): открой скриншот и посмотри глазами, поправь, что не так. Строгий режим у проекта включён.\n" +
+		"- Работа не готова, пока `" + cli + " design check " + project + " --strict` не даёт ok: поправь каждое замечание и запусти снова. Раскладка, текст и иконки тоже из кита (Stack, Grid, Text, Glyph, DataTable, TextField, SelectField, если они есть в ките: kit_index): ни <div>, <table>, <input>, ни своих px и цветов."
 }
 
 // providerNote says where the kit's root sits: only a kit that has one wraps new boards in it.

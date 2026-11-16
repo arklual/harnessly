@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 // The scopes a look is put on: everything, the folder of the agent's chat, or the chat itself.
@@ -32,13 +33,19 @@ type Request struct {
 	Conv  string `json:"conv,omitempty"`
 	Scope string `json:"scope"`
 	// Look is the look to put on; nil with Reset takes the scope's own look away.
-	Look  *Look  `json:"look,omitempty"`
-	Reset bool   `json:"reset,omitempty"`
-	Why   string `json:"why,omitempty"`
-	State string `json:"state"`
+	Look  *Look `json:"look,omitempty"`
+	Reset bool  `json:"reset,omitempty"`
+	// FxCode is the JS of a custom live effect: the page uploads it (PUT /api/v2/me/looks) and sets look.fx.script to
+	// its hash itself, so Look.Fx may be absent or have no script yet. Look is then set.
+	FxCode string `json:"fxCode,omitempty"`
+	Why    string `json:"why,omitempty"`
+	State  string `json:"state"`
 	// Note is what the page said: why it failed.
 	Note string `json:"note,omitempty"`
 }
+
+// MaxFxCode is the longest fxCode of a request, in bytes (the store takes up to wire.MaxLookFx).
+const MaxFxCode = 128 << 10
 
 // RequestTTL is how long a request waits for a page.
 const RequestTTL = 10 * time.Minute
@@ -194,6 +201,8 @@ type Ask struct {
 	Look   json.RawMessage
 	Preset string
 	Reset  bool
+	// FxCode is the JS of a custom live effect; it needs a look of the agent's own.
+	FxCode string
 	Why    string
 	Wait   time.Duration
 }
@@ -211,6 +220,17 @@ func (b *Inbox) Submit(ctx context.Context, a Ask) (Request, string, error) {
 		return Request{}, "", bad("scope %s needs a chat: run it from the agent's chat", a.Scope)
 	}
 	req := Request{Scope: a.Scope, Conv: a.Conv, Why: a.Why, Reset: a.Reset}
+	if a.FxCode != "" {
+		switch {
+		case len(a.FxCode) > MaxFxCode:
+			return Request{}, "", bad("fxCode is longer than %d bytes", MaxFxCode)
+		case !utf8.ValidString(a.FxCode):
+			return Request{}, "", bad("fxCode is not valid UTF-8")
+		case a.Reset || a.Preset != "" || len(a.Look) == 0:
+			return Request{}, "", bad("fxCode goes with a look of your own (not a preset or reset)")
+		}
+		req.FxCode = a.FxCode
+	}
 	switch {
 	case a.Reset:
 	case a.Preset != "":
@@ -224,7 +244,7 @@ func (b *Inbox) Submit(ctx context.Context, a Ask) (Request, string, error) {
 		}
 		req.Look = &l
 	case len(a.Look) > 0:
-		l, err := Parse(a.Look)
+		l, err := parse(a.Look, a.FxCode != "")
 		if err != nil {
 			return Request{}, "", err
 		}

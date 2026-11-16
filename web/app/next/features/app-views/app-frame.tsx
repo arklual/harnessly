@@ -856,9 +856,10 @@ const AppFrame = ({
         }
         const chatId = chatTarget(to);
         if (chatId !== null) {
-          // The bridge has checked agents.read; only a conversation of this machine opens.
-          if (conversationsStore.get(chatId)?.machineId !== machine)
-            throw new BridgeError('invalid_params', 'no such conversation on this machine');
+          // The bridge has checked agents.read. A conversation of another machine of the person opens too, when the
+          // page holds it (its machine's sidebar group): a run the app started on that machine is opened in place.
+          if (conversationsStore.get(chatId) === undefined)
+            throw new BridgeError('invalid_params', 'no such conversation on this page');
           openConversation(chatId);
           return;
         }

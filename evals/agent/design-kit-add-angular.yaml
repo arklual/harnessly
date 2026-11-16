@@ -7,6 +7,10 @@ covers:
   - 'internal/hlcli/designkit*.go'
   - 'internal/designkit/kitadd/**'
   - 'docs/agents/design-kits.md'
+  - 'internal/design/kitproject.go'
+  - 'internal/hlcli/design.go'
+  - 'internal/hlcli/design_strict_stop.go'
+  - 'internal/hlcli/help.go'
 prompt: >-
   Нужен UI-кит для Sinopia из Angular Material (npm-пакет @angular/material): положи его в папку ./material-kit
   так, чтобы по нему можно было собирать доски — компоненты, токены и описания.

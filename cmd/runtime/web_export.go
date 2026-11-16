@@ -10,6 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agentbrowser/host"
 	"github.com/ly-solutions/harnessly/internal/apps"
+	"github.com/ly-solutions/harnessly/internal/designkit/kitadd"
 )
 
 // webExport writes the page this runtime would serve into dir: its files as they are and index.html with the base, the
@@ -53,6 +54,10 @@ func init() { host.Build = agent.BuildVersion }
 func subcommand(args []string) (bool, error) {
 	if len(args) > 0 && args[0] == "browser-host" {
 		return true, host.Main(args[1:])
+	}
+	if len(args) >= 1 && args[0] == kitadd.SandboxHelperArg {
+		// The helper of a sandboxed kit build: it only returns when it could not become the command.
+		return true, kitadd.RunSandboxHelper(args[1:])
 	}
 	if len(args) >= 2 && args[0] == SandboxExec && args[1] == "--" {
 		// It only returns when it could not become the command.

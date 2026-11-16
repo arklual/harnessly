@@ -31,7 +31,7 @@ harnessly design kit import <file-or-url> [--as-id ID] [--as-version V] [--dry-r
 harnessly design kit search <id> <words…> [--theme T] [--version V] [--dir DIR]
 harnessly design kit show <id> <node> [--theme T] [--version V] [--dir DIR]
 harnessly design kit add npm:<package>[@<version>]|shadcn:<registry> [<folder>] [--id ID] [--namespace NS] [--title T]
-        [--version V] [--root Comp] [--react 19] [--css <package>/<file>.css,…] [--registry URL] [--from DIR] [--no-render] [--no-draft] [--draft] [--license-secret NAME] [--json]
+        [--version V] [--root Comp] [--react 19] [--css <package>/<file>.css,…] [--registry URL] [--from DIR] [--no-render] [--sandbox|--no-sandbox] [--no-draft] [--draft] [--license-secret NAME] [--json]
 harnessly design kit update <folder> [--version V] [--from DIR] [--no-render] [--json]
 harnessly design kit check <folder> [--render] [--levels] [--json]
 harnessly design kit render <folder> [--shots] [--only ID,ID] [--json]
@@ -173,6 +173,7 @@ type kitOptions struct {
 	to, from, mode                string
 	css                           bool
 	noRender, noDraft, draft      bool
+	sandbox, noSandbox            bool
 	licenseSecret                 string
 	root, cssFiles, registry      string
 	react                         string
@@ -242,6 +243,10 @@ func (c *cli) kitFlags(args []string) (kitOptions, []string, error) {
 			}
 		case "no-render":
 			o.noRender = true
+		case "sandbox":
+			o.sandbox = true
+		case "no-sandbox":
+			o.noSandbox = true
 		case "draft":
 			o.draft = true
 		case "no-draft":

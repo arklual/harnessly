@@ -83,6 +83,10 @@
           "type": "string",
           "description": "The cursor of an earlier read."
         },
+        "before": {
+          "type": "string",
+          "description": "For a hub URL or remote id: the previous cursor, to read the older page. Do not combine with since."
+        },
         "limit": {
           "type": "integer",
           "minimum": 1,

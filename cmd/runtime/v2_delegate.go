@@ -46,7 +46,8 @@ const delegationSweep = 2 * time.Second
 
 func newDelegation(v *v2Live, settings wire.RuntimeSettingsStore) *delegation.Service {
 	return &delegation.Service{
-		Convs: v.rt,
+		Convs:       v.rt,
+		CentralRead: v.centralHistoryRead,
 		Settings: func() wire.DelegationSettings {
 			if settings == nil {
 				return wire.DefaultDelegation

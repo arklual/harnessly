@@ -14,17 +14,20 @@ import (
 // scene), grain, dim, roundness, a font and a few safe variants of the chat's parts. The person's page puts it on and
 // shows «Applied · Undo»; the command waits for that.
 
-const themeHelp = `harnessly theme get|presets|preset|set|reset
+const themeHelp = `harnessly theme get|presets|fx-presets|preset|set|reset
 
 The person's own look of harnessly: colours, the background of the chats (a gradient, a picture, an animated scene
 such as matrix, stars, aurora, rain, synthwave), grain, dim, roundness, font and the look of the chat's parts. Use it
 when the person asks for a theme, a background, colours or a style ("make it look like night Tokyo", "put the matrix
-on this folder"). The person's page applies the change at once and shows "Applied · Undo".
+on this folder"). The person's page applies the change at once and shows "Applied · Undo". A look may also carry a live
+effect that plays over the chat (snow that settles on the blocks, a lamp, a laser): a built-in one or your own script.
 
   harnessly theme get                         the looks now (everything, the folders, the chats) and the presets
   harnessly theme presets                     the ready looks: id, name
+  harnessly theme fx-presets                  the built-in live effects (fx.preset): id, name, what it does
   harnessly theme preset ID [--scope S] --why "…"
   harnessly theme set '<look JSON>' [--scope S] --why "…"    (or --file look.json)
+  harnessly theme set '<look JSON>' --fx-file effect.js --why "…"   a live effect of your own code (see below)
   harnessly theme reset [--scope S] --why "…"                takes the scope's own look away (it inherits again)
 
 --scope: all (the default: every chat), folder (the folder of this chat), chat (this chat only). A chat wears its own
@@ -40,7 +43,17 @@ A look (every field checked; no CSS, no code):
    "grain":0-100, "dim":0-100, "blur":0-24,     noise over the background; darkening and blur under the text
    "radius":"sharp|default|round", "density":"compact|cozy", "font":"system|inter|serif|mono|rounded",
    "parts":{"bubble":"soft|solid|outline|glass", "turns":"plain|card|glass", "composer":"solid|glass|outline",
-            "sidebar":"plain|tinted|glass"}}
+            "sidebar":"plain|tinted|glass"},
+   "fx":{"preset":"snowplay|nightlamp|laser"} or {"script":"<sha256>"}, "back":bool, "power":0-100}
+                                               optional live effect: a built-in one, or a script kept like a picture;
+                                               "back" puts it behind the chat's blocks, "power" is how strong it is
+Live effects: snowplay (Снежная игра: snow settles on the blocks, the mouse sweeps it, a double click calls a snowplough,
+Ded Moroz flies by), nightlamp (Ночник: a warm light from a corner while the agent works), laser (Лазер: a new answer is
+burnt in by a beam, a new prompt is lit up). When none fits, write a script and pass it with --fx-file effect.js (up to
+128 KB; the page uploads it and sets "fx.script" itself, so the look needs no hash: {"fx":{"back":true,"power":60}} or
+no "fx" at all). A script starts with the line //hx-fx v1 and runs only against the page's sandbox SDK "hx" (hx.ctx,
+hx.w, hx.h, hx.pointer, hx.blocks, hx.agent, hx.colors, hx.on("frame", (t, dt) => …) …; docs/looks.md, «Живые эффекты»):
+it draws in a transparent frame with no network, cannot read the page and never sees the chat's text. Never write CSS.
 The page keeps the text readable: a colour that would make text fail contrast is moved until it passes.
 `
 
@@ -50,7 +63,7 @@ func (c *cli) theme(args []string) error {
 		return nil
 	}
 	switch args[0] {
-	case "get", "presets":
+	case "get", "presets", "fx-presets":
 		status, raw, err := c.call(http.MethodGet, "/api/cli/looks", nil, nil)
 		if err != nil {
 			return err
@@ -64,6 +77,11 @@ func (c *cli) theme(args []string) error {
 				ID   string `json:"id"`
 				Name string `json:"name"`
 			} `json:"presets"`
+			FxPresets []struct {
+				ID    string `json:"id"`
+				Name  string `json:"name"`
+				About string `json:"about"`
+			} `json:"fxPresets"`
 		}
 		if err := json.Unmarshal(raw, &out); err != nil {
 			return err
@@ -79,9 +97,22 @@ func (c *cli) theme(args []string) error {
 				c.out("looks: %s\n", out.Looks)
 			}
 		}
+		if args[0] == "fx-presets" {
+			c.out("fx presets (a look's {\"fx\":{\"preset\":ID}}):\n")
+			for _, p := range out.FxPresets {
+				c.out("  %-10s %s: %s\n", p.ID, p.Name, p.About)
+			}
+			return nil
+		}
 		c.out("presets:\n")
 		for _, p := range out.Presets {
 			c.out("  %-10s %s\n", p.ID, p.Name)
+		}
+		if len(out.FxPresets) > 0 {
+			c.out("fx presets (harnessly theme fx-presets):\n")
+			for _, p := range out.FxPresets {
+				c.out("  %-10s %s\n", p.ID, p.Name)
+			}
 		}
 		return nil
 	case "preset", "set", "reset":
@@ -125,6 +156,15 @@ func (c *cli) themeSet(verb string, args []string) error {
 				}
 				value = string(b)
 			}
+		case a == "--fx-file":
+			var p string
+			if p, err = next(); err == nil {
+				b, rerr := os.ReadFile(p)
+				if rerr != nil {
+					return fail("cannot read %s: %v", p, rerr)
+				}
+				body["fxCode"] = string(b)
+			}
 		case a == "--wait":
 			var v string
 			if v, err = next(); err == nil {
@@ -147,6 +187,9 @@ func (c *cli) themeSet(verb string, args []string) error {
 	}
 	if strings.TrimSpace(why) == "" {
 		return usageErr("theme %s needs --why \"what the person asked for\"", verb)
+	}
+	if _, ok := body["fxCode"]; ok && verb != "set" {
+		return usageErr("--fx-file goes with theme set '<look JSON>'")
 	}
 	switch verb {
 	case "preset":

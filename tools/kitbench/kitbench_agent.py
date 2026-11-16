@@ -10,7 +10,7 @@ PROJECT = "cabinet"
 # Kits of the agent part: name -> where the installable archive comes from. "folder": a `kit add` result of part A;
 # "export": a ready `kit export` archive (a kit that is not public, kept outside the repository).
 # Private kits come from the environment: KITBENCH_EXPORT_KITS="name=archive.tar.gz,name2=other.tar.gz" (archives in the --out dir's parent).
-AGENT_KITS = [("antd", "folder", None), ("mui", "folder", None)] + [
+AGENT_KITS = [(n, "folder", None) for n in ("antd", "mui", "mantine9", "angular-material", "primeng")] + [
     (kv.split("=", 1)[0], "export", kv.split("=", 1)[1]) for kv in os.environ.get("KITBENCH_EXPORT_KITS", "").split(",") if "=" in kv]
 
 PROMPTS = [
@@ -118,10 +118,12 @@ def write_scenarios(a, KITS, env, run, h):
         json.dump({"title": "Кабинет", "boards": []}, open(os.path.join(proj2, "artifact.json"), "w"), ensure_ascii=False)
         json.dump({}, open(os.path.join(proj2, "meta", "project.json"), "w"))
         for pid, prompt in PROMPTS + [("ask", dict(PROMPTS)["dashboard"])]:
+            if os.environ.get("KITBENCH_ONLY_ASK") == "1" and pid != "ask":
+                continue
             fx = "fx-%s%s" % (name, "-ask" if pid == "ask" else "")
             sid = "kb-%s-%s" % (name, pid)
             ids.append(sid)
-            chk = "echo %s | base64 -d > ../../score.py && python3 ../../score.py %s" % (score, PROJECT)
+            chk = "echo %s | base64 -d > ../../score.py && python3 ../../score.py %s %s" % (score, PROJECT, os.path.join(os.path.abspath(out), "boards", sid))
             lines = [
                 "id: " + sid,
                 "title: " + yq("kitbench: %s, %s" % (name, pid)),
@@ -132,6 +134,7 @@ def write_scenarios(a, KITS, env, run, h):
                 "  workspace: [kitpkg-%s]" % name,
                 "  run: " + yq(inst + " && rm -f kit.tar.gz"),
                 "  design: [%s/%s]" % (fx, PROJECT),
+            ] + (["  runtime_env: {RUNTIME_EVAL_NOTICE_FIRST: \"1\"}"] if pid == "ask" else []) + [
                 "prompt: " + yq(prompt),
                 "expect:",
                 "  - name: did a screenshot check of the screen",

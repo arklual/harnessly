@@ -136,22 +136,73 @@ func npmInstall(o *Options, dir string, pkgs []string) error {
 			}
 		}
 	}
-	args := []string{"install", "--no-audit", "--no-fund", "--ignore-scripts", "--legacy-peer-deps", "--loglevel=error"}
+	base := []string{"--no-audit", "--no-fund", "--ignore-scripts", "--legacy-peer-deps", "--loglevel=error"}
 	if o.Registry != "" {
-		args = append(args, "--registry", o.Registry)
+		base = append(base, "--registry", o.Registry)
 	}
 	for _, p := range pkgs {
 		if !SafeNpmSpec(p) {
 			return fmt.Errorf("%q is not a package npm may install here (name[@version])", p)
 		}
 	}
-	args = append(args, pkgs...)
-	o.logf("npm %s\n", strings.Join(args, " "))
 	run := o.Npm
 	if run == nil {
-		run = func(dir string, args ...string) error { _, err := runCmd(dir, nil, "npm", args...); return err }
+		run = func(dir string, args ...string) error { _, err := o.runCmd(dir, "npm", args...); return err }
 	}
-	return run(dir, args...)
+	if o.Sandbox {
+		// First the lock alone: it names every package the tree needs and where each comes from. Only a lock whose every
+		// address is https on an allowed registry is installed (npm ci), and nothing was downloaded before that.
+		lockArgs := append(append([]string{"install", "--package-lock-only"}, base...), pkgs...)
+		o.logf("npm %s\n", strings.Join(lockArgs, " "))
+		if err := run(dir, lockArgs...); err != nil {
+			return err
+		}
+		if err := checkLock(dir, o.allowedHosts()); err != nil {
+			return err
+		}
+		ciArgs := append([]string{"ci"}, base...)
+		o.logf("npm %s\n", strings.Join(ciArgs, " "))
+		if err := run(dir, ciArgs...); err != nil {
+			return err
+		}
+	} else {
+		args := append(append([]string{"install"}, base...), pkgs...)
+		o.logf("npm %s\n", strings.Join(args, " "))
+		if err := run(dir, args...); err != nil {
+			return err
+		}
+	}
+	if o.NoInstallScripts {
+		return refuseInstallScripts(dir, pkgs)
+	}
+	return nil
+}
+
+// refuseInstallScripts is an error for a requested package that has an install script: npm ran with --ignore-scripts,
+// so the script did not run, and saying so beats a kit that is quietly missing what the script makes.
+func refuseInstallScripts(dir string, pkgs []string) error {
+	for _, spec := range pkgs {
+		name := spec
+		if i := strings.LastIndex(spec, "@"); i > 0 {
+			name = spec[:i]
+		}
+		raw, err := os.ReadFile(filepath.Join(dir, "node_modules", filepath.FromSlash(name), "package.json"))
+		if err != nil {
+			continue
+		}
+		var pj struct {
+			Scripts map[string]string `json:"scripts"`
+		}
+		if json.Unmarshal(raw, &pj) != nil {
+			continue
+		}
+		for _, hook := range []string{"preinstall", "install", "postinstall"} {
+			if pj.Scripts[hook] != "" {
+				return fmt.Errorf("%s has a %s script; install scripts are never run here (npm install --ignore-scripts), so this package cannot be connected from the button. Add it with the command on a machine you trust: harnessly design kit add npm:%s ./folder", name, hook, name)
+			}
+		}
+	}
+	return nil
 }
 
 // fetch reads an address or a file: a registry may be a folder on disk (a mirror inside a closed network).

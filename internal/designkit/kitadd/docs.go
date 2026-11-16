@@ -435,6 +435,11 @@ func claudeDraft(prompt string) (string, error) {
 
 // ---- the plain sentence ----
 
+var (
+	layoutRe = regexp.MustCompile(`^(Flex|Space|Stack|HStack|VStack|Group|Inline|Row|Col|Column|Grid|SimpleGrid|GridItem|Container|Center|Box|Layout|Wrap|WrapItem|Cluster|Spacer|Divider|Separator|AspectRatio|Masonry|Splitter)$`)
+	textRe   = regexp.MustCompile(`^(Typography|Text|Title|Heading|Paragraph|Blockquote|Highlight|Mark|Code|Kbd|Link|Anchor|Label)$`)
+)
+
 var camelRe = regexp.MustCompile(`([a-z0-9])([A-Z])`)
 
 func words(id string) string { return strings.ToLower(camelRe.ReplaceAllString(id, "$1 $2")) }
@@ -453,6 +458,26 @@ func generatedDoc(c genComp, pkg string, all []string) compDoc {
 		d.Description = fmt.Sprintf("The %s of %s from %s.", w, words(c.Part), pkg)
 		d.When = []string{fmt.Sprintf("Inside %s, where its content needs a %s.", c.Part, w)}
 		d.WhenNot = []string{fmt.Sprintf("Alone: a %s is drawn inside %s, never by itself.", w, c.Part)}
+		return d
+	}
+	if layoutRe.MatchString(c.ID) {
+		d.Description = fmt.Sprintf("%s from %s: lays other components out in a row, a column or a grid with gaps from the theme.", c.ID, pkg)
+		d.When = []string{
+			"Every row, column, gap and aligned group on a screen: arrange components with it, not with a raw div and flex or margin styles.",
+			"Spacing between components: set it here (gap, align, justify) so it follows the theme.",
+		}
+		d.WhenNot = []string{"A single component with nothing beside it: no wrapper is needed. Page-level structure (header, sidebar, content): take the package's layout shell if it has one."}
+		d.Keywords = append(d.Keywords, "layout", "row", "column", "gap", "grid", "stack", "spacing")
+		return d
+	}
+	if textRe.MatchString(c.ID) {
+		d.Description = fmt.Sprintf("%s from %s: text on a screen in the theme's fonts, sizes and colours.", c.ID, pkg)
+		d.When = []string{
+			"Every heading, paragraph, label, caption and link on a screen: write text with it, not with a raw h1, p or span with font styles.",
+			"A text in the theme's colour roles (secondary, success, danger) or truncated to some lines.",
+		}
+		d.WhenNot = []string{"Text inside a component that already draws its own (a button's label, a card's title prop): pass the text to that component."}
+		d.Keywords = append(d.Keywords, "text", "heading", "title", "paragraph", "typography", "font")
 		return d
 	}
 	d.Description = fmt.Sprintf("%s from %s.", strings.ToUpper(w[:1])+w[1:], pkg)

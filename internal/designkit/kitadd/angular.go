@@ -88,6 +88,9 @@ type ngPreset struct {
 	Overlays     map[string]ngOverlay
 	AttrDefaults map[string][2]string // id → host attribute with a value the selector does not carry (matButton="filled"): the look a design wants by default
 	Samples      map[string]string    // id → sample (JSON) where the generated one does not draw: parts in their parent, an overlay open
+	HK           map[string]string    // the library's CSS variables for the kit's own components: text, muted, border, card, page, primary, danger, radius
+	Dyn          map[string]string    // id → JS function(p, st) that builds the Angular template of a data component (DataTable, TextField, SelectField)
+	IconClass    string               // "pi": icons are the library's own font (primeicons)
 	ThemeJS      []byte               // a node script (arg: build folder) that prints the stylesheet the library would build in a browser
 }
 
@@ -101,6 +104,7 @@ type ngOverlay struct {
 	Query  *ngQuery `json:"query,omitempty"` // what the open method is called on
 	Open   string   `json:"open,omitempty"`  // the method that opens it, when the prop `open` is true
 	Data   any      `json:"data,omitempty"`
+	Dyn    bool     `json:"dyn,omitempty"` // the template is built from the props by the runtime (DYN[id])
 }
 
 type ngQuery struct {
@@ -110,8 +114,37 @@ type ngQuery struct {
 
 var ngPresets = map[string]ngPreset{
 	"primeng": {
-		Prefix:     "P",
-		Install:    []string{"@primeuix/themes"},
+		Prefix:    "P",
+		Install:   []string{"@primeuix/themes", "primeicons"},
+		CSS:       []string{"primeicons/primeicons.css"},
+		IconClass: "pi",
+		ExtraMods: []string{"primeng/table", "primeng/inputtext", "primeng/iconfield", "primeng/inputicon", "primeng/select", "primeng/tag", "@angular/forms"},
+		HK:        map[string]string{"text": "--p-text-color", "muted": "--p-text-muted-color", "border": "--p-content-border-color", "card": "--p-content-background", "page": "--p-surface-50", "primary": "--p-primary-color", "danger": "--p-red-500", "radius": "--p-content-border-radius"},
+		Dyn: map[string]string{
+			"DataTable": `function (p, st) {
+  var cols = colsOf(p);
+  var h = '<p-table [value]="v[' + valIdx(st, arr(p.rows)) + ']"><ng-template #header><tr>';
+  cols.forEach(function (c) { h += '<th' + alignStyle(c) + '>' + esc(c.header) + '</th>'; });
+  h += '</tr></ng-template><ng-template #body let-r><tr>';
+  cols.forEach(function (c) {
+    var cell = '{{r["' + c.key + '"]}}';
+    if (c.tag) cell = '<p-tag [value]="r[\'' + c.key + '\']" [severity]="v[' + valIdx(st, c.sev) + '][r[\'' + c.key + '\']] || \'secondary\'"/>';
+    h += '<td' + alignStyle(c) + '>' + cell + '</td>';
+  });
+  return h + '</tr></ng-template></p-table>';
+}`,
+			"TextField": `function (p, st) {
+  var ph = valIdx(st, p.placeholder || ''), val = valIdx(st, p.value == null ? '' : p.value), ty = valIdx(st, p.type || 'text'), f = fnIdx(st, p.onChange);
+  var inp = '<input pInputText [type]="v[' + ty + ']" [placeholder]="v[' + ph + ']" [value]="v[' + val + ']" [style.width]="\'100%\'" (input)="f[' + f + ']($event.target.value)"/>';
+  if (p.icon) inp = '<p-iconfield [style.width]="\'100%\'"><p-inputicon class="pi pi-' + String(p.icon).replace(/[^a-z0-9-]/g, '') + '"/>' + inp + '</p-iconfield>';
+  return '<div' + fieldStyle(p) + '>' + (p.label ? '<label style="font-size:0.875rem">' + esc(p.label) + '</label>' : '') + inp + '</div>';
+}`,
+			"SelectField": `function (p, st) {
+  var o = valIdx(st, optsOf(p)), val = valIdx(st, p.value == null ? null : p.value), f = fnIdx(st, p.onChange);
+  return '<div' + fieldStyle(p) + '>' + (p.label ? '<label style="font-size:0.875rem">' + esc(p.label) + '</label>' : '') +
+    '<p-select [options]="v[' + o + ']" optionLabel="label" optionValue="value" [ngModel]="v[' + val + ']" placeholder="' + attrEsc(p.placeholder || '') + '" (onChange)="f[' + f + ']($event.value)" [style.width]="\'100%\'"/></div>';
+}`,
+		},
 		Imports:    "import { providePrimeNG } from 'primeng/config';\nimport Aura from '@primeuix/themes/aura';\n",
 		Providers:  "providers.push(providePrimeNG({ theme: { preset: Aura.default || Aura } }));",
 		ThemeJS:    primengThemeScript,
@@ -166,6 +199,30 @@ var ngPresets = map[string]ngPreset{
 		RootClass:    "mat-app-background mat-typography",
 		RootFont:     `Roboto, "Helvetica Neue", Arial, system-ui, sans-serif`,
 		AttrDefaults: map[string][2]string{"Button": {"matButton", "filled"}},
+		HK:           map[string]string{"text": "--mat-sys-on-surface", "muted": "--mat-sys-on-surface-variant", "border": "--mat-sys-outline-variant", "card": "--mat-sys-surface-container-low", "page": "--mat-sys-surface", "primary": "--mat-sys-primary", "danger": "--mat-sys-error", "radius": "--mat-sys-corner-medium"},
+		Dyn: map[string]string{
+			"DataTable": `function (p, st) {
+  var cols = colsOf(p), names = '[' + cols.map(function (c) { return "'c" + c.i + "'"; }).join(',') + ']';
+  var h = '<table mat-table [dataSource]="v[' + valIdx(st, arr(p.rows)) + ']" style="width:100%">';
+  cols.forEach(function (c) {
+    var cell = '{{r["' + c.key + '"]}}';
+    if (c.tag) cell = '<mat-chip [style.--mat-chip-elevated-container-color]="v[' + valIdx(st, c.sev) + '][r[\'' + c.key + '\']]?.bg" [style.--mat-chip-label-text-color]="v[' + valIdx(st, c.sev) + '][r[\'' + c.key + '\']]?.fg">{{r["' + c.key + '"]}}</mat-chip>';
+    h += '<ng-container matColumnDef="c' + c.i + '"><th mat-header-cell *matHeaderCellDef' + alignStyle(c) + '>' + esc(c.header) + '</th><td mat-cell *matCellDef="let r"' + alignStyle(c) + '>' + cell + '</td></ng-container>';
+  });
+  return h + '<tr mat-header-row *matHeaderRowDef="' + names + '"></tr><tr mat-row *matRowDef="let r; columns: ' + names + '"></tr></table>';
+}`,
+			"TextField": `function (p, st) {
+  var ph = valIdx(st, p.placeholder || ''), val = valIdx(st, p.value == null ? '' : p.value), ty = valIdx(st, p.type || 'text'), f = fnIdx(st, p.onChange);
+  var ico = p.icon ? '<span matIconPrefix class="hk-ico hk-ico-' + String(p.icon).replace(/[^a-z0-9-]/g, '') + '" style="margin:0 8px 0 12px"></span>' : '';
+  return '<mat-form-field appearance="outline" subscriptSizing="dynamic"' + wStyle(p) + '>' + (p.label ? '<mat-label>' + esc(p.label) + '</mat-label>' : '') + ico +
+    '<input matInput [type]="v[' + ty + ']" [placeholder]="v[' + ph + ']" [value]="v[' + val + ']" (input)="f[' + f + ']($event.target.value)"></mat-form-field>';
+}`,
+			"SelectField": `function (p, st) {
+  var o = valIdx(st, optsOf(p)), val = valIdx(st, p.value == null ? '' : p.value), ph = valIdx(st, p.placeholder || ''), f = fnIdx(st, p.onChange);
+  return '<mat-form-field appearance="outline" subscriptSizing="dynamic"' + wStyle(p) + '>' + (p.label ? '<mat-label>' + esc(p.label) + '</mat-label>' : '') +
+    '<mat-select [value]="v[' + val + ']" [placeholder]="v[' + ph + ']" (selectionChange)="f[' + f + ']($event.value)">@for (o of v[' + o + ']; track o.value) {<mat-option [value]="o.value">{{o.label}}</mat-option>}</mat-select></mat-form-field>';
+}`,
+		},
 		PartOf: map[string]string{
 			"Cell": "Table", "HeaderCell": "Table", "FooterCell": "Table", "Row": "Table", "HeaderRow": "Table", "FooterRow": "Table",
 			"NoDataRow": "Table", "TextColumn": "Table", "NestedTreeNode": "Tree", "Tab": "TabGroup", "Step": "Stepper",
@@ -308,7 +365,7 @@ func analyzeAngular(o *Options, dir, pkg string) (*ngAnalysis, error) {
 	}
 	run := o.Node
 	if run == nil {
-		run = func(dir string, args ...string) ([]byte, error) { return runCmd(dir, nil, "node", args...) }
+		run = func(dir string, args ...string) ([]byte, error) { return o.runCmd(dir, "node", args...) }
 	}
 	out, err := run(dir, script, dir, pkg)
 	if err != nil {
@@ -504,6 +561,19 @@ func buildAngular(o *Options, rep *Report, dir string, version string) (*built, 
 		}
 	}
 	ngMarkParts(comps, preset.PartOf)
+	for _, cp := range compositeSet(preset) {
+		g := genComp{ID: cp.ID, Description: cp.Description, File: "kit", Code: pkg, Props: cp.Props, Sample: json.RawMessage(cp.Sample)}
+		if cp.Dyn {
+			var ins []ngInput
+			for _, pr := range cp.Props {
+				if pr.Type != "function" {
+					ins = append(ins, ngInput{Name: pr.Name, Prop: pr.Name, Type: pr.Type, Values: pr.Values, Required: pr.Required, Description: pr.Description})
+				}
+			}
+			data = append(data, ngRuntimeComp{ID: cp.ID, Tag: "div", Inputs: ins, Outputs: []ngOutput{}, Ov: &ngOverlay{Dyn: true}})
+		}
+		comps = append(comps, g)
+	}
 	for _, m := range preset.ExtraMods {
 		if _, ok := mods[m]; !ok {
 			mods[m] = len(modNames)
@@ -521,6 +591,8 @@ func buildAngular(o *Options, rep *Report, dir string, version string) (*built, 
 	b := &built{pkg: pkg, version: version, kitPackage: pkg, js: js, css: styles, tokensCSS: string(styles), comps: comps,
 		codeImport: func(string) string { return pkg }, root: "Root"}
 	b.comps = append(b.comps, genComp{ID: "Root", Part: designkit.PartProvider, Description: "Wraps the content of a board in the library's page background and type"})
+	b.docs = gatherDocs(o, dir, b, rep)
+	improveAngularDocs(b.docs, b.comps)
 	return b, nil
 }
 
@@ -566,6 +638,7 @@ func angularEntry(ns string, mods []string, data []ngRuntimeComp, p ngPreset) st
 	s = strings.Replace(s, "/*DATA*/", string(raw), 1)
 	s = strings.Replace(s, "/*NS*/", string(nsj), 1)
 	s = strings.Replace(s, "/*PROVIDERS*/", p.Providers, 1)
+	s = strings.Replace(s, "/*COMPOSE*/", composeJS(p), 1)
 	s = strings.Replace(s, "/*ROOT*/", root, 1)
 	return s
 }
@@ -646,7 +719,7 @@ func ngThemeCSS(o *Options, dir string, script []byte) (string, error) {
 	}
 	run := o.Node
 	if run == nil {
-		run = func(dir string, args ...string) ([]byte, error) { return runCmd(dir, nil, "node", args...) }
+		run = func(dir string, args ...string) ([]byte, error) { return o.runCmd(dir, "node", args...) }
 	}
 	out, err := run(dir, f, dir)
 	return string(out), err

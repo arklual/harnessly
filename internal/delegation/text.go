@@ -107,6 +107,11 @@ func transcript(c wire.Conversation, snap wire.ConvSnapshot, limit int) string {
 	return b.String()
 }
 
+// Transcript is the compact, safe-to-pass-to-an-agent rendering of a stored conversation page.
+func Transcript(c wire.Conversation, snap wire.ConvSnapshot, limit int) string {
+	return transcript(c, snap, limit)
+}
+
 func entryLine(e wire.Entry) string {
 	switch e.T {
 	case wire.EntryUser:

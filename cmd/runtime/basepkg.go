@@ -34,6 +34,7 @@ func basepkgView(dataDir string) basepkg.View {
 	}
 	return basepkg.MakeView(basepkg.Look{
 		LookPath:   exec.LookPath,
+		Snap:       basepkg.IsSnap,
 		Manager:    basepkg.Detect(exec.LookPath, runtime.GOOS),
 		State:      st,
 		HasService: has,

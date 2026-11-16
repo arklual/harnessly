@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // The pictures of the person's own looks (the background of their chats): a page uploads one and keeps its
@@ -16,13 +17,20 @@ import (
 // user in its own folder or bucket, a runtime on its own in its data folder; both serve the same two paths:
 //
 //	PUT  /api/v2/me/looks          the picture's bytes (png, jpeg, webp, avif; at most MaxLookImage) -> {hash}
-//	GET  /api/v2/me/looks/<hash>   the picture, cached for good (a hash names one content)
+//	                               or a live effect's script (starts with LookFxMagic, UTF-8, at most MaxLookFx) -> {hash}
+//	GET  /api/v2/me/looks/<hash>   the picture or script, cached for good (a hash names one content)
 //
-// Only pictures are taken (by their bytes, not by what the request says) and they are served with nosniff and a
-// sandbox: a picture can never run as a page.
+// Only pictures and fx scripts are taken (by their bytes, not by what the request says) and they are served with nosniff
+// and a sandbox: neither can ever run as a page. A script runs only where the page puts it: in a sandboxed frame.
 
 // MaxLookImage is the largest picture a look takes; a page shrinks a bigger one before it uploads.
 const MaxLookImage = 3 << 20
+
+// LookFxMagic starts every fx script (the same as looks.FxMagic; a test keeps them equal).
+const LookFxMagic = "//hx-fx v1\n"
+
+// MaxLookFx is the largest fx script (a live effect's code) a look takes.
+const MaxLookFx = 256 << 10
 
 // LookBlobs keeps the pictures by the sha256 of their content (sites.FolderBlobs and sites.S3Blobs fit).
 type LookBlobs interface {
@@ -53,8 +61,14 @@ func validLookHash(h string) bool {
 	return err == nil && strings.ToLower(h) == h
 }
 
-// lookType is the picture type of the bytes, "" for anything else.
+// isFxScript says whether the bytes begin like an fx script (the whole file's UTF-8 is checked on upload).
+func isFxScript(head []byte) bool { return bytes.HasPrefix(head, []byte(LookFxMagic)) }
+
+// lookType is the type of the bytes: a picture's, text/plain for an fx script, "" for anything else.
 func lookType(head []byte) string {
+	if isFxScript(head) {
+		return "text/plain; charset=utf-8"
+	}
 	switch ct := http.DetectContentType(head); ct {
 	case "image/png", "image/jpeg", "image/webp":
 		return ct
@@ -87,11 +101,20 @@ func putLook(w http.ResponseWriter, r *http.Request, blobs LookBlobs) {
 		refuse(w, RefuseBadRequest)
 		return
 	}
-	if len(raw) > MaxLookImage {
+	switch {
+	case isFxScript(raw):
+		if len(raw) > MaxLookFx {
+			refuse(w, RefuseAttachmentTooLarge)
+			return
+		}
+		if !utf8.Valid(raw) {
+			refuse(w, RefuseAttachmentType)
+			return
+		}
+	case len(raw) > MaxLookImage:
 		refuse(w, RefuseAttachmentTooLarge)
 		return
-	}
-	if lookType(raw) == "" {
+	case lookType(raw) == "":
 		refuse(w, RefuseAttachmentType)
 		return
 	}

@@ -44,7 +44,41 @@ type Item struct {
 	Personal bool
 	// Hosts are the addresses the item needs besides the package mirror.
 	Hosts []string
+	// NoSnap: a snap, or a script that only runs one, does not count as the item. Ubuntu's chromium is such a shim, and
+	// the runtime cannot start it (snapd refuses users outside a login session: «cannot track application process»).
+	NoSnap bool
+	// Vendor is where the item comes from on Ubuntu, whose own package of it is only a snap shim.
+	Vendor *AptSource
 }
+
+// AptSource is a vendor's apt repository, laid out as the vendor's own package keeps it, so that its updates do not
+// fight over the files.
+type AptSource struct {
+	// Name names the files: /etc/apt/sources.list.d/<Name>.sources and /usr/share/keyrings/<Name>.gpg.
+	Name   string
+	KeyURL string
+	URI    string
+	Suite  string
+	Comp   string
+	// Arch is the only architecture the vendor builds.
+	Arch string
+	Pkgs []string
+}
+
+// SourcesFile and KeyFile are where the source and its key go.
+func (s AptSource) SourcesFile() string { return "/etc/apt/sources.list.d/" + s.Name + ".sources" }
+func (s AptSource) KeyFile() string     { return "/usr/share/keyrings/" + s.Name + ".gpg" }
+
+// Sources is the deb822 file of the source.
+func (s AptSource) Sources() string {
+	return "Types: deb\nURIs: " + s.URI + "\nSuites: " + s.Suite + "\nComponents: " + s.Comp +
+		"\nArchitectures: " + s.Arch + "\nSigned-By: " + s.KeyFile() + "\n"
+}
+
+// googleChrome is Google's repository, as google-chrome-stable writes it itself (/opt/google/chrome/cron/google-chrome).
+var googleChrome = &AptSource{Name: "google-chrome", KeyURL: "https://dl.google.com/linux/linux_signing_key.pub",
+	URI: "https://dl.google.com/linux/chrome-stable/deb/", Suite: "stable", Comp: "main", Arch: "amd64",
+	Pkgs: []string{"google-chrome-stable"}}
 
 // same is a package of one name everywhere.
 func same(name string, on ...Manager) map[Manager][]string {
@@ -86,7 +120,7 @@ var List = []Item{
 	{ID: "ripgrep", Title: "ripgrep", Without: "агенты медленнее ищут по коду", Bins: []string{"rg"}, Pkgs: same("ripgrep"), SizeMB: 6},
 	{ID: "chrome", Title: "Chromium", Without: "не будет проверки макетов и экспорта PNG, PDF, MP4",
 		Bins: []string{"chromium", "chromium-browser", "google-chrome", "google-chrome-stable"},
-		Pkgs: same("chromium", Apt, Dnf, Yum, Pacman, Zypper, Apk), SizeMB: 400, Heavy: true},
+		Pkgs: same("chromium", Apt, Dnf, Yum, Pacman, Zypper, Apk), SizeMB: 400, Heavy: true, NoSnap: true, Vendor: googleChrome},
 	{ID: "libreoffice", Title: "LibreOffice", Without: "не будет импорта и экспорта PPTX", Bins: []string{"soffice", "libreoffice"},
 		Pkgs:   with(with(same("libreoffice", Dnf, Yum, Pacman, Zypper, Apk), Apt, "libreoffice-impress"), Dnf, "libreoffice-impress"),
 		SizeMB: 700, Heavy: true, Optional: true},
@@ -127,6 +161,12 @@ func Hash() string {
 		sort.Strings(ms)
 		for _, m := range ms {
 			h.Write([]byte(m + "=" + strings.Join(it.Pkgs[Manager(m)], " ") + ";"))
+		}
+		if it.NoSnap {
+			h.Write([]byte("nosnap;"))
+		}
+		if it.Vendor != nil {
+			h.Write([]byte("vendor=" + it.Vendor.Sources() + strings.Join(it.Vendor.Pkgs, " ") + ";"))
 		}
 	}
 	return hex.EncodeToString(h.Sum(nil))[:16]

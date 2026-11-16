@@ -6,6 +6,7 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { sendBlob } from '@/next/core/net/http';
 import { clusterApi } from '@/next/core/net/machine';
+import { MAX_FX, uploadFx } from '@/next/features/looks/fx-frame';
 import { colorOf, gradientOf, rgbOf } from '@/next/features/looks/tokens';
 import {
   BUBBLES,
@@ -14,6 +15,8 @@ import {
   PRESETS,
   RADII,
   SCENES,
+  FX_PRESETS,
+  type TFxPreset,
   SIDEBARS,
   TURNS,
   type IHue,
@@ -267,6 +270,9 @@ const uploadPicture = async (file: File): Promise<string | null> => {
   return 'ok' in res ? res.value : null;
 };
 
+type TFxPick = 'none' | TFxPreset | 'own';
+const FX_ORDER: readonly TFxPick[] = ['none', ...FX_PRESETS, 'own'];
+
 const BG_ORDER: readonly TBgKind[] = ['none', 'gradient', 'color', 'image', 'scene'];
 
 export interface ILookEditorProps {
@@ -280,6 +286,17 @@ const LookEditor = ({ look, onChange }: ILookEditorProps) => {
   const set = (patch: Partial<ILook>) => onChange({ ...look, ...patch, name: undefined });
   const setBg = (patch: Partial<ILook['bg']>) => set({ bg: { ...look.bg, ...patch } });
   const setParts = (patch: Partial<ILook['parts']>) => set({ parts: { ...look.parts, ...patch } });
+  const fxFile = useRef<HTMLInputElement>(null);
+  const setFx = (fx: ILook['fx']) => onChange({ ...look, fx, name: undefined });
+  const fxPick: TFxPick = look.fx?.preset ?? (look.fx?.script ? 'own' : 'none');
+  const pickFx = async (f: File | undefined) => {
+    if (!f) return;
+    setBusy(true);
+    const hash = f.size <= MAX_FX ? await uploadFx(await f.text()).catch(() => null) : null;
+    setBusy(false);
+    if (hash) setFx({ script: hash, power: look.fx?.power, back: look.fx?.back });
+    else toast(t('next.looks.fx.uploadFailed'), { tone: 'error' });
+  };
   const pickFile = async (f: File | undefined) => {
     if (!f) return;
     setBusy(true);
@@ -393,6 +410,59 @@ const LookEditor = ({ look, onChange }: ILookEditorProps) => {
             onChange={(v) => set({ blur: round((v / 100) * 24) })}
           />
         </div>
+      )}
+
+      <div className="hx-lk-row">
+        <span className="hx-lk-label">{t('next.looks.fx')}</span>
+        <SegControl
+          label={t('next.looks.fx')}
+          value={fxPick}
+          choices={FX_ORDER.map((value) => ({ value, label: t(`next.looks.fx.${value}`) }))}
+          onPick={(pick) => {
+            if (pick === 'own') fxFile.current?.click();
+            else if (pick === 'none') setFx(undefined);
+            else setFx({ preset: pick, power: look.fx?.power, back: look.fx?.back });
+          }}
+        />
+        <input
+          ref={fxFile}
+          type="file"
+          accept=".js,text/javascript"
+          hidden
+          onChange={(event) => void pickFx(event.target.files?.[0])}
+        />
+      </div>
+      {look.fx && (
+        <>
+          {fxPick !== 'none' && <p className="hx-lk-hint">{t(`next.looks.fx.about.${fxPick}`)}</p>}
+          <WaveSlider
+            label={t('next.looks.fx.power')}
+            value={look.fx.power ?? 60}
+            onChange={(power) => setFx({ ...look.fx, power })}
+          />
+          {fxPick === 'own' && (
+            <div className="hx-lk-row">
+              <button
+                type="button"
+                className="hx-btn"
+                data-size="sm"
+                disabled={busy}
+                onClick={() => fxFile.current?.click()}
+              >
+                {busy ? t('next.looks.uploading') : t('next.looks.fx.replace')}
+              </button>
+              <SegControl
+                label={t('next.looks.fx.layer')}
+                value={look.fx.back ? 'back' : 'front'}
+                choices={[
+                  { value: 'front', label: t('next.looks.fx.layer.front') },
+                  { value: 'back', label: t('next.looks.fx.layer.back') },
+                ]}
+                onPick={(layer) => setFx({ ...look.fx, back: layer === 'back' || undefined })}
+              />
+            </div>
+          )}
+        </>
       )}
 
       <details className="hx-lk-more">

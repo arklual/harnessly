@@ -326,6 +326,9 @@ func sampleFor(id string, props []kitProp, parts []string, partProps map[string]
 		return s
 	}
 	if !hasProp(props, "children") {
+		if tbl := tableParts(id, parts, partProps); tbl != nil {
+			s["children"] = tbl // a polymorphic table lists no children, yet it is written as head, body, rows
+		}
 		return s
 	}
 	if shown != "" && len(parts) > 0 {
@@ -558,6 +561,10 @@ func writeKit(o *Options, b *built, old *oldKit, rep *Report) error {
 							smp = r
 						}
 						co.set("sample", smp)
+						if _, has := smp["children"]; has && !hasProp(props, "children") {
+							props = append(props, kitProp{Name: "children", Type: "node", Description: "The rows of the table: a head and a body."})
+							co.set("props", props) // the live preview passes only declared props
+						}
 					} else if vs := variantsFor(props); len(vs) > 0 {
 						co.set("variants", vs)
 					}
@@ -998,7 +1005,7 @@ func writeReadme(o *Options, b *built, first bool, rep *Report) error {
 			"kept, and this file is rewritten from «Not in the kit» on.\n\n", o.Title, "`"+b.pkg+"`")
 	}
 	head = strings.TrimRight(head, "\n") + "\n\n"
-	body, err := generatedReadme(o.Folder, o.Namespace, b.others, b.root)
+	body, err := generatedReadme(o.Folder, o.Namespace, b.others, b.root, nil)
 	if err != nil {
 		return err
 	}
@@ -1029,7 +1036,7 @@ func partOf(raw json.RawMessage) string {
 }
 
 // generatedReadme is the part of README.md that follows the package: what is not in the kit, Consuming, the index.
-func generatedReadme(folder, ns string, others []string, root string) (string, error) {
+func generatedReadme(folder, ns string, others []string, root string, why map[string]string) (string, error) {
 	raw, err := os.ReadFile(filepath.Join(folder, designkit.ManifestFile))
 	if err != nil {
 		return "", err
@@ -1061,13 +1068,11 @@ func generatedReadme(folder, ns string, others []string, root string) (string, e
 	for _, g := range d.Groups {
 		for _, c := range g.Components {
 			if partOf(c.Part) == "" && isNull(c.Sample) && isNull(c.Variants) {
-				why := "no sample yet"
-				for _, t := range c.Todo {
-					if strings.HasPrefix(t, "sample:") {
-						why = strings.TrimSpace(strings.TrimPrefix(t, "sample:"))
-					}
+				reason := "no sample yet"
+				if w := why[c.ID]; w != "" {
+					reason = "draws only inside an application (" + w + ")"
 				}
-				alone = append(alone, fmt.Sprintf("  - `%s` — %s", c.ID, why))
+				alone = append(alone, fmt.Sprintf("  - `%s` — %s", c.ID, reason))
 			}
 		}
 	}
@@ -1145,10 +1150,7 @@ func DropSamples(folder, ns, root string, failed map[string]string) error {
 				}
 				co.del("sample")
 				co.del("variants")
-				var todo []string
-				_ = json.Unmarshal(co.vals["todo"], &todo)
-				todo = append(todo, "sample: draws only inside an application ("+why+"); write a sample that works alone, or leave it out")
-				co.set("todo", todo)
+				// the reason is in README.md («draws only inside an application»), not a todo: nothing is left for a person to write
 			}
 			keep = append(keep, co)
 		}
@@ -1168,7 +1170,7 @@ func DropSamples(folder, ns, root string, failed map[string]string) error {
 	if i := strings.Index(head, readmeGenerated); i >= 0 {
 		head = head[:i]
 	}
-	body, err := generatedReadme(folder, ns, others, root)
+	body, err := generatedReadme(folder, ns, others, root, failed)
 	if err != nil {
 		return err
 	}

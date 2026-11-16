@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -59,6 +60,8 @@ func noticeRefused(w http.ResponseWriter, err error) {
 func noticeRoutes(d deps, reg *apps.Registry, views *apps.ViewServer, chats appChats) []gate.Route {
 	noticeMutes.Path = filepath.Join(d.DataDir, "notice-mutes.json")
 	noticeSlot.Muted = noticeMutes.Has
+	// An eval stand has no person to answer: RUNTIME_EVAL_NOTICE_FIRST=1 takes the first option of a choice.
+	noticeSlot.FirstOption = os.Getenv("RUNTIME_EVAL_NOTICE_FIRST") == "1"
 
 	page := func(method string, w http.ResponseWriter, r *http.Request) bool {
 		if sameorigin.Refuse(w, r) {

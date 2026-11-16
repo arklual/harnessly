@@ -39,6 +39,17 @@ type Options struct {
 	From      string // a folder with node_modules already installed: nothing is installed (offline, tests)
 	WorkDir   string // the build folder; the user cache when empty
 	Cwd       string // where the command runs: its .npmrc is used
+	// NoInstallScripts makes a package that asks for an install script (preinstall, install, postinstall) an error
+	// with the reason, not a silent skip: npm never runs scripts here (--ignore-scripts), and a kit that needs one
+	// would be half built. Set for a package an HTTP request names.
+	NoInstallScripts bool
+	// Sandbox runs npm and node under Landlock and seccomp (sandbox.go) and installs from a checked lock file: for a
+	// package an HTTP request names, or any package not yet trusted.
+	Sandbox bool
+	// SandboxHelper is the helper's command line up to the arguments it takes (this binary and SandboxHelperArg).
+	SandboxHelper []string
+	// AllowedHosts are the registry hosts a sandboxed install may fetch from, besides registry.npmjs.org and Registry's.
+	AllowedHosts []string
 
 	Log   io.Writer
 	Npm   func(dir string, args ...string) error           // runs npm; exec when nil
@@ -246,6 +257,9 @@ func buildNpm(o *Options, rep *Report) (*built, error) {
 	if len(css) == 0 {
 		css = packageCSS(dir, src.Package)
 	}
+	if len(css) == 0 {
+		css = companionCSS[src.Package] // the package styles nothing itself: its stylesheet is a library it is built on
+	}
 	css = compileTailwindSources(o, dir, src.Package, css, rep)
 	b := &built{pkg: src.Package, version: version, kitPackage: src.Package, root: o.Root,
 		codeImport: func(string) string { return src.Package }}
@@ -399,7 +413,7 @@ func tailwind(o *Options, dir string, reg *shadcnBuild) ([]byte, error) {
 	}
 	run := o.Node
 	if run == nil {
-		run = func(dir string, args ...string) ([]byte, error) { return runCmd(dir, nil, "node", args...) }
+		run = func(dir string, args ...string) ([]byte, error) { return o.runCmd(dir, "node", args...) }
 	}
 	if _, err := run(dir, cli, "-i", in, "-o", out, "--minify"); err != nil {
 		return nil, err
@@ -640,3 +654,10 @@ var slotRe = regexp.MustCompile(`^(?:Control|Panel|Item|Header|Footer|Main|Navba
 
 // groupSlotRe is a slot only when the parent has other slots: HoverCardGroup, ToolbarGroup, but not ButtonGroup.
 var groupSlotRe = regexp.MustCompile(`^Group$`)
+
+// companionCSS is the stylesheet of the library a package is only the React side of: react-bootstrap ships no CSS, Bootstrap's
+// dist/css does (its --bs-* variables become the tokens).
+var companionCSS = map[string][]string{
+	"react-bootstrap": {"bootstrap/dist/css/bootstrap.css"},
+	"reactstrap":      {"bootstrap/dist/css/bootstrap.css"},
+}

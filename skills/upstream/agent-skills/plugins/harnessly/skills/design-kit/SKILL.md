@@ -62,6 +62,8 @@ README, docs and stories, then, with `--draft` only, one `claude -p` call per 40
 is a draft). Then read the README's «Not in the kit», fix the samples of what did not draw, and
 `harnessly design kit check <folder> --render`.
 
+A package the team's recipes do not know (not antd, MUI, Chakra, HeroUI, PrimeNG) is somebody's code: `kit add` runs it in a sandbox by itself (no home, no tokens, no network but the install's; the dependency lock is checked before `npm ci`). Do not add `--no-sandbox` to make it work; a private registry that needs a token is the one case for it, and only when the person asked. `--sandbox` forces it for any package.
+
 ## A draft kit
 
 1. Agree the look in two or three sentences, or take it from the request.

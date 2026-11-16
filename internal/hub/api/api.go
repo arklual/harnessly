@@ -647,6 +647,9 @@ func New(o Options) (*Hub, error) {
 		mux.Handle("POST "+hubproto.MemoryPullPath, httpx.Handler(h.memoryPull))
 		mux.Handle("POST "+hubproto.MemoryPutPath, httpx.Handler(h.memoryPut))
 	}
+	if h.History != nil {
+		mux.Handle("POST "+hubproto.HistoryReadPath, httpx.Handler(h.agentHistoryRead))
+	}
 	notFound := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { httpx.WriteError(w, r, httpx.ErrNotFound) })
 	if appsView != nil {
 		mux.Handle("/apps/guest/", appsView)                   // apps.GuestPrefix

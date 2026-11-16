@@ -94,6 +94,8 @@ type Service struct {
 	fullPending map[string]int // parent → delegations with full_context starting now
 
 	Convs Conversations
+	// CentralRead reads the owner's synchronised history from the hub. It is only used when the id is not a local chat.
+	CentralRead func(ctx context.Context, id, before string, limit int) (string, error)
 	// Settings are the person's limits, read at every call.
 	Settings func() wire.DelegationSettings
 	// Models are the models an agent CLI takes here; nil trusts any id.
@@ -468,13 +470,31 @@ func joinEfforts(es []wire.Effort) string {
 
 // Read is the chat's feed as text: the last limit entries, or the ones after the entry since.
 func (s *Service) Read(ctx context.Context, callerID, id, since string, limit int) (string, error) {
+	return s.ReadPage(ctx, callerID, id, since, "", limit)
+}
+
+// ReadPage also accepts the hub's older-page cursor. Since remains the local runtime's entry cursor.
+func (s *Service) ReadPage(ctx context.Context, callerID, id, since, before string, limit int) (string, error) {
 	caller, err := s.caller(callerID)
 	if err != nil {
 		return "", err
 	}
 	rec, err := s.target(caller, id)
 	if err != nil {
+		if s.CentralRead != nil {
+			if since != "" {
+				return "", refuse("bad-request", "since only reads a local chat; use before for a hub history page")
+			}
+			text, centralErr := s.CentralRead(ctx, id, before, limit)
+			if centralErr == nil {
+				return text, nil
+			}
+			return "", refuse("hub-unavailable", "%v", centralErr)
+		}
 		return "", err
+	}
+	if before != "" {
+		return "", refuse("bad-request", "before only reads a hub history page")
 	}
 	var snap wire.ConvSnapshot
 	if since == "" {

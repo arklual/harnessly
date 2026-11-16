@@ -202,6 +202,12 @@ restarts no service. An item is installed only when 2 GiB stay free after it (`w
 (Chromium, LibreOffice, the speech model) wait while the load is above twice the cores (`deferred`). A failure of one
 item never stops the others.
 
+**Chromium on Ubuntu.** Ubuntu's `chromium` package is only a shim that installs the snap, and the runtime cannot
+start a snap (snapd refuses a process outside a login session). So a snap or a script that runs one never counts as
+Chromium, and on Ubuntu amd64 the service adds Google's repository the way `google-chrome-stable` keeps it itself
+(`/usr/share/keyrings/google-chrome.gpg`, `/etc/apt/sources.list.d/google-chrome.sources`) and installs
+`google-chrome-stable`. Google builds no Chrome for arm64, so there the item stays `missing` and says why.
+
 **No network.** An item whose install failed on the network is `no_access`, with the address when the package
 manager names one. The card offers «Указать прокси» (an `http`, `https` or `socks5` address; a login and password go
 in the safe, never in the address) and «Пропустить». The service goes direct first and uses the proxy only after

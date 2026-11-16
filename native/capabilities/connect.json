@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "connect-page",
+  "description": "The app's own page (start-up and the connect form). Remote pages get their bridge at run time.",
+  "windows": ["*"],
+  "permissions": ["allow-startup", "allow-connect", "allow-recent-servers", "allow-forget-server", "allow-use-local"]
+}

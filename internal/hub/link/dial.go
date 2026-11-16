@@ -320,6 +320,14 @@ func (d *Dialer) AdmitMemory(r *http.Request) (store.Machine, error) {
 	return m, err
 }
 
+func (d *Dialer) AdmitHistory(r *http.Request) (store.Machine, error) {
+	m, err := d.admit(r, hubproto.VerifyHistory, false, "history:")
+	if err == nil && m.DisabledAt != nil {
+		err = errDisabled
+	}
+	return m, err
+}
+
 func describe(err error) string {
 	if err == nil {
 		return ""

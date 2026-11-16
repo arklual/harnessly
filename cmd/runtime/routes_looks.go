@@ -21,7 +21,9 @@ import (
 //	POST <platform>/look-requests/<id>/done       {state: applied|failed, note?}
 //	PUT  <platform>/look-state                    {looks}: the page's hx-looks, for `harnessly theme get`
 //	GET  /api/cli/looks                           {looks, presets, scenes}: an agent of this machine (cli-token)
-//	POST /api/cli/looks/set                       {scope, look?|preset?|reset?, why, wait} -> {status, request}
+//	POST /api/cli/looks/set                       {scope, look?|preset?|reset?, fxCode?, why, wait} -> {status, request}
+//	                                              (fxCode: the JS of a custom live effect, up to looks.MaxFxCode; the page
+//	                                              uploads it and sets look.fx.script itself)
 //
 // Pages learn that a request came through the settings' watch (settingsctl.Touch): no watch of its own.
 
@@ -101,7 +103,7 @@ func lookRoutes(inbox *looks.Inbox, actorOf func(*http.Request) settingsctl.Acto
 		if cur == nil {
 			cur = json.RawMessage("null")
 		}
-		secretJSON(w, http.StatusOK, map[string]any{"looks": cur, "presets": looks.Presets(), "scenes": looks.Scenes})
+		secretJSON(w, http.StatusOK, map[string]any{"looks": cur, "presets": looks.Presets(), "scenes": looks.Scenes, "fxPresets": looks.FxPresetList})
 	}
 	cliSet := func(w http.ResponseWriter, r *http.Request) {
 		if !cliOK(w, r, http.MethodPost) {
@@ -112,15 +114,16 @@ func lookRoutes(inbox *looks.Inbox, actorOf func(*http.Request) settingsctl.Acto
 			Look   json.RawMessage `json:"look"`
 			Preset string          `json:"preset"`
 			Reset  bool            `json:"reset"`
+			FxCode string          `json:"fxCode"`
 			Why    string          `json:"why"`
 			Wait   float64         `json:"wait"`
 		}
-		if !readJSON(w, r, 16<<10, &b) {
+		if !readJSON(w, r, 192<<10, &b) {
 			return
 		}
 		by := actorOf(r)
 		out, status, err := inbox.Submit(r.Context(), looks.Ask{Scope: b.Scope, Conv: by.Conv, Look: b.Look, Preset: b.Preset,
-			Reset: b.Reset, Why: b.Why, Wait: time.Duration(b.Wait * float64(time.Second))})
+			Reset: b.Reset, FxCode: b.FxCode, Why: b.Why, Wait: time.Duration(b.Wait * float64(time.Second))})
 		if err != nil {
 			bad(w, err.Error())
 			return

@@ -140,15 +140,35 @@ type Installer struct {
 	Now  func() time.Time
 	// Save is called with the state as it goes, so the card sees progress.
 	Save func(State)
+	// Snap says a binary is a snap or a script that runs one (IsSnap); nil takes nothing for a snap.
+	Snap func(string) bool
+	// Distro is the ID of /etc/os-release and Arch the Debian name of the machine's architecture (amd64, arm64).
+	Distro, Arch string
+	// AddSource puts a vendor's apt repository in place: its key and its deb822 file. The proxy is tried after the
+	// direct way fails, as for the packages.
+	AddSource func(ctx context.Context, src AptSource, proxy string) error
 }
 
-func (in *Installer) present(it Item) bool {
+func (in *Installer) present(it Item) bool { return onPath(it, in.LookPath, in.Snap) }
+
+// onPath says one of the item's binaries is on PATH, and is the thing itself: for a NoSnap item a snap does not count.
+func onPath(it Item, look func(string) (string, error), snap func(string) bool) bool {
 	for _, b := range it.Bins {
-		if _, err := in.LookPath(b); err == nil {
+		if p, err := look(b); err == nil && !(it.NoSnap && snap != nil && snap(p)) {
 			return true
 		}
 	}
 	return false
+}
+
+// vendored is where an item comes from on this machine when the distribution's own package will not do: Ubuntu's
+// chromium is only a snap shim. ok is false when the item has no way here at all (a vendor that does not build for
+// this architecture).
+func (in *Installer) vendored(it Item) (src *AptSource, ok bool) {
+	if in.Manager != Apt || it.Vendor == nil || in.Distro != "ubuntu" {
+		return nil, true
+	}
+	return it.Vendor, in.Arch == it.Vendor.Arch
 }
 
 // netFail is an install output that says the network failed, and the host when it names one.
@@ -234,6 +254,13 @@ func (in *Installer) Install(ctx context.Context, box Inbox) State {
 			set(Missing, "на этой системе не ставится само", "")
 			continue
 		}
+		pkgs := it.Pkgs[in.Manager]
+		vendor, ok := in.vendored(it)
+		if !ok {
+			set(Missing, "в Ubuntu "+it.Title+" есть только в snap, а его рантайм запустить не может; для "+in.Arch+
+				" другого источника нет — без этого "+it.Without, "")
+			continue
+		}
 		if free, err := in.Free(); err == nil && free < uint64(it.SizeMB)<<20+freeAfter {
 			set(WaitingDisk, fmt.Sprintf("нужно %d МБ и ещё 2 ГиБ свободных", it.SizeMB), "")
 			continue
@@ -253,7 +280,25 @@ func (in *Installer) Install(ctx context.Context, box Inbox) State {
 				}
 			}
 		}
-		out, err := run(InstallArgs(in.Manager, it.Pkgs[in.Manager]))
+		if vendor != nil {
+			if err := in.AddSource(ctx, *vendor, box.Proxy); err != nil {
+				host := ""
+				if u, perr := url.Parse(vendor.KeyURL); perr == nil {
+					host = u.Hostname()
+				}
+				set(NoAccess, "не вышло подключить репозиторий "+vendor.URI+": "+err.Error()+" — без этого "+it.Without, host)
+				in.Save(st)
+				continue
+			}
+			// The new source is read only after its own update; the next item refreshes nothing it needs.
+			if out, err := run(RefreshArgs(in.Manager)); err != nil {
+				set(Failed, lastLine(out), "")
+				in.Save(st)
+				continue
+			}
+			pkgs = vendor.Pkgs
+		}
+		out, err := run(InstallArgs(in.Manager, pkgs))
 		switch {
 		case err == nil && in.present(it):
 			set(OK, "", "")

@@ -96,3 +96,27 @@ func TestPrimengLicense(t *testing.T) {
 		t.Fatalf("the key is put into the provider: %q", got)
 	}
 }
+
+func TestAngularRuntimeSetsOwnDefs(t *testing.T) {
+	// The template's directive table is set from the classes' own definitions: the JIT stops short on long import
+	// lists (PrimeNG), leaving p-table and p-select as bare elements.
+	for _, want := range []string{"directiveDefs = function", "allDefs()", "ɵtransitiveScopesFor"} {
+		if !strings.Contains(angularRuntime, want) {
+			t.Fatalf("the runtime lacks %q", want)
+		}
+	}
+}
+
+func TestImproveAngularDocsReplacesGeneratedAlternatives(t *testing.T) {
+	docs := map[string]compDoc{
+		"Chip":   {WhenSrc: srcGenerated, WhenNot: []string{"A chip avatar fits better: take ChipAvatar instead."}},
+		"Button": {WhenSrc: srcJSDoc, WhenNot: []string{"kept"}},
+	}
+	improveAngularDocs(docs, []genComp{{ID: "Chip"}, {ID: "Button"}})
+	if got := docs["Chip"].WhenNot[0]; !strings.Contains(got, "Badge") {
+		t.Fatalf("Chip alternative not replaced: %q", got)
+	}
+	if docs["Button"].WhenNot[0] != "kept" {
+		t.Fatalf("authors' text must stay")
+	}
+}

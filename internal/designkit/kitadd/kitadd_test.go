@@ -447,3 +447,37 @@ func TestReplaceSection(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+// A package an HTTP request names must not need an install script: npm never runs one here, so it is an error with
+// the reason.
+func TestInstallScriptsAreRefusedWithAReason(t *testing.T) {
+	dir := t.TempDir()
+	put := func(name, scripts string) {
+		d := filepath.Join(dir, "node_modules", filepath.FromSlash(name))
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(d, "package.json"), []byte(`{"name":"`+name+`","scripts":`+scripts+`}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	put("plain", `{"build":"x"}`)
+	put("@s/needs", `{"postinstall":"node setup.js"}`)
+	var seen []string
+	o := &Options{NoInstallScripts: true, Npm: func(_ string, args ...string) error { seen = args; return nil }}
+	if err := npmInstall(o, dir, []string{"plain@1.0.0"}); err != nil {
+		t.Fatalf("a plain package: %v", err)
+	}
+	if !strings.Contains(strings.Join(seen, " "), "--ignore-scripts") {
+		t.Errorf("npm ran without --ignore-scripts: %v", seen)
+	}
+	err := npmInstall(o, dir, []string{"@s/needs"})
+	if err == nil || !strings.Contains(err.Error(), "postinstall") || !strings.Contains(err.Error(), "--ignore-scripts") {
+		t.Errorf("a package with postinstall: %v", err)
+	}
+	// Without the flag (the command line, a person's own run) the same package installs.
+	o.NoInstallScripts = false
+	if err := npmInstall(o, dir, []string{"@s/needs"}); err != nil {
+		t.Errorf("the command line refused: %v", err)
+	}
+}

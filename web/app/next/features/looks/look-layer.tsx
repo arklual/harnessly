@@ -13,6 +13,8 @@ import { setForcedMode, useTheme } from '@/platform/theme';
 export interface IActiveLook {
   look: ILook;
   mode: TMode;
+  /** The open chat, null outside one (a live effect hears its agent: fx-layer.tsx). */
+  chat: string | null;
 }
 
 let active: IActiveLook | null = null;
@@ -99,8 +101,8 @@ const LookLayer = ({ chatId, folderId }: ILookLayerProps) => {
   useLayoutEffect(() => {
     setForcedMode(look && look.mode !== 'auto' ? look.mode : null);
     paintLook(tokens, attrsOf(look));
-    publish(look ? { look, mode } : null);
-  }, [look, mode, tokens]);
+    publish(look ? { look, mode, chat: chatId } : null);
+  }, [look, mode, tokens, chatId]);
   return null;
 };
 

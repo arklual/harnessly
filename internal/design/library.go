@@ -43,6 +43,9 @@ type Texts struct {
 
 // Config is what the deployment names.
 type Config struct {
+	// Offline starts the browser with no network but this machine: for a page of code nobody here wrote (a kit from a
+	// package an HTTP request named). Everything but loopback goes to a proxy that is not there.
+	Offline bool
 	DataDir string
 	// Passive is a library a hub reads or edits for a moment: no keepers, no history, no PDF builds.
 	Passive bool

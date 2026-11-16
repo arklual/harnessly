@@ -22,6 +22,7 @@ import (
 // KitProbeOptions are ProbeKit's.
 type KitProbeOptions struct {
 	Chrome  string
+	Offline bool
 	KitsDir string
 }
 
@@ -170,7 +171,7 @@ func ProbeKit(folder string, opt KitProbeOptions) (*KitProbe, error) {
 	if comp == "" {
 		return nil, errors.New("the kit has no component to draw the page with")
 	}
-	l := New(Config{LibraryDir: filepath.Join(work, "library"), DataDir: filepath.Join(work, "data"), KitsDir: kits,
+	l := New(Config{Offline: opt.Offline, LibraryDir: filepath.Join(work, "library"), DataDir: filepath.Join(work, "data"), KitsDir: kits,
 		Chrome: opt.Chrome, Texts: Texts{Tag: "harnessly-kit", CLI: "harnessly"}})
 	port, err := l.EnsureServer()
 	if err != nil {

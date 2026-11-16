@@ -1,0 +1,37 @@
+id: theme-fx
+title: «Живую тему со снегом, который ложится на поле ввода» — встроенный fx snowplay, без своего кода и CSS
+tags: [looks]
+timeout_s: 240
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'cmd/runtime/routes_looks.go'
+  - 'internal/looks/**'
+  - 'internal/hlcli/theme.go'
+  - 'internal/hlcli/help.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+prompt: сделай мне живую тему со снегом, который ложится на поле ввода
+expect:
+  - name: put a live effect on, the built-in snowplay
+    any_of:
+      - called: harnessly\.theme_set
+        args: {look: 'snowplay'}
+      - called: harnessly\.theme_set
+        args: {preset: 'snowplay'}
+      - called: Bash
+        args: {command: 'harnessly theme (preset|set)\b(?s:.*)snowplay'}
+  - name: wrote no CSS or page code for it
+    not_called: (Write|Edit)
+    args: {file_path: '\.(css|scss|tsx?|jsx|html)$'}
+variants:
+  - id: v1
+    kind: short
+    text: "живая тема со снегом на поле ввода"
+  - id: v2
+    kind: english
+    text: "make me a live theme where snow settles on the input box"
+  - id: v3
+    kind: indirect
+    text: "хочу, чтобы в интерфейсе шёл снег и ложился на блоки, а мышкой его можно было смахнуть"
+  - id: v4
+    kind: typos
+    text: "сдлеай живую тему со снегм, который лжится на поле ввода"

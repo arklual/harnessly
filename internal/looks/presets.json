@@ -196,5 +196,74 @@
       "blur": 0,
       "parts": { "composer": "glass", "sidebar": "tinted" }
     }
+  },
+  {
+    "id": "snowplay",
+    "name": "Снежная игра",
+    "nameEn": "Snow play",
+    "look": {
+      "v": 1,
+      "name": "Снежная игра",
+      "mode": "dark",
+      "hues": [
+        { "h": 208, "s": 70 },
+        { "h": 190, "s": 45 },
+        { "h": 355, "s": 70 }
+      ],
+      "accent": { "h": 200, "s": 80 },
+      "intensity": 55,
+      "bg": { "kind": "gradient" },
+      "grain": 6,
+      "dim": 10,
+      "blur": 0,
+      "radius": "round",
+      "font": "rounded",
+      "parts": { "bubble": "glass", "composer": "glass", "sidebar": "glass" },
+      "fx": { "preset": "snowplay", "power": 65 }
+    }
+  },
+  {
+    "id": "nightlamp",
+    "name": "Ночник",
+    "nameEn": "Night lamp",
+    "look": {
+      "v": 1,
+      "name": "Ночник",
+      "mode": "dark",
+      "hues": [
+        { "h": 32, "s": 60 },
+        { "h": 250, "s": 35 }
+      ],
+      "intensity": 40,
+      "bg": { "kind": "color" },
+      "grain": 10,
+      "dim": 0,
+      "blur": 0,
+      "parts": { "bubble": "soft", "composer": "solid" },
+      "fx": { "preset": "nightlamp", "power": 70 }
+    }
+  },
+  {
+    "id": "laser",
+    "name": "Лазер",
+    "nameEn": "Laser",
+    "look": {
+      "v": 1,
+      "name": "Лазер",
+      "mode": "dark",
+      "hues": [
+        { "h": 345, "s": 85 },
+        { "h": 280, "s": 60 }
+      ],
+      "accent": { "h": 345, "s": 90 },
+      "intensity": 45,
+      "bg": { "kind": "scene", "scene": "stars", "speed": 30 },
+      "grain": 8,
+      "dim": 30,
+      "blur": 0,
+      "font": "mono",
+      "parts": { "bubble": "outline", "composer": "glass" },
+      "fx": { "preset": "laser", "power": 70 }
+    }
   }
 ]

@@ -2,16 +2,27 @@ package hlcli
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/url"
+	"os"
+	"strconv"
 	"strings"
+	"time"
+
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
 // chat is `harnessly chat test ID|current [--off]`: the mark of a test chat, which the sidebar leaves out.
 func (c *cli) chat(args []string) error {
+	if len(args) > 0 && args[0] == "read" {
+		return c.chatRead(args[1:])
+	}
 	if len(args) > 0 && args[0] == "delete" {
 		return c.chatDelete(args[1:])
 	}
 	if len(args) == 0 || args[0] != "test" {
-		return usageErr("harnessly chat test ID|current [--off] | harnessly chat delete ID")
+		return usageErr("harnessly chat read ID|URL [--before TURN] [-n N] | chat test ID|current [--off] | chat delete ID")
 	}
 	off := false
 	rest := make([]string, 0, len(args))
@@ -62,6 +73,63 @@ func (c *cli) chat(args []string) error {
 		c.out("%s is a test chat: the sidebar leaves it out\n", strings.TrimSpace(r.Conversation))
 	} else {
 		c.out("%s is an ordinary chat again\n", strings.TrimSpace(r.Conversation))
+	}
+	return nil
+}
+
+func cliConversationID(ref string) (string, error) {
+	ref = strings.TrimSpace(ref)
+	if u, err := url.Parse(ref); err == nil && u.Scheme != "" && u.Host != "" {
+		p := strings.Split(strings.Trim(u.Path, "/"), "/")
+		if len(p) != 3 || p[0] != "agents" || p[1] != "c" {
+			return "", fmt.Errorf("not a hub conversation URL")
+		}
+		ref = p[2]
+	}
+	if !strings.HasPrefix(ref, "tab-") || len(ref) > 200 || strings.ContainsAny(ref, "/?# ") {
+		return "", fmt.Errorf("not a conversation id or hub conversation URL")
+	}
+	return ref, nil
+}
+
+// chatRead reads the owner's synchronised copy through their local agent; it never needs a browser session.
+func (c *cli) chatRead(args []string) error {
+	f, err := parseFlags(args, map[string]string{"before": "before", "n": "limit", "limit": "limit"})
+	if err != nil || len(f.pos) != 1 {
+		return usageErr("chat read ID|URL [--before TURN] [-n N]")
+	}
+	id, err := cliConversationID(f.pos[0])
+	if err != nil {
+		return err
+	}
+	limit := 40
+	if s := f.values["limit"]; s != "" {
+		limit, err = strconv.Atoi(s)
+		if err != nil || limit < 1 || limit > 100 {
+			return usageErr("chat read: -n is 1 to 100")
+		}
+	}
+	status, raw, err := agent.CallLocal(c.env.Client, c.dataDir(), os.Getenv("RUNTIME_AGENT_TOKEN_HEADER"), "/history/read", hubproto.HistoryRead{Conversation: id, Before: f.values["before"], Limit: limit}, 20*time.Second)
+	if err != nil {
+		return fail("central history: %v", err)
+	}
+	if status != 200 {
+		return apiError(status, raw)
+	}
+	if c.json {
+		c.printRaw(raw)
+		return nil
+	}
+	var page hubproto.HistoryPage
+	if json.Unmarshal(raw, &page) != nil {
+		return fail("central history returned invalid JSON")
+	}
+	c.out("%s\n", string(page.Conversation))
+	for _, entry := range page.Entries {
+		c.out("%s\n", string(entry))
+	}
+	if page.BeforeTurnID != nil {
+		c.out("previous: %s (pass --before to read the older page)\n", *page.BeforeTurnID)
 	}
 	return nil
 }

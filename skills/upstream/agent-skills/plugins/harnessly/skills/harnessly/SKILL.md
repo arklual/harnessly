@@ -86,6 +86,13 @@ harnessly theme set '{"v":1,"mode":"dark","hues":[{"h":320,"s":80}],"intensity":
 harnessly theme reset --scope chat --why "…"              # the chat inherits again
 ```
 
+A live effect over the chat («живая тема»: snow that settles on the field and the messages and is swept by the
+mouse, a night lamp that lights up while the agent works, a laser that burns in a new answer) is the look's `fx`:
+`"fx":{"preset":"snowplay|nightlamp|laser","power":0-100}` (`harnessly theme fx-presets`). When none fits, write the
+effect's code: a script on the page's sandbox SDK `hx` (docs/looks.md, «Живые эффекты»), sent with
+`harnessly theme set '<look>' --fx-file effect.js` (or `fx_code` of `theme_set`); it runs in a sandboxed frame with no
+network and sees only the pointer, the blocks' boxes and the agent's state.
+
 A chat wears its own look, else its folder's, else the one for all. The page shows «Применено · Отменить»; the answer
 is `applied`, or `waiting` when no page of the person is open (it applies when they open harnessly within 10 minutes). `harnessly theme` alone
 prints every field of a look.

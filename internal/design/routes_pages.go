@@ -121,6 +121,10 @@ func (a *API) CLIPages(r *http.Request) Answer {
 		}
 		return JSON(r, 200, out, h)
 	case "connect":
+		// Installing a package runs npm on this machine: only the project's owner may ask for it.
+		if no := a.gate(r, project, RoleOwner); no != nil {
+			return *no
+		}
 		source, _ := strField(body, "source")
 		registry, _ := strField(body, "registry")
 		pin, err := a.L.ConnectKitPackage(project, source, registry)

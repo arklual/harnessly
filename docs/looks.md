@@ -10,7 +10,7 @@ An agent changes it from a chat with the same data (`theme_set`, `harnessly them
 
 ## A look is data
 
-A look never holds CSS or code. Every field is a number in a range or one of a closed list
+A look holds no CSS and no code itself (the one field that reaches code is `fx`, «Живые эффекты (fx)» below). Every field is a number in a range or one of a closed list
 (`internal/looks/look.go`, `web/app/next/features/looks/types.ts`, the same limits on both sides); a field that is
 neither is dropped, and a look that does not read is no look. So a look from anywhere (an agent, another device, a
 preset) can only recolour the page: it cannot run code, load anything from outside or hide a button.
@@ -31,6 +31,74 @@ preset) can only recolour the page: it cannot run code, load anything from outsi
 - The tokens are generated from the hues (`features/looks/tokens.ts`): the surfaces, lines and the accent. Text stays the
   base's; every colour text sits on is checked against it (WCAG 2: 4.5:1 for the secondary text and the accent, 3:1 for
   the faint text) and moved in lightness until it passes.
+
+## Живые эффекты (fx)
+
+A look may carry an optional live effect that plays over (or behind) the chat: snow that settles on the blocks, a
+lamp, a laser. It is the look's `fx`:
+
+```json
+{"fx": {"preset": "snowplay", "back": false, "power": 70}}
+{"fx": {"script": "<sha256 of an uploaded script>", "back": true, "power": 50}}
+```
+
+- Exactly one of `preset` and `script` (`internal/looks/look.go`, `Fx`): `preset` is one of the page's built-in effects
+  (`FxPresets`), `script` the lowercase hex sha256 of a script kept like a picture. `back` puts it behind the chat's
+  blocks instead of over them; `power` is 0–100 (default: the effect's own).
+- Built-in effects: `snowplay` (Снежная игра: snow settles on the blocks, the mouse sweeps it, a double click calls a
+  snowplough, Ded Moroz flies by), `nightlamp` (Ночник: a warm light from a corner while the agent works), `laser`
+  (Лазер: a new answer is burnt in by a beam, a new prompt is lit up). `harnessly theme fx-presets` lists them.
+- A script is kept by `PUT /api/v2/me/looks` next to the pictures: bytes that begin with the exact line `//hx-fx v1`
+  (then a newline), valid UTF-8, at most 256 KB (`wire.MaxLookFx`); recognised by their content, not by what the request
+  says. `GET /api/v2/me/looks/<sha256>` serves them like a picture: `text/plain`, `nosniff`,
+  `default-src 'none'; sandbox`, immutable.
+- The page runs a script only in a sandboxed frame: an opaque origin (no `allow-same-origin`), no network (a CSP of
+  `default-src 'none'`), no way to open windows or reach the page. It sees only what the page tells it: the pointer, the
+  blocks' rectangles, the agent's state. Never the chat's text. Under `prefers-reduced-motion` the page does not run it at all.
+
+### An agent writes one
+
+An agent may write the code of a custom effect, but only as such a script against the SDK below, never as CSS or as
+anything else. The request carries it next to the look: MCP `theme_set` takes `fx_code` (the JS), the CLI
+`harnessly theme set '<look>' --fx-file effect.js`; the runtime's body field is `fxCode` (valid UTF-8, up to
+`looks.MaxFxCode` = 128 KB, and the look must be one of the agent's own, not a preset or reset). The person's page uploads
+the code, sets `look.fx.script` to its hash and applies the look, so the look in the request may have no `fx` or an `fx`
+with only `back` and `power`. The hash and the check of the code are the page's: `Look.Validate` allows an `fx` with no
+effect only for a request that comes with code, and `Inbox.Submit` checks the code's size and UTF-8.
+
+### The SDK the page gives a script
+
+The script runs in a transparent frame covering the chat's stage, with `pointer-events: none`. Its global is `hx`:
+
+- `hx.canvas`, `hx.ctx` (2d, already sized to the frame with the device pixel ratio), `hx.w`, `hx.h` (CSS pixels),
+  `hx.dpr`.
+- `hx.layer`: `"front"` or `"back"`; `hx.power`: 0–1; `hx.mode`: `"light"` or `"dark"`; `hx.reduced`: the person
+  prefers reduced motion.
+- `hx.colors`: `{accent, fg, bg, hues: [css colors]}`, the look's own tokens.
+- `hx.pointer`: `{x, y, vx, vy, down, inside}`, in frame coordinates.
+- `hx.blocks`: an array of `{id, kind, x, y, w, h}` in frame coordinates, `kind` one of `composer`, `user` (a prompt),
+  `answer`. Rectangles only, of what is on screen (at most 48), measured on scroll and about three times a second.
+  `hx.blockAt(x, y)` finds the one under a point; `hx.rand(a, b)` is a random number.
+- `hx.agent`: `{state: "idle" | "working" | "waiting", since}`.
+- `hx.on(event, fn)` (returns the unsubscribe): `start` (the first size is known); `frame` `(t, dt)`; `resize`;
+  `theme` (the mode, colours or power changed); `pointer`; `down`, `up`, `dblclick` `({x, y, block})`; `prompt`
+  `({block})` (a new prompt appeared); `answer-start`; `answer` `({block, done})`; `answer-end`; `state` `({state})`;
+  `blocks` (the rectangles changed).
+
+The script cannot fetch, open windows, read the page or the chat's text; an error in it is logged once in the page's
+console as `[живая тема]`. The runtime is `web/app/next/features/looks/fx/runtime.js`; the built-in effects next to it
+(`snowplay.js`, `nightlamp.js`, `laser.js`) are full examples. The host side is `features/looks/fx-layer.tsx`. A
+minimal one:
+
+```js
+//hx-fx v1
+hx.on('frame', (t, dt) => {
+  hx.ctx.clearRect(0, 0, hx.w, hx.h)
+  hx.ctx.fillStyle = hx.colors.accent
+  hx.ctx.globalAlpha = 0.4 * hx.power
+  hx.ctx.fillRect(hx.pointer.x - 4, hx.pointer.y - 4, 8, 8)
+})
+```
 
 ## Where it lives
 
@@ -61,13 +129,14 @@ preset) can only recolour the page: it cannot run code, load anything from outsi
 ## From a chat
 
 - MCP: `theme_get` (the looks now and the presets), `theme_set` (`preset` | `look` | `reset`, `scope` all|folder|chat,
-  `why`).
-- CLI: `harnessly theme get|presets`, `harnessly theme preset <id>`, `harnessly theme set '<look JSON>'`,
-  `harnessly theme reset`, each with `--scope` and `--why`.
+  `why`, `fx_code`).
+- CLI: `harnessly theme get|presets|fx-presets`, `harnessly theme preset <id>`, `harnessly theme set '<look JSON>'`,
+  `harnessly theme reset`, each with `--scope` and `--why`; `--fx-file effect.js` on `set` sends the code of a custom live
+effect.
 
 Both go to one core (`looks.Inbox.Submit`): the runtime keeps the request for 10 minutes, the person's open page takes it
 (`GET <platform>/look-requests`), applies it, shows «Применено · Отменить» and answers (`POST …/look-requests/<id>/done`).
 The tool answers applied, or waiting when no page of the person is open. The folder and chat scopes are the calling
 chat's.
 
-Scenarios: `evals/agent/theme-*.yaml`.
+Scenarios: `evals/agent/theme-*.yaml` (`theme-fx.yaml` for a live effect).

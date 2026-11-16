@@ -2,6 +2,7 @@ package designrec
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -80,5 +81,82 @@ func TestCoverIsWrittenOnceInTheEmbeddedStore(t *testing.T) {
 	}
 	if ok, _ := s.PushCover(ctx, "Bad Id", []byte("x")); ok {
 		t.Fatal("a cover of a bad id was written")
+	}
+}
+
+// refusingStore refuses the writes of the paths in deny, as the hub does for a project none of the machine's people may
+// edit, and counts what it is asked.
+type refusingStore struct {
+	Store
+	deny  map[string]bool
+	puts  map[string]int
+	reads int
+}
+
+func (r *refusingStore) Current(ctx context.Context, path string) (*filestore.Entry, error) {
+	r.reads++
+	if r.deny[path] {
+		return nil, nil // the hub answers 404 for a path the machine may not see
+	}
+	return r.Store.Current(ctx, path)
+}
+
+func (r *refusingStore) Put(ctx context.Context, path string, data []byte, author string) (filestore.Entry, error) {
+	r.puts[path]++
+	if r.deny[path] {
+		return filestore.Entry{}, fmt.Errorf("%w: %s", filesync.ErrRefused, path)
+	}
+	return r.Store.Put(ctx, path, data, author)
+}
+
+// a refused record or cover does not stop the others and is not asked again on every pass, only after it
+// changed or RefusedRetry passed.
+func TestRefusedWriteIsNotRepeatedOnEveryPass(t *testing.T) {
+	ctx := context.Background()
+	l, err := storelink.Open(storelink.Options{DataDir: t.TempDir(), Name: "box"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	if err := l.Ready(ctx, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	deny := map[string]bool{filestore.RecordPath("theirs"): true, filestore.CoverPath("theirs"): true}
+	stores := map[string]*refusingStore{}
+	now := time.Unix(1_800_000_000, 0)
+	s := &Syncer{Author: "t", Now: func() time.Time { return now }, Clients: func(k string) Store {
+		if stores[k] == nil {
+			stores[k] = &refusingStore{Store: l.Client(k), deny: deny, puts: map[string]int{}}
+		}
+		return stores[k]
+	}}
+	recs := []filestore.Record{{ID: "theirs", Title: "Theirs", Kind: "site", At: 1}, {ID: "mine", Title: "Mine", Kind: "site", At: 2}}
+	if n, err := s.Push(ctx, recs); err != nil || n != 1 {
+		t.Fatalf("first push: %d %v", n, err)
+	}
+	if ok, err := s.PushCover(ctx, "theirs", []byte("\xff\xd8x")); err != nil || ok {
+		t.Fatalf("refused cover: %v %v", ok, err)
+	}
+	if s.Refused() != 2 {
+		t.Fatalf("refused %d", s.Refused())
+	}
+	projects, covers := stores[filestore.KindProjects], stores[filestore.KindCovers]
+	for range 10 {
+		now = now.Add(time.Minute)
+		if n, err := s.Push(ctx, recs); err != nil || n != 0 {
+			t.Fatalf("a later push: %d %v", n, err)
+		}
+		_, _ = s.PushCover(ctx, "theirs", []byte("\xff\xd8x"))
+	}
+	if p, c := projects.puts[filestore.RecordPath("theirs")], covers.puts[filestore.CoverPath("theirs")]; p != 1 || c != 1 {
+		t.Fatalf("refused writes asked again: record %d, cover %d", p, c)
+	}
+	// Changed, it is asked again at once; and so is the unchanged one an hour later.
+	recs[0].Title = "Theirs v2"
+	_, _ = s.Push(ctx, recs)
+	now = now.Add(RefusedRetry)
+	_, _ = s.PushCover(ctx, "theirs", []byte("\xff\xd8x"))
+	if p, c := projects.puts[filestore.RecordPath("theirs")], covers.puts[filestore.CoverPath("theirs")]; p != 2 || c != 2 {
+		t.Fatalf("after a change and an hour: record %d, cover %d", p, c)
 	}
 }

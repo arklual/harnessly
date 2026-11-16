@@ -35,6 +35,8 @@ type KitRenderOptions struct {
 	Only map[string]bool
 	// Chrome is the browser to drive; the usual places when empty.
 	Chrome string
+	// Offline draws with a browser that reaches nothing but this machine (a kit nobody here wrote).
+	Offline bool
 	// Tabs is how many pages draw at once (4 when 0).
 	Tabs int
 	// KitsDir is the folder of installed kits a kit that extends another finds its base in; "" for none.
@@ -141,7 +143,7 @@ func RenderKit(folder string, opt KitRenderOptions) ([]KitRenderItem, error) {
 		}
 	}
 	l := New(Config{LibraryDir: filepath.Join(work, "library"), DataDir: filepath.Join(work, "data"), KitsDir: kits,
-		Chrome: opt.Chrome, Texts: Texts{Tag: "harnessly-kit", CLI: "harnessly"}})
+		Chrome: opt.Chrome, Offline: opt.Offline, Texts: Texts{Tag: "harnessly-kit", CLI: "harnessly"}})
 	port, err := l.EnsureServer()
 	if err != nil {
 		return nil, err

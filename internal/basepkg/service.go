@@ -53,6 +53,7 @@ func Service(args []string, stdout, stderr io.Writer) int {
 		Manager:  Detect(exec.LookPath, runtime.GOOS),
 		Run:      runCmd,
 		LookPath: exec.LookPath,
+		Snap:     IsSnap,
 		Free:     func() (uint64, error) { return freeAt("/") },
 		Busy:     busy,
 		Now:      time.Now,
@@ -61,6 +62,9 @@ func Service(args []string, stdout, stderr io.Writer) int {
 				fmt.Fprintln(stderr, "basepkg: state:", err)
 			}
 		},
+		Distro:    OSRelease("/etc/os-release"),
+		Arch:      DebArch(runtime.GOARCH),
+		AddSource: AddAptSource,
 	}
 	st := in.Install(ctx, ReadInbox(*inbox))
 	for _, s := range st.Items {

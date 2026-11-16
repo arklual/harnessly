@@ -27,10 +27,14 @@ var _ mcpserver.Toolset = Tools{}
 
 func (Tools) Instructions() string {
 	return "Looks: when the person asks to change how harnessly looks — a theme, colours, a background for the chats, an animated " +
-		"background (matrix, stars, aurora, rain, synthwave…), grain, a font, the look of the message bubbles or the field " +
-		"(«сделай тему как ночной Токио», «поставь на эту папку матрицу», «фон со звёздами в этом чате») — call theme_set " +
-		"(a preset id, or a look you compose; scope all, folder or chat). The page applies it at once with Undo. Never write CSS " +
-		"or code for it."
+		"background (matrix, stars, aurora, rain, synthwave…), grain, a font, the look of the message bubbles or the field, " +
+		"a live effect that plays over the chat (snow that settles on the blocks, a lamp, a laser) " +
+		"(«сделай тему как ночной Токио», «поставь на эту папку матрицу», «фон со звёздами в этом чате», «живую тему со снегом») — call theme_set " +
+		"(a preset id, or a look you compose; scope all, folder or chat). The page applies it at once with Undo. Never write CSS. " +
+		"A live effect is the look's `fx`: a built-in one ({preset: snowplay|nightlamp|laser}) or, when none fits, your own code " +
+		"in `fx_code` — only a script against the page's sandbox SDK `hx` (docs/looks.md, «Живые эффекты»): it starts with the " +
+		"line `//hx-fx v1`, draws on `hx.ctx` in `hx.on('frame', (t, dt) => …)` and reads `hx.pointer`, `hx.blocks`, `hx.agent`, " +
+		"`hx.colors`; it cannot fetch, open windows or read the chat's text."
 }
 
 func (Tools) Tools() []any {
@@ -56,13 +60,16 @@ func (Tools) Tools() []any {
 				"hues [{h 0-360, s 0-100}] 1-3 (the first is the accent), intensity 0-100, accent {h,s}?, bg {kind none|color|gradient|image|scene, "+
 				"scene, image (sha256 of an uploaded picture), fit cover|tile, speed 0-100}, grain 0-100, dim 0-100, blur 0-24, "+
 				"radius sharp|default|round, density compact|cozy, font system|inter|serif|mono|rounded, parts {bubble soft|solid|outline|glass, "+
-				"turns plain|card|glass, composer solid|glass|outline, sidebar plain|tinted|glass}.",
+				"turns plain|card|glass, composer solid|glass|outline, sidebar plain|tinted|glass}, "+
+				"fx {preset snowplay|nightlamp|laser | script (sha256, set by the page from fx_code), back bool (behind the blocks), power 0-100}. "+
+				"Built-in effects: "+fxAbout()+" For a custom effect pass fx_code (the JS; the look's fx may then carry just back and power).",
 			"inputSchema", jsvalue.NewObject(
 				"type", "object",
 				"properties", jsvalue.NewObject(
 					"scope", jsvalue.NewObject("type", "string", "enum", []any{ScopeAll, ScopeFolder, ScopeChat}, "description", "Where: all chats, this chat's folder, or this chat."),
 					"preset", jsvalue.NewObject("type", "string", "enum", presets, "description", "A ready look."),
 					"look", jsvalue.NewObject("type", "object", "description", "A look of your own (see the fields above); bg.scene is one of "+strings.Join(Scenes, ", ")+"."),
+					"fx_code", jsvalue.NewObject("type", "string", "description", "The JS of a custom live effect (at most 128 KB): it must start with the line `//hx-fx v1` and uses only the page's sandbox SDK `hx` (hx.ctx, hx.w, hx.h, hx.pointer, hx.blocks, hx.agent, hx.colors, hx.on('frame'|'pointer'|'down'|'dblclick'|'prompt'|'answer-start'|'answer'|'answer-end'|'state'|'blocks'|'resize', fn); docs/looks.md). Goes with `look` (not a preset or reset); the page uploads it and sets look.fx.script itself."),
 					"reset", jsvalue.NewObject("type", "boolean", "description", "Take the scope's own look away: it inherits again."),
 					"why", jsvalue.NewObject("type", "string", "description", "What the person asked for, in a few words."),
 				),
@@ -72,6 +79,14 @@ func (Tools) Tools() []any {
 	}
 }
 
+func fxAbout() string {
+	var parts []string
+	for _, p := range FxPresetList {
+		parts = append(parts, p.ID+" ("+p.Name+": "+p.About+")")
+	}
+	return strings.Join(parts, "; ") + "."
+}
+
 func (Tools) Has(name string) bool { return name == ToolGet || name == ToolSet }
 
 func (t Tools) Call(ctx context.Context, name string, args *jsvalue.Object) *jsvalue.Object {
@@ -79,11 +94,11 @@ func (t Tools) Call(ctx context.Context, name string, args *jsvalue.Object) *jsv
 		return mcpserver.TextResult("looks are not available on this machine", true)
 	}
 	if name == ToolGet {
-		out := map[string]any{"looks": t.Inbox.State(), "presets": Presets()}
+		out := map[string]any{"looks": t.Inbox.State(), "presets": Presets(), "fxPresets": FxPresetList}
 		raw, _ := json.Marshal(out)
 		return mcpserver.TextResult(string(raw), false)
 	}
-	a := Ask{Scope: args.String("scope"), Conv: t.Caller, Preset: args.String("preset"), Why: args.String("why"), Wait: 20 * time.Second}
+	a := Ask{Scope: args.String("scope"), Conv: t.Caller, Preset: args.String("preset"), FxCode: args.String("fx_code"), Why: args.String("why"), Wait: 20 * time.Second}
 	if v, _ := args.Get("reset"); v == true {
 		a.Reset = true
 	}

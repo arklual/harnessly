@@ -525,6 +525,7 @@ func (c *cli) hook(args []string) error {
 	}
 	if args[0] == "design-release" {
 		c.releaseLeases()
+		c.strictStopReminder()
 		return nil
 	}
 	in := c.env.Stdin
@@ -606,6 +607,7 @@ func (c *cli) leaseRefusal(raw []byte) string {
 	if len(writes) == 0 {
 		return ""
 	}
+	c.noteBoardWrites(writes)
 	session := c.hookSession()
 	if session == "" {
 		return ""

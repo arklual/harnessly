@@ -27,6 +27,10 @@ import { t } from '@/next/i18n';
 import { SIGN_IN, type TSignIn } from '@/next/features/pane/stand-sign-in';
 import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
 import LiveView, { type ILiveViewProps } from '@/next/features/pane/live-view';
+import NativeView, { paneBrowser } from '@/next/features/pane/native-view';
+
+/** The shell's own browser when it has one, else the machine's live browser. */
+const PageView = paneBrowser() ? NativeView : LiveView;
 
 export interface IBrowserViewProps {
   /** What the bar shows; empty for a new tab. */
@@ -516,7 +520,8 @@ const BrowserView = (props: IBrowserViewProps) => {
         )}
         {address !== '' && props.live !== null && (
           <div ref={stage} className="hx-tbrowser__stage" data-device={props.screen.device}>
-            <LiveView
+            {/* The desktop app opens the site in a browser of the person's computer (HRN-1287). */}
+            <PageView
               key={`${props.live.tab}|${reloadKey}`}
               machine={props.live.machine}
               tab={props.live.tab}

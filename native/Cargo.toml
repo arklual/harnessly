@@ -1,0 +1,45 @@
+[package]
+name = "harnessly-native"
+version = "0.1.0"
+description = "Harnessly native shell (Tauri): opens a Harnessly runtime or hub in a native window."
+license = "Apache-2.0"
+edition = "2021"
+rust-version = "1.85"
+publish = false
+
+[lib]
+name = "harnessly_native_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "harnessly-native"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["unstable"] }
+tauri-plugin-opener = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-deep-link = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = "2"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+
+[profile.dev]
+debug = 0
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
+
+# The pane's browser on Linux is laid over the page in a GTK overlay (tauri packs child webviews one under another).
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"

@@ -3,6 +3,7 @@ import { t } from '@/next/i18n';
 import { useDelayed as useDelayedFlag } from '@/next/ui/skeleton';
 import Spinner from '@/next/ui/spinner';
 import LookBackdrop from '@/next/features/looks/backdrop';
+import LookFx from '@/next/features/looks/fx-layer';
 
 export interface IChatStageProps {
   /** The chat's feed and composer from the chat feature; null while the chat is not there yet. */
@@ -71,6 +72,7 @@ const ChatStage = ({
       data-side={side ? 'true' : undefined}
     >
       <LookBackdrop />
+      <LookFx layer="back" />
       {missing && (
         <div className="hx-chatmiss" role="status">
           <b>{t('next.chatStage.missing')}</b>
@@ -89,6 +91,8 @@ const ChatStage = ({
             </div>
           </div>
         ))}
+      {/* A look's live effect over the feed and the field: it never takes the pointer (fx-layer.tsx). */}
+      <LookFx layer="front" />
       {side}
     </div>
   );

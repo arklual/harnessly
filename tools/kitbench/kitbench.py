@@ -74,7 +74,7 @@ def part_a(a):
         folder = os.path.join(kd, name)
         shutil.rmtree(folder, ignore_errors=True)
         r = dict(name=name, package=pkg, framework=fw, built=False, errors=[])
-        rc, out, err, dt = run([h, "design", "kit", "add", "npm:" + pkg, folder, "--id", name, "--json", "--no-render"] + (["--namespace", "Tui"] if "taiga" in pkg else []), env, kd, 900)
+        rc, out, err, dt = run([h, "design", "kit", "add", "npm:" + pkg, folder, "--id", name, "--json"] + (["--namespace", "Tui"] if "taiga" in pkg else []), env, kd, 900)
         r["addSeconds"] = round(dt, 1)
         d = jload(out)
         if rc != 0 or not d or not os.path.exists(os.path.join(folder, "design-system.json")):

@@ -2,6 +2,7 @@ package hlcli
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -63,6 +64,26 @@ func (c *cli) kitAddRun(opt kitOptions, o kitadd.Options) error {
 		o.CSS = strings.Split(opt.cssFiles, ",")
 	}
 	o.Cwd = c.env.Cwd
+	// A package the team's recipes do not know runs in the sandbox (no home, no tokens, no network but npm's); --sandbox
+	// asks for it on any, --no-sandbox turns it off.
+	if opt.sandbox && opt.noSandbox {
+		return usageErr("--sandbox and --no-sandbox together")
+	}
+	if o.From == "" && !opt.noSandbox && (opt.sandbox || o.Registry != "" || !kitadd.Verified(o.Source)) {
+		switch {
+		case kitadd.SandboxAvailable():
+			o.Sandbox = true
+			for _, h := range strings.Split(os.Getenv("HARNESSLY_KIT_REGISTRIES"), ",") {
+				if h = strings.TrimSpace(h); h != "" {
+					o.AllowedHosts = append(o.AllowedHosts, h)
+				}
+			}
+		case opt.sandbox:
+			return fail("--sandbox: this machine cannot make a sandbox (Landlock is off)")
+		default:
+			fmt.Fprintln(os.Stderr, "warning: no sandbox on this machine (Landlock is off); the package runs as you")
+		}
+	}
 	o.NoDraft = opt.noDraft
 	o.DraftOn = opt.draft
 	if o.Folder == "" {

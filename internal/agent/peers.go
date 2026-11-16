@@ -178,6 +178,16 @@ func (h *hub) signedCall(ctx context.Context, sign func(ed25519.PrivateKey, stri
 	case http.StatusNotFound:
 		return errPeersNotServed
 	case http.StatusUnauthorized, http.StatusForbidden:
+		var denied struct {
+			Error  string `json:"error"`
+			Detail string `json:"detail"`
+		}
+		if json.Unmarshal(data, &denied) == nil && denied.Error != "" {
+			if denied.Detail != "" {
+				return fmt.Errorf("%s: %s", denied.Error, denied.Detail)
+			}
+			return errors.New(denied.Error)
+		}
 		return errors.New("the hub did not accept this machine")
 	}
 	return fmt.Errorf("the hub answered HTTP %d", res.StatusCode)

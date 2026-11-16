@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Harnessly</title>
+<style>
+  :root { --bg: #ffffff; --fg: #18181b; --muted: #71717a; --border: #e4e4e7; --card: #fafafa; --accent: #18181b; --accent-fg: #fafafa; --danger: #dc2626; color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #09090b; --fg: #fafafa; --muted: #a1a1aa; --border: #27272a; --card: #111113; --accent: #fafafa; --accent-fg: #09090b; --danger: #f87171; }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { display: grid; place-items: center; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  main { width: min(380px, calc(100vw - 32px)); }
+  .logo { width: 48px; height: 48px; display: block; margin-bottom: 20px; }
+  h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 4px; }
+  p { margin: 0 0 20px; color: var(--muted); }
+  input, button { font: inherit; border-radius: 8px; }
+  input { width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--border); background: transparent; color: var(--fg); outline: none; }
+  input:focus { border-color: var(--muted); }
+  .primary { width: 100%; height: 36px; margin-top: 8px; border: 0; background: var(--accent); color: var(--accent-fg); font-weight: 500; cursor: pointer; }
+  .primary:disabled { opacity: .6; cursor: default; }
+  .error { color: var(--danger); min-height: 20px; margin-top: 6px; font-size: 13px; }
+  h2 { font-size: 12px; font-weight: 500; color: var(--muted); margin: 20px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+  ul { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  li { display: flex; align-items: center; border-top: 1px solid var(--border); }
+  li:first-child { border-top: 0; }
+  li button { border: 0; background: transparent; color: inherit; cursor: pointer; }
+  li .open { flex: 1; text-align: left; padding: 8px 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  li .open:hover, li .forget:hover { background: var(--card); }
+  li .forget { width: 36px; align-self: stretch; color: var(--muted); }
+  .link { margin-top: 16px; border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 3px; }
+  .loading { display: flex; flex-direction: column; align-items: center; gap: 16px; color: var(--muted); }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--fg); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="loading" id="loading"><img class="logo" src="logo.svg" alt=""><div class="spinner"></div><span id="loading-text">Connecting…</span></div>
+<main id="connect" hidden>
+  <img class="logo" src="logo.svg" alt="">
+  <h1>Connect to Harnessly</h1>
+  <p>Enter the address of your Harnessly server, or start one on this computer.</p>
+  <form id="form" novalidate>
+    <input id="url" type="url" placeholder="https://harnessly.example.com" autocomplete="url" spellcheck="false" autofocus>
+    <div class="error" id="error"></div>
+    <button class="primary" id="submit" type="submit">Connect</button>
+  </form>
+  <section id="recent-box" hidden>
+    <h2>Recent</h2>
+    <ul id="recent"></ul>
+  </section>
+  <button class="link" id="local" type="button">Use the runtime on this computer</button>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

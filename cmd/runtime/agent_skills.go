@@ -157,6 +157,9 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 		"make it and hand it over with the `deliver_file` tool (or `harnessly deliver <path>`); never answer with the path in text. " +
 		"Any type goes (html, zip, pdf, png, md, csv, docx…), a folder goes as one zip. The chat gets a card that opens the file on the right, " +
 		"and the person's browser downloads it at once. " +
+		"An html file opens in the right pane as a page the moment it is handed over. " +
+		"The card exists only after the command or the tool call actually ran: never announce a card in advance, and never fake its markup in your " +
+		"message (no tags, no placeholders) — if you wrote about a card without running the command, the person sees only your words. " +
 		"Deliver only files the person asked to receive. Files you merely write or change while working make no card, so do not deliver them, " +
 		"and do not deliver the same file twice unless you changed it.\n\n")
 	b.WriteString(sideWidgetsPromptText)

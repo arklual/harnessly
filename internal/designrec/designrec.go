@@ -9,13 +9,20 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/filestore"
+	"github.com/ly-solutions/harnessly/internal/filesync"
 )
+
+// RefusedRetry is how long a write the store refused (a project none of the machine's people may edit) is not
+// asked again while it stays as it was: a refused record was written again on every change of the library, about twice
+// a minute, each a 403 at the hub. A role given later is picked up within this time.
+const RefusedRetry = time.Hour
 
 // Store is a collection of the store as a client has it (filesync.Client).
 type Store interface {
@@ -41,13 +48,66 @@ func CollectionOf(kind string) string {
 	return filestore.KindProjects
 }
 
-// Syncer writes records and remembers what it wrote, so a record that did not change is not written again.
+// Syncer writes records and remembers what it wrote, so a record that did not change is not written again; a record the
+// store refused is not asked again for RefusedRetry while it stays the same.
 type Syncer struct {
 	Clients Clients
 	Author  string
+	// Now is the clock (time.Now when nil).
+	Now func() time.Time
 
-	mu   sync.Mutex
-	sent map[string]string // collection/id → sha of the record written
+	mu      sync.Mutex
+	sent    map[string]string  // collection/id → sha of the record written
+	refused map[string]refusal // collection/id → the write the store refused
+}
+
+type refusal struct {
+	sum string
+	at  time.Time
+}
+
+func (s *Syncer) now() time.Time {
+	if s.Now != nil {
+		return s.Now()
+	}
+	return time.Now()
+}
+
+// settled: what is under key now was written, or was refused as it is a short while ago.
+func (s *Syncer) settled(key, sum string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.sent[key] == sum {
+		return true
+	}
+	r, ok := s.refused[key]
+	return ok && r.sum == sum && s.now().Sub(r.at) < RefusedRetry
+}
+
+func (s *Syncer) remember(key, sum string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.sent == nil {
+		s.sent = map[string]string{}
+	}
+	s.sent[key] = sum
+	delete(s.refused, key)
+}
+
+func (s *Syncer) refuse(key, sum string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.refused == nil {
+		s.refused = map[string]refusal{}
+	}
+	s.refused[key] = refusal{sum: sum, at: s.now()}
+}
+
+// Refused is how many writes the store refuses now (collection/id).
+func (s *Syncer) Refused() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.refused)
 }
 
 func body(r filestore.Record) ([]byte, string, error) {
@@ -59,8 +119,9 @@ func body(r filestore.Record) ([]byte, string, error) {
 	return b, hex.EncodeToString(sum[:]), nil
 }
 
-// Push writes the records the store does not have as they are now and returns how many it wrote. The first failure ends
-// the push (the caller asks again); what was written stays written.
+// Push writes the records the store does not have as they are now and returns how many it wrote. A record the store
+// refuses is skipped and remembered; any other failure ends the push (the caller asks again); what was written stays
+// written.
 func (s *Syncer) Push(ctx context.Context, recs []filestore.Record) (int, error) {
 	n := 0
 	for _, r := range recs {
@@ -76,13 +137,7 @@ func (s *Syncer) Push(ctx context.Context, recs []filestore.Record) (int, error)
 			return n, err
 		}
 		key := coll + "/" + r.ID
-		s.mu.Lock()
-		if s.sent == nil {
-			s.sent = map[string]string{}
-		}
-		same := s.sent[key] == sum
-		s.mu.Unlock()
-		if same {
+		if s.settled(key, sum) {
 			continue
 		}
 		c := s.Clients(coll)
@@ -91,14 +146,16 @@ func (s *Syncer) Push(ctx context.Context, recs []filestore.Record) (int, error)
 			return n, err
 		}
 		if cur == nil || cur.Deleted || cur.Sha != sum {
-			if _, err := c.Put(ctx, filestore.RecordPath(r.ID), b, s.Author); err != nil {
+			if _, err := c.Put(ctx, filestore.RecordPath(r.ID), b, s.Author); errors.Is(err, filesync.ErrRefused) {
+				// Not this machine's to write: the others go on, this one waits for a change or RefusedRetry.
+				s.refuse(key, sum)
+				continue
+			} else if err != nil {
 				return n, fmt.Errorf("record %s: %w", key, err)
 			}
 			n++
 		}
-		s.mu.Lock()
-		s.sent[key] = sum
-		s.mu.Unlock()
+		s.remember(key, sum)
 	}
 	return n, nil
 }
@@ -189,13 +246,7 @@ func (s *Syncer) PushCover(ctx context.Context, id string, data []byte) (bool, e
 	sum := sha256.Sum256(data)
 	hexSum := hex.EncodeToString(sum[:])
 	key := filestore.KindCovers + "/" + id
-	s.mu.Lock()
-	if s.sent == nil {
-		s.sent = map[string]string{}
-	}
-	same := s.sent[key] == hexSum
-	s.mu.Unlock()
-	if same {
+	if s.settled(key, hexSum) {
 		return false, nil
 	}
 	c := s.Clients(filestore.KindCovers)
@@ -205,13 +256,14 @@ func (s *Syncer) PushCover(ctx context.Context, id string, data []byte) (bool, e
 	}
 	wrote := false
 	if cur == nil || cur.Deleted || cur.Sha != hexSum {
-		if _, err := c.Put(ctx, filestore.CoverPath(id), data, s.Author); err != nil {
+		if _, err := c.Put(ctx, filestore.CoverPath(id), data, s.Author); errors.Is(err, filesync.ErrRefused) {
+			s.refuse(key, hexSum)
+			return false, nil
+		} else if err != nil {
 			return false, fmt.Errorf("cover %s: %w", id, err)
 		}
 		wrote = true
 	}
-	s.mu.Lock()
-	s.sent[key] = hexSum
-	s.mu.Unlock()
+	s.remember(key, hexSum)
 	return wrote, nil
 }

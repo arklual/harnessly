@@ -11,6 +11,7 @@ var DATA = /*DATA*/;
 var NS = /*NS*/;
 var React = window.React, ReactDOM = window.ReactDOM;
 var zoneless = core.provideZonelessChangeDetection || core.provideExperimentalZonelessChangeDetection;
+var DYN = {};
 var providers = [zoneless ? zoneless() : []];
 /*PROVIDERS*/
 // Some libraries measure the page (a scrollbar probe on document.body) while they start: wait for a body.
@@ -52,7 +53,29 @@ function allClasses() {
     var v = m[k];
     if (typeof v === 'function' && (/Module$/.test(k) || v.ɵmod || (v.ɵcmp && v.ɵcmp.standalone) || (v.ɵdir && v.ɵdir.standalone)) && seen.indexOf(v) < 0) seen.push(v);
   }); });
+  // NgModules are flattened here: a module in a JIT standalone import list does not always bring its exports along
+  // (PrimeNG's TableModule, SelectModule …), so the exported directives and components are added by themselves.
+  var scopes = core.ɵtransitiveScopesFor;
+  if (typeof scopes === 'function') seen.slice().forEach(function (m) {
+    if (!m.ɵmod) return;
+    try {
+      var ex = scopes(m).exported;
+      [ex.directives, ex.pipes].forEach(function (set) { set.forEach(function (x) { if (seen.indexOf(x) < 0) seen.push(x); }); });
+    } catch (e) {}
+  });
   return (ALL = seen);
+}
+var DEFS = null;
+function own(c, k) { return Object.prototype.hasOwnProperty.call(c, k) ? c[k] : null; }
+function allDefs() {
+  if (DEFS) return DEFS;
+  var dirs = [], pipes = [];
+  allClasses().forEach(function (c) {
+    var d = own(c, 'ɵcmp') || own(c, 'ɵdir'), p = own(c, 'ɵpipe');
+    if (d && dirs.indexOf(d) < 0) dirs.push(d);
+    if (p && pipes.indexOf(p) < 0) pipes.push(p);
+  });
+  return (DEFS = { dirs: dirs, pipes: pipes });
 }
 function findCls(name) {
   for (var i = 0; i < MODS.length; i++) if (typeof MODS[i][name] === 'function') return MODS[i][name];
@@ -105,6 +128,7 @@ function openTpl(c, p, st) {
 }
 function tplSource(c, p, st) {
   var ov = c.ov;
+  if (ov && ov.dyn) return DYN[c.id](p, st);
   if (ov && ov.tpl) return ov.tpl;
   var root = openTpl(c, p, st);
   return ov ? (ov.before || '') + root + (ov.after || '') : root;
@@ -112,6 +136,13 @@ function tplSource(c, p, st) {
 function tplClass(src, c) {
   var T = class { constructor() { this.v = []; this.f = []; this.d = (c.ov && c.ov.data) || []; this.ca = function (n) { return n.children || []; }; } };
   core.Component({ selector: 'hk-tpl', standalone: true, imports: allClasses(), template: src })(T);
+  // The JIT does not always resolve every import of the list into the template's directive table (long lists stop
+  // short), so the table is set from the classes' own definitions.
+  try {
+    var def = T.ɵcmp, defs = allDefs();
+    def.directiveDefs = function () { return defs.dirs; };
+    def.pipeDefs = function () { return defs.pipes; };
+  } catch (e) { console.error('[kit] defs', e); }
   if (c.ov && c.ov.query) {
     var q = c.ov.query, read = q.cls ? findCls(q.cls) : null;
     core.ViewChild(q.name, read ? { read: read } : {})(T.prototype, 'trg');
@@ -221,4 +252,5 @@ function wrap(c) {
   return W;
 }
 DATA.forEach(function (c) { ns[c.id] = wrap(c); });
+/*COMPOSE*/
 /*ROOT*/

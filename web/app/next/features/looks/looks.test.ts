@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import presetsJson from '@/next/features/looks/presets.json';
+import { fxDocument } from '@/next/features/looks/fx-frame';
 import { contrast, ensure, lookTokens } from '@/next/features/looks/tokens';
 import {
   NO_LOOKS,
   PRESETS,
   STARTER_LOOK,
   lookFor,
+  readFx,
   readLook,
   readLooks,
   withLook,
@@ -81,5 +83,27 @@ describe('looks', () => {
   it('moves a colour until it passes', () => {
     const bg: [number, number, number] = [0.98, 0, 0];
     expect(contrast(ensure([0.9, 0.1, 30], bg, 4.5, 'light'), bg)).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe('live effects', () => {
+  it('reads a built-in effect or a script hash, never both or neither', () => {
+    expect(readFx({ preset: 'snowplay', power: 70 })).toEqual({ preset: 'snowplay', power: 70 });
+    expect(readFx({ script: 'a'.repeat(64), back: true })).toEqual({ script: 'a'.repeat(64), back: true });
+    expect(readFx({ preset: 'snowplay', script: 'a'.repeat(64) })).toBeUndefined();
+    expect(readFx({ preset: 'rm -rf' })).toBeUndefined();
+    expect(readFx({ script: 'https://evil.example.com/x.js' })).toBeUndefined();
+    expect(readFx({})).toBeUndefined();
+  });
+  it('keeps the effect on a look and drops one that does not read', () => {
+    const look = readLook({ ...STARTER_LOOK, fx: { preset: 'laser' } });
+    expect(look?.fx).toEqual({ preset: 'laser' });
+    expect(readLook({ ...STARTER_LOOK, fx: { code: 'alert(1)' } })?.fx).toBeUndefined();
+  });
+  it('cannot close its script element', () => {
+    const doc = fxDocument('const a = "</script><img src=x onerror=alert(1)>"; <!-- x', 'n0');
+    expect(doc.match(/<\/script>/g)).toHaveLength(2);
+    expect(doc).not.toContain('<!--');
+    expect(doc).toContain("default-src 'none'");
   });
 });

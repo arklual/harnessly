@@ -194,3 +194,15 @@ func TestMutesFile(t *testing.T) {
 		t.Fatal("unmute should survive")
 	}
 }
+
+func TestFirstOptionAnswersAChoiceAtOnce(t *testing.T) {
+	s := New()
+	s.FirstOption = true
+	r, err := s.Ask(context.Background(), app, "c1", Spec{Kind: KindChoice, Title: "Кит?", Options: []string{"ant", "другой"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != StatusAnswered || string(r.Value) != `{"choice":0,"option":"ant"}` {
+		t.Fatalf("got %+v %s", r, r.Value)
+	}
+}

@@ -127,11 +127,11 @@ func (t Tools) call(ctx context.Context, name string, args *jsvalue.Object) (str
 		text := fmt.Sprintf("delegated: %s\nconversationId: %s\nThe agent starts and works on it now; %s.", Head(c), c.ID, then)
 		return text, nil
 	case "read_conversation":
-		id, since, limit := a.str("id"), a.str("since"), a.integer("limit", 1, ReadMax)
+		id, since, before, limit := a.str("id"), a.str("since"), a.str("before"), a.integer("limit", 1, ReadMax)
 		if err := a.need("id", id); err != nil {
 			return "", err
 		}
-		return t.S.Read(ctx, t.Caller, id, since, limit)
+		return t.S.ReadPage(ctx, t.Caller, id, since, before, limit)
 	case "send_to_conversation":
 		id, text, how := a.str("id"), a.text(), a.str("deliver")
 		if err := errors.Join(a.need("id", id), a.need("text", text), a.err()); err != nil {

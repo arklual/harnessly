@@ -41,6 +41,82 @@ func shownProp(props []kitProp) string {
 	return ""
 }
 
+// containerPartRe: parts that hold content even when the package's types do not list children for them (polymorphic props).
+var containerPartRe = regexp.MustCompile(`(Section|Body|Content|Header|Footer|Panel|Cell|Td|Th|Caption|Title|Description|Label|Text)$`)
+
+// tableParts nests the parts the way an HTML table is written: a head and a body of rows, a row of cells. Nil when the
+// parts do not have a row and a cell.
+func tableParts(id string, parts []string, partProps map[string][]kitProp) []any {
+	has := map[string]string{}
+	for _, p := range parts {
+		for _, s := range []string{"Thead", "Tbody", "Tfoot", "Tr", "Th", "Td", "Header", "Body", "Row", "Cell", "HeaderCell"} {
+			if p == id+s {
+				has[s] = p
+			}
+		}
+	}
+	row, head, body := has["Tr"], has["Thead"], has["Tbody"]
+	cell, hcell := has["Td"], has["Th"]
+	if row == "" {
+		row = has["Row"]
+	}
+	if head == "" {
+		head = has["Header"]
+	}
+	if body == "" {
+		body = has["Body"]
+	}
+	if cell == "" {
+		cell = has["Cell"]
+	}
+	if hcell == "" {
+		hcell = has["HeaderCell"]
+	}
+	if row == "" || (cell == "" && hcell == "") {
+		return nil
+	}
+	cells := func(c string, label string) []any {
+		if c == "" {
+			return nil
+		}
+		var out []any
+		for _, n := range []string{label + " 1", label + " 2"} {
+			el := partNode(c, partProps[c], n)
+			out = append(out, el)
+		}
+		return out
+	}
+	mk := func(c string, label string) any {
+		return partNode(row, partProps[row], cells(c, label))
+	}
+	var kids []any
+	switch {
+	case head != "" && body != "":
+		hc := hcell
+		if hc == "" {
+			hc = cell
+		}
+		kids = append(kids, partNode(head, partProps[head], []any{mk(hc, "Heading")}))
+		bc := cell
+		if bc == "" {
+			bc = hcell
+		}
+		kids = append(kids, partNode(body, partProps[body], []any{mk(bc, "Cell"), mk(bc, "Cell")}))
+	case body != "":
+		kids = append(kids, partNode(body, partProps[body], []any{mk(cell, "Cell"), mk(cell, "Cell")}))
+	default:
+		kids = append(kids, mk(firstNonEmpty(cell, hcell), "Cell"))
+	}
+	return kids
+}
+
+func firstNonEmpty(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
+}
+
 // partNode is a part as a child of a sample: required props set, a label when it takes children.
 func partNode(part string, pp []kitProp, children any) map[string]any {
 	el := map[string]any{"$c": part}
@@ -53,10 +129,10 @@ func partNode(part string, pp []kitProp, children any) map[string]any {
 	if len(req) > 0 {
 		el["props"] = req
 	}
-	if hasProp(pp, "children") {
-		if children != nil {
-			el["children"] = children
-		} else {
+	if children != nil {
+		el["children"] = children
+	} else if hasProp(pp, "children") || containerPartRe.MatchString(part) {
+		{
 			el["children"] = humanize(part)
 		}
 	}
@@ -146,6 +222,9 @@ func triggerNode(part string, pp []kitProp, filler string) map[string]any {
 // flatParts lists the parts of a component as children of its sample. Triggers hold an element; when the component has
 // one <Name>Item part, the other parts live inside it (an Accordion's Control and Panel are the item's).
 func flatParts(id string, parts []string, partProps map[string][]kitProp, filler string) []any {
+	if tbl := tableParts(id, parts, partProps); tbl != nil {
+		return tbl
+	}
 	item := ""
 	for _, p := range parts {
 		if p == id+"Item" {

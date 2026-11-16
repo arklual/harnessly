@@ -1,6 +1,10 @@
 package kitadd
 
-import "testing"
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+)
 
 func TestFoldRootsAndAdoptItems(t *testing.T) {
 	comps := []genComp{{ID: "Modal"}, {ID: "ModalRoot"}, {ID: "ModalBody", Part: "ModalRoot"}, {ID: "ListBox"}, {ID: "ListBoxItem"}, {ID: "ListBoxItemIndicator", Part: "ListBoxItem"}, {ID: "Collection"}}
@@ -55,5 +59,14 @@ func TestGeneralSampleRules(t *testing.T) {
 	tr := sampleFor("Fade", []kitProp{{Name: "in", Type: "boolean"}, {Name: "children", Type: "node"}}, nil, nil, "Box")
 	if tr["in"] != true || tr["children"].(map[string]any)["$c"] != "Box" {
 		t.Errorf("transition: %v", tr)
+	}
+}
+
+func TestTableSampleNests(t *testing.T) {
+	parts := []string{"TableThead", "TableTbody", "TableTr", "TableTd", "TableTh", "TableCaption"}
+	s := sampleFor("Table", []kitProp{{Name: "children", Type: "node"}}, parts, nil, "Box")
+	raw, _ := json.Marshal(s)
+	if !strings.Contains(string(raw), `"$c":"TableTbody","children":[{"$c":"TableTr","children":[{"$c":"TableTd"`) {
+		t.Fatalf("table not nested: %s", raw)
 	}
 }
