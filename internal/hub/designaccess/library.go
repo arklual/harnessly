@@ -127,7 +127,7 @@ func (s *Service) libraryRoute(w http.ResponseWriter, r *http.Request, u store.U
 
 // storeLibraryOf is the person's library and shelves as the hub's store has them (the store-library answer).
 func (s *Service) storeLibraryOf(ctx context.Context, u store.User, m store.Machine) (storeLibrary, error) {
-	lister, ok := s.view.(Librarian)
+	lister, ok := s.currentView().(Librarian)
 	if !ok || m.SpaceID == "" {
 		return storeLibrary{}, fail("store_off", "Хранилище дизайнов не подключено")
 	}
@@ -167,7 +167,7 @@ func (s *Service) storeLibraryOf(ctx context.Context, u store.User, m store.Mach
 	seen := map[string]bool{}
 	hubOwns := s.OwnerOn(ctx, m)
 	var covers map[string]string
-	if c, ok := s.view.(Coverer); ok {
+	if c, ok := s.currentView().(Coverer); ok {
 		covers, _ = c.CoverVersions(ctx, spaceID)
 	}
 	for _, it := range items {

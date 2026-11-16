@@ -110,6 +110,9 @@ type Service struct {
 	searchOn      func(ctx context.Context, email, machineID string) bool
 	appKinds      AppKinder
 	appsCatalogOn func(ctx context.Context, email, machineID string) bool
+	// viewMu guards view: ServeHome's store goroutine outlives the handler, so a
+	// view swap (UseView) must not race with a listing already in flight.
+	viewMu        sync.RWMutex
 	view          Viewer
 	sheets        *sheetCache // the store's stylesheets with their fonts inside, by revision (sheetcache.go)
 	// cover is the count of the recorded projects the store has (coverage.go).
