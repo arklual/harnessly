@@ -94,6 +94,8 @@ export interface IGeneralSectionProps {
   checks?: ReactNode;
   /** «Ссылки» (pane-sites-group.tsx): which sites the chat's links open in the pane. */
   links?: ReactNode;
+  /** «Люди»: the people who share the machine and who sits at this browser (features/settings/people-group). */
+  people?: ReactNode;
 }
 
 const SignOutRow = ({ account, onSignOut }: Pick<IGeneralSectionProps, 'account' | 'onSignOut'>) => {
@@ -153,9 +155,11 @@ const GeneralSection = ({
   updates = null,
   checks = null,
   links = null,
+  people = null,
 }: IGeneralSectionProps) => (
   <>
     {checks}
+    {people}
     <Group title={t('next.settings.general.look')}>
       <SwitchRow
         label={t('next.settings.general.topTabs')}

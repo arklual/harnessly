@@ -1,27 +1,35 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { t } from '@/next/i18n';
 import Modal from '@/next/features/shell/modal';
+import OwnerPick from '@/next/features/people/owner-pick';
 import { GIVE_UP_MS, SLOW_MS } from '@/next/ui/use-pending-list';
 
 export interface INewProjectDialogProps {
   open: boolean;
   onClose: () => void;
-  /** Resolves once the server has the project; a rejection is said under the field. */
-  onCreate: (name: string) => Promise<void>;
+  /** Resolves once the server has the project; a rejection is said under the field. `owner`: whose it is among the
+   *  people of the machine, '' everyone's. */
+  onCreate: (name: string, owner: string) => Promise<void>;
+  /** The people of the machine (features/people): with any, «Чей проект» is asked. */
+  people?: readonly string[];
 }
+
+const NO_PEOPLE: readonly string[] = [];
 
 const STATE = { idle: 'idle', busy: 'busy', slow: 'slow' } as const;
 type TState = (typeof STATE)[keyof typeof STATE];
 
 /** «Новый проект»: a name alone. The button spins until the server answers; it does not close before. */
-const NewProjectDialog = ({ open, onClose, onCreate }: INewProjectDialogProps) => {
+const NewProjectDialog = ({ open, onClose, onCreate, people = NO_PEOPLE }: INewProjectDialogProps) => {
   const nameRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
+  const [owner, setOwner] = useState('');
   const [state, setState] = useState<TState>(STATE.idle);
   const [error, setError] = useState<string | null>(null);
 
   const close = () => {
     setName('');
+    setOwner('');
     setError(null);
     setState(STATE.idle);
     onClose();
@@ -40,7 +48,7 @@ const NewProjectDialog = ({ open, onClose, onCreate }: INewProjectDialogProps) =
     let giveUp: ReturnType<typeof setTimeout> | undefined;
     try {
       await Promise.race([
-        onCreate(trimmed),
+        onCreate(trimmed, owner),
         new Promise((_, reject) => {
           giveUp = setTimeout(() => reject(new Error(t('next.pending.noAnswer'))), GIVE_UP_MS);
         }),
@@ -80,6 +88,7 @@ const NewProjectDialog = ({ open, onClose, onCreate }: INewProjectDialogProps) =
               onChange={(event) => setName(event.target.value)}
             />
           </label>
+          <OwnerPick people={people} value={owner} disabled={busy} onPick={setOwner} />
           {error && (
             <p className="hx-create__err" role="alert">
               {error}

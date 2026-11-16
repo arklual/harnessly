@@ -962,8 +962,16 @@ func (c SendCmd) Validate() error {
 	for i, id := range c.AttachmentIDs {
 		errs = append(errs, need(fmt.Sprintf("attachmentIds[%d]", i), id))
 	}
-	errs = append(errs, refsValid(c.Refs))
+	errs = append(errs, refsValid(c.Refs), personField("by", c.By))
 	return errors.Join(errs...)
+}
+
+// personField: an optional name of a person of the machine (ValidPersonName) when it is set.
+func personField(field, name string) error {
+	if name != "" && !ValidPersonName(name) {
+		return fmt.Errorf("%s: one line of at most %d characters, no spaces around it", field, PersonNameMax)
+	}
+	return nil
 }
 
 func scoped(opID, conv string) error {
@@ -1060,6 +1068,7 @@ func (c ConversationCreateCmd) Validate() error {
 	if utf8.RuneCountInString(c.Title) > RefTitleMax {
 		errs = append(errs, fmt.Errorf("title: longer than %d characters", RefTitleMax))
 	}
+	errs = append(errs, personField("by", c.By))
 	return errors.Join(errs...)
 }
 
@@ -1264,13 +1273,17 @@ func (c ProjectCreateCmd) Validate() error {
 	if utf8.RuneCountInString(c.Name) > ProjectNameMax || strings.ContainsAny(c.Name, "\r\n") {
 		errs = append(errs, errors.New("name: one line of at most 120 characters"))
 	}
+	errs = append(errs, personField("owner", c.Owner))
 	return errors.Join(errs...)
 }
 
 func (c ProjectUpdateCmd) Validate() error {
 	errs := []error{need("opId", c.OpID), need("id", c.ID)}
-	if c.Path == "" && strings.TrimSpace(c.Name) == "" {
-		errs = append(errs, errors.New("path or name: required"))
+	if c.Path == "" && strings.TrimSpace(c.Name) == "" && c.Owner == nil {
+		errs = append(errs, errors.New("path, name or owner: required"))
+	}
+	if c.Owner != nil {
+		errs = append(errs, personField("owner", *c.Owner))
 	}
 	if c.Path != "" && !strings.HasPrefix(c.Path, "/") {
 		errs = append(errs, errors.New("path: must be absolute"))

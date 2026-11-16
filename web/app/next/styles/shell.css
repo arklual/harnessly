@@ -2133,3 +2133,38 @@ html:has(.hx-app) body {
   font-size: 12.5px;
   line-height: 1.4;
 }
+
+/* «Чей проект» in the project's settings (features/people): everyone, or one of the people of the machine. */
+.hx-owner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hx-owner__opt {
+  padding: 5px 12px;
+  border: 1px solid var(--hx-border);
+  border-radius: 999px;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+.hx-owner__opt:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-owner__opt:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hx-accent) 16%, transparent);
+}
+.hx-owner__opt[aria-checked='true'] {
+  border-color: var(--hx-accent);
+  background: color-mix(in srgb, var(--hx-accent) 6%, transparent);
+}
+.hx-create__hint {
+  color: var(--hx-fg-3);
+  font-size: 12px;
+}

@@ -17,7 +17,7 @@ import {
 } from 'react';
 import { Skeleton } from '@/next/ui/skeleton';
 import Icon from '@/next/ui/icon';
-import { t } from '@/next/i18n';
+import { plural, t } from '@/next/i18n';
 import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
 import { useDelayed as useDelayedFlag } from '@/next/ui/skeleton';
 import usePendingList from '@/next/ui/use-pending-list';
@@ -85,6 +85,7 @@ import {
   type TNavItem,
 } from '@/next/features/sidebar/nav-layout';
 import type { NavSettings } from '@/next/stores/me';
+import type { IPersonFold } from '@/next/features/people/people';
 import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import { toast } from '@/next/ui/toast';
 import ProductSwitcher from '@/next/features/sidebar/product-switcher';
@@ -251,6 +252,9 @@ export interface ISidebarProps {
   machineReveal?: number;
   /** The agents' questions to people («People»), under the favorites; hidden on the rail. */
   people?: ReactNode;
+  /** The people who share the machine (features/people): another person's projects and chats fold under their name
+   *  at the end of «Проекты»; absent while this browser names nobody. */
+  personFolds?: { folds: readonly IPersonFold[]; onFold: (person: string, open: boolean) => void };
   /** The designs at work under «Sinopia Design»: the first five, then «Дальше»; null or empty shows none. */
   designs?: ISidebarDesigns | null;
   /** The installed apps that are on in the person's chats, under «Приложения»; null shows the item with no rows. */
@@ -396,6 +400,8 @@ const NavItem = ({
 );
 
 /** The designs under «Sinopia Design» folded by its chevron; per device. */
+const NO_PERSON_FOLDS: readonly IPersonFold[] = [];
+
 const DESIGNS_FOLDED_KEY = 'hx-sidebar-designs-folded';
 
 const readDesignsFolded = (): boolean => {
@@ -757,6 +763,7 @@ const Sidebar = ({
   onCloseDrawer,
   onManageMachines,
   people,
+  personFolds,
   designs = null,
   gpt = null,
   nav = DEFAULT_NAV,
@@ -1141,6 +1148,45 @@ const Sidebar = ({
   const toggleProject = (id: string, open: boolean) =>
     setProjectChoice((current) => new Map(current).set(id, !open));
 
+  // The people of the machine: a heading over everyone's projects, one's own and an unfolded person's; another
+  // person's things fold under a row of their name at the end of the projects.
+  const folds = personFolds?.folds ?? NO_PERSON_FOLDS;
+  const renderFold = (fold: IPersonFold) => (
+    <button
+      key={`fold:${fold.person}`}
+      type="button"
+      className="hx-people__fold"
+      aria-expanded={fold.open}
+      onClick={() => {
+        // the person's own change shows at once: the list held under the pointer starts again from it
+        setHeld(null);
+        personFolds?.onFold(fold.person, !fold.open);
+      }}
+    >
+      <span className="hx-people__name">{fold.person}</span>
+      <span className="hx-people__count">
+        {fold.open
+          ? null
+          : [
+              fold.projects > 0 ? plural(fold.projects, 'next.people.projects') : null,
+              fold.chats > 0 ? plural(fold.chats, 'next.people.chats') : null,
+            ]
+              .filter((part) => part !== null)
+              .join(', ')}
+      </span>
+      <Icon name={fold.open ? 'chevron-down' : 'chevron-right'} size="sm" className="hx-people__chev" />
+    </button>
+  );
+  const renderBand = (band: string) => {
+    const fold = folds.find((f) => f.person === band && f.open);
+    if (fold) return renderFold(fold);
+    return (
+      <div key={`band:${band}`} className="hx-people__band">
+        {band}
+      </div>
+    );
+  };
+
   // A folder's first chats, then «Дальше» for the rest; opened once, it shows them all.
   const renderFolder = (id: string, list: readonly ISidebarChat[]) => {
     const { shown, hidden } = longFolders.has(id) ? { shown: list, hidden: 0 } : folderRows(list, currentId);
@@ -1443,7 +1489,7 @@ const Sidebar = ({
           </section>
         )}
 
-        {sections && (sections.projects.length > 0 || actions.onNewProject) && (
+        {sections && (sections.projects.length > 0 || actions.onNewProject || folds.length > 0) && (
           <section aria-label={t('next.sidebar.projects')} data-empty={sections.projects.length === 0}>
             <div className="hx-group__label hx-group__label--static hx-enter" data-enter="up" data-eb="480">
               {t('next.sidebar.projects')}
@@ -1462,76 +1508,87 @@ const Sidebar = ({
             </div>
             {sections.projects.map(({ project, chats: inProject }, i) => {
               const open = projectOpen(project.id, inProject);
+              const band = project.band !== sections.projects[i - 1]?.project.band ? project.band : undefined;
               return (
-                <div
-                  key={project.id}
-                  className="hx-nav__group hx-enter"
-                  data-enter="up"
-                  data-eb="520"
-                  data-i={Math.min(i, 24)}
-                  aria-expanded={open}
-                >
+                <Fragment key={project.id}>
+                  {band !== undefined && renderBand(band)}
                   <div
-                    className="hx-item hx-project"
-                    data-drop="project"
-                    data-drop-id={project.id}
-                    data-drop-box="parent"
+                    className="hx-nav__group hx-enter"
+                    data-enter="up"
+                    data-eb="520"
+                    data-i={Math.min(i, 24)}
+                    aria-expanded={open}
                   >
-                    <button
-                      type="button"
-                      className="hx-project__open"
-                      aria-expanded={open}
-                      data-tip={project.name}
-                      onClick={() => toggleProject(project.id, open)}
+                    <div
+                      className="hx-item hx-project"
+                      data-drop="project"
+                      data-drop-id={project.id}
+                      data-drop-box="parent"
                     >
-                      <span className="hx-project__mark" aria-hidden="true">
-                        <Icon name={open ? 'folder-open' : 'folder'} className="hx-project__icon" />
-                        <span className="hx-mono">{project.name.slice(0, 1).toUpperCase()}</span>
-                      </span>
-                      <span className="hx-item__title">{project.name}</span>
-                      <Icon name="chevron-right" size="sm" className="hx-nav__chev" />
-                    </button>
-                    <button
-                      type="button"
-                      className="hx-nav__add hx-project__add"
-                      aria-label={t('next.sidebar.projectLook', { project: project.name })}
-                      title={t('next.sidebar.projectLook', { project: project.name })}
-                      onClick={() => openLookEditor({ k: 'folder', id: project.id })}
-                    >
-                      <Icon name="palette" size="sm" />
-                    </button>
-                    {actions.onProjectSettings && (
+                      <button
+                        type="button"
+                        className="hx-project__open"
+                        aria-expanded={open}
+                        data-tip={project.name}
+                        onClick={() => toggleProject(project.id, open)}
+                      >
+                        <span className="hx-project__mark" aria-hidden="true">
+                          <Icon name={open ? 'folder-open' : 'folder'} className="hx-project__icon" />
+                          <span className="hx-mono">{project.name.slice(0, 1).toUpperCase()}</span>
+                        </span>
+                        <span className="hx-item__title">{project.name}</span>
+                        <Icon name="chevron-right" size="sm" className="hx-nav__chev" />
+                      </button>
                       <button
                         type="button"
                         className="hx-nav__add hx-project__add"
-                        aria-label={t('next.sidebar.projectSettings', { project: project.name })}
-                        title={t('next.sidebar.projectSettings', { project: project.name })}
-                        onClick={() => actions.onProjectSettings?.(project.id)}
+                        aria-label={t('next.sidebar.projectLook', { project: project.name })}
+                        title={t('next.sidebar.projectLook', { project: project.name })}
+                        onClick={() => openLookEditor({ k: 'folder', id: project.id })}
                       >
-                        <Icon name="settings" size="sm" />
+                        <Icon name="palette" size="sm" />
                       </button>
-                    )}
-                    {actions.onNewChatIn && (
-                      <button
-                        type="button"
-                        className="hx-nav__add hx-project__add"
-                        aria-label={t('next.sidebar.newChatIn', { project: project.name })}
-                        title={t('next.sidebar.newChatIn', { project: project.name })}
-                        onClick={() => actions.onNewChatIn?.(project.id)}
-                      >
-                        <Icon name="plus" size="sm" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="hx-nav__kids" inert={!open}>
-                    <div>
-                      {renderFolder(project.id, inProject)}
-                      {inProject.length === 0 && <p className="hx-snote">{t('next.sidebar.projectEmpty')}</p>}
+                      {actions.onProjectSettings && (
+                        <button
+                          type="button"
+                          className="hx-nav__add hx-project__add"
+                          aria-label={t('next.sidebar.projectSettings', { project: project.name })}
+                          title={t('next.sidebar.projectSettings', { project: project.name })}
+                          onClick={() => actions.onProjectSettings?.(project.id)}
+                        >
+                          <Icon name="settings" size="sm" />
+                        </button>
+                      )}
+                      {actions.onNewChatIn && (
+                        <button
+                          type="button"
+                          className="hx-nav__add hx-project__add"
+                          aria-label={t('next.sidebar.newChatIn', { project: project.name })}
+                          title={t('next.sidebar.newChatIn', { project: project.name })}
+                          onClick={() => actions.onNewChatIn?.(project.id)}
+                        >
+                          <Icon name="plus" size="sm" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="hx-nav__kids" inert={!open}>
+                      <div>
+                        {renderFolder(project.id, inProject)}
+                        {inProject.length === 0 && (
+                          <p className="hx-snote">{t('next.sidebar.projectEmpty')}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
+                </Fragment>
               );
             })}
+            {folds
+              .filter(
+                (fold) =>
+                  !fold.open || !sections.projects.some(({ project }) => project.band === fold.person),
+              )
+              .map((fold) => renderFold(fold))}
           </section>
         )}
 

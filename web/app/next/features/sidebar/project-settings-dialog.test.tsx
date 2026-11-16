@@ -73,3 +73,34 @@ describe('deleting a project', () => {
     expect(screen.queryByRole('button', { name: 'Delete project' })).toBeNull();
   });
 });
+
+describe('whose project', () => {
+  it('is not asked while the machine names nobody', async () => {
+    open({});
+    await screen.findByRole('button', { name: 'Save' });
+    expect(screen.queryByRole('radiogroup', { name: 'Whose project' })).toBeNull();
+  });
+
+  it('gives the project to one of the people, and only the owner goes to the runtime', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    open({ onSave, people: ['Артём', 'Маша'] });
+    const shared = await screen.findByRole('radio', { name: 'Shared' });
+    expect(shared.getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(screen.getByRole('radio', { name: 'Маша' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith({ owner: 'Маша' }));
+  });
+
+  it('makes one person’s project everyone’s again', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    open({
+      onSave,
+      people: ['Артём', 'Маша'],
+      project: { name: 'Витрина', path: '/w/shop', owner: 'Артём' },
+    });
+    expect((await screen.findByRole('radio', { name: 'Артём' })).getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(screen.getByRole('radio', { name: 'Shared' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith({ owner: '' }));
+  });
+});

@@ -1,0 +1,28 @@
+{
+  "next.people.shared": "Shared",
+  "next.people.mine": "Mine",
+  "next.people.projects": {
+    "one": "{n} project",
+    "other": "{n} projects"
+  },
+  "next.people.chats": {
+    "one": "{n} chat",
+    "other": "{n} chats"
+  },
+  "next.people.owner": "Whose project",
+  "next.people.everyone": "Shared",
+  "next.people.ownerHint": "Other people see someone else's projects folded under the owner's name. Everyone sees a shared project's chats.",
+  "next.people.title": "People",
+  "next.people.foot": "The list is the machine's; who you are is remembered by this browser alone. Another person's projects and chats fold under their name, and a chat's notices go to whoever wrote to it last.",
+  "next.people.me": "On this device",
+  "next.people.meHint": "Who sits at this browser. «Nobody» shows everything, as before.",
+  "next.people.nobody": "Nobody — show everything",
+  "next.people.itsMe": "You, on this device",
+  "next.people.remove": "Remove",
+  "next.people.add.label": "Add a person",
+  "next.people.add.placeholder": "A name, e.g. Masha",
+  "next.people.add": "Add",
+  "next.people.tooLong": "At most {n} characters",
+  "next.people.twice": "That name is already there",
+  "next.people.tooMany": "At most {n} people"
+}

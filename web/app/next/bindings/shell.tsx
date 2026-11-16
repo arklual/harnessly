@@ -210,6 +210,15 @@ import { ToastHost, toast } from '@/next/ui/toast';
 import { useDeadline } from '@/next/ui/use-deadline';
 import { FLY_FIELD, flyComposer } from '@/next/ui/fly-composer';
 import { countRender } from '@/next/core/perf-journal';
+import {
+  chatOwner,
+  newsFor,
+  ownersOf,
+  splitForPeople,
+  type IPersonFold,
+} from '@/next/features/people/people';
+import { usePeopleView } from '@/next/features/people/use-people';
+import { setUnfolded, useUnfolded } from '@/next/stores/whoami';
 
 /** ⌥ Space away from a chat: the voice's field over the screen, loaded when asked. */
 const VoiceFloat = lazy(() => import('@/next/features/voice-live/voice-float'));
@@ -220,6 +229,7 @@ const WakeWord = lazy(() => import('@/next/features/voice-live/wake-word'));
 const CHAT_LEAVE_MS = 180;
 const NO_CHATS: readonly ISidebarChat[] = [];
 const NO_PROJECTS: readonly ISidebarProject[] = [];
+const NO_FOLDS: readonly IPersonFold[] = [];
 const NO_ROWS: readonly ISearchRow[] = [];
 
 /** The value as the stage shows it: a change to another chat waits `ms` while the shown one leaves; to or from no
@@ -846,7 +856,10 @@ const Shell = ({ owner }: IShellProps) => {
 
   // While the profile loads there is no name to show: the footer draws a placeholder, not the login.
   const loginName = me.k === 'loading' ? null : login;
-  const personName = name ?? loginName;
+  // Two people on one account (features/people): the footer names the one this browser says sits here.
+  const people = usePeopleView();
+  const unfolded = useUnfolded();
+  const personName = people?.me ?? name ?? loginName;
   const person = personName === null ? null : { name: personName };
 
   const { navigate, openInNewTab } = tabs;
@@ -1051,9 +1064,35 @@ const Shell = ({ owner }: IShellProps) => {
     return () => document.removeEventListener('keydown', onKey);
   }, [drawerOpen]);
   const showTests = useShowTestChats();
-  const shownChats = useMemo(
-    () => (model.chats === null ? null : withoutTestChats(model.chats, showTests, currentId)),
-    [model.chats, showTests, currentId],
+  // Under the people of the machine another person's chats and projects fold away under their name (features/people);
+  // the chat on screen stays.
+  const forPeople = useMemo(() => {
+    const chats = model.chats === null ? null : withoutTestChats(model.chats, showTests, currentId);
+    if (people === null || chats === null || model.projects === null)
+      return { chats, projects: model.projects, folds: NO_FOLDS };
+    return splitForPeople(
+      chats,
+      model.projects,
+      people,
+      unfolded,
+      { shared: t('next.people.shared'), mine: t('next.people.mine') },
+      currentId,
+    );
+  }, [model.chats, model.projects, showTests, currentId, people, unfolded]);
+  const shownChats = forPeople.chats;
+  const shownProjects = forPeople.projects;
+  // What a chat answers is news for the one who wrote to it last (features/people): the other person's turns make no
+  // notice, chime or count here, and each person keeps a list of notices of their own.
+  const projectOwners = useMemo(() => ownersOf(model.projects ?? []), [model.projects]);
+  const newsForMe = useCallback(
+    (chat: { projectId: string | null; startedBy?: string; by?: string }) =>
+      people === null || newsFor(chat.by, chatOwner(chat, projectOwners), people),
+    [people, projectOwners],
+  );
+  const noticePerson = people === null ? owner || 'local' : `${owner || 'local'}~${people.me}`;
+  const newsChats = useMemo(
+    () => (model.chats === null || people === null ? model.chats : model.chats.filter(newsForMe)),
+    [model.chats, people, newsForMe],
   );
   const [navigatorOpen, setNavigatorOpen] = useState(false);
   const keysHelp = useShellKeys({
@@ -1068,12 +1107,13 @@ const Shell = ({ owner }: IShellProps) => {
 
   // The chat in sight, the open one or the one beside an app's page: its replies are no news.
   const notices = useNotices({
-    person: owner || 'local',
+    person: noticePerson,
     currentId: besideId ?? currentId,
     onOpenChat: openChat,
+    forMe: people === null ? undefined : newsForMe,
   });
   useTurnSummaries();
-  setHistoryPerson(owner || 'local');
+  setHistoryPerson(noticePerson);
 
   // The machines whose agents may change the person's look (features/looks/agent-looks.tsx): the open one and the
   // open chat's.
@@ -1095,8 +1135,8 @@ const Shell = ({ owner }: IShellProps) => {
     [chat, model.chats],
   );
   const center = useNotificationCenter({
-    person: owner || 'local',
-    chats: model.chats,
+    person: noticePerson,
+    chats: newsChats,
     machineNotices: model.machineNotices,
     onOpenChat: (id) => {
       setNotifications(null);
@@ -1422,7 +1462,8 @@ const Shell = ({ owner }: IShellProps) => {
       brand={appConfig().productName}
       hubHref={hubEntry}
       chats={noV2 ? NO_CHATS : shownChats}
-      projects={noV2 ? NO_PROJECTS : model.projects}
+      projects={noV2 ? NO_PROJECTS : shownProjects}
+      personFolds={people === null ? undefined : { folds: forPeople.folds, onFold: setUnfolded }}
       favorites={model.favorites}
       loadError={listFailed?.reason ?? null}
       onRetryLoad={listFailed?.onRetry}
@@ -1672,7 +1713,7 @@ const Shell = ({ owner }: IShellProps) => {
         />
       )}
       <SmartNoticeHost
-        person={owner || 'local'}
+        person={noticePerson}
         notices={notices.notices}
         machineNotices={model.machineNotices}
         machine={boot.k === 'ready' ? model.active : null}
