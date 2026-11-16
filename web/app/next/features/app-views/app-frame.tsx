@@ -577,7 +577,7 @@ const AppFrame = ({
       // A site is up when its page loaded: it shows its own states, and owes the host no handshake to be seen. A built-in
       // service's view (Доски, Документы) always shakes hands through its bridge shim: a load is not enough for it, since
       // a frame the site refused (frame-ancestors, a gateway's error page) loads too, white, and the card never came
-      // 
+      //
       if (remote && !isSpaceApp(app.id)) send({ k: 'handshake' });
       journal(
         {
