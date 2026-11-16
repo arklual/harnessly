@@ -44,6 +44,8 @@ export interface IProjectKit {
   draftProject?: string;
   /** The project is itself the draft of this kit. */
   kitDraftOf?: string;
+  /** The kits installed on the machine; sent while the project has none. */
+  installed?: string[];
 }
 
 export interface IKitDraft {
@@ -125,6 +127,19 @@ export const fetchProjectKit = (m: MachineId, artifact: string, signal?: AbortSi
   runtimeJson<IProjectKit>(m, projectPath(`/kit?${q({ artifact })}`), { signal, cache: 'no-store' });
 
 export const KIT_ACTION = { edit: 'edit', use: 'use', stay: 'stay' } as const;
+
+/** «Подключить UI-кит»: an installed kit by its id, or a package (`npm:name`) made into a kit and installed. */
+export const attachProjectKit = (m: MachineId, artifact: string, kit: string) =>
+  runtimeJson<IProjectKit>(m, projectPath('/kit'), postJson({ artifact, action: 'attach', kit }));
+/** A package is fetched, drawn and installed in one request: far longer than a usual answer. */
+const CONNECT_TIMEOUT_MS = 5 * 60_000;
+export const connectProjectKit = (m: MachineId, artifact: string, source: string, registry: string) =>
+  runtimeJson<IProjectKit>(
+    m,
+    projectPath('/kit'),
+    postJson({ artifact, action: 'connect', source, registry }),
+    CONNECT_TIMEOUT_MS,
+  );
 export type TKitAction = (typeof KIT_ACTION)[keyof typeof KIT_ACTION];
 
 export const changeProjectKit = (m: MachineId, artifact: string, action: TKitAction, version?: string) =>

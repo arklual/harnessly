@@ -488,7 +488,7 @@ func withClientOf(source, id string, video bool) string {
 
 // withClientAt is withClientOf with the board script at src (its address with a version, Library.clientSrc).
 func withClientAt(source, id string, video bool, src string) string {
-	tag := resourcesScript() + `<script data-artifact="` + id + `" src="` + src + `"></script>`
+	tag := resourcesFor(source) + `<script data-artifact="` + id + `" src="` + src + `"></script>`
 	if video {
 		tag += `<script src="` + videoRuntimePath + `"></script>`
 	}
@@ -749,7 +749,7 @@ func (l *Library) serveFileAs(w http.ResponseWriter, r *http.Request, q url.Valu
 // withReadOnlyClient is withClient with the board script in guest mode: the page shows, follows nothing and edits
 // nothing. src is the board script's address with its version (Library.clientSrc).
 func withReadOnlyClient(source, id, src string) string {
-	tag := resourcesScript() + `<script data-artifact="` + id + `" data-guest="1" src="` + src + `"></script>`
+	tag := resourcesFor(source) + `<script data-artifact="` + id + `" data-guest="1" src="` + src + `"></script>`
 	if m := headTag.FindString(source); m != "" {
 		return strings.Replace(source, m, m+tag, 1)
 	}

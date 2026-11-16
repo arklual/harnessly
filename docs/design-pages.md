@@ -30,11 +30,17 @@ its pages:
 Agents change pages through the runtime (which holds the project's lock):
 
 ```
+harnessly design new "<title>" [--page "<page>"] [--kit ID[@VERSION][/THEME]]
 harnessly design page list <project>
 harnessly design page create <project> --title TITLE [--file NAME.dc.html] [--route /path] [--variant-of PAGE] [--w N --h N] [--fill]
 harnessly design page rename <project> <page> [--title TITLE] [--file NAME.dc.html]
 harnessly design page remove <project> <page>
 ```
+
+`new` makes a project of the person's with its first page, from any chat (`{action: new, title, page?, kit?, session?}`
+of the same route): a mockup or a prototype asked in a chat outside the library is drawn on a board, and the board opens
+in the chat's pane. `--kit` pins a UI kit installed on the machine (the newest version when none is named; without a
+theme, all the kit gives), refused before anything is made when the kit is not there.
 
 `<page>` is an id, a file (with or without `.dc.html`) or a title. `create` makes the board file from the project's
 `project/_board-template.html` (or the runtime's own template), or from the page named by `--variant-of`; with
@@ -187,7 +193,8 @@ is not carried back into the source yet.
 current (exit code 1 when not), and `design check` (the board check) lists the same under `sources`.
 `harnessly design check <project> --strict` reads the page, its local components and the hand-written boards against the
 kit: only its components, the props they declare and its tokens (see «Strict mode» in
-[design-kits.md](agents/design-kits.md#strict-mode)). A project or a kit can turn it on for good (`"strict": true`).
+[design-kits.md](agents/design-kits.md#strict-mode)). A project or a kit can turn it on for good (`"strict": true`); a project on a kit has it on by default
+([A project on a kit](agents/design-kits.md#a-project-on-a-kit)).
 
 **A page from an old board.** `harnessly design migrate --to tsx <project>` turns boards of the old format
 into pages, by rules, and keeps each only when its page draws the board's picture pixel for pixel

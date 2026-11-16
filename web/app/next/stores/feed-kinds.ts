@@ -1,7 +1,8 @@
 // «Что показывать в ленте» (Settings → General): which things a turn made get a card under its answer. This browser's,
 // as the theme and the pane's own switch are. The plain files are off unless the person turns them on (what
 // the agent made matters, not that it wrote a file). `mrDone` is the block of the chat's merge requests under a
-// finished task; it is off until the person turns it on (Settings → Plugins → Code review).
+// finished task; it is off until the person turns it on (Settings → Plugins → Code review). The commits' cards are
+// off too: a commit is the agent's own bookkeeping, shown only when the person turns it on in Settings.
 import { notePrefWrite } from '@/next/core/pref-write';
 import { useSyncExternalStore } from 'react';
 import { OUTPUT_KINDS } from '@/next/protocol/v2';
@@ -20,7 +21,7 @@ export const DEFAULT_FEED_KINDS: FeedKinds = {
   stand: true,
   delivery: true,
   task: true,
-  commit: true,
+  commit: false,
   file: false,
   mrDone: false,
 } as const satisfies Record<FeedKind, boolean>;

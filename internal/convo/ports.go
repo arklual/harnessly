@@ -362,6 +362,9 @@ type Deps struct {
 	// model_context_window for Codex — and the tokens its last answer was asked with (0 where it says nothing). nil: the
 	// window is guessed from the model id.
 	Window func(p wire.Provider, sessionID, transcriptPath string) (used, limit int64)
+	// Cost is what a session cost by the agent's own count, in USD (Claude's statusline); 0 where it says nothing. nil:
+	// never known.
+	Cost func(p wire.Provider, sessionID string) float64
 	// Compact is what the agent is set to compact at in a chat of the folder on the model, by its settings: Claude's
 	// autoCompactWindow (window, the window it counts compaction from) and Codex's model_auto_compact_token_limit (at,
 	// the tokens it compacts at); 0 where nothing is set. nil: nothing is ever set.

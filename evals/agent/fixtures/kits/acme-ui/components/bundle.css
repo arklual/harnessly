@@ -1,0 +1,12 @@
+@layer kit-acme-ui {
+  .acme-ui-root { font: 15px/22px var(--acme-ui-font-sans); color: var(--acme-ui-text); background: var(--acme-ui-surface-0); }
+  .acme-ui-btn { font: inherit; border: 1px solid transparent; border-radius: var(--acme-ui-radius-m); padding: 8px 16px; cursor: pointer; }
+  .acme-ui-btn--primary { background: var(--acme-ui-accent); color: var(--acme-ui-on-accent); }
+  .acme-ui-btn--secondary { background: var(--acme-ui-surface-1); border-color: var(--acme-ui-border); color: var(--acme-ui-text); }
+  .acme-ui-btn--ghost { background: transparent; color: var(--acme-ui-accent); }
+  .acme-ui-btn:disabled { opacity: .5; cursor: default; }
+  .acme-ui-card { background: var(--acme-ui-surface-1); border: 1px solid var(--acme-ui-border); border-radius: var(--acme-ui-radius-l); max-width: 360px; }
+  .acme-ui-card__header { padding: var(--acme-ui-space-4) var(--acme-ui-space-4) 0; }
+  .acme-ui-card__header h3 { margin: 0; font-size: 17px; line-height: 24px; }
+  .acme-ui-card__body { padding: var(--acme-ui-space-2) var(--acme-ui-space-4) var(--acme-ui-space-4); }
+}

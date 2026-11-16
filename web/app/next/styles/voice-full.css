@@ -1,0 +1,253 @@
+/* The full-screen talk (features/voice-live/voice-full.tsx): a layer over the app with the orb in the middle.
+ * Tokens only, so the light, the dark and the contrast themes each get their own; the orb is a canvas (orb.tsx). */
+.hx-voice-full {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  padding: calc(8px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
+  background:
+    radial-gradient(
+      ellipse 90% 60% at 50% 42%,
+      color-mix(in srgb, var(--hx-voice-full-tint, var(--hx-accent)) 14%, transparent),
+      transparent 70%
+    ),
+    var(--hx-bg-app);
+  color: var(--hx-fg-1);
+  outline: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: contain;
+  transform-origin: 50% 100%;
+  will-change: transform;
+  animation: hx-voice-full-in 420ms var(--hx-ease-out) backwards;
+}
+.hx-voice-full[data-s='listening'] {
+  --hx-voice-full-tint: var(--hx-danger);
+}
+.hx-voice-full[data-s='waiting'],
+.hx-voice-full[data-s='failed'] {
+  --hx-voice-full-tint: var(--hx-fg-3);
+}
+.hx-voice-full[data-closing] {
+  animation: hx-voice-full-out 320ms var(--hx-ease-out) forwards;
+  pointer-events: none;
+}
+/* Folded by a pull: it is already gone down the screen, the exit adds nothing. */
+.hx-voice-full[data-gone] {
+  animation: none;
+  pointer-events: none;
+}
+@keyframes hx-voice-full-in {
+  from {
+    opacity: 0;
+    transform: translateY(5%) scale(0.97);
+  }
+}
+@keyframes hx-voice-full-out {
+  to {
+    opacity: 0;
+    transform: translateY(8%) scale(0.97);
+  }
+}
+
+.hx-voice-full__top {
+  flex: none;
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  height: 52px;
+}
+.hx-voice-full__who {
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  --hx-head-size: 20px;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+.hx-voice-full__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-voice-full__i,
+.hx-voice-full__b {
+  border: 0;
+  color: var(--hx-fg-2);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background 160ms ease-out,
+    color 160ms ease-out;
+}
+.hx-voice-full__i {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: transparent;
+}
+.hx-voice-full__i:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-voice-full__i[aria-pressed='false'] {
+  opacity: 0.55;
+}
+.hx-voice-full__i:focus-visible,
+.hx-voice-full__b:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 2px;
+}
+/* The grip: a short bar, the sign that the layer can be pulled down. */
+.hx-voice-full__grab {
+  position: absolute;
+  top: calc(6px + env(safe-area-inset-top));
+  left: 50%;
+  width: 36px;
+  height: 4px;
+  translate: -50% 0;
+  border-radius: 2px;
+  background: var(--hx-border-strong);
+}
+
+.hx-voice-full__stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: grab;
+}
+.hx-voice-full__orb {
+  flex: none;
+  width: min(78vw, 46vh, 460px);
+  aspect-ratio: 1;
+  max-width: 100%;
+}
+.hx-voice-full__state {
+  margin: 0;
+  font-size: clamp(20px, 5vw, 26px);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--hx-fg-1);
+}
+.hx-voice-full__line {
+  margin: 4px 0 0;
+  min-height: 3.2em;
+  max-width: min(560px, 100%);
+  padding: 0 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-align: center;
+  font-size: clamp(16px, 4.2vw, 20px);
+  line-height: 1.6;
+  color: var(--hx-fg-2);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.hx-voice-full__line[data-on] {
+  opacity: 1;
+  animation: hx-voice-full-line 360ms var(--hx-ease-out) backwards;
+}
+@keyframes hx-voice-full-line {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(3px);
+  }
+}
+
+.hx-voice-full__bar {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  gap: clamp(14px, 6vw, 28px);
+}
+.hx-voice-full__b {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 76px;
+  padding: 0;
+  background: transparent;
+  font-size: var(--hx-text-xs, 12px);
+}
+.hx-voice-full__c {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--hx-bg-raised);
+  border: 1px solid var(--hx-border-strong);
+  color: var(--hx-fg-1);
+  transition:
+    background 160ms ease-out,
+    transform 160ms var(--hx-ease-out);
+}
+.hx-voice-full__b:hover > .hx-voice-full__c {
+  background: var(--hx-bg-hover);
+}
+.hx-voice-full__b:active > .hx-voice-full__c {
+  transform: scale(0.94);
+}
+.hx-voice-full__b[data-on] > .hx-voice-full__c {
+  background: var(--hx-fg-1);
+  color: var(--hx-bg-app);
+}
+.hx-voice-full__b--end > .hx-voice-full__c {
+  background: var(--hx-danger);
+  border-color: transparent;
+  color: #fff;
+}
+.hx-voice-full__b--end:hover > .hx-voice-full__c {
+  background: color-mix(in srgb, var(--hx-danger) 86%, #000);
+}
+
+@media (max-height: 520px) {
+  .hx-voice-full__orb {
+    width: min(50vh, 60vw);
+  }
+  .hx-voice-full__line {
+    min-height: 0;
+  }
+}
+
+/* Reduced motion: no turning and no pulse, the layer fades; the orb is one still circle in the state's colour (orb.tsx). */
+@media (prefers-reduced-motion: reduce) {
+  .hx-voice-full {
+    animation: hx-voice-full-fade 200ms linear backwards;
+  }
+  .hx-voice-full[data-closing] {
+    animation: hx-voice-full-fade-out 200ms linear forwards;
+  }
+  .hx-voice-full__line[data-on] {
+    animation: none;
+  }
+  .hx-voice-full__b:active > .hx-voice-full__c {
+    transform: none;
+  }
+}
+@keyframes hx-voice-full-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hx-voice-full-fade-out {
+  to {
+    opacity: 0;
+  }
+}

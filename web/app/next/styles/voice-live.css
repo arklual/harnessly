@@ -356,6 +356,14 @@
 .hx-voice-btn[aria-pressed='true'] {
   color: var(--hx-danger);
 }
+/* The voice can not go yet (voice-start.tsx): the wave stays in its place, quiet; its tooltip says what to do. */
+.hx-voice-btn[data-off] {
+  opacity: 0.45;
+}
+.hx-voice-btn[data-off]:hover,
+.hx-voice-btn[data-off]:focus-visible {
+  opacity: 0.8;
+}
 
 /* Quiet lines of what the voice did, just over the field («Заголовок крупнее · Отменить»). */
 .hx-voice-notes {

@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { createChat, loadModels } from '@/next/features/chatgpt/api';
 import { carryDraft, gptChatsChanged, useGptSignedIn } from '@/next/features/chatgpt/store';
 import type { IPickerExtra } from '@/next/features/composer/model-picker';
+import { askVoiceStart } from '@/next/features/voice-live/field';
 import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
 import { goTo, ROUTE } from '@/next/routes/routes';
@@ -42,7 +43,7 @@ export const useGptExtra = (
         <ChatGptSettings machine={machine} />
       </Suspense>
     ),
-    onPick: (model) => {
+    onPick: (model, opts) => {
       const words = text;
       createChat(machine, model ?? '', '').then(
         (chat) => {
@@ -50,6 +51,8 @@ export const useGptExtra = (
           clear();
           gptChatsChanged();
           goTo({ kind: ROUTE.chatgpt, id: chat.id, machine });
+          // The chat's voice (voice-live-gpt.tsx) takes the ask as its field comes on screen.
+          if (opts?.voice) askVoiceStart();
         },
         () => goTo({ kind: ROUTE.settings, section: 'accounts' }),
       );

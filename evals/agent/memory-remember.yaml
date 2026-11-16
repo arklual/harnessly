@@ -1,0 +1,14 @@
+id: memory-remember
+title: «Запомни» — агент записывает факт в память Claude Code (каталог memory проекта), а не теряет его
+tags: [memory]
+timeout_s: 240
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'internal/agentcfg/claude.go'
+  - 'cmd/runtime/safe_prompt.go'
+  - 'internal/providers/settings.go'
+prompt: "запомни на будущее, пожалуйста: релизы у нас выкатываются по четвергам в 11:00, а ответственного зовут Марина"
+expect:
+  - name: wrote a memory file
+    called: Write
+    args: {file_path: '(?s:.*/memory/.*\.md)'}

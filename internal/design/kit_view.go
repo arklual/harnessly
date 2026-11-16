@@ -29,9 +29,18 @@ var (
 // project's board gets it: the kit screen then draws without unpkg.com, on a machine that cannot reach it too.
 func withResources(source string) string {
 	if m := headTag.FindString(source); m != "" {
-		return strings.Replace(source, m, m+resourcesScript(), 1)
+		return strings.Replace(source, m, m+resourcesFor(source), 1)
 	}
-	return resourcesScript() + source
+	return resourcesFor(source) + source
+}
+
+// withReact19Meta puts <meta name="dc-react" content="19"> in a page's head.
+func withReact19Meta(source string) string {
+	const meta = `<meta name="dc-react" content="19">`
+	if m := headTag.FindString(source); m != "" {
+		return strings.Replace(source, m, m+meta, 1)
+	}
+	return meta + source
 }
 
 // kitThemeFolder is the folder name a theme has on a board, ds/<name>/: its own folder's name, or the kit's id for a
@@ -99,7 +108,11 @@ func (l *Library) serveKitView(w http.ResponseWriter, r *http.Request, q url.Val
 			sendHTML(w, 404, l.notFoundPage(), head)
 			return
 		}
-		send(w, 200, "text/html; charset=utf-8", []byte(withResources(string(src))), head, "Cache-Control", kitImmutable)
+		page := string(src)
+		if c, err := designkit.ReadCanvas(dir, id, version, theme); err == nil && c.React == "19" && react19Tag(page, "") == "" {
+			page = withReact19Meta(page)
+		}
+		send(w, 200, "text/html; charset=utf-8", []byte(withResources(page)), head, "Cache-Control", kitImmutable)
 		return
 	case len(rest) >= 3 && rest[0] == "ds" && rest[1] == kitThemeFolder(folder, id):
 		l.serveKitFile(w, r, designkit.Resolve(dir, id, version, themeSegs(rest[2:]...)), head)
@@ -199,6 +212,9 @@ func playBoard(c *designkit.Canvas, folder, dir string, q url.Values) (string, b
 	}
 	var b strings.Builder
 	b.WriteString("<!doctype html>\n<html lang=\"ru\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n")
+	if c.React == "19" {
+		b.WriteString("<meta name=\"dc-react\" content=\"19\">\n")
+	}
 	b.WriteString("<script src=\"./support.js\"></script>\n")
 	// The theme's tokens first (components and the board's own markup read their variables), then its fonts and the
 	// components' styles: the same files, in the same order, a board on the kit loads.

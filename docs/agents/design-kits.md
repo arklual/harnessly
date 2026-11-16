@@ -97,7 +97,7 @@ id. A theme is another look (a second brand); light and dark of one look are **m
 | `title` | the kit's name on the screen. |
 | `namespace` | the global the bundle sets: `window.Acme`; boards write `Acme.Button`. A JS identifier. |
 | `libraries` | Claude Design's list of what previews load; `[]` for a bundle that takes React from the page. |
-| `kit` | the kit's record. `id` (lower case, digits, `-`) and `version` (`major.minor.patch`) are what install checks: an archive whose record says another id or version is refused. `source`: `library` or `draft`. `package`: the npm name. `root`: the provider every board wraps its content in, and the live preview wraps each component in. `cssLayer`, `tokenPrefix`: see "Bundle rules". |
+| `kit` | the kit's record. `id` (lower case, digits, `-`) and `version` (`major.minor.patch`) are what install checks: an archive whose record says another id or version is refused. `source`: `library` or `draft`. `package`: the npm name. `root`: the provider every board wraps its content in, and the live preview wraps each component in. `react`: `"19"` when the kit is built for React 19 (its boards carry `<meta name="dc-react" content="19">`, which makes the engine load React 19); absent = React 18.3.1. `cssLayer`, `tokenPrefix`: see "Bundle rules". |
 | `sections` | titles of the tree's sections; ids and order fixed: `foundation`, `components`, `templates`, `assets`. |
 | `groups` | the components, by group (below). |
 | `assetGroups` | icons, logos, pictures (below). |
@@ -252,7 +252,7 @@ the search and an agent read to pick it; `thumb` is written by `kit render --sho
 
 ## A board on the kit
 
-A layout's board, and every project board built on the kit, is HTML the board engine (React 18.3.1) renders:
+A layout's board, and every project board built on the kit, is HTML the board engine (React 18.3.1; React 19.2 when the board's head has `<meta name="dc-react" content="19">`, which `kit add` sets up for a kit whose record says `react: "19"`) renders:
 
 ```html
 <!doctype html>
@@ -413,7 +413,7 @@ bases deep and has no loop. `kit render` draws the child with its bases when the
 ## Bundle rules
 
 - `components/bundle.js` is one classic script (IIFE) that assigns `window.<Namespace>`: no `import`, no network, no
-  literal `</script`. It takes `React` and `ReactDOM` from `window`; the board engine supplies **React 18.3.1**. A
+  literal `</script`. It takes `React` and `ReactDOM` from `window`; the board engine supplies **React 18.3.1**, or 19.2 for a kit whose record says `react: "19"`. A
   bundle with its own React breaks on the first hook.
 - A library kit bundles the package's exports with esbuild, `react`, `react-dom`, `react/jsx-runtime` mapped to the
   page's globals; a package on React 19 is built for 18 (no `use`, no React 19 only APIs at the top level).
@@ -428,20 +428,20 @@ bases deep and has no loop. `kit render` draws the child with its bases when the
 One command makes the kit from the package, the same command (or `kit update`) brings it to a new version:
 
 ```sh
-harnessly design kit add npm:@acme/ui@1.4.0 ./acme-ui [--root ThemeProvider] [--css @acme/ui/theme.css] [--registry URL]
+harnessly design kit add npm:@acme/ui@1.4.0 ./acme-ui [--root ThemeProvider] [--react 19] [--css @acme/ui/theme.css] [--registry URL] [--draft]
 harnessly design kit add shadcn:ui ./shadcn-ui                 # shadcn/ui; shadcn:<folder or address> for another registry
 harnessly design kit update ./acme-ui --version 1.5.0          # the newest when --version is not given
 ```
 
 | Step | What `kit add` does |
 | --- | --- |
-| Install | `npm install` of the package (plus React 18.3.1 and TypeScript for reading the types) into a build folder in the user cache, with the registry and token of the `.npmrc` in the folder the command runs in (or `--registry`); `--from DIR` takes a folder that already has `node_modules` and installs nothing. A peer dependency npm left out is installed when the bundle needs it. A shadcn registry: every `registry:ui` item and what it names, from the address or a folder (a mirror in a closed network) |
-| Bundle | esbuild: every export into `window.<Namespace>`, `react`, `react-dom`, `react/jsx-runtime` and React 19's compiler runtime mapped to the page's React 18; the package's stylesheets (its `style` field and the `.css` of its `exports`, or `--css`) with fonts and pictures inlined, in `@layer kit-<id>`. A shadcn kit: Tailwind compiles the classes the components use, with the registry's style, into `bundle.css`; the kit gets a `Root` (light and dark) |
+| Install | `npm install` of the package (plus React 18.3.1 (19 when the package needs it: its `react` peer starts at 19, its bundle uses `useActionState`/`useOptimistic`, or `--react 19`) and TypeScript for reading the types) into a build folder in the user cache, with the registry and token of the `.npmrc` in the folder the command runs in (or `--registry`); `--from DIR` takes a folder that already has `node_modules` and installs nothing. A peer dependency npm left out is installed when the bundle needs it. A shadcn registry: every `registry:ui` item and what it names, from the address or a folder (a mirror in a closed network) |
+| Bundle | esbuild: every export into `window.<Namespace>`, `react`, `react-dom`, `react/jsx-runtime` and React 19's compiler runtime mapped to the page's React 18; the package's stylesheets (its `style` field and the `.css` of its `exports`, or `--css`) with fonts and pictures inlined, in `@layer kit-<id>`. A shadcn kit: Tailwind compiles the classes the components use, with the registry's style, into `bundle.css`; the kit gets a `Root` (light and dark) A package whose theme needs a provider (MUI `ThemeProvider`, Ant Design `ConfigProvider`, Chakra `ChakraProvider`, Fluent, Radix Themes, Primer, Mantine) gets it from a built-in recipe, or any exported provider that takes no required props: it becomes the kit's `KitRoot` (`kit.root`) with no `--root`. Samples: a built-in recipe table (`kitadd/recipes.go`) holds checked first samples for MUI, Chakra and HeroUI components that draw nothing alone (a transition with `in` and a child, a menu or a dialog open with its trigger and content, a tab list with its tabs); it applies only when every component it names is in the kit. `<Name>Root` is folded into `<Name>` when both are exported, `<Parent>Item`/`Section` and a few named items (Tab, Tag, Radio) become parts of their collection, and a class or factory export is left out. `--react 19` / a React 19 package: the kit record gets `react: "19"` and the engine loads React 19.2 for its boards. |
 | Props | TypeScript reads each exported component's props: enums from string unions, booleans, nodes, functions, the doc comments as descriptions. The attributes React's own types add (`className`, `onClick`, `aria-*`) are left out; `children` stays where the component takes it |
-| Parts | a `…Provider` is a provider; in a file declaring several components, the ones named after another (`CardHeader` after `Card`) are its parts |
-| Tokens | the CSS variables of the package's stylesheets (shadcn: of the registry's colours) under `:root`, `[data-theme]`, `.dark`: `tokens.json` + `tokens.css` (see «Other formats», CSS) |
-| Index and cards | `kit.version` = the package's version, `kit.package`, `code` `{import, export}` for every component, a first sample (a value for every required prop; a parent holds its parts), variants from a `variant` prop, a card each (description, Props, Example, In code), `todo` with what a person writes, README.md with «Not in the kit» and Consuming |
-| Draw | every component in headless Chrome (`--no-render` skips it): one that throws or draws nothing alone loses its sample, says why in its `todo`, and is listed in the README under «Not in the kit»; the check and `--render` then pass over it |
+| Parts | a `…Provider` is a provider; in a file declaring several components, the ones named after another (`CardHeader` after `Card`) are its parts Flat compound exports (Chakra's `AccordionRoot`, `AccordionItem`, ...) are parts of their `<Name>Root`, wherever the package declares them; a part of a part belongs to the top component; `…Context` objects are not components. |
+| Tokens | the CSS variables of the package's stylesheets (shadcn: of the registry's colours) under `:root`, `[data-theme]`, `.dark`: `tokens.json` + `tokens.css` (see «Other formats», CSS) Then the kit is drawn in headless Chrome inside its root and the browser reads the custom properties it sees: what a theme builds in JavaScript (MUI, Ant Design, Chakra, emotion, styled-components) and values made of others (`calc()`, `color-mix()`, `var()` chains) arrive resolved, a dark pass applies the page's dark selector (or `[data-theme="dark"]`) and keeps what differs. Only names the stylesheet did not give are added. |
+| Index and cards | `kit.version` = the package's version, `kit.package`, `code` `{import, export}` for every component, a first sample (a value for every required prop; a parent holds its parts), variants from a `variant` prop, a card each (description, Props, Example, In code), `todo` with what a person writes, README.md with «Not in the kit» and Consuming Descriptions, «When to use», «When not to use» and keywords come, in order, from the package's JSDoc, its README and doc pages, its stories (`docs.description.component`), then, with `--draft`, a draft by one `claude -p --model sonnet` call per 40 components (it runs the login of the machine the command runs on, so it is opt-in; build-1 has no Claude login, and no path through the runtime exists for a command run there), and last a plain sentence from the name and props; the card's Status says where a draft or generated text came from, so no component is left in `todo` for the texts. |
+| Draw | every component in headless Chrome (`--no-render` skips it): one that throws or draws nothing alone loses its sample, says why in its `todo`, and is listed in the README under «Not in the kit»; the check and `--render` then pass over it One that draws nothing or throws gets up to three more first samples before it loses its sample: opened (`open`, `in`, `show`, ...) with a text, with the label-like props filled, with two plain entries in every list prop (`children` is declared when the types left it out). A required `component` / `as` prop gets `"div"`. |
 
 The run ends with the report: components, parts, providers, tokens; on an update what changed (`+` a component, `-` a
 component, `~` its props: `+size, -tone, ~variant: enum(a|b) → enum(a|b|c)`); **what it could not read** (no types, no
@@ -456,6 +456,49 @@ The same version twice writes the same files. `_harnessly/kit-source.json` recor
 
 After the command: write what each component's `todo` says (what it is for, «When to use», «When not to use»), better
 samples, `keywords`; four to six templates; `harnessly design kit render <folder> --shots`; `check --render` until clean.
+
+### An Angular library kit
+
+`kit add npm:@angular/material`, `npm:primeng`, `npm:@taiga-ui/core` and `npm:@taiga-ui/kit` work the same way as a React
+package: a package that has `@angular/core` as a peer is built by the Angular route. The board is React, so each Angular
+component is wrapped as a React one in `window.<Namespace>`: `<x-import component-from-global-scope="Mat.Button">` and
+`pages/*.tsx` use it as any kit component.
+
+| What | How |
+| --- | --- |
+| Read | node and the TypeScript compiler read every public entry of the package (`exports` of its `package.json`): a class with `ɵcmp` or `ɵdir` in its `.d.ts` gives the selector, `inputs`, `outputs` and `<ng-content>` slots. A component declared in an NgModule is not mounted and is listed under «not carried» |
+| Props | an input is a prop (its alias, a union of strings is an enum), an output is an `onXxx` callback, the React `children` go into the component's content. A directive without its own tag (`[tuiButton]`, `[matButton]`) is wrapped in a host element |
+| Run | esbuild bundles Angular (JIT, zoneless) with the package; the first render waits for `window.<Namespace>.ready`. `Root` gives the page the library's providers, the theme stylesheet and background class |
+| Tokens | the CSS variables the theme styles define: Material `--mat-sys-*` (prebuilt theme), PrimeNG `--p-*` (the Aura preset, built by node as a browser would), Taiga `--tui-*` (its LESS compiled). A theme the harness does not know: `--css <package>/<file>.css` |
+| Parts | `ExpansionPanelHeader` of `ExpansionPanel` by name (the shortest name it begins with); the table, tab, stepper and calendar parts that the name does not tell are listed per library |
+
+Overlays: a menu, select panel, datepicker, dialog or drawer takes its content from the wrapper's `children` and opens with the
+sample's props, so it draws on the board and on the kit's `check --render`. A form control is controlled: `value` plus
+`onChange` / `onBlur` (what `ngModel` and `formControl` would carry). A component declared in an NgModule (PrimeNG) is carried
+as a standalone one. The `Mat`, `P` and `Tui` prefixes are taken off the ids without `--namespace`. Taiga's icons are embedded
+in the bundle (data addresses), not read from the machine.
+
+What does not carry: components that need a host the board cannot give — service-driven ones (Toast, ConfirmDialog, Taiga's
+Root, Dialog and Notification services) and the non-visual directives (Copy, Fullscreen, Pulse, LineClamp); they are skipped
+by the library presets, not drawn blank.
+
+**PrimeNG license.** PrimeNG 22 and newer check a PrimeUI (commercial) license and draw a red «Invalid PrimeUI License» badge in the corner of every board without a key. The badge is theirs: the kit does not hide it. `kit add npm:primeng --license-secret NAME` takes the key from the safe (`harnessly secret ask NAME`) and puts it into the Root provider (`providePrimeNG({ license })`); the key then sits in the kit's `bundle.js`, so keep such a kit inside the licensed team. Without a key `kit add` warns about the badge. The last PrimeNG without the check is `npm:primeng@21.1.10` (the check came with 22.0.0-rc.1); it needs Angular 21, which `kit add` installs by itself.
+
+Kit on a kit: Taiga `@taiga-ui/kit` fields (Input, Select, DateTime, …) live inside `tui-textfield`, which belongs to
+`@taiga-ui/core`. The kit build mixes the core package in (its providers, `tui-textfield`, `tui-label`) and draws these
+fields in a textfield with a label. This is a limitation: the kit is not built from its own package only, so a project
+that takes `@taiga-ui/kit` gets the core pieces in the same bundle and `@taiga-ui/core` is not added next to it. About
+one in seven kit components still does not draw on `check --render` (Pager, Filter, Timeline, InputChip, Password,
+InputPhoneInternational, …); the report lists them.
+
+### Kits it was checked on
+
+The sample rules are general (by component kind and name, not by package); the recipes in `recipes.go` are only optional hints.
+Checked on packages without recipes, drawn alone / components (parts inside parents are not counted), check errors 0:
+@mantine/core 123/144, react-bootstrap 60/67, @fluentui/react-components 78/86, @blueprintjs/core 65/73,
+@radix-ui/themes 37/42, and with hints: @mui/material 97/102, @chakra-ui/react 116/128, @heroui/react 87/94, antd 63/70.
+What stays «drawn only inside an application» is listed in the kit's README.md (hooks-only helpers, portals, layout
+measurers, components that need a live parent).
 
 ### A draft kit
 
@@ -681,6 +724,35 @@ keeps the semantic names as aliases in its `tokens.css` (`--acme-accent: var(--a
 them; the application loads only the package's CSS. The repository's `sinopia.export.json`, the checks and what is
 never touched are in [design-pages.md](../design-pages.md#into-the-products-code-hrn-1015).
 
+## A project on a kit
+
+A project remembers its kit: `meta/project.json` has `"kit": {id, version, …}` (the pin the runtime serves
+`ds/<mount>/…` from) and `"kits": [{id, version}]` (the same, as a list). Pin it one of three ways:
+
+```sh
+harnessly design new "<title>" --kit <id>[@version][/theme]
+harnessly design kit use <project> <id>[@version][/theme]   # an installed kit; `none` = «no kit», kept, not asked again
+```
+
+or the button **«Подключить UI-кит»** over a project without a kit in Sinopia Design: an installed kit in one click, or a
+package (`npm:@scope/name`, with a registry when it is not public) that is made into a kit (`kit add`), drawn once
+(`kit render`), installed and written into the project.
+
+What it changes:
+
+- every new board and page (`design new`, `design page create`) starts with the kit's `tokens.css`, `fonts.css`,
+  `components/bundle.css`, `components/bundle.js` and its provider (`<x-import component-from-global-scope="NS.Root">`)
+  around the content;
+- strict mode is on for the project;
+- an agent is told, once per chat and project, which kit it is, to draw only from it (`kit_index`, `kit_component`,
+  `kit_tokens`, `kit_templates`), and to end every edit with `design check <project> --strict` and
+  `design check <project> --board FILE`, then open the screenshot (`.check/`) and look. The text is printed by
+  `design new`, `design page create` and `design kit use`, held back once by the `design-guard` hook on the chat's first
+  edit of a board of such a project, and written into the design dialog's instructions and the MCP instructions;
+- a new design in a project with no kit, no kit named in the request, while kits are installed on the machine: the agent
+  asks once with a card (`notice_ask`: the fitting kit recommended, another installed one, no kit) and runs
+  `design kit use`; the answer is kept in `meta/project.json` (`kitAsk`) and never asked again.
+
 ## Strict mode
 
 A mockup on a kit is meant to become the product's code one to one, so it must be made of the kit and nothing else.
@@ -690,7 +762,8 @@ The strict check says where it is not:
 harnessly design check <project> --strict [--board home] [--json]   # local: no runtime, no browser; exit 1 on a finding
 ```
 
-It is on without the flag when the project says so (`meta/project.json` `"strict": true`) or its kit does (`kit.strict`);
+It is on without the flag when the project is on a kit (unless it says `"strict": false`), when it says `"strict": true`,
+or when its kit does (`kit.strict`);
 then `harnessly design check <project>` runs it before drawing the boards. Agents have it as `kit_check {kit, project}`
 (see [design-kit-mcp.md](design-kit-mcp.md)). It reads the project's files under `project/`:
 
@@ -737,6 +810,8 @@ checked.
 - Projects do not yet record their kits (`meta.kits` is kept but not read): a board names the kit's files itself
  .
 - No command draws a project's board on a kit outside Sinopia.
-- `kit add` reads token values as the stylesheet writes them: a variable defined by `calc()` or `color-mix()` of others
-  is left out, not resolved in a browser. Packages styled by CSS-in-JS have no variables to read (their theme object is
-  not read yet), and Angular packages are not built.
+- Token values that need a browser (`calc()`, `color-mix()`, CSS-in-JS themes) are read by a headless Chrome for React
+  packages (`Tokens` row); without Chrome on the machine they are left out. A package whose stylesheet is Tailwind input
+  (HeroUI's `@import "tailwindcss"`) is compiled by the Tailwind CLI with `@source` on the package, and its tokens are read from
+  the result. The Angular libraries' own theme builders are
+  known for Material, PrimeNG and Taiga only (see «An Angular library kit»).

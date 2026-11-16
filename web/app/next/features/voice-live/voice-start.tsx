@@ -3,6 +3,7 @@
 import { t } from '@/next/i18n';
 import { useVoiceState, voiceOffered } from '@/next/features/voice-live/use-voice-state';
 import type { MachineId } from '@/next/protocol/v2';
+import { goTo, ROUTE } from '@/next/routes/routes';
 import { RoundButton } from '@/next/ui/button';
 import '@/next/styles/voice-live.css';
 
@@ -15,14 +16,31 @@ interface IVoiceStartProps {
 
 const VoiceStart = ({ machine, onStart, busy = false }: IVoiceStartProps) => {
   const [state] = useVoiceState(machine);
-  if (!voiceOffered(state)) return null;
-  const label = state && !state.ready ? 'next.chatgpt.voice.noLogin' : 'next.chatgpt.voice.newChat';
+  // Not read yet: nothing, so a machine without the voice does not flash a button.
+  if (!state) return null;
+  // The voice can not go now (no ChatGPT sign-in, or the mode is off): the wave stays, quiet, and says what to do;
+  // a press leads to the settings where it is fixed instead of starting a chat that would fail.
+  if (!state.ready) {
+    const label = voiceOffered(state) ? 'next.chatgpt.voice.noLogin' : 'next.chatgpt.voice.offHint';
+    return (
+      <span className="hx-voice-holder">
+        <RoundButton
+          icon="audio-lines"
+          className="hx-voice-btn"
+          data-off=""
+          aria-disabled="true"
+          label={t(label)}
+          onClick={() => goTo({ kind: ROUTE.settings, section: 'accounts' })}
+        />
+      </span>
+    );
+  }
   return (
     <span className="hx-voice-holder">
       <RoundButton
         icon="audio-lines"
         className="hx-voice-btn"
-        label={t(label)}
+        label={t('next.chatgpt.voice.newChat')}
         disabled={busy}
         onClick={onStart}
       />

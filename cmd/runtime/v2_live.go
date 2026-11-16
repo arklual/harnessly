@@ -225,6 +225,7 @@ func newV2Live(d deps, c *core) *v2Live {
 		AlwaysApps:  alwaysApps(apps.Open(d.DataDir)),
 		Rewinder:    v2Rewinder{c},
 		Window:      v2Window(&history.Stats{Dir: filepath.Join(d.DataDir, "session-stats")}),
+		Cost:        v2Cost(&history.Stats{Dir: filepath.Join(d.DataDir, "session-stats")}),
 		Compact:     v2Compact(agentFiles(d.Home)),
 		AutoContinue: func() (bool, bool) {
 			s := runtimeSettings.RuntimeSettings()

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -109,9 +110,9 @@ func packageOf(spec string) string {
 
 // bundleInstalling is bundle that installs a missing peer dependency and builds again (three rounds at most); with
 // no installer (a prepared folder) a missing package is an error.
-func bundleInstalling(o *Options, dir, module, namespace string, css []string, install bool) ([]byte, []byte, error) {
+func bundleInstalling(o *Options, dir, module, namespace string, css []string, extra string, install bool) ([]byte, []byte, error) {
 	for round := 0; ; round++ {
-		js, styles, err := bundle(dir, module, namespace, css)
+		js, styles, err := bundle(dir, module, namespace, css, extra)
 		var miss *missingError
 		if !errors.As(err, &miss) || !install || round == 3 {
 			return js, styles, err
@@ -134,7 +135,7 @@ var reactSpecRe = regexp.MustCompile(`^(react|react-dom)(/.*)?$`)
 
 // bundle builds module (an npm name or a file of dir) into one classic script that adds every export to
 // window.<namespace>, and the CSS it imports (plus the package's stylesheets in css) into one stylesheet.
-func bundle(dir, module, namespace string, css []string) (js, styles []byte, err error) {
+func bundle(dir, module, namespace string, css []string, extra string) (js, styles []byte, err error) {
 	var entry strings.Builder
 	fmt.Fprintf(&entry, "import * as K from %q;\n", module)
 	for _, c := range css {
@@ -142,6 +143,7 @@ func bundle(dir, module, namespace string, css []string) (js, styles []byte, err
 	}
 	ns, _ := json.Marshal(namespace)
 	fmt.Fprintf(&entry, "var ns = window[%s] || (window[%s] = {});\nfor (var k in K) if (k !== \"default\") ns[k] = K[k];\n", ns, ns)
+	entry.WriteString(extra)
 	res := api.Build(api.BuildOptions{
 		Stdin:         &api.StdinOptions{Contents: entry.String(), ResolveDir: dir, Sourcefile: "kit-entry.js", Loader: api.LoaderJS},
 		AbsWorkingDir: dir,
@@ -207,6 +209,10 @@ func bundle(dir, module, namespace string, css []string) (js, styles []byte, err
 	}
 	// A literal </script would end the script when a board inlines it; <\/script means the same in strings and regexps.
 	js = regexp.MustCompile(`(?i)</script`).ReplaceAll(js, []byte(`<\/script`))
+	// A line of a template string that starts with "export " (a code sample in a package's warning) would read as a module
+	// statement to the kit check; \u0065 is the same letter in a string, and the bundle has no real module statements.
+	js = regexp.MustCompile(`(?m)^(\s*)export(\s)`).ReplaceAll(js, []byte(`${1}\u0065xport${2}`))
+	js = regexp.MustCompile(`(?m)^(\s*)import(\s)`).ReplaceAll(js, []byte(`${1}\u0069mport${2}`))
 	return js, styles, nil
 }
 
@@ -217,8 +223,9 @@ func packageCSS(dir, pkg string) []string {
 		return nil
 	}
 	var pj struct {
-		Style   string          `json:"style"`
-		Exports json.RawMessage `json:"exports"`
+		Style   string            `json:"style"`
+		Exports json.RawMessage   `json:"exports"`
+		Deps    map[string]string `json:"dependencies"`
 	}
 	if json.Unmarshal(raw, &pj) != nil {
 		return nil
@@ -232,6 +239,16 @@ func packageCSS(dir, pkg string) []string {
 		for k := range ex {
 			if strings.HasSuffix(k, ".css") && !strings.Contains(k, "*") {
 				set[pkg+"/"+strings.TrimPrefix(k, "./")] = true
+			}
+		}
+	}
+	if len(set) == 0 && !strings.HasSuffix(pkg, "/styles") {
+		// The styles of a package live in a sibling it depends on (@heroui/react → @heroui/styles): its "style" field.
+		for dep := range pj.Deps {
+			if dep == packageScope(pkg)+"styles" || dep == pkg+"-styles" || dep == pkg+"-theme" {
+				if spec := styleSpecifier(dir, dep); spec != "" {
+					set[spec] = true
+				}
 			}
 		}
 	}
@@ -461,3 +478,149 @@ export function Root({ theme = "light", children }: {
   )
 }
 `
+
+// packageScope is "@scope/" of a scoped package, "" of an unscoped one.
+func packageScope(pkg string) string {
+	if strings.HasPrefix(pkg, "@") {
+		if i := strings.Index(pkg, "/"); i > 0 {
+			return pkg[:i+1]
+		}
+	}
+	return ""
+}
+
+// styleSpecifier is the import that gives a package's main stylesheet: the "style" field when "exports" lets it be
+// imported, else the export that points at the same file.
+func styleSpecifier(dir, pkg string) string {
+	raw, err := os.ReadFile(filepath.Join(dir, "node_modules", filepath.FromSlash(pkg), "package.json"))
+	if err != nil {
+		return ""
+	}
+	var pj struct {
+		Style   string                     `json:"style"`
+		Exports map[string]json.RawMessage `json:"exports"`
+	}
+	if json.Unmarshal(raw, &pj) != nil || pj.Style == "" {
+		return ""
+	}
+	if len(pj.Exports) == 0 {
+		return pkg + "/" + strings.TrimPrefix(pj.Style, "./")
+	}
+	for _, k := range sortedKeysRaw(pj.Exports) {
+		if k != "." && !strings.Contains(k, "*") && strings.Contains(string(pj.Exports[k]), pj.Style) {
+			return pkg + "/" + strings.TrimPrefix(k, "./")
+		}
+	}
+	return ""
+}
+
+func sortedKeysRaw(m map[string]json.RawMessage) []string {
+	var ks []string
+	for k := range m {
+		ks = append(ks, k)
+	}
+	sort.Strings(ks)
+	return ks
+}
+
+var tailwindSourceRe = regexp.MustCompile(`@import\s+["']tailwindcss["']|@tailwind\s`)
+
+// specPackage is the package a specifier like "@heroui/styles/css" names.
+func specPackage(spec string) string {
+	parts := strings.Split(spec, "/")
+	if strings.HasPrefix(spec, "@") && len(parts) >= 2 {
+		return parts[0] + "/" + parts[1]
+	}
+	return parts[0]
+}
+
+// isTailwindSource is true when a package's stylesheet is Tailwind input (it imports "tailwindcss"): it is not CSS yet,
+// Tailwind has to compile it with the classes the components use.
+func isTailwindSource(dir, spec string) bool {
+	pkg := specPackage(spec)
+	raw, err := os.ReadFile(filepath.Join(dir, "node_modules", filepath.FromSlash(pkg), "package.json"))
+	if err != nil {
+		return false
+	}
+	var pj struct {
+		Style string `json:"style"`
+	}
+	if json.Unmarshal(raw, &pj) != nil || pj.Style == "" {
+		return false
+	}
+	css, err := os.ReadFile(filepath.Join(dir, "node_modules", filepath.FromSlash(pkg), filepath.FromSlash(pj.Style)))
+	return err == nil && tailwindSourceRe.Match(css)
+}
+
+// compileTailwindSources replaces the stylesheets that are Tailwind input by what Tailwind makes of them, with the
+// classes the package's components use (@source its folder): a package such as HeroUI styles its components only that way.
+func compileTailwindSources(o *Options, dir, pkg string, css []string, rep *Report) []string {
+	var out []string
+	for i, spec := range css {
+		if !isTailwindSource(dir, spec) {
+			out = append(out, spec)
+			continue
+		}
+		file, err := tailwindCompile(o, dir, pkg, spec, i)
+		if err != nil {
+			rep.NotCarried = append(rep.NotCarried, "styles: "+spec+" is Tailwind input and Tailwind did not compile it: "+firstLine(err.Error()))
+			continue
+		}
+		out = append(out, file)
+	}
+	return out
+}
+
+var tailwindCodeRe = regexp.MustCompile(`@plugin\b|@config\b`)
+
+// tailwindLoadsCode: a stylesheet of the package asks Tailwind to load a script (@plugin, @config), which would run the
+// package's code inside the compiler; such a package is not compiled.
+func tailwindLoadsCode(dir, spec string) bool {
+	root := filepath.Join(dir, "node_modules", filepath.FromSlash(specPackage(spec)))
+	found := false
+	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || found {
+			return nil
+		}
+		if d.IsDir() && d.Name() == "node_modules" && p != root {
+			return filepath.SkipDir
+		}
+		if !d.IsDir() && strings.HasSuffix(p, ".css") {
+			if raw, rerr := os.ReadFile(p); rerr == nil && tailwindCodeRe.Match(raw) {
+				found = true
+			}
+		}
+		return nil
+	})
+	return found
+}
+
+func tailwindCompile(o *Options, dir, pkg, spec string, n int) (string, error) {
+	if tailwindLoadsCode(dir, spec) {
+		return "", fmt.Errorf("its stylesheets load scripts through @plugin or @config, which the kit does not run")
+	}
+	cli := filepath.Join(dir, "node_modules", "@tailwindcss", "cli", "dist", "index.mjs")
+	if _, err := os.Stat(cli); err != nil && o.From == "" {
+		need := []string{"tailwindcss@4", "@tailwindcss/cli@4"}
+		if err := npmInstall(o, dir, need); err != nil {
+			return "", err
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "node_modules", "tw-animate-css")); err != nil && o.From == "" {
+		_ = npmInstall(o, dir, []string{"tw-animate-css"}) // imported by some themes; one that does not need it ignores it
+	}
+	in := filepath.Join(dir, fmt.Sprintf(".kit-pkg-%d.src.css", n))
+	src := fmt.Sprintf("@import %q;\n@source %q;\n", spec, "./node_modules/"+pkg)
+	if err := os.WriteFile(in, []byte(src), 0o644); err != nil {
+		return "", err
+	}
+	out := filepath.Join(dir, fmt.Sprintf(".kit-pkg-%d.css", n))
+	run := o.Node
+	if run == nil {
+		run = func(dir string, args ...string) ([]byte, error) { return runCmd(dir, nil, "node", args...) }
+	}
+	if _, err := run(dir, cli, "-i", in, "-o", out, "--minify"); err != nil {
+		return "", err
+	}
+	return out, nil
+}

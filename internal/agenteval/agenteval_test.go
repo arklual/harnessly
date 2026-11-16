@@ -336,3 +336,16 @@ func TestSecretScenarioTextNot(t *testing.T) {
 		}
 	}
 }
+
+// A question to the person that timed out counts as asked when the expectation says even_failed.
+func TestCalledEvenFailed(t *testing.T) {
+	f := Facts{Calls: []Call{{Name: "mcp__harnessly__notice_ask", Args: []byte(`{"title":"Kit acme-ui?"}`), Error: true, Result: "timed out"}}}
+	strict := Expect{Called: ".*notice_ask.*"}
+	if ok, _ := strict.holds(f); ok {
+		t.Fatal("a failed call must not count without even_failed")
+	}
+	lenient := Expect{Called: ".*notice_ask.*", EvenFailed: true, Args: map[string]string{"title": "acme"}}
+	if ok, why := lenient.holds(f); !ok {
+		t.Fatalf("a failed call must count with even_failed: %s", why)
+	}
+}

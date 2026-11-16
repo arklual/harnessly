@@ -368,22 +368,15 @@
   color: var(--hx-fg-3);
 }
 
-/* The field's meter of the chat's limits (features/limits/limits-mini.tsx): two thin bars by the context ring, the
-   five hours over the week; the words on hover. A bar takes the level's colour as it runs low. */
-.hx-limmini {
-  display: inline-grid;
+/* The field's meter of the chat's limits (features/limits/limits-mini.tsx): thin bars in the context ring's chip, the
+   five hours over the week; on hover the card of every window (HRN-1552). A bar takes the level's colour as it runs
+   low. On a narrow field it gives way with the ring: the pill's popover keeps the windows. */
+.hx-ctx__chip.hx-limmini {
   align-content: center;
+  place-items: stretch;
   gap: 4px;
-  width: 22px;
-  height: 32px;
-  padding: 0 5px;
-  box-sizing: content-box;
-  border-radius: var(--hx-radius-full);
-  cursor: default;
-  transition: background var(--hx-dur-sm);
-}
-.hx-limmini:hover {
-  background: var(--hx-bg-hover);
+  padding: 0 6px;
+  box-sizing: border-box;
 }
 .hx-limmini i {
   position: relative;
@@ -410,9 +403,47 @@
 .hx-limmini i[data-level='out']::before {
   background: var(--hx-danger);
 }
-/* A narrow field (the phone) has no room for it: the pill's popover keeps the card. */
-@container hx-field (max-width: 580px) {
-  .hx-composer__bar .hx-limmini {
-    display: none;
+.hx-limmini i[data-none] {
+  opacity: 0.5;
+}
+
+/* Other subscriptions in one quiet line, opened on a click; one that runs low stands out above it. */
+.hx-limo__sum {
+  all: unset;
+  cursor: pointer;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+}
+.hx-limo__sum:hover {
+  color: var(--hx-fg-2);
+}
+.hx-limo__sum:focus-visible {
+  outline: 2px solid var(--hx-focus, currentColor);
+  outline-offset: 2px;
+}
+.hx-limo__body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 200ms var(--hx-ease-out);
+}
+.hx-limo[data-open='true'] .hx-limo__body {
+  grid-template-rows: 1fr;
+}
+.hx-limo__in {
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.hx-limo[data-open='true'] .hx-limo__in {
+  padding-top: 10px;
+}
+.hx-limb__warm .hx-limb__win .hx-limb__pct {
+  color: var(--hx-warning);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-limo__body {
+    transition: none;
   }
 }

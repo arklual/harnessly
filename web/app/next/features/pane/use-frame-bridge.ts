@@ -73,6 +73,8 @@ export const useFrameBridge = ({
 }: IFrameBridgeArgs) => {
   // Null until the page's bridge says hello: a page without one cannot pick.
   const [picking, setPicking] = useState<boolean | null>(null);
+  // Annotating was on when the document went (a link, a reload): its next document goes on with it.
+  const resume = useRef(false);
   // Where the blocks the tab follows (`tk:anchors`) show now: marks write their place from it, no render per scroll.
   const [anchors] = useState(createAnchorStore);
   const [url, setUrl] = useState<string | null>(null);
@@ -80,6 +82,19 @@ export const useFrameBridge = ({
   const [keyStep, setKeyStep] = useState(false);
   /** How many times a page's bridge said hello: each new document says it again. */
   const [hellos, setHellos] = useState(0);
+  const postPick = (on: boolean) => {
+    if (origin !== null)
+      frame.current?.contentWindow?.postMessage(
+        { type: 'tk:pick', on, ...(on ? { keep: true } : {}) },
+        origin,
+      );
+  };
+  // Asks the page's bridge to say hello again: a hello that came before the frame's load was counted is not lost.
+  const ping = () => {
+    if (origin !== null) frame.current?.contentWindow?.postMessage({ type: 'tk:ping' }, origin);
+  };
+  // The same two, for the effect that hears the page (an effect event may be called only from effects).
+  const resumePick = useEffectEvent(() => postPick(true));
   const opened = useEffectEvent((url: string) => onOpen(url));
   const redirected = useEffectEvent((url: string): boolean => onRedirect(url));
   const picked = useEffectEvent((p: IFramePicked) => onPicked(p));
@@ -113,7 +128,8 @@ export const useFrameBridge = ({
       for (const waiter of [...waitKind.current]) if (waiter.kind === message.k) waiter.heard(message);
       if (message.k === 'hello') {
         setNonceNow(message.nonce);
-        setPicking((on) => on ?? false);
+        setPicking((on) => on ?? resume.current);
+        if (resume.current) resumePick();
         setUrl(message.url);
         setHellos((n) => n + 1);
         for (const heard of [...waitHello.current]) heard();
@@ -122,7 +138,10 @@ export const useFrameBridge = ({
         acts.current.delete(message.acted.id);
         waiter?.(message.acted);
       } else if (message.k === 'nav') setUrl(message.url);
-      else if (message.k === 'pick') setPicking(message.on);
+      else if (message.k === 'pick') {
+        resume.current = message.on;
+        setPicking(message.on);
+      }
       else if (message.k === 'picked') picked(message.picked);
       else if (message.k === 'anchored') anchors.set(message.report);
       else if (message.k === 'redirect') {
@@ -140,13 +159,6 @@ export const useFrameBridge = ({
     return () => window.removeEventListener('message', onMessage);
   }, [frame, origin, anchors]);
 
-  const postPick = (on: boolean) => {
-    if (origin !== null)
-      frame.current?.contentWindow?.postMessage(
-        { type: 'tk:pick', on, ...(on ? { keep: true } : {}) },
-        origin,
-      );
-  };
 
   return {
     /** The page asked for a security key or Touch ID; false again with its next document. */
@@ -158,15 +170,38 @@ export const useFrameBridge = ({
     togglePick: () => {
       if (picking === null) return;
       const next = !picking;
+      resume.current = next;
       setPicking(next);
       postPick(next);
     },
+    /** Turns annotating on without asking what was known before: for a page that just answered a recheck. */
+    startPick: () => {
+      resume.current = true;
+      setPicking(true);
+      postPick(true);
+    },
     endPick: () => {
+      resume.current = false;
       if (picking) {
         setPicking(false);
         postPick(false);
       }
     },
+    /** Asks the page again whether it can be annotated: its bridge answers with hello; false after timeoutMs. */
+    recheck: (timeoutMs: number): Promise<boolean> =>
+      new Promise((resolve) => {
+        const heard = () => {
+          window.clearTimeout(timer);
+          waitHello.current.delete(heard);
+          resolve(true);
+        };
+        const timer = window.setTimeout(() => {
+          waitHello.current.delete(heard);
+          resolve(false);
+        }, timeoutMs);
+        waitHello.current.add(heard);
+        ping();
+      }),
     /** A new document in the frame: its bridge says hello again; what the old one was doing is lost with it. */
     onFrameLoad: () => {
       setKeyStep(false);
@@ -175,6 +210,7 @@ export const useFrameBridge = ({
       setNonceNow(null);
       for (const waiter of [...acts.current.values()]) waiter(null);
       acts.current.clear();
+      ping();
     },
     /** Has the frame do an action; null when it did not answer in time or its document went. */
     act: (message: IFrameAct, timeoutMs: number): Promise<IFrameActed | null> =>

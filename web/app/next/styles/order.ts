@@ -77,6 +77,7 @@ import '@/next/styles/voice-live.css';
 import '@/next/styles/voice-style.css';
 import '@/next/styles/voice-head.css';
 import '@/next/styles/voice-layer.css';
+import '@/next/styles/voice-full.css';
 import '@/next/styles/editor.css';
 import '@/next/styles/review.css';
 import '@/next/styles/review-picker.css';

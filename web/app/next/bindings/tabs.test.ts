@@ -42,3 +42,29 @@ describe('stripTabOf: how a chat at work shows', () => {
     expect(stripTabOf(chatTab, chats(CHAT_STATUS.none)).title).toBe('Доступ к dev-машине');
   });
 });
+
+describe('stripTabOf: a chat tab is named by the chat (HRN-1557)', () => {
+  const named = (title: string) =>
+    new Map([['x', { id: 'x', title, status: CHAT_STATUS.none } as unknown as ISidebarChat]]);
+  const design = { ...createTab('/designly/harnessly?chat=x&edit=1'), title: 'harnessly' };
+
+  it("a design edited with its chat shows the chat's name, not the design's", () => {
+    expect(stripTabOf(design, named('Редизайн досок')).title).toBe('Редизайн досок');
+  });
+
+  it('follows a rename of the chat', () => {
+    expect(stripTabOf(design, named('Новое имя')).title).toBe('Новое имя');
+    expect(stripTabOf(chatTab, named('Новое имя')).title).toBe('Новое имя');
+  });
+
+  it('a chat with no title yet is «New chat», not the design', () => {
+    expect(stripTabOf({ ...design, title: null }, named('')).title).toBe('New chat');
+    expect(stripTabOf({ ...chatTab, title: null }, new Map()).title).toBe('New chat');
+  });
+
+  it("a design looked at without a chat keeps the design's name", () => {
+    expect(stripTabOf({ ...createTab('/designly/harnessly'), title: 'harnessly' }, new Map()).title).toBe(
+      'harnessly',
+    );
+  });
+});

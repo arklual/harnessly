@@ -21,6 +21,7 @@ import { pinLocale, t } from '@/next/i18n';
 import { runsByCall, WorkflowRuns, type TWorkflowTask } from '@/next/features/workflows/run';
 import { sampleWorkflow } from '@/next/dev/workflow-sample';
 import Feed from '@/next/features/chat/feed';
+import { MockupHost, type IMockupHost } from '@/next/features/chat/mockup-to-design';
 import { limitPlaceholder } from '@/next/features/chat/limit';
 import LimitCard from '@/next/features/chat/limit-card';
 import { MessagePictures, type IMessagePictures } from '@/next/features/chat/pictures';
@@ -89,6 +90,27 @@ const nextId = (prefix: string) => `${prefix}${++seq}`;
 const MIN = 60_000;
 const CONV = 'tab-gallery' as ConvId;
 const GALLERY_MACHINE = 'gallery' as MachineId;
+// «Продолжить в Sinopia Design» on an html card: the board is made after the usual wait; ?fail=mockup refuses.
+const GALLERY_MOCKUP: IMockupHost = {
+  machine: GALLERY_MACHINE,
+  conv: CONV,
+  make: (body) =>
+    later(!new URLSearchParams(window.location.search).get('fail')?.includes('mockup'), 1200).then(
+      () => ({
+        project: 'mockup',
+        projectTitle: body.title,
+        page: '01JD3Q4M5N6P7Q8R9S0T1V2W3X',
+        file: 'Mockup.dc.html',
+        title: body.title,
+        newProject: true,
+        existing: false,
+        opened: true,
+      }),
+      () => {
+        throw new Error('Машина не ответила');
+      },
+    ),
+};
 /** The Workflow call of the workflow scene: its step in the feed draws the sample's run. */
 const WORKFLOW_CALL = 'toolu_gallery_workflow';
 
@@ -2335,80 +2357,82 @@ const SceneView = ({ build }: { build: (now: Ms) => IScene }) => {
           <RewindActions value={rewindActions}>
             <SelBar conv={CONV} aside />
             <DelegatedChats.Provider value={scene.delegated ?? NO_DELEGATED}>
-              <Feed
-                machine={GALLERY_MACHINE}
-                items={scene.items}
-                failed={scene.failed}
-                onRetryLoad={() => setScene((current) => ({ ...current, failed: false }))}
-                hasOlder={scene.hasOlder ?? false}
-                loadingOlder={loadingOlder}
-                onLoadOlder={() => {
-                  setLoadingOlder(true);
-                  setTimeout(() => {
-                    setLoadingOlder(false);
-                    setScene((current) => ({
-                      ...current,
-                      hasOlder: false,
-                      items: current.items && [...history(startedAt - 300 * MIN), ...current.items],
-                    }));
-                  }, ANSWER_MS);
-                }}
-                density={scene.density ?? 'compact'}
-                offline={scene.offline ?? false}
-                limit={
-                  <LimitCard
-                    limited={scene.limited ?? null}
-                    clock={Date.now}
-                    controls
-                    onDecide={(action) =>
-                      later().then(() => setScene((current) => afterDecision(current, action)))
-                    }
-                  />
-                }
-                enterAfter={startedAt}
-                machineName={scene.machine ?? 'runner-2'}
-                refs={REFS}
-                onOpenRef={() => {}}
-                onOpenFile={(path) => toast(path)}
-                onOpenOutput={(output) => toast(`${output.kind}: ${output.ref}`)}
-                downloadUrl={(path) => `data:text/plain,${encodeURIComponent(path)}`}
-                shown={shown}
-                onLoadSteps={(turnId) =>
-                  new Promise<boolean>((done) =>
+              <MockupHost value={GALLERY_MOCKUP}>
+                <Feed
+                  machine={GALLERY_MACHINE}
+                  items={scene.items}
+                  failed={scene.failed}
+                  onRetryLoad={() => setScene((current) => ({ ...current, failed: false }))}
+                  hasOlder={scene.hasOlder ?? false}
+                  loadingOlder={loadingOlder}
+                  onLoadOlder={() => {
+                    setLoadingOlder(true);
                     setTimeout(() => {
+                      setLoadingOlder(false);
                       setScene((current) => ({
                         ...current,
-                        items:
-                          current.items?.map((item) =>
-                            item.kind === 'turn' && item.key === turnId
-                              ? { ...item, steps: workSteps(item.turn.startedAt) }
-                              : item,
-                          ) ?? null,
+                        hasOlder: false,
+                        items: current.items && [...history(startedAt - 300 * MIN), ...current.items],
                       }));
-                      done(true);
-                    }, ANSWER_MS),
-                  )
-                }
-                onContinueTurn={() => later()}
-                onRetryTurn={() => later()}
-                onRetryMessage={() => later(false)}
-                onDeleteMessage={(clientId) =>
-                  later().then(() =>
-                    setScene((current) => ({
-                      ...current,
-                      items: current.items?.filter((item) => item.key !== clientId) ?? null,
-                    })),
-                  )
-                }
-                renderGate={renderGate}
-                onForkTurn={() => later().then(() => toast('fork'))}
-                dock={dock}
-                waiting={
-                  flowsAtWork.length > 0
-                    ? { agents: flowsAtWork, onOpen: () => toast(t('next.bg.waitingTip')) }
-                    : null
-                }
-              />
+                    }, ANSWER_MS);
+                  }}
+                  density={scene.density ?? 'compact'}
+                  offline={scene.offline ?? false}
+                  limit={
+                    <LimitCard
+                      limited={scene.limited ?? null}
+                      clock={Date.now}
+                      controls
+                      onDecide={(action) =>
+                        later().then(() => setScene((current) => afterDecision(current, action)))
+                      }
+                    />
+                  }
+                  enterAfter={startedAt}
+                  machineName={scene.machine ?? 'runner-2'}
+                  refs={REFS}
+                  onOpenRef={() => {}}
+                  onOpenFile={(path) => toast(path)}
+                  onOpenOutput={(output) => toast(`${output.kind}: ${output.ref}`)}
+                  downloadUrl={(path) => `data:text/plain,${encodeURIComponent(path)}`}
+                  shown={shown}
+                  onLoadSteps={(turnId) =>
+                    new Promise<boolean>((done) =>
+                      setTimeout(() => {
+                        setScene((current) => ({
+                          ...current,
+                          items:
+                            current.items?.map((item) =>
+                              item.kind === 'turn' && item.key === turnId
+                                ? { ...item, steps: workSteps(item.turn.startedAt) }
+                                : item,
+                            ) ?? null,
+                        }));
+                        done(true);
+                      }, ANSWER_MS),
+                    )
+                  }
+                  onContinueTurn={() => later()}
+                  onRetryTurn={() => later()}
+                  onRetryMessage={() => later(false)}
+                  onDeleteMessage={(clientId) =>
+                    later().then(() =>
+                      setScene((current) => ({
+                        ...current,
+                        items: current.items?.filter((item) => item.key !== clientId) ?? null,
+                      })),
+                    )
+                  }
+                  renderGate={renderGate}
+                  onForkTurn={() => later().then(() => toast('fork'))}
+                  dock={dock}
+                  waiting={
+                    flowsAtWork.length > 0
+                      ? { agents: flowsAtWork, onOpen: () => toast(t('next.bg.waitingTip')) }
+                      : null
+                  }
+                />
+              </MockupHost>
             </DelegatedChats.Provider>
           </RewindActions>
           <HandoffSheet

@@ -85,9 +85,15 @@
   "next.limits.alert.textOut": "Исчерпан, сброс в {at}",
   "next.limits.brief.five": "5 ч",
   "next.limits.brief.week": "неделя",
+  "next.limits.brief.reset": "сброс {at}",
+  "next.limits.brief.others": "Другие: {list}",
   "next.limits.brief.month": "месяц",
   "next.limits.brief.lastsTo": "Хватит до {at}",
   "next.limits.brief.aria": "{provider}, {window}: осталось {left}%",
   "next.limits.mini.tip": "Лимиты {provider}: {windows}",
-  "next.limits.brief.model": "{model} · неделя"
+  "next.limits.brief.model": "{model} · неделя",
+  "next.limits.pop.least": "осталось · {window}",
+  "next.limits.pop.resetAt": "сброс в {at}",
+  "next.limits.spend.rest": "Остальные",
+  "next.limits.spend.chat": "этот чат {sum}"
 }

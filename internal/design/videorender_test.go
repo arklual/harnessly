@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -109,9 +110,12 @@ func waitVideoJob(t *testing.T, l *Library, id, job string) VideoRenderJob {
 	return VideoRenderJob{}
 }
 
+var bumpSeq atomic.Int64
+
 func bump(t *testing.T, path string) {
 	t.Helper()
-	at := time.Now().Add(time.Hour)
+	// Every call moves the mtime to a time no earlier call used: a fast machine makes two bumps in one clock tick.
+	at := time.Now().Add(time.Hour + time.Duration(bumpSeq.Add(1))*time.Second)
 	if err := os.Chtimes(path, at, at); err != nil {
 		t.Fatal(err)
 	}

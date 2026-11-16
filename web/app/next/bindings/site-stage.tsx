@@ -15,7 +15,7 @@ import { uploadSrc } from '@/next/commands/uploads';
 import ChatView, { type TChatOpeners } from '@/next/bindings/chat-view';
 import { openFileInChat } from '@/next/bindings/open-file-in-chat';
 import { keepLayout, keptLayout } from '@/next/features/designly/site-layout';
-import { openPlainOnce } from '@/next/features/designly/chat-place';
+import { chooseChat } from '@/next/features/designly/chat-place';
 import { noteLayoutKey } from '@/next/stores/chat-view';
 import ChatDock, { type IDockExtra } from '@/next/bindings/chat-dock';
 import { outgoingItem, useFeedItems } from '@/next/bindings/feed-items';
@@ -38,9 +38,7 @@ import Feed from '@/next/features/chat/feed';
 import type { FeedItem } from '@/next/features/chat/types';
 import type { IModelChoice, IPickerAgent } from '@/next/features/composer/agents';
 import ScreenField from '@/next/features/composer/one-field';
-import { ChatSwitch } from '@/next/features/designly/chat-switch';
 import { DESIGN_CONV, designChats, designKey, type TDesignConv } from '@/next/features/designly/design-conv';
-import { chatStatusOf } from '@/next/features/sidebar/status';
 import { lastLineOf, linksOf } from '@/next/features/designly/last-line';
 import { cardKindOf } from '@/next/features/chat/link-card';
 import {
@@ -93,7 +91,7 @@ import { useConnection } from '@/next/stores/connection';
 import { useFeed, useNow } from '@/next/stores/conversation';
 import { useConversation, useConversationList } from '@/next/stores/conversations';
 import { clearDraft, setDraft, useDraft, type DraftKey } from '@/next/stores/drafts';
-import { limitsOf, useMachine, useMachines } from '@/next/stores/machines';
+import { limitsOf, useMachine } from '@/next/stores/machines';
 import { useEnterSends, useMe } from '@/next/stores/me';
 import { useMessage } from '@/next/stores/messages';
 import { AttachmentSrc } from '@/next/ui/attachment-thumb';
@@ -586,17 +584,10 @@ export const useSiteStage = ({
   const layoutKey = space ? designKey(machine, space.layoutKey) : key;
   const current = useDesignConv(machine, design, fromChat, app?.address, space ? letGo.get(key) : null);
   const { picked } = current;
-  const machines = useMachines();
-  const machineNames = useMemo(
-    () => new Map((machines ?? []).map((v) => [v.machine.id as string, v.machine.name])),
-    [machines],
-  );
-  const connection = useConnection(machine);
   const moveOn = useMoveEnabled(machine);
   // The chats of every machine: the switch lists the design's chats wherever they are.
   const everywhere = useConversationList(null);
-  const [asked, setAsked] = useState(0);
-  const found = useDesignChatsFound(machine, design, tied, asked, app !== undefined);
+  const found = useDesignChatsFound(machine, design, tied, app !== undefined);
   // A pick in the switch: the chat on screen gives way, the next one comes in.
   const [epoch, setEpoch] = useState(0);
   const swap = useSwap(picked, epoch);
@@ -666,10 +657,10 @@ export const useSiteStage = ({
   const running = conv?.state.k === 'working' || conv?.state.k === 'starting';
   if (running && !sawRun) setSawRun(true);
 
-  // «Открыть чат»: the plain chat page, once; opened again from anywhere the chat is the design with it (chat-place.ts).
+  // «К чату»: the plain chat page, the chat's choice from now on (chat-place.ts) until the design opens with it again.
   const openChatPage = () => {
     if (!convId) return;
-    openPlainOnce(convId);
+    chooseChat(convId);
     goTo({ kind: ROUTE.chat, id: convId });
   };
   const turnStatus = statusOf(conv, now, sawRun, creating !== undefined);
@@ -886,14 +877,6 @@ export const useSiteStage = ({
     current.pick(id);
     setEpoch((n) => n + 1);
   };
-  const online = connection === undefined || connection.k === 'live';
-  const rows = rowsOf.map((c) => ({
-    id: c.id,
-    title: c.title,
-    machine: c.machineId === machine ? null : (machineNames.get(c.machineId) ?? c.machineId),
-    status: chatStatusOf(c, online),
-    at: c.lastActivityAt,
-  }));
   const changeMode = (next: TSiteMode, section: { width: number; height: number }) => {
     if (next === mode) return;
     setChosen(true);
@@ -922,7 +905,7 @@ export const useSiteStage = ({
           : []),
       ]
     : [];
-  // The switch names the chat (never the design); before it has one, what the new chat is about.
+  // The head names the chat (never the design); before it has one, what the new chat is about.
   const headTitle = chatTitleOf({
     convId,
     convTitle: conv?.title ?? null,
@@ -932,15 +915,6 @@ export const useSiteStage = ({
   });
   const chat: ISiteChatProps = {
     title: headTitle,
-    heading: (
-      <ChatSwitch
-        current={convId}
-        title={headTitle}
-        rows={rows}
-        onPick={pickChat}
-        onOpen={() => setAsked((n) => n + 1)}
-      />
-    ),
     swapping: swap.leaving,
     mode,
     float: shownFloat,

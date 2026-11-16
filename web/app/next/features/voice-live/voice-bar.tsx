@@ -8,7 +8,13 @@ import { sendMessage as sendGpt } from '@/next/features/chatgpt/api';
 import { GPT_VOICE_EVENT, gptIdOf, gptPickOf, tellGptScreen } from '@/next/features/chatgpt/voice-bridge';
 import VoiceHead, { HEAD, headOf } from '@/next/features/voice-live/voice-head';
 import MiniWave from '@/next/features/voice-live/mini-wave';
-import { lookOf, useVoiceNow, type IVoiceField } from '@/next/features/voice-live/field';
+import {
+  lookOf,
+  setVoiceExpanded,
+  useVoiceExpanded,
+  useVoiceNow,
+  type IVoiceField,
+} from '@/next/features/voice-live/field';
 import { useVoiceDocked } from '@/next/features/voice-live/voice-layer';
 import { t } from '@/next/i18n';
 import type { ConvId } from '@/next/protocol/v2';
@@ -32,7 +38,10 @@ interface IVoiceBarProps {
 const VoiceBar = ({ titleOf, onBack, at }: IVoiceBarProps) => {
   const now = useVoiceNow();
   const docked = useVoiceDocked(now?.conv ?? null, at);
-  const away = now?.conv && !docked ? now : null;
+  // The talk is folded from the full-screen layer (voice-full.tsx), in its chat or away from it: the bar stands and
+  // «Вернуться» (in the chat — «Развернуть») opens the layer again.
+  const expanded = useVoiceExpanded();
+  const away = now?.conv && !expanded ? now : null;
   const { value: voice, state } = usePresence<IVoiceField>(away, EXIT_MS);
   if (!voice?.conv) return null;
   return (
@@ -40,6 +49,7 @@ const VoiceBar = ({ titleOf, onBack, at }: IVoiceBarProps) => {
       voice={voice}
       title={titleOf(voice.conv) ?? t('next.chatgpt.voice.bar.untitled')}
       closing={state === PRESENCE.closing}
+      docked={docked}
       onBack={onBack}
     />
   );
@@ -49,11 +59,13 @@ const VoiceBarBody = ({
   voice,
   title,
   closing,
+  docked,
   onBack,
 }: {
   voice: IVoiceField;
   title: string;
   closing: boolean;
+  docked: boolean;
   onBack: (conv: ConvId) => void;
 }) => {
   const conv = voice.conv as ConvId;
@@ -63,6 +75,10 @@ const VoiceBarBody = ({
   useEffect(() => {
     if (writing) input.current?.focus();
   }, [writing]);
+  const back = () => {
+    onBack(conv);
+    setVoiceExpanded(true);
+  };
   const look = lookOf(voice.floor);
   const head = voice.interrupted ? HEAD.barged : headOf(voice.floor);
   const send = () => {
@@ -121,10 +137,10 @@ const VoiceBarBody = ({
         <button
           type="button"
           className="hx-voice-bar__i hx-voice-bar__narrow"
-          aria-label={t('next.chatgpt.voice.bar.back')}
-          onClick={() => onBack(conv)}
+          aria-label={t(docked ? 'next.chatgpt.voice.bar.expand' : 'next.chatgpt.voice.bar.back')}
+          onClick={back}
         >
-          <Icon name="arrow-left" size="sm" />
+          <Icon name={docked ? 'maximize-2' : 'arrow-left'} size="sm" />
         </button>
         <button
           type="button"

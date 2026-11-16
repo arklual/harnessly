@@ -443,6 +443,22 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
     go,
   });
 
+  // The button was pressed where annotating is not on: it says why, calmly, and tries again when asked. A page that did
+  // not answer is asked once more (its hello may have gone before the frame was ready) before anything is said.
+  const [pickNote, setPickNote] = useState<string | null>(null);
+  const tryPick = () => {
+    const say = (key: string) => setPickNote(t(key));
+    if (live) return say('next.pane.pickNote.live');
+    if (!chat) return say('next.pane.pickNote.noChat');
+    if (slotOrigin === null) return say('next.pane.pickNote.noPage');
+    void bridge.recheck(2500).then((answered) => {
+      if (!answered) return say('next.pane.pickNote.silent');
+      setPickNote(null);
+      if (dom.inspect) dom.setInspect(false);
+      bridge.startPick();
+    });
+  };
+
   // What goes to the chat lands in its field, after what is typed there.
   const toChat = (words: string) => {
     const have = draftsStore.get(conv.id);
@@ -537,8 +553,15 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
       picking={slotOrigin !== null && !live && chat ? bridge.picking : null}
       onPick={() => {
         if (dom.inspect) dom.setInspect(false);
+        setPickNote(null);
         bridge.togglePick();
       }}
+      pickNote={
+        pickNote === null || (!live && chat && slotOrigin !== null && bridge.picking !== null)
+          ? null
+          : { text: pickNote, onRetry: tryPick, onClose: () => setPickNote(null) }
+      }
+      onPickBlocked={tryPick}
       annotations={{
         list: marks,
         editing,

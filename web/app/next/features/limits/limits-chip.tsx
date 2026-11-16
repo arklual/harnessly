@@ -30,6 +30,7 @@ import {
   type WindowKind,
 } from '@/next/features/limits/model';
 import LimitsLine from '@/next/features/limits/limits-line';
+import CtxCard from '@/next/features/composer/ctx-card';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
 import { usePresentFlag } from '@/next/ui/presence';
@@ -106,75 +107,98 @@ const Gauge = ({ kind, window, provider, now }: IGaugeProps) => {
   );
 };
 
-/** What Claude cost since the start of the person's day: the chip with the sum, the card with it by model. */
-const SpendChip = ({ view }: { view: SpendView }) => {
-  const { open, pinned, setTrigger, setFloating, getFloating, triggerProps, floatingProps } =
-    useHoverIntent();
-  const { mounted, state } = usePresentFlag(open, EXIT_MS);
-  const now = useNow();
-  useFitInViewport(getFloating, mounted);
+/** The colours of the spend's parts: the context card's own (the conversation's accent, then its other parts). */
+const SPEND_KEYS = ['msg', 'mem', 'mcp', 'sys'] as const;
 
+/** What Claude cost since the start of the person's day: the chip with the sum, and the card of the context ring's kind
+ *  the sum, a bar of the models it went to, a row a model, and what this chat cost by Claude's own count. */
+const SpendChip = ({ view, chatUsd }: { view: SpendView; chatUsd?: number }) => {
+  const now = useNow();
+  const barRef = useRef<HTMLDivElement>(null);
   const since = dayStartOf(now, view.dayStartHour);
   const today = useMemo(() => spentSince(view.spend, since), [view.spend, since]);
   const total = usd(today.usd);
   const from = clockOf(since, false);
+  // The biggest models each on their own, the rest as one: the bar has as many parts as there are colours.
+  const parts = useMemo(() => {
+    const head = today.models
+      .slice(0, SPEND_KEYS.length - 1)
+      .map((m) => ({ label: modelName(m.model), usd: m.usd }));
+    const rest = today.models.slice(SPEND_KEYS.length - 1);
+    if (rest.length === 1) head.push({ label: modelName(rest[0].model), usd: rest[0].usd });
+    else if (rest.length > 1)
+      head.push({ label: t('next.limits.spend.rest'), usd: rest.reduce((sum, m) => sum + m.usd, 0) });
+    return head.map((p, j) => ({ ...p, k: SPEND_KEYS[j] }));
+  }, [today]);
+  const shares = parts.map((p) => (today.usd > 0 ? (p.usd / today.usd) * 100 : 0)).join(',');
+
+  useLayoutEffect(() => {
+    const els = barRef.current?.querySelectorAll<HTMLElement>('i');
+    shares.split(',').forEach((w, i) => els?.[i]?.style.setProperty('--w', `${w || 0}%`));
+  }, [shares]);
+
+  const sub = [
+    t('next.limits.spend.since', { from }),
+    chatUsd !== undefined && chatUsd > 0 ? t('next.limits.spend.chat', { sum: usd(chatUsd) }) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const foot = [
+    t('next.limits.spend.api'),
+    t('next.limits.updated', { at: clockOf(view.spend.asOf, false) }),
+  ].join(' · ');
 
   return (
-    <div className="hx-lim">
-      <button
-        ref={setTrigger}
-        type="button"
-        className="hx-lim__chip"
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        aria-label={t('next.limits.spend.aria', { sum: total, from })}
-        data-pinned={pinned || undefined}
-        {...triggerProps}
-      >
-        <Icon name="gauge" size="sm" />
-        <span className="hx-lim__win">
-          {total}
-          <small>{t('next.limits.spend.today')}</small>
-        </span>
-      </button>
-      {mounted && (
-        <div
-          ref={setFloating}
-          className="hx-lim__pop hx-hover-fit"
-          data-state={state}
-          role="dialog"
-          aria-label={t('next.limits.spend.title')}
-          {...floatingProps}
-        >
-          <div className="hx-lim__title">{t('next.limits.spend.title')}</div>
-          <div className="hx-lim__spend">
-            <b>{total}</b>
-            <span>{t('next.limits.spend.since', { from })}</span>
+    <CtxCard
+      label={t('next.limits.spend.aria', { sum: total, from })}
+      title={t('next.limits.spend.title')}
+      chipClassName="hx-lim__chip"
+      wide
+      chip={
+        <>
+          <Icon name="gauge" size="sm" />
+          <span className="hx-lim__win">
+            {total}
+            <small>{t('next.limits.spend.today')}</small>
+          </span>
+        </>
+      }
+    >
+      <div className="hx-ctx__head">
+        <span className="hx-ctx__title">{t('next.limits.spend.title')}</span>
+        <span className="hx-ctx__pct">{total}</span>
+      </div>
+      <div className="hx-ctx__used">{sub}</div>
+      {parts.length > 0 && (
+        <>
+          <div className="hx-ctx__bar" data-fit="true" ref={barRef}>
+            {parts.map((p) => (
+              <i key={p.k} data-k={p.k} />
+            ))}
           </div>
-          {today.models.length > 0 && (
-            <ul className="hx-lim__models">
-              {today.models.map((m) => (
-                <li key={m.model}>
-                  <span>{modelName(m.model)}</span>
-                  <b>{usd(m.usd)}</b>
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="hx-lim__foot">
-            {[
-              t('next.limits.spend.api'),
-              t('next.limits.updated', { at: clockOf(view.spend.asOf, false) }),
-            ].join(' · ')}
-          </p>
-        </div>
+          <div className="hx-ctx__rows">
+            {parts.map((p, j) => (
+              <div key={p.k} className="hx-ctx__row" data-j={j}>
+                <i className="hx-ctx__dot" data-k={p.k} />
+                <span className="hx-ctx__label">{p.label}</span>
+                <span className="hx-ctx__val">{usd(p.usd)}</span>
+              </div>
+            ))}
+          </div>
+        </>
       )}
-    </div>
+      <div className="hx-ctx__foot">
+        <Icon name="coins" size="sm" />
+        <span>{foot}</span>
+      </div>
+    </CtxCard>
   );
 };
 
 export interface ILimitsChipProps {
   view: LimitsView;
+  /** What this chat cost by the agent's own count, USD; told on a machine that pays by the API. */
+  chatUsd?: number;
 }
 
 /** A machine that pays Claude by the API: no windows, the chip tells the day's spend. */
@@ -182,9 +206,9 @@ export const paysBySpend = (view: LimitsView): boolean =>
   view.state === 'ready' && view.spend !== null && showsSpend(view.limits, view.spend.spend);
 
 // the chip sits in the field, which renders on each key; its view changes only with the limits.
-const LimitsChip = memo(({ view }: ILimitsChipProps) =>
+const LimitsChip = memo(({ view, chatUsd }: ILimitsChipProps) =>
   view.state === 'ready' && view.spend && paysBySpend(view) ? (
-    <SpendChip view={view.spend} />
+    <SpendChip view={view.spend} chatUsd={chatUsd} />
   ) : (
     <WindowsChip view={view} />
   ),

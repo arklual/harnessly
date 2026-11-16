@@ -36,7 +36,7 @@ function kind(t) {
     return { type: 'enum', values: parts.filter((p) => p.isStringLiteral()).map((p) => p.value) };
   }
   const text = checker.typeToString(t, undefined, ts.TypeFormatFlags.NoTruncation);
-  if (/ReactNode|ReactElement|JSX\.Element/.test(text)) return { type: 'node' };
+  if (/ReactNode|ReactElement|JSX\.Element|MaybeElement|ReactChild|ReactPortal/.test(text)) return { type: 'node' };
   if (parts.every((p) => p.flags & (ts.TypeFlags.Number | ts.TypeFlags.NumberLiteral))) return { type: 'number' };
   if (parts.every((p) => p.flags & (ts.TypeFlags.String | ts.TypeFlags.StringLiteral | ts.TypeFlags.TemplateLiteral))) return { type: 'string' };
   if (parts.some((p) => p.getCallSignatures().length > 0)) return { type: 'function' };
@@ -86,7 +86,7 @@ for (let sym of checker.getExportsOfModule(modSym)) {
   if (/^[A-Z]/.test(name) && sigs.length > 0) {
     const ret = checker.typeToString(sigs[0].getReturnType());
     const ctor = t.getConstructSignatures().length > 0;
-    if (ctor || /ReactNode|ReactElement|Element|null/.test(ret) || /ExoticComponent|FC|FunctionComponent/.test(checker.typeToString(t))) {
+    if (ctor || /ReactNode|ReactElement|Element|null/.test(ret) || /ExoticComponent|Component|FC|FunctionComponent|ForwardRef|MemoExoticComponent/.test(checker.typeToString(t)) || (ret === 'any' && sigs[0].parameters.length >= 1 && sigs[0].parameters.length <= 2 && /Props|Ref/.test(checker.typeToString(checker.getTypeOfSymbolAtLocation(sigs[0].parameters[0], decl))))) {
       rec.kind = 'component';
       rec.props = propsOf(sigs[0], decl);
     }

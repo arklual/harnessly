@@ -36,15 +36,37 @@ export interface IVoiceField {
   head: THeadKind;
   /** The person spoke over the voice and it is silenced (barge.ts): the head shows «barged». */
   interrupted: boolean;
+  /** The microphone is off (the full-screen talk's button and the Space key). */
+  muted: boolean;
+  /** Turns the microphone off and on. */
+  mute: () => void;
 }
 
 let current: IVoiceField | null = null;
 const listeners = new Set<() => void>();
 
 export const setVoiceField = (next: IVoiceField | null) => {
+  // A talk that begins opens the full-screen layer (voice-full.tsx); folding it is the person's, until the talk ends.
+  if (current === null && next !== null) expanded = true;
+  if (next === null) expanded = false;
   current = next;
   for (const listen of listeners) listen();
 };
+
+let expanded = false;
+
+/** True while the full-screen talk is open: the layer stands over the chat, the bar waits. */
+export const voiceExpanded = (): boolean => expanded && current !== null;
+
+/** Opens (true) or folds (false) the full-screen talk; the call itself goes on. */
+export const setVoiceExpanded = (on: boolean) => {
+  const next = on && current !== null;
+  if (next === expanded) return;
+  expanded = next;
+  for (const listen of listeners) listen();
+};
+
+export const useVoiceExpanded = (): boolean => useSyncExternalStore(subscribe, voiceExpanded, () => false);
 
 const subscribe = (listen: () => void) => {
   listeners.add(listen);

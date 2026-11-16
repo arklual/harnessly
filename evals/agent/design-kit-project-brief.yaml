@@ -1,0 +1,33 @@
+id: design-kit-project-brief
+title: Кит назван в просьбе — агент без напоминаний рисует только из кита, проверяет строгим режимом и скриншотом
+tags: [design, kits]
+timeout_s: 900
+setup:
+  kits: [fixtures/kits/acme-ui]
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/skills/design-kit/**'
+  - 'internal/hlcli/design*.go'
+  - 'internal/hlcli/help.go'
+  - 'internal/design/kitproject.go'
+  - 'internal/design/kittools.go'
+  - 'internal/design/routes_pages.go'
+prompt: >-
+  Нарисуй экран «Профиль» на UI-ките acme-ui: аватар, имя, три строки настроек и кнопка «Выйти».
+expect:
+  - name: pinned a kit to the project once, without asking twice
+    any_of:
+      - called: Bash
+        args: {command: '(?s).*harnessly design kit use\s.*'}
+      - called: Bash
+        args: {command: '(?s).*harnessly design new\s.*--kit.*'}
+  - name: read the kit with the kit tools
+    called: '.*kit_(index|component).*'
+  - name: the board is built of the kit's components
+    file: {glob: 'design:*/project/*.dc.html', contains: 'component-from-global-scope'}
+  - name: ran the strict check
+    called: Bash
+    args: {command: '(?s).*harnessly design check\s.*--strict.*'}
+  - name: took a screenshot of the board
+    called: Bash
+    args: {command: '(?s).*harnessly design check\s.*--board.*'}

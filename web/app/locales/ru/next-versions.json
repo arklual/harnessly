@@ -68,5 +68,10 @@
   "next.versions.kit.settings": "Настройки кита",
   "next.versions.kit.startFailed": "Не удалось открыть черновик кита",
   "next.versions.kit.inChat": "Добавлено к сообщению в чате кита",
-  "next.versions.kit.where": "Файлы темы в черновике"
+  "next.versions.kit.where": "Файлы темы в черновике",
+  "next.versions.attach": "Подключить UI-кит",
+  "next.versions.attachTitle": "UI-кит проекта",
+  "next.versions.attachPackage": "Пакет: npm:@scope/name",
+  "next.versions.attachRegistry": "Реестр (если не публичный)",
+  "next.versions.attachConnect": "Подключить пакет"
 }

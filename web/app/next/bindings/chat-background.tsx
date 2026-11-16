@@ -181,6 +181,7 @@ export const useChatBackground = (
           recap: recap !== null,
           waits: drops.length > 0,
           widgets: !has,
+          docked: !has && room,
           open,
           onToggle: toggle,
         }

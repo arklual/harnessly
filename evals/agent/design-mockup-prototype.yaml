@@ -1,0 +1,46 @@
+id: design-mockup-prototype
+title: Макет с рабочими кнопками из обычного чата — доска Sinopia Design, а не HTML-файл и http.server
+tags: [design, pane]
+timeout_s: 600
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/hlcli/design*.go'
+  - 'internal/hlcli/help.go'
+  - 'internal/design/routes_pages.go'
+prompt: >-
+  Сделай прототип мастера ставки для аукциона в три шага: «Данные» (месяц и бюджет), «Параметры» (выбор ставки),
+  «Результат» (итог). Чтобы кнопки «Далее» и «Назад» работали и шаги переключались, и покажи мне его.
+expect:
+  - name: made a board of Sinopia Design (a new project or a page of one)
+    any_of:
+      - called: Bash
+        args: {command: '(?s).*harnessly design new\s.*'}
+      - called: Bash
+        args: {command: '(?s).*harnessly design page create\s.*'}
+  - name: the board has its logic (the steps switch on the board)
+    file: {glob: 'design:*/project/*.dc.html', contains: 'data-dc-script'}
+  - name: showed the design in the pane
+    pane: {tab: design, target: '.+'}
+  - name: started no server to show it
+    not_called: Bash
+    args: {command: '(?s).*(http\.server|http-server|SimpleHTTPServer|npx serve|vite).*'}
+  - name: wrote no separate HTML file for it
+    not_called: Write
+    args: {file_path: '(?i)(^|.*/)[^/.]+\.html?$'}
+variants:
+  - id: v1
+    kind: short
+    text: "Прототип мастера ставки аукциона: 3 шага (Данные, Параметры, Результат), кнопки Далее/Назад работают. Покажи."
+  - id: v2
+    kind: long
+    text: "Слушай, хочу посмотреть, как будет выглядеть мастер ставки для аукциона. Там три шага: сначала данные (месяц и бюджет), потом параметры, где выбирают ставку, и в конце результат. Сделай, пожалуйста, чтобы кнопочки «Далее» и «Назад» реально работали и шаги переключались, и покажи мне."
+  - id: v3
+    kind: typos
+    text: "сделай прототип мастера ставки аукицона в 3 шага данные параметры резултат, чтоб кнопочки далее назад работали и покажи"
+  - id: v4
+    kind: english
+    text: "Make a prototype of an auction bid wizard in three steps: Data (month and budget), Parameters (pick a bid), Result. The Next and Back buttons should work and switch the steps. Show it to me."
+  - id: v5
+    kind: indirect
+    text: "Давай степпером сделаем мастер ставки аукциона — данные, параметры, результат — и чтобы кнопочки работали."

@@ -136,6 +136,7 @@ The store reuses the hub's database and bucket settings and has none of its own 
 | `HUB_STORE_S3_BUCKET` | `HUB_S3_BUCKET` | another bucket of the same S3 for the blobs |
 | `HUB_STORE_S3_PREFIX` | `<HUB_S3_PREFIX>store/` | where in the bucket the blobs are; a blob is `<prefix>rooms/<room>/blobs/<sha[:2]>/<sha>` |
 | `HUB_STORE_LEGACY_SPACE` | not set | a space's slug: its library is the room `design` itself, the one a design-sync center kept |
+| `HUB_STORE_GC_HOURS` | `0` (off) | how often the leader collects the store as `hub store gc` does with its defaults (below) |
 | `HUB_STORE_MAX_UPLOAD_MB` | `0` (no limit) | the biggest file a machine sends in parts, for an installation that wants one (one PUT of a blob takes 50 MiB) |
 | `HUB_STORE_PROFILE_ROOMS` | not set | `<user id>=profile-sergey,<user id>=profile-rsk`: the rooms a design-sync center kept people's Claude profiles in, bound by user id (not by email, which an account may merely claim); the person's machines sync those instead of `profile-<user id>` |
 
@@ -207,6 +208,11 @@ hub store gc --keep 20 --days 30 --dry-run  # count what old revisions and unref
 hub store gc --keep 20 --days 30            # and delete them (a blob is kept a day after nothing refers to it)
 hub store migrate --from /path/to/store --rooms design --into-room design-<space id>
 ```
+
+`HUB_STORE_GC_HOURS=<hours>` has the hub collect on its own with the same defaults: the leader runs it ten minutes
+after it starts leading and then every that many hours, and logs `store gc` with what went. The blobs the hub's own
+database refers to (design answers kept for revisions, site files) stay either way. Unset or `0`, collection is left to
+the command.
 
 `backup` takes a consistent snapshot of the SQLite databases while the hub keeps writing, then the blobs; with Postgres,
 back the database up as you do the hub's ([migrations](migrations.md)) and the bucket with the bucket's own tools.

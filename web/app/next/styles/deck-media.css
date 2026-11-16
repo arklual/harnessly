@@ -1008,10 +1008,15 @@
   transform: scale(var(--hx-gk, 1));
   transform-origin: 0 0;
   opacity: 0;
-  transition: opacity 220ms ease;
+  pointer-events: none;
+  /* The slide leaving stays under the one fading in, then goes at once: no white between them. */
+  transition: opacity 0s linear 220ms;
 }
 .hx-deck-guest__frame[data-ready='1'] {
   opacity: 1;
+  z-index: 1;
+  pointer-events: auto;
+  transition: opacity 220ms ease;
 }
 .hx-deck-guest__pager {
   display: flex;

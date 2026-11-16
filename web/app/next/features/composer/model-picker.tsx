@@ -132,18 +132,12 @@ export interface IPickerExtra {
   models: readonly { id: string; label: string }[] | null;
   /** The sign-in, right in the tab, while no account is signed in; null when one is. */
   signIn: ReactNode;
-  onPick: (model: string | null) => void;
+  /** Starts the chat with the model; `voice` also begins the live voice in it (the wave of «Разговор»). */
+  onPick: (model: string | null, opts?: { voice?: boolean }) => void;
 }
 
 /** The key of the extra tab among the agents'. */
 const EXTRA_KEY = '~chat';
-
-/** One line under the tabs on what the browsed kind is, in plain words; null for the vendors' own groups. */
-const aboutOf = (a: IPickerAgent): string | null => {
-  if (a.vendor === 'gpt') return t('next.picker.about.gpt');
-  if (a.profile) return null;
-  return a.provider === 'codex' ? t('next.picker.about.codex') : t('next.picker.about.claude');
-};
 
 /** The stops of a model's slider, in the order of the protocol's efforts. */
 const stopsOf = (model: AgentModel | null): Effort[] =>
@@ -209,10 +203,6 @@ const ModelPicker = ({
           0,
           listed.findIndex((a) => agentKey(a) === browse),
         );
-  const browsed = browseIndex < listed.length ? listed[browseIndex] : null;
-  let about: string | null = null;
-  if (browsed) about = aboutOf(browsed);
-  else if (extra) about = t('next.picker.about.chat');
   // The tabs are vendors; OpenAI's ways of working are a row under its tab (picker-groups.ts).
   const groups = pickerGroups(listed, agentKey, extra ? EXTRA_KEY : null);
   const group = groupOfKey(groups, browse) ?? groups[0];
@@ -618,7 +608,7 @@ const ModelPicker = ({
               )}
               {limits && (
                 <div className="hx-picker__limits">
-                  <LimitsBrief view={limits} />
+                  <LimitsBrief view={limits} model={value.model} />
                 </div>
               )}
             </div>
@@ -671,7 +661,6 @@ const ModelPicker = ({
                   ))}
                 </div>
               )}
-              {segmented && about && <div className="hx-picker__about">{about}</div>}
               <div className="hx-carousel">
                 <div
                   className="hx-carousel__track"

@@ -1,0 +1,24 @@
+id: design-kit-ask-once
+title: Проект без кита, а на машине кит есть — агент один раз спрашивает человека, какой кит взять, и не рисует молча без него
+tags: [design, kits]
+timeout_s: 600
+setup:
+  kits: [fixtures/kits/acme-ui]
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'internal/hlcli/design*.go'
+  - 'internal/hlcli/help.go'
+  - 'internal/design/kitproject.go'
+  - 'internal/design/kittools.go'
+  - 'internal/design/routes_pages.go'
+prompt: >-
+  Нарисуй экран «Профиль»: аватар, имя, три строки настроек и кнопка «Выйти».
+expect:
+  - name: asked the person which kit to use, naming the installed one
+    any_of:
+      - called: '.*notice_ask.*'
+        even_failed: true
+        args: {title: '(?is).*acme.*'}
+      - called: Bash
+        even_failed: true
+        args: {command: '(?is).*harnessly notice ask.*acme.*'}

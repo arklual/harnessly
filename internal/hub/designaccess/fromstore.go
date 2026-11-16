@@ -38,18 +38,7 @@ type Viewer interface {
 }
 
 // UseView makes guest links read their projects from the store; it is set once, before the hub serves.
-func (s *Service) UseView(v Viewer) {
-	s.viewMu.Lock()
-	s.view = v
-	s.viewMu.Unlock()
-}
-
-// currentView reads the store view; use it from goroutines that can outlive the caller.
-func (s *Service) currentView() Viewer {
-	s.viewMu.RLock()
-	defer s.viewMu.RUnlock()
-	return s.view
-}
+func (s *Service) UseView(v Viewer) { s.view = v }
 
 // storeRev is the revision the store answers a scope at: the pinned one, or the project's newest; false when the
 // store cannot answer it.
@@ -92,7 +81,11 @@ func (s *Service) fromStore(ctx context.Context, machine string, req hubproto.De
 	if r != nil && r.Method == http.MethodHead {
 		method = http.MethodHead
 	}
-	in, err := http.NewRequestWithContext(ctx, method, "http://hub/", nil)
+	target := "http://hub/"
+	if q := assetVersionQuery(r); q != "" {
+		target += "?" + q
+	}
+	in, err := http.NewRequestWithContext(ctx, method, target, nil)
 	if err != nil {
 		return nil, true, err
 	}

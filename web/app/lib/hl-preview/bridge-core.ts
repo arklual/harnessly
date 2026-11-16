@@ -1570,8 +1570,18 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
   const siteTools = core.makeSiteTools();
   const bound = { ...core.captureNatives(win), origin: win.location.origin, parent, siteTools };
   core.installModelContext(win, siteTools);
-  const post = (message: Record<string, unknown>) =>
-    parent.postMessage(slotKey ? { ...message, hlSlot: slotKey } : message, parentOrigin);
+  // A frame inside the page (not the pane's own frame) answers to the page that holds it, in its own origin: a mark
+  // put in it travels up through the frames to the pane. A frame of another origin, or an opaque one, is not reached.
+  const nested = parent !== win.top;
+  const frameOrigin: string | null = win.location.origin && win.location.origin !== 'null' ? win.location.origin : null;
+  const post = (message: Record<string, unknown>) => {
+    if (!nested) {
+      parent.postMessage(slotKey ? { ...message, hlSlot: slotKey } : message, parentOrigin);
+      return;
+    }
+    if (frameOrigin !== null && (message.type === 'tk:picked' || message.type === 'tk:pick'))
+      parent.postMessage({ tkFrame: 'up', message }, frameOrigin);
+  };
   const actRefs = core.makeActRefs();
   const setTouch = core.installTouch(win, doc, core);
   const domState = core.makeDomState(actRefs);
@@ -1589,6 +1599,19 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
       label = null;
     }
   };
+  // Picking goes on inside the frames of the page that share its origin (a frame of another origin never hears it).
+  const frameElements = (): any[] => Array.from(doc.querySelectorAll('iframe,frame'));
+  const tellFrame = (el: any) => {
+    if (frameOrigin === null) return;
+    try {
+      el.contentWindow?.postMessage({ tkFrame: 'pick', on: picking, keep: keepPicking }, frameOrigin);
+    } catch {
+      // A frame that is gone has nobody to tell.
+    }
+  };
+  const tellFrames = () => {
+    for (const el of frameElements()) tellFrame(el);
+  };
   const setPicking = (on: boolean, report: boolean) => {
     if (picking === on) return;
     picking = on;
@@ -1597,6 +1620,7 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
       hide();
     }
     if (report && !on) post({ type: 'tk:pick', on: false });
+    tellFrames();
   };
   const highlight = (el: any) => {
     if (!box) {
@@ -1617,7 +1641,20 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
     box.style.height = `${rect.height}px`;
     const found = core.findComponent(el, win);
     const tag = String(el.tagName).toLowerCase();
-    label.textContent = found?.component ? `${found.component.name} · ${tag}` : tag;
+    // A frame of another site keeps its content to itself: it is shown, and said why it cannot be picked inside.
+    let sealed = false;
+    if (tag === 'iframe' || tag === 'frame') {
+      try {
+        sealed = !el.contentDocument;
+      } catch {
+        sealed = true;
+      }
+    }
+    label.textContent = sealed
+      ? `${tag} · another site, its content cannot be picked`
+      : found?.component
+        ? `${found.component.name} · ${tag}`
+        : tag;
   };
   const isPage = (target: any) =>
     target && typeof target.getBoundingClientRect === 'function' && target !== box && target !== label;
@@ -1711,7 +1748,9 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
   const nav = () => {
     if (win.location.href === lastUrl) return;
     lastUrl = win.location.href;
-    setPicking(false, true);
+    // Annotating goes on through the page's own routes; only the outline of the old element goes.
+    if (keepPicking) hide();
+    else setPicking(false, true);
     win.setTimeout(() => post({ type: 'tk:nav', url: win.location.href, title: doc.title }), 0);
   };
   for (const method of ['pushState', 'replaceState']) {
@@ -1923,12 +1962,58 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
   // read through the accessors taken now, comes from the parent.
   const isTrusted = (event: any) =>
     Object.getOwnPropertyDescriptor(event, 'isTrusted')?.get?.call(event) === true;
+  // What the frames of the same origin say: the page above tells whether to pick, a frame below says it is ready or what
+  // was picked in it (its place and address are made the page's own on the way up).
+  const fromFrame = (source: any, data: any) => {
+    if (data.tkFrame === 'pick' && nested && source === parent && typeof data.on === 'boolean') {
+      keepPicking = data.on && data.keep === true;
+      setPicking(data.on, false);
+      return;
+    }
+    const el = frameElements().find((candidate) => {
+      try {
+        return candidate.contentWindow === source;
+      } catch {
+        return false;
+      }
+    });
+    if (!el) return;
+    if (data.tkFrame === 'ready') {
+      if (picking) tellFrame(el);
+      return;
+    }
+    const inner = data.tkFrame === 'up' && data.message && typeof data.message === 'object' ? data.message : null;
+    if (!inner) return;
+    if (inner.type === 'tk:pick' && inner.on === false) {
+      setPicking(false, true);
+      return;
+    }
+    if (inner.type !== 'tk:picked' || !picking || !inner.rect || typeof inner.selector !== 'string') return;
+    const at = el.getBoundingClientRect();
+    const { pick: _pick, look: _look, ...rest } = inner;
+    post({
+      ...rest,
+      selector: `${core.cssSelector(el, doc)} >>> ${inner.selector}`,
+      rect: {
+        x: Math.round(Number(inner.rect.x) + at.left + (el.clientLeft || 0)),
+        y: Math.round(Number(inner.rect.y) + at.top + (el.clientTop || 0)),
+        width: inner.rect.width,
+        height: inner.rect.height,
+      },
+      viewport: { w: win.innerWidth, h: win.innerHeight },
+    });
+  };
   win.addEventListener(
     'message',
     (event: any) => {
       if (!isTrusted(event)) return;
       const source = bound.messageSource ? bound.messageSource.call(event) : event.source;
       const origin = bound.messageOrigin ? bound.messageOrigin.call(event) : event.origin;
+      const raw = bound.messageData ? bound.messageData.call(event) : event.data;
+      if (frameOrigin !== null && origin === frameOrigin && raw && typeof raw === 'object' && raw.tkFrame) {
+        fromFrame(source, raw);
+        return;
+      }
       if (source !== parent || origin !== parentOrigin) return;
       const message = core.parseParentMessage(bound.messageData ? bound.messageData.call(event) : event.data);
       if (!message) return;
@@ -2054,6 +2139,8 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
   };
   if (doc.readyState === 'complete') hello();
   else win.addEventListener('load', hello);
+  // A frame of the page: the page above may be picking already, and tells it.
+  if (nested && frameOrigin !== null) parent.postMessage({ tkFrame: 'ready' }, frameOrigin);
 };
 
 /** What the bridge applies to the page's requests, from the proxy (`data-devtools`, `/__tk/devtools/config`). */

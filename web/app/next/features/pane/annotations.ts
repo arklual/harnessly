@@ -72,10 +72,13 @@ export const annotationWords = (
   list: readonly IAnnotation[],
   pageUrl: (from: string) => string,
   labels: IAnnotationLabels,
-): string =>
-  list
+): string => {
+  const marks = list
     .map((a, i) => `${labels.annotation} ${i + 1}\n${pickedWords(a, pageUrl(a.url), a.comment, labels)}`)
     .join('\n\n');
+  // The element's text and code come from the page, which anyone may have written: they are said to be data.
+  return labels.data && marks !== '' ? `${labels.data}\n\n${marks}` : marks;
+};
 
 /** A mark's name in a list: its element's text, else its tag. */
 export const annotationName = (a: IAnnotation): string => (a.text ? `«${a.text}»` : `<${a.tag}>`);

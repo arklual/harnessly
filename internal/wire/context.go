@@ -21,6 +21,9 @@ type ConvContext struct {
 	LimitTokens int64 `json:"limitTokens"`
 	// CompactAtTokens is where the agent compacts by itself, by its settings; 0 (absent) where the runtime cannot say.
 	CompactAtTokens int64 `json:"compactAtTokens,omitempty"`
+	// CostUSD is what the chat's session cost by the agent's own count (Claude's statusline, at API prices); 0 (absent)
+	// where the agent says nothing.
+	CostUSD float64 `json:"costUsd,omitempty"`
 }
 
 func (c ConvContext) Validate() error {
@@ -30,6 +33,9 @@ func (c ConvContext) Validate() error {
 	}
 	if c.LimitTokens < 1 {
 		errs = append(errs, errors.New("limitTokens: below 1"))
+	}
+	if c.CostUSD < 0 {
+		errs = append(errs, errors.New("costUsd: below 0"))
 	}
 	return errors.Join(errs...)
 }

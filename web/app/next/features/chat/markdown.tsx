@@ -6,6 +6,7 @@ import { useContext, useState, type ReactElement, type ReactNode } from 'react';
 import renderTree, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import HtmlBlock from '@/next/features/chat/html-block';
+import { AnswerText } from '@/next/features/chat/mockup-to-design';
 import LinkCard, { cardKindOf } from '@/next/features/chat/link-card';
 import { AppLinkParagraph } from '@/next/features/app-views/link-card';
 import MermaidBlock from '@/next/features/chat/mermaid-block';
@@ -269,7 +270,11 @@ const Markdown = ({ md, paths = false, guide }: IMarkdownProps) => {
         })}
       </div>
     );
-  return <div className="hx-md">{render(md, paths)}</div>;
+  const tree = render(md, paths);
+  // An ```html card names its mockup by the answer's first line when the page has no heading.
+  return (
+    <div className="hx-md">{md.includes('```html') ? <AnswerText value={md}>{tree}</AnswerText> : tree}</div>
+  );
 };
 
 export default Markdown;

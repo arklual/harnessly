@@ -404,3 +404,21 @@ func (c *callerCache) find(inode string) (string, int, string) {
 	}
 	return "", 0, "the call comes from a process outside the machine's chats"
 }
+
+// showDesign opens a design on a board in the pane of the chat's tab, as `open design` does; asked by the person (a
+// press), so it is not held back as a repeat of the agent's request.
+func (v *v2Live) showDesign(conv, project, board string) error {
+	c := v.c
+	if c.cfg.Tmux == nil || c.intents == nil || v.rt == nil {
+		return errNoPane
+	}
+	tab, err := legacyTabOf(v.rt.Record, c.cfg.Tmux.ParseSessionName, conv)
+	if err != nil || tab.TabID == "" {
+		return errNoPane
+	}
+	c.intents.Add(tab.TabID, panel.Command{Kind: "open", Tab: "design", Target: project, Place: board}.JSON())
+	if c.sync != nil {
+		c.sync.Broadcast(jsvalue.NewObject("type", "pane-intents", "tabId", tab.TabID))
+	}
+	return nil
+}

@@ -217,3 +217,14 @@ export default () => <Root>` + strings.Repeat("<Root>", 5000) + strings.Repeat("
 	junk := "const x = (" + strings.Repeat("< a ", 20000) + ");"
 	_ = k.CheckModule("pages/p.tsx", junk, false)
 }
+
+// The board engine's own tags (sc-if, sc-for, dc-import) are the board format, not plain HTML.
+func TestStrictAllowsBoardEngineTags(t *testing.T) {
+	k := NewStrictKit(strictCanvas())
+	ins := `<sc-for each="{{rows}}" as="r"><x-import component-from-global-scope="Acme.Tag">x</x-import></sc-for>` +
+		`<sc-if test="{{open}}"><x-import component-from-global-scope="Acme.Tag">y</x-import></sc-if>`
+	src := strings.Replace(strictBoard, `  <x-import component="Card" from="components/card.jsx"></x-import>`, ins, 1)
+	if fs := k.CheckBoard("home.dc.html", src, func(string) bool { return false }); len(fs) != 0 {
+		t.Fatalf("engine tags flagged: %v", fs)
+	}
+}

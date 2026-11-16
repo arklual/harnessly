@@ -74,6 +74,10 @@ export interface IBrowserViewProps {
   /** Annotating is on (a click on an element puts a mark); null when the page has no bridge to pick with (it has not loaded). */
   picking: boolean | null;
   onPick: () => void;
+  /** Why annotating does not turn on, in words by the button, and what to do again; null when nothing is said. */
+  pickNote?: { text: string; onRetry: () => void; onClose: () => void } | null;
+  /** The button was pressed while the page cannot be annotated (picking is null): the tab says why. */
+  onPickBlocked?: () => void;
   /** The marks put on the page, and what is done with them. */
   annotations: IBrowserAnnotations;
   /** What the page is looked at on. */
@@ -267,7 +271,7 @@ const BrowserView = (props: IBrowserViewProps) => {
               aria-pressed={props.picking === true}
               aria-disabled={props.picking === null || undefined}
               aria-label={t('next.pane.pick')}
-              onClick={() => props.picking !== null && props.onPick()}
+              onClick={() => (props.picking !== null ? props.onPick() : props.onPickBlocked?.())}
             >
               <Icon name="message-square-plus" size="sm" />
               <span className="hx-tip" data-pos="below" data-align="end">
@@ -367,6 +371,22 @@ const BrowserView = (props: IBrowserViewProps) => {
             }
           />
         </div>
+        {props.pickNote && (
+          <div className="hx-tbrowser__offer" role="alert" aria-label={t('next.pane.pickNote.label')}>
+            <span className="hx-tbrowser__offer-text">{props.pickNote.text}</span>
+            <button type="button" className="hx-tbrowser__offer-btn" data-primary onClick={props.pickNote.onRetry}>
+              {t('next.pane.pickNote.retry')}
+            </button>
+            <button
+              type="button"
+              className="hx-head-btn"
+              aria-label={t('next.pane.annot.cancel')}
+              onClick={props.pickNote.onClose}
+            >
+              <Icon name="x" size="sm" />
+            </button>
+          </div>
+        )}
         {props.signIn !== SIGN_IN.none && (
           <div className="hx-tbrowser__offer" role="group" aria-label={t('next.pane.signInLabel')}>
             <span className="hx-tbrowser__offer-text">

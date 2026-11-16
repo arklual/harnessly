@@ -1,0 +1,22 @@
+/* Acme UI tokens: light by default, dark under [data-theme="dark"] (Root sets it). Same values as tokens.json. */
+:root, [data-theme="light"] {
+  --acme-ui-surface-0: #f6f7f9;
+  --acme-ui-surface-1: #ffffff;
+  --acme-ui-text: #16181d;
+  --acme-ui-border: #dfe2e8;
+  --acme-ui-accent: #3b5bdb;
+  --acme-ui-on-accent: #ffffff;
+  --acme-ui-space-2: 8px;
+  --acme-ui-space-4: 16px;
+  --acme-ui-radius-m: 8px;
+  --acme-ui-radius-l: 12px;
+  --acme-ui-font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+[data-theme="dark"] {
+  --acme-ui-surface-0: #0f1115;
+  --acme-ui-surface-1: #181b21;
+  --acme-ui-text: #eceef2;
+  --acme-ui-border: #2b2f38;
+  --acme-ui-accent: #7c94f5;
+  --acme-ui-on-accent: #0f1115;
+}

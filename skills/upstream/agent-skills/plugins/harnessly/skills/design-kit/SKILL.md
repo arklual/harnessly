@@ -5,6 +5,8 @@ description: Make, change, check or install a design kit for Sinopia — a desig
 
 # Making a design kit for Sinopia
 
+A kit from an npm package (React or Angular: antd, @mui/material, @angular/material, primeng, @taiga-ui/kit) is one command, no script of your own: `harnessly design kit add npm:<package> ./<folder>`, then `harnessly design kit check ./<folder> --render`, `tar -czf <id>.tgz -C ./<folder> .`, `harnessly design kit install <id> <version> <id>.tgz` and `harnessly design kit use <project> <id>`. Details below.
+
 The contract — every file, every field, how the preview draws a component, every rule the check runs — is one page.
 Read it first, whole; this skill is the order of work:
 
@@ -41,7 +43,7 @@ shapes. Each problem the check prints names its rule (`[sample.required]`); the 
 1. **Inventory** the package (exports, families, token CSS, fonts, icons) into `kit-inventory.md` next to the build:
    every line ends in the kit or in the README's «not in the kit» with a reason.
 2. **Build script** (`npm run build:kit`) writing the folder: the bundle (esbuild, React from `window`, built for
-   React 18), `tokens.json` with values resolved in a browser + `tokens.css`, `design-system.json` from the types,
+   React 18, or 19 with `"react": "19"` in the kit record), `tokens.json` with values resolved in a browser + `tokens.css`, `design-system.json` from the types,
    cards from the package's docs.
 3. **Samples by hand** for every component: realistic content of the product, required props filled, overlays open
    with their trigger as an element, compound parents holding their parts as elements. Parts `"part": "<Parent>"`,
@@ -49,6 +51,16 @@ shapes. Each problem the check prints names its rule (`[sample.required]`); the 
 4. **Templates**: four to six whole pages as boards (the docs' «A board on the kit»).
 5. Last step of the build: `harnessly design kit render <folder> --shots` (pictures and `thumb` fields), then
    `check --render` must be clean.
+
+### A ready npm package: `kit add`
+
+For a public React package (antd, @mui/material, @chakra-ui/react, a React 19 kit) do not write the script:
+`harnessly design kit add npm:<package> <folder>` makes the kit. It finds the provider (`KitRoot`, no `--root`), reads
+the tokens of a CSS-in-JS theme and resolves `calc()` / `color-mix()` in headless Chrome, takes `react: "19"` from the
+package (or `--react 19`), and writes descriptions, When to use / When not to use and keywords from the package's JSDoc,
+README, docs and stories, then, with `--draft` only, one `claude -p` call per 40 components for the rest (it runs the machine's own login, so build-1 has none; without `--draft` the texts are generated from names and props; the card's Status says what
+is a draft). Then read the README's «Not in the kit», fix the samples of what did not draw, and
+`harnessly design kit check <folder> --render`.
 
 ## A draft kit
 
@@ -75,6 +87,19 @@ harnessly design kit search <id> <words a person would type>
 
 Open the kit screen in Sinopia: every component a picture, parts in their parent's panel, providers apart. A version is
 immutable — a fix is a new version.
+
+## Designing in a project on a kit
+
+A project that is on a kit (`harnessly design kit use <project> <kit>`, `design new --kit`, or the button «Подключить
+UI-кит») is drawn ONLY from that kit, and you do not wait to be reminded:
+
+1. Read it: `kit_index`, then `kit_component` for every component you use, `kit_tokens`, `kit_templates`.
+2. Start boards with `design new` / `design page create`: they come with the kit's files and provider; write the content
+   inside it as `<x-import component-from-global-scope="NS.Name">`, no own HTML, colours or sizes.
+3. After an edit: `harnessly design check <project> --strict` (no findings), then
+   `harnessly design check <project> --board FILE`; open the screenshot it writes to `.check/` and look at it.
+4. A new design, no kit in the project or in the request, kits installed: ask once with `notice_ask` (the fitting kit
+   recommended, another installed one, no kit), then `harnessly design kit use <project> <kit>|none`. Never ask twice.
 
 ## Traps the check cannot see
 

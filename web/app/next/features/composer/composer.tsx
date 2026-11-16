@@ -134,6 +134,9 @@ export interface IComposerProps {
   waiting?: boolean;
   /** The agent, model and depth pill with its popover; null where the machine has no agent to pick. */
   picker: IModelPickerProps | null;
+  /** The pill, the limits and the ring are put away (a «Разговор» of the new chat, kind-switch.tsx): they fold to
+   *  nothing by width and fade, and unfold the same way back, instead of standing a moment and vanishing at once. */
+  tucked?: boolean;
   /**
    * What «/» lists over the field (commands, skills, MCP servers, settings, files); without it «/» only finds the quick
    * prompts, as before.
@@ -180,6 +183,8 @@ export interface IComposerProps {
   limits?: LimitsView | null;
   /** How full the agent's window is; no ring until it is known. */
   contextRing?: IContextRingProps | null;
+  /** What this chat cost by the agent's own count, USD: the spend card of a machine that pays by the API. */
+  chatCost?: number;
   onCancelRecording: () => void;
   onFinishRecording: () => void;
   /** How many dictated texts the voice input has fixed in the field so far (see useVoice). */
@@ -223,10 +228,41 @@ const limitsKey = (view: LimitsView): string =>
 const ringKey = (ring: IContextRingProps): string => `${ring.used}/${ring.limit}/${ring.compacting === true}`;
 
 const LIFT_MS = 200;
+
+/** How long the old hint fades before the new one takes its place and fades in (composer.css, .hx-composer__input). */
+const HINT_OUT_MS = 140;
+
+/** The field's hint changes (a «Задача» becomes a «Разговор»): the old words fade out, the new ones fade in, instead
+ *  of one replacing the other at once. Reduced motion swaps them at once. */
+const useHintSwap = (hint: string, calm: boolean): { text: string; out: boolean } => {
+  const [shown, setShown] = useState(hint);
+  const [out, setOut] = useState(false);
+  const swap = !calm && hint !== shown;
+  if (swap && !out) setOut(true);
+  useEffect(() => {
+    if (!out) return;
+    const timer = setTimeout(() => {
+      setShown(hint);
+      setOut(false);
+    }, HINT_OUT_MS);
+    return () => clearTimeout(timer);
+  }, [out, hint]);
+  if (calm) return { text: hint, out: false };
+  return { text: shown, out };
+};
+
+/** A control of the bar that can be put away (IComposerProps.tucked): it folds by width and fades, and takes no click
+ *  or focus while it is away. The box is always there, so the way back is the same motion. */
+const Tuck = ({ tucked, children }: { tucked: boolean; children: ReactNode }) => (
+  <span className="hx-tuck" data-tucked={tucked || undefined} inert={tucked || undefined}>
+    <span className="hx-tuck__in">{children}</span>
+  </span>
+);
 const LIFT_PX = 10;
 const Composer = (props: IComposerProps) => {
   countRender('field');
   const { value, onChange, onSubmit, mode, picker, attachments, recording, maxText } = props;
+  const tucked = props.tucked === true;
   const rootRef = useRef<HTMLDivElement>(null);
   const voice = useVoiceField(rootRef);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -244,6 +280,7 @@ const Composer = (props: IComposerProps) => {
   /** What was sent from the field a moment ago: the text and where it stood, until the field shows it is empty. */
   const sentRef = useRef<{ text: string; at: number } | null>(null);
   const touch = useMedia('(pointer: coarse)');
+  const calm = useMedia('(prefers-reduced-motion: reduce)');
   const stop = usePending<'stop'>();
   // The recording bar leaves with an animation and keeps what it showed meanwhile.
   const { value: bar, state: barState } = usePresence(recording, REC_EXIT_MS);
@@ -541,6 +578,8 @@ const Composer = (props: IComposerProps) => {
     narrowField && !bar && props.placeholder === undefined && shortKey ? t(shortKey) : fullPlaceholder;
   // The voice's wave stands where the placeholder would.
   if (voice) placeholder = '';
+  // A recording's own words (getting ready, listen) come at once: they tell a state, not a kind of chat.
+  const hint = useHintSwap(placeholder, calm || !!bar || voice !== null);
 
   return (
     <div
@@ -646,7 +685,8 @@ const Composer = (props: IComposerProps) => {
               className="hx-composer__input"
               rows={1}
               disabled={props.quiet}
-              placeholder={placeholder}
+              placeholder={hint.text}
+              data-hint={hint.out ? 'out' : undefined}
               title={placeholder === fullPlaceholder ? undefined : fullPlaceholder}
               aria-label={t('next.composer.label')}
               aria-invalid={tooLong || undefined}
@@ -771,24 +811,35 @@ const Composer = (props: IComposerProps) => {
               />
             )}
             {shownPicker.value && (
-              <span className="hx-composer__held" inert={shownPicker.held || undefined}>
-                <ModelPicker
-                  {...shownPicker.value}
-                  limits={shownLimits.value && !paysBySpend(shownLimits.value) ? shownLimits.value : null}
-                />
-              </span>
+              <Tuck tucked={tucked}>
+                <span className="hx-composer__held" inert={shownPicker.held || undefined}>
+                  <ModelPicker
+                    {...shownPicker.value}
+                    limits={shownLimits.value && !paysBySpend(shownLimits.value) ? shownLimits.value : null}
+                  />
+                </span>
+              </Tuck>
             )}
             {/* The limit is the bars by the context ring and the pill popover's card (HRN-1496); a chip of its own
                 only for a machine that pays by the API (the day's spend), or where no pill stands. */}
             {shownLimits.value && (!shownPicker.value || paysBySpend(shownLimits.value)) && (
-              <LimitsChip view={shownLimits.value} />
+              <Tuck tucked={tucked}>
+                <LimitsChip view={shownLimits.value} chatUsd={props.chatCost} />
+              </Tuck>
             )}
             <span className="hx-spacer" />
-            {/* The chat's limits in the field itself (HRN-1496): the five hours and the week, quiet bars. */}
+            {/* The chat's limits in the field itself (HRN-1496): the five hours and the week, quiet bars; on hover the
+                card of every window (HRN-1552). */}
             {shownLimits.value && shownPicker.value && !paysBySpend(shownLimits.value) && (
-              <LimitsMini view={shownLimits.value} model={shownPicker.value.value.model ?? null} />
+              <Tuck tucked={tucked}>
+                <LimitsMini view={shownLimits.value} model={shownPicker.value.value.model ?? null} />
+              </Tuck>
             )}
-            {shownRing.value && <ContextRing {...shownRing.value} />}
+            {shownRing.value && (
+              <Tuck tucked={tucked}>
+                <ContextRing {...shownRing.value} />
+              </Tuck>
+            )}
             {props.tools}
             {/* Dictation (the mic) always stays; the live voice is its own button beside it (the wave). Only during a
                 call the call's own mic (mute) stands here instead, so the field never shows two mics. */}

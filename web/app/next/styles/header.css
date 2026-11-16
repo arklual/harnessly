@@ -59,6 +59,19 @@
   align-items: center;
   gap: 5px;
 }
+/* «Виджеты»: the same round button as the terminal's and the pane's beside it, no pill of its own. Beside
+   a column of widgets (room enough) it stays quiet: the column is the layout, not something opened over the chat. */
+.hx-bg-btn.hx-wg-btn {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+  border-radius: 50%;
+  justify-content: center;
+}
+.hx-wg-btn[data-docked][aria-pressed='true']:not(:hover) {
+  background: none;
+  color: var(--hx-fg-3);
+}
 .hx-bg-btn__n {
   font-size: 12px;
   font-weight: var(--hx-weight-medium);
@@ -256,6 +269,10 @@
   .hx-header .hx-bg-btn {
     width: auto;
     padding: 0 8px;
+  }
+  .hx-header .hx-bg-btn.hx-wg-btn {
+    width: 40px;
+    padding: 0;
   }
   .hx-header .hx-bg-btn__n {
     font-size: 14px;

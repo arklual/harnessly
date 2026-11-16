@@ -1199,7 +1199,11 @@ func (r *Runtime) Context(ctx context.Context, id string) (wire.ConvContext, err
 		if r.d.Compact != nil {
 			window, at = r.d.Compact(c.rec.Provider, c.rec.Cwd, model)
 		}
-		return contextOf(c.rec.Provider, used, limit, window, at), nil
+		out := contextOf(c.rec.Provider, used, limit, window, at)
+		if r.d.Cost != nil {
+			out.CostUSD = r.d.Cost(c.rec.Provider, c.rec.AgentSessionID)
+		}
+		return out, nil
 	})
 }
 

@@ -6,6 +6,7 @@ import (
 	"embed"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,6 +23,21 @@ import (
 // so the map is a getter that answers undefined once: on the first read after init() has put __dcBoot on window, which
 // is boot()'s check. React and ReactDOM are asked for before init, Babel, stylesheets and siblings after boot.
 const vendorPrefix = "/__vendor/"
+
+const react19URL = "harnessly:react@19.2.0"
+
+// react19Meta is what a board's head says to run on React 19: <meta name="dc-react" content="19">. A kit whose record
+// says "react": "19" gets the meta in its layouts and live previews; a board on such a kit writes it once in its head.
+var react19Meta = regexp.MustCompile(`(?i)<meta\s[^>]*name=["']dc-react["'][^>]*content=["']19(?:\.[0-9.]*)?["']|<meta\s[^>]*content=["']19(?:\.[0-9.]*)?["'][^>]*name=["']dc-react["']`)
+
+// react19Tag is the script that puts React 19 on the page before the engine, "" for a page that does not declare it
+// (every older board keeps React 18.3.1).
+func react19Tag(source, prefix string) string {
+	if !react19Meta.MatchString(source) {
+		return ""
+	}
+	return `<script src="` + prefix + vendorFiles[react19URL].Name + `"></script>`
+}
 
 //go:embed vendor/*.js
 var vendorFS embed.FS
@@ -45,6 +61,13 @@ var vendorFiles = map[string]*vendorFile{
 	"https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js": {
 		Name: "react-dom@18.3.1.js", file: "react-dom.production.min.js",
 		SRI: "sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1",
+	},
+	// React 19 has no UMD build: this file is react, react-dom and react-dom/client bundled by esbuild (scripts/
+	// build-react19.sh) into one script that sets window.React and window.ReactDOM. The engine does not ask for it: a
+	// board or kit page that declares React 19 (react19Tag) gets it before the engine, which then finds React on the page.
+	react19URL: {
+		Name: "react@19.2.0.js", file: "react19.production.min.js",
+		SRI: "sha384-22rBTevYNtrErvE3oe4D5Jb2W4z7LIegUOdP7Pd64NuXmv6YdpfxdFGVZ6Ajg8XC",
 	},
 	"https://unpkg.com/@babel/standalone@7.29.0/babel.min.js": {
 		Name: "babel-standalone@7.29.0.js", file: "babel.min.js",
@@ -100,10 +123,17 @@ func resourcesScript() string {
 	return resourcesScriptAt(vendorPrefix)
 }
 
+// resourcesFor is resourcesScript plus React 19 when the page asks for it.
+func resourcesFor(source string) string {
+	return resourcesScript() + react19Tag(source, vendorPrefix)
+}
+
 func resourcesScriptAt(prefix string) string {
 	m := make(map[string]string, len(vendorFiles)+len(vendorMirrors))
 	for url, f := range vendorFiles {
-		m[url] = prefix + f.Name
+		if url != react19URL { // a page that declares React 19 loads it by tag (react19Tag), not through the engine's map
+			m[url] = prefix + f.Name
+		}
 	}
 	for url, to := range vendorMirrors {
 		m[url] = prefix + vendorFiles[to].Name

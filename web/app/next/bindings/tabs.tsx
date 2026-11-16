@@ -68,6 +68,18 @@ const FIXED: Record<
   [ROUTE.efficiency]: { icon: 'gauge', title: () => t('next.sidebar.efficiency') },
 };
 
+/** A chat's tab is named by the chat: its title, the last one the tab kept, or «Новый чат» — never a design's. */
+const chatTabTitle = (chat: ITabChat | undefined, tab: ITab): string =>
+  chat?.title || tab.title || t('next.tabs.newChat');
+
+/** The chat a tab is: a chat's address, or a design edited with its chat. */
+export const tabChatOf = (path: string): string | null => {
+  const r = parseRoute(path);
+  if (r.kind === ROUTE.chat) return r.id;
+  if (r.kind === ROUTE.site && r.chat && r.edit) return r.chat;
+  return null;
+};
+
 /** What the strip shows for a tab: its place's icon and name, a chat's status. */
 export const stripTabOf = (tab: ITab, chats: ReadonlyMap<string, ITabChat>): IStripTab => {
   const route = parseRoute(tab.path);
@@ -77,7 +89,7 @@ export const stripTabOf = (tab: ITab, chats: ReadonlyMap<string, ITabChat>): ISt
     const look = status === CHAT_STATUS.none ? null : STATUS_LOOK[status];
     return {
       id: tab.id,
-      title: chat?.title ?? tab.title ?? t('next.tabs.chat'),
+      title: chatTabTitle(chat, tab),
       icon: look?.icon ?? 'message-square',
       busy: paceOf(status),
       ...(chat?.waitsFor ? { note: chat.waitsFor } : {}),
@@ -88,14 +100,14 @@ export const stripTabOf = (tab: ITab, chats: ReadonlyMap<string, ITabChat>): ISt
     return { id: tab.id, title: tab.title ?? route.id, icon: 'layout-grid', busy: null, attention: false };
   if (route.kind === ROUTE.appDoc)
     return { id: tab.id, title: tab.title ?? route.id, icon: 'blocks', busy: null, attention: false };
-  // A design edited with its chat is one tab (chat-place.ts): the design's name, the chat's state.
+  // A design edited with its chat is one tab (chat-place.ts): it is the chat's, by its name and state.
   if (route.kind === ROUTE.site && route.chat && route.edit) {
     const chat = chats.get(route.chat);
     const status = chat?.status ?? CHAT_STATUS.none;
     const look = status === CHAT_STATUS.none ? null : STATUS_LOOK[status];
     return {
       id: tab.id,
-      title: tab.title ?? route.id,
+      title: chatTabTitle(chat, tab),
       icon: look?.icon ?? 'pen-tool',
       busy: paceOf(status),
       ...(chat?.waitsFor ? { note: chat.waitsFor } : {}),
@@ -349,8 +361,8 @@ export const useShellTabs = (byId: ReadonlyMap<string, ITabChat>, enabled: boole
   // A chat's tab keeps its last title, to draw it before the list comes after a reload.
   useEffect(() => {
     for (const tab of state.tabs) {
-      const r = parseRoute(tab.path);
-      const title = r.kind === ROUTE.chat ? byId.get(r.id)?.title : undefined;
+      const conv = tabChatOf(tab.path);
+      const title = conv === null ? undefined : byId.get(conv)?.title;
       if (title && title !== tab.title) tabsStore.patch(tab.id, { title });
     }
   }, [byId, state.tabs]);

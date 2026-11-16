@@ -2,7 +2,7 @@
 // 21:00», «неделя ▬▬▬─ 45% сб 14:00» — and one grey line only when the machine's forecast says the limit runs out
 // before its reset («Хватит до ср 09:00»). Only the windows the plan has stand: a model's own week
 // («Fable · неделя») follows the plan's week. Colour is only on a number that runs low.
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
 import {
   FORECAST,
@@ -16,6 +16,7 @@ import {
   type Level,
   type LimitsView,
   type LimitWindow,
+  type OtherLimits,
   type ProviderLimits,
   type WindowKind,
 } from '@/next/features/limits/model';
@@ -81,17 +82,44 @@ export const slotsOf = (limits: ProviderLimits | null, nowSec: number): ISlot[] 
 };
 
 /** When the limit runs out before its reset, as the line tells it; null when it lasts or the machine does not say. */
-export const runsOutLine = (windows: readonly Shown[]): string | null => {
+export const runsOutLine = (windows: readonly Shown[], nowSec: number = Date.now() / 1000): string | null => {
   const short = windows
     .flatMap(({ kind, window }) => {
       const f = window.forecast;
       if (f?.status !== FORECAST.exhausts || f.exhaustAt === null) return [];
       if (f.exhaustAt >= window.resetsAt) return [];
       const at = Math.round(f.exhaustAt / ROUND_SEC[kind]) * ROUND_SEC[kind];
-      return [{ at, weekly: kind !== WINDOW.fiveHour }];
+      if (at >= window.resetsAt) return [];
+      // The day is named only when it is not today: «пн 18:00» read on a Monday looks later than a Saturday reset.
+      const today = new Date(at * 1000).toDateString() === new Date(nowSec * 1000).toDateString();
+      return [{ at, weekly: kind !== WINDOW.fiveHour && !today }];
     })
     .sort((a, b) => a.at - b.at)[0];
   return short ? t('next.limits.brief.lastsTo', { at: clockOf(short.at, short.weekly) }) : null;
+};
+
+/** A model's own limit is the chat's when the model's id names it («claude-fable-5-2» and «Fable»). */
+export const ofModel = (slot: ISlot, model: string | null): boolean =>
+  slot.model !== null && model !== null && model.toLowerCase().includes(slot.model.toLowerCase());
+
+/** A limit is told only when it presses: this much or less is left. */
+const PRESS_AT = 25;
+/** Another subscription this low is lifted out of the quiet summary line. */
+const WARM_AT = 10;
+
+/** What the chosen model spends: the plan's windows and the model's own week; of them the one that is nearest to
+ *  its end, and the other only when it presses too. A plan's month stays for those who have nothing else. */
+export const shownSlots = (slots: readonly ISlot[], model: string | null): ISlot[] => {
+  const mine = slots.filter((s) => s.model === null || ofModel(s, model));
+  const plan = mine.filter((s) => s.kind !== WINDOW.month);
+  const pool = plan.length > 0 ? plan : mine;
+  const sorted = [...pool].sort((a, b) => a.left - b.left);
+  return sorted.filter((s, i) => i === 0 || s.left <= PRESS_AT).slice(0, 2);
+};
+
+const leastOf = (limits: ProviderLimits, nowSec: number): number | null => {
+  const left = slotsOf(limits, nowSec).map((s) => s.left);
+  return left.length > 0 ? Math.min(...left) : null;
 };
 
 const Win = ({ slot, provider }: { slot: ISlot; provider: string }) => {
@@ -112,14 +140,28 @@ const Win = ({ slot, provider }: { slot: ISlot; provider: string }) => {
         aria-valuenow={slot.left}
       />
       <span className="hx-limb__pct">{`${slot.left}%`}</span>
-      <span className="hx-limb__reset">{resetClock(slot.kind, slot.window.resetsAt)}</span>
+      <span className="hx-limb__reset">{t('next.limits.brief.reset', { at: resetClock(slot.kind, slot.window.resetsAt) })}</span>
     </div>
   );
 };
 
-const Row = ({ name, limits, now }: { name: string; limits: ProviderLimits | null; now: number }) => {
-  const slots = slotsOf(limits, now / 1000);
-  const forecast = runsOutLine(slots.filter((s) => s.model === null));
+const Row = ({
+  name,
+  limits,
+  now,
+  model = null,
+}: {
+  name: string;
+  limits: ProviderLimits | null;
+  now: number;
+  model?: string | null;
+}) => {
+  const all = slotsOf(limits, now / 1000);
+  const slots = shownSlots(all, model);
+  const forecast = runsOutLine(
+    all.filter((s) => s.model === null),
+    now / 1000,
+  );
   if (slots.length === 0 && !limits?.balance) return null;
   return (
     <div className="hx-limb">
@@ -137,8 +179,43 @@ const Row = ({ name, limits, now }: { name: string; limits: ProviderLimits | nul
   );
 };
 
-/** The chat's limits and the machine's other subscriptions. */
-const LimitsBrief = ({ view }: { view: LimitsView }) => {
+const Others = ({ others, now, fallback }: { others: OtherLimits[]; now: number; fallback: string }) => {
+  const [open, setOpen] = useState(false);
+  const nameOf = (o: OtherLimits) => o.name ?? t(`next.agent.${o.provider ?? fallback}`);
+  const rows = others.map((o) => ({ o, left: leastOf(o.limits, now / 1000) }));
+  const warm = rows.filter((r) => r.left !== null && r.left <= WARM_AT);
+  const quiet = rows.filter((r) => !warm.includes(r));
+  const summary = quiet
+    .filter((r) => r.left !== null)
+    .map((r) => `${nameOf(r.o)} ${r.left}%`)
+    .join(' · ');
+  return (
+    <>
+      {warm.map(({ o }) => (
+        <div key={o.key} className="hx-limb__warm">
+          <Row name={nameOf(o)} limits={o.limits} now={now} />
+        </div>
+      ))}
+      {quiet.length > 0 && (
+        <div className="hx-limo" data-open={open}>
+          <button type="button" className="hx-limo__sum" aria-expanded={open} onClick={() => setOpen(!open)}>
+            <span className="hx-limo__text">{t('next.limits.brief.others', { list: summary })}</span>
+          </button>
+          <div className="hx-limo__body">
+            <div className="hx-limo__in">
+              {quiet.map(({ o }) => (
+                <Row key={o.key} name={nameOf(o)} limits={o.limits} now={now} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+/** The limits of the chat's model, and the machine's other subscriptions in one quiet line. */
+const LimitsBrief = ({ view, model = null }: { view: LimitsView; model?: string | null }) => {
   const now = useNow();
   const name = view.profile ? profileName(view.profile) : t(`next.agent.${view.provider}`);
   if (view.state === 'failed') {
@@ -157,18 +234,13 @@ const LimitsBrief = ({ view }: { view: LimitsView }) => {
   return (
     <div className="hx-limbs">
       {own ? (
-        <Row name={name} limits={view.limits} now={now} />
+        <Row name={name} limits={view.limits} now={now} model={model} />
       ) : (
         <p className="hx-limb__fc">{view.limits?.error ?? t('next.limits.none', { provider: name })}</p>
       )}
-      {(view.others ?? []).map((o) => (
-        <Row
-          key={o.key}
-          name={o.name ?? t(`next.agent.${o.provider ?? view.provider}`)}
-          limits={o.limits}
-          now={now}
-        />
-      ))}
+      {(view.others ?? []).length > 0 && (
+        <Others others={view.others ?? []} now={now} fallback={view.provider} />
+      )}
     </div>
   );
 };

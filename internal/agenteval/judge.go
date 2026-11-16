@@ -113,7 +113,7 @@ func (e Expect) holds(f Facts) (bool, string) {
 			if !name.MatchString(c.Name) {
 				continue
 			}
-			if c.Error {
+			if c.Error && !e.EvenFailed {
 				near = append(near, c.Name+" failed: "+clip(c.Result, 160))
 				continue
 			}

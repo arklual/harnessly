@@ -226,6 +226,9 @@ DESIGN PROJECTS
                                     components, props and tokens; the fix with each finding), else draws its boards in Chrome
   harnessly design code <project> --to <repo> [--dry-run]   turn the page modules into the application's code by its
                                     sinopia.export.json: views, fixtures, stories, tests, routes; containers are never touched
+  harnessly design new "<title>" [--page "<page>"] [--kit ID[@VERSION][/THEME]]   a new Sinopia Design project with
+                                    its first board, from any chat (a mockup, a prototype, a screen by a screenshot);
+                                    --kit pins a UI kit installed on the machine; opens the board in the pane
   harnessly design page list <project>        the pages of a design project: id, title, board file
   harnessly design page build <project> [page]  build the boards of page modules (pages/<name>.tsx)
   harnessly design page check <project>       is every page module's board current (fails when not)

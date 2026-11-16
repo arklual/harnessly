@@ -25,7 +25,7 @@ func engineConst(t *testing.T, src, name string) string {
 // The vendored files are the bytes their SRI names. The engine is not in the tree (see engine.go): with
 // HARNESSLY_TEST_ENGINE naming a fetched support.js, the test also holds its URLs and SRIs to the vendored files.
 func TestVendorFilesMatchEngineSRI(t *testing.T) {
-	if len(vendorFiles) != 3 {
+	if len(vendorFiles) != 4 {
 		t.Fatalf("vendorFiles has %d entries", len(vendorFiles))
 	}
 	for url, f := range vendorFiles {
@@ -99,6 +99,9 @@ func TestBoardHTMLHasResourcesBeforeEngine(t *testing.T) {
 		t.Fatalf("resources at %d, engine at %d", res, eng)
 	}
 	for _, f := range vendorFiles {
+		if f.URL == react19URL {
+			continue // loaded by tag on a page that declares React 19, not through the map
+		}
 		if !strings.Contains(html, `"`+f.URL+`":"`+vendorPrefix+f.Name+`"`) {
 			t.Fatalf("no mapping for %s", f.URL)
 		}

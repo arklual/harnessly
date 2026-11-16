@@ -1,6 +1,6 @@
 // An ```html answer: the page the agent wrote, in a sandboxed frame (html-doc.ts) that grows to its content, with the
 // source one toggle away and the page full size over the feed.
-import { useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import {
   frameDocument,
   FRAME_SANDBOX,
@@ -9,6 +9,7 @@ import {
   issueLine,
   newNonce,
 } from '@/next/features/chat/html-doc';
+import MockupToDesign, { MockupHost } from '@/next/features/chat/mockup-to-design';
 import RichView from '@/next/features/chat/rich-view';
 import Icon from '@/next/ui/icon';
 import Segmented from '@/next/ui/segmented';
@@ -72,6 +73,7 @@ const HtmlBlock = ({ source }: { source: string }) => {
   const [height, setHeight] = useState(MIN_HEIGHT * 3);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const host = useContext(MockupHost);
   const code = source.replace(/\n$/, '');
   const copy = () => {
     void navigator.clipboard?.writeText(source).then(() => {
@@ -93,6 +95,7 @@ const HtmlBlock = ({ source }: { source: string }) => {
           onChange={setMode}
         />
         <span className="hx-spacer" />
+        {host && <MockupToDesign html={source} host={host} />}
         <button
           type="button"
           className="hx-rich__btn"

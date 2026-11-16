@@ -1323,6 +1323,27 @@
 .hx-rich__btn[data-copied='true'] {
   color: var(--hx-success);
 }
+/* «Продолжить в Sinopia Design»: busy keeps the button's width steady, a failure is a quiet line beside it. */
+.hx-rich__btn[data-state='busy'] {
+  cursor: progress;
+}
+.hx-rich__btn[data-state='busy']:disabled {
+  opacity: 1;
+  color: var(--hx-fg-3);
+}
+.hx-rich__fail {
+  min-width: 0;
+  max-width: 28ch;
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 520px) {
+  .hx-rich__fail {
+    display: none;
+  }
+}
 .hx-rich__diagram {
   display: grid;
   place-items: center;

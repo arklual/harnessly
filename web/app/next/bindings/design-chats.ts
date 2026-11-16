@@ -18,7 +18,6 @@ export const useDesignChatsFound = (
   machine: MachineId,
   design: string,
   here: readonly string[],
-  ask: number,
   /** Ask only the open machine's list (an app's object is no design of the libraries). */
   hereOnly = false,
 ): readonly IDesignChatsFound[] => {
@@ -52,7 +51,7 @@ export const useDesignChatsFound = (
     return () => abort.abort();
     // others is othersKey's list: a new array with the same machines asks nothing new.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, ask]);
+  }, [key]);
 
   const elsewhere = answers.key === key ? answers.found : NO_FOUND;
   return useMemo(() => [{ machine, convs: here }, ...elsewhere], [machine, here, elsewhere]);

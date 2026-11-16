@@ -11,6 +11,7 @@ import {
   parsePage,
   type DesignArtifact,
   type DesignlyCreate,
+  type DesignlyFromHTML,
   type DesignSystemInfo,
   type MachineId,
 } from '@/next/protocol/v2';
@@ -214,6 +215,10 @@ export const restoreDemoDesigns = (m: MachineId) =>
 /** The chat conv was started from the design's own column: the machine lists it among the design's chats. */
 export const recordDesignChat = (m: MachineId, id: string, conv: string) =>
   page(m, '/designly/chat', parsePage.designlyChat, { method: 'POST', body: { id, conv } });
+
+/** A mockup of the chat's feed made a board of Sinopia Design, once per mockup; the chat's pane is asked to show it. */
+export const mockupToDesign = (m: MachineId, body: DesignlyFromHTML) =>
+  page(m, '/designly/from-html', parsePage.designlyMockup, { method: 'POST', body });
 
 /**
  * The design's chats as one machine has them: started from the design, then the ones that edited its files. The

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"github.com/ly-solutions/harnessly/internal/filestore"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
@@ -31,9 +30,9 @@ func runStore(ctx context.Context, args []string, lookup func(string) (string, b
 	fs.SetOutput(stderr)
 	var (
 		dir                   = fs.String("dir", "", "the folder the backup is written to")
-		keep                  = fs.Int("keep", 20, "gc: the newest N revisions of every file stay")
-		days                  = fs.Int("days", 30, "gc: revisions younger than this many days stay")
-		grace                 = fs.Duration("grace", 24*time.Hour, "gc: a blob nothing refers to is deleted after this long")
+		keep                  = fs.Int("keep", storehub.GCKeep, "gc: the newest N revisions of every file stay")
+		days                  = fs.Int("days", storehub.GCDays, "gc: revisions younger than this many days stay")
+		grace                 = fs.Duration("grace", storehub.GCGrace, "gc: a blob nothing refers to is deleted after this long")
 		dry                   = fs.Bool("dry-run", false, "gc: count what would go and delete nothing")
 		from, fromDB, fromDir = fs.String("from", "", "migrate: a store's folder (SQLite and files: a runtime's or a hub's)"), fs.String("from-db", "", "migrate: the source database URL"), fs.String("from-dir", "", "migrate: the source files folder")
 		rooms, intoRoom       = fs.String("rooms", "", "migrate: only these rooms, comma separated"), fs.String("into-room", "", "migrate: the room the copied room becomes (one room only)")

@@ -208,6 +208,7 @@ var Flags = []Flag{
 	{Name: "HUB_STORE", Owner: "store", Temporary: true, RemoveAfter: "2027-03-01"},
 	{Name: "HUB_STORE_DATABASE_URL", Owner: "store"},
 	{Name: "HUB_STORE_DIR", Owner: "store"},
+	{Name: "HUB_STORE_GC_HOURS", Owner: "store"},
 	{Name: "HUB_STORE_LEGACY_SPACE", Owner: "store", Temporary: true, RemoveAfter: "2027-03-01"},
 	{Name: "HUB_STORE_MAX_UPLOAD_MB", Owner: "store"},
 	{Name: "HUB_STORE_PROFILE_ROOMS", Owner: "store"},

@@ -274,7 +274,8 @@ func TestDesignGuardHookTakesTheLeaseOnABoard(t *testing.T) {
 	if code, out := run([]string{"hook", "design-guard"}, in); code != 0 || out != "" {
 		t.Fatalf("free board: %d %q", code, out)
 	}
-	if len(got) != 1 || got[0]["action"] != "claim" || got[0]["project"] != "site" || got[0]["board"] != "Home.dc.html" || got[0]["session"] != "s-1" {
+	// The claim, then the question whether the project is on a kit; the board is free, so it goes through.
+	if len(got) != 2 || got[1]["action"] != "brief" || got[0]["action"] != "claim" || got[0]["project"] != "site" || got[0]["board"] != "Home.dc.html" || got[0]["session"] != "s-1" {
 		t.Fatalf("the claim: %+v", got)
 	}
 	status = http.StatusConflict

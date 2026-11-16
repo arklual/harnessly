@@ -22,14 +22,16 @@ import (
 // (RUNTIME_DESIGN_KITS_DIR) and served by the library server at /kit/<id>/<version>/. Both work on the folder itself,
 // they do not need the runtime to be up.
 
-const kitHelp = `harnessly design kit install <id> <version> <tarball-or-url> [--force] [--dir DIR] [--header 'Name: value']
+const kitHelp = `A kit from an npm package (React or Angular: antd, @mui/material, @angular/material, primeng, @taiga-ui/kit): harnessly design kit add npm:<package> ./<folder> --id ID; then tar -czf ID.tgz -C ./<folder> . && harnessly design kit install ID <version> ID.tgz; then harnessly design kit use <project> ID. Nothing to write by hand; contract: harnessly docs read agents/design-kits.
+
+harnessly design kit install <id> <version> <tarball-or-url> [--force] [--dir DIR] [--header 'Name: value']
 harnessly design kit list [--dir DIR]
 harnessly design kit export <id> [--version V] [--out FILE] [--with-sources] [--accept-restricted] [--dir DIR]
 harnessly design kit import <file-or-url> [--as-id ID] [--as-version V] [--dry-run] [--dir DIR] [--header 'Name: value']
 harnessly design kit search <id> <words…> [--theme T] [--version V] [--dir DIR]
 harnessly design kit show <id> <node> [--theme T] [--version V] [--dir DIR]
 harnessly design kit add npm:<package>[@<version>]|shadcn:<registry> [<folder>] [--id ID] [--namespace NS] [--title T]
-        [--version V] [--root Comp] [--css <package>/<file>.css,…] [--registry URL] [--from DIR] [--no-render] [--json]
+        [--version V] [--root Comp] [--react 19] [--css <package>/<file>.css,…] [--registry URL] [--from DIR] [--no-render] [--no-draft] [--draft] [--license-secret NAME] [--json]
 harnessly design kit update <folder> [--version V] [--from DIR] [--no-render] [--json]
 harnessly design kit check <folder> [--render] [--levels] [--json]
 harnessly design kit render <folder> [--shots] [--only ID,ID] [--json]
@@ -110,7 +112,7 @@ default the runtime serves from).
 // designKit is "design kit ..."; args are what follows "kit".
 func (c *cli) designKit(args []string) error {
 	if len(args) == 0 {
-		return usageErr("design kit takes: init|add|update|check|render|convert|install|list|export|import|search|show")
+		return usageErr("design kit takes: use|init|add|update|check|render|convert|install|list|export|import|search|show")
 	}
 	if args[0] == "--help" || args[0] == "-h" || args[0] == "help" {
 		c.out("%s", kitHelp)
@@ -122,6 +124,8 @@ func (c *cli) designKit(args []string) error {
 		return err
 	}
 	switch sub {
+	case "use":
+		return c.kitUse(pos)
 	case "install":
 		return c.kitInstall(opt, pos)
 	case "export":
@@ -168,8 +172,10 @@ type kitOptions struct {
 	id, namespace, title, source  string
 	to, from, mode                string
 	css                           bool
-	noRender                      bool
+	noRender, noDraft, draft      bool
+	licenseSecret                 string
 	root, cssFiles, registry      string
+	react                         string
 }
 
 func (c *cli) kitFlags(args []string) (kitOptions, []string, error) {
@@ -236,6 +242,14 @@ func (c *cli) kitFlags(args []string) (kitOptions, []string, error) {
 			}
 		case "no-render":
 			o.noRender = true
+		case "draft":
+			o.draft = true
+		case "no-draft":
+			o.noDraft = true
+		case "license-secret":
+			o.licenseSecret, err = value()
+		case "react":
+			o.react, err = value()
 		case "root":
 			o.root, err = value()
 		case "registry":
@@ -716,4 +730,33 @@ func (c *cli) readiness(rep *designkit.CheckReport, all bool) {
 		}
 		c.out("\n")
 	}
+}
+
+// kitUse is "design kit use <project> <kit>[@version][/theme]|none": the project is pinned to an installed kit (its new
+// boards start with the kit's files, strict mode turns on) or told «no kit».
+func (c *cli) kitUse(pos []string) error {
+	if len(pos) != 2 {
+		return usageErr("design kit use <project> <kit>[@VERSION][/THEME] | none")
+	}
+	raw, err := c.request(http.MethodPost, designPagesPath, nil, map[string]any{"action": "kit", "project": pos[0], "kit": pos[1]})
+	if err != nil {
+		return err
+	}
+	if c.json {
+		c.printRaw(raw)
+		return nil
+	}
+	var out struct {
+		Kit   string `json:"kit"`
+		Brief string `json:"brief"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return err
+	}
+	if out.Kit == "" {
+		c.out("Project %s: no kit (kept; it will not be asked again).\n", pos[0])
+		return nil
+	}
+	c.out("Project %s is on the kit %s; new boards start with its files.\n\n%s\n", pos[0], out.Kit, out.Brief)
+	return nil
 }

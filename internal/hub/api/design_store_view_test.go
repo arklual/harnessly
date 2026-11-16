@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -23,7 +24,17 @@ import (
 // the store's new revision, the pinned one stays where it was, the version and the events come from the hub, and the
 // machine is asked nothing.
 func TestDesignGuestLinksReadTheStoreWithTheMachineOff(t *testing.T) {
-	s := hubtest.New(t, hubtest.Env("HUB_DESIGN_SHARE_URL", "http://"+shareHost))
+	guestLinksWithTheMachineOff(t, "off")
+}
+
+// The same with HUB_DESIGN_DERIVED: the answers kept in the store are given with the same validators and
+// the same caching as the ones worked out from a folder.
+func TestDesignGuestLinksReadTheKeptAnswersWithTheMachineOff(t *testing.T) {
+	guestLinksWithTheMachineOff(t, "on")
+}
+
+func guestLinksWithTheMachineOff(t *testing.T, derived string) {
+	s := hubtest.New(t, hubtest.Env("HUB_DESIGN_SHARE_URL", "http://"+shareHost), hubtest.Env("HUB_DESIGN_DERIVED", derived))
 	if s.Hub.Store == nil {
 		t.Skip("the hub runs without a store")
 	}
@@ -108,6 +119,43 @@ func TestDesignGuestLinksReadTheStoreWithTheMachineOff(t *testing.T) {
 	}
 	if r := guest.DoAt(s.URL, shareHost, "GET", whole+"/f/kit.css", nil, "If-None-Match", tag); r.Code != http.StatusNotModified || r.Header.Get("ETag") != tag {
 		t.Fatalf("a file the guest holds was sent again: %s %v", r, r.Header)
+	}
+
+	// a board's page names each of its files with its version (?tkv=…). Asked for under it, the file is kept
+	// by the guest's browser for good; a new revision changes the address of the edited file only.
+	put("shop/project/pic.png", "png v1")
+	put("shop/project/Assets.dc.html", `<html><head><link rel="stylesheet" href="kit.css"></head><body><img src="pic.png"></body></html>`)
+	versioned := regexp.MustCompile(`(?:href|src)="((kit\.css|pic\.png)\?tkv=[^"#]+)"`)
+	assets := func() map[string]string {
+		t.Helper()
+		r := open(whole + "/f/Assets.dc.html")
+		if r.Code != 200 {
+			t.Fatalf("a board's page with the machine off: %s", r)
+		}
+		out := map[string]string{}
+		for _, m := range versioned.FindAllStringSubmatch(string(r.Body), -1) {
+			out[m[2]] = m[1]
+		}
+		if len(out) != 2 {
+			t.Fatalf("the page does not name its files' versions: %s", r.Body)
+		}
+		return out
+	}
+	before := assets()
+	for _, f := range before {
+		if r := open(whole + "/f/" + f); r.Code != 200 || !strings.Contains(r.Header.Get("Cache-Control"), "immutable") {
+			t.Fatalf("a file under its version is not kept for good: %s %v", r, r.Header)
+		}
+	}
+	for _, f := range []string{"kit.css", "kit.css?tkv=stale"} {
+		if r := open(whole + "/f/" + f); r.Code != 200 || strings.Contains(r.Header.Get("Cache-Control"), "immutable") {
+			t.Fatalf("%s is kept for good: %v", f, r.Header)
+		}
+	}
+	put("shop/project/pic.png", "png v2, edited")
+	after := assets()
+	if after["kit.css"] != before["kit.css"] || after["pic.png"] == before["pic.png"] {
+		t.Fatalf("a new revision moved the files: before %v, after %v", before, after)
 	}
 
 	// The project changes in the store (a teammate's machine, the editor through the hub): the live link follows.

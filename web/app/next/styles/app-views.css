@@ -296,10 +296,13 @@
 
 /* A pane tab's app view stands in the page's layer of kept views (features/app-views/kept-frames.tsx), over this box
    while the tab is on screen and out of sight, still running, while it is not. */
+/* The pane's body is a block, so `flex: 1` alone gives the place no height: the layer then counts it off screen and the
+   view stands out of sight (HRN-1566). It takes the body's whole height, like the browser tab's place. */
 .hx-keptslot {
   flex: 1;
   min-width: 0;
   min-height: 0;
+  height: 100%;
 }
 .hx-keptframe {
   position: fixed;
@@ -417,10 +420,6 @@
   flex: 1;
   min-width: 0;
   min-height: 0;
-}
-/* The place of a kept browser tab: the pane's body is a block, and the tab takes its whole height, as it did in it. */
-.hx-keptslot--browser {
-  height: 100%;
 }
 
 /* The spaces' windows on one stage: the one on screen in the flow, the others kept alive under it, out of

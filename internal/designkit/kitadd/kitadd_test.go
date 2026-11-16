@@ -256,7 +256,10 @@ func TestUpdateReportsChangesAndKeepsWhatAPersonWrote(t *testing.T) {
 		}
 	}
 	edit("design-system.json", func(s string) string {
-		s = strings.Replace(s, `"description": "Card from @acme/ui; what it is for is not written yet."`,
+		s = strings.Replace(s, `"description": "Card from @acme/ui.",
+          "keywords": [
+            "card"
+          ]`,
 			`"description": "A raised surface that groups one record.", "keywords": ["panel"]`, 1)
 		return strings.Replace(s, `"sample": {
             "children": "Button"

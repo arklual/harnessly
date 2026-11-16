@@ -628,7 +628,7 @@ var (
 )
 
 // boardAllowed are the elements of a board that are its frame, not its content.
-var boardAllowed = map[string]bool{"x-dc": true, "helmet": true, "style": true, "script": true, "template": true}
+var boardAllowed = map[string]bool{"x-dc": true, "helmet": true, "style": true, "script": true, "template": true, "sc-if": true, "sc-for": true, "dc-import": true}
 
 // CheckBoard checks a board written by hand: its <x-import> elements against the kit, every other element inside
 // <x-dc> as not from the kit, its styles and style attributes for raw values, and the elements renderVals() makes

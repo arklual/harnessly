@@ -867,6 +867,12 @@ func (h *Hub) Run(ctx context.Context) {
 	safego.Go("outbox chats", func() { h.lead.Lead(ctx, "outbox chats", h.Proxy.RunOutboxChats) })
 	// the documents and boards services' health, on every replica
 	safego.Go("docs health", func() { h.Docs.RunHealth(ctx) })
+	if h.Store != nil && h.cfg.Store.GCEvery > 0 {
+		// the store's old revisions and the blobs nothing refers to, removed on a schedule (HUB_STORE_GC_HOURS)
+		safego.Go("store gc", func() {
+			h.lead.Lead(ctx, "store gc", func(ctx context.Context) { h.Store.RunGC(ctx, h.db, h.cfg.Store.GCEvery) })
+		})
+	}
 	// comments not yet handed to their conversations
 	safego.Go("docs", func() { h.lead.Lead(ctx, "docs sweep", h.Docs.RunSweep) })
 	if h.historySweep != nil {

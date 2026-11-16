@@ -3,6 +3,7 @@ package wirefake
 import (
 	"context"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/wire"
@@ -161,4 +162,27 @@ func (s designly) Chat(_ context.Context, id, conv string) error {
 		}
 	}
 	return &wire.DesignlyError{Code: wire.RefuseNotFound, Message: "Макета больше нет"}
+}
+
+// FromHTML makes the fake library's board of a chat's mockup: the same mockup of the same chat is the same board.
+func (s designly) FromHTML(_ context.Context, c wire.DesignlyFromHTML) (wire.DesignlyMockup, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := c.Conv + "\x00" + c.HTML
+	if s.mockups == nil {
+		s.mockups = map[string]wire.DesignlyMockup{}
+	}
+	if was, ok := s.mockups[key]; ok {
+		was.Existing, was.NewProject = true, false
+		return was, nil
+	}
+	title := strings.TrimSpace(c.Title)
+	if title == "" {
+		title = "Макет из чата"
+	}
+	n := len(s.mockups) + 1
+	out := wire.DesignlyMockup{Project: "mockup-" + strconv.Itoa(n), ProjectTitle: title, Page: "page-" + strconv.Itoa(n),
+		File: "Mockup-" + strconv.Itoa(n) + ".dc.html", Title: title, NewProject: true}
+	s.mockups[key] = out
+	return out, nil
 }

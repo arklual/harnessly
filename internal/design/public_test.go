@@ -340,6 +340,9 @@ func TestPublicBoardsGetTheGuestScriptRelativeToThemselves(t *testing.T) {
 		t.Fatalf("head of a board: %q", body)
 	}
 	for _, f := range vendorFiles {
+		if f.URL == react19URL {
+			continue // loaded by tag on a page that declares React 19, not through the map
+		}
 		if !strings.Contains(body, `"`+f.URL+`":"__vendor/`+f.Name+`"`) {
 			t.Fatalf("no public mapping for %s in %q", f.URL, body)
 		}

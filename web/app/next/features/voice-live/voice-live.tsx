@@ -9,7 +9,9 @@ import { t } from '@/next/i18n';
 import { loadVoiceState, VOICE_TALK, type TVoiceMode } from '@/next/features/voice-live/api';
 import {
   FIELD_FLOOR,
+  setVoiceExpanded,
   setVoiceField,
+  voiceExpanded,
   VOICE_MOVED_EVENT,
   takeVoiceStart,
   takeWakeStart,
@@ -214,7 +216,10 @@ const VoiceLive = ({
   useEffect(() => {
     if (!on) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') end();
+      if (e.key !== 'Escape') return;
+      // The full-screen talk folds into the chat; the talk goes on (voice-full.tsx).
+      if (voiceExpanded()) setVoiceExpanded(false);
+      else end();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -302,8 +307,25 @@ const VoiceLive = ({
       typed: type,
       head: mascot,
       interrupted,
+      muted,
+      mute: toggleMute,
     });
-  }, [on, fieldFloor, level, heard, said, type, voiceOnly, mascot, interrupted, conv, machine, moved]);
+  }, [
+    on,
+    fieldFloor,
+    level,
+    heard,
+    said,
+    type,
+    voiceOnly,
+    mascot,
+    interrupted,
+    conv,
+    machine,
+    moved,
+    muted,
+    toggleMute,
+  ]);
   useEffect(() => {
     if (!on) return;
     return () => {

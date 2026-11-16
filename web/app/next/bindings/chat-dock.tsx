@@ -418,6 +418,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         element: t('next.pane.pick.words.element'),
         component: t('next.pane.pick.words.component'),
         comment: t('next.pane.pick.words.comment'),
+        data: t('next.pane.pick.words.data'),
       });
       return words === '' ? marks : `${words}\n\n${marks}`;
     },
@@ -727,6 +728,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
             onCompact: compact,
           }
         }
+        chatCost={window?.costUsd}
         maxText={maxText}
       />
     </>

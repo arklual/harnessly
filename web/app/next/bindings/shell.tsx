@@ -77,7 +77,7 @@ import { APP_ROW, appSearchGroup } from '@/next/features/search/app-rows';
 import { useInstalledApps } from '@/next/features/app-views/api';
 import { openAppTab } from '@/next/features/app-views/open';
 import { isSpaceApp } from '@/next/features/app-views/service-health';
-import { clearPlain, designPlaceOf } from '@/next/features/designly/chat-place';
+import { designPlaceOf } from '@/next/features/designly/chat-place';
 import { setDraftText } from '@/next/stores/drafts';
 import { useSmartSearch } from '@/next/bindings/use-smart-search';
 import {
@@ -200,6 +200,7 @@ import { countRender } from '@/next/core/perf-journal';
 /** ⌥ Space away from a chat: the voice's field over the screen, loaded when asked. */
 const VoiceFloat = lazy(() => import('@/next/features/voice-live/voice-float'));
 const VoiceBar = lazy(() => import('@/next/features/voice-live/voice-bar'));
+const VoiceFull = lazy(() => import('@/next/features/voice-live/voice-full'));
 const WakeWord = lazy(() => import('@/next/features/voice-live/wake-word'));
 
 const CHAT_LEAVE_MS = 180;
@@ -772,7 +773,6 @@ const Shell = ({ owner }: IShellProps) => {
   const route = useMemo(() => designPlaceOf(asked), [asked]);
   useWarmPages();
   useEffect(() => {
-    clearPlain(asked.kind === ROUTE.chat ? asked.id : null);
     if (route !== asked) goTo(route, { replace: true });
   }, [asked, route]);
   const me = useMe();
@@ -1658,6 +1658,13 @@ const Shell = ({ owner }: IShellProps) => {
       <TourOverlay />
       <VoiceLayer />
       <Suspense fallback={null}>
+        <VoiceFull
+          titleOf={(id) => {
+            const gpt = gptIdOf(id);
+            if (gpt !== null) return gptChats?.find((c) => c.id === gpt)?.title ?? null;
+            return model.conversations?.find((c) => c.id === id)?.title ?? null;
+          }}
+        />
         <VoiceBar
           titleOf={(id) => {
             const gpt = gptIdOf(id);

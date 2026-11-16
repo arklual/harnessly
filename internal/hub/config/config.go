@@ -487,6 +487,10 @@ type StoreConfig struct {
 	ProfileRooms map[string]string
 	// MaxUpload is the biggest file a machine sends in parts (HUB_STORE_MAX_UPLOAD_MB); 0, the default, is no limit.
 	MaxUpload int64
+	// GCEvery (HUB_STORE_GC_HOURS) is how often the leader collects the store as `hub store gc` does with its defaults:
+	// the newest 20 revisions of a file and those younger than 30 days stay, a blob nothing refers to goes after 24
+	// hours. 0, the default, leaves it to the command.
+	GCEvery time.Duration
 }
 
 // StorageS3 says the hub keeps its files in an S3-compatible bucket (HUB_STORAGE=s3), not in its data folder.
@@ -1580,6 +1584,13 @@ func (c *Config) loadStore(get func(string) string, def func(string, string) str
 		} else {
 			bad("HUB_STORE_MAX_UPLOAD_MB must be a whole number of megabytes (0: no limit), got %q", v)
 		}
+	}
+	if v := strings.TrimSpace(get("HUB_STORE_GC_HOURS")); v != "" {
+		h, err := strconv.Atoi(v)
+		if err != nil || h < 0 || h > 24*30 {
+			bad("HUB_STORE_GC_HOURS must be a whole number of hours between collections of the store (0: off), got %q", v)
+		}
+		c.Store.GCEvery = time.Duration(h) * time.Hour
 	}
 	c.Store.LegacySpace = strings.TrimSpace(get("HUB_STORE_LEGACY_SPACE"))
 	if raw := strings.TrimSpace(get("HUB_STORE_PROFILE_ROOMS")); raw != "" {

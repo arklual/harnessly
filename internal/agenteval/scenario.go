@@ -67,6 +67,9 @@ type Setup struct {
 	Files map[string]string `yaml:"files" json:"files,omitempty"`
 	// Design are folders (relative to the scenario file) copied into the stand's design library as projects.
 	Design []string `yaml:"design" json:"design,omitempty"`
+	// Kits are UI kit folders (relative to the scenario file, each with its design-system.json naming the kit's id and
+	// version) installed into the stand as kits installed on the machine are: the kit_* tools and design new --kit see them.
+	Kits []string `yaml:"kits" json:"kits,omitempty"`
 	// RuntimeEnv adds to the setup's runtime settings for this scenario.
 	RuntimeEnv map[string]string `yaml:"runtime_env" json:"runtimeEnv,omitempty"`
 	// Workspace are folders (relative to the scenario file) whose contents are copied into the workspace.
@@ -80,6 +83,9 @@ type Expect struct {
 	Name string `yaml:"name" json:"name,omitempty"`
 	// Called: a call that did not fail, of a tool whose name matches (whole), with arguments matching Args.
 	Called string `yaml:"called" json:"called,omitempty"`
+	// EvenFailed makes Called count a call that failed too: a question to the person times out in a run nobody
+	// answers, and what is judged is that the agent asked.
+	EvenFailed bool `yaml:"even_failed" json:"evenFailed,omitempty"`
 	// NotCalled: no call of a matching tool with matching Args ran (a refused call does not count).
 	NotCalled string `yaml:"not_called" json:"notCalled,omitempty"`
 	// Args are regexps over the call's arguments: argument name → regexp over its value (a string as it is, other JSON
@@ -225,7 +231,7 @@ func ParseScenario(name string, raw []byte) (*Scenario, error) {
 			return nil, fmt.Errorf("%s: runtime_env takes RUNTIME_* settings, not %s", name, k)
 		}
 	}
-	for _, d := range append(append([]string{}, s.Setup.Design...), s.Setup.Workspace...) {
+	for _, d := range append(append(append([]string{}, s.Setup.Design...), s.Setup.Workspace...), s.Setup.Kits...) {
 		if filepath.IsAbs(d) {
 			return nil, fmt.Errorf("%s: a fixture folder is relative to the scenario", name)
 		}

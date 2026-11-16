@@ -57,7 +57,7 @@ var ErrNotFound = errors.New("blobserve: no such blob")
 
 // Serve answers GET and HEAD of a blob. On an error nothing was written and no header set: the caller answers.
 func Serve(w http.ResponseWriter, r *http.Request, b Blob, p Policy) error {
-	etag := `"` + b.Sha + `"`
+	etag := ETag(b.Sha)
 	if p.Cache != NoStore && matches(r.Header.Get("If-None-Match"), etag) {
 		setHeaders(w.Header(), etag, p)
 		w.WriteHeader(http.StatusNotModified)
@@ -119,6 +119,14 @@ func setHeaders(h http.Header, etag string, p Policy) {
 	default:
 		h.Set("Content-Disposition", p.Disposition)
 	}
+}
+
+// ETag is the validator a blob is given with: its hash, the same on every replica.
+func ETag(sha string) string { return `"` + sha + `"` }
+
+// Holds says whether the request's If-None-Match names the blob of this hash: the browser holds it already.
+func Holds(r *http.Request, sha string) bool {
+	return matches(r.Header.Get("If-None-Match"), ETag(sha))
 }
 
 // matches says whether an If-None-Match header names the validator: one of a list, weak or strong, or "*".

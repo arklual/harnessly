@@ -265,6 +265,9 @@ type Canvas struct {
 	Root string `json:"root,omitempty"`
 	// TokenPrefix is the kit record's prefix of the tokens' CSS variables (--acme-), "" when none.
 	TokenPrefix string `json:"tokenPrefix,omitempty"`
+	// React is the React the kit's bundle was built for ("19"), "" for the page's own React 18.3.1: the kit record's
+	// react. A board or preview on such a kit loads React 19 before the engine.
+	React string `json:"react,omitempty"`
 	// Package is the npm package the kit stands for (kit.package), Strict whether projects on it are checked in strict
 	// mode (kit.strict).
 	Package string `json:"package,omitempty"`
@@ -461,6 +464,7 @@ func readCanvas(dir, id, version, theme string, stack []string) (*Canvas, error)
 	}
 	c.Root = kitRoot(raw)
 	c.TokenPrefix = kitTokenPrefix(raw)
+	c.React = kitReact(raw)
 	c.Package, c.Strict = kitPackageStrict(raw)
 	if tokens, err := readThemeFile(dir, id, version, th.Folder, "tokens.json"); err == nil {
 		readFoundation(c, tokens)
@@ -855,6 +859,33 @@ func partOf(raw json.RawMessage) string {
 	}
 	if json.Unmarshal(raw, &o) == nil {
 		return strings.TrimSpace(o.Of)
+	}
+	return ""
+}
+
+// kitReact is the kit record's react: "19" for a kit built on React 19, "" otherwise ("18" is the page's own).
+func kitReact(manifest []byte) string {
+	var all map[string]json.RawMessage
+	if json.Unmarshal(manifest, &all) != nil {
+		return ""
+	}
+	names := make([]string, 0, len(all))
+	for name := range all {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		var own struct {
+			ID      string `json:"id"`
+			Version string `json:"version"`
+			React   string `json:"react"`
+		}
+		if json.Unmarshal(all[name], &own) == nil && own.ID != "" && own.Version != "" {
+			if own.React == "19" {
+				return "19"
+			}
+			return ""
+		}
 	}
 	return ""
 }

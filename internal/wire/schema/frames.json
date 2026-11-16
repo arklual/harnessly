@@ -315,7 +315,7 @@
       ]
     },
     "RetryableRefuseCode": {"enum": ["machine-offline", "rate-limited", "internal", "timeout"]},
-    "HttpKind": {"enum": ["hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "designlyDemo", "designlyChat", "files", "file", "tasks", "legacy", "open", "openRefs", "made", "messageStatus", "context", "search", "digest", "glance", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest", "profileSwitch", "login", "loginOK"]},
+    "HttpKind": {"enum": ["hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "designlyDemo", "designlyChat", "designlyMockup", "files", "file", "tasks", "legacy", "open", "openRefs", "made", "messageStatus", "context", "search", "digest", "glance", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest", "profileSwitch", "login", "loginOK"]},
     "Channel": {"type": "string", "pattern": "^(machine|convs|conv:tab-[A-Za-z0-9_-]+)$"},
     "EntryId": {"type": "string", "pattern": "^((c:[0-9a-f-]+|x:[0-9]+)#[0-9]+|live:(c:[0-9a-f-]+|x:[0-9]+)#[0-9]+)$"},
     "TurnId": {"type": "string", "pattern": "^(c:[0-9a-f-]+|x:[0-9]+)#[0-9]+$"},
@@ -724,6 +724,21 @@
       "required": ["id", "conv"],
       "additionalProperties": false,
       "properties": {"id": {"type": "string", "minLength": 1}, "conv": {"$ref": "#/$defs/ConvId"}}
+    },
+    "DesignlyMockup": {
+      "type": "object",
+      "required": ["project", "projectTitle", "page", "file", "title", "newProject", "existing", "opened"],
+      "additionalProperties": false,
+      "properties": {
+        "project": {"type": "string", "minLength": 1},
+        "projectTitle": {"type": "string"},
+        "page": {"type": "string", "minLength": 1},
+        "file": {"type": "string", "minLength": 1},
+        "title": {"type": "string"},
+        "newProject": {"type": "boolean"},
+        "existing": {"type": "boolean"},
+        "opened": {"type": "boolean"}
+      }
     },
     "DesignlyRefusal": {
       "type": "object",
@@ -4158,6 +4173,15 @@
           "properties": {
             "http": {"const": "designlyChat"},
             "response": {"oneOf": [{"$ref": "#/$defs/DesignlyChat"}, {"$ref": "#/$defs/DesignlyRefusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "designlyMockup"},
+            "response": {"oneOf": [{"$ref": "#/$defs/DesignlyMockup"}, {"$ref": "#/$defs/DesignlyRefusal"}]}
           }
         },
         {

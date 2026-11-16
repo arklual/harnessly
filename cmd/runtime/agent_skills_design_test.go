@@ -38,3 +38,16 @@ func TestWorkspacePromptOpensTaskByKey(t *testing.T) {
 		}
 	}
 }
+
+// A mockup or a prototype asked in any chat is a board of Sinopia Design, not a file served from the folder.
+func TestWorkspacePromptDrawsMockupsInSinopia(t *testing.T) {
+	for _, agent := range []string{"Claude Code", "Codex"} {
+		p := workspacePromptText(agent, integrations.Config{})
+		for _, want := range []string{"harnessly design new", "DCLogic", "data-props", "http.server", "harnessly design panel <project> show --board",
+			"--kit <id>", "kit_component", "component-from-global-scope", "Сделать то же доской Sinopia?"} {
+			if !strings.Contains(p, want) {
+				t.Errorf("%s prompt lacks %q", agent, want)
+			}
+		}
+	}
+}

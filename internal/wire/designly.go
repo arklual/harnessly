@@ -39,7 +39,9 @@ const (
 	DesignBriefMax  = 20000
 	DesignSystemMax = 200
 	DesignlyBodyMax = 256 << 10
-	DesignBoardsMax = 200
+	// DesignlyMockupMax is the longest mockup of a feed that becomes a board.
+	DesignlyMockupMax = 200 << 10
+	DesignBoardsMax   = 200
 	// DesignPeopleMax is the most people a project names (DesignArtifact.People).
 	DesignPeopleMax = 20
 )
@@ -385,6 +387,47 @@ func (c DesignlyChat) Validate() error {
 	return errors.Join(errs...)
 }
 
+// DesignlyFromHTML is the body of POST /api/v2/designly/from-html: a mockup of conversation Conv's feed (an ```html
+// answer) continued in Sinopia Design. Project is the design open beside the chat, if one is; Title the
+// mockup's heading or the answer's first line.
+type DesignlyFromHTML struct {
+	Conv    string `json:"conv"`
+	HTML    string `json:"html"`
+	Title   string `json:"title"`
+	Project string `json:"project"`
+}
+
+func (c DesignlyFromHTML) Validate() error {
+	errs := []error{need("html", c.HTML)}
+	if !ValidConvID(c.Conv) {
+		errs = append(errs, errors.New("conv: not a conversation id"))
+	}
+	if len(c.HTML) > DesignlyMockupMax {
+		errs = append(errs, errors.New("html: longer than 200 KB"))
+	}
+	if len(c.Title) > 1000 || len(c.Project) > 200 {
+		errs = append(errs, errors.New("title or project: too long"))
+	}
+	return errors.Join(errs...)
+}
+
+// DesignlyMockup is the answer of POST /api/v2/designly/from-html: the board the mockup is, and whether the pane of
+// the chat was asked to show it.
+type DesignlyMockup struct {
+	Project      string `json:"project"`
+	ProjectTitle string `json:"projectTitle"`
+	Page         string `json:"page"`
+	File         string `json:"file"`
+	Title        string `json:"title"`
+	NewProject   bool   `json:"newProject"`
+	Existing     bool   `json:"existing"`
+	Opened       bool   `json:"opened"`
+}
+
+func (m DesignlyMockup) Validate() error {
+	return errors.Join(need("project", m.Project), need("page", m.Page), need("file", m.File))
+}
+
 // DesignlyRefusal is the answer of a designly page that refuses: the code of the protocol, a message worded for the
 // person, and the project that was made before the failure, if one was.
 type DesignlyRefusal struct {
@@ -417,6 +460,8 @@ type DesignlySource interface {
 	Chat(ctx context.Context, id, conv string) error
 	// Demo copies back the demo projects the library no longer has; the ones it has are left as they are.
 	Demo(ctx context.Context) (DesignlyDemo, error)
+	// FromHTML makes a board of a mockup of a chat's feed, once per mockup, and shows it in the chat's pane.
+	FromHTML(ctx context.Context, c DesignlyFromHTML) (DesignlyMockup, error)
 }
 
 // designlyBudget is how long a project may take to be made and its conversation to be opened.
@@ -461,14 +506,14 @@ func etagMatches(header, etag string) bool {
 	return false
 }
 
-// designly serves /api/v2/designly/{create,library,systems,pin,chat,demo}.
+// designly serves /api/v2/designly/{create,library,systems,pin,chat,demo,from-html}.
 func (s *Server) designly(w http.ResponseWriter, r *http.Request, what string) {
 	if s.Designly == nil {
 		refuse(w, RefuseNotFound)
 		return
 	}
 	want := http.MethodGet
-	if what == "create" || what == "pin" || what == "chat" || what == "demo" {
+	if what == "create" || what == "pin" || what == "chat" || what == "demo" || what == "from-html" {
 		want = http.MethodPost
 	}
 	if r.Method != want {
@@ -538,6 +583,17 @@ func (s *Server) designly(w http.ResponseWriter, r *http.Request, what string) {
 			return
 		}
 		s.writeChecked(w, r, body)
+	case "from-html":
+		var body DesignlyFromHTML
+		if !readDesignly(w, r, &body) {
+			return
+		}
+		out, err := s.Designly.FromHTML(WithRequest(ctx, r), body)
+		if err != nil {
+			s.designlyRefusal(w, r, err)
+			return
+		}
+		s.writeChecked(w, r, out)
 	case "demo":
 		out, err := s.Designly.Demo(ctx)
 		if err != nil {

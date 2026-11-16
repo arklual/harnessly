@@ -716,6 +716,20 @@ func TestPagesRoute(t *testing.T) {
 	if len(shown) != 1 || shown[0] != "tk-ws-1-tab-a files Made.dc.html" {
 		t.Fatalf("pane asked: %q", shown)
 	}
+	// A new project of the person's with its first board, from any chat; the board opens in the chat's pane.
+	shown = nil
+	code, body = call("POST", "/api/cli/design/pages", `{"action":"new","title":"Аукцион","page":"Мастер ставки","session":"tk-ws-1-tab-a"}`)
+	var made NewProject
+	if err := json.Unmarshal([]byte(body), &made); code != 200 || err != nil || made.Project == "" || made.Page.Title != "Мастер ставки" ||
+		!strings.HasSuffix(made.Board, made.Page.File) || made.Rules == "" || !made.Opened {
+		t.Fatalf("new: %d %s", code, body)
+	}
+	if _, err := os.Stat(made.Board); err != nil || len(shown) != 1 || shown[0] != "tk-ws-1-tab-a "+made.Project+" "+made.Page.File {
+		t.Fatalf("board %v, pane asked: %q", err, shown)
+	}
+	if code, _ := call("POST", "/api/cli/design/pages", `{"action":"new","title":"   "}`); code != 422 {
+		t.Fatalf("new without a title: %d", code)
+	}
 	a.OpenPane = nil
 	if code, body := call("POST", "/api/cli/design/pages", `{"action":"rename","project":"files","page":"New","title":"Newer"}`); code != 200 || !strings.Contains(body, `"title":"Newer"`) {
 		t.Fatalf("rename: %d %s", code, body)

@@ -1,0 +1,52 @@
+id: design-kit-screen
+title: Экран по макету на UI-ките машины — доска Sinopia из настоящих компонентов кита, а не отдельное приложение на localhost
+tags: [design, kits, pane]
+timeout_s: 900
+setup:
+  kits: [fixtures/kits/acme-ui]
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/hlcli/design*.go'
+  - 'internal/hlcli/help.go'
+  - 'internal/design/routes_pages.go'
+  - 'internal/design/kittools.go'
+prompt: >-
+  Сделай на основе UI-кита, который установлен на машине, дизайн экрана «Категории кэшбэка» по макету: шапка с крестиком
+  слева и ссылкой «Условия» справа, заголовок «Категории в ноябре», список из четырёх категорий, у двух — кнопка «Перейти».
+  По «Условия» открывается шторка с условиями, по «Перейти» — экран-заглушка сервиса с кнопкой «Назад», по крестику —
+  тост «Экран закрыт». Надо полностью функционально.
+expect:
+  - name: looked the kit up with the kit tools
+    any_of:
+      - called: '.*kit_(list|index|search|component|tokens|templates?).*'
+      - called: Bash
+        args: {command: '(?s).*harnessly design kit list.*'}
+  - name: made a board of Sinopia Design
+    any_of:
+      - called: Bash
+        args: {command: '(?s).*harnessly design new\s.*'}
+      - called: Bash
+        args: {command: '(?s).*harnessly design page create\s.*'}
+  - name: the board is built of the kit's components
+    file: {glob: 'design:*/project/*.dc.html', contains: 'component-from-global-scope'}
+  - name: the board has its logic (the sheet, the stub screen, the toast)
+    file: {glob: 'design:*/project/*.dc.html', contains: 'data-dc-script'}
+  - name: showed the design in the pane
+    pane: {tab: design, target: '.+'}
+  - name: started no localhost server
+    not_called: Bash
+    args: {command: '(?s).*(http\.server|http-server|SimpleHTTPServer|npx serve|vite|npm run dev|pnpm dev|node .*server).*'}
+  - name: wrote no separate HTML page or app
+    not_called: Write
+    args: {file_path: '(?i)(^|.*/)[^/.]+\.(html?|jsx|tsx)$'}
+variants:
+  - id: v1
+    kind: short
+    text: "На UI-ките машины — экран «Категории кэшбэка»: шапка (крестик, «Условия»), заголовок, 4 категории, у двух «Перейти». Условия — шторка, Перейти — заглушка с «Назад», крестик — тост. Полностью рабочий."
+  - id: v2
+    kind: english
+    text: "Using the UI kit installed on this machine, design the «Категории кэшбэка» screen from the mockup: a header with a close cross and a «Условия» link, the title, four categories, two with a «Перейти» button. «Условия» opens a sheet, «Перейти» a stub screen with «Назад», the cross a toast «Экран закрыт». Fully working."
+  - id: v3
+    kind: typos
+    text: "сделай на основе юай кита на машине дизайн экрана категории кешбэка: шапка крестик и условия, 4 категории, у двух перейти, условия шторка, перейти заглушка с назад, крестик тост. полностью функционально"

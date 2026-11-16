@@ -1,7 +1,9 @@
 package agenteval
 
 import (
+	"archive/tar"
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -17,6 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/designkit"
 	"github.com/ly-solutions/harnessly/internal/pricing"
 )
 
@@ -389,11 +392,56 @@ func prepare(s *Stand, sc *Scenario) error {
 			return infra("design fixture %s: %v", d, err)
 		}
 	}
+	for _, d := range sc.Setup.Kits {
+		if err := installKit(filepath.Join(sc.Dir(), filepath.FromSlash(d)), designkit.DefaultDir(s.Data)); err != nil {
+			return infra("kit fixture %s: %v", d, err)
+		}
+	}
 	if len(sc.Setup.Design) > 0 {
 		// The library is read by the runtime's store; give it a moment to see the new projects.
 		time.Sleep(2 * time.Second)
 	}
 	return nil
+}
+
+// installKit installs a kit folder as `design kit install` does a tarball: packed, then designkit.Install under the id and
+// version its design-system.json names.
+func installKit(src, dir string) error {
+	raw, err := os.ReadFile(filepath.Join(src, "design-system.json"))
+	if err != nil {
+		return err
+	}
+	var ds struct {
+		Kit struct{ ID, Version string } `json:"kit"`
+	}
+	if err := json.Unmarshal(raw, &ds); err != nil {
+		return err
+	}
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	err = filepath.Walk(src, func(p string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return err
+		}
+		rel, _ := filepath.Rel(src, p)
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		if err := tw.WriteHeader(&tar.Header{Name: filepath.ToSlash(rel), Mode: 0o644, Size: int64(len(b)), Typeflag: tar.TypeReg}); err != nil {
+			return err
+		}
+		_, err = tw.Write(b)
+		return err
+	})
+	if err == nil {
+		err = tw.Close()
+	}
+	if err != nil {
+		return err
+	}
+	_, err = designkit.Install(dir, ds.Kit.ID, ds.Kit.Version, &buf, designkit.Options{})
+	return err
 }
 
 func copyTree(src, dst string) error {

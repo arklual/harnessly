@@ -139,13 +139,32 @@ func (v *View) serveDerived(w http.ResponseWriter, r *http.Request, spaceID, pro
 	for _, h := range []string{"If-None-Match", "If-Modified-Since", "If-Range", "If-Match", "If-Unmodified-Since"} {
 		inner.Header.Del(h)
 	}
-	tee := &keepWriter{ResponseWriter: w, max: maxDerived}
+	// The answer is held until it is whole: one that is kept goes out with the validator the kept copy will have (the
+	// blob's hash), so a browser that got it worked out and asks again with its ETag is answered 304 from the store
+	// instead of being sent it again under another validator. A bigger one goes on as it is written.
+	tee := &keepWriter{w: w, max: maxDerived}
 	if err := work(tee, inner); err != nil {
+		if !tee.passing && (tee.status != 0 || tee.body.Len() > 0) {
+			tee.pass()
+		}
 		return true, err
 	}
-	if tee.status == http.StatusOK && !tee.over && tee.body.Len() > 0 {
+	keep := !tee.passing && tee.status == http.StatusOK && tee.body.Len() > 0
+	var sha string
+	if keep {
 		sum := sha256.Sum256(tee.body.Bytes())
-		a := DerivedAnswer{Key: key, SpaceID: spaceID, Project: project, Rev: at, Sha: hex.EncodeToString(sum[:]), Size: int64(tee.body.Len()),
+		sha = hex.EncodeToString(sum[:])
+		w.Header().Set("ETag", blobserve.ETag(sha))
+		if blobserve.Holds(r, sha) {
+			w.WriteHeader(http.StatusNotModified)
+		} else {
+			tee.pass()
+		}
+	} else if !tee.passing {
+		tee.pass()
+	}
+	if keep {
+		a := DerivedAnswer{Key: key, SpaceID: spaceID, Project: project, Rev: at, Sha: sha, Size: int64(tee.body.Len()),
 			Type: w.Header().Get("Content-Type"), Immutable: strings.Contains(w.Header().Get("Cache-Control"), "immutable"), Headers: map[string]string{}}
 		for _, k := range keptHeaders {
 			if val := w.Header().Get(k); val != "" {
@@ -159,39 +178,65 @@ func (v *View) serveDerived(w http.ResponseWriter, r *http.Request, spaceID, pro
 	return true, nil
 }
 
-// keepWriter sends an answer on as it is written and keeps a copy of it up to max bytes.
+// keepWriter holds an answer whole, up to max bytes, so it can be kept and given with its hash as the validator; an
+// answer that is not a 200 or grows over max is sent on as it is written from then on (pass).
 type keepWriter struct {
-	http.ResponseWriter
-	status int
-	over   bool
-	max    int
-	body   bytes.Buffer
+	w       http.ResponseWriter
+	status  int
+	over    bool
+	passing bool
+	max     int
+	body    bytes.Buffer
 }
 
+func (k *keepWriter) Header() http.Header { return k.w.Header() }
+
 func (k *keepWriter) WriteHeader(code int) {
-	if k.status == 0 {
-		k.status = code
+	if k.status != 0 {
+		return
 	}
-	k.ResponseWriter.WriteHeader(code)
+	k.status = code
+	if code != http.StatusOK {
+		k.pass()
+	}
 }
 
 func (k *keepWriter) Write(b []byte) (int, error) {
 	if k.status == 0 {
 		k.status = http.StatusOK
 	}
-	if !k.over {
-		if k.body.Len()+len(b) > k.max {
-			k.over = true
-			k.body.Reset()
-		} else {
-			k.body.Write(b)
-		}
+	if k.passing {
+		return k.w.Write(b)
 	}
-	return k.ResponseWriter.Write(b)
+	if k.body.Len()+len(b) > k.max {
+		k.over = true
+		k.pass()
+		k.body.Reset()
+		return k.w.Write(b)
+	}
+	return k.body.Write(b)
+}
+
+// pass sends on what is held and every write after it.
+func (k *keepWriter) pass() {
+	if k.passing {
+		return
+	}
+	k.passing = true
+	if k.status == 0 {
+		k.status = http.StatusOK
+	}
+	k.w.WriteHeader(k.status)
+	if k.body.Len() > 0 {
+		_, _ = k.w.Write(k.body.Bytes())
+	}
 }
 
 func (k *keepWriter) Flush() {
-	if f, ok := k.ResponseWriter.(http.Flusher); ok {
+	if !k.passing {
+		return
+	}
+	if f, ok := k.w.(http.Flusher); ok {
 		f.Flush()
 	}
 }

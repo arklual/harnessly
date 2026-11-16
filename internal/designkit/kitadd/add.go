@@ -29,8 +29,12 @@ type Options struct {
 	Namespace string // the window global; from the id when empty
 	Title     string
 	Version   string // a shadcn kit's version (a registry has none); an npm kit takes the package's
-	Root      string // an npm kit's provider every board wraps its content in
+	Root      string // an npm kit's provider every board wraps its content in; found by itself when empty
+	React     string // "19" for a kit that needs React 19 on the page; found from the package when empty
+	DraftOn   bool   // `--draft`: call `claude -p` on this machine for the cards the docs leave empty (off by default: it uses the machine's login)
+	NoDraft   bool   // no `claude -p` drafts for cards the package's own docs leave empty
 	CSS       []string
+	License   string // PrimeNG 22+: the PrimeUI license key (from the safe); empty = no key
 	Registry  string // npm: --registry
 	From      string // a folder with node_modules already installed: nothing is installed (offline, tests)
 	WorkDir   string // the build folder; the user cache when empty
@@ -40,6 +44,7 @@ type Options struct {
 	Npm   func(dir string, args ...string) error           // runs npm; exec when nil
 	Node  func(dir string, args ...string) ([]byte, error) // runs node; exec when nil
 	Fetch func(loc string) ([]byte, error)                 // reads a registry address or file; http/disk when nil
+	Draft func(prompt string) (string, error)              // writes card drafts from the package's docs (claude -p); exec when nil
 }
 
 func (o *Options) logf(format string, a ...any) {
@@ -81,6 +86,7 @@ const SourceFile = "_harnessly/kit-source.json"
 type sourceRecord struct {
 	Source   string   `json:"source"`
 	Root     string   `json:"root,omitempty"`
+	React    string   `json:"react,omitempty"`
 	CSS      []string `json:"css,omitempty"`
 	Registry string   `json:"registry,omitempty"`
 }
@@ -96,7 +102,7 @@ func ReadSource(folder string) (Source, *Options, error) {
 		return Source{}, nil, fmt.Errorf("%s: %v", SourceFile, err)
 	}
 	s, err := ParseSource(r.Source)
-	return s, &Options{Root: r.Root, CSS: r.CSS, Registry: r.Registry}, err
+	return s, &Options{Root: r.Root, React: r.React, CSS: r.CSS, Registry: r.Registry}, err
 }
 
 var idCleanRe = regexp.MustCompile(`[^a-z0-9]+`)
@@ -137,6 +143,8 @@ type built struct {
 	codeImport   func(id string) string
 	kitPackage   string
 	root         string
+	react        string             // "19": the page loads React 19 for this kit
+	docs         map[string]compDoc // what the cards say, by component, with where it came from
 }
 
 // Add makes or updates the kit in o.Folder from o.Source.
@@ -231,15 +239,40 @@ func buildNpm(o *Options, rep *Report) (*built, error) {
 	if !designkit.ValidVersion(version) {
 		return nil, fmt.Errorf("%s's version %q is not major.minor.patch", src.Package, version)
 	}
+	if isAngularPackage(dir, src.Package) {
+		return buildAngular(o, rep, dir, version)
+	}
 	css := o.CSS
 	if len(css) == 0 {
 		css = packageCSS(dir, src.Package)
 	}
+	css = compileTailwindSources(o, dir, src.Package, css, rep)
 	b := &built{pkg: src.Package, version: version, kitPackage: src.Package, root: o.Root,
 		codeImport: func(string) string { return src.Package }}
+	recipe, _ := rootFor(src.Package, nil)
+	if o.Root != "" && o.Root != KitRootID {
+		recipe = nil // the person named the provider: the bundle adds none
+	}
+	extra := ""
+	if recipe != nil {
+		extra = recipe.code
+	}
 	var err error
-	if b.js, b.css, err = bundleInstalling(o, dir, src.Package, o.Namespace, css, o.From == ""); err != nil {
+	if b.js, b.css, err = bundleInstalling(o, dir, src.Package, o.Namespace, css, extra, o.From == ""); err != nil {
 		return nil, err
+	}
+	switch {
+	case o.React == "19":
+		b.react = "19"
+	case reactPeer(dir, src.Package) == "19":
+		b.react = "19"
+		o.logf("react: the package asks for React 19; the kit loads it\n")
+	case needsReact19(b.js):
+		b.react = "19"
+		o.logf("react: the bundle uses React 19 only APIs; the kit loads React 19\n")
+	}
+	if b.react != "" {
+		o.React = b.react
 	}
 	if len(css) == 0 && len(b.css) == 0 {
 		rep.NotCarried = append(rep.NotCarried, "styles: the package publishes no stylesheet (no \"style\" field, no .css in \"exports\"); name one with --css <package>/<file>.css")
@@ -250,6 +283,18 @@ func buildNpm(o *Options, rep *Report) (*built, error) {
 		return nil, err
 	}
 	b.comps, b.others = components(o, dir, entry, src.Package, rep, nil)
+	if recipe != nil && strings.Contains(string(b.js), "KitRoot") {
+		rc := rootComp(recipe)
+		rc.Code = src.Package
+		b.comps = append(b.comps, rc)
+		b.root = KitRootID
+		o.Root = KitRootID
+	} else if o.Root == "" {
+		if _, name := rootFor(src.Package, b.comps); name != "" {
+			o.Root = name
+			b.root = name
+		}
+	}
 	if o.Root != "" {
 		found := false
 		for i := range b.comps {
@@ -262,6 +307,7 @@ func buildNpm(o *Options, rep *Report) (*built, error) {
 			b.root = ""
 		}
 	}
+	b.docs = gatherDocs(o, dir, b, rep)
 	return b, nil
 }
 
@@ -319,7 +365,7 @@ func buildShadcn(o *Options, rep *Report, old *oldKit) (*built, error) {
 	if o.Source.Base != "" {
 		b.pkg = o.Source.Base
 	}
-	if b.js, b.css, err = bundleInstalling(o, dir, "./src/index.ts", o.Namespace, nil, o.From == ""); err != nil {
+	if b.js, b.css, err = bundleInstalling(o, dir, "./src/index.ts", o.Namespace, nil, "", o.From == ""); err != nil {
 		return nil, err
 	}
 	if len(reg.cssVars) == 0 {
@@ -397,9 +443,10 @@ type genComp struct {
 	Part        string
 	Description string // from the doc comment; "" when the package has none
 	Props       []TypeProp
-	File        string // the file that declares it (shadcn: the registry file's base name)
-	Pos         int    // its place in that file
-	Code        string // code.import
+	File        string          // the file that declares it (shadcn: the registry file's base name)
+	Pos         int             // its place in that file
+	Code        string          // code.import
+	Sample      json.RawMessage // a sample written by hand (an Angular preset); nil: one is made from the props
 }
 
 // components reads the module's exports: components with their props, and the rest by name.
@@ -424,8 +471,8 @@ func components(o *Options, dir, entry, module string, rep *Report, reg *shadcnB
 	var others []string
 	for _, name := range sortedKeys(a.Exports) {
 		e := a.Exports[name]
-		if e.Kind != "component" {
-			others = append(others, name)
+		if e.Kind != "component" || (strings.HasSuffix(name, "Context") && len(name) > 7) {
+			others = append(others, name) // a context object is no component a board can place
 			continue
 		}
 		c := genComp{ID: name, Description: e.Description, Props: e.Props, File: e.File, Pos: e.Pos}
@@ -445,6 +492,8 @@ func components(o *Options, dir, entry, module string, rep *Report, reg *shadcnB
 		comps = append(comps, c)
 	}
 	markParts(comps)
+	comps = foldRoots(comps)
+	comps = adoptItems(module, comps)
 	return comps, others
 }
 
@@ -507,4 +556,87 @@ func markParts(comps []genComp) {
 			}
 		}
 	}
+	flatten := func() {
+		for i := range comps {
+			for n := 0; n < 4; n++ {
+				p := comps[i].Part
+				if p == "" || p == designkit.PartProvider {
+					break
+				}
+				var par *genComp
+				for j := range comps {
+					if comps[j].ID == p {
+						par = &comps[j]
+					}
+				}
+				if par == nil || par.Part == "" || par.Part == designkit.PartProvider {
+					break
+				}
+				comps[i].Part = par.Part // a part of a part is a part of the top component
+			}
+		}
+	}
+	defer flatten()
+	// Slot parts: <Name><Slot> next to <Name> is a part of it even from another file (Mantine's AccordionControl,
+	// AppShellHeader), when the rest is a slot noun and not a component of its own (ButtonGroup, TextInput).
+	have := map[string]int{}
+	for i, c := range comps {
+		have[c.ID] = i
+	}
+	slotted := map[string]bool{} // parents that have a slot part
+	for _, c := range comps {
+		for j := len(c.ID) - 1; j > 1; j-- {
+			if c.ID[j] >= 'A' && c.ID[j] <= 'Z' && slotRe.MatchString(c.ID[j:]) {
+				if _, ok := have[c.ID[:j]]; ok {
+					slotted[c.ID[:j]] = true
+				}
+				break
+			}
+		}
+	}
+	for i, c := range comps {
+		if c.Part != "" {
+			continue
+		}
+		best := ""
+		for j := len(c.ID) - 1; j > 1; j-- {
+			if c.ID[j] >= 'A' && c.ID[j] <= 'Z' {
+				if k, ok := have[c.ID[:j]]; ok && comps[k].Part == "" && (slotRe.MatchString(c.ID[j:]) || (groupSlotRe.MatchString(c.ID[j:]) && slotted[c.ID[:j]])) {
+					best = c.ID[:j]
+					break
+				}
+			}
+		}
+		if best != "" {
+			comps[i].Part = best
+		}
+	}
+	// Flat compound exports (Chakra's AccordionRoot, AccordionItem, ...): <Name>Root is the parent of every <Name><Part>,
+	// wherever the package declares them.
+	roots := map[string]bool{}
+	for _, c := range comps {
+		if strings.HasSuffix(c.ID, "Root") && len(c.ID) > 4 && c.Part == "" {
+			roots[strings.TrimSuffix(c.ID, "Root")] = true
+		}
+	}
+	for i, c := range comps {
+		if c.Part != "" || roots[c.ID] {
+			continue
+		}
+		best := ""
+		for r := range roots {
+			if len(c.ID) > len(r) && strings.HasPrefix(c.ID, r) && len(r) > len(best) {
+				best = r
+			}
+		}
+		if best != "" && c.ID != best+"Root" {
+			comps[i].Part = best + "Root"
+		}
+	}
 }
+
+// slotRe are the nouns that name a slot of a compound component and are not a component alone.
+var slotRe = regexp.MustCompile(`^(?:Control|Panel|Item|Header|Footer|Main|Navbar|Aside|Section|Target|Dropdown|Trigger|Anchor|Content|Body|Title|Description|Label|Value|Actions|Indicator|Divider|Empty|Search|Options|Option|Arrow|Backdrop|Positioner|Close|CloseButton|CloseTrigger|Chevron|Thumb|Track|Tab|Step|Legend|Caption|Col|Handle|Separator|Tr|Td|Th|Thead|Tbody|Tfoot|Sub|Pane|List|ContextMenu|Completed|Events|Floating|Hidden|Checkbox|Radio|Toggle|Input)(?:(?:Control|Panel|Item|Header|Footer|Main|Navbar|Aside|Section|Target|Dropdown|Trigger|Anchor|Content|Body|Title|Description|Label|Value|Actions|Indicator|Divider|Empty|Search|Options|Option|Arrow|Backdrop|Positioner|Close|CloseButton|CloseTrigger|Chevron|Thumb|Track|Tab|Step|Legend|Caption|Col|Handle|Separator|Tr|Td|Th|Thead|Tbody|Tfoot|Sub|Pane|List|ContextMenu|Completed|Events|Floating|Hidden|Checkbox|Radio|Toggle|Group|Input))*$`)
+
+// groupSlotRe is a slot only when the parent has other slots: HoverCardGroup, ToolbarGroup, but not ButtonGroup.
+var groupSlotRe = regexp.MustCompile(`^Group$`)

@@ -16,7 +16,7 @@ machines and services.
 | **Stand** | A disposable harnessly: its own home, its own runtime on its own port and tmux socket, one workspace, empty memory, no plugins, logins copied without refresh tokens, `env -i`, permissions bypassed (nobody is there to grant one). Not connected to a hub, so nothing reaches anybody's sidebar, search or notifications. Confined by Landlock (`harnessly eval sandbox`, no privileges needed): the runtime and every agent it starts read the system and the tools and read and write only the stand's folder; homes, `/tmp` and other stands are out of reach. Without it an agent that cannot find a project searches the whole machine and writes into what it finds; a machine without Landlock refuses to run stands, and there is no flag around it. One stand per run, N in parallel. Pictures are drawn by a fake generator (`RUNTIME_IMAGEGEN_BIN`), so a run costs only the agent. |
 | **Scenario** | A YAML file: setup (files, a design project), the person's words (a canonical prompt plus stored variants), the agents it applies to, and expectations. |
 | **Facts** | What a run left, read after the turn: tool calls with arguments and errors from the transcript (subagents included), the right pane's intents (`pane-intents.json`), picture jobs, the workspace's files, the final words, tokens and cost. Facts are saved, so a run is judged again without running it. |
-| **Judge** | Expectations over facts, never over the wording alone: `called` / `not_called` (a tool, regexps over its arguments), `pane` (tab and target), `images`, `file`, `text_not`, `any_of`, `max_calls`, `check` (a shell command run in the workspace after the run, inside the stand's sandbox: a hidden test of the code the agents wrote; it sees `EVAL_STARTED_AT` and `EVAL_INTERRUPT_AT`). An optional `judge:` rubric goes to a cheap model only where no fact can tell. |
+| **Judge** | Expectations over facts, never over the wording alone: `called` / `not_called` (a tool, regexps over its arguments; `even_failed: true` counts a call that failed too: a question to the person times out in a run nobody answers), `pane` (tab and target), `images`, `file`, `text_not`, `any_of`, `max_calls`, `check` (a shell command run in the workspace after the run, inside the stand's sandbox: a hidden test of the code the agents wrote; it sees `EVAL_STARTED_AT` and `EVAL_INTERRUPT_AT`). An optional `judge:` rubric goes to a cheap model only where no fact can tell. |
 | **Matrix** | scenario × variant × model × setup × repeat. Budget in runs and dollars, parallel stands, infrastructure failures (stand down, launch failed, API 5xx/401, timeout with no answer) retried apart from the model's failures and never counted, a cache by fingerprint (scenario, variant, model, setup, harnessly and CLI version). |
 | **Report** | Scenario × model: passes/runs with the 95% Wilson interval, the diff to the last run of the same setup (improved / regressed / same within noise), and for each failure the expectation that failed in words and the transcript. Markdown and JSON; a page in harnessly comes next. |
 
@@ -84,6 +84,11 @@ wrapper that sets its libraries) in a `--tools` folder and name it in the setup'
 agent environment both, with `RUNTIME_DESIGN_CHROME_ARGS: --no-sandbox` under Landlock). Without it the agent calls
 `harnessly design export` rightly and the export fails, which is the stand's fault, not the agent's. Pick a
 `--port-base` whose next ports are free: a stand that cannot bind its port is an infrastructure failure.
+
+A scenario about a UI kit installed on the machine names kit folders in `setup.kits` (each with its
+`design-system.json` naming the kit's id and version, as `harnessly design kit init` makes one): the stand installs them as
+`design kit install` does, so the `kit_*` tools and `design new --kit` see them. Fixtures are neutral kits
+(`fixtures/kits/acme-ui`), never a real company's.
 
 ## Teamwork scenarios
 

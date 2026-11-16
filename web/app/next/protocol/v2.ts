@@ -883,6 +883,25 @@ export interface DesignlyChat {
   id: string;
   conv: string;
 }
+/** POST /api/v2/designly/from-html: the board a mockup of a chat's feed became. */
+export interface DesignlyFromHTML {
+  conv: string;
+  html: string;
+  title: string;
+  /** The design open beside the chat; '' for none. */
+  project: string;
+}
+export interface DesignlyMockup {
+  project: string;
+  projectTitle: string;
+  page: string;
+  file: string;
+  title: string;
+  newProject: boolean;
+  existing: boolean;
+  /** The chat's pane was asked to show the board. */
+  opened: boolean;
+}
 /** What a designly page answers when it refuses (status 4xx/5xx): projectId names a project made before the failure. */
 export interface DesignlyRefusal {
   r: 'refused';
@@ -905,6 +924,8 @@ export interface ConvContext {
   limitTokens: number;
   /** Where the agent compacts by itself by its settings; absent where the runtime cannot say. */
   compactAtTokens?: number;
+  /** What the chat's session cost by the agent's own count, USD (Claude's statusline); absent where it says nothing. */
+  costUsd?: number;
 }
 /** What the runtime knows of a message by its clientId (GET /api/v2/conversations/{id}/messages?ids=a,b). */
 export const MESSAGE_STATUS_KINDS = ['known', 'unknown', 'expired'] as const;
@@ -2713,12 +2734,22 @@ const chatMade: Decoder<ChatMade> = object({ items: madeItems, complete: bool })
 const designSystemInfo: Decoder<DesignSystemInfo> = object({ id, label: id, desc: str });
 const designlyPin: Decoder<DesignlyPin> = object({ id, pinned: bool });
 const designlyChat: Decoder<DesignlyChat> = object({ id, conv: convId });
+const designlyMockup: Decoder<DesignlyMockup> = object({
+  project: id,
+  projectTitle: str,
+  page: id,
+  file: id,
+  title: str,
+  newProject: bool,
+  existing: bool,
+  opened: bool,
+});
 
 const taskStatus = oneOf(TASK_STATUSES);
 const task: Decoder<Task> = object({ id, subject: str, status: taskStatus });
 const convContext: Decoder<ConvContext> = object(
   { usedTokens: int, limitTokens: int },
-  { compactAtTokens: int },
+  { compactAtTokens: int, costUsd: num },
 );
 const messageHit: Decoder<MessageHit> = object({
   convId,
@@ -3729,6 +3760,7 @@ export const parsePage = {
   designlyPin: (v: unknown): DesignlyPin => designlyPin(v, '$'),
   designlyDemo: (v: unknown): DesignlyDemo => object({ restored: array(id) })(v, '$'),
   designlyChat: (v: unknown): DesignlyChat => designlyChat(v, '$'),
+  designlyMockup: (v: unknown): DesignlyMockup => designlyMockup(v, '$'),
   files: (v: unknown): DirListing =>
     object({ path: str, entries: array(fileEntry), truncated: bool }, { root: str })(v, '$'),
   file: (v: unknown): FileContent =>

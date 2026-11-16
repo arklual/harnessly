@@ -70,6 +70,7 @@ import { t } from '@/next/i18n';
 import { onBoardAsked, takeNoteBoard } from '@/next/features/designly/open-note';
 import DesignlyDeck from '@/next/bindings/designly-deck';
 import KitBand, { hasKitBand, useProjectKit } from '@/next/features/designly/versions/kit-band';
+import KitAttach, { canAttachKit } from '@/next/features/designly/versions/kit-attach';
 import {
   changeProjectKit,
   KIT_ACTION,
@@ -311,9 +312,10 @@ const DesignlySiteInner = ({
   // A design kept hidden behind another tab (features/shell/kept-screens) has no address of its own: it moves nothing.
   const onScreen = useTabScope()?.active !== false;
   const own = pane === undefined && onScreen && route.kind === ROUTE.site && route.id === id ? route : null;
+  // Edited with its chat, the tab is the chat's and the chat names it (bindings/tabs.tsx), not the design.
   useTabTitle(
     own ? routePath(own) : routePath({ kind: ROUTE.site, id }),
-    pane ? null : (project?.design.title ?? null),
+    pane || (own?.chat && own.edit) ? null : (project?.design.title ?? null),
   );
   const pageSlot = pane ? PANE_PAGE_SLOT : PAGE_SLOT;
   const outsideSlot = pane ? PANE_OUTSIDE_SLOT : OUTSIDE_SLOT;
@@ -991,6 +993,17 @@ const DesignlySiteInner = ({
         onOpenProject={(other) => goTo({ kind: ROUTE.site, id: other })}
         onOpenKit={(kit) => goTo({ kind: ROUTE.kit, id: kit, version: KIT_DRAFT_VERSION })}
         onKitChanged={() => setReloadKey((n) => n + 1)}
+      />
+    ) : project !== null && mayEdit && canAttachKit(kitInfo.kit) ? (
+      <KitAttach
+        machine={machine}
+        id={id}
+        installed={kitInfo.kit.installed ?? []}
+        onDone={(next) => {
+          kitInfo.setKit(next);
+          kitInfo.reload();
+          setReloadKey((n) => n + 1);
+        }}
       />
     ) : undefined;
   const versionsPanel = versionsShown ? (

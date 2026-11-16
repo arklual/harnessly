@@ -288,3 +288,15 @@
     transform: translateY(-4px);
   }
 }
+
+/* The package fields of «Подключить UI-кит». */
+.hx-kitpop__field {
+  width: 100%;
+  min-width: 220px;
+  padding: var(--hx-space-1) var(--hx-space-2);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg);
+  color: var(--hx-fg-1);
+  font: inherit;
+}

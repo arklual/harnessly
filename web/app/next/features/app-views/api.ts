@@ -821,6 +821,10 @@ export const useConsentApps = (m: MachineId, enabled = true, watch = false): IIn
   return enabled && state?.m === m ? state.apps : null;
 };
 
+/** How long a failed read of the installed apps waits before the next: 3 s, doubling, at most a minute. */
+export const installedRetryMs = (failures: number): number =>
+  Math.min(60_000, 3_000 * 2 ** Math.min(failures, 5));
+
 /**
  * The installed apps of a machine: null while they load. One read per machine until `reload` or a
  * refreshInstalledApps; a read again keeps the list it had on screen until the new one comes. `enabled: false` asks
@@ -838,10 +842,14 @@ export const useInstalledApps = (
     error: string | null;
   } | null>(null);
   const reread = useSyncExternalStore(onReread, () => rereads.get(m) ?? 0);
-  const key = `${m}|${reload}|${reread}`;
+  // A read that failed (the machine busy past the timeout, a dropped connection) is tried again by itself, later and
+  // later: without it the start page, whose stage comes from this list, stayed empty until a reload.
+  const [failures, setFailures] = useState(0);
+  const key = `${m}|${reload}|${reread}|${failures}`;
   useEffect(() => {
     if (!enabled) return;
     let live = true;
+    let again: ReturnType<typeof setTimeout> | undefined;
     if (reload > 0) lists.delete(m);
     const asked = lists.get(m) ?? loadInstalledApps(m);
     lists.set(m, asked);
@@ -849,13 +857,16 @@ export const useInstalledApps = (
       (list) => live && setState({ m, key, list, error: null }),
       (e: Error) => {
         lists.delete(m);
-        if (live) setState({ m, key, list: null, error: e.message });
+        if (!live) return;
+        setState({ m, key, list: null, error: e.message });
+        again = setTimeout(() => live && setFailures((n) => n + 1), installedRetryMs(failures));
       },
     );
     return () => {
       live = false;
+      clearTimeout(again);
     };
-  }, [m, reload, key, enabled]);
+  }, [m, reload, key, enabled, failures]);
   if (!enabled || state === null) return { list: null, error: null };
   if (state.key === key) return state;
   // Read again for the same machine and `reload`: the old list stays until the new one comes, so nothing flickers.

@@ -3,7 +3,7 @@
 // card of both windows. ?five=<left %>&week=<left %> set the windows, ?theme=light|dark&lang=en|ru the look; ?alerts
 // tells the steps reached at the top (the memory is cleared first); ?working shows the field in a turn (stop, the
 // context ring), ?fc a weekly forecast that runs out before the reset; ?kind=task|talk the «Задача | Разговор» segment
-// over the field, ?plan=week a plan of the week alone with Fable's own week, ?stale a five-hour reading of a window that has reset, ?full the popover with everything (ChatGPT, the machine, a long name) for its fit in a low window. Never part of a production path.
+// over the field, ?plan=week a plan of the week alone with Fable's own week, ?stale a five-hour reading of a window that has reset, ?full the popover with everything (ChatGPT, the machine, a long name) for its fit in a low window; ?codex a Codex chat, ?api a machine that pays Claude by the API (the spend card, this chat's cost), ?none a reading with no window. Never part of a production path.
 import '@/next/styles/tokens.css';
 import '@/next/styles/base.css';
 import '@/next/styles/shell.css';
@@ -70,35 +70,42 @@ const LimitringGallery = () => {
   const runsOut = query.fc !== undefined;
   const stale = query.stale !== undefined;
   const plan = query.plan === 'week';
+  const codex = query.codex !== undefined;
+  const api = query.api !== undefined;
+  const none = query.none !== undefined;
   const limits = useMemo<LimitsView>(
     () => ({
       state: 'ready',
-      provider: 'claude',
+      provider: codex ? 'codex' : 'claude',
       limits: {
-        fiveHour: plan
-          ? null
-          : {
-              usedPct: 100 - five,
-              resetsAt: stale ? now - 60 * 3600 : now + 2 * 3600 + 25 * 60,
-              forecast: null,
-            },
-        sevenDay: {
-          usedPct: 100 - week,
-          resetsAt: now + 3 * 86400 + 5 * 3600,
-          forecast: runsOut
-            ? {
-                status: 'exhausts_before_reset',
-                exhaustAt: now + 86400 + 4 * 3600,
-                exhaustRange: null,
-                usedAtReset: null,
-                confidence: 'medium',
-                reason: null,
-                lastAt: null,
+        fiveHour:
+          plan || api || none
+            ? null
+            : {
+                usedPct: 100 - five,
+                resetsAt: stale ? now - 60 * 3600 : now + 2 * 3600 + 25 * 60,
+                forecast: null,
+              },
+        sevenDay:
+          api || none
+            ? null
+            : {
+                usedPct: 100 - week,
                 resetsAt: now + 3 * 86400 + 5 * 3600,
-                profile: true,
-              }
-            : null,
-        },
+                forecast: runsOut
+                  ? {
+                      status: 'exhausts_before_reset',
+                      exhaustAt: now + 86400 + 4 * 3600,
+                      exhaustRange: null,
+                      usedAtReset: null,
+                      confidence: 'medium',
+                      reason: null,
+                      lastAt: null,
+                      resetsAt: now + 3 * 86400 + 5 * 3600,
+                      profile: true,
+                    }
+                  : null,
+              },
         month: null,
         balance: null,
         estimate: false,
@@ -117,7 +124,22 @@ const LimitringGallery = () => {
             ]
           : [],
       },
-      spend: null,
+      spend: api
+        ? {
+            dayStartHour: 3,
+            spend: {
+              asOf: now,
+              billing: 'api',
+              hours: [
+                {
+                  start: now - 3600,
+                  byModel: { opus: 3.12, sonnet: 0.84, haiku: 0.06 } as Record<string, number>,
+                },
+                { start: now - 2 * 3600, byModel: { opus: 1.4, fable: 0.52 } as Record<string, number> },
+              ],
+            },
+          }
+        : null,
       others: [
         {
           key: 'codex',
@@ -138,7 +160,7 @@ const LimitringGallery = () => {
         },
       ],
     }),
-    [five, week, now, runsOut, stale, plan],
+    [five, week, now, runsOut, stale, plan, codex, api, none],
   );
   const alerts = query.alerts !== undefined;
   const [cleared] = useState(() => {
@@ -201,7 +223,10 @@ const LimitringGallery = () => {
                 }
           }
           limits={talk ? null : limits}
-          contextRing={working ? { used: 82_000, limit: 200_000, compacting: false } : null}
+          contextRing={
+            working || query.ring !== undefined ? { used: 82_000, limit: 200_000, compacting: false } : null
+          }
+          chatCost={api ? 0.84 : undefined}
           onMic={() => undefined}
           tools={<RoundButton icon="audio-lines" label="Живой голос" onClick={() => undefined} />}
           attachments={[]}

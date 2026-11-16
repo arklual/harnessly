@@ -23,7 +23,7 @@
 //   &voice=speak|listen|think          a talk going on in «Очередь сообщений v2» away from it: its row
 //                                      lit in the sidebar and the bar on top; &head=face the other head
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { FIELD_FLOOR, setVoiceField, type TFieldFloor } from '@/next/features/voice-live/field';
+import { FIELD_FLOOR, setVoiceExpanded, setVoiceField, type TFieldFloor } from '@/next/features/voice-live/field';
 import ChatHeader from '@/next/features/header/chat-header';
 import NotificationCenter, { type INotification } from '@/next/features/notifications/notification-center';
 import { notificationsFromChats } from '@/next/features/notifications/from-chats';
@@ -1265,7 +1265,10 @@ const GalleryVoice = ({
       typed: () => undefined,
       head: params.get('head') === 'face' ? 'face' : 'h',
       interrupted: false,
+      muted: false,
+      mute: () => undefined,
     });
+    setVoiceExpanded(false);
     return () => setVoiceField(null);
   }, []);
   return (

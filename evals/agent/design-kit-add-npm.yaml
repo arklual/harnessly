@@ -1,0 +1,28 @@
+id: design-kit-add-npm
+title: Готовый React-пакет в кит одной командой — kit add npm:<пакет>, без самописного скрипта сборки и без ручного --root
+tags: [design, kits]
+timeout_s: 900
+covers:
+  - 'skills/upstream/agent-skills/plugins/harnessly/skills/design-kit/**'
+  - 'internal/hlcli/designkit*.go'
+  - 'internal/designkit/kitadd/**'
+prompt: >-
+  Нужен UI-кит для Sinopia из готовой библиотеки Ant Design (npm-пакет antd): положи его в папку ./antd-kit так,
+  чтобы по нему можно было собирать доски — со всеми компонентами, токенами и описаниями.
+expect:
+  - name: made the kit with kit add
+    called: Bash
+    args: {command: '(?s).*harnessly design kit add\s+npm:antd.*'}
+  - name: did not write a build script of its own
+    not_called: Write
+    args: {file_path: '(?i).*(build[-_]?kit|esbuild|webpack|vite).*'}
+  - name: checked the kit afterwards
+    called: Bash
+    args: {command: '(?s).*harnessly design kit check.*'}
+variants:
+  - id: v1
+    kind: short
+    text: "Сделай кит Sinopia из npm-пакета antd в ./antd-kit: компоненты, токены, описания."
+  - id: v2
+    kind: english
+    text: "Make a Sinopia design kit from the npm package antd in ./antd-kit: all components, tokens and descriptions, ready to build boards from."

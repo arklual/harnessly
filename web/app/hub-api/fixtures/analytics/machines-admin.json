@@ -29,9 +29,7 @@
         }
       ],
       "access": [],
-      "problems": [
-        "offline"
-      ],
+      "problems": ["offline"],
       "opensRuntime": true,
       "cloud": null,
       "hardware": null,
@@ -43,8 +41,7 @@
         "resources": false,
         "access": false
       },
-      "activeOps": [],
-      "canSeeDebug": false
+      "activeOps": []
     },
     {
       "id": "h2oldboxaaaaaaaaaaaa",
@@ -60,17 +57,14 @@
       "chatsRunning": 0,
       "people": [],
       "access": [],
-      "problems": [
-        "disabled"
-      ],
+      "problems": ["disabled"],
       "opensRuntime": true,
       "cloud": null,
       "hardware": null,
       "load": null,
       "week": null,
       "managed": null,
-      "activeOps": [],
-      "canSeeDebug": false
+      "activeOps": []
     },
     {
       "id": "h2runneraaaaaaaaaaaa",
@@ -165,8 +159,7 @@
           "finishedAt": null,
           "chatsNow": null
         }
-      ],
-      "canSeeDebug": false
+      ]
     },
     {
       "id": "h2productaaaaaaaaaaa",
@@ -224,8 +217,7 @@
         "resources": false,
         "access": false
       },
-      "activeOps": [],
-      "canSeeDebug": false
+      "activeOps": []
     }
   ]
 }

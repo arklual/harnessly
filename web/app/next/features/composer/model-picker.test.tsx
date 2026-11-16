@@ -281,7 +281,7 @@ describe('ChatGPT beside the agents', () => {
     act(() => tab?.click());
     expect(tab?.getAttribute('aria-pressed')).toBe('true');
     expect(view.container.querySelector('.hx-picker__modes')).toBeNull();
-    expect(view.container.querySelector('.hx-picker__about')?.textContent).toBeTruthy();
+    expect(view.container.querySelector('.hx-picker__about')).toBeNull();
     act(() => view.getByText('GPT-6.1 Sol').click());
     expect(onPick).toHaveBeenCalledWith('gpt-6.1-sol');
   });
@@ -318,15 +318,15 @@ describe('the limit on the pill (HRN-1496)', () => {
     spend: null,
   } as const;
 
-  it('shows both windows of the provider in the popover', () => {
+  it('shows the window that is nearest to its end, the week one only when it presses too', () => {
     const view = render(
       <ModelPicker value={choice()} agents={[agent]} locked onChange={vi.fn()} limits={limits} />,
     );
     const pill = view.container.querySelector<HTMLButtonElement>('.hx-model');
     act(() => pill?.click());
     const wins = view.container.querySelectorAll('.hx-picker__limits .hx-limb__win');
-    expect(wins).toHaveLength(2);
-    expect(view.container.querySelector('.hx-picker__limits')?.textContent).toMatch(/5 h.*18%.*week.*51%/);
+    expect(wins).toHaveLength(1);
+    expect(view.container.querySelector('.hx-picker__limits')?.textContent).toMatch(/5 h.*18%/);
   });
 
   it('has no limits card without limits', () => {

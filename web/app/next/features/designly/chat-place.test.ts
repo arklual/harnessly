@@ -2,11 +2,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   chatPlaceOf,
-  clearPlain,
+  chooseChat,
   designPlaceOf,
   keepChatPlace,
   MAX_PLACES,
-  openPlainOnce,
   parsePlaces,
   resetChatPlaces,
 } from '@/next/features/designly/chat-place';
@@ -37,15 +36,38 @@ describe('chat-place: a chat that edits a design', () => {
     expect(designPlaceOf(home)).toBe(home);
   });
 
-  it('«Открыть чат» shows the plain chat once; after it is left the chat is the design again', () => {
+  it("«К чату» is the chat's choice: after another chat and a reload it stays a plain chat (HRN-1557)", () => {
     keepChatPlace('tab-a', { design: 'd', machine: null, page: null });
-    openPlainOnce('tab-a');
-    const chat = { kind: ROUTE.chat, id: 'tab-a' } as const;
-    expect(designPlaceOf(chat)).toBe(chat);
-    clearPlain('tab-a');
-    expect(designPlaceOf(chat)).toBe(chat);
-    clearPlain(null);
-    expect(designPlaceOf(chat)).toEqual({ kind: ROUTE.site, id: 'd', chat: 'tab-a', edit: true });
+    keepChatPlace('tab-b', { design: 'e', machine: null, page: null });
+    chooseChat('tab-a');
+    const a = { kind: ROUTE.chat, id: 'tab-a' } as const;
+    const b = { kind: ROUTE.chat, id: 'tab-b' } as const;
+    expect(designPlaceOf(a)).toBe(a);
+    // Another chat keeps its own view: B is still its design.
+    expect(designPlaceOf(b)).toEqual({ kind: ROUTE.site, id: 'e', chat: 'tab-b', edit: true });
+    // Back to A, and after a reload of the page.
+    expect(designPlaceOf(a)).toBe(a);
+    resetChatPlaces();
+    expect(designPlaceOf(a)).toBe(a);
+    expect(designPlaceOf(b)).toEqual({ kind: ROUTE.site, id: 'e', chat: 'tab-b', edit: true });
+  });
+
+  it('the design opened with the chat again (by the person or the agent) makes it the design again', () => {
+    keepChatPlace('tab-a', { design: 'd', machine: null, page: 'p.html' });
+    chooseChat('tab-a');
+    keepChatPlace('tab-a', { design: 'd', machine: null, page: 'p.html' });
+    expect(designPlaceOf({ kind: ROUTE.chat, id: 'tab-a' })).toEqual({
+      kind: ROUTE.site,
+      id: 'd',
+      chat: 'tab-a',
+      edit: true,
+      page: 'p.html',
+    });
+  });
+
+  it('«К чату» of a chat with no design keeps nothing', () => {
+    chooseChat('tab-x');
+    expect(chatPlaceOf('tab-x')).toBeNull();
   });
 
   it('is kept in the browser, the oldest beyond the limit forgotten', () => {

@@ -906,3 +906,24 @@ func TestLoadServicePublicURLs(t *testing.T) {
 		t.Errorf("a public address without a scheme: %v", err)
 	}
 }
+
+func TestStoreGCEvery(t *testing.T) {
+	base := map[string]string{"HUB_PUBLIC_URL": "https://hub.example.com", "HUB_SMTP_URL": "smtp://mail.example.com"}
+	load := func(value string) (*Config, error) {
+		vars := map[string]string{"HUB_STORE_GC_HOURS": value}
+		for k, v := range base {
+			vars[k] = v
+		}
+		return Load(env(vars))
+	}
+	for value, want := range map[string]time.Duration{"": 0, "0": 0, "6": 6 * time.Hour, "24": 24 * time.Hour} {
+		if c, err := load(value); err != nil || c.Store.GCEvery != want {
+			t.Errorf("HUB_STORE_GC_HOURS=%q: %v %v, want %v", value, c.Store.GCEvery, err, want)
+		}
+	}
+	for _, value := range []string{"-1", "6h", "1.5", "721"} {
+		if _, err := load(value); err == nil {
+			t.Errorf("HUB_STORE_GC_HOURS=%q was taken", value)
+		}
+	}
+}

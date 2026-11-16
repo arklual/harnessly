@@ -12,7 +12,13 @@ import DigestListen, { DIGEST_VOICE } from '@/next/features/voice-live/digest-li
 import FieldHead from '@/next/features/voice-live/field-head';
 import MascotPick from '@/next/features/voice-live/mascot-pick';
 import MiniWave from '@/next/features/voice-live/mini-wave';
-import { FIELD_FLOOR, setVoiceField, type TFieldFloor, VOICE_LOOK } from '@/next/features/voice-live/field';
+import {
+  FIELD_FLOOR,
+  setVoiceExpanded,
+  setVoiceField,
+  type TFieldFloor,
+  VOICE_LOOK,
+} from '@/next/features/voice-live/field';
 import VoiceHead, { HEAD, type THead } from '@/next/features/voice-live/voice-head';
 import { pinLocale, type TLang } from '@/next/i18n';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
@@ -67,7 +73,10 @@ const Gallery = () => {
       typed: () => undefined,
       head: KIND,
       interrupted: S === HEAD.barged,
+      muted: false,
+      mute: () => undefined,
     });
+    setVoiceExpanded(false);
     return () => setVoiceField(null);
   }, []);
   return (

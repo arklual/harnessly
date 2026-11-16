@@ -63,11 +63,12 @@ export default function Home() {
 	return l, project
 }
 
+// A project on a kit is checked strictly by default.
 func TestStrictModeIsTurnedOnByTheProjectOrTheKit(t *testing.T) {
 	cases := []struct {
 		kit, project bool
 		want         string
-	}{{false, false, ""}, {false, true, "project"}, {true, false, "kit"}}
+	}{{false, false, "kit"}, {false, true, "project"}, {true, false, "kit"}}
 	for _, c := range cases {
 		l, _ := strictRig(t, c.kit, c.project)
 		if got := l.StrictOn("x"); got != c.want {

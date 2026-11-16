@@ -169,7 +169,11 @@ func (s *Service) machineFetch(ctx context.Context, machine string, req hubproto
 	if r != nil && r.Method == http.MethodHead {
 		method = http.MethodHead
 	}
-	out, err := http.NewRequestWithContext(ctx, method, "http://runtime/m/"+machine+p, nil)
+	target := "http://runtime/m/" + machine + p
+	if q := assetVersionQuery(r); q != "" {
+		target += "?" + q
+	}
+	out, err := http.NewRequestWithContext(ctx, method, target, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -750,7 +754,7 @@ func (s *Service) guestFile(w http.ResponseWriter, r *http.Request, g guestReq) 
 			h.Set("ETag", tag)
 		}
 		h.Set("Access-Control-Allow-Origin", "*")
-		h.Set("Cache-Control", guestCache(g, "private, max-age=30"))
+		h.Set("Cache-Control", guestFileCache(g, res))
 		w.WriteHeader(http.StatusNotModified)
 		return nil
 	}
@@ -769,9 +773,37 @@ func (s *Service) guestFile(w http.ResponseWriter, r *http.Request, g guestReq) 
 	h.Set("Content-Type", safeType(res.Header.Get("Content-Type")))
 	h.Set("Content-Security-Policy", "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors "+s.shareURL)
 	h.Set("Access-Control-Allow-Origin", "*")
-	h.Set("Cache-Control", guestCache(g, "private, max-age=30"))
+	h.Set("Cache-Control", guestFileCache(g, res))
 	passEncoding(h, res)
 	return copyBody(w, res, maxFile, false)
+}
+
+// assetVersionParam is the file's version a board's page puts into the address of each of its files (design's
+// versionParam, styles.css?tkv=…): a file asked for under its current version is answered immutable.
+const assetVersionParam = "tkv"
+
+// assetVersionQuery is the part of a guest's query the file's reader is told: only the version, so a guest's own
+// parameters do not make answers of their own (each would be worked out and kept apart, HUB_DESIGN_DERIVED).
+func assetVersionQuery(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	v := r.URL.Query().Get(assetVersionParam)
+	if v == "" {
+		return ""
+	}
+	return url.Values{assetVersionParam: {v}}.Encode()
+}
+
+// guestFileCache is how long a guest's browser keeps a file of the link. HRN-1005: a file asked for under the version
+// its page named (?tkv=…, the reader checks it is the current one) never changes at that address, so it is kept for
+// good, and a new revision changes the addresses of the edited files only; a revoked link ends at its page and index,
+// which are never kept. Anything else as guestCache says.
+func guestFileCache(g guestReq, res *http.Response) string {
+	if strings.Contains(res.Header.Get("Cache-Control"), "immutable") {
+		return "private, max-age=31536000, immutable"
+	}
+	return guestCache(g, "private, max-age=30")
 }
 
 // guestCache is how long a guest's browser keeps a file of the link: a link pinned to a store revision reads contents

@@ -176,6 +176,9 @@ type PageSpec struct {
 	// Layout is a slide layout of an installed kit, <kit>[@version]/<theme>/<layout>: the page starts as that board and the
 	// theme's folder is put into the project as ds/<theme>/. Not with VariantOf or File.
 	Layout string
+	// Seed is the board's content as it is (a chat's mockup, BoardFromHTML), instead of the template. Not with Layout,
+	// VariantOf or File.
+	Seed []byte
 }
 
 func cleanRoute(v *string) (*string, error) {
@@ -239,6 +242,9 @@ func (l *Library) CreatePage(id string, s PageSpec) (Page, error) {
 		}
 		layoutRoot, layoutTheme, layoutKit, layoutVersion = root, lay.Theme, lay.Kit, lay.Version
 	}
+	if s.Seed != nil && (s.Layout != "" || s.VariantOf != "" || s.File != "") {
+		return Page{}, pageErr(400, locale.Pick("A board's content comes alone: no layout, file or variant", "Содержимое доски даётся без макета, файла и варианта"))
+	}
 	var base *Page
 	if s.VariantOf != "" {
 		b, err := ResolvePage(m, s.VariantOf)
@@ -285,9 +291,12 @@ func (l *Library) CreatePage(id string, s PageSpec) (Page, error) {
 		}
 	}
 	if !adopt {
-		seed := l.boardSeed(id)
+		seed := l.kitSeed(id, l.boardSeed(id))
 		if layoutBoard != nil {
 			seed = layoutBoard
+		}
+		if s.Seed != nil {
+			seed = s.Seed
 		}
 		if base != nil && IsBoardFile(base.File) {
 			if src, err := l.boardFile(id, base.File); err == nil {

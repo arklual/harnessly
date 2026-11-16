@@ -137,6 +137,7 @@ type kitForPages struct {
 	Package            string
 	Namespace          string
 	Root               string // the provider component
+	React              string // "19" for a kit built on React 19: its boards say so in their head
 	// byImport: module specifier -> export name -> component id in the namespace.
 	byImport map[string]map[string]string
 	exports  []string
@@ -204,9 +205,10 @@ func (l *Library) pageKit(project string) (*kitForPages, error) {
 			Version string `json:"version"`
 			Package string `json:"package"`
 			Root    string `json:"root"`
+			React   string `json:"react"`
 		}
 		if json.Unmarshal(all[n], &rec) == nil && rec.ID != "" && rec.Version != "" {
-			k.Package, k.Root = rec.Package, rec.Root
+			k.Package, k.Root, k.React = rec.Package, rec.Root, rec.React
 			break
 		}
 	}
@@ -472,7 +474,7 @@ func (l *Library) buildPageBoard(project, name string) (board []byte, inputs []s
 	h := sha256.New()
 	h.Write([]byte("builder " + pageBuilderVersion + "\n"))
 	if kit != nil {
-		h.Write([]byte("kit " + kit.stamp + "\n"))
+		h.Write([]byte("kit " + kit.stamp + " react " + kit.React + "\n"))
 	}
 	for _, in := range inputs {
 		raw, rerr := os.ReadFile(filepath.Join(projectDir, filepath.FromSlash(in)))
@@ -491,6 +493,9 @@ func (l *Library) buildPageBoard(project, name string) (board []byte, inputs []s
 	var kitHead strings.Builder
 	if kit != nil {
 		base := "ds/" + kit.Mount
+		if kit.React == "19" {
+			kitHead.WriteString("<meta name=\"dc-react\" content=\"19\">\n")
+		}
 		kitHead.WriteString("<link rel=\"stylesheet\" href=\"" + attr(base) + "/tokens.css\">\n")
 		kitHead.WriteString("<link rel=\"stylesheet\" href=\"" + attr(base) + "/components/bundle.css\">\n")
 		kitHead.WriteString("<script src=\"" + attr(base) + "/components/bundle.js\"></script>\n")

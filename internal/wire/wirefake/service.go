@@ -54,10 +54,11 @@ type Service struct {
 	delays     map[wire.Op]time.Duration
 	ids        int64
 	tmpl       templates
-	opened     map[string]string           // session id -> the conversation opened on it
-	terms      map[string]map[string]int64 // conversation -> own terminal id -> created at
-	designs    []fakeDesign                // the design library's projects, newest first; nil until first used
-	edits      map[string]string           // conversation, path -> a saved file's text
+	opened     map[string]string              // session id -> the conversation opened on it
+	terms      map[string]map[string]int64    // conversation -> own terminal id -> created at
+	designs    []fakeDesign                   // the design library's projects, newest first; nil until first used
+	mockups    map[string]wire.DesignlyMockup // the boards made of chats' mockups, by chat and HTML
+	edits      map[string]string              // conversation, path -> a saved file's text
 }
 
 var _ convo.Service = (*Service)(nil)

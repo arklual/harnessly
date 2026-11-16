@@ -1,0 +1,24 @@
+.hx-voicefull-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  min-height: 100vh;
+  padding: 24px 16px;
+  background: var(--hx-bg-app);
+  color: var(--hx-fg-1);
+}
+.hx-voicefull-gallery__cell {
+  margin: 0;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+.hx-voicefull-gallery__orb {
+  width: 100%;
+  max-width: 260px;
+  aspect-ratio: 1;
+}
+.hx-voicefull-gallery figcaption {
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-2);
+}

@@ -232,9 +232,54 @@ func valueFor(p kitProp) any {
 	case "array":
 		return []any{}
 	case "object":
+		if textLikeRe.MatchString(p.Name) {
+			return titleCase(humanize(p.Name)) // typed as an element alias the analysis could not see through: a text draws
+		}
 		return map[string]any{}
 	}
 	return titleCase(humanize(p.Name))
+}
+
+var tooltipRe = regexp.MustCompile(`Tooltip$`)
+
+var textLikeRe = regexp.MustCompile(`^(content|title|label|text|description|message|heading|header|caption|tooltip|placeholder|children)$`)
+
+var (
+	overlayRe   = regexp.MustCompile(`(?i)modal|drawer|dialog|tour|sheet|popover|popconfirm|tooltip|dropdown|snackbar|backdrop|popup|overlay`)
+	listPropRe  = regexp.MustCompile(`^(items|options|dataSource|data|treeData|steps|tabs|list|rows|slides|panels|segments|links|entries)$`)
+	bodyItemsRe = regexp.MustCompile(`(?i)tabs|collapse|accordion|descriptions|carousel|timeline|segmented`)
+	carouselRe  = regexp.MustCompile(`(?i)^(carousel|slider|swiper)$`)
+	masonryRe   = regexp.MustCompile(`(?i)masonry|waterfall`)
+	imageRe     = regexp.MustCompile(`(?i)^(image|picture|thumbnail|photo)$`)
+)
+
+// placeholderImage is a plain grey picture for a first sample, inline so it needs no network.
+const placeholderImage = "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='100'%3E%3Crect width='160' height='100' fill='%23d9d9d9'/%3E%3C/svg%3E"
+
+// illustrative is a value for an optional prop whose absence leaves a component empty: a list gets two plain entries,
+// an overlay is open. Only a first sample; a person edits it.
+func illustrative(id string, p kitProp) (any, bool) {
+	switch {
+	case p.Type == "boolean" && (p.Name == "open" || p.Name == "visible") && overlayRe.MatchString(id):
+		return true, true
+	case p.Type == "string" && p.Name == "src" && imageRe.MatchString(id):
+		return placeholderImage, true
+	case (p.Type == "array" || p.Type == "node" && p.Name == "items") && listPropRe.MatchString(p.Name):
+		items := make([]any, 2)
+		for i, n := range []string{"One", "Two"} {
+			it := map[string]any{"key": strings.ToLower(n), "value": strings.ToLower(n), "label": n, "title": n, "description": n + " description"}
+			if bodyItemsRe.MatchString(id) {
+				it["children"] = n + " content"
+			}
+			if p.Name == "items" && masonryRe.MatchString(id) {
+				it["data"] = n
+				it["height"] = 60 + 40*i
+			}
+			items[i] = it
+		}
+		return items, true
+	}
+	return nil, false
 }
 
 func hasProp(ps []kitProp, name string) bool {
@@ -249,37 +294,55 @@ func hasProp(ps []kitProp, name string) bool {
 // sampleFor is a first sample of a new component: its label as children, a value for every required prop, and for a
 // compound component its parts inside it, so they get a picture. A component the live preview cannot draw alone loses
 // it after the render (DropSamples).
-func sampleFor(id string, props []kitProp, parts []string, partProps map[string][]kitProp) map[string]any {
+func sampleFor(id string, props []kitProp, parts []string, partProps map[string][]kitProp, filler string) map[string]any {
 	s := map[string]any{}
+	listed := false
 	for _, p := range props {
 		if p.Required && p.Name != "children" {
 			s[p.Name] = valueFor(p)
+			if elementTypeProp(p) {
+				s[p.Name] = "div" // a tag is a valid component type; an empty object makes React throw
+			}
+			if v, ok := illustrative(id, p); ok {
+				s[p.Name] = v // a required "open" of an overlay draws it open
+			}
+		} else if v, ok := illustrative(id, p); ok {
+			s[p.Name] = v
+			if p.Type != "boolean" && p.Name != "src" {
+				listed = true
+			}
 		}
+	}
+	shown := shownProp(props)
+	if shown != "" {
+		s[shown] = true // an overlay, a collapsible and a transition draw their content only while shown
+	}
+	if listed {
+		// the entries are the content: a label as children would replace them (a Tabs, a Cascader's trigger)
+		return s
+	}
+	if carouselRe.MatchString(id) && hasProp(props, "children") {
+		s["children"] = []any{"One", "Two", "Three"}
+		return s
 	}
 	if !hasProp(props, "children") {
 		return s
 	}
-	var kids []any
-	for _, part := range parts {
-		pp := partProps[part]
-		el := map[string]any{"$c": part}
-		req := map[string]any{}
-		for _, p := range pp {
-			if p.Required && p.Name != "children" {
-				req[p.Name] = valueFor(p)
-			}
-		}
-		if len(req) > 0 {
-			el["props"] = req
-		}
-		if hasProp(pp, "children") {
-			el["children"] = humanize(part)
-		}
-		kids = append(kids, el)
-		if len(kids) == 8 {
-			break
+	if shown != "" && len(parts) > 0 {
+		if nested := composeOpen(parts, partProps, filler); len(nested) > 0 {
+			s["children"] = nested
+			return s
 		}
 	}
+	if filler != "" && tooltipRe.MatchString(id) {
+		s["children"] = map[string]any{"$c": filler, "children": humanize(id)} // a tooltip points at one element
+		return s
+	}
+	if (shown == "in" || shown == "present") && len(parts) == 0 && filler != "" {
+		s["children"] = map[string]any{"$c": filler, "children": humanize(id)} // a transition moves an element
+		return s
+	}
+	kids := flatParts(id, parts, partProps, filler)
 	if len(kids) > 0 {
 		s["children"] = kids
 	} else {
@@ -341,7 +404,7 @@ func writeKit(o *Options, b *built, old *oldKit, rep *Report) error {
 			rep.NotCarried = append(rep.NotCarried, fmt.Sprintf("tokens: variables under %d component or page selectors are the components' own, not tokens", scoped))
 		}
 		if mixed > 0 {
-			rep.NotCarried = append(rep.NotCarried, fmt.Sprintf("tokens: %d colour values made of others (color-mix(), var() in calc()) are left out: they are not resolved yet", mixed))
+			rep.NotCarried = append(rep.NotCarried, fmt.Sprintf("tokens: %d values made of others (color-mix(), var() in calc()) are not read from the stylesheet: the browser resolves them after the kit is drawn", mixed))
 		}
 	}
 	oldToks, _, _ := formats.LoadTokens(dir)
@@ -399,6 +462,11 @@ func writeKit(o *Options, b *built, old *oldKit, rep *Report) error {
 		rec.del("root")
 	}
 	rec.set("cssLayer", layer)
+	if b.react != "" {
+		rec.set("react", b.react)
+	} else {
+		rec.del("react")
+	}
 	doc.set("kit", rec)
 	if !doc.has("sections") {
 		doc.set("sections", map[string]any{"foundation": map[string]string{"title": "Foundation"},
@@ -432,6 +500,9 @@ func writeKit(o *Options, b *built, old *oldKit, rep *Report) error {
 			co, fresh = old.comps[c.ID], false
 		}
 		props := newProps[c.ID]
+		if fresh {
+			props = declareRecipeProps(b.pkg, c.ID, props)
+		}
 		if !fresh {
 			var had []kitProp
 			_ = json.Unmarshal(co.vals["props"], &had)
@@ -453,11 +524,18 @@ func writeKit(o *Options, b *built, old *oldKit, rep *Report) error {
 				}
 			case "description":
 				if co.str("description") == "" {
-					d := c.Description
+					d := b.docs[c.ID].Description
+					if d == "" {
+						d = c.Description
+					}
 					if d == "" {
 						d = fmt.Sprintf("%s from %s; what it is for is not written yet.", c.ID, b.pkg)
 					}
 					co.set("description", d)
+				}
+			case "keywords":
+				if fresh && len(b.docs[c.ID].Keywords) > 0 && !co.has("keywords") {
+					co.set("keywords", b.docs[c.ID].Keywords)
 				}
 			case "code":
 				if c.Code != "" {
@@ -467,8 +545,19 @@ func writeKit(o *Options, b *built, old *oldKit, rep *Report) error {
 				co.set("props", props)
 			case "variants", "sample":
 				if fresh && c.Part == "" {
-					if k == "sample" {
-						co.set("sample", sampleFor(c.ID, props, partsOf[c.ID], newProps))
+					if k == "sample" && len(c.Sample) > 0 {
+						co.set("sample", c.Sample)
+					} else if k == "sample" {
+						smp := sampleFor(c.ID, props, partsOf[c.ID], newProps, fillerFor(func(n string) bool { _, ok := gen[n]; return ok }))
+						if r := recipeSample(b.pkg, c.ID, func(n string) bool { _, ok := gen[n]; return ok }, props); r != nil {
+							for k, v := range smp { // what the component requires and the recipe leaves out (MUI's `component`)
+								if _, has := r[k]; !has && k != "children" {
+									r[k] = v
+								}
+							}
+							smp = r
+						}
+						co.set("sample", smp)
 					} else if vs := variantsFor(props); len(vs) > 0 {
 						co.set("variants", vs)
 					}
@@ -476,6 +565,9 @@ func writeKit(o *Options, b *built, old *oldKit, rep *Report) error {
 			case "todo":
 				if fresh {
 					var todo []string
+					if _, ok := b.docs[c.ID]; ok {
+						break
+					}
 					if c.Description == "" {
 						todo = append(todo, "description: what it is for and when to take it (the package has no doc comment for it)")
 					}
@@ -577,7 +669,7 @@ func writeKit(o *Options, b *built, old *oldKit, rep *Report) error {
 		have, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(card)))
 		var md string
 		if err != nil {
-			md = newCard(c, props(newProps, c.ID), o.Namespace, b.pkg)
+			md = newCard(c, props(newProps, c.ID), o.Namespace, b.pkg, b.docs[c.ID])
 		} else {
 			md = string(have)
 		}
@@ -601,6 +693,7 @@ func writeKit(o *Options, b *built, old *oldKit, rep *Report) error {
 	if o.Source.Kind == "npm" {
 		src.Source = "npm:" + b.pkg + "@" + b.version
 		src.Root = o.Root
+		src.React = b.react
 	}
 	if err := write(SourceFile, pretty(src)); err != nil {
 		return err
@@ -621,6 +714,13 @@ func writeKit(o *Options, b *built, old *oldKit, rep *Report) error {
 	sort.Strings(rep.Added)
 	sort.Strings(rep.Removed)
 	sort.Slice(rep.Changed, func(i, j int) bool { return rep.Changed[i].Component < rep.Changed[j].Component })
+	nd := map[string]int{}
+	for _, d := range b.docs {
+		nd[d.DescSrc]++
+	}
+	if n := nd[srcDraft] + nd[srcGenerated]; n > 0 {
+		rep.ToWrite = append(rep.ToWrite, fmt.Sprintf("%d components have cards written by a model or from names (listed under Status in each card): read them once", n))
+	}
 	if n := countTodo(dir); n > 0 {
 		rep.ToWrite = append(rep.ToWrite, fmt.Sprintf("%d components list in \"todo\" what a person writes: a description, «When to use» and «When not to use» in the card", n))
 	}
@@ -745,13 +845,30 @@ func countTodo(dir string) int {
 	return n
 }
 
-func newCard(c genComp, props []kitProp, ns, pkg string) string {
+func newCard(c genComp, props []kitProp, ns, pkg string, doc compDoc) string {
 	var b strings.Builder
-	desc := c.Description
+	desc := doc.Description
+	if desc == "" {
+		desc = c.Description
+	}
 	if desc == "" {
 		desc = fmt.Sprintf("%s from %s; what it is for is not written yet.", c.ID, pkg)
 	}
 	fmt.Fprintf(&b, "# %s\n\n%s\n\n", c.ID, desc)
+	if len(doc.When) > 0 {
+		b.WriteString("## When to use\n\n")
+		for _, l := range doc.When {
+			b.WriteString("- " + l + "\n")
+		}
+		b.WriteString("\n")
+	}
+	if len(doc.WhenNot) > 0 {
+		b.WriteString("## When not to use\n\n")
+		for _, l := range doc.WhenNot {
+			b.WriteString("- " + l + "\n")
+		}
+		b.WriteString("\n")
+	}
 	if c.Part != "" && c.Part != designkit.PartProvider {
 		fmt.Fprintf(&b, "A part of `%s`: it is drawn inside it, never alone.\n\n", c.Part)
 	}
@@ -776,7 +893,31 @@ func newCard(c genComp, props []kitProp, ns, pkg string) string {
 		b.WriteString("\n## In code\n\n")
 		b.WriteString(inCode(c))
 	}
+	if note := docNote(doc); note != "" {
+		b.WriteString("\n## Status\n\n" + note + "\n")
+	}
 	return b.String()
+}
+
+// docNote says where a card's texts came from, when a person should look at them: a model's draft or a plain
+// sentence made from the name. The authors' own words (jsdoc, readme, docs) need no note.
+func docNote(d compDoc) string {
+	var parts []string
+	if d.DescSrc == srcDraft {
+		parts = append(parts, "the description is a draft by a model from the package's docs")
+	} else if d.DescSrc == srcGenerated {
+		parts = append(parts, "the description is made from the name")
+	}
+	switch d.WhenSrc {
+	case srcDraft:
+		parts = append(parts, "«When to use» and «When not to use» are a draft by a model")
+	case srcGenerated:
+		parts = append(parts, "«When to use» and «When not to use» are made from the name and the props")
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "Docs: " + strings.Join(parts, "; ") + "; check them before relying on them."
 }
 
 func propsTable(props []kitProp) string {
@@ -894,6 +1035,9 @@ func generatedReadme(folder, ns string, others []string, root string) (string, e
 		return "", err
 	}
 	var d struct {
+		Kit struct {
+			React string `json:"react"`
+		} `json:"kit"`
 		Groups []struct {
 			Title      string       `json:"title"`
 			Components []readmeComp `json:"components"`
@@ -934,8 +1078,12 @@ func generatedReadme(folder, ns string, others []string, root string) (string, e
 	if len(others) == 0 && len(alone) == 0 {
 		b.WriteString("Nothing: every export of the package is a component of the kit.\n")
 	}
+	reactNote := "React 18.3.1 comes from the page"
+	if d.Kit.React == "19" {
+		reactNote = "React 19 comes from the page when it has `<meta name=\"dc-react\" content=\"19\">` in its head: `design new --kit` writes it, and the kit's own boards need it"
+	}
 	fmt.Fprintf(&b, "\n## Consuming\n\nNamespace `%s`: a board writes `<x-import component-from-global-scope=\"%s.<Component>\">`. "+
-		"A board loads, in this order: `tokens.css`, `components/bundle.css`, `components/bundle.js` (React 18.3.1 comes from the page).", ns, ns)
+		"A board loads, in this order: `tokens.css`, `components/bundle.css`, `components/bundle.js` (%s).", ns, ns, reactNote)
 	if root != "" {
 		fmt.Fprintf(&b, " Everything goes inside `%s.%s`", ns, root)
 		if root == "Root" {
@@ -992,6 +1140,9 @@ func DropSamples(folder, ns, root string, failed map[string]string) error {
 		for _, c := range cs {
 			co, _ := parseObj(c)
 			if why, bad := failed[co.str("id")]; bad {
+				if notAComponent(why) {
+					continue // a class or a factory the package exports: a board cannot place it
+				}
 				co.del("sample")
 				co.del("variants")
 				var todo []string
@@ -1022,4 +1173,15 @@ func DropSamples(folder, ns, root string, failed map[string]string) error {
 		return err
 	}
 	return os.WriteFile(filepath.Join(folder, "README.md"), []byte(head+body), 0o644)
+}
+
+// elementTypeProp is a prop that takes a component or a tag (component, as, ...): an empty object there makes React throw, and
+// the component draws by default without it.
+func elementTypeProp(p kitProp) bool {
+	return p.Type == "object" && (p.Name == "component" || p.Name == "as" || p.Name == "ref" || p.Name == "slots")
+}
+
+// notAComponent: the render's verdict says the export is a class or a constructor, not something React draws.
+func notAComponent(why string) bool {
+	return strings.Contains(why, "cannot be invoked without 'new'") || strings.Contains(why, "is not a constructor")
 }

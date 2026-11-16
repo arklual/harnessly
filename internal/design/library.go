@@ -117,6 +117,7 @@ type Library struct {
 	hashed     *hashIndex
 	pinned     pinnedState
 	kitPins    kitPinState
+	briefed    sync.Map
 	pageBuilds pageBuildState
 	// revs is the store's history when the library syncs with one (revisions.go); nil keeps the git history.
 	revs      atomic.Pointer[revisionsBox]

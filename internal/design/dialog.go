@@ -92,7 +92,7 @@ func (l *Library) ContinueInstructions(a *Artifact) string {
 			"- Do not create a canvas on claude.ai and do not publish anything until the person asks for it directly: the design lives in the project folder.",
 			"- Comments from the pane arrive as <annotation> blocks: template is the board file and line, rules are the rules, comment is what to change.",
 			"- Larger reworks go on a new board next to the original.",
-			"- After an edit, say briefly what you changed and on which board." + l.kitLine(a.ID),
+			"- After an edit, say briefly what you changed and on which board." + l.kitLine(a.ID) + l.kitBriefLine(a.ID),
 			"",
 		}, "\n")
 	}
@@ -108,9 +108,17 @@ func (l *Library) ContinueInstructions(a *Artifact) string {
 		"- Холст на claude.ai не создавай и ничего не публикуй, пока человек прямо не попросит: макет живёт в папке проекта.",
 		"- Комментарии из панели приходят блоками <annotation>: template — файл доски и строка, rules — правила, comment — что поменять.",
 		"- Крупные переделки — новой доской рядом с исходной. Тексты по-русски, «мероприятие», а не «событие».",
-		"- После правки коротко напиши, что поменял и на какой доске." + l.kitLine(a.ID),
+		"- После правки коротко напиши, что поменял и на какой доске." + l.kitLine(a.ID) + l.kitBriefLine(a.ID),
 		"",
 	}, "\n")
+}
+
+// kitBriefLine is the short block of a project on a kit, as lines of its own; "" without one.
+func (l *Library) kitBriefLine(project string) string {
+	if b := l.KitBrief(project); b != "" {
+		return "\n- " + b
+	}
+	return ""
 }
 
 // kitLine is where the agent finds the project's kit, which the project does not carry a copy of, as a line of its own

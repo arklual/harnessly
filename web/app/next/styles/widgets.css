@@ -20,8 +20,8 @@
 .hx-wgs-wrap[data-pop] {
   margin-left: auto;
   width: 288px;
-  padding: 6px;
-  border-radius: 20px;
+  padding: 4px;
+  border-radius: var(--hx-radius-lg);
   background: var(--hx-bg-raised);
   box-shadow:
     0 0 0 1px var(--hx-border),
@@ -34,7 +34,23 @@
 }
 .hx-wgs-wrap[data-pop] .hx-wgs__list {
   max-height: min(520px, calc(100dvh - 220px));
+  gap: 0;
+}
+/* In the popover the cards are its sections, not cards in a card: no frame of their own, a hairline between them. */
+.hx-wgs-wrap[data-pop] .hx-wg {
+  border-color: transparent;
   border-radius: 14px;
+  background: none;
+}
+.hx-wgs-wrap[data-pop] .hx-wg + .hx-wg::before {
+  content: '';
+  display: block;
+  height: 1px;
+  margin: 0 8px 4px;
+  background: var(--hx-border);
+}
+.hx-wgs-wrap[data-pop] .hx-wgs__foot {
+  padding: 2px 0 0;
 }
 .hx-side-below > * + .hx-wgs-wrap {
   margin-top: 8px;
@@ -48,12 +64,11 @@
 .hx-wgs__list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   max-height: calc(100dvh - var(--hx-side-h, 0px) - 240px);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
-  border-radius: 18px;
 }
 .hx-wgs__list:empty {
   display: none;
@@ -71,7 +86,7 @@
   height: 26px;
   padding: 0 10px 0 8px;
   border: 0;
-  border-radius: var(--hx-radius-pill);
+  border-radius: var(--hx-radius-full);
   background: transparent;
   color: var(--hx-fg-3);
   font-size: var(--hx-text-xs);
@@ -122,11 +137,9 @@
 .hx-wg {
   flex: none;
   padding: 4px;
-  border-radius: 18px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-lg);
   background: var(--hx-bg-raised);
-  box-shadow:
-    0 0 0 1px var(--hx-border),
-    var(--hx-shadow-sm);
   animation: hx-wg-in 320ms var(--hx-ease-out) backwards;
 }
 @keyframes hx-wg-in {
@@ -136,30 +149,28 @@
   }
 }
 .hx-wg[data-drag-on] {
-  box-shadow:
-    0 0 0 1px var(--hx-border-strong),
-    var(--hx-shadow-md);
+  border-color: var(--hx-border-strong);
 }
 .hx-wg__head {
   display: flex;
   align-items: center;
   gap: 2px;
-  min-height: 32px;
+  min-height: 30px;
 }
 .hx-wg__name {
   display: inline-flex;
   flex: 1;
   min-width: 0;
   align-items: center;
-  gap: 7px;
-  height: 32px;
+  gap: 8px;
+  height: 30px;
   padding: 0 8px;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--hx-radius-md);
   background: transparent;
   color: var(--hx-fg-1);
   font-size: var(--hx-text-sm);
-  font-weight: var(--hx-weight-semibold);
+  font-weight: var(--hx-weight-medium);
   text-align: left;
   cursor: pointer;
 }
@@ -248,7 +259,7 @@
 .hx-wg__wait {
   height: 36px;
   border-radius: 10px;
-  background: var(--hx-bg-subtle);
+  background: var(--hx-bg-hover);
   animation: hx-wg-wait 1.4s ease-in-out infinite;
 }
 @keyframes hx-wg-wait {
@@ -285,9 +296,12 @@
   font-size: var(--hx-text-xs);
   color: var(--hx-fg-3);
 }
+.hx-wgl__win small {
+  font-size: inherit;
+}
 .hx-wgl__win b {
   color: var(--hx-fg-1);
-  font-weight: var(--hx-weight-semibold);
+  font-weight: var(--hx-weight-medium);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -369,7 +383,7 @@
 .hx-wgn {
   display: block;
   width: 100%;
-  min-height: 56px;
+  min-height: 38px;
   max-height: 200px;
   padding: 0;
   border: 0;
@@ -394,9 +408,9 @@
 }
 .hx-wgc__big {
   color: var(--hx-fg-1);
-  font-size: 26px;
+  font-size: 24px;
   line-height: 30px;
-  font-weight: var(--hx-weight-semibold);
+  font-weight: var(--hx-weight-medium);
   font-variant-numeric: tabular-nums;
 }
 .hx-wgc__row {
@@ -410,14 +424,14 @@
   height: 26px;
   padding: 0 10px;
   border: 0;
-  border-radius: var(--hx-radius-pill);
-  background: var(--hx-bg-subtle);
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-hover);
   color: var(--hx-fg-2);
   font-size: var(--hx-text-xs);
   cursor: pointer;
 }
 .hx-wgc__btn:hover {
-  background: var(--hx-bg-hover);
+  background: var(--hx-bg-active);
   color: var(--hx-fg-1);
 }
 

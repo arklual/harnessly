@@ -71,6 +71,8 @@ type Store struct {
 	blobs filestore.BlobStore
 	// reader opens contents in every mode, also when the driver is lent by a test and blobs is cleared.
 	reader filestore.BlobStore
+	// index is the metadata in every mode, for the collection (RunGC).
+	index  filestore.MetaStore
 	key    []byte
 	db     Machines
 	admit  Admit
@@ -156,7 +158,7 @@ func Open(ctx context.Context, o Options) (*Store, error) {
 	}
 	s.srv = filestore.NewServer(s.meta, s.blobs, s.authorize)
 	s.srv.SetMaxUpload(cfg.Store.MaxUpload)
-	s.reader = s.blobs
+	s.reader, s.index = s.blobs, s.meta
 	if !owned {
 		s.meta, s.blobs = nil, nil
 	}

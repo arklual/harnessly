@@ -51,7 +51,14 @@ type designlyState struct {
 	// design's chats: its folder, a design named in a message or opened from the chat do not. The links of
 	// the older rule (attachedDesigns, the folder) are not read, and the next write of the file drops them.
 	CreatedFrom map[string]string `json:"createdFrom,omitempty"`
+	// Mockups are the boards the chats' mockups became, by design.MockupKey: a second press opens the board.
+	Mockups map[string]design.MockupBoard `json:"mockups,omitempty"`
+	// LastMockup is, by conversation, the project its last mockup went to: the next one goes there too.
+	LastMockup map[string]string `json:"lastMockup,omitempty"`
 }
+
+// mockupsMax bounds the boards of mockups kept; past it the record starts again (a press then makes a new board).
+const mockupsMax = 2000
 
 // createdFromMax bounds the record; the oldest conversations go first (map order is no age, so the cut is by id).
 const createdFromMax = 2000
@@ -472,7 +479,8 @@ func (d *v2Designly) Line(conv string, r wire.MessageRef) (string, wire.RefuseCo
 	case err != nil:
 		return "", wire.RefuseInternal
 	}
-	return lib.AttachedLine(art, rules), ""
+	// The chip a mockup's press put on the field names its board: the agent hears the mockup is that board now.
+	return lib.AttachedLine(art, rules) + lib.MockupNote(art, r.Target), ""
 }
 
 // v2Refs gives the conversations the library's designs once it is there (it is made after the runtime).
@@ -751,4 +759,70 @@ func (d *v2Designly) Systems(ctx context.Context) ([]wire.DesignSystemInfo, erro
 		out = append(out, s.info)
 	}
 	return out, nil
+}
+
+// mockupStore keeps which board each mockup became in the designly state file.
+type mockupStore struct{ d *v2Designly }
+
+func (m mockupStore) Mockup(key string) (design.MockupBoard, bool) {
+	b, ok := m.d.state().Mockups[key]
+	return b, ok
+}
+
+func (m mockupStore) SetMockup(key string, b design.MockupBoard) error {
+	return m.d.change(func(st *designlyState) {
+		if st.Mockups == nil || len(st.Mockups) >= mockupsMax {
+			st.Mockups = map[string]design.MockupBoard{}
+		}
+		st.Mockups[key] = b
+	})
+}
+
+// FromHTML makes a board of a mockup of conversation c.Conv's feed (POST /api/v2/designly/from-html): in
+// the design open beside the chat, the one the chat was started from or the one its last mockup went to, when the
+// person may edit it, else in a new project of theirs; the same mockup is the same board ever after. The chat's pane is
+// asked to show the board; the page puts the design on the chat's field, so the agent reads where the mockup now is.
+func (d *v2Designly) FromHTML(ctx context.Context, c wire.DesignlyFromHTML) (wire.DesignlyMockup, error) {
+	if d.v.rt == nil {
+		return wire.DesignlyMockup{}, designlyFail(wire.RefuseUnsupported, "no conversations", "")
+	}
+	if _, ok := d.v.rt.Record(c.Conv); !ok {
+		return wire.DesignlyMockup{}, designlyFail(wire.RefuseNotFound, locale.Pick("No such chat", "Нет такого чата"), "")
+	}
+	st := d.state()
+	lib := d.api.L
+	person := d.personOf(ctx)
+	// A deck, a video or a design system takes no board of a page's mockup.
+	fits := func(id string) bool {
+		k := kindOf(st, lib, id)
+		return k != wire.DesignSlides && k != wire.DesignVideo && k != wire.DesignDS
+	}
+	spec := design.MockupSpec{Conv: c.Conv, HTML: c.HTML, Title: c.Title, Person: person, Fits: fits,
+		Candidates: []string{c.Project, st.CreatedFrom[c.Conv], st.LastMockup[c.Conv]}}
+	b, err := lib.BoardOfMockup(spec, mockupStore{d})
+	if err != nil {
+		if errors.Is(err, design.ErrMockupEmpty) {
+			return wire.DesignlyMockup{}, designlyFail(wire.RefuseBadRequest, locale.Pick("The mockup is empty", "Макет пустой"), "")
+		}
+		var pe *design.PageError
+		if errors.As(err, &pe) {
+			return wire.DesignlyMockup{}, designlyFail(wire.RefuseBadRequest, pe.Msg, b.Project)
+		}
+		return wire.DesignlyMockup{}, createFailure(err)
+	}
+	if !b.Existing {
+		_ = d.change(func(st *designlyState) {
+			if st.LastMockup == nil || len(st.LastMockup) >= mockupsMax {
+				st.LastMockup = map[string]string{}
+			}
+			st.LastMockup[c.Conv] = b.Project
+			// A project made for the chat's mockup is the chat's design: its chats list it, and the next mockup goes there.
+			if b.NewProject {
+				st.Kinds[b.Project] = wire.DesignSite
+				markCreatedFrom(st, c.Conv, b.Project)
+			}
+		})
+	}
+	return wire.DesignlyMockup{Project: b.Project, ProjectTitle: b.ProjectTitle, Page: b.Page, File: b.File, Title: b.Title,
+		NewProject: b.NewProject, Existing: b.Existing, Opened: d.v.showDesign(c.Conv, b.Project, b.File) == nil}, nil
 }

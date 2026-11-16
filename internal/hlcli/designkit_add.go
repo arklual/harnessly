@@ -21,9 +21,18 @@ func (c *cli) kitAdd(opt kitOptions, pos []string) error {
 		return usageErr("%v", err)
 	}
 	o := kitadd.Options{Source: src, ID: opt.id, Namespace: opt.namespace, Title: opt.title, Version: opt.version,
-		Root: opt.root, Registry: opt.registry, From: opt.from}
+		Root: opt.root, React: opt.react, Registry: opt.registry, From: opt.from}
 	if len(pos) == 2 {
 		o.Folder = pos[1]
+	}
+	if opt.licenseSecret != "" {
+		vals, err := c.secretValues(map[string]string{"LICENSE": opt.licenseSecret}, nil)
+		if err != nil {
+			return err
+		}
+		if o.License = vals[opt.licenseSecret]; o.License == "" {
+			return fail("the safe has no secret %q (harnessly secret ask %s --why \"PrimeUI license for kit add\")", opt.licenseSecret, opt.licenseSecret)
+		}
 	}
 	return c.kitAddRun(opt, o)
 }
@@ -37,7 +46,7 @@ func (c *cli) kitUpdate(opt kitOptions, pos []string) error {
 	if err != nil {
 		return fail("%v", err)
 	}
-	o := kitadd.Options{Source: src, Folder: pos[0], Root: rec.Root, CSS: rec.CSS, Registry: rec.Registry, From: opt.from}
+	o := kitadd.Options{Source: src, Folder: pos[0], Root: rec.Root, React: rec.React, CSS: rec.CSS, Registry: rec.Registry, From: opt.from}
 	if opt.registry != "" {
 		o.Registry = opt.registry
 	}
@@ -54,6 +63,8 @@ func (c *cli) kitAddRun(opt kitOptions, o kitadd.Options) error {
 		o.CSS = strings.Split(opt.cssFiles, ",")
 	}
 	o.Cwd = c.env.Cwd
+	o.NoDraft = opt.noDraft
+	o.DraftOn = opt.draft
 	if o.Folder == "" {
 		o.Folder = o.ID
 		if o.Folder == "" {
@@ -75,6 +86,28 @@ func (c *cli) kitAddRun(opt kitOptions, o kitadd.Options) error {
 	}
 	var drawn, alone int
 	if !opt.noRender {
+		// The tokens a stylesheet cannot give (a theme built in JavaScript, calc() and color-mix()) are read from the kit
+		// drawn in the browser, before the components are drawn for the check.
+		if pr, perr := design.ProbeKit(o.Folder, design.KitProbeOptions{KitsDir: opt.dir}); perr != nil {
+			rep.NotCarried = append(rep.NotCarried, "tokens: the browser probe failed: "+firstOf(perr.Error()))
+		} else {
+			vars := make([]kitadd.ProbeVar, 0, len(pr.Vars))
+			for _, v := range pr.Vars {
+				vars = append(vars, kitadd.ProbeVar{Name: v.Name, Value: v.Value, Dark: v.Dark})
+			}
+			if n, aerr := kitadd.ApplyProbe(o.Folder, o.Title, vars); aerr != nil {
+				rep.NotCarried = append(rep.NotCarried, "tokens: "+firstOf(aerr.Error()))
+			} else if n > 0 {
+				rep.Tokens += n
+				kept := rep.NotCarried[:0]
+				for _, l := range rep.NotCarried {
+					if !strings.HasPrefix(l, "tokens: no CSS custom properties") && !strings.Contains(l, "defines no variables under") {
+						kept = append(kept, l)
+					}
+				}
+				rep.NotCarried = kept
+			}
+		}
 		items, rerr := design.RenderKit(o.Folder, design.KitRenderOptions{KitsDir: opt.dir})
 		if rerr != nil {
 			rep.NotCarried = append(rep.NotCarried, "render: "+rerr.Error()+" (run `kit check --render` where Chrome is)")
@@ -92,6 +125,31 @@ func (c *cli) kitAddRun(opt kitOptions, o kitadd.Options) error {
 						why = firstOf(it.Errors[0])
 					}
 					failed[it.ID] = why
+				}
+			}
+			// A component that draws nothing or throws alone gets up to three more samples (opened, with a text, with entries).
+			for attempt := 1; attempt <= 3 && len(failed) > 0; attempt++ {
+				var ids []string
+				for id := range failed {
+					ids = append(ids, id)
+				}
+				changed, terr := kitadd.RetrySamples(o.Folder, ids, attempt)
+				if terr != nil || len(changed) == 0 {
+					continue
+				}
+				only := map[string]bool{}
+				for _, id := range changed {
+					only[id] = true
+				}
+				again, aerr := design.RenderKit(o.Folder, design.KitRenderOptions{KitsDir: opt.dir, Only: only})
+				if aerr != nil {
+					break
+				}
+				for _, it := range again {
+					if it.Status == "ok" && only[it.ID] {
+						delete(failed, it.ID)
+						drawn++
+					}
 				}
 			}
 			alone = len(failed)

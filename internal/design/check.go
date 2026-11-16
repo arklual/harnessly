@@ -172,7 +172,7 @@ func shotStatus(errs, failed []string, blank bool) string {
 }
 
 func (l *Library) findChrome() string {
-	for _, c := range append([]string{l.cfg.Chrome}, chromeCandidates...) {
+	for _, c := range append([]string{l.cfg.Chrome, os.Getenv("RUNTIME_DESIGN_CHROME")}, chromeCandidates...) {
 		if c != "" {
 			if _, err := os.Stat(c); err == nil {
 				return c

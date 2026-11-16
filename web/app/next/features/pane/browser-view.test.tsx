@@ -193,6 +193,31 @@ describe('BrowserView: the tools of a page', () => {
     open.mockRestore();
   });
 
+  it('says why a press on the inert button does nothing, with a retry and a way to close', () => {
+    const onPickBlocked = vi.fn();
+    const onRetry = vi.fn();
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <BrowserView {...props({ address: 'stand.example.com', src: 'https://slot/x', onPickBlocked })} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Annotate the page' }));
+    expect(onPickBlocked).toHaveBeenCalledTimes(1);
+    rerender(
+      <BrowserView
+        {...props({
+          address: 'stand.example.com',
+          src: 'https://slot/x',
+          pickNote: { text: 'The page did not answer.', onRetry, onClose },
+        })}
+      />,
+    );
+    expect(screen.getByRole('alert').textContent).toContain('The page did not answer.');
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('stands a mark with its comment row, and the bar sends the marks', () => {
     const onCommit = vi.fn();
     const onSend = vi.fn();

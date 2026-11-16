@@ -27,13 +27,15 @@ const (
 
 func (c *cli) design(args []string) error {
 	if len(args) == 0 {
-		return usageErr("design needs a subcommand: check, code, page, notes, export, migrate, kit, pack, layouts, engine, timeline, moment, video, list, state, logs, panel, claim, release, who, history, restore, delete")
+		return usageErr("design needs a subcommand: new, check, code, page, notes, export, migrate, kit, pack, layouts, engine, timeline, moment, video, list, state, logs, panel, claim, release, who, history, restore, delete")
 	}
 	switch args[0] {
 	case "check":
 		return c.designCheck(args[1:])
 	case "code":
 		return c.designCode(args[1:])
+	case "new":
+		return c.designNew(args[1:])
 	case "page", "pages":
 		return c.designPage(args[1:])
 	case "notes", "note":
@@ -89,6 +91,7 @@ type pageAnswer struct {
 		Title string `json:"title"`
 		File  string `json:"file"`
 	} `json:"page"`
+	Brief string `json:"brief,omitempty"`
 }
 
 func (c *cli) designPage(args []string) error {
@@ -300,6 +303,58 @@ func (c *cli) pageCommand(body map[string]any, format string) error {
 		return err
 	}
 	c.out(format, out.Page.ID, out.Page.Title, out.Page.File)
+	if out.Brief != "" {
+		c.out("\n%s\n", out.Brief)
+	}
+	return nil
+}
+
+// designNew makes a project of the person's with a first page, from any chat: a mockup or a prototype is
+// drawn on a board of Sinopia Design, which the pane shows and whose logic runs, not in a file served from the chat's
+// folder. From a chat, the board opens in its pane.
+func (c *cli) designNew(args []string) error {
+	f, err := parseFlags(args, map[string]string{"page": "page", "p": "page", "kit": "kit"})
+	if err != nil {
+		return err
+	}
+	if len(f.pos) != 1 || strings.TrimSpace(f.pos[0]) == "" {
+		return usageErr("design new \"<project title>\" [--page \"<first page title>\"] [--kit ID[@VERSION][/THEME]]")
+	}
+	body := map[string]any{"action": "new", "title": f.pos[0]}
+	for _, k := range []string{"page", "kit"} {
+		if v, ok := f.values[k]; ok {
+			body[k] = v
+		}
+	}
+	if s := c.session(); s != "" {
+		body["session"] = s
+	}
+	raw, err := c.request(http.MethodPost, designPagesPath, nil, body)
+	if err != nil {
+		return err
+	}
+	if c.json {
+		c.printRaw(raw)
+		return nil
+	}
+	var out design.NewProject
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return err
+	}
+	c.out("Created project %s %q with page %q.\n", out.Project, out.Title, out.Page.Title)
+	c.out("Board: %s\n", out.Board)
+	if out.Kit != "" {
+		c.out("UI kit: %s (pinned: its components on the board are x-import component-from-global-scope=…; kit_component gives each one's import and props)\n", out.Kit)
+	}
+	if out.Brief != "" {
+		c.out("\n%s\n", out.Brief)
+	}
+	if out.Rules != "" {
+		c.out("Read the board format and rules before you write it: %s\n", out.Rules)
+	}
+	c.out("Write the screen into the board (markup in <x-dc>, logic in <script type=\"text/x-dc\" data-dc-script>, steps and states as data-props); "+
+		"more pages: harnessly design page create %s --title …; show it: harnessly design panel %s show --board %q\n",
+		out.Project, out.Project, out.Page.File)
 	return nil
 }
 
@@ -491,8 +546,44 @@ func (c *cli) hook(args []string) error {
 	}
 	if reason := c.leaseRefusal(raw); reason != "" {
 		_, _ = c.env.Stdout.Write(design.DenyAnswer(reason))
+		return nil
+	}
+	if reason := c.kitBriefRefusal(raw); reason != "" {
+		_, _ = c.env.Stdout.Write(design.DenyAnswer(reason))
 	}
 	return nil
+}
+
+// kitBriefRefusal stops the chat's first edit of a board of a project on a UI kit once and says what the kit is and how
+// to work on it, so an agent without memory of the kit draws from it. The retry goes through.
+func (c *cli) kitBriefRefusal(raw []byte) string {
+	var in design.GuardInput
+	if json.Unmarshal(raw, &in) != nil {
+		return ""
+	}
+	session := c.hookSession()
+	if session == "" {
+		return ""
+	}
+	seen := map[string]bool{}
+	for _, w := range design.BoardWrites(in) {
+		if seen[w.Project] {
+			continue
+		}
+		seen[w.Project] = true
+		status, body, err := c.call(http.MethodPost, designPagesPath, nil,
+			map[string]any{"action": "brief", "project": w.Project, "session": session, "pinned": true})
+		if err != nil || status != http.StatusOK {
+			continue
+		}
+		var out struct {
+			Brief string `json:"brief"`
+		}
+		if json.Unmarshal(body, &out) == nil && out.Brief != "" {
+			return out.Brief + "\n(This edit was held once so that you read this; repeat it after reading the kit.)"
+		}
+	}
+	return ""
 }
 
 // hookSession is the tab's session when the hook can tell it; "" outside a tab.

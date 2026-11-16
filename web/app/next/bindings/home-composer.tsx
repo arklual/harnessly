@@ -233,19 +233,20 @@ const HomeComposer = ({
 
   const onSubmit = useCallback(() => {
     if (creating) return;
+    // The voice button asked (VoiceStart): the chat starts empty unless something is typed, and its field begins the talk.
+    const talk = talkRef.current;
+    talkRef.current = false;
     if (plainTalk && gptExtra) {
       if (gptExtra.signIn) {
         toast(t('next.kind.talkSignIn'), { tone: 'info' });
         goTo({ kind: ROUTE.settings, section: 'accounts' });
         return;
       }
-      if (text.trim() === '') return;
-      gptExtra.onPick(gptExtra.models?.[0]?.id ?? null);
+      // «Разговор» by voice: the plain chat with the model is made (empty unless words are typed) and talks at once.
+      if (text.trim() === '' && !talk) return;
+      gptExtra.onPick(gptExtra.models?.[0]?.id ?? null, { voice: talk });
       return;
     }
-    // The voice button asked (VoiceStart): the chat starts empty unless something is typed, and its field begins the talk.
-    const talk = talkRef.current;
-    talkRef.current = false;
     // A talk's chat starts without a first message unless the field has something in it.
     const firstOf = (asTalk: boolean) =>
       !asTalk || text.trim() !== '' || uploads.ready.length > 0 || refs.length > 0;
@@ -467,11 +468,7 @@ const HomeComposer = ({
 
   return (
     <AttachmentSrc.Provider value={srcOf}>
-      <div
-        className="hx-dock"
-        data-creating={creating || undefined}
-        data-kind={plainTalk ? 'talk' : undefined}
-      >
+      <div className="hx-dock" data-creating={creating || undefined} data-kind={plainTalk ? 'talk' : 'task'}>
         {above}
         <div className="hx-enter" data-enter="up" data-eb="520" data-ed="700">
           <DockBar
@@ -487,8 +484,10 @@ const HomeComposer = ({
             mode="new"
             onStop={() => Promise.resolve()}
             placeholder={plainTalk ? t('next.kind.talkPlaceholder') : undefined}
+            // A talk puts the pill and the limits away (they fold, composer.tsx Tuck), not out of the field at once.
+            tucked={plainTalk}
             picker={
-              !plainTalk && choice
+              choice
                 ? {
                     value: choice,
                     agents,
@@ -519,9 +518,9 @@ const HomeComposer = ({
             onFiles={uploads.onFiles}
             onRemoveAttachment={uploads.onRemove}
             onRetryAttachment={uploads.onRetry}
-            tools={plainTalk ? null : <VoiceStart machine={machine} busy={creating} onStart={startTalk} />}
+            tools={<VoiceStart machine={machine} busy={creating} onStart={startTalk} />}
             {...voice}
-            limits={plainTalk ? null : limits}
+            limits={limits}
             maxText={machine ? limitsOf(machine).maxText : 0}
           />
         </div>

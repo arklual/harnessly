@@ -26,6 +26,25 @@ func v2Window(stats *history.Stats) func(p wire.Provider, sessionID, transcriptP
 	}
 }
 
+// v2Cost is what a Claude session cost by its statusline (cost.total_cost_usd), the figure Claude Code itself shows;
+// 0 for Codex, whose transcript has no price.
+func v2Cost(stats *history.Stats) func(p wire.Provider, sessionID string) float64 {
+	return func(p wire.Provider, sessionID string) float64 {
+		if p != wire.ProviderClaude || sessionID == "" {
+			return 0
+		}
+		st := stats.Read(sessionID)
+		if st == nil {
+			return 0
+		}
+		v, _ := st.Get("cost")
+		if f, ok := v.(float64); ok && f > 0 {
+			return f
+		}
+		return 0
+	}
+}
+
 func windowNum(o *jsvalue.Object, k string) int64 {
 	v, _ := o.Get(k)
 	if f, ok := v.(float64); ok && f > 0 {

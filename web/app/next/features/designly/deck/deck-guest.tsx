@@ -1,6 +1,10 @@
 // «По ссылке»: the deck as a guest sees it. Slides (the stage, a pager, pins of comments), full screen (black, a capsule
 // with «Выйти», ‹ n/N › and «Комментарий»), or the recording with its chapters. «Как откроется» of the link decides where
 // it starts. The guest page and the owner's «Как видит гость» both draw this; the owner's has «Назад» and no comments.
+// A slide's board is kept loaded once it was shown, and the others load ahead after the first is drawn (warm.ts, as the
+// owner's stage does since HRN-994/HRN-1238): the guest's frames have an opaque origin and no HTTP cache, so a frame
+// dropped at a turn loaded everything anew behind a white slot. A turn shows the next frame once its board says it is
+// drawn; until then the slide that was on screen stays.
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import DeckVideo, { type IDeckVideoChapter } from '@/next/features/designly/deck/deck-video';
 import { readDeckMessage, readPickedPoint } from '@/next/features/designly/deck/bridge';
@@ -9,6 +13,7 @@ import { DECK_OPENS, type TDeckOpens } from '@/next/features/designly/deck/types
 import { GUEST_KEY_CODE, readBridgeMessage } from '@/next/features/designly/page-bridge';
 import { pageOfLink, readPageGo } from '@/next/features/designly/page-link';
 import { useTouch } from '@/next/features/designly/guest/guest-full';
+import { DECK_KEEP_MAX, DECK_KEEP_PHONE, nextToWarm, warmOrder } from '@/next/features/designly/deck/warm';
 import Icon from '@/next/ui/icon';
 import { Button } from '@/next/ui/button';
 import { usePresence } from '@/next/ui/presence';
@@ -67,6 +72,28 @@ const POP_W = 320;
 const POP_H = 220;
 const SIZE_FALLBACK = { w: 1920, h: 1080 } as const;
 
+/** A board that loaded but does not say it is drawn (a failed script) is shown after this long, ms. */
+export const GUEST_PAINT_WAIT_MS = 3000;
+
+/** A slide's frame, kept loaded for its turn. */
+interface IGuestFrame {
+  src: string;
+  loaded: boolean;
+  /** The board said it is drawn (its `ready`), or did not in time: the frame can be on screen. */
+  drawn: boolean;
+  /** The board said `ready` and how many steps it has. */
+  said: boolean;
+  steps: number;
+}
+
+const freshFrame = (src: string): IGuestFrame => ({
+  src,
+  loaded: false,
+  drawn: false,
+  said: false,
+  steps: 0,
+});
+
 /** A key pressed while the guest writes is the field's. */
 const typingIn = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
@@ -109,15 +136,51 @@ const DeckGuest = ({
   const [draft, setDraft] = useState<IDraft | null>(null);
   const [menu, setMenu] = useState(false);
   const [sending, setSending] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  const [ready, setReady] = useState(false);
+  const [frames, setFrames] = useState<IGuestFrame[]>([]);
+  // The slide whose frame is on screen: the one that was there stays until the frame of the slide turned to is drawn.
+  const [shownSrc, setShownSrc] = useState<string | null>(null);
   const [step, setStep] = useState(0);
-  const [steps, setSteps] = useState(0);
   const wantLast = useRef(false);
   const [videoSlide, setVideoSlide] = useState<string | null>(null);
 
   const total = slides.length;
   const slide: IDeckGuestSlide | undefined = slides[index];
+  const cur = slide ? frames.find((f) => f.src === slide.src) : undefined;
+  const loaded = cur?.loaded ?? false;
+  const ready = cur?.said ?? false;
+  const steps = cur?.steps ?? 0;
+  const onTop = cur?.drawn ? cur.src : shownSrc;
+  // The slide turned to gets its frame; once it is on screen the others load ahead, the neighbours first, a few at a
+  // time, and those beyond what a guest's browser keeps go.
+  const ahead = slide
+    ? warmOrder(total, index)
+        .map((i) => slides[i]?.src)
+        .filter((src): src is string => typeof src === 'string' && src !== slide.src)
+        .slice(0, touch ? DECK_KEEP_PHONE : DECK_KEEP_MAX)
+    : [];
+  if (slide && !cur) setFrames([...frames, freshFrame(slide.src)]);
+  else if (slide && onTop === slide.src) {
+    const kept = frames.filter((f) => f.src === slide.src || ahead.includes(f.src));
+    const missing = nextToWarm(ahead, kept, slide.src);
+    if (kept.length !== frames.length || missing.length > 0) setFrames([...kept, ...missing.map(freshFrame)]);
+  }
+  if (cur?.drawn && shownSrc !== cur.src) setShownSrc(cur.src);
+  // A board that loaded and keeps silent is shown anyway.
+  const silentSrc = cur && cur.loaded && !cur.drawn ? cur.src : null;
+  useEffect(() => {
+    if (silentSrc === null) return;
+    const timer = setTimeout(
+      () => setFrames((list) => list.map((f) => (f.src === silentSrc ? { ...f, drawn: true } : f))),
+      GUEST_PAINT_WAIT_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [silentSrc]);
+  const elements = useRef(new Map<string, HTMLIFrameElement>());
+  const srcOf = (source: MessageEventSource | null) => {
+    if (source === null) return null;
+    for (const [src, el] of elements.current) if (el.contentWindow === source) return src;
+    return null;
+  };
   const inSlides = mode === MODE.slides;
   const isFull = full === FULL.on && inSlides;
   const canComment = comments !== null && inSlides;
@@ -129,15 +192,21 @@ const DeckGuest = ({
 
   // The board's own window is the only one listened to; its sandbox gives it no origin, so it is addressed as `*`.
   const post = (message: Record<string, unknown>) => frame.current?.contentWindow?.postMessage(message, '*');
+  const postTo = (src: string, message: Record<string, unknown>) =>
+    elements.current.get(src)?.contentWindow?.postMessage(message, '*');
 
   const go = (to: number) => {
     const next = Math.max(0, Math.min(total - 1, to));
     if (next === index) return;
+    // The board left stays loaded: it is told the guest stopped picking on it.
+    if (picking) post({ type: 'tk:pick', on: false });
+    const toFrame = frames.find((f) => f.src === slides[next]?.src);
     setIndex(next);
-    setLoaded(false);
-    setReady(false);
-    setStep(0);
-    setSteps(0);
+    // A board drawn before says its steps again only when it is reloaded: a turn back starts at its last step.
+    if (wantLast.current && toFrame?.said) {
+      wantLast.current = false;
+      setStep(toFrame.steps);
+    } else setStep(0);
     setDraft(null);
     setPicking(false);
   };
@@ -155,12 +224,14 @@ const DeckGuest = ({
 
   useEffect(() => {
     if (ready) post({ type: 'tk:deck-step', n: step });
-  }, [step, ready]);
-  // Turns the board's deck mode on and tells it what the page is doing; again whenever its script says it is there.
-  const sync = () => {
-    post({ type: 'tk:deck', on: true, mode: 'guest' });
-    post({ type: 'tk:pick', on: picking });
-    post({ type: 'tk:hold', on: comments !== null });
+  }, [step, ready, slide?.src]);
+  // Turns the board's deck mode on and tells it what the page is doing; again whenever its script says it is there. A
+  // board loaded ahead is told the same, so that it says when it is drawn, and is not picking.
+  const sync = (src: string | undefined = slide?.src) => {
+    if (src === undefined) return;
+    postTo(src, { type: 'tk:deck', on: true, mode: 'guest' });
+    postTo(src, { type: 'tk:pick', on: src === slide?.src && picking });
+    postTo(src, { type: 'tk:hold', on: comments !== null });
   };
   useEffect(() => {
     if (loaded) post({ type: 'tk:pick', on: picking });
@@ -201,20 +272,27 @@ const DeckGuest = ({
   };
 
   const onMessage = useEffectEvent((event: MessageEvent) => {
-    if (event.source === null || event.source !== frame.current?.contentWindow) return;
+    const from = srcOf(event.source);
+    if (from === null) return;
     const deck = readDeckMessage(event.data);
-    // A pick (a click while picking, or a held finger) reads as the deck's `held` too; here it opens the card below.
-    if (deck && deck.k !== 'held') {
-      if (deck.k === 'ready') {
-        setReady(true);
-        setSteps(deck.steps);
-        if (wantLast.current) {
-          wantLast.current = false;
-          setStep(deck.steps);
-        }
+    const top = from === slide?.src;
+    // A board loaded ahead is heard only for its `ready` and its script's start; what it says is kept for its turn.
+    if (deck?.k === 'ready') {
+      setFrames((list) =>
+        list.map((f) => (f.src === from ? { ...f, drawn: true, said: true, steps: deck.steps } : f)),
+      );
+      if (top && wantLast.current) {
+        wantLast.current = false;
+        setStep(deck.steps);
       }
       return;
     }
+    if (!top) {
+      if (readBridgeMessage(event.data)?.k === 'lib-ready') sync(from);
+      return;
+    }
+    // A pick (a click while picking, or a held finger) reads as the deck's `held` too; here it opens the card below.
+    if (deck && deck.k !== 'held') return;
     // A link of a slide to another slide of what was shared turns to it; any other page is not the guest's.
     const link = readPageGo(event.data);
     if (link) {
@@ -474,20 +552,29 @@ const DeckGuest = ({
           className="hx-deck-guest__slot"
           aria-label={slide ? t('next.deck.stage.slide', { n: index + 1 }) : undefined}
         >
-          {slide && (
-            <iframe
-              key={slide.id}
-              ref={frame}
-              className="hx-deck-guest__frame"
-              data-ready={loaded ? '1' : '0'}
-              src={slide.src}
-              title={slide.title}
-              onLoad={() => {
-                setLoaded(true);
-                sync();
-              }}
-            />
-          )}
+          {frames.map((f) => {
+            const isTop = f.src === slide?.src;
+            return (
+              <iframe
+                key={f.src}
+                ref={(el) => {
+                  if (el) elements.current.set(f.src, el);
+                  else elements.current.delete(f.src);
+                  if (isTop) frame.current = el;
+                }}
+                className="hx-deck-guest__frame"
+                data-ready={f.src === onTop ? '1' : '0'}
+                src={f.src}
+                title={slides.find((s) => s.src === f.src)?.title ?? ''}
+                tabIndex={isTop ? 0 : -1}
+                aria-hidden={isTop ? undefined : true}
+                onLoad={() => {
+                  setFrames((list) => list.map((x) => (x.src === f.src ? { ...x, loaded: true } : x)));
+                  sync(f.src);
+                }}
+              />
+            );
+          })}
           {pins.map((pin) => (
             <GuestPin key={pin.id} pin={pin} n={(comments?.pins.indexOf(pin) ?? 0) + 1} />
           ))}

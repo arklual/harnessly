@@ -217,6 +217,24 @@ func trackerPromptText() string {
 // designPromptText is how to hand over and show Sinopia Design projects: the design library is not in the agent's
 // folder, so the library's own guide is not loaded.
 const designPromptText = "## Sinopia Design\n\n" +
+	"A mockup, a prototype or a screen the person asks for (\"сделай макет\", \"прототип\", \"набросай экран\", " +
+	"\"сделай, чтобы кнопки работали\", steps, states) is a board of Sinopia Design, from any chat and any folder. " +
+	"Boards run their logic: buttons, steps and states work there and the person sees the board in the pane. " +
+	"Start one with `harnessly design new \"<title>\" --page \"<screen>\"` (or add a page to a project of `harnessly design list`: " +
+	"`harnessly design page create <project> --title …`); it prints the board's file and the rules of the format: read them, " +
+	"write the screen into that file (markup in `<x-dc>`, logic in a `DCLogic` class of `<script type=\"text/x-dc\" data-dc-script>`, " +
+	"steps and states as `data-props` switches), then `harnessly design panel <project> show --board <file>`. " +
+	"A screen or a page by a screenshot or a mockup on a UI kit installed on the machine is a board too: find the kit with " +
+	"`kit_list`, `kit_index`, `kit_search`, `kit_component` and `kit_tokens`, start with `harnessly design new \"<title>\" --kit <id>`, " +
+	"build it of the kit's real components (`<x-import component-from-global-scope=…>`, as `kit_component` gives them). " +
+	"A project on a kit is drawn only from it (the output of `design new` / `design page create` says which kit and how to check: " +
+	"`design check <project> --strict`, then `--board FILE` and look at the screenshot). A new design with no kit named while kits are " +
+	"installed: ask once with `notice_ask`, then `harnessly design kit use <project> <kit>|none`. " +
+	"Make its scenes (a sheet, a transition, a toast) `data-props` switches and handlers of the `DCLogic` class. " +
+	"Do not write a separate HTML file, build a separate app or start `python3 -m http.server`, a dev server or another localhost " +
+	"server to show a mockup. Only when the person asks for an app or the product's code is it code; even then offer the board " +
+	"as the prototype first and ask. If you still work outside Sinopia Design, the first line of your answer says why and asks " +
+	"\"Сделать то же доской Sinopia?\". An ```html block in the chat is only for a short static sketch: it runs no scripts.\n\n" +
 	"Design projects (boards, pages, decks) live in the design library, not in your folder; `harnessly design list` names them. " +
 	"When the person asks for a page as HTML or a file (\"дай HTML страницы\", \"скинь макет файлом\"), run " +
 	"`harnessly design export <project> \"<page>\"`: it builds one self-contained HTML (styles, fonts, pictures inside) and hands it over " +

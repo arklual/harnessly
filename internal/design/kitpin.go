@@ -293,8 +293,8 @@ func mountInside(root, dir string) string {
 		return ""
 	}
 	real, err := filepath.EvalSymlinks(dir)
-	if err != nil || !strings.HasPrefix(real, realRoot+string(filepath.Separator)) {
-		return ""
+	if err != nil || (real != realRoot && !strings.HasPrefix(real, realRoot+string(filepath.Separator))) {
+		return "" // a kit without themes mounts whole: the mount is its root
 	}
 	return real
 }
@@ -321,11 +321,13 @@ func (l *Library) SetKitPin(project string, pin *KitPin) error {
 	}
 	if pin == nil {
 		meta.raw.Delete(kitPinKey)
+		meta.Kits = mirrorKits(nil)
 	} else {
 		if !designkit.ValidID(pin.ID) || !designkit.ValidVersion(pin.Version) {
 			return errors.New("invalid kit pin")
 		}
 		meta.raw.Set(kitPinKey, pin.value())
+		meta.Kits = mirrorKits(pin)
 	}
 	_, err := l.writeProjectMeta(project, meta)
 	return err

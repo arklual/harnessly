@@ -1,0 +1,29 @@
+id: design-kit-add-angular
+title: Angular-библиотека в кит одной командой — kit add npm:@angular/material, без самописной сборки Angular и без ручного --root
+tags: [design, kits]
+timeout_s: 1200
+covers:
+  - 'skills/upstream/agent-skills/plugins/harnessly/skills/design-kit/**'
+  - 'internal/hlcli/designkit*.go'
+  - 'internal/designkit/kitadd/**'
+  - 'docs/agents/design-kits.md'
+prompt: >-
+  Нужен UI-кит для Sinopia из Angular Material (npm-пакет @angular/material): положи его в папку ./material-kit
+  так, чтобы по нему можно было собирать доски — компоненты, токены и описания.
+expect:
+  - name: made the kit with kit add
+    called: Bash
+    args: {command: '(?s).*harnessly design kit add\s+npm:@angular/material.*'}
+  - name: did not write a build script of its own
+    not_called: Write
+    args: {file_path: '(?i).*(build[-_]?kit|esbuild|webpack|vite|angular\.json).*'}
+  - name: checked the kit afterwards
+    called: Bash
+    args: {command: '(?s).*harnessly design kit check.*'}
+variants:
+  - id: v1
+    kind: short
+    text: "Сделай кит Sinopia из @angular/material в ./material-kit: компоненты, токены, описания."
+  - id: v2
+    kind: english
+    text: "Make a Sinopia design kit from the npm package @angular/material in ./material-kit: components, tokens and descriptions, ready to build boards from."

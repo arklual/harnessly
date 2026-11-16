@@ -127,7 +127,7 @@ func (c *cli) connectorsList(args []string) error {
 			names = append(names, sp.Title.En)
 		}
 		sort.Strings(names)
-		c.out("nothing is connected. The person can connect in Settings → Connections: %s\n", strings.Join(names, ", "))
+		c.out("nothing is connected. Tell the person to connect it in Settings → Connections (%s); do not look for mail programs, accounts or tokens on this machine, and do not try IMAP, SMTP or curl yourself.\n", strings.Join(names, ", "))
 		return nil
 	}
 	for _, conn := range out.Connections {

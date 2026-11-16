@@ -39,12 +39,17 @@ const strictMaxFile = 4 << 20
 
 // StrictOn says whether the project is checked in strict mode by its own setting ("project") or its kit's ("kit").
 func (l *Library) StrictOn(project string) string {
+	explicit := true
 	if o, ok := readSmallJSON(filepath.Join(l.MetaDir(project), MetaProjectFile)); ok {
-		if on, _ := get(o, "strict").(bool); on {
-			return "project"
+		if on, isBool := get(o, "strict").(bool); isBool {
+			if on {
+				return "project"
+			}
+			explicit = false
 		}
 	}
-	if c, err := l.strictCanvas(project); err == nil && c.Strict {
+	// A project on a kit is checked in strict mode unless it says "strict": false.
+	if c, err := l.strictCanvas(project); err == nil && (c.Strict || explicit) {
 		return "kit"
 	}
 	return ""

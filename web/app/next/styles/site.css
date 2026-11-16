@@ -37,8 +37,12 @@
   white-space: nowrap;
 }
 .hx-site__chat-title {
+  min-width: 0;
+  overflow: hidden;
   font-size: var(--hx-text-md);
   font-weight: var(--hx-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .hx-site__log {
   flex: 1;
@@ -2797,81 +2801,6 @@
   .hx-site__conv {
     transition: none;
   }
-}
-/* The switch of the design's chat in the column's head (features/designly/chat-switch.tsx). */
-.hx-chatswitch {
-  position: relative;
-  min-width: 0;
-}
-.hx-chatswitch__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  height: 30px;
-  padding: 0 8px;
-  margin-left: -8px;
-  border: 0;
-  border-radius: 10px;
-  background: none;
-  color: var(--hx-fg-1);
-  font: inherit;
-  font-size: var(--hx-text-md);
-  font-weight: var(--hx-weight-semibold);
-  cursor: pointer;
-  transition: background var(--hx-dur-md) var(--hx-ease-out);
-}
-.hx-chatswitch__btn:hover,
-.hx-chatswitch__btn[aria-expanded='true'] {
-  background: var(--hx-bg-hover);
-}
-.hx-chatswitch__title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hx-chatswitch__chev {
-  flex: none;
-  color: var(--hx-fg-3);
-  transition: transform 200ms var(--hx-ease-out);
-}
-.hx-chatswitch__btn[aria-expanded='true'] .hx-chatswitch__chev {
-  transform: rotate(180deg);
-}
-.hx-chatswitch__menu {
-  width: 300px;
-  max-height: min(420px, 60vh);
-  overflow-y: auto;
-  white-space: normal;
-}
-.hx-chatswitch__row {
-  min-height: 34px;
-}
-.hx-chatswitch__name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  font-size: var(--hx-text-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* Another machine's chat: its machine, quiet, before the time. */
-.hx-chatswitch__machine {
-  flex: none;
-  max-width: 96px;
-  overflow: hidden;
-  color: var(--hx-fg-3);
-  font-size: var(--hx-text-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hx-chatswitch__at {
-  flex: none;
-  color: var(--hx-fg-3);
-  font-size: var(--hx-text-xs);
-}
-.hx-site[data-mode='float'] .hx-chatswitch__btn {
-  font-size: var(--hx-text-sm);
 }
 /* The chat changed by the switch: the leaving feed fades down, the next one rises in. */
 .hx-site__conv > .hx-chat {

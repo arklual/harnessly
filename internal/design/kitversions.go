@@ -275,6 +275,8 @@ type ProjectKitState struct {
 	DraftProject string `json:"draftProject,omitempty"`
 	// KitDraftOf: the project is itself the draft of this kit.
 	KitDraftOf string `json:"kitDraftOf,omitempty"`
+	// Installed are the kits installed on the machine, for «Подключить UI-кит» of a project that has none.
+	Installed []string `json:"installed,omitempty"`
 }
 
 // ProjectKit is the project's kit, its newer version and its draft.
@@ -289,6 +291,9 @@ func (l *Library) ProjectKit(project string) ProjectKitState {
 	}
 	pin, ok := l.KitPinOf(project)
 	if !ok {
+		for _, k := range l.installedKits() {
+			st.Installed = append(st.Installed, k.ID)
+		}
 		return st
 	}
 	st.Pin = &pin
