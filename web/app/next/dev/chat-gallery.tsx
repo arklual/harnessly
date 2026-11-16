@@ -68,6 +68,7 @@ import QuestionCard from '@/next/features/questions/question-card';
 import type { Permission, PermissionScope, Question } from '@/next/features/questions/types';
 import { clearQuotes, editQuote, removeQuote, useQuotes, withQuotes } from '@/next/stores/quotes';
 import { useFeedKinds } from '@/next/stores/feed-kinds';
+import { conversationsStore, convsLoadedStore } from '@/next/stores/conversations';
 import { bindLaunch } from '@/next/ui/flight';
 import { PortalContext } from '@/next/ui/portal';
 import Segmented from '@/next/ui/segmented';
@@ -133,6 +134,88 @@ const tool = (
   ok,
   output: out === null ? null : { text: out, truncated: null },
 });
+
+/** A step with what the runtime tells of the call beyond its summary. */
+const toolCall = (
+  name: string,
+  summary: string,
+  at: Ms,
+  ok: boolean | null,
+  out: string | null,
+  call: ToolEntry['call'],
+): ToolEntry => ({ ...tool(name, summary, at, ok, out), call });
+
+const CM_DIR = 'S=/tmp/claude-995/-srv-acme-design-analytics-page/56e4efc7-2442-4d3d-b3f0-1c2a9e0f7d11';
+
+/** the steps of the screenshot — three runs of one script under a long path — and the other tools. */
+const actionSteps = (at: Ms): Entry[] => [
+  think('Code Mode пока не совместим с agent teams, поэтому перезапускаю без них.', at),
+  toolCall(
+    'Bash',
+    `$ ${CM_DIR}; cd $S && node bench.mjs --mode code`,
+    at,
+    true,
+    'run 31/33 ok\nrun 32/33 ok\nrun 33/33 ok\nCode Mode: 33 из 33, 412 с',
+    {
+      description: 'Гоняет Code Mode на 33 задачах',
+      command: `${CM_DIR}; cd $S && node bench.mjs --mode code`,
+      durationMs: 412_000,
+      lines: 19,
+      tail: 'run 32/33 ok\nrun 33/33 ok\nCode Mode: 33 из 33, 412 с',
+    },
+  ),
+  toolCall(
+    'Bash',
+    `$ ${CM_DIR}; jq '.usage' $S/transcript.jsonl | tail -3`,
+    at,
+    false,
+    'Exit code 2\njq: error (at <stdin>:14): Cannot index string with "usage"',
+    {
+      command: `${CM_DIR}; jq '.usage' $S/transcript.jsonl | tail -3`,
+      durationMs: 1_300,
+      exit: 2,
+      lines: 2,
+    },
+  ),
+  toolCall('Bash', `$ ${CM_DIR}; cd $S && node bench.mjs --mode plain`, at, null, null, {
+    description: 'Запускает обычный режим в тех же условиях',
+    command: `${CM_DIR}; cd $S && node bench.mjs --mode plain`,
+  }),
+  say('Code Mode прошёл все 33 из 33. Сейчас беру расход токенов и смотрю, где правка.', at),
+  toolCall('Read', 'Read /home/dev/projects/app/web/app/next/features/chat/steps.tsx', at, true, null, {
+    offset: 120,
+    limit: 61,
+    lines: 61,
+  }),
+  tool(
+    'Grep',
+    'Grep "toolView" → 3 results',
+    at,
+    true,
+    'Found 3 files\nsteps.tsx\nstep-view.test.ts\nturn.tsx',
+  ),
+  tool(
+    'Edit',
+    'Update web/app/next/features/chat/steps.tsx (+42, -11)',
+    at,
+    true,
+    'The file has been updated.',
+  ),
+  tool(
+    'mcp__plugin_acme-tracker_youtrack__search_issues',
+    'mcp__plugin_acme-tracker_youtrack__search_issues project: HRN Лента',
+    at,
+    true,
+    '[{"idReadable":"HRN-1522"}]',
+  ),
+  toolCall('Bash', '$ go test ./internal/feed', at, true, 'ok  \tgithub.com/example/feed\t9.7s', {
+    description: 'Проверяет ленту',
+    command: 'go test ./internal/feed',
+    durationMs: 9_700,
+    lines: 1,
+    tail: 'ok  \tgithub.com/example/feed\t9.7s',
+  }),
+];
 
 interface ITurnSpec {
   prompt: string | null;
@@ -962,6 +1045,54 @@ const delegatedChat = (
 });
 
 const SCENES: Record<string, { title: string; build: (now: Ms) => IScene }> = {
+  chatlinks: {
+    title: 'Ссылки на подчаты',
+    build: (now) => {
+      // one chat the answer names is there, the other was deleted.
+      const known = 'tab-vh0l85vgd' as ConvId;
+      conversationsStore.set(known, { id: known, title: 'Ресерч коннекторов' } as unknown as Conversation);
+      convsLoadedStore.set('gallery' as MachineId, true);
+      return {
+        items: [
+          turnOf({
+            prompt: 'Отдай ресерч коннекторов в подчат',
+            at: now - 3 * MIN,
+            minutes: 1,
+            steps: [],
+            answer:
+              'Запустил исследование в подчате [«Ресерч коннекторов»](tab-vh0l85vgd). Реализацию начну сразу после его отчёта.\n\n' +
+              'Тот же чат по ref машины: [ресерч](dev-department.example.com/tab-vh0l85vgd), и просто id: tab-vh0l85vgd.\n\n' +
+              'Старый подчат [«Черновик коннекторов»](tab-zz9gone00) уже удалён, а tab-zz9gone11 в тексте остаётся словом.',
+          }),
+        ],
+      };
+    },
+  },
+  actions: {
+    title: 'Действия агента',
+    build: (now) => ({
+      items: [
+        turnOf({
+          prompt: 'Сравни Code Mode с обычным режимом на тех же задачах',
+          at: now - 12 * MIN,
+          minutes: 9,
+          steps: actionSteps(now - 12 * MIN),
+          answer: 'Code Mode прошёл все 33 из 33. Обычный режим запущен в тех же условиях.',
+        }),
+        turnOf({
+          prompt: 'Собери пакет и проверь',
+          at: now - 2 * MIN,
+          status: 'live',
+          steps: [
+            toolCall('Bash', '$ pnpm --filter web build', now - 95_000, null, null, {
+              description: 'Собирает фронт',
+              command: 'cd /w/harnessly && pnpm --filter web build',
+            }),
+          ],
+        }),
+      ],
+    }),
+  },
   rich: {
     title: 'Диаграммы и HTML',
     build: (now) => ({

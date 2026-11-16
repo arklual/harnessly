@@ -66,7 +66,9 @@ export const useInheritedMade = (
         const list = outcome.value.items.filter((item) => item.from);
         // The same answer keeps the same list: a new one, even empty, redraws every turn of the feed.
         setMade((current) =>
-          current.conv === conv && sameMade(current.list, list) ? current : { conv, list: list.length ? list : NONE },
+          current.conv === conv && sameMade(current.list, list)
+            ? current
+            : { conv, list: list.length ? list : NONE },
         );
       });
     }, INHERITED_DEBOUNCE_MS);

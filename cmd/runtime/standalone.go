@@ -140,7 +140,7 @@ func hookFilesConfig(dataDir string) hooksetup.Config {
 		Budget:           hubMode(),
 		AppsLiveHook:     appsLiveHookCommand(),
 		StatusHookCLI:    statusHookCommand(),
-		VoiceGuardHook:   voiceGuardCommand(),
+		VoiceGuardHook:   voiceGuardCommand(dataDir),
 		Codex: &codex.LauncherScriptConfig{DataDirs: scriptDirs, PortFile: hooksetup.PortFile, TokenFile: hooksetup.TokenFile,
 			LaunchArgsPath: "/api/codex/launch-args", TokenHeaders: headers, TokenEnv: mcpTokenEnv()},
 	}

@@ -56,28 +56,32 @@ export const appForLink = (
   return null;
 };
 
-export const AppLinkParagraph = ({ href, children }: { href: string; children: ReactNode }) => {
+/** The card of the app on in the chat that claims the address, or nothing: the link's own text stays with the caller. */
+export const AppLinkCard = ({ href }: { href: string }) => {
   const host = useAppViewHost();
   const on = useConversation(host?.conversation ?? null)?.apps ?? [];
   const { list } = useInstalledApps(host?.machine ?? 'local', 0, host !== null && on.length > 0);
   const found = host && list ? appForLink(list.apps, on, href) : null;
+  if (!host || !list || !found) return null;
   return (
-    <>
-      <p>{children}</p>
-      {host && list && found && (
-        <div className="hx-appcard">
-          <AppFrame
-            machine={host.machine}
-            app={found.app}
-            view={found.view}
-            target="chat"
-            viewPort={list.viewPort}
-            conversation={host.conversation}
-            data={{ url: withoutQuery(href) }}
-            fit
-          />
-        </div>
-      )}
-    </>
+    <div className="hx-appcard">
+      <AppFrame
+        machine={host.machine}
+        app={found.app}
+        view={found.view}
+        target="chat"
+        viewPort={list.viewPort}
+        conversation={host.conversation}
+        data={{ url: withoutQuery(href) }}
+        fit
+      />
+    </div>
   );
 };
+
+export const AppLinkParagraph = ({ href, children }: { href: string; children: ReactNode }) => (
+  <>
+    <p>{children}</p>
+    <AppLinkCard href={href} />
+  </>
+);

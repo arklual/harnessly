@@ -4,6 +4,7 @@ import {
   navLayout,
   navSettingsOf,
   withHidden,
+  withPlaced,
   withRaised,
 } from '@/next/features/sidebar/nav-layout';
 
@@ -40,5 +41,24 @@ describe('navLayout: the sidebar menu as the person laid it out (HRN-1484)', () 
     });
     layout = withRaised(layout, 'harnessly.docs', false);
     expect(layout.apps).toEqual(['harnessly.docs', 'harnessly.boards']);
+  });
+  it('carries an app up to the main buttons and back by hand (HRN-1512)', () => {
+    let layout = navLayout(EMPTY, ITEMS, ['harnessly.boards', 'harnessly.docs', 'acme.notes']);
+    const up = withPlaced(layout, 'app:acme.notes', 'search', true);
+    expect(up?.top).toEqual(['newChat', 'search', 'app:acme.notes', 'designly', 'apps']);
+    expect(up?.apps).toEqual(['harnessly.boards', 'harnessly.docs']);
+    layout = up ?? layout;
+    const down = withPlaced(layout, 'app:acme.notes', 'app:harnessly.boards', false);
+    expect(down?.top).toEqual(['newChat', 'search', 'designly', 'apps']);
+    expect(down?.apps).toEqual(['acme.notes', 'harnessly.boards', 'harnessly.docs']);
+    expect(withPlaced(layout, 'search', 'app:harnessly.docs', false)).toBeNull();
+    expect(withPlaced(layout, 'search', 'newChat', true)).toBeNull();
+    expect(withPlaced(layout, 'newChat', 'designly', true)?.top).toEqual([
+      'search',
+      'app:acme.notes',
+      'designly',
+      'newChat',
+      'apps',
+    ]);
   });
 });

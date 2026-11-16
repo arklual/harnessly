@@ -30,6 +30,8 @@ export const SYNCED_PREFS = [
   'hx-next-new-chat-choice',
   'hx.next.quickPrompts',
   'hx-top-tabs',
+  'hx-looks',
+  'hx-widgets',
 ] as const;
 export type TSyncedPref = (typeof SYNCED_PREFS)[number];
 

@@ -36,7 +36,8 @@ export const digestScreen = (phrases: readonly IDigestPhrase[]): string => {
 /** «Да», «продолжай», «дальше», «давай»: go on reading. JS's \b knows no Cyrillic, hence the look-aheads. */
 const ON_RE = /^(да(?![а-яё])|ага|угу|давай|продолж|дальше|читай|поехали|ok|окей|хорошо|yes|go on|continue)/i;
 /** «Хватит», «стоп», «закончим», «всё»: end. */
-const STOP_RE = /^(нет(?![а-яё])|не надо|хватит|стоп|закончи|заканчива|всё(?![а-яё])|достаточно|пока(?![а-яё])|stop|enough|no\b)/i;
+const STOP_RE =
+  /^(нет(?![а-яё])|не надо|хватит|стоп|закончи|заканчива|всё(?![а-яё])|достаточно|пока(?![а-яё])|stop|enough|no\b)/i;
 
 export const DIGEST_SAID = { on: 'on', stop: 'stop', ask: 'ask' } as const;
 export type TDigestSaid = (typeof DIGEST_SAID)[keyof typeof DIGEST_SAID];

@@ -78,8 +78,9 @@ type Config struct {
 	// Primed hears the sizes of what a call started knowing (Primer.Sizes): the runtime journals them, never the words.
 	Primed func(route string, sizes map[string]int)
 	// Relayed hears how the machine's own connection of a call over the machine goes (relay.go): its states, the
-	// page joining, the frames counted; never the sound or the words.
-	Relayed func(level, text string)
+	// page joining, the frames counted; never the sound or the words. ctx is the call's start request, without its
+	// end: its scope (trace and chat) lets the chat's agent read the lines with its own journal tool.
+	Relayed func(ctx context.Context, level, text string)
 	// Live hears when a call opened from a chat begins (true) and ends (false): while it lasts, the chat's agent asks
 	// the person before it reaches outside (internal/voice/consent).
 	Live func(conv string, on bool)
@@ -116,9 +117,11 @@ var Models = map[string][]string{
 	RouteKey:          {"gpt-realtime-2.1", "gpt-realtime-2", "gpt-realtime", "gpt-realtime-mini"},
 }
 
-// Voices each route speaks with; the first is the default.
+// Voices each route speaks with; the first is the default. The subscription route speaks only ChatGPT's own voices:
+// with any other name (the API's marin, cedar, verse…) the call is made and answered, but OpenAI's media server
+// never answers a connectivity check, so the call dies with no error anywhere (live probes, 15.11).
 var Voices = map[string][]string{
-	RouteSubscription: {"cove", "marin", "cedar", "sage", "verse", "coral", "ash", "ballad", "alloy", "echo", "shimmer"},
+	RouteSubscription: {"cove", "arbor", "breeze", "ember", "juniper", "maple", "sol", "spruce", "vale"},
 	RouteKey:          {"marin", "cedar", "alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse"},
 }
 
@@ -381,7 +384,12 @@ func (s *Service) Start(ctx context.Context, in CallInput) (*Started, error) {
 	var rl *relay
 	if in.Relay {
 		var err error
-		if rl, err = newRelay(s.cfg.Relayed); err == nil {
+		var note func(level, text string)
+		if s.cfg.Relayed != nil {
+			scope := context.WithoutCancel(ctx)
+			note = func(level, text string) { s.cfg.Relayed(scope, level, text) }
+		}
+		if rl, err = newRelay(note); err == nil {
 			in.SDP, err = rl.offer(ctx)
 		}
 		if err != nil {
@@ -665,10 +673,10 @@ func (c *Call) run(s *Service) {
 				c.end("control socket refused")
 				return
 			}
-			wait := []time.Duration{100, 300, 800}
+			wait := []time.Duration{100 * time.Millisecond, 300 * time.Millisecond, 800 * time.Millisecond}
 			d := backoff
 			if status == http.StatusNotFound && attempt < len(wait) {
-				d = wait[attempt] * time.Millisecond
+				d = wait[attempt]
 			} else {
 				backoff = min(backoff*2, 5*time.Second)
 			}

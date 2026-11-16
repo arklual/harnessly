@@ -5,10 +5,21 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pinLocale } from '@/next/i18n';
 import ShotsStrip, { SHOTS_HEAD } from '@/next/features/background/shots-strip';
-import { IMAGE_VIEW_EXIT_MS, SWIPE_PX } from '@/next/ui/image-view';
+import { IMAGE_VIEW_EXIT_MS } from '@/next/ui/image-view';
 import type { Ms, Shot } from '@/next/protocol/v2';
 
-beforeAll(() => pinLocale('en'));
+beforeAll(() => {
+  pinLocale('en');
+  // The viewer's picture canvas (image-edit's zoom) fits itself by a ResizeObserver, which jsdom has not.
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+    },
+  );
+});
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
   cleanup();
@@ -66,48 +77,36 @@ describe('ShotsStrip', () => {
   });
 });
 
+// The viewer opens with the marks' tools on: the pen draws, so there is no caption and no swipe; the
+// pictures step by the side buttons and the arrows.
 describe('the viewer of the pictures', () => {
   const open = (container: HTMLElement, index: number) => fireEvent.click(squares(container)[index]);
   const dialog = () => screen.getByRole('dialog');
+  const shown = () => dialog().querySelector('img')?.getAttribute('src');
 
-  it('says which agent looked at the picture and when', () => {
+  it('opens on the picture it was clicked on', () => {
     const { container } = draw(shots(3));
     open(container, 1);
-    expect(dialog().textContent).toContain('page-1.png');
-    expect(dialog().textContent).toContain('Check the phone · 10 min');
-    expect(dialog().textContent).toContain('2 / 3');
-    expect(dialog().querySelector('img')?.getAttribute('src')).toBe('/shot/s1');
+    expect(shown()).toBe('/shot/s1');
   });
 
-  it('steps by the arrows, the side buttons and a swipe, round the ends', () => {
+  it('steps by the arrows and the side buttons, round the ends', () => {
     const { container } = draw(shots(3));
     open(container, 0);
-    expect(dialog().textContent).toContain('1 / 3');
+    expect(shown()).toBe('/shot/s0');
     fireEvent.keyDown(document, { key: 'ArrowRight' });
-    expect(dialog().textContent).toContain('2 / 3');
+    expect(shown()).toBe('/shot/s1');
     fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
-    expect(dialog().textContent).toContain('1 / 3');
-    // A finger moving left by SWIPE_PX steps on; mostly vertical movement does not.
-    fireEvent.pointerDown(dialog(), { clientX: 200, clientY: 300 });
-    fireEvent.pointerUp(dialog(), { clientX: 200 - SWIPE_PX - 10, clientY: 310 });
-    expect(dialog().textContent).toContain('2 / 3');
-    fireEvent.pointerDown(dialog(), { clientX: 200, clientY: 300 });
-    fireEvent.pointerUp(dialog(), { clientX: 130, clientY: 480 });
-    expect(dialog().textContent).toContain('2 / 3');
-    // A swipe right goes back, and past the first picture to the last.
-    fireEvent.pointerDown(dialog(), { clientX: 100, clientY: 300 });
-    fireEvent.pointerUp(dialog(), { clientX: 100 + SWIPE_PX + 10, clientY: 300 });
-    fireEvent.pointerDown(dialog(), { clientX: 100, clientY: 300 });
-    fireEvent.pointerUp(dialog(), { clientX: 100 + SWIPE_PX + 10, clientY: 300 });
-    expect(dialog().textContent).toContain('3 / 3');
+    expect(shown()).toBe('/shot/s0');
+    fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
+    expect(shown()).toBe('/shot/s2');
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(shown()).toBe('/shot/s0');
   });
 
-  it('closes with a closing phase, and a swipe is not a tap on the scrim', () => {
+  it('closes by Escape with a closing phase', () => {
     const { container } = draw(shots(3));
     open(container, 0);
-    fireEvent.pointerDown(dialog(), { clientX: 200, clientY: 300 });
-    fireEvent.pointerUp(dialog(), { clientX: 100, clientY: 300 });
-    fireEvent.click(dialog());
     expect(dialog().getAttribute('data-state')).toBe('open');
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(dialog().getAttribute('data-state')).toBe('closing');

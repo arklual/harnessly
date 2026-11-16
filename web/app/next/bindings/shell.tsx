@@ -101,6 +101,9 @@ import { usePaneOpen } from '@/next/bindings/pane-open';
 import { useChatScreen } from '@/next/bindings/use-chat-screen';
 import { useChatViewSync } from '@/next/bindings/use-chat-view-sync';
 import ChatStage from '@/next/features/shell/chat-stage';
+import LookLayer from '@/next/features/looks/look-layer';
+import AgentLooks from '@/next/features/looks/agent-looks';
+import LookSheet from '@/next/features/looks/look-sheet';
 import QuietChat from '@/next/bindings/quiet-chat';
 import { PHONE_QUERY } from '@/next/features/shell/gestures';
 import Greeting from '@/next/features/shell/greeting';
@@ -178,7 +181,7 @@ import { conversationsStore, useConversation, useConvsAnswered } from '@/next/st
 import NextChatPull from '@/next/features/chat/next-chat-pull';
 import usePaneEdgeSwipe from '@/next/features/shell/use-pane-edge-swipe';
 import { linkReason, useConnection } from '@/next/stores/connection';
-import { useMe } from '@/next/stores/me';
+import { patchSettings, useMe, type NavSettings } from '@/next/stores/me';
 import { useHomeMachine, useMachineLoad } from '@/next/stores/machines';
 import { useCentral } from '@/next/stores/central';
 import { useFeed } from '@/next/stores/conversation';
@@ -752,6 +755,12 @@ const LoadedChatHeader = ({ shown, ...props }: IChatHeaderProps & { shown: IShow
   );
 };
 
+/** The menu the person laid out by hand in the rail: kept in their settings, the same on every device. */
+const saveNav = async (nav: NavSettings): Promise<void> => {
+  const res = await patchSettings({ nav });
+  if (res.r !== 'accepted') throw new Error(res.r);
+};
+
 const Shell = ({ owner }: IShellProps) => {
   countRender('shell');
   const model = useShellModel();
@@ -1022,6 +1031,17 @@ const Shell = ({ owner }: IShellProps) => {
   useTurnSummaries();
   setHistoryPerson(owner || 'local');
 
+  // The machines whose agents may change the person's look (features/looks/agent-looks.tsx): the open one and the
+  // open chat's.
+  const lookMachines = useMemo(() => {
+    const out = new Set<string>();
+    if (model.active) out.add(model.active);
+    return [...out];
+  }, [model.active]);
+  const folderOfChat = useCallback(
+    (id: string) => model.chats?.find((item) => item.id === id)?.projectId ?? null,
+    [model.chats],
+  );
   const chat = useMemo(
     () => (currentId === null ? null : (model.chats?.find((item) => item.id === currentId) ?? null)),
     [currentId, model.chats],
@@ -1405,6 +1425,7 @@ const Shell = ({ owner }: IShellProps) => {
       people={<PeopleBlock machine={noV2 ? null : model.active} />}
       apps={sidebarApps}
       nav={me.k === 'ready' ? me.me.settings.nav : undefined}
+      onNav={saveNav}
       gpt={sidebarGpt}
       designs={
         workingDesigns && {
@@ -1804,6 +1825,11 @@ const Shell = ({ owner }: IShellProps) => {
           )}
         />
       )}
+      <LookLayer chatId={currentId} folderId={chat?.projectId ?? null} />
+      <LookSheet />
+      {lookMachines.map((machine) => (
+        <AgentLooks key={machine} machine={machine} folderOf={folderOfChat} />
+      ))}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.chat && (
         <ChatStage
           chatKey={stageId}

@@ -155,11 +155,21 @@
 .hx-net[data-kind='update'] .hx-net__icon {
   color: var(--hx-ink-fg);
 }
-/* Under «Нет связи» when both are up. */
-.hx-net ~ .hx-net[data-kind='update'],
-.hx-net ~ .hx-net[data-kind='release'],
-.hx-net ~ .hx-net[data-kind='rollout'] {
+/* Under «Нет связи» when both are up, whichever came first (the portal keeps them in the order they mounted). */
+:has(> .hx-net:not([data-kind]))
+  > .hx-net:is([data-kind='update'], [data-kind='release'], [data-kind='rollout']) {
   top: 58px;
+}
+/* Under the window's tab strip, not across its edge (HRN-1258 put «Версия от …» there too). */
+@media not all and (max-width: 900px) {
+  .hx-app[data-tabs] .hx-net {
+    top: calc(var(--hx-tabs-h) + 14px);
+  }
+  .hx-app[data-tabs]
+    :has(> .hx-net:not([data-kind]))
+    > .hx-net:is([data-kind='update'], [data-kind='release'], [data-kind='rollout']) {
+    top: calc(var(--hx-tabs-h) + 58px);
+  }
 }
 /* «Доступна версия»: the same pill, quieter than «Вышла новая версия»: links, not a button. */
 .hx-net[data-kind='release'] {

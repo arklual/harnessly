@@ -5,7 +5,7 @@
 // first words sent from the field or from the view (`hl.chat.send`) make the chat, with the app on in it. The strip's
 // «…» holds the app's rights, the debug section of a dev install and turning the app off in the chat.
 import { useSpaceDir } from '@/next/features/space-field/space-dir';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import AppAsks from '@/next/features/app-views/asks';
 import AppFrame, { fromApp } from '@/next/features/app-views/app-frame';
 import AppUnavailable from '@/next/features/app-views/app-unavailable';
@@ -31,6 +31,7 @@ import { onOpenAppTab } from '@/next/features/app-views/open';
 import { keptFrames } from '@/next/features/app-views/kept-frames';
 import { parseAppTarget } from '@/next/features/app-views/target';
 import type { IAppMenuItem } from '@/next/features/app-main/app-menu';
+import type { IHostAction } from '@/next/features/app-views/bridge';
 import AppStage, { appStageDesign } from '@/next/features/app-main/app-stage';
 import type { TChatOpeners } from '@/next/bindings/chat-view';
 import { startFolder } from '@/next/bindings/home-composer';
@@ -48,6 +49,7 @@ import { appBasePath } from '@/platform/config';
 import { DOCS_APP, docsReaderPath } from '@/platform/router';
 import { claimSpaceOpens } from '@/next/features/pane/space-claim';
 import { BOARDS_APP } from '@/next/features/pane/board-link';
+import ObjectShare, { type TShareKind } from '@/next/features/app-main/object-share';
 import { cardKindOf, cardSlugOf } from '@/next/features/chat/link-card';
 import { t } from '@/next/i18n';
 import { useAppsDebug } from '@/next/features/app-views/debug-mode';
@@ -86,6 +88,11 @@ interface IAppStagePageProps extends Omit<IAppMainPageProps, 'machine'>, IStageA
 
 /** The space that opens each kind of our links. */
 const SPACE_OF_CARD = { board: BOARDS_APP, doc: DOCS_APP } as const;
+/** What «Поделиться» shares in each app of the boards and documents. */
+const SHARE_KIND = { [BOARDS_APP]: 'board', [DOCS_APP]: 'artifact' } as const satisfies Record<
+  string,
+  TShareKind
+>;
 
 /** The one layout of the spaces' chat window, whichever space is open. */
 const SPACE_LAYOUT = 'app:spaces';
@@ -96,6 +103,12 @@ const openInView = new Map<string, string>();
 /** The data a space's window is given: what to open in it, and the thread on it (a mention in the bell). */
 const useSpaceData = (opens: string | null, thread: string | null) =>
   useMemo(() => (opens ? { object: opens, ...(thread ? { thread } : {}) } : undefined), [opens, thread]);
+
+/** What the host's own strip offers, for a view that draws its own bar instead. */
+interface IHostActions {
+  actions: readonly IHostAction[];
+  run: (id: string) => void;
+}
 
 interface IStageFrameProps extends IStageApp {
   machine: MachineId;
@@ -111,7 +124,11 @@ interface IStageFrameProps extends IStageApp {
   /** The page's calls, the same for every window: each window names itself. */
   sendFrom: (name: string, text: string) => Promise<void>;
   goIn: (app: string, object: string | null) => void;
+  /** `hl.pane.open('share:<slug>')` of a view: «Поделиться» of one of its objects. */
+  shareObject: (app: string, slug: string) => void;
   publish?: (app: string, data: unknown, frame: DOMRect | null) => void;
+  /** The host's actions for a view that draws its own bar, read when the view asks. */
+  host: RefObject<IHostActions>;
 }
 
 /** One app's window on the stage: its view, or why its service does not open now. */
@@ -130,14 +147,21 @@ const StageFrame = ({
   thread,
   sendFrom,
   goIn,
+  shareObject,
   publish,
+  host,
 }: IStageFrameProps) => {
   // Handlers that never change for the window: its bridge keeps the port it shook hands on.
   const handlers = useMemo(
-    () => ({ chatSend: (text: string) => sendFrom(app.name, text) }),
-    [sendFrom, app.name],
+    () => ({
+      chatSend: (text: string) => sendFrom(app.name, text),
+      hostActions: () => host.current.actions,
+      hostRun: (id: string) => host.current.run(id),
+    }),
+    [sendFrom, app.name, host],
   );
   const onOpenObject = useCallback((to: string | null) => goIn(app.id, to), [goIn, app.id]);
+  const onShareObject = useCallback((slug: string) => shareObject(app.id, slug), [shareObject, app.id]);
   const onPublish = useMemo(
     () => (publish ? (data: unknown, frame: DOMRect | null) => publish(app.id, data, frame) : undefined),
     [publish, app.id],
@@ -170,6 +194,7 @@ const StageFrame = ({
           data={data}
           handlers={handlers}
           onOpenObject={onOpenObject}
+          onShareObject={onShareObject}
           skeleton={space ? <SpaceSkeleton object={object !== null} /> : undefined}
           onPublish={onPublish}
         />
@@ -368,9 +393,21 @@ const AppStagePage = ({
     else now.fill?.(text);
   }, []);
 
+  // The page's own base (/m/<machine> on the hub) goes into the link, as the chat's «Скопировать ссылку» does.
+  const appLink = `${window.location.origin}${appBasePath()}${routePath({ kind: ROUTE.app, id, ...(object ? { object } : {}) })}`;
+  // A board or a document is shared as in Sinopia, with its people and links; the app's home and other apps
+  // copy the link to the app.
+  const [sharing, setSharing] = useState<{ kind: TShareKind; slug: string } | null>(null);
+  const shareObject = useCallback((appId: string, slug: string) => {
+    const kind = SHARE_KIND[appId as keyof typeof SHARE_KIND];
+    if (kind) setSharing({ kind, slug });
+  }, []);
   const share = () => {
-    // The page's own base (/m/<machine> on the hub) goes into the link, as the chat's «Скопировать ссылку» does.
-    const link = `${window.location.origin}${appBasePath()}${routePath({ kind: ROUTE.app, id, ...(object ? { object } : {}) })}`;
+    if (object && (id === BOARDS_APP || id === DOCS_APP)) {
+      shareObject(id, object);
+      return;
+    }
+    const link = appLink;
     navigator.clipboard.writeText(link).then(
       () => toast(t('next.appmain.shared'), { description: t('next.appmain.sharedHint') }),
       () => toast(t('next.appmain.shareFailed'), { tone: 'error', description: link }),
@@ -423,9 +460,41 @@ const AppStagePage = ({
       : []),
   ];
 
+  // A space, or a view that draws its own bar, shows no strip of the host: the view shows these actions in its own bar.
+  const bare = space || (target === 'app' && view.chrome === 'none');
+  const host = useRef<IHostActions>({ actions: [], run: () => undefined });
+  useLayoutEffect(() => {
+    const items = [
+      { id: 'share', label: t('next.appmain.share'), icon: 'share', run: share },
+      ...(toolPane
+        ? [
+            {
+              id: 'pane',
+              label: t('next.header.pane'),
+              icon: 'panel-right',
+              pressed: toolPane.open,
+              run: toolPane.onToggle,
+            },
+          ]
+        : []),
+      ...menu.map((m) => ({
+        id: m.id,
+        label: m.label,
+        icon: m.icon,
+        ...(m.danger ? { danger: true } : {}),
+        run: m.onSelect,
+      })),
+    ];
+    host.current = {
+      actions: items.map(({ run: _run, ...action }) => action),
+      run: (id) => items.find((i) => i.id === id)?.run(),
+    };
+  });
+
   return (
     <>
       <AppStage
+        bare={bare}
         title={object ?? (space ? app.name : t('next.appmain.home'))}
         onBack={object ? () => go(null) : undefined}
         stage={stage}
@@ -453,7 +522,9 @@ const AppStagePage = ({
               thread={shown ? (thread ?? null) : null}
               sendFrom={sendFrom}
               goIn={goIn}
+              shareObject={shareObject}
               publish={space ? publish : undefined}
+              host={host}
             />
           );
         })}
@@ -473,6 +544,16 @@ const AppStagePage = ({
         }
       />
       <AppAsks machine={machine} conversation={conv} />
+      {sharing && (
+        <ObjectShare
+          key={`${sharing.kind}:${sharing.slug}`}
+          kind={sharing.kind}
+          slug={sharing.slug}
+          open
+          onClose={() => setSharing(null)}
+          fallbackLink={appLink}
+        />
+      )}
     </>
   );
 };

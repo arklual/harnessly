@@ -488,11 +488,10 @@ const steerScenario = async (text: string, name: string) => {
   await startLongTask(`a long task before ${text}`);
   const stop = await watchBubble(text);
   await input.fill(text);
-  await input.press('Control+Enter');
+  // Enter into a working agent goes straight into its turn; the handed row says nothing more.
+  await input.press('Enter');
   await expect(stack.filter({ hasText: text })).toHaveCount(1, { timeout: 8_000 });
-  await expect(stack.filter({ hasText: text })).toContainText(
-    "In the agent's queue — read after the current step",
-  );
+  await expect(stack.filter({ hasText: text }).locator('.hx-queue__note')).toHaveCount(0);
   await shot(`${name}-stack`);
   await expect(feed().getByText(text, { exact: true })).toHaveCount(1, { timeout: 30_000 });
   await expect(stack).toHaveCount(0);
@@ -505,13 +504,14 @@ const steerScenario = async (text: string, name: string) => {
   expectSteady(await stop(), 'stack-then-feed');
 };
 
-/** Enter into the working agent: it stands in the stack till the turn ends, then it is a turn of its own, below. */
+/** ⌃↵ into the working agent: it stands in the stack till the turn ends, then it is a turn of its own, below. */
 const queueScenario = async (text: string, name: string) => {
   const { input, stack } = stage();
   await startLongTask(`a long task before ${text}`);
   const stop = await watchBubble(text);
   await input.fill(text);
-  await input.press('Enter');
+  // ⌃↵ is «after the turn»; Enter would hand it into the turn.
+  await input.press('Control+Enter');
   await expect(stack.filter({ hasText: text })).toHaveCount(1, { timeout: 8_000 });
   // The row is the message, a pencil and a bin: no note, no «Now».
   const row = stack.filter({ hasText: text });
@@ -542,7 +542,7 @@ test('3c. «right now» while the agent works waits over the field «handed» an
   await steerScenario('steer this', 'steer');
 });
 
-test('3c2. Enter while the agent works puts the message in the stack; it goes when the turn ends and stands once below the reply, never in between', async () => {
+test('3c2. ⌃↵ while the agent works puts the message in the stack; it goes when the turn ends and stands once below the reply, never in between', async () => {
   await queueScenario('then this', 'queue');
 });
 

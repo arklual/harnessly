@@ -102,8 +102,12 @@ const preloadShell = (): Plugin => ({
       }
       const present = (file: string) => html.includes(`/${file}"`);
       const links = [
-        ...[...css].filter((file) => !present(file)).map((file) => `<link rel="preload" as="style" crossorigin href="./${file}">`),
-        ...[...js].filter((file) => !present(file)).map((file) => `<link rel="modulepreload" crossorigin href="./${file}">`),
+        ...[...css]
+          .filter((file) => !present(file))
+          .map((file) => `<link rel="preload" as="style" crossorigin href="./${file}">`),
+        ...[...js]
+          .filter((file) => !present(file))
+          .map((file) => `<link rel="modulepreload" crossorigin href="./${file}">`),
       ];
       return links.length === 0 ? html : html.replace('</head>', `${links.join('\n')}\n</head>`);
     },

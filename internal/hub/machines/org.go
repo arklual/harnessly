@@ -94,6 +94,9 @@ type HubMachine struct {
 	Managed *ManagedView `json:"managed"`
 	// ActiveOps are the operations running on the machine.
 	ActiveOps []OpView `json:"activeOps"`
+	// CanSeeDebug says the viewer may read the machine's openings for debugging (MaySeeDebug); set by the list that
+	// knows the viewer, false elsewhere.
+	CanSeeDebug bool `json:"canSeeDebug"`
 }
 
 // orgsOn says whether the person gets the organizations' API (HUB_ORGS: off is nobody).

@@ -118,7 +118,8 @@ const TurnEnd = ({ item, handlers }: { item: TurnItem; handlers: ITurnHandlers }
       </div>
     );
   }
-  if (turn.status !== 'failed') return null;
+  // A restart cut it short and the runtime goes on by itself: the auto line under it is the one status.
+  if (turn.status !== 'failed' || item.wentOn) return null;
   const code = turn.failure?.code ?? 'unknown';
   if (code === 'rate-limit') {
     // The usage limit is no breakdown: the limit card under the feed says when the agent goes on and offers the

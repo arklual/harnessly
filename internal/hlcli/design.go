@@ -283,6 +283,10 @@ func (c *cli) pageCheck(project string) error {
 }
 
 func (c *cli) pageCommand(body map[string]any, format string) error {
+	if s := c.session(); s != "" && body["action"] == "create" {
+		// From a chat, the new board opens in its pane.
+		body["session"] = s
+	}
 	raw, err := c.request(http.MethodPost, designPagesPath, nil, body)
 	if err != nil {
 		return err
@@ -447,6 +451,9 @@ func (c *cli) hook(args []string) error {
 	}
 	if len(args) == 5 && args[0] == "app-validate" && args[1] == "--policy" && args[3] == "--event" {
 		return c.appValidateHook(args[2], args[4])
+	}
+	if len(args) == 1 && args[0] == "role-guard" {
+		return c.roleGuard()
 	}
 	if len(args) == 1 && args[0] == "voice-guard" {
 		return c.voiceGuard(false)

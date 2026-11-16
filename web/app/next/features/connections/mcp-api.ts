@@ -31,6 +31,21 @@ export const MCP_REASONS = [
 export const MCP_AUTH = { oauth: 'oauth', header: 'header', none: 'none' } as const;
 export type TMcpAuth = (typeof MCP_AUTH)[keyof typeof MCP_AUTH];
 
+/** The catalog's groups in the order the page shows them (mcpconn.Kinds). */
+export const MCP_KINDS = [
+  'mail',
+  'calendar',
+  'meetings',
+  'tasks',
+  'docs',
+  'code',
+  'monitoring',
+  'support',
+  'payments',
+  'sites',
+] as const;
+export type TMcpKind = (typeof MCP_KINDS)[number];
+
 export const MCP_TRANSPORT = { http: 'http', sse: 'sse' } as const;
 export type TMcpTransport = (typeof MCP_TRANSPORT)[keyof typeof MCP_TRANSPORT];
 
@@ -72,11 +87,15 @@ export interface IMcpServer {
 export interface IMcpCatalogEntry {
   id: string;
   name: string;
+  /** Its group on the page. */
+  kind: TMcpKind;
   url: string;
   transport: TMcpTransport;
   /** The sign-in the entry expects; connecting probes anyway, so a wrong hint corrects itself. */
   auth: TMcpAuth;
   headerName: string;
+  /** Goes before a bare token in Authorization instead of «Bearer » («OAuth » for Yandex 360); empty for Bearer. */
+  tokenPrefix: string;
   tokenUrl: string;
   docsUrl: string;
   blurb: string;
@@ -101,6 +120,11 @@ export interface IMcpList {
 const auth = (v: unknown): TMcpAuth => {
   if (v === MCP_AUTH.oauth || v === MCP_AUTH.header || v === MCP_AUTH.none) return v;
   throw new Error('connections: mcp auth');
+};
+const kind = (v: unknown): TMcpKind => {
+  const found = MCP_KINDS.find((item) => item === v);
+  if (found === undefined) throw new Error('connections: mcp catalog kind');
+  return found;
 };
 /** An omitted transport is streamable HTTP. */
 const transport = (v: unknown): TMcpTransport => {
@@ -138,10 +162,12 @@ export const readMcpCatalogEntry = (v: unknown): IMcpCatalogEntry => {
   return {
     id: str(o.id, 'id'),
     name: str(o.name, 'name'),
+    kind: kind(o.kind),
     url: str(o.url, 'url'),
     transport: transport(o.transport),
     auth: auth(o.auth),
     headerName: optStr(o.headerName, 'headerName'),
+    tokenPrefix: optStr(o.tokenPrefix, 'tokenPrefix'),
     tokenUrl: optStr(o.tokenUrl, 'tokenUrl'),
     docsUrl: optStr(o.docsUrl, 'docsUrl'),
     blurb: optStr(o.blurb, 'blurb'),

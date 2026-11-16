@@ -7,7 +7,7 @@ import { ACCESS, useProjectAccess } from '@/next/features/designly/access/use-ac
 import { docRef } from '@/next/features/designly/access/api';
 import ResourceShare from '@/next/features/designly/access/resource-share';
 import ShareDialog from '@/next/features/designly/access/share-dialog';
-import { useResourceView } from '@/next/features/designly/access/use-resource';
+import { isResourceView, useResourceView } from '@/next/features/designly/access/use-resource';
 import { shareFileAsDoc, unlinkFileDoc, type IFileDoc } from '@/next/features/filedoc/api';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { Button } from '@/next/ui/button';
@@ -84,8 +84,7 @@ const Dialog = ({ machine, conv, path, open, onClose, doc, onDoc }: IDialogProps
       <span>{t('next.share.unlink')}</span>
     </button>
   );
-  const one =
-    shared.state !== null && shared.state !== 'absent' && shared.state.owner !== null ? shared.state : null;
+  const one = isResourceView(shared.state) && shared.state.owner !== null ? shared.state : null;
   if (one) {
     return (
       <ResourceShare

@@ -56,6 +56,8 @@ type PrefsSettings struct {
 var PrefKeys = []string{
 	"hl-theme", "hl-palette", "hl:beta", "hl:feed-kinds", "hl:pane-auto-open", "hl:browser-agent",
 	"hx-show-test-chats", "voice.lang", "hx-next-new-chat-choice", "hx.next.quickPrompts", "hx-top-tabs",
+	"hx-looks",
+	"hx-widgets",
 }
 
 // Limit of one value of Prefs.

@@ -106,9 +106,6 @@ html[data-theme='dark'] .hx-conn-glyph[data-kind='outline'] {
 .hx-conn-glyph[data-mcp='huggingface'] {
   --hx-conn-c: #ff9d00;
 }
-.hx-conn-glyph[data-mcp='figma'] {
-  --hx-conn-c: #a259ff;
-}
 .hx-conn-glyph[data-mcp='intercom'] {
   --hx-conn-c: #1f8ded;
 }
@@ -121,18 +118,51 @@ html[data-theme='dark'] .hx-conn-glyph[data-kind='outline'] {
 .hx-conn-glyph[data-mcp='paypal'] {
   --hx-conn-c: #003087;
 }
+.hx-conn-glyph[data-mcp='gitlab'] {
+  --hx-conn-c: #fc6d26;
+}
+.hx-conn-glyph[data-mcp='cloudflare'] {
+  --hx-conn-c: #f38020;
+}
+.hx-conn-glyph[data-mcp='todoist'] {
+  --hx-conn-c: #e44332;
+}
+.hx-conn-glyph[data-mcp='calendly'] {
+  --hx-conn-c: #006bff;
+}
+.hx-conn-glyph[data-mcp='pagerduty'] {
+  --hx-conn-c: #06ac38;
+}
+.hx-conn-glyph[data-mcp='wix'] {
+  --hx-conn-c: #0c6efc;
+}
+.hx-conn-glyph[data-mcp='airtable'] {
+  --hx-conn-c: #18bfff;
+}
+.hx-conn-glyph[data-mcp='fireflies'] {
+  --hx-conn-c: #6b3aed;
+}
+.hx-conn-glyph[data-mcp='granola'] {
+  --hx-conn-c: #2f6b3f;
+}
+.hx-conn-glyph[data-mcp='yandex-mail'],
+.hx-conn-glyph[data-mcp='yandex-calendar'] {
+  --hx-conn-c: #fc3f1d;
+}
 .hx-conn-glyph[data-mcp='github'],
 .hx-conn-glyph[data-mcp='context7'],
 .hx-conn-glyph[data-mcp='notion'],
 .hx-conn-glyph[data-mcp='vercel'],
-.hx-conn-glyph[data-mcp='square'] {
+.hx-conn-glyph[data-mcp='calcom'],
+.hx-conn-glyph[data-mcp='posthog'] {
   --hx-conn-c: #24292f;
 }
 html[data-theme='dark'] .hx-conn-glyph[data-mcp='github'],
 html[data-theme='dark'] .hx-conn-glyph[data-mcp='context7'],
 html[data-theme='dark'] .hx-conn-glyph[data-mcp='notion'],
 html[data-theme='dark'] .hx-conn-glyph[data-mcp='vercel'],
-html[data-theme='dark'] .hx-conn-glyph[data-mcp='square'] {
+html[data-theme='dark'] .hx-conn-glyph[data-mcp='calcom'],
+html[data-theme='dark'] .hx-conn-glyph[data-mcp='posthog'] {
   --hx-conn-c: #e6e8eb;
   color: #16181d;
 }
@@ -588,6 +618,42 @@ html[data-theme='dark'] .hx-conn-glyph[data-mcp='square'] {
 }
 .hx-mcp-more:hover {
   color: var(--hx-fg-1);
+}
+/* The whole catalog: a search, then the services by what they reach */
+.hx-mcp-all {
+  display: grid;
+  gap: 16px;
+}
+.hx-mcp-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.hx-mcp-search__icon {
+  position: absolute;
+  left: 12px;
+  color: var(--hx-fg-3);
+  pointer-events: none;
+}
+.hx-mcp-search__input {
+  width: 100%;
+  padding-left: 34px;
+}
+.hx-mcp-group {
+  display: grid;
+  gap: 8px;
+  animation: hx-conn-in 320ms var(--hx-ease-out) backwards;
+}
+.hx-mcp-group__title {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  font-weight: 500;
+}
+.hx-mcp-none {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
 }
 .hx-mcp__foot {
   margin: 0;

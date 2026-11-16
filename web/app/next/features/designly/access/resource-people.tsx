@@ -3,6 +3,7 @@
 // own, each with its menu: the role, «Может делиться» at edit (for a manager), the term, «Убрать доступ». Above them the
 // requests, when someone asks. Every change waits for the gateway.
 import { useMemo, useState } from 'react';
+import { Delayed, Skeleton } from '@/next/ui/skeleton';
 import type { TTtlValue } from '@/next/features/designly/access/api';
 import { canLabel, roleLabel, untilLabel } from '@/next/features/designly/access/labels';
 import { Who } from '@/next/features/designly/access/access-people';
@@ -274,5 +275,57 @@ const ResourcePeople = (props: IResourceSection & { me: string | null }) => {
     </section>
   );
 };
+
+/** The owner as already known before the view comes (the project's access, read with the page). */
+export interface IKnownOwner {
+  name: string;
+  email: string | null;
+  you: boolean;
+}
+
+/** «У кого есть доступ» while the view is read: the owner at once where it is known, the rest a skeleton —
+ *  not an empty list; a gateway that did not answer says so with «Повторить», not with an empty list either. */
+export const PeoplePending = ({
+  owner,
+  failed,
+  onRetry,
+}: {
+  owner: IKnownOwner | null;
+  failed: boolean;
+  onRetry: () => void;
+}) => (
+  <section className="hx-acc-sec" data-section="people" aria-busy={!failed || undefined}>
+    <h3 className="hx-acc-sec__title">{t('next.access.whoHas')}</h3>
+    <ul className="hx-acc-rows">
+      {owner && (
+        <li className="hx-acc-row">
+          <Who name={owner.name} sub={owner.email} you={owner.you} />
+          <span className="hx-acc-row__fixed">{roleLabel('owner')}</span>
+        </li>
+      )}
+      {!failed && (
+        <Delayed>
+          {[0, 1].map((n) => (
+            <li key={n} className="hx-acc-row hx-acc-row--sk" aria-hidden="true">
+              <Skeleton className="hx-acc-sk-av" />
+              <span className="hx-acc-row__who">
+                <Skeleton className="hx-acc-sk-name" />
+                <Skeleton className="hx-acc-sk-sub" />
+              </span>
+            </li>
+          ))}
+        </Delayed>
+      )}
+    </ul>
+    {failed && (
+      <p className="hx-acc-failed" role="alert">
+        <span>{t('next.access.failure.view')}</span>
+        <button type="button" className="hx-btn" data-variant="ghost" data-size="sm" onClick={onRetry}>
+          {t('next.access.retry')}
+        </button>
+      </p>
+    )}
+  </section>
+);
 
 export default ResourcePeople;

@@ -204,3 +204,25 @@ func TestAudioOfACallWithoutRelayIsRefused(t *testing.T) {
 		t.Fatalf("status %d", resp.StatusCode)
 	}
 }
+
+func TestRelayLeavesOutContainerBridges(t *testing.T) {
+	for name, want := range map[string]bool{"ens3": true, "eth0": true, "wg0": true, "wt0": true,
+		"docker0": false, "br-1a2b3c": false, "veth9f8e": false, "virbr0": false} {
+		if got := outward(name); got != want {
+			t.Errorf("outward(%q) = %v, want %v", name, got, want)
+		}
+	}
+}
+
+func TestChecksOfTellsPairsAndCandidates(t *testing.T) {
+	got := checksOf(webrtc.StatsReport{
+		"p1": webrtc.ICECandidatePairStats{State: webrtc.StatsICECandidatePairStateInProgress, RequestsSent: 3},
+		"p2": webrtc.ICECandidatePairStats{State: webrtc.StatsICECandidatePairStateFailed, RequestsSent: 5, ResponsesReceived: 0},
+		"l1": webrtc.ICECandidateStats{Type: webrtc.StatsTypeLocalCandidate, Protocol: "udp", CandidateType: webrtc.ICECandidateTypeHost, IP: "192.0.2.10"},
+		"r1": webrtc.ICECandidateStats{Type: webrtc.StatsTypeRemoteCandidate, Protocol: "udp", IP: "198.51.100.1"},
+	})
+	want := "pairs [failed 1, in-progress 1], checks sent 8 answered 0, checks from the server 0, local [udp host 192.0.2.10], remote 1"
+	if got != want {
+		t.Fatalf("checksOf:\n got %s\nwant %s", got, want)
+	}
+}

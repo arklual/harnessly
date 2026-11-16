@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/ly-solutions/harnessly/internal/chatrole"
 )
 
 // Book is what the runtime keeps of each delegated chat besides its record: whether its parent asked to be woken when
@@ -42,6 +44,14 @@ type Page struct {
 	// first seen not running in the middle of a turn.
 	HeldAt  int64 `json:"heldAt,omitempty"`
 	EndedAt int64 `json:"endedAt,omitempty"`
+	// Role is what the chat is held to (internal/chatrole), "" for nothing; Plan where its plan stands when it was
+	// started with plan_first (PlanDrafting, PlanSubmitted, PlanApproved).
+	Role string `json:"role,omitempty"`
+	Plan string `json:"plan,omitempty"`
+	// Full: the chat starts with the person's whole context (memory, every plugin), not lean (Service.Lean).
+	Full bool `json:"full,omitempty"`
+	// Held are broadcasts kept for the chat's next turn: it was free when they were sent (team.go).
+	Held []HeldMessage `json:"held,omitempty"`
 }
 
 // asked is a new piece of work from the parent: the reminders and the verdicts of the work before it are forgotten.
@@ -110,8 +120,22 @@ func (b *Book) watched() []string {
 	b.load()
 	var out []string
 	for id, p := range b.chats {
-		if p.Notify && p.Wakes < MaxWakes || p.Contract {
+		if p.Notify && p.Wakes < MaxWakes || p.Contract || len(p.Held) > 0 {
 			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// roles are the chats that have a role, with it.
+func (b *Book) roles() map[string]chatrole.Role {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.load()
+	out := map[string]chatrole.Role{}
+	for id, p := range b.chats {
+		if p.Role != "" {
+			out[id] = chatrole.Role(p.Role)
 		}
 	}
 	return out

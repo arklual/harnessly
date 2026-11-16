@@ -122,6 +122,7 @@ export type TTarget =
   | 'chat'
   | 'pane'
   | 'app'
+  | 'side'
   | 'settings'
   | 'onboarding'
   | 'object-action'
@@ -221,6 +222,17 @@ export interface IWorkflowMove {
   note?: string;
 }
 
+/** One of the host's actions a view that draws its own bar shows there. */
+export interface IHostAction {
+  id: string;
+  label: string;
+  /** A name from the host's icon set. */
+  icon: string;
+  /** A toggle that is on (the right pane open). */
+  pressed?: boolean;
+  danger?: boolean;
+}
+
 export interface IBridgeHandlers {
   tool?: (name: string, args: Record<string, unknown>) => Promise<unknown>;
   storage?: (
@@ -241,6 +253,10 @@ export interface IBridgeHandlers {
   chatRead?: (last: number) => Promise<{ role: string; text: string }[]>;
   chatCard?: (view: string, data: unknown) => Promise<void>;
   paneOpen?: (target: string) => Promise<void>;
+  /** The host's actions for a view that draws its own bar (chrome none): share, the right pane, the host's menu. */
+  hostActions?: () => readonly IHostAction[];
+  /** Runs one of hostActions by its id, as the host's own button would. */
+  hostRun?: (id: string) => void;
   /** The person's conversations on this machine: who and in what state, never what was said. */
   agents?: () => Promise<readonly object[]>;
   notify?: (text: string) => Promise<void>;
@@ -939,6 +955,15 @@ export class AppBridge {
       case 'harnessly/pane.open':
         await this.need('paneOpen')(str('target', 2048));
         return {};
+      case 'harnessly/host.actions':
+        return { actions: this.need('hostActions')() };
+      case 'harnessly/host.run': {
+        const id = str('id', 80);
+        if (!this.need('hostActions')().some((a) => a.id === id))
+          throw new BridgeError('invalid_params', `no host action ${id}`);
+        this.need('hostRun')(id);
+        return {};
+      }
       case 'harnessly/agents.list':
         return { agents: await this.need('agents')() };
       case 'harnessly/storage.get': {

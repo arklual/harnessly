@@ -20,8 +20,9 @@ vi.mock('../../../lib/hooks', () => ({ useNow: () => Date.now() }));
 
 import { MachineDrawer } from './drawer';
 
-const open = async (role: Role) => {
+const open = async (role: Role, debug?: () => Promise<unknown>) => {
   const api = machinesMock({ role }) as unknown as OrgApi;
+  if (debug) (api as unknown as { debugOpenings: () => Promise<unknown> }).debugOpenings = debug;
   state.api = api;
   const list = await api.machinesList('acme', { scope: 'all' });
   const id = list.groups[0]?.machines[0]?.id ?? '';
@@ -54,5 +55,22 @@ describe('machine card: transfer to another tenant', () => {
     await open('lead');
     await screen.findByText('Нагрузка за сутки');
     expect(screen.queryByRole('button', { name: /Перенести…/ })).toBeNull();
+  });
+});
+
+describe('machine card: the openings for debugging', () => {
+  // The hub lists them to the machine's creator and to who manages the tenant (canSeeDebug); anyone else got 403.
+  it('asks for them when the hub says the viewer may see them', async () => {
+    const debug = vi.fn(async () => []);
+    await open('admin', debug);
+    await screen.findByText('Нагрузка за сутки');
+    expect(debug).toHaveBeenCalled();
+  });
+
+  it('does not ask a lead the hub keeps out', async () => {
+    const debug = vi.fn(async () => []);
+    await open('lead', debug);
+    await screen.findByText('Нагрузка за сутки');
+    expect(debug).not.toHaveBeenCalled();
   });
 });

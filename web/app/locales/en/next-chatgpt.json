@@ -91,6 +91,7 @@
   "next.chatgpt.voice.digest.you": "You: «{text}»",
   "next.chatgpt.voice.digest.end": "Stop",
   "next.chatgpt.voice.button": "Voice mode",
+  "next.chatgpt.voice.newChat": "Voice mode in a new chat",
   "next.chatgpt.voice.byKey": "The voice goes through the Realtime API with the OpenAI key from Settings → Voice input, paid by the key.",
   "next.chatgpt.voice.close": "End the conversation",
   "next.chatgpt.voice.confirm.ask": "«{task}» — sure? Say “yes”.",

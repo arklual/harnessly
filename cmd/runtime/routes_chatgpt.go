@@ -97,7 +97,6 @@ func chatgptRoutes(d deps) []gate.Route {
 	}
 	var handlers []gate.Route
 	for _, base := range []string{platformAPI + "/chatgpt", "/agents" + platformAPI + "/chatgpt"} {
-		base := base
 		var h http.Handler
 		var once sync.Once
 		handlers = append(handlers, gate.Route{

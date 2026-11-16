@@ -49,7 +49,7 @@ type contributionReader struct {
 // (pointReaders, builtin.go).
 var contributionTable = []contributionReader{
 	{ContributionKind{Name: "view", Field: "views[]", Doc: "A page of the app in a frame.",
-		Targets: []string{TargetPane, TargetApp, TargetChat, TargetSettings, TargetOnboarding, TargetObjectAction, TargetHubSettings, TargetHome, "sinopia.<kind>"}},
+		Targets: []string{TargetPane, TargetApp, TargetSide, TargetChat, TargetSettings, TargetOnboarding, TargetObjectAction, TargetHubSettings, TargetHome, "sinopia.<kind>"}},
 		func(m *Manifest) []Contribution {
 			var out []Contribution
 			for _, v := range m.Views {

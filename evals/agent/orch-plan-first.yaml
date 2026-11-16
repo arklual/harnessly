@@ -1,0 +1,56 @@
+id: orch-plan-first
+title: Переименование поля через весь проект — очевидный первый подход ломает сгенерированный код и чужую библиотеку
+tags: [orchestration, hard]
+agents: [claude, codex]
+timeout_s: 1800
+settle_s: 45
+setup:
+  workspace: [fixtures/orch-plan]
+  run: git init -q && git add -A && git -c user.name=eval -c user.email=eval@example.test commit -qm init
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/delegation/**'
+  - 'internal/mcpserver/**'
+prompt: |-
+  Переименуй в проекте бронирований поле user_id в account_id: в API (api.yaml), в клиенте generated/, в нашем коде app/ (параметры и функция by_user → by_account) и в тестах. Синхронизация с партнёром (sync) должна работать как раньше.
+  Раздай трём агентам параллельно: первый — API и клиент, второй — app/, третий — тесты. В конце прогони тесты и скажи, что поменялось. Тесты — на unittest, запуск `python3 -m unittest discover -s tests -t .` (pytest тут не установлен).
+expect:
+  - name: helpers did the parts
+    any_of:
+      - called: harnessly\.delegate_task
+      - called: Agent|Task
+      - called: Bash
+        args: {command: 'harnessly tab create\b.*--prompt'}
+  - name: the rename is done right (hidden check)
+    check: |
+      python3 - <<'PY'
+      import subprocess, sys
+      sys.path.insert(0, ".")
+      api = open("api.yaml").read()
+      assert "account_id" in api and "user_id" not in api, "api.yaml still has user_id"
+      import gen
+      assert open("generated/client.py").read() == gen.build(), "generated/client.py differs from what gen.py builds (edited by hand?)"
+      d = subprocess.run(["git", "diff", "--quiet", "HEAD", "--", "vendor/"])
+      assert d.returncode == 0, "vendor/ was changed"
+      from app import service, views
+      service._BOOKINGS.clear()
+      b = service.book(1, account_id=77, event="Концерт", seats=2)
+      assert b.account_id == 77
+      assert service.refund(10, 1, 500).account_id == 77
+      assert [x.id for x in service.by_account(77)] == [1]
+      assert "#77" in views.booking_card(1)
+      assert service.sync(1) == {"external_id": 1, "owner": 77, "title": "Концерт", "qty": 2}, service.sync(1)
+      import glob, io, tokenize
+      left = []
+      for f in glob.glob("app/*.py"):
+          if f.endswith("compat.py"):
+              continue
+          for t in tokenize.generate_tokens(io.StringIO(open(f).read()).readline):
+              if t.type == tokenize.NAME and t.string == "user_id" or t.type == tokenize.STRING and "user_id" in t.string:
+                  left.append(f"{f}:{t.start[0]}")
+      assert not left, "user_id left in app/ code: " + ", ".join(left[:5])
+      print("ok")
+      PY
+  - name: tests pass
+    check: python3 -m unittest discover -s tests -t .

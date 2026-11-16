@@ -2,7 +2,8 @@
 // installation's next-ui feature. The gateway is played in the page: every change answers with the new state, the people
 // search knows two people. &role=view opens it for a person who may only look, &theme=light|dark and &lang=en|ru pick
 // the look, &v=one the one dialog of HRN-675 (its own gateway, /access/…), with &kind=deck|video|doc|board the same
-// dialog of another kind, &people=N that many more people in it (to feel a long list). Never part of a production path.
+// dialog of another kind, &people=N that many more people in it (to feel a long list), &pending=loading|slow|failed the
+// dialog before its view is read. Never part of a production path.
 import '@/next/styles/tokens.css';
 import '@/next/styles/base.css';
 import '@/next/styles/shell.css';
@@ -451,11 +452,15 @@ const OneGallery = ({
   kind,
   ask,
   people,
+  pending,
 }: {
   viewer: boolean;
   kind: string;
   ask: boolean;
   people: number;
+  /** the dialog before its view is read — `loading` stays so, `slow` fills in after 1.5 s, `failed` offers
+   *  «Повторить» (which then fills in after 1.5 s). */
+  pending: string | null;
 }) => {
   const shape = KINDS[kind] ?? KINDS.design!;
   const [view, setView] = useState<IResourceView>(() => {
@@ -492,6 +497,12 @@ const OneGallery = ({
     const frame = requestAnimationFrame(() => setOpen(true));
     return () => cancelAnimationFrame(frame);
   }, []);
+  const [phase, setPhase] = useState(pending ?? 'ready');
+  useEffect(() => {
+    if (phase !== 'slow') return;
+    const timer = setTimeout(() => setPhase('ready'), 1500);
+    return () => clearTimeout(timer);
+  }, [phase]);
   return (
     <>
       <button type="button" className="hx-btn" data-gallery-open onClick={() => setOpen(true)}>
@@ -502,7 +513,10 @@ const OneGallery = ({
         onClose={() => setOpen(false)}
         target={{ kind: shape.ref, id: 'landing' }}
         title={shape.title}
-        view={view}
+        view={phase === 'ready' ? view : null}
+        failed={phase === 'failed'}
+        onRetry={() => setPhase('slow')}
+        knownOwner={view.owner ? { name: view.owner.name, email: view.owner.email, you: !viewer } : null}
         onNext={setView}
         address="https://example.com/designly/landing"
         onCopyLink={() => undefined}
@@ -547,6 +561,7 @@ const ShareGallery = () => {
             kind={typeof query.kind === 'string' ? query.kind : 'design'}
             ask={query.ask === '1'}
             people={Number(query.people ?? 0) || 0}
+            pending={typeof query.pending === 'string' ? query.pending : null}
           />
         ) : (
           <>

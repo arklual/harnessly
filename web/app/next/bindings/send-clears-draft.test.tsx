@@ -147,11 +147,11 @@ describe('a send leaves an empty field', () => {
     await expectEmptyEverywhere(CONV);
   });
 
-  it('Ctrl+Enter, into the queue after the working turn', async () => {
+  it('Alt/⌥+Enter, into the queue after the working turn', async () => {
     render(<ChatDock conv={CONV} machine={machine} />);
     await composed(CONV);
     working();
-    fireEvent.keyDown(field(), { key: 'Enter', ctrlKey: true });
+    fireEvent.keyDown(field(), { key: 'Enter', code: 'Enter', altKey: true });
     await settle();
     expect(sent().at(-1)?.body).toMatchObject({ mode: 'queue' });
     await expectEmptyEverywhere(CONV);

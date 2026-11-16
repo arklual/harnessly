@@ -91,7 +91,7 @@ import { conversationsStore, useConversation } from '@/next/stores/conversations
 import { openAppTerminal } from '@/next/features/app-views/app-terminal';
 import { openAddressTab, openAppTab } from '@/next/features/app-views/open';
 import { agentRows, chatTarget, openConversation, watchAgents } from '@/next/features/app-views/agents';
-import { objectTarget } from '@/next/features/app-views/target';
+import { objectTarget, shareTarget } from '@/next/features/app-views/target';
 import { reaches, subscribeStorageChanges } from '@/next/features/app-views/storage-events';
 import { viewTheme } from '@/next/features/app-views/theme';
 import { sendMessage } from '@/next/commands/messages';
@@ -209,6 +209,8 @@ export interface IAppFrameProps {
   onSinopiaCall?: (method: string, params: Record<string, unknown>) => void;
   /** Where the app is the main thing: `hl.pane.open('object:<slug>')` opens one of its objects, `object:` its home. */
   onOpenObject?: (object: string | null) => void;
+  /** Where the app is the main thing: `hl.pane.open('share:<slug>')` opens «Поделиться» of one of its objects. */
+  onShareObject?: (object: string) => void;
 }
 
 export interface IViewNotice {
@@ -250,6 +252,7 @@ const AppFrame = ({
   notice = null,
   onSinopiaCall,
   onOpenObject,
+  onShareObject,
   inChat = false,
   skeleton,
   onPublish,
@@ -516,9 +519,9 @@ const AppFrame = ({
     }),
     [app.id, app.version, target, view.id, resolvedTheme, chat, data, readOnly, person, doc],
   );
-  const latest = useRef({ context, onBridgeCall, onSinopiaCall, onOpenObject });
+  const latest = useRef({ context, onBridgeCall, onSinopiaCall, onOpenObject, onShareObject });
   useEffect(() => {
-    latest.current = { context, onBridgeCall, onSinopiaCall, onOpenObject };
+    latest.current = { context, onBridgeCall, onSinopiaCall, onOpenObject, onShareObject };
   });
 
   const slotted = opened?.key === key ? opened : null;
@@ -843,6 +846,14 @@ const AppFrame = ({
           openObject(object);
           return;
         }
+        const shared = shareTarget(to);
+        if (shared !== null) {
+          const shareObject = latest.current.onShareObject;
+          if (!shareObject)
+            throw new BridgeError('invalid_params', 'objects are shared where the app is the main thing');
+          shareObject(shared);
+          return;
+        }
         const chatId = chatTarget(to);
         if (chatId !== null) {
           // The bridge has checked agents.read; only a conversation of this machine opens.
@@ -854,7 +865,7 @@ const AppFrame = ({
         if (!openAppTab(to))
           throw new BridgeError(
             'invalid_params',
-            'only app:<id>[/<view>], chat:<id> and object:<slug> open from a view',
+            'only app:<id>[/<view>], chat:<id>, object:<slug> and share:<slug> open from a view',
           );
       },
       sinopia: async (method, params) => {

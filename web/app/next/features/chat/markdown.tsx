@@ -9,7 +9,7 @@ import HtmlBlock from '@/next/features/chat/html-block';
 import LinkCard, { cardKindOf } from '@/next/features/chat/link-card';
 import { AppLinkParagraph } from '@/next/features/app-views/link-card';
 import MermaidBlock from '@/next/features/chat/mermaid-block';
-import { changeLinkLabel, docOfCode, splitRefs } from '@/next/features/chat/refs';
+import { changeLinkLabel, chatIdOfHref, docOfCode, splitRefs } from '@/next/features/chat/refs';
 import RefChip, { RefContext } from '@/next/features/chat/ref-chip';
 import { fileNameOf, isReportPath } from '@/next/features/chat/report-paths';
 import type { RefKind } from '@/next/features/chat/types';
@@ -121,8 +121,19 @@ const components = {
   ),
   // A link to a merge request, a pull request or a commit is its chip, which opens it with the diff in the pane.
   a: ({ href, children }) => {
-    const change = href ? changeLinkLabel(href) : null;
     const text = textOf(children);
+    // A link to a chat (`[title](tab-…)`) opens that chat, as its row in the sidebar does.
+    const chat = href ? chatIdOfHref(href, window.location.origin) : null;
+    if (chat)
+      return (
+        <RefChip
+          kind="chat"
+          label={chat}
+          href={href ?? null}
+          text={text && text !== href ? text : undefined}
+        />
+      );
+    const change = href ? changeLinkLabel(href) : null;
     if (change)
       return (
         <RefChip

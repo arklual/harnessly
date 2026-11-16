@@ -1,11 +1,7 @@
 // Settings → voice: «Привет, harnessly» starts the voice (wake.ts). Off by default; it saves its own field only, so the
 // other voice settings stay as they are.
 import { useEffect, useState } from 'react';
-import {
-  loadVoiceState,
-  saveVoiceWake,
-  type IVoiceWake,
-} from '@/next/features/voice-live/api';
+import { loadVoiceState, saveVoiceWake, type IVoiceWake } from '@/next/features/voice-live/api';
 import { WAKE_SILENCE_DEFAULT } from '@/next/features/voice-live/wake';
 import { SegRow, SwitchRow } from '@/next/features/settings/rows';
 import { t } from '@/next/i18n';
@@ -53,7 +49,10 @@ const WakeSettings = ({ machine }: { machine: MachineId }) => {
         <SegRow
           label={t('next.chatgpt.voice.wakeSilence')}
           value={wake.silence || WAKE_SILENCE_DEFAULT}
-          choices={SILENCE_CHOICES.map((n) => ({ value: n, label: t('next.chatgpt.voice.wakeSilenceSec', { n }) }))}
+          choices={SILENCE_CHOICES.map((n) => ({
+            value: n,
+            label: t('next.chatgpt.voice.wakeSilenceSec', { n }),
+          }))}
           busy={busy}
           onPick={(silence) => save({ silence })}
         />

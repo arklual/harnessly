@@ -12,10 +12,12 @@ const key = (over: Partial<Parameters<typeof keyAction>[0]> = {}) => ({
 });
 
 describe('keyAction', () => {
-  it('sends on Enter, right now on Ctrl/Cmd+Enter, a new line on Shift+Enter', () => {
+  it('sends right away on Enter and Ctrl/Cmd+Enter, after the turn on Alt/⌥+Enter, a new line on Shift+Enter', () => {
     expect(keyAction(key(), false)).toBe(KEY_ACTION.send);
-    expect(keyAction(key({ ctrlKey: true }), false)).toBe(KEY_ACTION.sendNow);
-    expect(keyAction(key({ metaKey: true }), false)).toBe(KEY_ACTION.sendNow);
+    expect(keyAction(key({ ctrlKey: true }), false)).toBe(KEY_ACTION.send);
+    expect(keyAction(key({ metaKey: true }), false)).toBe(KEY_ACTION.send);
+    expect(keyAction(key({ altKey: true }), false)).toBe(KEY_ACTION.queue);
+    expect(keyAction(key({ altKey: true, shiftKey: true }), false)).toBeNull();
     expect(keyAction(key({ shiftKey: true }), false)).toBe(KEY_ACTION.newline);
   });
 
@@ -23,15 +25,15 @@ describe('keyAction', () => {
     expect(keyAction(key(), true)).toBe(KEY_ACTION.newline);
     expect(keyAction(key({ isComposing: true }), false)).toBeNull();
     expect(keyAction(key({ isComposing: true }), false, false)).toBeNull();
-    expect(keyAction(key({ altKey: true }), false)).toBeNull();
     expect(keyAction(key({ key: 'a' }), false)).toBeNull();
   });
 
   it('makes Enter a new line when Enter does not send, and keeps Ctrl/Cmd+Enter sending', () => {
     expect(keyAction(key(), false, false)).toBe(KEY_ACTION.newline);
     expect(keyAction(key({ shiftKey: true }), false, false)).toBe(KEY_ACTION.newline);
-    expect(keyAction(key({ ctrlKey: true }), false, false)).toBe(KEY_ACTION.sendNow);
-    expect(keyAction(key({ metaKey: true }), false, false)).toBe(KEY_ACTION.sendNow);
+    expect(keyAction(key({ ctrlKey: true }), false, false)).toBe(KEY_ACTION.send);
+    expect(keyAction(key({ metaKey: true }), false, false)).toBe(KEY_ACTION.send);
+    expect(keyAction(key({ altKey: true }), false, false)).toBe(KEY_ACTION.queue);
     expect(keyAction(key({ key: 'a' }), false, false)).toBeNull();
   });
 });

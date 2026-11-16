@@ -286,6 +286,8 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 		return h.opRepl(l, op, req)
 	case opConversationsStart:
 		return h.opAutomationStart(req, pol)
+	case hubproto.OpConnectorsWebhook:
+		return h.opWebhook(req, pol)
 	case hubproto.OpEnvProposed:
 		if h.observe {
 			return nil, nil, h.allow(op, false, "changes of the organization's environment")

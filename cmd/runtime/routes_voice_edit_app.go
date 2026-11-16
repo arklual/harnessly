@@ -115,7 +115,6 @@ func (o appObject) Undo(ctx context.Context, version string) error {
 func appQuickEditRoutes(d deps, reg *apps.Registry) []gate.Route {
 	var routes []gate.Route
 	for _, base := range []string{platformAPI + "/voice/edit/app", "/agents" + platformAPI + "/voice/edit/app"} {
-		base := base
 		routes = append(routes, gate.Route{
 			Match: func(r *http.Request) bool { return r.URL.Path == base || r.URL.Path == base+"/undo" },
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

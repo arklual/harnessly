@@ -1,0 +1,27 @@
+id: side-widget-machine
+title: «Виджет с нагрузкой машины» — виджет с данными машины, сделанный агентом
+tags: [widgets]
+timeout_s: 300
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/hlcli/widget.go'
+  - 'internal/sidewidget/**'
+prompt: сделай виджет, который показывает нагрузку машины и предупреждает, если диск кончается
+expect:
+  - name: made a widget over the machine's data
+    any_of:
+      - called: harnessly\.widget_create
+        args: {sources: 'machine'}
+      - called: Bash
+        args: {command: 'harnessly widget create\b(?s:.*)--sources[ =]\S*machine'}
+variants:
+  - id: v1
+    kind: short
+    text: "виджет: нагрузка машины и место на диске"
+  - id: v2
+    kind: english
+    text: "make a widget that shows the machine's load and warns me when the disk runs low"
+  - id: v3
+    kind: long
+    text: "слушай, хочу видеть под правой колонкой, насколько загружена машина, и чтобы оно мне подсказывало, когда диск почти забит"

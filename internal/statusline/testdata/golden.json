@@ -246,7 +246,7 @@
    ],
    "changed": {
     "session-stats/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.json": "{\"7\":\"seven\",\"custom\":1,\"sessionId\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"transcriptPath\":\"/srv/app/.claude/s.jsonl\",\"model\":\"Opus 4.6\",\"inputTokens\":15000,\"outputTokens\":1200,\"cost\":1.2345,\"currentContextTokens\":11010,\"contextWindowSize\":200000,\"usedPercentage\":12.5,\"effort\":\"high\",\"exceeds200k\":false,\"receivedAt\":1792281600000}",
-    "rate-limits.json": "{\"codex\":{\"ts\":1792280000,\"five_hour\":{\"used_percentage\":3,\"resets_at\":1792290000,\"at\":1792280000,\"source\":\"codex-usage\"},\"seven_day\":null,\"source\":\"codex-usage\"},\"ts\":1792281600,\"claude\":{\"ts\":1792281600,\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000,\"at\":1792281600},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000,\"at\":1792281600}}}"
+    "rate-limits.json": "{\"codex\":{\"ts\":1792280000,\"five_hour\":{\"used_percentage\":3,\"resets_at\":1792290000,\"at\":1792280000,\"source\":\"codex-usage\"},\"seven_day\":null,\"source\":\"codex-usage\"},\"ts\":1792281600,\"claude\":{\"ts\":1792281600,\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000,\"at\":1792281600},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000,\"at\":1792281600},\"seenAt\":1792281600}}"
    }
   },
   {
@@ -269,7 +269,7 @@
    ],
    "changed": {
     "session-stats/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.json": "{\"7\":\"seven\",\"custom\":1,\"sessionId\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"model\":\"Opus 4.6 (1M)\",\"inputTokens\":15000,\"outputTokens\":1200,\"cost\":null,\"currentContextTokens\":11010,\"contextWindowSize\":200000,\"usedPercentage\":12.5,\"effort\":\"high\",\"exceeds200k\":false,\"receivedAt\":1792281600000}",
-    "rate-limits.json": "{\"claude\":{\"ts\":1792281600,\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000,\"at\":1792281600},\"seven_day\":{\"used_percentage\":12,\"resets_at\":1792800000,\"at\":1792281600}},\"codex\":{\"ts\":1792280000,\"five_hour\":{\"used_percentage\":3,\"resets_at\":1792290000,\"at\":1792280000,\"source\":\"codex-usage\"},\"seven_day\":null,\"source\":\"codex-usage\"},\"ts\":1792281600}"
+    "rate-limits.json": "{\"claude\":{\"ts\":1792281600,\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000,\"at\":1792281600},\"seven_day\":{\"used_percentage\":12,\"resets_at\":1792800000,\"at\":1792281600},\"seenAt\":1792281600},\"codex\":{\"ts\":1792280000,\"five_hour\":{\"used_percentage\":3,\"resets_at\":1792290000,\"at\":1792280000,\"source\":\"codex-usage\"},\"seven_day\":null,\"source\":\"codex-usage\"},\"ts\":1792281600}"
    }
   },
   {
@@ -335,7 +335,7 @@
     "{\"sessionId\":\"not-a-uuid\",\"transcriptPath\":\"/srv/app/.claude/s.jsonl\",\"inputTokens\":0,\"outputTokens\":0,\"cost\":1.2345,\"currentContextTokens\":\"502\",\"contextWindowSize\":0,\"usedPercentage\":null,\"model\":\"Opus 4.6\",\"effort\":\"high\",\"exceeds200k\":true,\"receivedAt\":1792281600000}"
    ],
    "changed": {
-    "rate-limits.json": "{\"claude\":{\"ts\":1792281600,\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000,\"at\":1792281600},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000,\"at\":1792281600}},\"codex\":{\"ts\":1792280000,\"five_hour\":{\"used_percentage\":3,\"resets_at\":1792290000,\"at\":1792280000,\"source\":\"codex-usage\"},\"seven_day\":null,\"source\":\"codex-usage\"},\"ts\":1792281600}"
+    "rate-limits.json": "{\"claude\":{\"ts\":1792281600,\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000,\"at\":1792281600},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000,\"at\":1792281600},\"seenAt\":1792281600},\"codex\":{\"ts\":1792280000,\"five_hour\":{\"used_percentage\":3,\"resets_at\":1792290000,\"at\":1792280000,\"source\":\"codex-usage\"},\"seven_day\":null,\"source\":\"codex-usage\"},\"ts\":1792281600}"
    }
   },
   {

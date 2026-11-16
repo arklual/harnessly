@@ -26,6 +26,9 @@ type HookConfig struct {
 	// BudgetScript is the hub's limit script (hooksetup); "" adds nothing. It runs after Script on UserPromptSubmit
 	// and PreToolUse, where it can stop the chat.
 	BudgetScript string
+	// RoleGuard is the command line of the chats' role hook (`harnessly hook role-guard`, internal/chatrole); "" adds
+	// nothing. It runs last on PreToolUse, where it refuses what a planning or coordinating chat may not do.
+	RoleGuard string
 
 	mu    sync.Mutex
 	cache *userHooks
@@ -218,6 +221,9 @@ func (h *HookConfig) FlagsWithGuard(guard string) (args []string, parseError boo
 		cmds := []any{command(h.Script)}
 		if h.BudgetScript != "" && (ev == "UserPromptSubmit" || ev == "PreToolUse") {
 			cmds = append(cmds, command(`sh "`+h.BudgetScript+`" codex `+ev))
+		}
+		if h.RoleGuard != "" && ev == "PreToolUse" {
+			cmds = append(cmds, command(h.RoleGuard+" 2>/dev/null || true"))
 		}
 		ours := tomlTable{keys: []string{"matcher", "hooks"}, m: map[string]any{"matcher": ".*", "hooks": cmds}}
 		entries := append([]any{ours}, u.byEvent[ev]...)

@@ -10,6 +10,8 @@ export interface IHeaderBackground {
   recap: boolean;
   /** Something put away from the smart notice still waits: its drop is in the column. */
   waits?: boolean;
+  /** Nothing in the column but the person's widgets: the button shows and hides them. */
+  widgets?: boolean;
   open: boolean;
   onToggle: () => void;
 }
@@ -21,6 +23,7 @@ export interface IHeaderToggle {
 
 /** What the column's button says on hover: what runs, that it has finished, that there is a recap, or only the pictures the agent looked at. */
 const backgroundTip = (background: IHeaderBackground): string => {
+  if (background.widgets) return t('next.widgets.title');
   if (background.waits) return t('next.smart.drops.title');
   if (background.running > 0) return t('next.header.backgroundRunning', { n: background.running });
   if (background.total > 0) return t('next.header.backgroundDone');

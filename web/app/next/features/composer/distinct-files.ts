@@ -14,13 +14,16 @@ const hex = (buffer: ArrayBuffer): string =>
 /** What a file holds, as a key: two files with the same bytes have the same one. */
 export const contentKey = async (file: File): Promise<string> => {
   // A page over plain http (a machine on the local network) has no crypto.subtle.
-  if (file.size > HASH_LIMIT || !globalThis.crypto?.subtle) return `${file.name}:${file.size}:${file.lastModified}`;
+  if (file.size > HASH_LIMIT || !globalThis.crypto?.subtle)
+    return `${file.name}:${file.size}:${file.lastModified}`;
   return hex(await crypto.subtle.digest('SHA-256', await file.arrayBuffer()));
 };
 
 /** The picture the browser made of the clipboard's pixels (Chrome and Safari name it image.png). */
 const isClipboardBitmap = (file: File, now: number): boolean =>
-  file.name === 'image.png' && file.type === 'image/png' && Math.abs(now - file.lastModified) < BITMAP_FRESH_MS;
+  file.name === 'image.png' &&
+  file.type === 'image/png' &&
+  Math.abs(now - file.lastModified) < BITMAP_FRESH_MS;
 
 /**
  * The files of one paste: where the clipboard holds a picture's file, the browser's copy of its pixels is the same

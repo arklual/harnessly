@@ -1,0 +1,3 @@
+# Booking API: one model per line, "Model: field:type, field:type"
+Booking: id:int, user_id:int, event:str, seats:int
+Refund: id:int, booking_id:int, user_id:int, amount:int

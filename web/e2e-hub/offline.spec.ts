@@ -239,7 +239,8 @@ test('4. the machine is off: the list and the whole chat open from the hub, a me
     .last()
     .click();
   await page.locator('.hx-tool__head', { hasText: 'cat big.log' }).last().click();
-  await expect(page.getByText(/Показано \d+ из \d+|Showing \d+ of \d+/).first()).toBeVisible({
+  // Cut by size, the output says so in bytes: «Первые 4 КБ из 9 КБ».
+  await expect(page.getByText(/Первые [\d,.]+ [КМ]Б из|First [\d,.]+ [KM]B of/).first()).toBeVisible({
     timeout: 15_000,
   });
   await expect(page.getByText('END-OF-BIG-OUTPUT')).toHaveCount(0);

@@ -1,0 +1,448 @@
+/* The widgets under the chat's right column (features/widgets). They stand in .hx-side-below, under the
+   column, with its width; the stack scrolls on its own when it is taller than what the stage leaves. Colours from the
+   tokens only. */
+
+.hx-wgs-wrap {
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 200ms cubic-bezier(0.4, 0, 1, 1),
+    transform 200ms cubic-bezier(0.4, 0, 1, 1);
+}
+.hx-wgs-wrap[data-shown='true'] {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 360ms var(--hx-ease-out),
+    transform 360ms var(--hx-ease-out);
+}
+/* No room beside the chat: a compact popover at the header's button, over the feed's edge (the feed does not move). */
+.hx-wgs-wrap[data-pop] {
+  margin-left: auto;
+  width: 288px;
+  padding: 6px;
+  border-radius: 20px;
+  background: var(--hx-bg-raised);
+  box-shadow:
+    0 0 0 1px var(--hx-border),
+    var(--hx-shadow-overlay);
+  transform-origin: top right;
+  transform: translateY(-6px) scale(0.97);
+}
+.hx-wgs-wrap[data-pop][data-shown='true'] {
+  transform: none;
+}
+.hx-wgs-wrap[data-pop] .hx-wgs__list {
+  max-height: min(520px, calc(100dvh - 220px));
+  border-radius: 14px;
+}
+.hx-side-below > * + .hx-wgs-wrap {
+  margin-top: 8px;
+}
+
+.hx-wgs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hx-wgs__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: calc(100dvh - var(--hx-side-h, 0px) - 240px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  border-radius: 18px;
+}
+.hx-wgs__list:empty {
+  display: none;
+}
+.hx-wgs__foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* «+ Виджет»: quiet until pointed at. */
+.hx-wg-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: var(--hx-radius-pill);
+  background: transparent;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+  cursor: pointer;
+  opacity: 0.7;
+  transition:
+    opacity 160ms var(--hx-ease-out),
+    background-color 160ms var(--hx-ease-out),
+    color 160ms var(--hx-ease-out);
+}
+.hx-wg-add:hover,
+.hx-wg-add:focus-visible,
+.hx-wg-add[data-popup-open] {
+  opacity: 1;
+  color: var(--hx-fg-1);
+  background: var(--hx-bg-hover);
+}
+
+.hx-wg-gallery {
+  min-width: 240px;
+}
+.hx-wg-gallery__item {
+  align-items: flex-start;
+  padding-block: 6px;
+}
+.hx-wg-gallery__txt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.hx-wg-gallery__name {
+  color: var(--hx-fg-1);
+}
+.hx-wg-gallery__hint {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  line-height: 16px;
+}
+.hx-wg-gallery__empty {
+  padding: 8px 10px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+
+/* One card: its name, the largest thing in it, over what it shows. */
+.hx-wg {
+  flex: none;
+  padding: 4px;
+  border-radius: 18px;
+  background: var(--hx-bg-raised);
+  box-shadow:
+    0 0 0 1px var(--hx-border),
+    var(--hx-shadow-sm);
+  animation: hx-wg-in 320ms var(--hx-ease-out) backwards;
+}
+@keyframes hx-wg-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+.hx-wg[data-drag-on] {
+  box-shadow:
+    0 0 0 1px var(--hx-border-strong),
+    var(--hx-shadow-md);
+}
+.hx-wg__head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 32px;
+}
+.hx-wg__name {
+  display: inline-flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-semibold);
+  text-align: left;
+  cursor: pointer;
+}
+.hx-wg__name:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-wg__icon {
+  color: var(--hx-fg-3);
+}
+.hx-wg__title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hx-wg__chev {
+  margin-left: auto;
+  color: var(--hx-fg-3);
+  opacity: 0;
+  transition:
+    opacity 160ms var(--hx-ease-out),
+    transform 260ms var(--hx-ease-out);
+}
+.hx-wg:hover .hx-wg__chev,
+.hx-wg__name:focus-visible .hx-wg__chev {
+  opacity: 1;
+}
+.hx-wg[data-folded] .hx-wg__chev {
+  transform: rotate(-90deg);
+}
+.hx-wg__more,
+.hx-wg__tool {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 160ms var(--hx-ease-out),
+    background-color 160ms var(--hx-ease-out);
+}
+.hx-wg:hover :is(.hx-wg__more, .hx-wg__tool),
+.hx-wg :is(.hx-wg__more, .hx-wg__tool):focus-visible,
+.hx-wg__more[data-popup-open] {
+  opacity: 1;
+}
+:is(.hx-wg__more, .hx-wg__tool):hover {
+  color: var(--hx-fg-1);
+  background: var(--hx-bg-hover);
+}
+
+/* The fold: a grid row between 0fr and 1fr, with a fade. */
+.hx-wg__clip {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows 280ms var(--hx-ease-out),
+    opacity 200ms var(--hx-ease-out);
+}
+.hx-wg[data-folded] .hx-wg__clip {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+.hx-wg__keep {
+  min-height: 0;
+  overflow: hidden;
+}
+/* Away from the stack's view the body is not drawn; its last height holds the place. */
+.hx-wg__keep[data-away] {
+  height: var(--hx-wg-h, 48px);
+}
+.hx-wg__body {
+  padding: 2px 8px 8px;
+}
+.hx-wg__quiet {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  line-height: 18px;
+}
+.hx-wg__wait {
+  height: 36px;
+  border-radius: 10px;
+  background: var(--hx-bg-subtle);
+  animation: hx-wg-wait 1.4s ease-in-out infinite;
+}
+@keyframes hx-wg-wait {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Lines with a meter: «5 ч ▬▬▬ 94%». */
+.hx-wgl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hx-wgl__row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hx-wgl__row + .hx-wgl__row {
+  padding-top: 6px;
+  border-top: 1px solid var(--hx-border);
+}
+.hx-wgl__name {
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-wgl__win {
+  display: grid;
+  grid-template-columns: 40px 1fr 38px;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+}
+.hx-wgl__win b {
+  color: var(--hx-fg-1);
+  font-weight: var(--hx-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.hx-wgm {
+  width: 100%;
+  height: 4px;
+}
+.hx-wgm__track {
+  fill: var(--hx-bg-active);
+}
+.hx-wgm__fill {
+  fill: var(--hx-success);
+  transition: width 420ms var(--hx-ease-out);
+}
+.hx-wgm__fill[data-level='low'] {
+  fill: var(--hx-warning);
+}
+.hx-wgm__fill[data-level='out'] {
+  fill: var(--hx-danger);
+}
+
+/* Rows of what runs: a dot, the name, its number. */
+.hx-wgr {
+  display: flex;
+  flex-direction: column;
+}
+.hx-wgr__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  margin: 0 -6px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.hx-wgr__row:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-wgr__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hx-wgr__id {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-wgr__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-fg-3);
+}
+.hx-wgr__dot:is([data-state='run'], [data-state='running'], [data-state='pending']) {
+  background: var(--hx-accent);
+  animation: hx-wg-wait 1.4s ease-in-out infinite;
+}
+.hx-wgr__dot[data-state='wait'] {
+  background: var(--hx-warning);
+}
+.hx-wgr__dot[data-state='success'] {
+  background: var(--hx-success);
+}
+.hx-wgr__dot[data-state='failed'] {
+  background: var(--hx-danger);
+}
+
+/* «Заметка». */
+.hx-wgn {
+  display: block;
+  width: 100%;
+  min-height: 56px;
+  max-height: 200px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  field-sizing: content;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  line-height: 19px;
+}
+.hx-wgn::placeholder {
+  color: var(--hx-fg-3);
+}
+
+/* «Часы». */
+.hx-wgc {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hx-wgc__big {
+  color: var(--hx-fg-1);
+  font-size: 26px;
+  line-height: 30px;
+  font-weight: var(--hx-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.hx-wgc__row {
+  display: flex;
+  gap: 4px;
+}
+.hx-wgc__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--hx-radius-pill);
+  background: var(--hx-bg-subtle);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  cursor: pointer;
+}
+.hx-wgc__btn:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+
+/* An app's widget: its frame at the height its manifest asks for. */
+.hx-wga {
+  height: 96px;
+  margin: 0 -4px -4px;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.hx-wga[data-size='m'] {
+  height: 160px;
+}
+.hx-wga[data-size='l'] {
+  height: 240px;
+}
+.hx-wga .hx-appview__box {
+  height: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-wg,
+  .hx-wgs-wrap,
+  .hx-wg__clip {
+    animation: none;
+    transition-duration: 1ms;
+  }
+}

@@ -6,14 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@/next/i18n';
-import {
-  loadVoiceState,
-  onVoiceState,
-  voiceStateRetryDelay,
-  VOICE_TALK,
-  type IVoiceState,
-  type TVoiceMode,
-} from '@/next/features/voice-live/api';
+import { loadVoiceState, VOICE_TALK, type TVoiceMode } from '@/next/features/voice-live/api';
 import {
   FIELD_FLOOR,
   setVoiceField,
@@ -23,6 +16,7 @@ import {
   VOICE_START_EVENT,
   type TFieldFloor,
 } from '@/next/features/voice-live/field';
+import { useVoiceState } from '@/next/features/voice-live/use-voice-state';
 import { useWakeEnd } from '@/next/features/voice-live/wake-end';
 import { WAKE_SILENCE_DEFAULT } from '@/next/features/voice-live/wake';
 import {
@@ -121,7 +115,8 @@ const VoiceLive = ({
     return () => window.removeEventListener(VOICE_MOVED_EVENT, onMoved);
   }, []);
   const [on, setOn] = useState(false);
-  const [state, setState] = useState<IVoiceState | null>(null);
+  // The button stands only where the person turned the voice mode on (use-voice-state.ts).
+  const [state, setState] = useVoiceState(machine);
   const holder = useRef<HTMLSpanElement>(null);
   const [notes, setNotes] = useState<readonly IVoiceNote[]>([]);
   const noteSeq = useRef(0);
@@ -202,32 +197,6 @@ const VoiceLive = ({
     setOn(false);
     setByWake(false);
   };
-
-  // The button stands only where the person turned the voice mode on. A read that failed (the machine was briefly
-  // off the hub) is asked again, and a setting saved later comes in, or the button would stay away until a reload.
-  useEffect(() => {
-    let live = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const load = (tries: number) => {
-      loadVoiceState(machine).then(
-        (st) => {
-          if (live) setState(st);
-        },
-        () => {
-          if (live) timer = setTimeout(() => load(tries + 1), voiceStateRetryDelay(tries));
-        },
-      );
-    };
-    load(0);
-    const off = onVoiceState(machine, (st) => {
-      if (live) setState(st);
-    });
-    return () => {
-      live = false;
-      clearTimeout(timer);
-      off();
-    };
-  }, [machine]);
 
   // ⌥ Space from anywhere: the shell opened this chat and asks its field to start.
   useEffect(() => {

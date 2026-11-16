@@ -16,7 +16,7 @@ machines and services.
 | **Stand** | A disposable harnessly: its own home, its own runtime on its own port and tmux socket, one workspace, empty memory, no plugins, logins copied without refresh tokens, `env -i`, permissions bypassed (nobody is there to grant one). Not connected to a hub, so nothing reaches anybody's sidebar, search or notifications. Confined by Landlock (`harnessly eval sandbox`, no privileges needed): the runtime and every agent it starts read the system and the tools and read and write only the stand's folder; homes, `/tmp` and other stands are out of reach. Without it an agent that cannot find a project searches the whole machine and writes into what it finds; a machine without Landlock refuses to run stands, and there is no flag around it. One stand per run, N in parallel. Pictures are drawn by a fake generator (`RUNTIME_IMAGEGEN_BIN`), so a run costs only the agent. |
 | **Scenario** | A YAML file: setup (files, a design project), the person's words (a canonical prompt plus stored variants), the agents it applies to, and expectations. |
 | **Facts** | What a run left, read after the turn: tool calls with arguments and errors from the transcript (subagents included), the right pane's intents (`pane-intents.json`), picture jobs, the workspace's files, the final words, tokens and cost. Facts are saved, so a run is judged again without running it. |
-| **Judge** | Expectations over facts, never over the wording alone: `called` / `not_called` (a tool, regexps over its arguments), `pane` (tab and target), `images`, `file`, `text_not`, `any_of`, `max_calls`. An optional `judge:` rubric goes to a cheap model only where no fact can tell. |
+| **Judge** | Expectations over facts, never over the wording alone: `called` / `not_called` (a tool, regexps over its arguments), `pane` (tab and target), `images`, `file`, `text_not`, `any_of`, `max_calls`, `check` (a shell command run in the workspace after the run, inside the stand's sandbox: a hidden test of the code the agents wrote; it sees `EVAL_STARTED_AT` and `EVAL_INTERRUPT_AT`). An optional `judge:` rubric goes to a cheap model only where no fact can tell. |
 | **Matrix** | scenario × variant × model × setup × repeat. Budget in runs and dollars, parallel stands, infrastructure failures (stand down, launch failed, API 5xx/401, timeout with no answer) retried apart from the model's failures and never counted, a cache by fingerprint (scenario, variant, model, setup, harnessly and CLI version). |
 | **Report** | Scenario × model: passes/runs with the 95% Wilson interval, the diff to the last run of the same setup (improved / regressed / same within noise), and for each failure the expectation that failed in words and the transcript. Markdown and JSON; a page in harnessly comes next. |
 
@@ -84,6 +84,32 @@ wrapper that sets its libraries) in a `--tools` folder and name it in the setup'
 agent environment both, with `RUNTIME_DESIGN_CHROME_ARGS: --no-sandbox` under Landlock). Without it the agent calls
 `harnessly design export` rightly and the export fails, which is the stand's fault, not the agent's. Pick a
 `--port-base` whose next ports are free: a stand that cannot bind its port is an infrastructure failure.
+
+## Teamwork scenarios
+
+Scenarios where one chat hands work to others (`evals/agent/orch-*.yaml`) need three things more:
+
+- **The workspace as a project**: `setup.workspace` copies fixture folders into it and `setup.run` runs a script there
+  (`git init` and a first commit), so a check can ask `git diff` what changed.
+- **Waiting for the helpers**: a chat that delegates ends its turn and is woken by its chats' answers. With `settle_s`
+  the run goes on until no agent of the stand (subagents, delegated chats in their own folders, teammates) wrote to its
+  transcript for that many seconds and the person's chat is not working; the facts and tokens include every session.
+- **The person speaking mid-work**: `interrupt: {after_s, text}` types a message into the chat while something still
+  works («stop, main is frozen»); a check reads `EVAL_INTERRUPT_AT` to find commits and edits made after it.
+
+The ways to work are compared as setups over the same scenarios: `setups/orch-subagents.yaml`,
+`orch-subchats.yaml`, `orch-teams.yaml` (agent teams, the control). A setup's `prompt_suffix` is added to the person's
+words to name the way, and `agent_env` switches a CLI feature on. The report adds a table of cost and teamwork per cell:
+work time and tokens (medians with their spread over repeats), dollars, helpers started (subagents / delegated chats /
+teammates), files edited from more than one session, identical edits, the times the person was needed (a question tool,
+a turn ending on input), edits of the lead chat itself, REPL calls and timeouts.
+
+**Code Mode** of Claude Code (`setups/code-mode.yaml`): `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1` plus the
+consent the opt-in dialog stores (`codeModeCaveatsAcceptedV1` and `codeModeAutoModeCaveatAcceptedV1` in
+`~/.claude.json`, set by the setup's `claude_config`) starts the chat with the REPL tool and no dialog. It is refused
+in `-p`, with agent teams, with OpenTelemetry on, and on API keys or other providers. The calls a REPL script makes go
+through PreToolUse and PostToolUse hooks one by one with their own tool names (a deny stops that call only), and the
+transcript records them as ordinary tool calls, so expectations judge them as usual.
 
 ## New features
 

@@ -4,11 +4,8 @@ import { prefixAppPath } from '@/lib/app-path';
 import { fetchDocAccess, setDocPublic } from '@/lib/doc-threads-client';
 import type { IDocAccess } from '@/types/doc-threads';
 import { t } from '@/lib/i18n';
-import { docRef, type TGuestRights } from '@/next/features/designly/access/api';
-import { LINK_KIND, type ILinkContext } from '@/next/features/designly/access/link-form';
-import ResourceShare from '@/next/features/designly/access/resource-share';
-import ShareDialog from '@/next/features/designly/access/share-dialog';
-import { useResourceView } from '@/next/features/designly/access/use-resource';
+import { docRef } from '@/next/features/designly/access/api';
+import { DocShareDialog } from '@/next/features/app-main/doc-share-dialog';
 import { ACCESS, useProjectAccess } from '@/next/features/designly/access/use-access';
 import { usePortalContainer } from '@/next/ui/portal';
 import { toast } from '@/next/ui/toast';
@@ -209,9 +206,6 @@ const LegacyShareMenu = ({ slug }: { slug: string }) => {
   );
 };
 
-/** What a guest link may allow, a document's and a board's alike: read, or read and comment. */
-const GUEST_RIGHTS: readonly TGuestRights[] = ['view', 'comment'];
-
 type TLegacy =
   { status: 'loading' } | { status: 'ready'; access: IDocAccess } | { status: 'failed'; message: string };
 
@@ -284,73 +278,54 @@ interface IDocShareProps {
   slug: string;
   title: string;
   kind: 'artifact' | 'board';
+  /** Opens at once (the page was opened from «Поделиться» of the board or the document itself, `?share=1`). */
+  autoOpen?: boolean;
 }
 
-const DOC_LINKS: ILinkContext = { kind: LINK_KIND.doc };
-const BOARD_LINKS: ILinkContext = { kind: LINK_KIND.board };
-
 /**
- * «Поделиться» of a document or a board: the one dialog of every kind (stage «д») — people and teams with
- * their roles, the home team first, links without sign-in per recipient (a document's own «Скачивание» and «Копирование
- * текста»). A gateway without the common access API keeps the older dialog; one without any access model (a
- * standalone runtime) keeps a document's old one-link menu, and a board has no button there.
+ * The viewer's dialog: the one of the new interface (DocShareDialog), with a document's old public link while it is
+ * open and, on a page of its own, the frame the dialog takes its tokens and popups from.
  */
-export const DocShare = ({ slug, title, kind }: IDocShareProps) => {
-  const gate = useProjectAccess(docRef(slug));
-  const { reload } = gate;
-  const shared = useResourceView('doc', slug, gate.state.k === ACCESS.ready);
-  const one =
-    shared.state !== null && shared.state !== 'absent' && shared.state.owner !== null ? shared.state : null;
-  const [open, setOpen] = useState(false);
-  // Inside the new interface's frame the dialog has its place; on a page of its own it brings one.
+const ViewerShareDialog = ({
+  slug,
+  title,
+  kind,
+  open,
+  onClose,
+}: {
+  slug: string;
+  title: string;
+  kind: 'artifact' | 'board';
+  open: boolean;
+  onClose: () => void;
+}) => {
   const framed = usePortalContainer() !== null;
-
-  if (gate.state.k === ACCESS.absent) return kind === 'artifact' ? <LegacyShareMenu slug={slug} /> : null;
-  const ready = gate.state.k === ACCESS.ready ? gate.state.access : null;
-
-  const copyLink = () => {
-    navigator.clipboard
-      ?.writeText(docAddress(slug))
-      .then(() => toast(t('next.site.linkCopied')))
-      .catch((failure: Error) =>
-        toast(t('next.site.copyFailed'), { tone: 'error', description: failure.message }),
-      );
-  };
-
-  const legacyLink = kind === 'artifact' && open ? <LegacyPublicLink slug={slug} /> : null;
-  const dialog = one ? (
-    <ResourceShare
-      open={open}
-      onClose={() => setOpen(false)}
-      target={{ kind: 'doc', id: slug }}
+  const dialog = (
+    <DocShareDialog
+      slug={slug}
       title={title}
-      view={one}
-      onNext={(next) => {
-        shared.apply(next);
-        reload();
-      }}
+      kind={kind}
+      open={open}
+      onClose={onClose}
       address={docAddress(slug)}
-      onCopyLink={copyLink}
-      linkContext={kind === 'board' ? BOARD_LINKS : DOC_LINKS}
-      extra={legacyLink}
+      extra={kind === 'artifact' && open ? <LegacyPublicLink slug={slug} /> : null}
     />
-  ) : (
-    ready && (
-      <ShareDialog
-        open={open}
-        onClose={() => setOpen(false)}
-        project={docRef(slug)}
-        title={title}
-        access={ready}
-        onNext={gate.apply}
-        onCopyLink={copyLink}
-        onClaim={() => Promise.resolve()}
-        guestRights={GUEST_RIGHTS}
-        extra={legacyLink}
-      />
-    )
   );
+  return framed ? (
+    dialog
+  ) : (
+    <Suspense fallback={null}>
+      <DocShareHost>{dialog}</DocShareHost>
+    </Suspense>
+  );
+};
 
+/** The viewer's own button of «Поделиться»: the dialog above, or a document's old one-link menu where there is no
+ *  access model (a standalone runtime); a board has no button there. */
+export const DocShare = ({ slug, title, kind, autoOpen = false }: IDocShareProps) => {
+  const gate = useProjectAccess(docRef(slug));
+  const [open, setOpen] = useState(autoOpen);
+  if (gate.state.k === ACCESS.absent) return kind === 'artifact' ? <LegacyShareMenu slug={slug} /> : null;
   return (
     <>
       <button
@@ -358,24 +333,12 @@ export const DocShare = ({ slug, title, kind }: IDocShareProps) => {
         className="td-icon"
         aria-haspopup="dialog"
         title={t('docs.docShare.share')}
-        disabled={!ready}
-        onClick={() => {
-          // The dialog shows what the gateway holds now, not what it held when the document was opened.
-          reload();
-          shared.reload();
-          setOpen(true);
-        }}
+        disabled={gate.state.k !== ACCESS.ready}
+        onClick={() => setOpen(true)}
       >
         <Share2 />
       </button>
-      {dialog &&
-        (framed ? (
-          dialog
-        ) : (
-          <Suspense fallback={null}>
-            <DocShareHost>{dialog}</DocShareHost>
-          </Suspense>
-        ))}
+      <ViewerShareDialog slug={slug} title={title} kind={kind} open={open} onClose={() => setOpen(false)} />
     </>
   );
 };

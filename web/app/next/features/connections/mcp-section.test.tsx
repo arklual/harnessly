@@ -9,7 +9,7 @@ import {
   readMcpProbe,
   readMcpServer,
 } from '@/next/features/connections/mcp-api';
-import { headerValue, openCatalog } from '@/next/features/connections/mcp-model';
+import { catalogGroups, headerValue, openCatalog } from '@/next/features/connections/mcp-model';
 import McpSection, { type IMcpSectionProps } from '@/next/features/connections/mcp-section';
 import { pinLocale } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
@@ -67,6 +67,7 @@ const server = (over: Record<string, unknown> = {}) => ({
 const linear = {
   id: 'linear',
   name: 'Linear',
+  kind: 'tasks',
   url: 'https://mcp.linear.app/mcp',
   transport: 'http',
   auth: 'oauth',
@@ -77,6 +78,7 @@ const linear = {
 const github = {
   id: 'github',
   name: 'GitHub',
+  kind: 'code',
   url: 'https://api.githubcopilot.com/mcp/',
   transport: 'http',
   auth: 'header',
@@ -127,10 +129,21 @@ describe('the MCP readers', () => {
     expect(openCatalog(catalog, [s]).map((e) => e.id)).toEqual(['github']);
   });
 
-  it('puts «Bearer» before a bare token in Authorization only', () => {
-    expect(headerValue('Authorization', ` ${TOKEN} `)).toBe(`Bearer ${TOKEN}`);
-    expect(headerValue('authorization', `Token ${TOKEN}`)).toBe(`Token ${TOKEN}`);
-    expect(headerValue('X-API-Key', TOKEN)).toBe(TOKEN);
+  it("puts «Bearer» (or the entry's own prefix) before a bare token in Authorization only", () => {
+    expect(headerValue('Authorization', ` ${TOKEN} `, '')).toBe(`Bearer ${TOKEN}`);
+    expect(headerValue('Authorization', TOKEN, 'OAuth ')).toBe(`OAuth ${TOKEN}`);
+    expect(headerValue('authorization', `Token ${TOKEN}`, 'OAuth ')).toBe(`Token ${TOKEN}`);
+    expect(headerValue('X-API-Key', TOKEN, '')).toBe(TOKEN);
+  });
+
+  it('groups the catalog by kind and finds by name or what it gives', () => {
+    expect(() => readMcpCatalogEntry({ ...linear, kind: 'magic' })).toThrow();
+    const all = catalogGroups(catalog, (entry) => entry, '');
+    expect(all.map((group) => group.kind)).toEqual(['tasks', 'code']);
+    expect(catalogGroups(catalog, (entry) => entry, 'git').flatMap((g) => g.items.map((e) => e.id))).toEqual([
+      'github',
+    ]);
+    expect(catalogGroups(catalog, (entry) => entry, 'nothing-like-it')).toEqual([]);
   });
 });
 
@@ -141,6 +154,32 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
     expect(screen.getByText('Agents in new chats get the tools of these servers')).toBeTruthy();
     expect(screen.getByText('Issues, projects and cycles')).toBeTruthy();
     expect(screen.getByLabelText('MCP server address')).toBeTruthy();
+  });
+
+  it('«Show all» opens the catalog in groups with a search over it', () => {
+    // GitHub is seventh, past the first six the catalog shows until «Show all».
+    const many = [
+      readMcpCatalogEntry(linear),
+      ...['a', 'b', 'c', 'd', 'e'].map((n) =>
+        readMcpCatalogEntry({
+          ...linear,
+          id: `tasks-${n}`,
+          name: `Tasks ${n}`,
+          url: `https://${n}.example.com/mcp`,
+        }),
+      ),
+      readMcpCatalogEntry(github),
+    ];
+    render(<McpSection {...props({ mcp: { servers: [], catalog: many } })} />);
+    expect(screen.queryByText('GitHub')).toBeNull();
+    fireEvent.click(screen.getByText('Show all'));
+    expect(screen.getByRole('heading', { name: 'Tasks' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Code and infrastructure' })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Find a service'), { target: { value: 'pull requests' } });
+    expect(screen.getByText('GitHub')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Tasks' })).toBeNull();
+    fireEvent.change(screen.getByLabelText('Find a service'), { target: { value: 'zzz' } });
+    expect(screen.getByText('Nothing found')).toBeTruthy();
   });
 
   it('a catalog card only fills the address: nothing is kept and no window opens', async () => {

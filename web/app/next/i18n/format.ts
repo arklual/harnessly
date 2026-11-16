@@ -107,3 +107,19 @@ export const formatWhen = (at: number, now: number): string => {
   const year = new Date(at).getFullYear();
   return year === new Date(now).getFullYear() ? date : `${date} ${year}`;
 };
+
+const KB = 1024;
+const MB = 1024 * KB;
+
+/** «4 КБ», «1,2 МБ»: a size of text for a person, to a whole KB (at least 1) or a tenth of a MB. */
+export const size = (bytes: number): string => {
+  if (bytes >= MB) {
+    const n = new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(bytes / MB);
+    return t('next.size.mb', { n });
+  }
+  return t('next.size.kb', { n: Math.max(1, Math.round(bytes / KB)) });
+};
+
+/** Under an output cut by its size: «первые 4 КБ из 120 КБ», not «Показано 4096 из 122880». */
+export const cutBySize = (shown: number, total: number): string =>
+  t('next.tool.firstBytes', { shown: size(shown), total: size(total) });

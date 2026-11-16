@@ -109,5 +109,17 @@
   "next.connections.mcp.reason.other": "The machine did not take it ({code})",
   "next.connections.mcp.state.oauthUnavailable": "This service needs a token here: it does not let new apps sign in by themselves",
   "next.connections.mcp.signInWith": "Sign in with {name}",
-  "next.connections.mcp.more": "Show all"
+  "next.connections.mcp.more": "Show all",
+  "next.connections.mcp.search": "Find a service",
+  "next.connections.mcp.nothingFound": "Nothing found",
+  "next.connections.mcp.kind.mail": "Mail",
+  "next.connections.mcp.kind.calendar": "Calendar",
+  "next.connections.mcp.kind.meetings": "Meetings",
+  "next.connections.mcp.kind.tasks": "Tasks",
+  "next.connections.mcp.kind.docs": "Docs and data",
+  "next.connections.mcp.kind.code": "Code and infrastructure",
+  "next.connections.mcp.kind.monitoring": "Monitoring",
+  "next.connections.mcp.kind.support": "Support",
+  "next.connections.mcp.kind.payments": "Payments",
+  "next.connections.mcp.kind.sites": "Sites"
 }

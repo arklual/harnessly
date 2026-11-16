@@ -78,5 +78,12 @@
   "next.limits.alert.sevenDay": "Weekly {provider} limit",
   "next.limits.alert.fiveHour": "5-hour {provider} limit",
   "next.limits.alert.text": "{left}% left, resets at {at}",
-  "next.limits.alert.textOut": "Used up, resets at {at}"
+  "next.limits.alert.textOut": "Used up, resets at {at}",
+  "next.limits.brief.five": "5 h",
+  "next.limits.brief.week": "week",
+  "next.limits.brief.month": "month",
+  "next.limits.brief.lastsTo": "Lasts until {at}",
+  "next.limits.brief.aria": "{provider}, {window}: {left}% left",
+  "next.limits.mini.tip": "{provider} limits: {windows}",
+  "next.limits.brief.model": "{model} · week"
 }

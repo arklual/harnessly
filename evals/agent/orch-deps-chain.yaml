@@ -1,0 +1,75 @@
+id: orch-deps-chain
+title: Пять частей с зависимостями — порядок важен, интерфейс первой части решает всё
+tags: [orchestration, hard]
+agents: [claude, codex]
+timeout_s: 1800
+settle_s: 45
+setup:
+  workspace: [fixtures/orch-deps]
+  run: git init -q && git add -A && git -c user.name=eval -c user.email=eval@example.test commit -qm init
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/delegation/**'
+  - 'internal/mcpserver/**'
+prompt: |-
+  Нужен отчёт по журналу сканера билетов data/scans.log (формат и правила подсчёта — data/FORMAT.md). Пять частей, каждая — отдельному агенту:
+  1) scan/record.py — модель скана и разбор строки обоих форматов (интерфейс придумывает этот агент);
+  2) scan/dedupe.py — классификация сканов по правилам FORMAT.md (вход / повтор / отказ), на интерфейсе части 1;
+  3) scan/stats.py — счётчики по воротам и уникальные билеты из результата части 2;
+  4) report.py — `python3 report.py <журнал>` печатает JSON {"entered": {ворота: n}, "duplicates": {ворота: n}, "rejected": n, "unique_tickets": n};
+  5) tests/test_report.py — тест всей цепочки на маленьком журнале, который он сам составит.
+  Части зависят друг от друга: 2 и 3 строятся на интерфейсе 1, 4 — на 3, тест — на 4. Где можно — параллельно, но чтобы всё сошлось. В конце запусти отчёт и тесты. Тесты — на unittest, запуск `python3 -m unittest discover -s tests -t .` (pytest тут не установлен).
+expect:
+  - name: helpers did the parts
+    any_of:
+      - called: harnessly\.delegate_task
+      - called: Agent|Task
+      - called: Bash
+        args: {command: 'harnessly tab create\b.*--prompt'}
+  - name: the report is exact on the given log and on a hidden one
+    check: |
+      python3 - <<'PY'
+      import json, random, subprocess, os
+      def ref(lines):
+          ent, dup, bad, seen = {}, {}, 0, set()
+          for l in lines:
+              if l.startswith("{"):
+                  d = json.loads(l); g, t, r = d["gate"], d["ticket"], d["status"]
+              else:
+                  _, g, t, r = l.split("|")
+              if r == "bad":
+                  bad += 1
+              elif r == "dup" or t in seen:
+                  dup[g] = dup.get(g, 0) + 1
+              else:
+                  seen.add(t); ent[g] = ent.get(g, 0) + 1
+          return {"entered": ent, "duplicates": dup, "rejected": bad, "unique_tickets": len(seen)}
+      def run(path):
+          out = subprocess.run(["python3", "report.py", path], capture_output=True, text=True, timeout=60)
+          assert out.returncode == 0, out.stderr[-500:]
+          d = json.loads(out.stdout)
+          for k in ("entered", "duplicates"):
+              d[k] = {g: n for g, n in d.get(k, {}).items() if n}
+          return d
+      lines = open("data/scans.log").read().splitlines()
+      got = run("data/scans.log")
+      assert got == ref(lines), f"given log: got {got}"
+      rnd = random.Random(1525)
+      hid = []
+      for i in range(300):
+          g = rnd.choice(["N", "S", "E"]); t = f"X{rnd.randint(1, 40)}"; r = rnd.choice(["ok", "ok", "dup", "bad"])
+          hid.append(json.dumps({"v": 2, "time": i, "gate": g, "ticket": t, "status": r}) if i % 3 == 0 else f"{i}|{g}|{t}|{r}")
+      p = os.path.join(os.environ.get("TMPDIR", "/tmp"), "hidden.log")
+      open(p, "w").write("\n".join(hid) + "\n")
+      got = run(p)
+      assert got == ref(hid), f"hidden log: got {got}"
+      import ast
+      for f, need in (("scan/dedupe.py", "record"), ("scan/stats.py", "dedupe"), ("report.py", "stats")):
+          mods = {n.module or "" for n in ast.walk(ast.parse(open(f).read())) if isinstance(n, ast.ImportFrom)}
+          mods |= {a.name for n in ast.walk(ast.parse(open(f).read())) if isinstance(n, ast.Import) for a in n.names}
+          assert any(need in m for m in mods), f"{f} does not build on {need}: imports {sorted(mods)}"
+      print("ok")
+      PY
+  - name: their test passes
+    check: test -s tests/test_report.py && python3 -m unittest discover -s tests -t .

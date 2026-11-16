@@ -163,6 +163,13 @@ const Rules = "\n\n---\nYou work as a delegated chat of another agent; your last
 	"- End your final message with the line " + MarkDone + " when the task is complete, or " + MarkQuestion + " when you wait for your parent's answer. " +
 	"A turn that ends without one is taken for a pause, and you will be told to go on."
 
+// TeamRules tell a delegated chat about its team: it may write to its parent and to the chats
+// delegated beside it in the middle of its turn, and take tasks off the team's list.
+const TeamRules = "\n- You can write to your parent at any moment with send_to_conversation (id \"parent\"), and to the chats delegated " +
+	"beside you (list_children names them): a short message when something they rely on changes (a contract, a shared file) " +
+	"or a question you cannot go on without; when your part must match another chat's (an API it writes), agree on it with that chat by message instead of guessing. It reaches them at their next step. Do not chat back and forth; the result goes in your final answer.\n" +
+	"- If your team keeps a task list (task_list), take tasks with task_claim, report each with task_done and give back what you cannot do with task_release."
+
 // NudgeText is what a delegated chat is told when its turn ended on a pause; n of max reminders.
 func NudgeText(n, max int) string {
 	return fmt.Sprintf("[automatic reminder %d of %d] Your last message was not a final answer. If the task is complete, answer with the result and end with the line %s. "+
@@ -279,6 +286,9 @@ func wakeText(r Result) string {
 // SentText is the answer of send_to_conversation: where the message went, in words the sender can act on.
 func SentText(s Sent) string {
 	var line string
+	if s.How == DeliverInterrupt && s.Where != convo.PeerFailed {
+		return "interrupted the running turn of " + Head(s.To) + " (its foreground command was stopped) and gave it the message: it reads it now.\nwait_conversation for its answer."
+	}
 	switch s.Where {
 	case convo.PeerInTurn:
 		line = "delivered into the running turn of " + Head(s.To) + ": the agent reads it at its next step."

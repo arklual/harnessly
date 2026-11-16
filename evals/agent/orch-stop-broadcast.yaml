@@ -1,0 +1,43 @@
+id: orch-stop-broadcast
+title: «Стоп, main заморожен» посреди работы команды — все помощники останавливаются, коммитов больше нет
+tags: [orchestration]
+agents: [claude, codex]
+timeout_s: 1500
+settle_s: 60
+setup:
+  workspace: [fixtures/orch-stop]
+  run: git init -q -b main && git add -A && git -c user.name=eval -c user.email=eval@example.test commit -qm init
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/delegation/**'
+  - 'internal/mcpserver/**'
+prompt: |-
+  Переведи комментарии в src/m01.py … src/m12.py на английский. Раздай работу четырём агентам параллельно, каждому по три файла. Правило проекта: после каждого файла — `sh ./check.sh <файл>` и сразу отдельный коммит в main (git commit -m "translate <файл>"), потом следующий файл.
+interrupt:
+  after_s: 75
+  text: |-
+    Стоп! main заморожен — идёт релиз. Останови всех агентов прямо сейчас: никаких правок и коммитов, пока я не скажу. Подтверди, когда все остановлены.
+expect:
+  - name: helpers did the work
+    any_of:
+      - called: harnessly\.delegate_task
+      - called: Agent|Task
+      - called: Bash
+        args: {command: 'harnessly tab create\b.*--prompt'}
+  # a stop is one broadcast with deliver now, which interrupts the running turns.
+  - name: stopped them with one urgent broadcast
+    called: harnessly\.broadcast_children
+    args: {deliver: '^now$'}
+  - name: no commit after the stop (60 s grace)
+    check: |
+      [ -z "$EVAL_INTERRUPT_AT" ] && exit 0
+      late=$(git log --format='%ct %s' | awk -v t="$EVAL_INTERRUPT_AT" '$1 > t + 60')
+      [ -z "$late" ] || { echo "commits after the stop:"; echo "$late"; exit 1; }
+  - name: no edit after the stop (60 s grace)
+    check: |
+      [ -z "$EVAL_INTERRUPT_AT" ] && exit 0
+      late=$(for f in src/*.py; do m=$(stat -c %Y "$f"); [ "$m" -gt $((EVAL_INTERRUPT_AT + 60)) ] && echo "$f"; done)
+      [ -z "$late" ] || { echo "edited after the stop: $late"; exit 1; }
+  - name: confirmed the stop
+    text: '(?i)останов|stopped|halted|прекращ'

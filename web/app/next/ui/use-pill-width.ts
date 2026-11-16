@@ -10,12 +10,13 @@ export const usePillWidth = () => {
     const pill = outerRef.current;
     if (!pill) return;
     const style = getComputedStyle(pill);
+    const px = (value: string) => parseFloat(value) || 0;
     const frame =
-      parseFloat(style.paddingLeft) +
-      parseFloat(style.paddingRight) +
-      parseFloat(style.borderLeftWidth) +
-      parseFloat(style.borderRightWidth);
-    pill.style.setProperty('--hx-pill-w', `${Math.ceil(content.getBoundingClientRect().width + frame)}px`);
+      px(style.paddingLeft) + px(style.paddingRight) + px(style.borderLeftWidth) + px(style.borderRightWidth);
+    // The laid-out width, not getBoundingClientRect: the content enters with a scale (hx-net-swap), and a rect taken
+    // mid-animation is a few pixels short, which no resize ever corrects — the button at the end was cut in half.
+    const width = parseFloat(getComputedStyle(content).width) || content.offsetWidth;
+    pill.style.setProperty('--hx-pill-w', `${Math.ceil(width + frame)}px`);
   };
 
   const outer = useCallback((node: HTMLElement | null) => {

@@ -707,6 +707,16 @@ func TestPagesRoute(t *testing.T) {
 	if code != 200 || !strings.Contains(body, `"file":"New.dc.html"`) || !strings.Contains(body, `"w":390`) || !strings.Contains(body, `"expand":"fill"`) {
 		t.Fatalf("create: %d %s", code, body)
 	}
+	// From a chat the new board opens in its pane on itself, not on the project's first page.
+	var shown []string
+	a.OpenPane = func(session, ref, board string) bool { shown = append(shown, session+" "+ref+" "+board); return true }
+	if code, body := call("POST", "/api/cli/design/pages", `{"action":"create","project":"files","title":"Made","session":"tk-ws-1-tab-a"}`); code != 200 {
+		t.Fatalf("create from a chat: %d %s", code, body)
+	}
+	if len(shown) != 1 || shown[0] != "tk-ws-1-tab-a files Made.dc.html" {
+		t.Fatalf("pane asked: %q", shown)
+	}
+	a.OpenPane = nil
 	if code, body := call("POST", "/api/cli/design/pages", `{"action":"rename","project":"files","page":"New","title":"Newer"}`); code != 200 || !strings.Contains(body, `"title":"Newer"`) {
 		t.Fatalf("rename: %d %s", code, body)
 	}

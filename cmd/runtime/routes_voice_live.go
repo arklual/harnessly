@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/ly-solutions/harnessly/internal/journal"
@@ -112,7 +113,6 @@ func voiceLiveRoutes(d deps) []gate.Route {
 	}
 	var routes []gate.Route
 	for _, base := range []string{platformAPI + "/voice/live", "/agents" + platformAPI + "/voice/live"} {
-		base := base
 		var h http.Handler
 		var once sync.Once
 		routes = append(routes, gate.Route{
@@ -161,14 +161,15 @@ func voicePrimed(route string, sizes map[string]int) {
 			sizes["about"], sizes["notes"], sizes["screen"])})
 }
 
-// voiceRelayed journals how the machine's connection of a call over the machine goes (voice.relay).
-func voiceRelayed(level, text string) {
+// voiceRelayed journals how the machine's connection of a call over the machine goes (voice.relay), in the scope of
+// the call's start: with the chat's id the chat's agent sees the lines, as it sees the page's voice.connect-timeout.
+func voiceRelayed(ctx context.Context, level, text string) {
 	l := journal.Info
 	if level == "warn" {
 		l = journal.Warn
 	}
-	journal.Add(journal.Entry{At: time.Now().UnixMilli(), Level: l, Source: journal.SourceRuntime,
-		Event: "voice.relay", Text: text})
+	journal.Add(journal.Fill(ctx, journal.Entry{At: time.Now().UnixMilli(), Level: l, Source: journal.SourceRuntime,
+		Event: "voice.relay", Text: text}))
 }
 
 // voiceLiveFlag marks the chat a call is opened from while it lasts: a file named by the agent's tmux session under

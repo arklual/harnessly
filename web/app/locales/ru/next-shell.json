@@ -1288,6 +1288,7 @@
   "next.sidebar.groupRenameFailed": "Не удалось переименовать группу",
   "next.sidebar.groupDeleteFailed": "Не удалось удалить группу",
   "next.sidebar.groupMoveFailed": "Не удалось переставить группу",
+  "next.sidebar.navFailed": "Не удалось сохранить меню",
   "next.sidebar.newGroup": "Новая группа",
   "next.sidebar.groupEmpty": "Перетащите чат сюда",
   "next.sidebar.favoritesEmpty": "Закрепите чат или перетащите его сюда",

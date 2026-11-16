@@ -1,0 +1,131 @@
+{
+ "day": 1,
+ "records": [
+  {
+   "order": "o1-0",
+   "city": "Тула",
+   "status": "paid",
+   "amount_rub": 1653
+  },
+  {
+   "order": "o1-1",
+   "city": "Тула",
+   "status": "paid",
+   "amount_rub": 5403
+  },
+  {
+   "order": "o1-2",
+   "city": "Москва",
+   "status": "refunded",
+   "amount_rub": 3228
+  },
+  {
+   "order": "o1-3",
+   "city": "Тула",
+   "status": "pending",
+   "amount_rub": 5686
+  },
+  {
+   "order": "o1-4",
+   "city": "Пермь",
+   "status": "paid",
+   "amount_rub": 2005
+  },
+  {
+   "order": "o1-5",
+   "city": "Казань",
+   "status": "refunded",
+   "amount_rub": 2282
+  },
+  {
+   "order": "o1-6",
+   "city": "Пермь",
+   "status": "pending",
+   "amount_rub": 6159
+  },
+  {
+   "order": "o1-7",
+   "city": "Сочи",
+   "status": "paid",
+   "amount_rub": 6747
+  },
+  {
+   "order": "o1-8",
+   "city": "Казань",
+   "status": "paid",
+   "amount_rub": 1255
+  },
+  {
+   "order": "o1-9",
+   "city": "Пермь",
+   "status": "paid",
+   "amount_rub": 7781
+  },
+  {
+   "order": "o1-10",
+   "city": "Москва",
+   "status": "paid",
+   "amount_rub": 5926
+  },
+  {
+   "order": "o1-11",
+   "city": "Тула",
+   "status": "paid",
+   "amount_rub": 3902
+  },
+  {
+   "order": "o1-12",
+   "city": "Пермь",
+   "status": "paid",
+   "amount_rub": 5634
+  },
+  {
+   "order": "o1-13",
+   "city": "Казань",
+   "status": "refunded",
+   "amount_rub": 3081
+  },
+  {
+   "order": "o1-14",
+   "city": "Тула",
+   "status": "paid",
+   "amount_rub": 6483
+  },
+  {
+   "order": "o1-15",
+   "city": "Тула",
+   "status": "refunded",
+   "amount_rub": 3593
+  },
+  {
+   "order": "o1-16",
+   "city": "Москва",
+   "status": "refunded",
+   "amount_rub": 473
+  },
+  {
+   "order": "o1-17",
+   "city": "Москва",
+   "status": "pending",
+   "amount_rub": 1870
+  },
+  {
+   "order": "o1-18",
+   "city": "Казань",
+   "status": "paid",
+   "amount_rub": 7368
+  },
+  {
+   "order": "o1-19",
+   "city": "Сочи",
+   "status": "pending",
+   "amount_rub": 926
+  },
+  {
+   "order": "o1-20",
+   "city": "Казань",
+   "status": "refunded",
+   "amount_rub": 276
+  }
+ ]
+}

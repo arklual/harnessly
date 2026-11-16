@@ -83,7 +83,12 @@ func (s *Service) machinesList(w http.ResponseWriter, r *http.Request, p *auth.P
 	}
 	cur := s.currency(ctx, x.org.Currency, span{from: x.now, to: x.now, loc: x.loc})
 	out := make([]machines.HubMachine, 0, len(hs))
-	for _, h := range hs {
+	for i, h := range hs {
+		see, err := s.machines.MaySeeDebug(ctx, p, ms[i])
+		if err != nil {
+			return err
+		}
+		h.CanSeeDebug = see
 		if w := h.Week; w != nil && w.Calls > w.Unpriced {
 			spend := cur.Micros(w.SpendMicros)
 			w.Spend = &spend

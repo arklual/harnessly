@@ -387,6 +387,7 @@ export type HubMachine = {
   access: { kind: 'user' | 'team'; id: string; label: string }[]; // empty: everyone in its tenant
   problems: MachineProblem[];
   opensRuntime?: boolean; // false: the hub only observes the machine and cannot open its runtime (absent: an older hub)
+  canSeeDebug?: boolean; // the viewer may read its openings for debugging (GET /api/machines/{id}/debug); absent: an older hub
   // The rest is filled only for an organization with the `machine.resources` feature on (docs/hub/machines-resources.md);
   // with it off these are null, and activeOps is empty.
   cloud: MachineCloud | null; // null: the hub knows no server of the machine

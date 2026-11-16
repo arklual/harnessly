@@ -101,6 +101,7 @@ import type { IPlusAttach } from '@/next/features/composer/plus-menu';
 import type { IPlusApps } from '@/next/features/composer/apps-pane';
 import { useInstalledApps } from '@/next/features/app-views/api';
 import { ConsentAsks } from '@/next/features/app-consent/consent-ask';
+import { ConnectorActions } from '@/next/bindings/connector-actions';
 import { SettingsProposals } from '@/next/bindings/settings-proposals';
 import { useChatApps } from '@/next/bindings/use-chat-apps';
 import { REFS_MAX, type MessageRef } from '@/next/protocol/v2';
@@ -608,6 +609,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
       />
       <ConsentAsks machine={machine} conversation={conv} variant="dock" watch />
       <SettingsProposals machine={machine} conversation={conv} />
+      <ConnectorActions machine={machine} conversation={conv} />
       <DockBar notice={keyNotice} />
       <DockBar notice={moveNotice} />
       <DockBar notice={voiceNotice} />

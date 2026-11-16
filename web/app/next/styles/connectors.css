@@ -1,0 +1,229 @@
+/* Connectors in Settings → Connections (features/connectors): the rows reuse .hx-conn-row; the catalog is a quiet
+   list of cards by kind, each opening its form in place (.hx-reveal folds it open and shut). Theme colours only. */
+
+.hx-icon[data-i='calendar'] {
+  --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M8 2v4%22 /%3E%3Cpath d=%22M16 2v4%22 /%3E%3Crect width=%2218%22 height=%2218%22 x=%223%22 y=%224%22 rx=%222%22 /%3E%3Cpath d=%22M3 10h18%22 /%3E%3C/svg%3E');
+}
+.hx-icon[data-i='rss'] {
+  --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M4 11a9 9 0 0 1 9 9%22 /%3E%3Cpath d=%22M4 4a16 16 0 0 1 16 16%22 /%3E%3Ccircle cx=%225%22 cy=%2219%22 r=%221%22 /%3E%3C/svg%3E');
+}
+
+.hx-cx-glyph {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-2);
+}
+
+.hx-cx-row__acts {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+/* The step a connection still waits for from the person (a bot's pairing link): quiet words and the link. */
+.hx-cx-row__next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 2px;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  line-height: 1.4;
+  white-space: normal;
+}
+.hx-cx-row__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--hx-accent);
+  font-weight: var(--hx-weight-medium);
+  text-decoration: none;
+  transition: opacity 160ms var(--hx-ease-out);
+}
+.hx-cx-row__link:hover {
+  opacity: 0.8;
+}
+
+.hx-cx-kind + .hx-cx-kind {
+  border-top: 1px solid var(--hx-border);
+}
+.hx-cx-kind__title {
+  padding: 12px 16px 4px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+}
+
+.hx-cx-card__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 16px;
+  border: 0;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-cx-card__head:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-cx-card__head:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: -2px;
+}
+.hx-cx-card__title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-cx-card__chev {
+  color: var(--hx-fg-3);
+  transition: transform var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-cx-card[data-open] .hx-cx-card__chev {
+  transform: rotate(180deg);
+}
+
+.hx-cx-form {
+  display: grid;
+  gap: 12px;
+  padding: 4px 16px 16px 60px;
+}
+.hx-cx-field {
+  display: grid;
+  gap: 6px;
+}
+/* A value shown once (a webhook's address, its secret): the value and its copy button on one line. */
+.hx-cx-shown {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+.hx-cx-shown__value {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--hx-font-mono, ui-monospace, monospace);
+  font-size: var(--hx-text-xs);
+}
+.hx-cx-hint {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  line-height: 1.4;
+}
+
+.hx-cx-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hx-cx-choice {
+  padding: 6px 12px;
+  border: 1px solid var(--hx-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--hx-dur-sm) var(--hx-ease-out),
+    color var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-cx-choice[data-on] {
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
+}
+
+@media (max-width: 560px) {
+  .hx-cx-form {
+    padding-left: 16px;
+  }
+  .hx-cx-row__acts {
+    flex-direction: column;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-cx-card__head,
+  .hx-cx-card__chev,
+  .hx-cx-choice {
+    transition: none;
+  }
+}
+
+/* The card of an action an agent proposes: every argument as it will be used. */
+.hx-cx-args {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 0;
+  font-size: var(--hx-text-sm);
+}
+.hx-cx-args__row {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+.hx-cx-args dt {
+  flex: none;
+  color: var(--hx-fg-3);
+}
+.hx-cx-args dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--hx-fg-1);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* «Rules» of a connection: a line per default rule, its name above what it does, a switch at the end; the words of a
+   rule that has them fold out under it while it is on. */
+.hx-cx-rules {
+  display: grid;
+  gap: 4px;
+}
+.hx-cx-rules__skeleton {
+  display: block;
+  height: 44px;
+  border-radius: var(--hx-radius-md);
+}
+.hx-cx-rule {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  padding: 8px 0;
+}
+.hx-cx-rule__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.hx-cx-rule__title {
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-md);
+}
+.hx-cx-rule__sub {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+.hx-cx-rule > .hx-reveal {
+  grid-column: 1 / -1;
+}
+.hx-cx-rule__words {
+  display: grid;
+  gap: 4px;
+  padding-top: 8px;
+}

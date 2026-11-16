@@ -554,6 +554,8 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(backgroundRoutes(d)...)
 	f.Add(searchRoutes(d)...)
 	f.Add(uiAgentRoutes(d)...)
+	f.Add(sideWidgetRoutes(d)...)
+	f.Add(sideWidgetCLIRoutes(d)...)
 	f.Add(settingsCtlRoutes(d, ref.c)...)
 	setupRunners := envSetupRunners(d, os.Getenv("AGENT_HUB_OBSERVE_FILE"), cfg.Version)
 	// The organization's rule for apps comes with the hub's list (apps_consent_policy.go).
@@ -563,6 +565,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(envSetupRoutes(d, setupRunners)...)
 	f.Add(basepkgRoutes(d)...)
 	f.Add(connectionRoutes(d)...)
+	f.Add(connectorRoutes(d, ref.c)...)
 	f.Add(mcpRoutes(d)...)
 	f.Add(journalRoutes(d)...)
 	f.Add(uiEventRoutes(d, func() *telemetry.Queue { return ref.c.cfg.Telemetry })...)

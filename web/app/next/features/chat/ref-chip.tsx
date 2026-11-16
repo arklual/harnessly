@@ -12,6 +12,8 @@ import { useLinkMenu } from '@/next/features/chat/link-menu';
 import { LINK_PLACE, linkPlace, openOutside, opensOutside } from '@/next/features/chat/pane-sites';
 import { bareRef } from '@/next/features/chat/refs';
 import { usePaneSites } from '@/next/stores/pane-sites';
+import { useConversation, useConvsAnswered } from '@/next/stores/conversations';
+import type { ConvId } from '@/next/protocol/v2';
 import type { RefInfo, RefKind } from '@/next/features/chat/types';
 import Icon, { type TIconName } from '@/next/ui/icon';
 import { t } from '@/next/i18n';
@@ -30,6 +32,7 @@ const ICONS: Record<RefKind, TIconName> = {
   mr: 'git-pull-request',
   file: 'file-code',
   link: 'link',
+  chat: 'message-square',
 };
 
 const KIND_KEYS: Record<RefKind, string> = {
@@ -37,6 +40,7 @@ const KIND_KEYS: Record<RefKind, string> = {
   mr: 'next.ref.mr',
   file: 'next.ref.file',
   link: 'next.ref.link',
+  chat: 'next.ref.chat',
 };
 
 interface IRefChipProps {
@@ -129,8 +133,55 @@ const LinkChip = ({ kind, label, href, text }: ILinkChipProps) => {
   );
 };
 
+/**
+ * A chat the agent's text names: its icon and its title; a click opens it, as its row in the sidebar does.
+ * A chat that is gone is a quiet chip saying so; a bare id of no chat known stays text.
+ */
+const ChatChip = ({ id, text, linked }: { id: string; text?: string; linked: boolean }) => {
+  const { onOpen } = useContext(RefContext);
+  const conv = useConversation(id as ConvId);
+  const answered = useConvsAnswered(null);
+  const gone = !conv && answered;
+  const words = conv?.title || text || id;
+  if (gone && !linked) return <>{text ?? id}</>;
+  if (gone)
+    return (
+      <span
+        className="hx-ref"
+        data-type="chat"
+        data-gone="true"
+        title={t('next.ref.chatGone')}
+        aria-disabled="true"
+      >
+        <Icon name={ICONS.chat} size="sm" />
+        <span className="hx-ref__label">{text || id}</span>
+      </span>
+    );
+  const open = () => onOpen?.('chat', id, null);
+  return (
+    <span
+      className="hx-ref"
+      data-type="chat"
+      title={t('next.ref.chatOpen')}
+      role="button"
+      tabIndex={0}
+      onClick={open}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          open();
+        }
+      }}
+    >
+      <Icon name={ICONS.chat} size="sm" />
+      <span className="hx-ref__label">{words}</span>
+    </span>
+  );
+};
+
 const RefChip = ({ kind, label, href = null, text, hint }: IRefChipProps) => {
   const { onOpen } = useContext(RefContext);
+  if (kind === 'chat') return <ChatChip id={label} text={text} linked={href !== null} />;
   if ((kind === 'link' || kind === 'mr') && opensOutside(href))
     return <LinkChip kind={kind} label={label} href={href} text={text} />;
   const open = () => onOpen?.(kind, label, href);

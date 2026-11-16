@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { t } from '@/next/i18n';
 import { useDelayed as useDelayedFlag } from '@/next/ui/skeleton';
 import Spinner from '@/next/ui/spinner';
+import LookBackdrop from '@/next/features/looks/backdrop';
 
 export interface IChatStageProps {
   /** The chat's feed and composer from the chat feature; null while the chat is not there yet. */
@@ -69,6 +70,7 @@ const ChatStage = ({
       data-arrive={fromHome ? 'home' : undefined}
       data-side={side ? 'true' : undefined}
     >
+      <LookBackdrop />
       {missing && (
         <div className="hx-chatmiss" role="status">
           <b>{t('next.chatStage.missing')}</b>

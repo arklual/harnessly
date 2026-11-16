@@ -1,0 +1,200 @@
+[
+  {
+    "id": "matrix",
+    "name": "Матрица",
+    "nameEn": "Matrix",
+    "look": {
+      "v": 1,
+      "mode": "dark",
+      "hues": [{ "h": 142, "s": 80 }],
+      "intensity": 55,
+      "bg": { "kind": "scene", "scene": "matrix" },
+      "grain": 12,
+      "dim": 35,
+      "blur": 0,
+      "font": "mono",
+      "parts": { "bubble": "outline", "composer": "glass" }
+    }
+  },
+  {
+    "id": "stars",
+    "name": "Звёзды",
+    "nameEn": "Stars",
+    "look": {
+      "v": 1,
+      "mode": "dark",
+      "hues": [
+        { "h": 255, "s": 55 },
+        { "h": 290, "s": 40 }
+      ],
+      "intensity": 50,
+      "bg": { "kind": "scene", "scene": "stars" },
+      "grain": 6,
+      "dim": 20,
+      "blur": 0,
+      "parts": { "composer": "glass" }
+    }
+  },
+  {
+    "id": "aurora",
+    "name": "Северное сияние",
+    "nameEn": "Aurora",
+    "look": {
+      "v": 1,
+      "mode": "dark",
+      "hues": [
+        { "h": 160, "s": 75 },
+        { "h": 200, "s": 65 },
+        { "h": 290, "s": 55 }
+      ],
+      "intensity": 60,
+      "bg": { "kind": "scene", "scene": "aurora" },
+      "grain": 14,
+      "dim": 30,
+      "blur": 0,
+      "parts": { "composer": "glass", "turns": "glass" }
+    }
+  },
+  {
+    "id": "rain",
+    "name": "Дождь на стекле",
+    "nameEn": "Rain on glass",
+    "look": {
+      "v": 1,
+      "mode": "dark",
+      "hues": [{ "h": 215, "s": 45 }],
+      "intensity": 45,
+      "bg": { "kind": "scene", "scene": "rain" },
+      "grain": 10,
+      "dim": 30,
+      "blur": 0,
+      "parts": { "composer": "glass" }
+    }
+  },
+  {
+    "id": "synthwave",
+    "name": "Синтвейв",
+    "nameEn": "Synthwave",
+    "look": {
+      "v": 1,
+      "mode": "dark",
+      "hues": [
+        { "h": 325, "s": 85 },
+        { "h": 280, "s": 70 },
+        { "h": 195, "s": 75 }
+      ],
+      "intensity": 70,
+      "bg": { "kind": "scene", "scene": "synthwave" },
+      "grain": 16,
+      "dim": 35,
+      "blur": 0,
+      "radius": "sharp",
+      "parts": { "bubble": "outline", "composer": "glass" }
+    }
+  },
+  {
+    "id": "twinkle",
+    "name": "Мерцание",
+    "nameEn": "Twinkle",
+    "look": {
+      "v": 1,
+      "mode": "auto",
+      "hues": [{ "h": 45, "s": 60 }],
+      "intensity": 35,
+      "bg": { "kind": "scene", "scene": "twinkle" },
+      "grain": 0,
+      "dim": 10,
+      "blur": 0,
+      "parts": {}
+    }
+  },
+  {
+    "id": "paper",
+    "name": "Бумага",
+    "nameEn": "Paper",
+    "look": {
+      "v": 1,
+      "mode": "light",
+      "hues": [{ "h": 70, "s": 30 }],
+      "intensity": 55,
+      "bg": { "kind": "scene", "scene": "paper" },
+      "grain": 40,
+      "dim": 0,
+      "blur": 0,
+      "font": "serif",
+      "parts": { "bubble": "soft" }
+    }
+  },
+  {
+    "id": "lava",
+    "name": "Лава-лампа",
+    "nameEn": "Lava lamp",
+    "look": {
+      "v": 1,
+      "mode": "dark",
+      "hues": [
+        { "h": 25, "s": 85 },
+        { "h": 340, "s": 75 }
+      ],
+      "intensity": 60,
+      "bg": { "kind": "scene", "scene": "lava" },
+      "grain": 18,
+      "dim": 35,
+      "blur": 0,
+      "radius": "round",
+      "parts": { "composer": "glass" }
+    }
+  },
+  {
+    "id": "snow",
+    "name": "Снегопад",
+    "nameEn": "Snowfall",
+    "look": {
+      "v": 1,
+      "mode": "auto",
+      "hues": [{ "h": 210, "s": 40 }],
+      "intensity": 40,
+      "bg": { "kind": "scene", "scene": "snow" },
+      "grain": 4,
+      "dim": 10,
+      "blur": 0,
+      "parts": {}
+    }
+  },
+  {
+    "id": "topo",
+    "name": "Топография",
+    "nameEn": "Topography",
+    "look": {
+      "v": 1,
+      "mode": "auto",
+      "hues": [{ "h": 170, "s": 50 }],
+      "intensity": 40,
+      "bg": { "kind": "scene", "scene": "topo" },
+      "grain": 8,
+      "dim": 0,
+      "blur": 0,
+      "parts": {}
+    }
+  },
+  {
+    "id": "tokyo",
+    "name": "Ночной Токио",
+    "nameEn": "Tokyo night",
+    "look": {
+      "v": 1,
+      "mode": "dark",
+      "hues": [
+        { "h": 320, "s": 80 },
+        { "h": 265, "s": 65 },
+        { "h": 195, "s": 70 }
+      ],
+      "intensity": 65,
+      "bg": { "kind": "gradient" },
+      "grain": 22,
+      "dim": 15,
+      "blur": 0,
+      "parts": { "composer": "glass", "sidebar": "tinted" }
+    }
+  }
+]

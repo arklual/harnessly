@@ -294,4 +294,13 @@ func TestMachinePageReadsTheChatsFromTheHub(t *testing.T) {
 	if r := owner.Do("GET", base+"/api/v2/chat-move/status?machine="+a.MachineID+"&conv=tab-a", nil); r.Code == 404 {
 		t.Errorf("chat-move status: %s", r)
 	}
+	// So is whether a rollout is under way: the machine's page says so over its losses of connection too.
+	var roll struct {
+		Active *bool `json:"active"`
+	}
+	if r := owner.Do("GET", base+"/api/v2/rollout", nil); r.Code != 200 {
+		t.Errorf("rollout: %s", r)
+	} else if r.JSON(&roll); roll.Active == nil {
+		t.Errorf("rollout without «active»: %s", r)
+	}
 }

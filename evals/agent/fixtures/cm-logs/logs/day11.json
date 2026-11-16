@@ -1,0 +1,125 @@
+{
+ "day": 11,
+ "records": [
+  {
+   "order": "o11-0",
+   "city": "Москва",
+   "status": "pending",
+   "amount_rub": 5992
+  },
+  {
+   "order": "o11-1",
+   "city": "Пермь",
+   "status": "refunded",
+   "amount_rub": 623
+  },
+  {
+   "order": "o11-2",
+   "city": "Тула",
+   "status": "paid",
+   "amount_rub": 8384
+  },
+  {
+   "order": "o11-3",
+   "city": "Тула",
+   "status": "pending",
+   "amount_rub": 2949
+  },
+  {
+   "order": "o11-4",
+   "city": "Тула",
+   "status": "paid",
+   "amount_rub": 1936
+  },
+  {
+   "order": "o11-5",
+   "city": "Тула",
+   "status": "refunded",
+   "amount_rub": 3955
+  },
+  {
+   "order": "o11-6",
+   "city": "Сочи",
+   "status": "pending",
+   "amount_rub": 4297
+  },
+  {
+   "order": "o11-7",
+   "city": "Казань",
+   "status": "paid",
+   "amount_rub": 8113
+  },
+  {
+   "order": "o11-8",
+   "city": "Тула",
+   "status": "paid",
+   "amount_rub": 8274
+  },
+  {
+   "order": "o11-9",
+   "city": "Пермь",
+   "status": "paid",
+   "amount_rub": 3417
+  },
+  {
+   "order": "o11-10",
+   "city": "Тула",
+   "status": "paid",
+   "amount_rub": 7446
+  },
+  {
+   "order": "o11-11",
+   "city": "Казань",
+   "status": "paid",
+   "amount_rub": 2587
+  },
+  {
+   "order": "o11-12",
+   "city": "Тула",
+   "status": "paid",
+   "amount_rub": 8228
+  },
+  {
+   "order": "o11-13",
+   "city": "Сочи",
+   "status": "pending",
+   "amount_rub": 7336
+  },
+  {
+   "order": "o11-14",
+   "city": "Пермь",
+   "status": "paid",
+   "amount_rub": 1288
+  },
+  {
+   "order": "o11-15",
+   "city": "Москва",
+   "status": "paid",
+   "amount_rub": 9000
+  },
+  {
+   "order": "o11-16",
+   "city": "Тула",
+   "status": "paid",
+   "amount_rub": 2495
+  },
+  {
+   "order": "o11-17",
+   "city": "Москва",
+   "status": "paid",
+   "amount_rub": 7069
+  },
+  {
+   "order": "o11-18",
+   "city": "Москва",
+   "status": "paid",
+   "amount_rub": 8709
+  },
+  {
+   "order": "o11-19",
+   "city": "Пермь",
+   "status": "pending",
+   "amount_rub": 8264
+  }
+ ]
+}

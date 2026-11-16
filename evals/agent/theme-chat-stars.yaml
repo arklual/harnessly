@@ -1,0 +1,30 @@
+id: theme-chat-stars
+title: «Фон со звёздами в этом чате» — свой вид одного чата
+tags: [looks]
+timeout_s: 240
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'internal/looks/**'
+  - 'internal/hlcli/theme.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+prompt: сделай в этом чате фон со звёздами, остальные не трогай
+expect:
+  - name: stars on this chat
+    any_of:
+      - called: harnessly\.theme_set
+        args: {scope: '^chat$'}
+      - called: Bash
+        args: {command: 'harnessly theme (preset|set)\b(?s:.*)--scope[ =]chat'}
+  - name: did not change every chat
+    not_called: harnessly\.theme_set
+    args: {scope: '^all$'}
+variants:
+  - id: v1
+    kind: short
+    text: "звёзды на фон только этого чата"
+  - id: v2
+    kind: english
+    text: "starry background in this chat only"
+  - id: v3
+    kind: indirect
+    text: "хочу космос за сообщениями вот здесь"

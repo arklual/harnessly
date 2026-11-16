@@ -8,10 +8,11 @@ import type {
   MessageRef,
   PermissionMode,
   TerminalAside,
+  ToolCall,
   TurnOutput,
 } from '@/next/protocol/v2';
 
-export type { ImageGen, OutputKind, TurnOutput } from '@/next/protocol/v2';
+export type { ImageGen, OutputKind, ToolCall, TurnOutput } from '@/next/protocol/v2';
 
 export type Ms = number;
 export type EntryId = string;
@@ -84,6 +85,8 @@ export type ToolEntry = EntryBase & {
   output: ToolOutput | null;
   /** A call that draws pictures: the card shows them. */
   images?: ImageGen;
+  /** What the call says of itself (a command's description, a Read's lines) and how it ended (time, exit code, output's tail). */
+  call?: ToolCall;
 };
 export type SubagentEntry = EntryBase & {
   t: 'subagent';
@@ -270,6 +273,11 @@ export interface TurnItem {
   auto?: AutoMark;
   /** The screen of the agent's terminal closed before the message went in (the person's /login, a picker). */
   cleared?: TerminalAside;
+  /**
+   * A restart cut this turn short and the runtime goes on by itself (its «go on» is on its way or became the next
+   * turn): the line under it says so, the turn shows no failure of its own. Absent for any other turn.
+   */
+  wentOn?: true;
 }
 
 /** A message of the person that has no turn yet: going out, refused, or waiting for the network. */
@@ -342,7 +350,7 @@ export interface OriginItem {
 export type FeedItem = TurnItem | OutgoingItem | ModelSwitchItem | RewoundItem | OriginItem;
 
 /** A reference the agent's text mentions: a task, a merge request, a file or a link. */
-export type RefKind = 'task' | 'mr' | 'file' | 'link';
+export type RefKind = 'task' | 'mr' | 'file' | 'link' | 'chat';
 
 export interface RefInfo {
   kind: RefKind;

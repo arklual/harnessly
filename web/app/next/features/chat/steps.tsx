@@ -1,7 +1,7 @@
 // The agent's work inside a turn, compact (not a log): a thought, one line per tool with its output
 // on a click, a run of tools folded into «K actions», subagents, dynamic workflows, a compaction divider and notices.
 import type { MachineId } from '@/next/protocol/v2';
-import { memo, useContext, useState, type ReactNode } from 'react';
+import { memo, useContext, useEffect, useState, type ReactNode } from 'react';
 import Md from '@/next/features/chat/md';
 import type {
   AnswersEntry,
@@ -31,9 +31,12 @@ import { setHookOff, useInstalledApps } from '@/next/features/app-views/api';
 import { type IGuardDenial, parseGuardDenial } from '@/next/features/app-views/guard-denial';
 import { parseWidgetRef } from '@/next/features/app-views/widgets';
 import { loadOutput } from '@/next/commands/pages';
+import CopyButton from '@/next/features/chat/copy-button';
+import { groupLabel, type IStepLine, stepLine, stepMeta, stepPreview } from '@/next/features/chat/step-line';
 import Icon, { type TIconName } from '@/next/ui/icon';
 import { useSeen } from '@/next/ui/presence';
 import { plural, t } from '@/next/i18n';
+import { cutBySize } from '@/next/i18n/format';
 
 /** How a tool reads in the feed: an icon and a verb, by the tool's name in the agent (Claude and Codex). */
 const TOOL_KINDS = [
@@ -148,20 +151,54 @@ const WholeOutput = ({ entry }: { entry: ToolEntry }) => {
 
 const MCP_PREFIX = 'mcp__';
 
+/** Now, every second while on: a running step counts how long it has been going. */
+const useNowWhile = (on: boolean): number => {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!on) return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [on]);
+  return now;
+};
+
+/** A step's line in words: the agent's description of a command, or the verb and what it works on. */
+export const lineOf = (entry: ToolEntry): IStepLine => stepLine(entry, stepView(entry).detail);
+
+/** The whole command of a shell step, with its copy button: the line shows its meaningful part only. */
+const CommandBlock = ({ command }: { command: string }) => (
+  <div className="hx-tool__cmd">
+    <div className="hx-tool__cmdhead">
+      <span>{t('next.tool.command')}</span>
+      <CopyButton text={command} />
+    </div>
+    <pre className="hx-tool__cmdtext">{command}</pre>
+  </div>
+);
+
 const ToolStep = memo(({ entry }: { entry: ToolEntry }) => {
   const [open, setOpen] = useState(false);
   const seen = useSeen(open);
-  const { icon, label, detail } = stepView(entry);
+  const { icon, label } = stepView(entry);
+  const line = lineOf(entry);
   const denial = entry.ok === false ? parseGuardDenial(entry.output?.text) : null;
   const text = denial ? denial.reason : entry.output?.text;
   const guardText = denial === null ? null : guardLabel(denial, label);
-  const has = Boolean(text);
+  // The whole command opens too when the line shows a description, or only the command's meaningful part.
+  const command =
+    !denial && line.command && (line.title || line.command !== line.detail) ? line.command : null;
+  const has = Boolean(text) || command !== null;
   // A failed MCP tool answers with an error text, not with output: one line of the reason, the raw text folded.
   // It is taken apart only once the card was opened.
   const error = entry.ok === false && !denial && text && entry.tool.startsWith(MCP_PREFIX) ? text : null;
-  let meta = '';
-  if (entry.ok === null) meta = t('next.tool.running');
-  else if (entry.ok === false && !denial) meta = t('next.tool.failed');
+  const now = useNowWhile(entry.ok === null);
+  const meta = denial ? null : stepMeta(entry, now);
+  const preview = denial ? null : stepPreview(entry, line.kind);
+  const shownLines = text ? text.split('\n').length : 0;
+  const cutLines =
+    !denial && !entry.output?.truncated && entry.call?.lines && entry.call.lines > shownLines
+      ? entry.call.lines
+      : null;
   return (
     <div
       className="hx-tool"
@@ -174,6 +211,7 @@ const ToolStep = memo(({ entry }: { entry: ToolEntry }) => {
         type="button"
         className="hx-tool__head"
         disabled={!has}
+        title={line.command ?? undefined}
         onClick={() => setOpen((value) => !value)}
       >
         {entry.ok === null ? (
@@ -185,36 +223,72 @@ const ToolStep = memo(({ entry }: { entry: ToolEntry }) => {
           <span className="hx-tool__label">{guardText}</span>
         ) : (
           <>
-            <span className="hx-tool__label">{label}</span>
-            <code className="hx-tool__detail">{detail}</code>
+            <span className="hx-tool__label" data-title={line.title ? 'true' : undefined}>
+              {line.title ?? label}
+            </span>
+            {line.detail && <code className="hx-tool__detail">{line.detail}</code>}
+            {line.fact && <span className="hx-tool__fact">{line.fact}</span>}
           </>
         )}
         <span className="hx-spacer" />
-        {meta && <span className="hx-tool__meta">{meta}</span>}
+        {meta && (
+          <span className="hx-tool__meta" data-failed={meta.failed || undefined}>
+            {meta.text}
+          </span>
+        )}
       </button>
+      {preview && (
+        <div className="hx-tool__peekwrap">
+          <div>
+            <button
+              type="button"
+              className="hx-tool__peek"
+              data-failed={preview.failed || undefined}
+              tabIndex={open ? -1 : 0}
+              onClick={() => setOpen(true)}
+            >
+              {preview.lines.map((ln, index) => (
+                <span key={index} className="hx-tool__peekln">
+                  {ln}
+                </span>
+              ))}
+              {preview.more > 0 && (
+                <span className="hx-tool__more">{plural(preview.more, 'next.tool.more')}</span>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
       {denial?.rule === 'hook' && denial.appId && <HookOffHere app={denial.appId} />}
       {has && (
         <div className="hx-tool__body">
           <div>
             {seen && (
-              <div className="hx-tool__out">
-                {error && <ErrorLine error={parseErrorText(error)} headline={null} />}
-                {!error &&
-                  text?.split('\n').map((line, index) => (
-                    <div key={index} className="hx-cmd__ln">
-                      {line}
-                    </div>
-                  ))}
-                {entry.output?.truncated && (
-                  <div className="hx-cmd__ln" data-tone="dim">
-                    {t('next.tool.truncated', {
-                      shown: entry.output.truncated.shown,
-                      total: entry.output.truncated.total,
-                    })}
+              <>
+                {command !== null && <CommandBlock command={command} />}
+                {text && (
+                  <div className="hx-tool__out">
+                    {error && <ErrorLine error={parseErrorText(error)} headline={null} />}
+                    {!error &&
+                      text.split('\n').map((ln, index) => (
+                        <div key={index} className="hx-cmd__ln">
+                          {ln}
+                        </div>
+                      ))}
+                    {cutLines !== null && (
+                      <div className="hx-cmd__ln" data-tone="dim">
+                        {plural(cutLines, 'next.tool.shownLines', { shown: shownLines })}
+                      </div>
+                    )}
+                    {entry.output?.truncated && (
+                      <div className="hx-cmd__ln" data-tone="dim">
+                        {cutBySize(entry.output.truncated.shown, entry.output.truncated.total)}
+                      </div>
+                    )}
+                    {entry.output?.truncated && !denial && <WholeOutput entry={entry} />}
                   </div>
                 )}
-                {entry.output?.truncated && !denial && <WholeOutput entry={entry} />}
-              </div>
+              </>
             )}
           </div>
         </div>
@@ -227,19 +301,18 @@ const ToolGroup = ({ tools }: { tools: ToolEntry[] }) => {
   const [open, setOpen] = useState(false);
   const seen = useSeen(open);
   const icons = [...new Set(tools.map((tool) => toolView(tool.tool).icon))].slice(0, 3);
-  const failed = tools.filter((tool) => tool.ok === false).length;
+  const running = tools.some((tool) => tool.ok === null);
   return (
     <div className="hx-tools" aria-expanded={open}>
       <button type="button" className="hx-tools__head" onClick={() => setOpen((value) => !value)}>
         <span className="hx-tools__icons">
-          {icons.map((icon) => (
-            <Icon key={icon} name={icon} size="sm" />
-          ))}
+          {running ? (
+            <span className="hx-tool__spin" aria-hidden="true" />
+          ) : (
+            icons.map((icon) => <Icon key={icon} name={icon} size="sm" />)
+          )}
         </span>
-        <span>
-          {plural(tools.length, 'next.work.actions')}
-          {failed > 0 && ` · ${plural(failed, 'next.work.failedActions')}`}
-        </span>
+        <span className="hx-tools__label">{groupLabel(tools, lineOf)}</span>
         <Icon name="chevron-right" size="sm" className="hx-tools__chev" />
       </button>
       <div className="hx-tools__body">

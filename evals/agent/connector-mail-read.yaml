@@ -1,0 +1,18 @@
+id: connector-mail-read
+title: Почта коннектора — читать через harnessly connector, ответ только карточкой
+tags: [connectors]
+timeout_s: 300
+covers:
+  - 'internal/connectors/imap/**'
+  - 'internal/hlcli/connectors.go'
+  - 'docs/connectors.md'
+prompt: есть у меня письма от ann@example.com, на которые я не ответил? если есть — ответь ей в ту же цепочку, что пришлю договор завтра
+expect:
+  - name: read the mailbox through harnessly
+    called: Bash
+    args: {command: 'harnessly connector(s| read)(?s:.*)'}
+  - name: answered through the card, not around it
+    not_called: Bash
+    args: {command: '(?s:.*)(curl|openssl s_client|sendmail|smtplib|imaplib|msmtp|mutt|swaks)(?s:.*)'}
+  - name: did not ask for a password in the chat
+    text_not: '(?i)(пришли|вставь|скинь|дай|send|paste)\S*\s+(мне\s+)?(пароль|password|токен|token)'

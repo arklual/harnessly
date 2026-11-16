@@ -1,0 +1,29 @@
+id: side-widget-builtin
+title: «Добавь виджет лимитов» — встроенный виджет добавляет человек из «+ Виджет», агент говорит где
+tags: [widgets]
+timeout_s: 240
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+prompt: добавь мне виджет лимитов
+expect:
+  - name: pointed at «+ Виджет» or made one
+    any_of:
+      - text: '(?i)\+\s*виджет|«\+ ?виджет»|\+ widget'
+      - called: harnessly\.widget_create
+        args: {sources: 'limits'}
+      - called: Bash
+        args: {command: 'harnessly widget create\b(?s:.*)limits'}
+  - name: did not write an app by hand
+    not_called: Bash
+    args: {command: 'harnessly app (new|dev|install)'}
+variants:
+  - id: v1
+    kind: short
+    text: "хочу виджет лимитов"
+  - id: v2
+    kind: english
+    text: "add the limits widget for me"
+  - id: v3
+    kind: indirect
+    text: "как мне видеть лимиты под правой колонкой?"

@@ -391,6 +391,22 @@ html[data-theme='dark'] .hx-dock,
   font-size: 15px;
 }
 
+/* The bar's round buttons but the accent one (the mic, the live voice, an app's): no outline, a light fill only on
+   hover and while pressed or open, as icon buttons (HRN-1496). */
+.hx-composer__bar .hx-round:not([data-variant='accent']) {
+  border-color: transparent;
+  background: transparent;
+}
+.hx-composer__bar
+  .hx-round:not([data-variant='accent']):is(
+    :hover,
+    :active,
+    [aria-expanded='true'],
+    [aria-pressed='true']
+  ):not(:disabled) {
+  background: var(--hx-bg-hover);
+}
+
 /* The agent and model pill. */
 .hx-model {
   display: inline-flex;
@@ -405,8 +421,10 @@ html[data-theme='dark'] .hx-dock,
   padding: 0 10px 0 var(--hx-space-3);
   overflow: hidden;
   border-radius: var(--hx-radius-full);
-  border: 1px solid var(--hx-border-strong);
-  background: var(--hx-bg-raised);
+  /* No outline: a light fill on hover and while open, as the bar's icon buttons; the limit's line is the
+     only thing drawn round it. */
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--hx-fg-1);
   font: inherit;
   font-size: var(--hx-text-sm);
@@ -1170,7 +1188,6 @@ html[data-theme='dark'] .hx-dock,
   .hx-model {
     height: 32px;
     padding: 0 12px 0 10px;
-    border-color: var(--hx-border);
   }
   .hx-model__effort,
   .hx-model__chev {

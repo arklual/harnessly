@@ -35,8 +35,12 @@ const PrecedenceSec = 180
 
 var windowKeys = []string{"five_hour", "seven_day"}
 
-func polled(source any) bool   { return source == SourceCodexbar || source == SourceCodexUsage }
-func complete(source any) bool { return source == SourceCodexUsage } // lists every window the plan has
+func polled(source any) bool {
+	return source == SourceCodexbar || source == SourceCodexUsage || source == SourceClaudeUsage
+}
+
+// complete: the source lists every window the plan has, so one it leaves out is gone.
+func complete(source any) bool { return source == SourceCodexUsage || source == SourceClaudeUsage }
 
 // num is a field as a number; NaN when it is not one (JavaScript arithmetic on undefined gives NaN too).
 func num(v any) float64 {
@@ -172,6 +176,10 @@ func Merge(prev, next Data) Data {
 		} else if !ok && complete(next["source"]) {
 			merged[k] = nil
 		}
+	}
+	// When the agent's statusline last came: the usage poller asks only while a chat runs.
+	if finite(next["seenAt"]) && num(next["seenAt"]) >= orZero(prev["seenAt"]) {
+		merged["seenAt"] = next["seenAt"]
 	}
 	for _, k := range []string{"plan", "pace"} {
 		if n, ok := object(next[k]); ok {

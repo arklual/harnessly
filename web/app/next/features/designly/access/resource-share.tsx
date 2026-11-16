@@ -31,7 +31,9 @@ import {
   type IResourceView,
 } from '@/next/features/designly/access/resource-api';
 import ResourcePeople, {
+  PeoplePending,
   ResourceRequests,
+  type IKnownOwner,
   type IResourceSection,
 } from '@/next/features/designly/access/resource-people';
 import {
@@ -71,7 +73,13 @@ export interface IResourceShareProps {
   target: IResourceRef;
   /** The resource's name, in the title. */
   title: string;
-  view: IResourceView;
+  /** Null while it is read: the dialog opens at once all the same, with what is known and a skeleton. */
+  view: IResourceView | null;
+  /** The gateway did not answer the view: «Повторить» instead of the list. */
+  failed?: boolean;
+  onRetry?: () => void;
+  /** The owner as known before the view comes. */
+  knownOwner?: IKnownOwner | null;
   onNext: (next: IResourceView) => void;
   /** The resource's own address: it opens for whoever already has access. */
   address: string;
@@ -443,41 +451,33 @@ const Main = memo(
   },
 );
 
-const ResourceShare = ({
-  open,
-  onClose,
-  target,
-  title,
-  view,
-  onNext,
-  address,
-  onCopyLink,
-  focus = null,
-  ask = false,
-  links,
-  publish,
-  linkContext = DOC_LINKS,
-  extra,
-  footExtra,
-}: IResourceShareProps) => {
+const NO_RETRY = () => undefined;
+
+/** The dialog's frame and what does not depend on the view (the sub-views, the action, the field) live here, so the
+ *  view coming in after the dialog opened fills the same dialog instead of opening it again. */
+const ResourceShare = (props: IResourceShareProps) => {
+  const {
+    open,
+    onClose,
+    target,
+    title,
+    view,
+    failed = false,
+    onRetry = NO_RETRY,
+    knownOwner = null,
+    onNext,
+    onCopyLink,
+    focus = null,
+  } = props;
   const action = useAction();
-  const me = useMe();
   const phone = usePhone();
   const field = useRef<HTMLInputElement>(null);
   const [body, setBody] = useState<HTMLDivElement | null>(null);
   const [sub, setSub] = useState<TView | null>(null);
-  const shown = usePresence(sub, VIEW_OUT_MS);
   // The views opened since the dialog opened stay mounted while hidden: going back and there again draws nothing anew
   // and reads nothing again (the history).
   const [seen, setSeen] = useState<readonly TView[]>([]);
   if (sub !== null && !seen.includes(sub)) setSeen([...seen, sub]);
-  const props: IResourceSection = { target, view, action, onNext };
-  const email = me.k === 'ready' ? me.me.email : null;
-  const manages = view.canManage;
-  const linkForm = useId();
-  const screen = useLinksScreen({ target, view, ctx: linkContext, action, onNext });
-  // The gateway of stage «г» answers the links in the view; an older one keeps them on their older routes.
-  const ownLinks = view.links !== undefined;
   useSheetKeyboard(body, open && phone);
 
   // The dialog opens again on its main view.
@@ -492,13 +492,14 @@ const ResourceShare = ({
 
   useEffect(() => (open ? warmLog() : undefined), [open]);
 
+  const ready = view !== null;
   useEffect(() => {
-    if (!open || !focus || !body) return;
+    if (!open || !focus || !body || !ready) return;
     const timer = setTimeout(() => {
       body.querySelector(`[data-section="${focus}"]`)?.scrollIntoView?.({ block: 'nearest' });
     }, 50);
     return () => clearTimeout(timer);
-  }, [open, focus, body]);
+  }, [open, focus, body, ready]);
 
   const { clear } = action;
   const go = useCallback(
@@ -510,6 +511,97 @@ const ResourceShare = ({
     },
     [clear, body],
   );
+  const manages = view?.canManage ?? false;
+
+  return (
+    <Frame
+      open={open}
+      fixedHead
+      onClose={onClose}
+      initialFocus={manages ? field : undefined}
+      title={t('next.access.shareTitle', { name: title || t('next.access.untitled') })}
+      actions={view !== null && manages && <ShareMore props={{ target, view, action, onNext }} onView={go} />}
+    >
+      {view !== null ? (
+        <Loaded
+          {...props}
+          view={view}
+          action={action}
+          field={field}
+          setBody={setBody}
+          sub={sub}
+          seen={seen}
+          go={go}
+        />
+      ) : (
+        <>
+          <div className="hx-modal__body hx-acc-body" ref={setBody}>
+            <PeoplePending owner={knownOwner} failed={failed} onRetry={onRetry} />
+          </div>
+          <div className="hx-modal__foot hx-acc-foot">
+            <div className="hx-acc-foot__left">
+              <button
+                type="button"
+                className="hx-btn"
+                data-variant="ghost"
+                data-size="sm"
+                onClick={onCopyLink}
+              >
+                <Icon name="link" size="sm" />
+                <span>{t('next.access.copyLink')}</span>
+              </button>
+            </div>
+            <button type="button" className="hx-btn" data-variant="primary" data-size="sm" onClick={onClose}>
+              {t('next.access.done')}
+            </button>
+          </div>
+        </>
+      )}
+    </Frame>
+  );
+};
+
+interface ILoadedProps extends IResourceShareProps {
+  view: IResourceView;
+  action: ReturnType<typeof useAction>;
+  field: RefObject<HTMLInputElement | null>;
+  setBody: (node: HTMLDivElement | null) => void;
+  sub: TView | null;
+  seen: readonly TView[];
+  go: (next: TView | null) => void;
+}
+
+/** The dialog's body and foot once the view is read. */
+const Loaded = ({
+  onClose,
+  target,
+  view,
+  onNext,
+  address,
+  onCopyLink,
+  ask = false,
+  links,
+  publish,
+  linkContext = DOC_LINKS,
+  extra,
+  footExtra,
+  action,
+  field,
+  setBody,
+  sub,
+  seen,
+  go,
+}: ILoadedProps) => {
+  const me = useMe();
+  const phone = usePhone();
+  const shown = usePresence(sub, VIEW_OUT_MS);
+  const props: IResourceSection = { target, view, action, onNext };
+  const email = me.k === 'ready' ? me.me.email : null;
+  const manages = view.canManage;
+  const linkForm = useId();
+  const screen = useLinksScreen({ target, view, ctx: linkContext, action, onNext });
+  // The gateway of stage «г» answers the links in the view; an older one keeps them on their older routes.
+  const ownLinks = view.links !== undefined;
   const listScreen = useMemo(
     () => ({ start: screen.start, fresh: screen.fresh }),
     [screen.start, screen.fresh],
@@ -521,14 +613,7 @@ const ResourceShare = ({
     v === VIEW.link && screen.editing ? t('next.access.links.editTitle') : t(VIEW_TITLE[v]);
 
   return (
-    <Frame
-      open={open}
-      fixedHead
-      onClose={onClose}
-      initialFocus={manages ? field : undefined}
-      title={t('next.access.shareTitle', { name: title || t('next.access.untitled') })}
-      actions={manages && <ShareMore props={props} onView={go} />}
-    >
+    <>
       <div className="hx-modal__body hx-acc-body" ref={setBody}>
         {manages ? (
           <div className="hx-acc-views" data-sub={sub !== null} data-covered={covered}>
@@ -627,7 +712,7 @@ const ResourceShare = ({
           </button>
         </div>
       )}
-    </Frame>
+    </>
   );
 };
 

@@ -62,6 +62,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.me(w, r)
 	case p == "me/settings":
 		s.meSettings(w, r)
+	case p == "me/looks", strings.HasPrefix(p, "me/looks/"):
+		hash, ok := LookPath(p)
+		if !ok {
+			refuse(w, RefuseNotFound)
+			return
+		}
+		ServeLooks(w, r, s.Looks, hash)
 	case p == "socket":
 		s.Socket(w, r)
 	case p == "replica":

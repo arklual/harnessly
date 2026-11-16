@@ -1,4 +1,5 @@
 import { memo, useState, type KeyboardEvent } from 'react';
+import { openLookEditor } from '@/next/features/looks/store';
 import Icon from '@/next/ui/icon';
 import Tooltip from '@/next/ui/tooltip';
 import { menuPointOf, wantsSystemMenu, type IMenuPoint } from '@/next/ui/context-menu';
@@ -314,6 +315,7 @@ const ChatRow = ({
               handlers.renameStart(chat.id);
             }}
             onPin={() => handlers.pin(chat)}
+            onLook={() => openLookEditor({ k: 'chat', id: chat.id })}
             onPlace={(groupId) => handlers.place(chat, groupId)}
             onShift={(direction) => handlers.shift(chat, direction)}
             onMove={(projectId) => handlers.move(chat.id, projectId)}

@@ -1,0 +1,11 @@
+# Arm of the orchestration comparison: the work is handed to harnessly subchats (delegate_task).
+name: orch-subchats
+runtime_env:
+  RUNTIME_GITLAB_HOSTS: gitlab.example.test
+  RUNTIME_TRACKER_HOSTS: tracker.example.test
+  RUNTIME_TASK_KEY_RE: '\b(?:PRJ|OPS)-\d+\b'
+  RUNTIME_TASK_EXAMPLES: PRJ-128
+  RUNTIME_STAND_DOMAIN: .preview.example.test
+  RUNTIME_DOCS_HOST: docs.example.test
+agent_env: {}
+prompt_suffix: Помощников заводи подчатами harnessly (delegate_task) на той же модели, что у тебя; сабагентов Claude Code и команды агентов не используй.

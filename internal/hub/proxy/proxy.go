@@ -115,18 +115,21 @@ func (s *Service) serveHome(w http.ResponseWriter, r *http.Request, u store.User
 
 // Service is the runtime proxy.
 type Service struct {
-	cfg     *config.Config
-	db      *store.DB
-	auth    *auth.Service
-	spaces  *spaces.Service
-	reg     *link.Registry
-	tickets *ticket.Store
-	log     *slog.Logger
-	now     func() time.Time
-	acc     *machaccess.Checker
-	design  Interceptor
-	gate    FeatureGate
-	web     fs.FS
+	cfg *config.Config
+	// looks keeps the pictures of the people's looks (personsettings.go lookBlobs).
+	looks     wire.LookBlobs
+	looksOnce sync.Once
+	db        *store.DB
+	auth      *auth.Service
+	spaces    *spaces.Service
+	reg       *link.Registry
+	tickets   *ticket.Store
+	log       *slog.Logger
+	now       func() time.Time
+	acc       *machaccess.Checker
+	design    Interceptor
+	gate      FeatureGate
+	web       fs.FS
 	// clientLim limits the calls of each personal token to the client API.
 	clientLim *ratelimit.Limiter
 	// static keeps the tags and gzipped copies of the workspace page's files.

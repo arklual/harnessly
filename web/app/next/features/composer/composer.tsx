@@ -22,6 +22,7 @@ import {
 } from 'react';
 import { isStashKey, KEY_ACTION, keyAction } from '@/next/features/composer/keys';
 import LimitsChip, { paysBySpend } from '@/next/features/limits/limits-chip';
+import LimitsMini from '@/next/features/limits/limits-mini';
 import { useHeld } from '@/next/ui/use-held';
 import type { LimitsView } from '@/next/features/limits/model';
 import ModelPicker, { type IModelPickerProps } from '@/next/features/composer/model-picker';
@@ -83,7 +84,7 @@ const SHORT_PLACEHOLDER_KEYS: Partial<Record<ComposerMode, string>> = {
   working: 'next.composer.placeholderWorkingShort',
 };
 /** The key that sends into the running turn, as the hints write it: ⌘ on a Mac, ⌃ elsewhere (keys.ts takes both). */
-const SEND_NOW_MOD = isMac() ? '⌘' : '⌃';
+const QUEUE_MOD = isMac() ? '⌥' : 'Alt+';
 /** Narrower than this, the field's own text box takes the short placeholder. */
 const NARROW_FIELD_PX = 480;
 /** A file this big shows its percent, speed and time left on its chip; a small one only its bar. */
@@ -499,23 +500,22 @@ const Composer = (props: IComposerProps) => {
     }
     if (palette.onKeyDown(event) || history.onKeyDown(event)) return;
     let action = keyAction(event.nativeEvent, touch, props.enterSends ?? true);
-    // «Send now» is the action of the shortcuts list: whatever it is bound to sends, and ⌃↵ no longer does once it is not.
+    // «After the turn» is the action of the shortcuts list (composer.send): whatever it is bound to queues, and ⌥↵ no
+    // longer does once it is bound elsewhere.
     const chord = chordOf(event.nativeEvent);
     const overrides = keyOverrides();
-    const sendNow =
+    const queues =
       chord !== null &&
       !event.nativeEvent.isComposing &&
       commandsOfChord(chord, overrides).some((c) => c.id === 'composer.send');
-    // GitHub #53. While «send now» keeps its own shortcut, every Ctrl/Cmd+Enter the field promises sends now: ⌃↵ on a
-    // Mac and the keypad's Enter used to fall through and do nothing at all.
-    if (action === KEY_ACTION.sendNow && !sendNow && !isDefault('composer.send', overrides)) action = null;
-    else if (sendNow && action !== KEY_ACTION.send) action = KEY_ACTION.sendNow;
+    if (action === KEY_ACTION.queue && !queues && !isDefault('composer.send', overrides)) action = null;
+    else if (queues && action !== KEY_ACTION.send) action = KEY_ACTION.queue;
     if (action === KEY_ACTION.send) {
       event.preventDefault();
       if (!recording) submit('now');
       else if (!recording.busy) stopAndSend();
     }
-    if (action === KEY_ACTION.sendNow) {
+    if (action === KEY_ACTION.queue) {
       event.preventDefault();
       submit('queue');
     }
@@ -534,7 +534,7 @@ const Composer = (props: IComposerProps) => {
     void distinctFiles(pastedFiles(files)).then(onFiles);
   };
 
-  let fullPlaceholder = props.placeholder ?? t(PLACEHOLDER_KEYS[mode], { mod: SEND_NOW_MOD });
+  let fullPlaceholder = props.placeholder ?? t(PLACEHOLDER_KEYS[mode], { mod: QUEUE_MOD });
   if (bar) fullPlaceholder = t(bar.preparing ? 'next.voice.preparing' : 'next.voice.listening');
   const shortKey = SHORT_PLACEHOLDER_KEYS[mode];
   let placeholder =
@@ -778,12 +778,16 @@ const Composer = (props: IComposerProps) => {
                 />
               </span>
             )}
-            {/* The limit is the pill's outline and its popover's card (HRN-1496); a chip of its own only for a machine
-                that pays by the API (the day's spend), or where no pill stands. */}
+            {/* The limit is the bars by the context ring and the pill popover's card (HRN-1496); a chip of its own
+                only for a machine that pays by the API (the day's spend), or where no pill stands. */}
             {shownLimits.value && (!shownPicker.value || paysBySpend(shownLimits.value)) && (
               <LimitsChip view={shownLimits.value} />
             )}
             <span className="hx-spacer" />
+            {/* The chat's limits in the field itself (HRN-1496): the five hours and the week, quiet bars. */}
+            {shownLimits.value && shownPicker.value && !paysBySpend(shownLimits.value) && (
+              <LimitsMini view={shownLimits.value} model={shownPicker.value.value.model ?? null} />
+            )}
             {shownRing.value && <ContextRing {...shownRing.value} />}
             {props.tools}
             {/* Dictation (the mic) always stays; the live voice is its own button beside it (the wave). Only during a
@@ -816,7 +820,7 @@ const Composer = (props: IComposerProps) => {
                 variant="accent"
                 label={
                   working
-                    ? t('next.composer.queueTip', { mod: SEND_NOW_MOD })
+                    ? t('next.composer.queueTip', { mod: QUEUE_MOD })
                     : (props.sendLabel ?? t('next.composer.send'))
                 }
                 keys={['↵']}

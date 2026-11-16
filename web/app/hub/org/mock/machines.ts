@@ -297,6 +297,7 @@ const build = (s: Seed, role: MockCtx['role'], now: number): OrgMachine => {
     managed: { budget: true, env: true, resources: true, access: true },
     canManage: role === 'admin' || (role === 'lead' && ownTeam),
     canAdmin: role === 'admin',
+    canSeeDebug: role === 'admin',
     needs: role === 'admin' ? null : 'tenant_admin',
   };
 };

@@ -1,0 +1,24 @@
+id: cm-broken-links
+title: Битые ссылки в 45 md — много мелких вызовов тулов (замер Code Mode)
+tags: [code-mode]
+agents: [claude]
+timeout_s: 900
+setup:
+  workspace: [fixtures/cm-docs]
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'internal/hooksetup/**'
+  - 'internal/codemode/**'
+prompt: |-
+  Найди все битые относительные ссылки в markdown-файлах папки docs/ — ссылки на файлы, которых нет (внешние https-ссылки не считаются). Запиши их в broken.txt, по строке на ссылку в виде `путь/к/файлу.md: ссылка` (ссылка как написана в тексте), отсортировав строки. В ответе скажи, сколько нашлось.
+expect:
+  - name: the list is exact
+    check: |
+      python3 - <<'PY'
+      want = set(["docs/api/a01.md: a16-old.md", "docs/api/a05.md: ../guide/g06-old.md", "docs/api/a07.md: a20-old.md", "docs/api/a09.md: a10-old.md", "docs/api/a12.md: ../guide/g02-old.md", "docs/api/a12.md: a15-old.md", "docs/api/a13.md: a03-old.md", "docs/api/a13.md: a07-old.md", "docs/api/a17.md: ../guide/g02-old.md", "docs/api/a17.md: ../guide/g24-old.md", "docs/api/a18.md: ../guide/g02-old.md", "docs/api/a19.md: a19-old.md", "docs/guide/g02.md: ../api/a15-old.md", "docs/guide/g02.md: g10-old.md", "docs/guide/g03.md: ../api/a09-old.md", "docs/guide/g04.md: ../api/a18-old.md", "docs/guide/g07.md: g07-old.md", "docs/guide/g08.md: g25-old.md", "docs/guide/g09.md: g07-old.md", "docs/guide/g09.md: g17-old.md", "docs/guide/g10.md: g05-old.md", "docs/guide/g12.md: ../api/a14-old.md", "docs/guide/g12.md: g04-old.md", "docs/guide/g15.md: g09-old.md", "docs/guide/g16.md: ../api/a16-old.md", "docs/guide/g16.md: g03-old.md", "docs/guide/g17.md: g05-old.md", "docs/guide/g18.md: ../api/a12-old.md", "docs/guide/g18.md: ../api/a13-old.md", "docs/guide/g19.md: ../api/a16-old.md", "docs/guide/g19.md: g05-old.md", "docs/guide/g20.md: ../api/a08-old.md", "docs/guide/g20.md: ../api/a10-old.md", "docs/guide/g20.md: ../api/a14-old.md", "docs/guide/g20.md: ../api/a20-old.md", "docs/guide/g25.md: ../api/a12-old.md", "docs/guide/g25.md: g13-old.md"])
+      got = set(l.strip() for l in open("broken.txt", encoding="utf-8") if l.strip())
+      miss, extra = sorted(want - got), sorted(got - want)
+      assert not miss and not extra, f"missing {miss[:5]} extra {extra[:5]}"
+      PY
+  - name: said how many
+    text: '\b37\b'

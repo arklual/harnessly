@@ -226,7 +226,8 @@ func (s *Sink) writeLimits(input any) {
 	if !jsvalue.Truthy(fiveHour) && !jsvalue.Truthy(sevenDay) {
 		return
 	}
-	data := limits.Data{"ts": float64(s.now().UnixMilli()) / 1000, "five_hour": plain(fiveHour), "seven_day": plain(sevenDay)}
+	at := float64(s.now().UnixMilli()) / 1000
+	data := limits.Data{"ts": at, "seenAt": at, "five_hour": plain(fiveHour), "seven_day": plain(sevenDay)}
 	if _, err := s.Limits.Write("claude", data); err != nil {
 		agent.Log("warn", "statusline: rate limits not written", agent.F{K: "err", V: err.Error()})
 	}

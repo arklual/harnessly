@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import LookBackdrop from '@/next/features/looks/backdrop';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
 import { usePresence } from '@/next/ui/presence';
@@ -162,6 +163,7 @@ const Greeting = ({
       data-back={fromChat ? 'chat' : undefined}
       data-home={stage ? 'stage' : undefined}
     >
+      <LookBackdrop />
       {stage}
       {composer ? composer(hello) : hello}
     </div>

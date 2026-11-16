@@ -18,6 +18,9 @@ type Service struct {
 	publicURL string
 	// Notify tells a person that someone asked them for access or that a request was decided; nil keeps the hub silent.
 	Notify func(ctx context.Context, to, subject, body string)
+	// LinkURL is where a guest link opens when the service of what it opens serves its guests itself (a board: the
+	// boards service); "" or nil: the hub's own page, <publicURL>/d/<token>.
+	LinkURL func(ref Ref, target, token string) string
 }
 
 // New returns the service; publicURL is the address guest links are built on (the hub's own).

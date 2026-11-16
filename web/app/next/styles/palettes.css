@@ -2,24 +2,15 @@
    surfaces, the lines and the secondary text with its own hue and brings its accent; the text and the states stay as
    the base. Graphite is the base itself (tokens.css), «Контраст» is black and white with a deep blue. The same rules dress a preview
    card (.hx-look[data-mode][data-palette]) so a palette is seen before it is picked.
-   A change made from a click spreads from it as a circle (html[data-look='spread'], a view transition). */
+   A change made from a click spreads from it as a circle (a view transition, platform/theme.tsx repaint). */
 
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
   mix-blend-mode: normal;
 }
-html[data-look='spread']::view-transition-new(root) {
-  animation: hx-look-in 620ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-@keyframes hx-look-in {
-  from {
-    clip-path: circle(0 at var(--hx-look-x) var(--hx-look-y));
-  }
-  to {
-    clip-path: circle(var(--hx-look-r) at var(--hx-look-x) var(--hx-look-y));
-  }
-}
+/* The circle itself (clip-path from 0 to the far corner, 620 ms, cubic-bezier(0.22, 1, 0.36, 1)) is animated on
+   ::view-transition-new(root) by platform/theme.tsx. */
 
 /* midnight */
 html[data-theme='light'][data-palette='midnight'],
@@ -303,4 +294,12 @@ html[data-theme='dark'][data-palette='contrast'],
   --hx-shell-active: oklch(1 0 0 / 0.12);
   --hx-bg-window: #000000;
   --hx-bg-canvas: oklch(0.08 0 0);
+}
+
+/* While the look changes (platform/theme.tsx repaint) no transition runs: the new tokens would start a colour
+   transition on every element, and each frame of the circle would recalculate them all on the main thread. */
+html[data-look-switch] *,
+html[data-look-switch] *::before,
+html[data-look-switch] *::after {
+  transition: none !important;
 }

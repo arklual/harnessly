@@ -201,3 +201,9 @@ func (c *Client) SendMessage(ctx context.Context, token string, chat int64, text
 	}
 	return c.call(ctx, token, "sendMessage", body, nil)
 }
+
+// Call posts any Bot API method with a JSON body and decodes its result into out (nil to drop it): for the callers
+// that need updates or methods beyond the ones above (internal/connectors/telegram). Its errors are APIError.
+func (c *Client) Call(ctx context.Context, token, method string, body, out any) error {
+	return c.call(ctx, token, method, body, out)
+}

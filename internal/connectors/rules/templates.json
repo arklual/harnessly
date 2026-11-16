@@ -1,0 +1,93 @@
+[
+  {
+    "id": "mail-unanswered-draft",
+    "connectors": ["imap"],
+    "title": {"en": "No answer for 3 days: draft a reply", "ru": "Нет ответа 3 дня — черновик ответа"},
+    "summary": {"en": "A letter from a person you did not answer: the agent drafts a reply and asks you", "ru": "Письмо от человека без ответа: агент пишет черновик и спрашивает вас"},
+    "trigger": {"events": ["mail.unanswered"]},
+    "perDay": 5,
+    "prompt": "Письмо от человека осталось без ответа. Прочитай его и переписку командой чтения из события (harnessly connector read {{connection}} thread …). Если ответ действительно нужен, напиши короткий черновик ответа по-русски (или на языке письма) и сохрани его в черновики: harnessly connector read {{connection}} draft reply=<Message-ID письма> to=<адрес> subject=\"Re: …\" text=\"…\". Ничего не отправляй. Сообщи человеку: от кого письмо, о чём одной строкой и сам черновик, кнопки «Отправить|Не сейчас». Если человек нажмёт «Отправить» — предложи отправку harnessly connector act {{connection}} reply id=<Message-ID письма> to=<адрес> subject=\"Re: …\" text=\"<ровно этот черновик>\" --why \"ответ на письмо\": отправит её только карточка подтверждения. Если ответ не нужен (рассылка, уведомление, ответ уже был) — так и скажи в одну строку, без пуша."
+  },
+  {
+    "id": "mail-morning",
+    "connectors": ["imap"],
+    "title": {"en": "Morning digest of important unread", "ru": "Утренняя сводка важного непрочитанного"},
+    "summary": {"en": "At 8:30: what in the unread letters needs you", "ru": "В 8:30: что в непрочитанном требует вас"},
+    "trigger": {"at": "08:30"},
+    "perDay": 1,
+    "prompt": "Утренняя сводка почты. Возьми непрочитанные письма за сутки: harnessly connector read {{connection}} list unread=true since=1d. Отбрось рассылки и роботов. Выбери до пяти писем, которые ждут действия человека: по строке на каждое — от кого, о чём, что от него хотят. Пришли сводку одним сообщением. Если важного нет — пуш не нужен, ответь одной строкой."
+  },
+  {
+    "id": "calendar-brief",
+    "connectors": ["caldav"],
+    "title": {"en": "Brief before a meeting", "ru": "Бриф перед встречей"},
+    "summary": {"en": "Before a meeting: who comes, the last letters with them, open tasks", "ru": "Перед встречей: кто будет, последняя переписка с ними, открытые задачи"},
+    "trigger": {"events": ["calendar.starting"]},
+    "perDay": 8,
+    "prompt": "Скоро встреча. Прочитай её командой чтения из события: участники, тема, ссылка на звонок. Если подключена почта ({{mail}}), найди последнюю переписку с участниками (harnessly connector read <почта> list from=<адрес> since=30d) и открытые вопросы из неё. Пришли бриф до 8 строк: тема, кто будет, что обсуждали в последний раз, что от человека ждут, ссылка на звонок. Кнопки не нужны."
+  },
+  {
+    "id": "calendar-tomorrow",
+    "connectors": ["caldav"],
+    "title": {"en": "Tomorrow's schedule in the evening", "ru": "Вечером — расписание на завтра"},
+    "summary": {"en": "At 20:00: tomorrow's meetings and free windows", "ru": "В 20:00: встречи завтра и свободные окна"},
+    "trigger": {"at": "20:00"},
+    "perDay": 1,
+    "prompt": "Расписание на завтра. Прочитай встречи завтрашнего дня (harnessly connector read {{connection}} events from=<завтра> to=<послезавтра>) и свободные окна (… free date=<завтра>). Пришли список: время — встреча, отметь встречи, к которым нужно подготовиться, и самое длинное свободное окно. Если завтра встреч нет — одной строкой."
+  },
+  {
+    "id": "calendar-ended",
+    "connectors": ["caldav"],
+    "title": {"en": "Meeting ended: note the outcome", "ru": "Встреча закончилась — записать итоги"},
+    "summary": {"en": "After a meeting with people: offer to note the outcome and the tasks", "ru": "После встречи с людьми: предложить записать итоги и задачи"},
+    "trigger": {"events": ["calendar.ended"]},
+    "perDay": 6,
+    "prompt": "Встреча закончилась. Если в ней не было других людей (attendees меньше 2), ничего не делай и ответь одной строкой. Иначе спроси человека коротко: «Встреча <тема> закончилась — записать итоги и задачи?» с кнопками «Записать|Не нужно». Если он ответит «Записать» — попроси продиктовать итоги здесь и оформи их списком задач с ответственными и сроками."
+  },
+  {
+    "id": "webhook-alert-stuck",
+    "connectors": ["webhook"],
+    "title": {"en": "Alert not resolved in 15 minutes: look into it", "ru": "Алерт не погас за 15 минут — разобрать"},
+    "summary": {"en": "The agent reads the alert and proposes what to do", "ru": "Агент читает алерт и предлагает, что сделать"},
+    "trigger": {"wait": {"events": ["webhook.received"], "facts": {"kind": "alert.firing"}, "stopFacts": {"kind": "alert.resolved"}, "key": "thread", "after": "15m"}},
+    "perDay": 6,
+    "prompt": "Алерт горит дольше 15 минут. Прочитай его целиком командой чтения из события. Определи, что сломалось и насколько срочно; если доступны логи или метрики в этой рабочей области — посмотри их. Пришли разбор до 6 строк: что горит, вероятная причина, одно предлагаемое действие, кнопки «Сделать|Позже». Ничего не меняй сам до ответа человека."
+  },
+  {
+    "id": "webhook-ci-failed",
+    "connectors": ["webhook"],
+    "title": {"en": "Build failed: read the log, propose a fix", "ru": "Упала сборка — посмотреть лог и предложить починку"},
+    "summary": {"en": "The agent reads the failed job and proposes a fix", "ru": "Агент читает упавшую сборку и предлагает починку"},
+    "trigger": {"events": ["webhook.received"], "facts": {"kind": "ci.failed"}},
+    "perDay": 6,
+    "prompt": "Упала сборка. Прочитай событие командой чтения из события: репозиторий, ветка, ссылка. Если репозиторий есть в этой рабочей области, найди причину по логу (glab или gh, если доступны) и коду. Пришли до 6 строк: что упало, почему, предлагаемая правка, кнопки «Починить|Позже». Ничего не пушь и не меняй до ответа человека."
+  },
+  {
+    "id": "folder-task-remind",
+    "connectors": ["folder"],
+    "title": {"en": "A task with a date: remind the day before", "ru": "Задача с датой — напомнить за день"},
+    "summary": {"en": "A message to you the day before the date, without an agent", "ru": "Сообщение вам накануне срока, без агента"},
+    "on": true,
+    "trigger": {"before": {"events": ["note.task"], "fact": "due", "days": 1, "at": "09:00"}},
+    "perDay": 10,
+    "notify": {"en": "Tomorrow is the date of a task in {{fact.path}}, line {{fact.line}}", "ru": "Завтра срок задачи в {{fact.path}}, строка {{fact.line}}"}
+  },
+  {
+    "id": "homework",
+    "connectors": ["folder", "imap", "caldav"],
+    "title": {"en": "An assignment with a deadline: offer a draft", "ru": "Задание с дедлайном — предложить сделать"},
+    "summary": {"en": "A note, letter or event with the words below: «Do a draft?»", "ru": "Заметка, письмо или событие со словами ниже: «Сделать черновик?»"},
+    "trigger": {"events": ["note.created", "mail.received", "calendar.changed"], "keywords": ["ДЗ", "домашнее задание", "дедлайн", "сдать до"]},
+    "perDay": 4,
+    "prompt": "Похоже, пришло задание со сроком (в названии есть слова: {{keywords}}). Прочитай его командой чтения из события. Если это не задание человеку — ответь одной строкой и ничего не присылай. Иначе пришли: «Задание <что> до <когда> — сделать черновик?» с кнопками «Да|Не сейчас». Если человек ответит «Да» — работай здесь же: собери материалы (вложения письма, заметки рядом, описание события), сделай черновик решения в папке этого чата и коротко скажи, что получилось и что проверить."
+  },
+  {
+    "id": "feed-daily",
+    "connectors": ["rss"],
+    "title": {"en": "Daily digest of new items on your topics", "ru": "Выжимка новых записей по темам раз в день"},
+    "summary": {"en": "At 19:00: the items of the day about the words below", "ru": "В 19:00: записи за день по словам ниже"},
+    "trigger": {"at": "19:00", "keywords": []},
+    "perDay": 1,
+    "prompt": "Выжимка ленты за день. Возьми записи: harnessly connector read {{connection}} items limit=30, оставь вышедшие за последние сутки и по темам: {{keywords}} (если тем нет — все). По каждой — одна строка сути и ссылка, не больше семи. Если подходящих нет — пуш не нужен, ответь одной строкой."
+  }
+]

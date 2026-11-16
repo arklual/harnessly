@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { objectTarget, parseAppTarget } from '@/next/features/app-views/target';
+import { objectTarget, parseAppTarget, shareTarget } from '@/next/features/app-views/target';
 
 describe('app targets', () => {
   it('reads an app and its view', () => {
@@ -12,5 +12,14 @@ describe('app targets', () => {
     expect(objectTarget('object:')).toBeNull();
     expect(objectTarget('object:a/b')).toBeUndefined();
     expect(objectTarget('app:acme.thing')).toBeUndefined();
+  });
+});
+
+describe('share targets (HRN-1519)', () => {
+  it('names an object to share and nothing else', () => {
+    expect(shareTarget('share:flow-abc')).toBe('flow-abc');
+    expect(shareTarget('share:')).toBeNull();
+    expect(shareTarget('share:../x')).toBeNull();
+    expect(shareTarget('object:flow-abc')).toBeNull();
   });
 });

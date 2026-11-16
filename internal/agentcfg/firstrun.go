@@ -106,9 +106,13 @@ func (s *Store) claudeOnboarded(dirs []string) error {
 	}
 	// With a defaultMode in settings.json Claude Code offers to make auto mode the default in a dialog the platform's
 	// first Enter would answer "yes", changing the person's settings.
-	if _, ok := dig(obj, "hasSeenAutoDefaultNudge"); !ok {
-		put(obj, true, "hasSeenAutoDefaultNudge")
-		changed = true
+	// A false the CLI wrote itself shows the dialog too, so anything but true is made true. Its notice of the same
+	// offer goes with it.
+	for _, key := range []string{"hasSeenAutoDefaultNudge", "hasSeenAutoDefaultNotice"} {
+		if v, _ := dig(obj, key); v != true {
+			put(obj, true, key)
+			changed = true
+		}
 	}
 	projects, _ := dig(obj, "projects")
 	if _, ok := projects.(*jsvalue.Object); !ok && projects != nil {

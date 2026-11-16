@@ -11,6 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/imagecard"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/outputs"
+	"github.com/ly-solutions/harnessly/internal/transcript"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -517,9 +518,11 @@ func (b *builder) tool(s *step, o *jsvalue.Object, typ, id string, at wire.Ms, o
 			summary = str(p, "to") + "\n" + clip(str(p, "text"), peerSummaryMax)
 		}
 	}
-	e := wire.Entry{ID: id, At: at, Rev: 1, T: wire.EntryTool, ToolUseID: use, Tool: name, Summary: summary, OK: status(o)}
+	e := wire.Entry{ID: id, At: at, Rev: 1, T: wire.EntryTool, ToolUseID: use, Tool: name, Summary: summary, OK: status(o),
+		Call: toolCallOf(o, typ)}
 	if out := str(o, "stdout"); out != "" {
 		e.Output = b.output(id, out)
+		e.Call = withOutput(e.Call, out)
 	}
 	if g, ok := o.Get("imageGen"); ok && typ == "tool-call" {
 		if call, isObj := g.(*jsvalue.Object); isObj {
@@ -537,6 +540,64 @@ func (b *builder) tool(s *step, o *jsvalue.Object, typ, id string, at wire.Ms, o
 	if typ == "exec-command-stream" {
 		b.ran(summary, str(o, "stdout"))
 	}
+}
+
+// toolCallOf is what a call says of itself beyond its summary: Claude's call detail (a command's description and whole
+// text, a Read's lines) or a Codex command's whole text, time and exit code. nil when there is nothing.
+func toolCallOf(o *jsvalue.Object, typ string) *wire.ToolCall {
+	c := &wire.ToolCall{}
+	if v, ok := o.Get("call"); ok {
+		if d, isObj := v.(*jsvalue.Object); isObj {
+			c.Description, c.Command = str(d, "description"), str(d, "command")
+			if f, has := num(d, "offset"); has {
+				c.Offset = int64(f)
+			}
+			if f, has := num(d, "limit"); has {
+				c.Limit = int64(f)
+			}
+		}
+	}
+	if typ == "exec-command-stream" {
+		c.Command = str(o, "command")
+		c.DurationMs, c.Exit = ptrNum(o, "durationMs"), ptrNum(o, "exitCode")
+	}
+	if *c == (wire.ToolCall{}) {
+		return nil
+	}
+	return c
+}
+
+// settledCall is the call once its result came: how long it ran (a negative span of a copied session is left out)
+// and the exit code, when the result told it.
+func settledCall(c *wire.ToolCall, span wire.Ms, exit *int64) *wire.ToolCall {
+	out := wire.ToolCall{}
+	if c != nil {
+		out = *c
+	}
+	if span >= 0 && out.DurationMs == nil {
+		ms := int64(span)
+		out.DurationMs = &ms
+	}
+	if exit != nil {
+		out.Exit = exit
+	}
+	return &out
+}
+
+// withOutput adds how many lines a command's whole output has and its last non-empty lines: the event's output is
+// only its first wire.ToolOutputMax bytes, and a folded step shows how a command ended.
+func withOutput(c *wire.ToolCall, text string) *wire.ToolCall {
+	lines, tail := transcript.OutputShape(text)
+	return withShape(c, int64(lines), tail)
+}
+
+func withShape(c *wire.ToolCall, lines int64, tail string) *wire.ToolCall {
+	out := wire.ToolCall{}
+	if c != nil {
+		out = *c
+	}
+	out.Lines, out.Tail = lines, tail
+	return &out
 }
 
 func status(o *jsvalue.Object) *bool {
@@ -693,8 +754,25 @@ func (b *builder) result(s *step, o *jsvalue.Object, id string, at wire.Ms, offs
 		changed = b.settleSubagent(&e, target, o, ok2)
 	}
 	if e.T == wire.EntryTool {
-		if sum := str(o, "summary"); sum != "" && e.Tool != "AskUserQuestion" && e.Output == nil {
-			e.Output = b.output(target, sum)
+		if e.Tool != "AskUserQuestion" && e.Output == nil {
+			if lines, has := num(o, "textLines"); has {
+				// The result's own text, not its summary («19 lines»): what the step shows folded and opened.
+				e.Call = withShape(e.Call, int64(lines), str(o, "textTail"))
+				if text := str(o, "text"); text != "" {
+					e.Output = b.output(target, text)
+				}
+				changed = true
+			} else if sum := str(o, "summary"); sum != "" {
+				e.Output = b.output(target, sum)
+				changed = true
+			}
+		}
+		if e.OK == nil {
+			span := wire.Ms(-1)
+			if e.At > 0 && at >= e.At {
+				span = at - e.At
+			}
+			e.Call = settledCall(e.Call, span, ptrNum(o, "exitCode"))
 			changed = true
 		}
 		e.OK = &ok2

@@ -119,7 +119,14 @@ export const useFocusTrap = (box: HTMLElement | null, enabled = true) => {
   useEffect(() => {
     if (!box || !enabled) return;
     const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (!box.contains(document.activeElement)) box.focus({ preventScroll: true });
+    // The focus goes in after the box's first frame: focused in the commit, the new box's styles and layout were
+    // worked out on the spot, in the same long task as the render. After the frame they are ready.
+    let timer = 0;
+    const frame = requestAnimationFrame(() => {
+      timer = window.setTimeout(() => {
+        if (box.isConnected && !box.contains(document.activeElement)) box.focus({ preventScroll: true });
+      });
+    });
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Tab') return;
       const all = [...box.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((x) => x.offsetParent !== null);
@@ -139,6 +146,8 @@ export const useFocusTrap = (box: HTMLElement | null, enabled = true) => {
     };
     box.addEventListener('keydown', onKey);
     return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
       box.removeEventListener('keydown', onKey);
       if (before?.isConnected) before.focus({ preventScroll: true });
     };

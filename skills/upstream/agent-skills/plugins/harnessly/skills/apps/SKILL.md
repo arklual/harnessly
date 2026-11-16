@@ -18,6 +18,13 @@ harnessly app docs export ./hl-docs # the pages and the example packages in a fo
 Pages: `overview`, `first-plugin`, `views`, `backend`, `sinopia`, `agents`, `debugging`, `sharing`, `worked-example`, `compatibility`,
 `reference`.
 
+## A widget under the right column
+
+A small card for the chat's right column is an app view of the `side` target with a `widget` block (size, refresh,
+sources, smart request). For one card, do not scaffold an app: `harnessly widget create <name> --title T …` (or the MCP
+tool `widget_create`) writes and installs it (`harnessly widget --help`, docs/side-widgets.md). An app of your own may
+add a `side` view next to its others the same way.
+
 ## The loop
 
 ```sh

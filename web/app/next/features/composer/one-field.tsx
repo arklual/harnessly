@@ -127,7 +127,13 @@ const holding = (token: object) => {
   return at < 0 || at === lenders.length - 1;
 };
 
-const lend = (token: object, props: IComposerProps, srcOf: TSrcOf, slot: HTMLElement | null, glide: IGlide) => {
+const lend = (
+  token: object,
+  props: IComposerProps,
+  srcOf: TSrcOf,
+  slot: HTMLElement | null,
+  glide: IGlide,
+) => {
   const me = lenders.find((l) => l.token === token);
   if (me) {
     // A screen that drew again with nothing new for the field (its clock, its handlers made anew) leaves it be.
@@ -234,7 +240,9 @@ const LentField = ({ glideOut, glideIn, ...props }: IScreenFieldProps) => {
   );
 
   // Each render hands the field what this screen wants of it; the first one registers the screen as the top one.
-  useLayoutEffect(() => lend(token, props, srcOf, slot.current, { out: glideOut ?? null, in: glideIn ?? null }));
+  useLayoutEffect(() =>
+    lend(token, props, srcOf, slot.current, { out: glideOut ?? null, in: glideIn ?? null }),
+  );
   useLayoutEffect(() => () => giveBack(token), [token]);
 
   return (
@@ -247,6 +255,10 @@ const LentField = ({ glideOut, glideIn, ...props }: IScreenFieldProps) => {
 
 /** The field of a screen: the window's one in the main area, a field of its own anywhere else. */
 const ScreenField = ({ glideOut, glideIn, ...props }: IScreenFieldProps) =>
-  useContext(MainField) ? <LentField {...props} glideOut={glideOut} glideIn={glideIn} /> : <Composer {...props} />;
+  useContext(MainField) ? (
+    <LentField {...props} glideOut={glideOut} glideIn={glideIn} />
+  ) : (
+    <Composer {...props} />
+  );
 
 export default ScreenField;

@@ -34,11 +34,39 @@ type Facts struct {
 	TokensOut  int    `json:"tokensOut"`
 	// APIErrors are the provider's errors the transcript recorded (overload, auth): an infrastructure failure.
 	APIErrors []string `json:"apiErrors,omitempty"`
+	// Sessions are the agent sessions the run left besides the person's chat: subagents, chats it delegated to,
+	// teammates. Their calls are in Calls (Session > 0), their tokens in the totals.
+	Sessions int `json:"sessions,omitempty"`
+	// LeadTokens are the tokens of the person's chat alone (input, cache, output).
+	LeadTokens int `json:"leadTokens,omitempty"`
+	// ByModel are the tokens of each model the sessions ran on.
+	ByModel map[string]Usage `json:"byModel,omitempty"`
+	// Checks are the scenario's check commands as they ran in the workspace after the run.
+	Checks []CheckResult `json:"checks,omitempty"`
+}
+
+// Usage are one model's tokens.
+type Usage struct {
+	In         int `json:"in"`
+	CacheRead  int `json:"cacheRead"`
+	CacheWrite int `json:"cacheWrite"`
+	Out        int `json:"out"`
+}
+
+// CheckResult is one check command's outcome.
+type CheckResult struct {
+	Command string `json:"command"`
+	Exit    int    `json:"exit"`
+	Output  string `json:"output,omitempty"`
 }
 
 // Call is one tool call of the agent or of its subagents.
 type Call struct {
-	Name   string          `json:"name"`
+	// Session is which transcript the call is in: 0 the person's chat, then the other sessions in the order read.
+	Session int    `json:"session,omitempty"`
+	Name    string `json:"name"`
+	// At is when the call was made, as the transcript stamps it.
+	At     string          `json:"at,omitempty"`
 	Args   json.RawMessage `json:"args,omitempty"`
 	Error  bool            `json:"error,omitempty"`
 	Result string          `json:"result,omitempty"`
@@ -88,6 +116,9 @@ func ReadClaudeTranscript(paths ...string) (Facts, error) {
 			}
 			continue
 		}
+		if i > 0 {
+			f.Sessions++
+		}
 		sc := bufio.NewScanner(bytes.NewReader(raw))
 		sc.Buffer(make([]byte, 0, 1<<20), 64<<20)
 		for sc.Scan() {
@@ -97,6 +128,7 @@ func ReadClaudeTranscript(paths ...string) (Facts, error) {
 			}
 			var e struct {
 				Type              string `json:"type"`
+				Timestamp         string `json:"timestamp"`
 				IsAPIErrorMessage bool   `json:"isApiErrorMessage"`
 				Message           struct {
 					ID      string          `json:"id"`
@@ -137,6 +169,17 @@ func ReadClaudeTranscript(paths ...string) (Facts, error) {
 					f.CacheRead += u.Read
 					f.CacheWrite += u.Create
 					f.TokensOut += u.Out
+					if i == 0 {
+						f.LeadTokens += u.In + u.Read + u.Create + u.Out
+					}
+					if m := e.Message.Model; m != "" && m != "<synthetic>" {
+						if f.ByModel == nil {
+							f.ByModel = map[string]Usage{}
+						}
+						bm := f.ByModel[m]
+						bm.In, bm.CacheRead, bm.CacheWrite, bm.Out = bm.In+u.In, bm.CacheRead+u.Read, bm.CacheWrite+u.Create, bm.Out+u.Out
+						f.ByModel[m] = bm
+					}
 				}
 			}
 			for _, b := range blocks {
@@ -155,7 +198,7 @@ func ReadClaudeTranscript(paths ...string) (Facts, error) {
 						continue
 					}
 					idx[b.ID] = len(f.Calls)
-					f.Calls = append(f.Calls, Call{Name: apps.ToolName(b.Name), Args: b.Input})
+					f.Calls = append(f.Calls, Call{Session: i, Name: apps.ToolName(b.Name), At: e.Timestamp, Args: b.Input})
 				case e.Type == "user" && b.Type == "tool_result":
 					if k, ok := idx[b.ToolUseID]; ok {
 						f.Calls[k].Error = b.IsError

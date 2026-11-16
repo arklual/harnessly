@@ -88,14 +88,17 @@ const at = ({ kind, id }: IResourceRef) => `/access/${kind}/${encodeURIComponent
 export const isView = (v: unknown): v is IResourceView =>
   typeof v === 'object' && v !== null && 'resource' in v && 'canManage' in v && 'manager' in v;
 
-/** The view, or null where the gateway does not answer this API (an older one): the caller keeps the older dialog. */
+/** The view, or null where the gateway does not know this API (an older one, standalone: 404, 405, a body that is not a
+ *  view): the caller keeps the older dialog. A gateway that is there but did not answer (the network, a 5xx, the
+ *  timeout) throws: that is «try again», not «absent», and must not swap the dialog for the older one. */
 export const fetchView = async (ref: IResourceRef, signal?: AbortSignal): Promise<IResourceView | null> => {
   try {
     const answer = await send('GET', at(ref), undefined, signal);
     return isView(answer) ? answer : null;
   } catch (failure) {
     if (signal?.aborted) throw failure;
-    return null;
+    if (failure instanceof AccessError && (failure.status === 404 || failure.status === 405)) return null;
+    throw failure;
   }
 };
 

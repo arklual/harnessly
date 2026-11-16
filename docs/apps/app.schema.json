@@ -198,6 +198,10 @@
             "description": "A full screen of its own, opened from the apps page or by link."
           },
           {
+            "const": "side",
+            "description": "A widget under the chat's right column on a computer: a small card the person adds from «+ Виджет», moves, folds and removes. The view's `widget` block sets its height (s, m, l), how often the host gives it its data again, which of the host's data it gets (limits, machine, subagents) and a `smart` request the host puts to a model now and then; the view reads them in hl.context.data."
+          },
+          {
             "const": "settings",
             "description": "A page in the settings."
           },

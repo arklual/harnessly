@@ -111,5 +111,17 @@
   "next.connections.mcp.reason.other": "Машина не приняла это ({code})",
   "next.connections.mcp.state.oauthUnavailable": "Этому сервису нужен токен: новым приложениям он не даёт входить самим",
   "next.connections.mcp.signInWith": "Войти через {name}",
-  "next.connections.mcp.more": "Показать все"
+  "next.connections.mcp.more": "Показать все",
+  "next.connections.mcp.search": "Найти сервис",
+  "next.connections.mcp.nothingFound": "Ничего не нашлось",
+  "next.connections.mcp.kind.mail": "Почта",
+  "next.connections.mcp.kind.calendar": "Календарь",
+  "next.connections.mcp.kind.meetings": "Встречи",
+  "next.connections.mcp.kind.tasks": "Задачи",
+  "next.connections.mcp.kind.docs": "Документы и данные",
+  "next.connections.mcp.kind.code": "Код и инфраструктура",
+  "next.connections.mcp.kind.monitoring": "Мониторинг",
+  "next.connections.mcp.kind.support": "Поддержка",
+  "next.connections.mcp.kind.payments": "Платежи",
+  "next.connections.mcp.kind.sites": "Сайты"
 }

@@ -1,0 +1,23 @@
+id: nav-move-app
+title: «Перенеси Доски в основные кнопки» — агент говорит, где человек переносит приложение в меню
+tags: [widgets, menu]
+timeout_s: 240
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+prompt: перенеси Доски в основные кнопки слева
+expect:
+  - name: said where the person moves it
+    text: '(?i)меню слева|перетащ|перенесите|drag|left menu'
+  - name: did not dig into files for it
+    max_calls: 6
+variants:
+  - id: v1
+    kind: short
+    text: "Доски — в основные кнопки"
+  - id: v2
+    kind: english
+    text: "move Boards up to the main buttons on the left"
+  - id: v3
+    kind: indirect
+    text: "хочу, чтобы Документы стояли рядом с новым чатом и поиском, а не в приложениях"

@@ -154,7 +154,16 @@ describe('the field glides only from a start page into the screen its sending op
     // jsdom lays nothing out: the field stands high on the start pages and low in the chat.
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
       const top = this.closest('[data-testid="chat"]') ? 800 : 300;
-      return { left: 100, top, width: 600, height: 120, right: 700, bottom: top + 120, x: 100, y: top } as DOMRect;
+      return {
+        left: 100,
+        top,
+        width: 600,
+        height: 120,
+        right: 700,
+        bottom: top + 120,
+        x: 100,
+        y: top,
+      } as DOMRect;
     });
     HTMLElement.prototype.animate = animate as unknown as HTMLElement['animate'];
   });
@@ -167,10 +176,13 @@ describe('the field glides only from a start page into the screen its sending op
     expect(animate).toHaveBeenCalledTimes(1);
   });
 
-  it.each(['sinopia', 'settings'] as const)('stands in its place at once when the chat comes from %s', (from) => {
-    const { rerender } = render(<At at={from} />);
-    animate.mockClear();
-    rerender(<At at="chat" />);
-    expect(animate).not.toHaveBeenCalled();
-  });
+  it.each(['sinopia', 'settings'] as const)(
+    'stands in its place at once when the chat comes from %s',
+    (from) => {
+      const { rerender } = render(<At at={from} />);
+      animate.mockClear();
+      rerender(<At at="chat" />);
+      expect(animate).not.toHaveBeenCalled();
+    },
+  );
 });

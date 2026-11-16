@@ -74,6 +74,7 @@
   "next.access.inviteGoneTitle": "Ссылка не действует",
   "next.access.inviteGone": "Она истекла, отозвана или места закончились. Попросите новую.",
   "next.access.inviteFailed": "Не удалось открыть",
+  "next.access.failure.view": "Не удалось загрузить, у кого есть доступ.",
   "next.access.failure.network": "Нет связи с сервером доступа. Попробуйте ещё раз.",
   "next.access.failure.timeout": "Сервер доступа не ответил вовремя. Попробуйте ещё раз.",
   "next.access.shareTitle": "Поделиться «{name}»",

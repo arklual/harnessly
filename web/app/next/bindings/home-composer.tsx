@@ -19,6 +19,12 @@ import { useSlashSource } from '@/next/bindings/slash-source';
 import { UI_REQUEST, requestUi } from '@/next/stores/ui-requests';
 import type { ISlashActions } from '@/next/features/composer/slash-model';
 import ScreenField from '@/next/features/composer/one-field';
+import KindSwitch, {
+  CHAT_KIND,
+  setChatKind,
+  useChatKind,
+  useKindKey,
+} from '@/next/features/composer/kind-switch';
 import type { IModelPickerProps } from '@/next/features/composer/model-picker';
 import { useGptExtra } from '@/next/bindings/use-gpt-extra';
 import type { Conversation, ConvId, MachineId } from '@/next/protocol/v2';
@@ -35,6 +41,8 @@ import {
 } from '@/next/stores/mentions';
 import { limitsOf } from '@/next/stores/machines';
 import { useVoice } from '@/next/bindings/use-voice';
+import VoiceStart from '@/next/features/voice-live/voice-start';
+import { askVoiceStart } from '@/next/features/voice-live/field';
 import { useTakesMenu } from '@/next/bindings/use-takes';
 import DockBar from '@/next/features/composer/dock-bar';
 import { useEnterSends } from '@/next/stores/me';
@@ -118,6 +126,10 @@ const HomeComposer = ({
   const field = useRef<HTMLTextAreaElement>(null);
   const { text, files, refs, setText, read } = useDraftField(NEW_CHAT, field);
   const gptExtra = useGptExtra(machine, text, () => setText(''));
+  // «Задача | Разговор» over the field: a talk sends the words to a plain chat with a model instead of an agent.
+  const kind = useChatKind();
+  const plainTalk = kind === CHAT_KIND.talk && gptExtra !== null;
+  useKindKey(field, kind, setChatKind);
   // The apps picked in «+» for the chat to be: turned on in it as soon as the machine has made it.
   const [apps, setApps] = useState<string[]>([]);
   const mentions = useMentions(NEW_CHAT);
@@ -129,6 +141,8 @@ const HomeComposer = ({
   // Enter pressed before the machine's list arrives waits for it and then sends, instead of being lost.
   const waiting = useRef<(() => void) | null>(null);
   const submitRef = useRef<() => void>(() => undefined);
+  /** The next submit is the voice button's (VoiceStart): it starts the talk in the chat it makes. */
+  const talkRef = useRef(false);
   useEffect(() => {
     if (mentions.length > 0) field.current?.focus();
     // Only on arrival: a chip added or removed later leaves the focus where the person put it.
@@ -219,6 +233,26 @@ const HomeComposer = ({
 
   const onSubmit = useCallback(() => {
     if (creating) return;
+    if (plainTalk && gptExtra) {
+      if (gptExtra.signIn) {
+        toast(t('next.kind.talkSignIn'), { tone: 'info' });
+        goTo({ kind: ROUTE.settings, section: 'accounts' });
+        return;
+      }
+      if (text.trim() === '') return;
+      gptExtra.onPick(gptExtra.models?.[0]?.id ?? null);
+      return;
+    }
+    // The voice button asked (VoiceStart): the chat starts empty unless something is typed, and its field begins the talk.
+    const talk = talkRef.current;
+    talkRef.current = false;
+    // A talk's chat starts without a first message unless the field has something in it.
+    const firstOf = (asTalk: boolean) =>
+      !asTalk || text.trim() !== '' || uploads.ready.length > 0 || refs.length > 0;
+    if (talk && queueWhenSilent) {
+      toast(t('next.newChat.connecting'), { tone: 'info' });
+      return;
+    }
     if (queueWhenSilent && machine && onQueued) {
       queueFirst(machine, onQueued);
       return;
@@ -228,7 +262,9 @@ const HomeComposer = ({
       const asked = read();
       // Typing on after the early Enter means the person is still writing: nothing goes out behind their back.
       waiting.current = () => {
-        if (read() === asked) submitRef.current();
+        if (read() !== asked) return;
+        talkRef.current = talk;
+        submitRef.current();
       };
       return;
     }
@@ -276,7 +312,7 @@ const HomeComposer = ({
     }
 
     function send(target: MachineId, place: NewConversation['where']) {
-      if (choice && companions.length > 0) {
+      if (choice && companions.length > 0 && !talk) {
         // One chat on each model, each in a worktree of its own, grouped under the prompt.
         const launch = { id: uuidv7(), prompt: launchPrompt(text) };
         const first = { text: withMentions(mentions, text.trim()), attachments: uploads.ready, refs };
@@ -324,7 +360,9 @@ const HomeComposer = ({
         provider: choice?.provider ?? 'claude',
         ...(choice?.profile ? { profile: choice.profile } : {}),
         model: choice?.model ? launchModel({ ...choice, model: choice.model }) : null,
-        first: { text: withMentions(mentions, text.trim()), attachments: uploads.ready, refs },
+        ...(firstOf(talk)
+          ? { first: { text: withMentions(mentions, text.trim()), attachments: uploads.ready, refs } }
+          : {}),
       });
       void created.done.then((st) => {
         if (st.k === 'failed') {
@@ -342,6 +380,8 @@ const HomeComposer = ({
         uploads.reset();
         turnOnApps(target, [id]);
         setCreating(false);
+        // The new chat's field takes the ask as it comes on screen (voice-live.tsx).
+        if (talk) askVoiceStart();
         onCreated(id);
       });
     }
@@ -365,6 +405,8 @@ const HomeComposer = ({
     queueWhenSilent,
     onQueued,
     queueFirst,
+    plainTalk,
+    gptExtra,
   ]);
   useLayoutEffect(() => {
     submitRef.current = onSubmit;
@@ -416,14 +458,26 @@ const HomeComposer = ({
     [refs, machine],
   );
 
+  const startTalk = useCallback(() => {
+    talkRef.current = true;
+    submitRef.current();
+  }, []);
+
   const srcOf = useCallback((item: { id: string }) => (machine ? uploadSrc(machine, item) : null), [machine]);
 
   return (
     <AttachmentSrc.Provider value={srcOf}>
-      <div className="hx-dock" data-creating={creating || undefined}>
+      <div
+        className="hx-dock"
+        data-creating={creating || undefined}
+        data-kind={plainTalk ? 'talk' : undefined}
+      >
         {above}
         <div className="hx-enter" data-enter="up" data-eb="520" data-ed="700">
-          <DockBar notice={voiceNotice ?? (allMachinesOff ? NO_MACHINES : signIn ? SIGN_IN : null)} />
+          <DockBar
+            notice={voiceNotice ?? (allMachinesOff ? NO_MACHINES : signIn && !plainTalk ? SIGN_IN : null)}
+          />
+          {gptExtra && <KindSwitch value={kind} onChange={setChatKind} />}
           <ScreenField
             glideOut="chat"
             enterSends={enterSends}
@@ -432,16 +486,19 @@ const HomeComposer = ({
             onSubmit={onSubmit}
             mode="new"
             onStop={() => Promise.resolve()}
+            placeholder={plainTalk ? t('next.kind.talkPlaceholder') : undefined}
             picker={
-              choice && {
-                value: choice,
-                agents,
-                locked: false,
-                onChange: onPickOne,
-                multi,
-                machine: machines,
-                extra: gptExtra,
-              }
+              !plainTalk && choice
+                ? {
+                    value: choice,
+                    agents,
+                    locked: false,
+                    onChange: onPickOne,
+                    multi,
+                    machine: machines,
+                    extra: gptExtra,
+                  }
+                : null
             }
             slash={slash}
             quotes={mentions.map((m) => ({
@@ -457,13 +514,14 @@ const HomeComposer = ({
             refs={refChips}
             onRemoveRef={(ref) => removeDraftRef(NEW_CHAT, ref)}
             attach={attach}
-            apps={plusApps}
+            apps={plainTalk ? null : plusApps}
             attachments={uploads.attachments}
             onFiles={uploads.onFiles}
             onRemoveAttachment={uploads.onRemove}
             onRetryAttachment={uploads.onRetry}
+            tools={plainTalk ? null : <VoiceStart machine={machine} busy={creating} onStart={startTalk} />}
             {...voice}
-            limits={limits}
+            limits={plainTalk ? null : limits}
             maxText={machine ? limitsOf(machine).maxText : 0}
           />
         </div>

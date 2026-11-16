@@ -65,6 +65,8 @@ func TestSlotRules(t *testing.T) {
 		"feed off the stage":         {`"targets":["home"],"network":{"connect":["day.example.com"]},"views":[{"id":"h","entry":"ui/h.html","targets":["home"],"feed":"https://day.example.com/api/day"}]`, "views[0].feed"},
 		"feed host not listed":       {`"targets":["home"],"views":[{"id":"h","entry":"ui/h.html","targets":["home"],"height":"stage","feed":"https://day.example.com/api/day"}]`, "views[0].feed"},
 		"feed over http":             {`"targets":["home"],"network":{"connect":["day.example.com"]},"views":[{"id":"h","entry":"ui/h.html","targets":["home"],"height":"stage","feed":"http://day.example.com/api/day"}]`, "views[0].feed"},
+		"chrome off the app screen":  {`"targets":["settings"],"views":[{"id":"s","entry":"ui/s.html","targets":["settings"],"chrome":"none"}]`, "views[0].chrome"},
+		"chrome unknown value":       {`"targets":["app"],"views":[{"id":"a","entry":"ui/a.html","targets":["app"],"chrome":"thin"}]`, "views[0].chrome"},
 		"feedSecret without feed":    {`"targets":["home"],"secrets":[{"name":"token"}],"views":[{"id":"h","entry":"ui/h.html","targets":["home"],"height":"stage","feedSecret":"token"}]`, "views[0].feedSecret"},
 		"feedSecret not a secret":    {`"targets":["home"],"network":{"connect":["day.example.com"]},"views":[{"id":"h","entry":"ui/h.html","targets":["home"],"height":"stage","feed":"https://day.example.com/api/day","feedSecret":"token"}]`, "views[0].feedSecret"},
 		"other height":               {`"targets":["home"],"views":[{"id":"h","entry":"ui/h.html","targets":["home"],"height":"400px"}]`, "views[0].height"},
@@ -99,5 +101,17 @@ func TestIsSlot(t *testing.T) {
 func TestSlotDoneNeedsNoRight(t *testing.T) {
 	if right, ok := methodPermission["harnessly/slot.done"]; !ok || right != "" {
 		t.Fatalf("slot.done: %q %v", right, ok)
+	}
+}
+
+// A view of the app's own screen may draw its own bar: the host then shows none above it.
+func TestChromeNoneOnAppScreen(t *testing.T) {
+	body := `"targets":["app"],"views":[{"id":"a","entry":"ui/a.html","targets":["app"],"chrome":"none"}]`
+	m, ps := ParseManifest([]byte(slotManifest(body)))
+	if m == nil || len(ps) != 0 {
+		t.Fatalf("chrome none on the app screen: %v", ps)
+	}
+	if m.Views[0].Chrome != ChromeNone {
+		t.Fatalf("chrome: %q", m.Views[0].Chrome)
 	}
 }

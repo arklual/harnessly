@@ -23,6 +23,12 @@ Your tracker, wiki and code host (Jira, Confluence, YouTrack, Linear, GitLab, Gi
 link in **Settings → Connections**. The agents then read them for you, without a token of their own. Remote MCP
 servers (Notion, Sentry, GitHub…) connect the same way and sign in in a popup.
 
+A connected mail, calendar, folder, feed or webhook also has **Rules** in its row: ready things to do with its
+events — a draft reply to a letter left without an answer, a brief before a meeting, tomorrow's schedule in the
+evening, a look at a failed build or a stuck alert, a reminder the day before a task's date, «do a draft?» for an
+assignment with a deadline. Switch on the ones you want; the agent only proposes, and a letter or a message goes after
+your «OK» on the card. With your Telegram bot connected, the news comes there with buttons.
+
 ## The safe
 
 Tokens, passwords and keys never go into the chat. When an agent needs one it asks the safe by name; you get a card

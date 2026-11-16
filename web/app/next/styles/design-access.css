@@ -466,6 +466,34 @@
     translate 180ms cubic-bezier(0.4, 0, 1, 1);
   pointer-events: none;
 }
+/* the rows while the view is read — the shape of a row, not an empty list. */
+.hx-acc-row--sk .hx-sk {
+  display: block;
+}
+.hx-acc-sk-av {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+.hx-acc-sk-name {
+  width: 42%;
+  height: 12px;
+}
+.hx-acc-sk-sub {
+  width: 64%;
+  height: 10px;
+  margin-top: 4px;
+}
+.hx-acc-failed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0 0;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
 .hx-acc-av {
   display: grid;
   flex: none;

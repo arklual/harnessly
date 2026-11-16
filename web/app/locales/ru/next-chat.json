@@ -40,7 +40,7 @@
   "next.composer.dropHere": "Отпустите, чтобы прикрепить",
   "next.composer.placeholderStopped": "Агент остановлен — сообщение продолжит разговор с того же места",
   "next.composer.placeholderAnswer": "Свой ответ на вопрос…",
-  "next.composer.placeholderWorking": "Дополнить — ↵ в очередь, {mod}↵ сразу в ход работы",
+  "next.composer.placeholderWorking": "Дополнить — ↵ сразу в ход, {mod}↵ после хода",
   "next.composer.placeholderShort": "Ответить в чате…",
   "next.composer.placeholderStoppedShort": "Продолжить разговор…",
   "next.composer.placeholderWorkingShort": "Дополнить…",
@@ -219,6 +219,7 @@
   "next.link.openPane": "Открыть в панели",
   "next.link.openOutside": "Открыть в браузере",
   "next.link.copy": "Копировать ссылку",
+  "next.link.share": "Поделиться…",
   "next.link.copied": "Ссылка скопирована",
   "next.time.durHours": "{h} ч {m} мин",
   "next.time.durMinutes": "{m} мин",
@@ -234,7 +235,6 @@
   "next.tool.search": "Искал",
   "next.tool.showAll": "Показать всё",
   "next.tool.showAllFailed": "Не открылось — ещё раз",
-  "next.tool.truncated": "Показано {shown} из {total}",
   "next.tool.web": "Открыл",
   "next.turnEnd.actionFailed": "не получилось, попробуйте ещё раз",
   "next.turnEnd.agentExited": "агент завершился",
@@ -652,5 +652,69 @@
   "next.picker.modeTitle": "Как работает",
   "next.picker.mode.harnessly": "Агент harnessly",
   "next.picker.mode.codex": "Codex",
-  "next.picker.mode.chat": "Чат"
+  "next.picker.mode.chat": "Чат",
+  "next.tool.exit": "код {code}",
+  "next.tool.linesRange": "строки {from}–{to}",
+  "next.tool.linesFrom": "со строки {from}",
+  "next.tool.linesFirst": "первые {n} строк",
+  "next.tool.linesRead": {
+    "one": "{n} строка",
+    "few": "{n} строки",
+    "many": "{n} строк",
+    "other": "{n} строки"
+  },
+  "next.tool.linesNew": {
+    "one": "{n} строка",
+    "few": "{n} строки",
+    "many": "{n} строк",
+    "other": "{n} строки"
+  },
+  "next.tool.found": "найдено: {n}",
+  "next.tool.nothingFound": "ничего не нашлось",
+  "next.tool.more": {
+    "one": "ещё {n} строка",
+    "few": "ещё {n} строки",
+    "many": "ещё {n} строк",
+    "other": "ещё {n} строки"
+  },
+  "next.tool.command": "Команда",
+  "next.tool.output": "Вывод",
+  "next.tool.copyCommand": "Копировать команду",
+  "next.tool.copied": "Скопировано",
+  "next.work.commands": {
+    "one": "{n} команда",
+    "few": "{n} команды",
+    "many": "{n} команд",
+    "other": "{n} команды"
+  },
+  "next.work.reads": {
+    "one": "Прочитал {n} файл",
+    "few": "Прочитал {n} файла",
+    "many": "Прочитал {n} файлов",
+    "other": "Прочитал {n} файла"
+  },
+  "next.work.edits": {
+    "one": "{n} правка",
+    "few": "{n} правки",
+    "many": "{n} правок",
+    "other": "{n} правки"
+  },
+  "next.work.searches": {
+    "one": "{n} поиск",
+    "few": "{n} поиска",
+    "many": "{n} поисков",
+    "other": "{n} поиска"
+  },
+  "next.ref.chat": "Чат",
+  "next.ref.chatOpen": "Открыть чат",
+  "next.ref.chatGone": "Чат удалён",
+  "next.tool.shownLines": {
+    "one": "Показано {shown} из {n} строки",
+    "few": "Показано {shown} из {n} строк",
+    "many": "Показано {shown} из {n} строк",
+    "other": "Показано {shown} из {n} строк"
+  },
+  "next.tool.firstBytes": "Первые {shown} из {total}",
+  "next.size.kb": "{n} КБ",
+  "next.size.mb": "{n} МБ"
 }

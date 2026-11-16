@@ -1,0 +1,32 @@
+id: theme-preset
+title: «Сделай тему как ночной Токио» — тема ставится тулом или командой, без CSS
+tags: [looks]
+timeout_s: 240
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'internal/looks/**'
+  - 'internal/hlcli/theme.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+prompt: сделай мне тему как ночной Токио
+expect:
+  - name: changed the look
+    any_of:
+      - called: harnessly\.theme_set
+      - called: Bash
+        args: {command: 'harnessly theme (preset|set)\b'}
+  - name: wrote no CSS or code for it
+    not_called: (Write|Edit)
+    args: {file_path: '\.(css|scss|tsx?|jsx?|html)$'}
+variants:
+  - id: v1
+    kind: short
+    text: "тему ночной Токио поставь"
+  - id: v2
+    kind: english
+    text: "give harnessly a night Tokyo theme"
+  - id: v3
+    kind: indirect
+    text: "надоел белый интерфейс, хочу что-то неоновое и тёмное"
+  - id: v4
+    kind: typos
+    text: "сдлеай тему как ночьной токио"

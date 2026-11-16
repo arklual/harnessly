@@ -88,8 +88,15 @@ func (a *API) CLIPages(r *http.Request) Answer {
 		variant, _ := strField(body, "variantOf")
 		layout, _ := strField(body, "layout")
 		expand, _ := Field(body, "expand").(bool)
-		return answer(a.L.CreatePage(project, PageSpec{Title: title, File: file, Route: optional("route"), VariantOf: variant, Layout: layout,
-			W: size("w"), H: size("h"), Expand: expand, Widths: intList(Field(body, "widths"))}))
+		made, err := a.L.CreatePage(project, PageSpec{Title: title, File: file, Route: optional("route"), VariantOf: variant, Layout: layout,
+			W: size("w"), H: size("h"), Expand: expand, Widths: intList(Field(body, "widths"))})
+		if err == nil {
+			// The board an agent made opens in its chat's pane, on that board, not on the project's first page.
+			if session, ok := strField(body, "session"); ok && sessionRe.MatchString(session) && a.OpenPane != nil {
+				a.OpenPane(session, project, made.File)
+			}
+		}
+		return answer(made, err)
 	case "rename":
 		return answer(a.L.RenamePage(project, page, optional("title"), optional("file")))
 	case "remove":

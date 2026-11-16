@@ -1,0 +1,125 @@
+{
+ "day": 29,
+ "records": [
+  {
+   "order": "o29-0",
+   "city": "Тула",
+   "status": "paid",
+   "amount_rub": 4587
+  },
+  {
+   "order": "o29-1",
+   "city": "Тула",
+   "status": "pending",
+   "amount_rub": 8952
+  },
+  {
+   "order": "o29-2",
+   "city": "Тула",
+   "status": "refunded",
+   "amount_rub": 8730
+  },
+  {
+   "order": "o29-3",
+   "city": "Пермь",
+   "status": "paid",
+   "amount_rub": 1435
+  },
+  {
+   "order": "o29-4",
+   "city": "Казань",
+   "status": "paid",
+   "amount_rub": 1356
+  },
+  {
+   "order": "o29-5",
+   "city": "Пермь",
+   "status": "pending",
+   "amount_rub": 3146
+  },
+  {
+   "order": "o29-6",
+   "city": "Казань",
+   "status": "paid",
+   "amount_rub": 1817
+  },
+  {
+   "order": "o29-7",
+   "city": "Пермь",
+   "status": "refunded",
+   "amount_rub": 7632
+  },
+  {
+   "order": "o29-8",
+   "city": "Пермь",
+   "status": "pending",
+   "amount_rub": 8102
+  },
+  {
+   "order": "o29-9",
+   "city": "Сочи",
+   "status": "paid",
+   "amount_rub": 3225
+  },
+  {
+   "order": "o29-10",
+   "city": "Казань",
+   "status": "refunded",
+   "amount_rub": 500
+  },
+  {
+   "order": "o29-11",
+   "city": "Сочи",
+   "status": "pending",
+   "amount_rub": 6662
+  },
+  {
+   "order": "o29-12",
+   "city": "Тула",
+   "status": "paid",
+   "amount_rub": 4716
+  },
+  {
+   "order": "o29-13",
+   "city": "Казань",
+   "status": "paid",
+   "amount_rub": 2934
+  },
+  {
+   "order": "o29-14",
+   "city": "Сочи",
+   "status": "paid",
+   "amount_rub": 421
+  },
+  {
+   "order": "o29-15",
+   "city": "Москва",
+   "status": "paid",
+   "amount_rub": 7047
+  },
+  {
+   "order": "o29-16",
+   "city": "Сочи",
+   "status": "pending",
+   "amount_rub": 1134
+  },
+  {
+   "order": "o29-17",
+   "city": "Сочи",
+   "status": "paid",
+   "amount_rub": 3091
+  },
+  {
+   "order": "o29-18",
+   "city": "Пермь",
+   "status": "paid",
+   "amount_rub": 2825
+  },
+  {
+   "order": "o29-19",
+   "city": "Пермь",
+   "status": "paid",
+   "amount_rub": 5614
+  }
+ ]
+}

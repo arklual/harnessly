@@ -816,14 +816,110 @@
   font-size: 12px;
   color: var(--hx-fg-3);
 }
+/* The agent's own words for a command: they lead the line and give way to nothing but the time. */
+.hx-tool__label[data-title='true'] {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 72%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-tool__label[data-title='true'] + .hx-tool__detail {
+  flex: 1 1 0;
+}
+.hx-tool__fact {
+  flex: none;
+  font-size: 12px;
+  color: var(--hx-fg-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 .hx-tool__meta {
   flex: none;
   font-size: 12px;
   color: var(--hx-fg-3);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* How a finished command ended, under its line while it is folded: it folds away as the output opens. */
+.hx-tool__peekwrap {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 460ms var(--hx-ease-out),
+    opacity 240ms var(--hx-ease-out);
+}
+.hx-tool[aria-expanded='true'] .hx-tool__peekwrap {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+.hx-tool__peekwrap > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.hx-tool__peek {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: calc(100% - 22px);
+  margin: 0 0 4px 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--hx-font-mono);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--hx-fg-3);
+  text-align: left;
+  cursor: pointer;
+}
+.hx-tool__peekln {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-tool__peek[data-failed='true'] .hx-tool__peekln {
+  color: color-mix(in srgb, var(--hx-danger) 80%, var(--hx-fg-2));
+}
+.hx-tool__more {
+  font-family: var(--hx-font-ui);
+  color: var(--hx-fg-3);
+  transition: color 240ms var(--hx-ease-out);
+}
+.hx-tool__peek:hover .hx-tool__more {
+  color: var(--hx-fg-1);
+}
+/* The whole command of a shell step, opened: it wraps, and copies with one click. */
+.hx-tool__cmd {
+  margin: 4px 0 0 22px;
+  border-radius: 10px;
+  background: var(--hx-bg-hover);
+}
+.hx-tool__cmdhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 28px;
+  padding: 0 4px 0 12px;
+  font-size: 12px;
+  color: var(--hx-fg-3);
+}
+.hx-tool__cmdtext {
+  margin: 0;
+  padding: 0 12px 8px;
+  font-family: var(--hx-font-mono);
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--hx-fg-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .hx-tool[data-ok='false'] .hx-tool__ico,
-.hx-tool[data-ok='false'] .hx-tool__meta {
+.hx-tool__meta[data-failed='true'] {
   color: var(--hx-danger);
 }
 .hx-tool__body {
@@ -862,6 +958,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  max-width: calc(100% + 8px);
   height: 28px;
   margin-left: -8px;
   padding: 0 8px;
@@ -886,7 +983,14 @@
   gap: 4px;
   flex: none;
 }
+.hx-tools__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .hx-tools__chev {
+  flex: none;
   transition: transform 460ms var(--hx-ease-out);
 }
 .hx-tools[aria-expanded='true'] .hx-tools__chev {
@@ -1574,6 +1678,25 @@ a.hx-file {
 }
 html[data-theme='dark'] .hx-ref[data-type='link'] {
   color: #7fa8ff;
+}
+.hx-ref[data-type='chat'] .hx-icon {
+  color: var(--hx-accent);
+}
+/* A chat that is gone: it says so on hover and opens nothing. */
+.hx-ref[data-gone='true'] {
+  cursor: default;
+  color: var(--hx-fg-3);
+}
+.hx-ref[data-gone='true'] .hx-icon {
+  color: var(--hx-fg-3);
+}
+.hx-ref[data-gone='true'] .hx-ref__label {
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--hx-fg-3) 60%, transparent);
+}
+.hx-ref[data-gone='true']:hover {
+  background: var(--hx-bg-hover);
+  box-shadow: none;
 }
 .hx-ref[data-type='file'] {
   font-family: var(--hx-font-mono);

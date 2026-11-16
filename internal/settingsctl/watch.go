@@ -65,3 +65,7 @@ func (s *Service) WaitRev(ctx context.Context, after uint64, d time.Duration) ui
 	}
 	return s.Rev()
 }
+
+// Touch moves the revision without a change of a setting: a page that watches reads what else it watches (the
+// agents' looks, cmd/runtime routes_looks.go).
+func (s *Service) Touch() { s.bump() }

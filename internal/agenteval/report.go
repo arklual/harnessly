@@ -19,6 +19,25 @@ type CellStat struct {
 	Hi       float64 `json:"hi"`
 	PassHat3 float64 `json:"passHat3,omitempty"`
 	USD      float64 `json:"usd"`
+	// The medians of the judged runs: work time (s), tokens, dollars; their spread is (max − min) / median.
+	ActiveS      float64 `json:"activeS,omitempty"`
+	ActiveSpread float64 `json:"activeSpread,omitempty"`
+	Tokens       float64 `json:"tokens,omitempty"`
+	TokenSpread  float64 `json:"tokenSpread,omitempty"`
+	USDMedian    float64 `json:"usdMedian,omitempty"`
+	// The means of the judged runs: helpers, conflicting and duplicate edits, the person needed, edits of the lead.
+	Sessions    float64 `json:"sessions,omitempty"`
+	Subagents   float64 `json:"subagents,omitempty"`
+	Delegations float64 `json:"delegations,omitempty"`
+	Teammates   float64 `json:"teammates,omitempty"`
+	Conflicts   float64 `json:"conflicts,omitempty"`
+	Duplicates  float64 `json:"duplicates,omitempty"`
+	Asks        float64 `json:"asks,omitempty"`
+	LeadEdits   float64 `json:"leadEdits,omitempty"`
+	Repl        float64 `json:"repl,omitempty"`
+	Messages    float64 `json:"messages,omitempty"`
+	// Timeouts are the judged runs that did not finish in time.
+	Timeouts int `json:"timeouts,omitempty"`
 	// Change is against the same cell of the earlier run: better, worse, same, new.
 	Change string `json:"change,omitempty"`
 	Before string `json:"before,omitempty"`
@@ -40,6 +59,8 @@ type Report struct {
 func Summarize(results, against []Result, noise float64) Report {
 	type k struct{ s, m string }
 	cells := map[k]*CellStat{}
+	type series struct{ active, tokens, usd, sess, sub, del, team, conf, dup, asks, lead, repl, msg []float64 }
+	ser := map[k]*series{}
 	models := map[string]bool{}
 	var rep Report
 	for _, r := range results {
@@ -62,6 +83,34 @@ func Summarize(results, against []Result, noise float64) Report {
 		case Fail:
 			rep.Failures = append(rep.Failures, r)
 		}
+		for _, v := range r.Verdicts {
+			if v.Name == "finished in time" && !v.OK {
+				c.Timeouts++
+			}
+		}
+		sr := ser[k{r.Scenario, r.Model}]
+		if sr == nil {
+			sr = &series{}
+			ser[k{r.Scenario, r.Model}] = sr
+		}
+		m := MetricsOf(r)
+		act := r.ActiveS
+		if act == 0 {
+			act = r.WallS
+		}
+		sr.active = append(sr.active, float64(act))
+		sr.tokens = append(sr.tokens, float64(m.Tokens))
+		sr.usd = append(sr.usd, r.USD)
+		sr.sess = append(sr.sess, float64(m.Sessions))
+		sr.sub = append(sr.sub, float64(m.Subagents))
+		sr.del = append(sr.del, float64(m.Delegations))
+		sr.team = append(sr.team, float64(m.Teammates))
+		sr.conf = append(sr.conf, float64(m.Conflicts))
+		sr.dup = append(sr.dup, float64(m.Duplicates))
+		sr.asks = append(sr.asks, float64(m.Asks))
+		sr.lead = append(sr.lead, float64(m.LeadEdits))
+		sr.repl = append(sr.repl, float64(m.Repl))
+		sr.msg = append(sr.msg, float64(m.Messages))
 		c.Runs++
 		rep.Runs++
 	}
@@ -78,6 +127,14 @@ func Summarize(results, against []Result, noise float64) Report {
 		before[k{r.Scenario, r.Model}] = b
 	}
 	for key, c := range cells {
+		if sr := ser[key]; sr != nil {
+			c.ActiveS, c.ActiveSpread = median(sr.active), spread(sr.active)
+			c.Tokens, c.TokenSpread = median(sr.tokens), spread(sr.tokens)
+			c.USDMedian = median(sr.usd)
+			c.Sessions, c.Subagents, c.Delegations, c.Teammates = mean(sr.sess), mean(sr.sub), mean(sr.del), mean(sr.team)
+			c.Conflicts, c.Duplicates, c.Asks, c.LeadEdits, c.Repl = mean(sr.conf), mean(sr.dup), mean(sr.asks), mean(sr.lead), mean(sr.repl)
+			c.Messages = mean(sr.msg)
+		}
 		c.Lo, c.Hi = Wilson(c.Pass, c.Runs)
 		if c.Runs >= 3 {
 			c.PassHat3 = PassHatK(c.Pass, c.Runs, 3)
@@ -172,6 +229,20 @@ func (rep Report) Markdown(title string) string {
 		fmt.Fprintf(&b, " **%d/%d** |", t[0], t[1])
 	}
 	b.WriteString("\n")
+	b.WriteString("\n## Cost and teamwork\n\n")
+	b.WriteString("Medians of the judged runs (spread = (max − min) / median), means of the counts per run: helpers started " +
+		"(subagents / delegated chats / teammates), files edited from more than one session, identical edits, the person needed, " +
+		"edits of the lead chat itself, messages between agents mid-work, REPL calls; timeouts.\n\n")
+	b.WriteString("| Scenario | Model | Time, s | Tokens, k | $ | Sub/Del/Team | Conflicts | Dups | Asks | Lead edits | Msgs | REPL | Timeouts |\n")
+	b.WriteString("|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
+	for _, c := range rep.Cells {
+		if c.Runs == 0 {
+			continue
+		}
+		fmt.Fprintf(&b, "| %s | %s | %.0f (±%s%%) | %.0f (±%s%%) | %.2f | %.1f/%.1f/%.1f | %.1f | %.1f | %.1f | %.1f | %.1f | %.1f | %d |\n",
+			c.Scenario, c.Model, c.ActiveS, pct(c.ActiveSpread/2), c.Tokens/1000, pct(c.TokenSpread/2), c.USDMedian,
+			c.Subagents, c.Delegations, c.Teammates, c.Conflicts, c.Duplicates, c.Asks, c.LeadEdits, c.Messages, c.Repl, c.Timeouts)
+	}
 	if len(rep.Failures) > 0 {
 		b.WriteString("\n## Failures\n\n")
 		for _, r := range rep.Failures {
@@ -189,4 +260,20 @@ func failText(r Result) string {
 		}
 	}
 	return strings.ReplaceAll(strings.Join(parts, "; "), "\n", " ")
+}
+
+// spread is (max − min) / median: how far repeats of one cell drift apart, the noise a change has to clear.
+func spread(xs []float64) float64 {
+	if len(xs) < 2 {
+		return 0
+	}
+	lo, hi := xs[0], xs[0]
+	for _, x := range xs {
+		lo, hi = min(lo, x), max(hi, x)
+	}
+	m := median(xs)
+	if m == 0 {
+		return 0
+	}
+	return (hi - lo) / m
 }

@@ -61,6 +61,10 @@ const (
 
 	// A message carried by the launch of the agent (its first prompt) is waited for this long: a start can be slow.
 	CarryDeadline = 90 * time.Second
+	// CarryLongest: a carried or steered message past its term whose agent's transcript is not read to its end yet
+	// waits for it this long at most — on a loaded machine a new session's transcript is found and read minutes after
+	// the agent took the prompt, and failing it before is a red «not confirmed» over a turn that runs.
+	CarryLongest = 10 * time.Minute
 	// GatherMaxText is the longest message the line's gathering makes (UTF-16 units): a long paste is refused by Claude
 	// Code without a word, so messages that would make more are typed one after another, each whole.
 	GatherMaxText = 8_000
@@ -556,7 +560,9 @@ func (b *Box) Retry(clientID string, find Find, now time.Time) (Change, wire.Ref
 	case r.Message.State.K != wire.MsgFailed:
 		return ch, wire.RefuseNotFailed
 	}
-	if r.TypedOffset > 0 {
+	// A message typed at offset 0 — the first prompt a launch carried — is looked for too: the agent may have it in its
+	// transcript, and a retry would be a second copy of it.
+	if r.TypedOffset > 0 || r.TypedAt > 0 {
 		if id, ok := b.found(r, find); ok {
 			b.accept(&ch, r, &id, now)
 			return ch, ""

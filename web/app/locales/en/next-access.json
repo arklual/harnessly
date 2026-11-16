@@ -74,6 +74,7 @@
   "next.access.inviteGoneTitle": "The link no longer works",
   "next.access.inviteGone": "It expired, was revoked or has no places left. Ask for a new one.",
   "next.access.inviteFailed": "Could not open",
+  "next.access.failure.view": "Could not load who has access.",
   "next.access.failure.network": "No connection to the access service. Try again.",
   "next.access.failure.timeout": "The access service did not answer in time. Try again.",
   "next.access.shareTitle": "Share “{name}”",

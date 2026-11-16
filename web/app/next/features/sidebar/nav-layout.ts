@@ -111,3 +111,48 @@ export const moved = <T>(list: readonly T[], from: number, to: number): T[] => {
   if (item !== undefined) next.splice(Math.max(0, Math.min(to, next.length)), 0, item);
   return next;
 };
+
+/** The two lists of the menu: the top level and the apps under «Приложения». */
+export const NAV_LIST = { top: 'top', apps: 'apps' } as const;
+export type TNavList = (typeof NAV_LIST)[keyof typeof NAV_LIST];
+
+/**
+ * A key carried by hand next to another (`at`, a key of either list), in that one's list: an app crosses from
+ * «Приложения» to the top level and back this way, a menu item only moves within the top level. null when the drop
+ * asks for nothing (an item under «Приложения», the same place, a key the layout lacks).
+ */
+export const withPlaced = (
+  layout: INavLayout,
+  key: string,
+  at: string,
+  after: boolean,
+): INavLayout | null => {
+  if (key === at) return null;
+  const app = appOfKey(key);
+  const atApp = appOfKey(at);
+  const list: TNavList | null = layout.top.includes(at)
+    ? NAV_LIST.top
+    : atApp !== null && layout.apps.includes(atApp)
+      ? NAV_LIST.apps
+      : null;
+  if (list === null) return null;
+  if (list === NAV_LIST.apps && app === null) return null;
+  const inTop = layout.top.includes(key);
+  const inApps = app !== null && layout.apps.includes(app);
+  if (!inTop && !inApps) return null;
+  const top = layout.top.filter((k) => k !== key);
+  const apps = app === null ? [...layout.apps] : layout.apps.filter((a) => a !== app);
+  if (list === NAV_LIST.top) {
+    const i = top.indexOf(at);
+    top.splice(after ? i + 1 : i, 0, key);
+  } else {
+    const i = apps.indexOf(atApp as string);
+    apps.splice(after ? i + 1 : i, 0, app as string);
+  }
+  const same =
+    top.length === layout.top.length &&
+    top.every((k, i) => k === layout.top[i]) &&
+    apps.length === layout.apps.length &&
+    apps.every((a, i) => a === layout.apps[i]);
+  return same ? null : { ...layout, top, apps };
+};

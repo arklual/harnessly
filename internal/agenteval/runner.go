@@ -68,24 +68,29 @@ const (
 
 // Result is one run as the results file keeps it.
 type Result struct {
-	Key        string    `json:"key"`
-	Scenario   string    `json:"scenario"`
-	Set        string    `json:"set"`
-	Variant    string    `json:"variant"`
-	Prompt     string    `json:"prompt"`
-	Model      string    `json:"model"`
-	Rep        int       `json:"rep"`
-	Setup      string    `json:"setup"`
-	State      string    `json:"state"`
-	Error      string    `json:"error,omitempty"`
-	Verdicts   []Verdict `json:"verdicts,omitempty"`
-	Facts      *Facts    `json:"facts,omitempty"`
-	TurnState  string    `json:"turnState,omitempty"`
-	WallS      int       `json:"wallS"`
-	USD        float64   `json:"usd"`
-	Transcript string    `json:"transcript,omitempty"`
-	StartedAt  string    `json:"startedAt"`
-	Reused     bool      `json:"reused,omitempty"`
+	Key       string    `json:"key"`
+	Scenario  string    `json:"scenario"`
+	Set       string    `json:"set"`
+	Variant   string    `json:"variant"`
+	Prompt    string    `json:"prompt"`
+	Model     string    `json:"model"`
+	Rep       int       `json:"rep"`
+	Setup     string    `json:"setup"`
+	State     string    `json:"state"`
+	Error     string    `json:"error,omitempty"`
+	Verdicts  []Verdict `json:"verdicts,omitempty"`
+	Facts     *Facts    `json:"facts,omitempty"`
+	TurnState string    `json:"turnState,omitempty"`
+	WallS     int       `json:"wallS"`
+	// ActiveS is from the start to the last thing an agent of the stand wrote: the work's time, without the wait for
+	// quiet.
+	ActiveS int `json:"activeS,omitempty"`
+	// InterruptAt is when the scenario's interrupt was sent (Unix seconds).
+	InterruptAt int64   `json:"interruptAt,omitempty"`
+	USD         float64 `json:"usd"`
+	Transcript  string  `json:"transcript,omitempty"`
+	StartedAt   string  `json:"startedAt"`
+	Reused      bool    `json:"reused,omitempty"`
 }
 
 // Options steer a run of the matrix.
@@ -268,17 +273,57 @@ func runOne(ctx context.Context, o Options, c Cell, key, worker string, port int
 	if err := prepare(stand, c.Scenario); err != nil {
 		return finish(Infra, err)
 	}
-	tab, err := stand.Chat(c.Model.Agent, c.Model.Model, c.Variant.Text)
+	prompt := c.Variant.Text
+	if sfx := strings.TrimSpace(o.Stand.PromptSuffix); sfx != "" {
+		prompt += "\n\n" + sfx
+	}
+	tab, err := stand.Chat(c.Model.Agent, c.Model.Model, prompt)
 	if err != nil {
 		return finish(Infra, err)
 	}
-	r.TurnState = stand.Wait(ctx, tab, time.Duration(c.Scenario.Timeout())*time.Second)
+	timeout := time.Duration(c.Scenario.Timeout()) * time.Second
+	deadline := t0.Add(timeout)
+	if it := c.Scenario.Interrupt; it != nil {
+		at := time.Now().Add(time.Duration(it.AfterS) * time.Second)
+		r.TurnState = stand.Wait(ctx, tab, time.Until(at))
+		// A chat that delegated ends its turn early; the person still speaks at the same moment.
+		time.Sleep(time.Until(at))
+		// The person speaks while something still works: the chat itself or an agent it started.
+		if r.TurnState == "timeout" || stand.chatState(tab) == "busy" || stand.working() || time.Since(stand.lastActivity()) < 30*time.Second {
+			if err := stand.Send(tab, it.Text); err != nil {
+				return finish(Infra, fmt.Errorf("send the interrupt: %v", err))
+			}
+			r.InterruptAt = time.Now().Unix()
+			time.Sleep(5 * time.Second)
+			r.TurnState = stand.Wait(ctx, tab, time.Until(deadline))
+		}
+	} else {
+		r.TurnState = stand.Wait(ctx, tab, timeout)
+	}
+	settled := true
+	if c.Scenario.SettleS > 0 && r.TurnState != "timeout" && ctx.Err() == nil {
+		var last time.Time
+		last, settled = stand.Settle(ctx, tab, time.Duration(c.Scenario.SettleS)*time.Second, deadline)
+		if !last.IsZero() {
+			r.ActiveS = max(0, int(last.Sub(t0).Seconds()))
+		}
+	} else if last := stand.lastActivity(); !last.IsZero() {
+		r.ActiveS = max(0, int(last.Sub(t0).Seconds()))
+	}
 	keep := filepath.Join(o.Out, "transcripts", key+".jsonl")
 	facts, err := stand.Collect(c.Model.Agent, tab, keep)
 	if err != nil {
 		return finish(Infra, err)
 	}
 	r.Transcript = filepath.Join("transcripts", key+".jsonl")
+	for _, chk := range c.Scenario.Checks() {
+		interrupt := ""
+		if r.InterruptAt > 0 {
+			interrupt = fmt.Sprint(r.InterruptAt)
+		}
+		code, out := stand.Exec(ctx, chk, []string{fmt.Sprintf("EVAL_STARTED_AT=%d", t0.Unix()), "EVAL_INTERRUPT_AT=" + interrupt}, 5*time.Minute)
+		facts.Checks = append(facts.Checks, CheckResult{Command: chk, Exit: code, Output: out})
+	}
 	r.Facts = &facts
 	r.USD = cost(facts)
 	if len(facts.Calls) == 0 && len(facts.Said) == 0 {
@@ -291,6 +336,8 @@ func runOne(ctx context.Context, o Options, c Cell, key, worker string, port int
 	r.Verdicts = c.Scenario.Check(facts)
 	if r.TurnState == "timeout" {
 		r.Verdicts = append(r.Verdicts, Verdict{Name: "finished in time", OK: false, Why: fmt.Sprintf("still working after %ds", c.Scenario.Timeout())})
+	} else if !settled {
+		r.Verdicts = append(r.Verdicts, Verdict{Name: "finished in time", OK: false, Why: fmt.Sprintf("agents still working after %ds", c.Scenario.Timeout())})
 	}
 	if Passed(r.Verdicts) {
 		return finish(Pass, nil)
@@ -298,11 +345,21 @@ func runOne(ctx context.Context, o Options, c Cell, key, worker string, port int
 	return finish(Fail, nil)
 }
 
+// cost prices each model's tokens at its own rate: a delegated chat may run on another model than the person's.
 func cost(f Facts) float64 {
-	if f.Model == "" || !pricing.Anthropic(f.Model) {
-		return 0
+	if len(f.ByModel) == 0 {
+		if f.Model == "" || !pricing.Anthropic(f.Model) {
+			return 0
+		}
+		return pricing.ClaudeCostByFullID(f.Model, float64(f.TokensIn), float64(f.TokensOut), float64(f.CacheWrite), 0, float64(f.CacheRead))
 	}
-	return pricing.ClaudeCostByFullID(f.Model, float64(f.TokensIn), float64(f.TokensOut), float64(f.CacheWrite), 0, float64(f.CacheRead))
+	total := 0.0
+	for m, u := range f.ByModel {
+		if pricing.Anthropic(m) {
+			total += pricing.ClaudeCostByFullID(m, float64(u.In), float64(u.Out), float64(u.CacheWrite), 0, float64(u.CacheRead))
+		}
+	}
+	return total
 }
 
 // prepare puts the scenario's setup into the stand.
@@ -314,6 +371,16 @@ func prepare(s *Stand, sc *Scenario) error {
 		}
 		if err := os.WriteFile(dst, []byte(content), 0o600); err != nil {
 			return infra("%v", err)
+		}
+	}
+	for _, d := range sc.Setup.Workspace {
+		if err := copyTree(filepath.Join(sc.Dir(), filepath.FromSlash(d)), s.Work); err != nil {
+			return infra("workspace fixture %s: %v", d, err)
+		}
+	}
+	if sc.Setup.Run != "" {
+		if code, out := s.Exec(context.Background(), sc.Setup.Run, nil, 2*time.Minute); code != 0 {
+			return infra("setup run: exit %d: %s", code, out)
 		}
 	}
 	for _, d := range sc.Setup.Design {

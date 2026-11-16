@@ -259,7 +259,8 @@ describe('Settings → Connections', { timeout: 20_000 }, () => {
     fireEvent.change(await screen.findByLabelText('Token'), { target: { value: TOKEN } });
     fireEvent.click(screen.getByText('Connect'));
     expect(await screen.findByText('Jira · jira.acme.com/jira · as Anna Petrova')).toBeTruthy();
-    expect(calls[0]?.url).toContain('/api/platform/connections');
+    // The page also reads the connectors (features/connectors) beside the connections; their order is not the point.
+    expect(calls.some((c) => c.method === 'GET' && c.url.endsWith('/api/platform/connections'))).toBe(true);
     const detect = calls.find((c) => c.url.endsWith('/connections/detect'));
     expect(JSON.parse(detect?.body ?? '{}')).toEqual({ url: 'https://jira.acme.com/jira/browse/ABC-12' });
     const connect = calls.find((c) => c.method === 'POST' && c.url.endsWith('/connections'));

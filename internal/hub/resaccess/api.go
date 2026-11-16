@@ -191,6 +191,16 @@ func (t *txn) view(ref Ref, a Actor, info Info) (map[string]any, error) {
 
 func (s *Service) shareURL(token string) string { return s.publicURL + "/d/" + token }
 
+// linkURL is the address a new guest link is handed out with: the service's own page where it serves the guest itself.
+func (s *Service) linkURL(ref Ref, target, token string) string {
+	if s.LinkURL != nil {
+		if u := s.LinkURL(ref, target, token); u != "" {
+			return u
+		}
+	}
+	return s.shareURL(token)
+}
+
 // Serve answers one request of the resource's access API (the part of the path after /acl). The caller has checked that
 // the resource exists; info tells who owns it where the model has no row yet. Pinned turns a link's version into the
 // one it should keep: "" for the live resource.
@@ -473,7 +483,7 @@ func (s *Service) sharesRoute(r *http.Request, a Actor, ref Ref, rest []string, 
 		if err != nil {
 			return nil, 0, err
 		}
-		return made.json(s.shareURL(token)), 201, nil
+		return made.json(s.linkURL(ref, in.Target, token)), 201, nil
 
 	case r.Method == http.MethodPatch && n == 2:
 		b, err := readBody(r)

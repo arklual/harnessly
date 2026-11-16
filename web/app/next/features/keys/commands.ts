@@ -55,7 +55,7 @@ export const KEY_COMMANDS = [
   cmd('composer', 'dictate', 'Mod+Shift+Space'),
   // Esc stops a dictation and keeps the text (it is not a command here); cancelling it has no key until one is given.
   cmd('composer', 'cancelDictation'),
-  cmd('composer', 'send', 'Mod+Enter'),
+  cmd('composer', 'send', 'Alt+Enter'),
   cmd('composer', 'stopAgent', 'Ctrl+KeyC', 'Mod+Period'),
   cmd('composer', 'attach', 'Mod+Shift+KeyU'),
 

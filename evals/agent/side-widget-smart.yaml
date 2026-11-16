@@ -1,0 +1,33 @@
+id: side-widget-smart
+title: «Сделай виджет, который показывает…» — умный виджет под правой колонкой через widget_create
+tags: [widgets]
+timeout_s: 300
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/hlcli/widget.go'
+  - 'internal/sidewidget/**'
+prompt: сделай виджет, который показывает, хватит ли мне лимитов до конца дня
+expect:
+  - name: made a smart widget over the limits
+    any_of:
+      - called: harnessly\.widget_create
+        args: {sources: 'limits', smart: '.{5,}'}
+      - called: Bash
+        args: {command: 'harnessly widget create\b(?s:.*)--sources[ =]\S*limits(?s:.*)--smart|harnessly widget create\b(?s:.*)--smart(?s:.*)--sources[ =]\S*limits'}
+  - name: did not write an app by hand
+    not_called: Bash
+    args: {command: 'harnessly app (new|dev|install)'}
+variants:
+  - id: v1
+    kind: short
+    text: "виджет: хватит ли лимитов до вечера"
+  - id: v2
+    kind: english
+    text: "make a widget that tells me whether my limits will last until the end of the day"
+  - id: v3
+    kind: typos
+    text: "сдлеай видджет каторый показыват хватит ли лимитов до канца дня"
+  - id: v4
+    kind: indirect
+    text: "хочу под правой колонкой карточку, которая сама прикидывает, дотяну ли я по лимитам до вечера"

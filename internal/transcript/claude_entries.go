@@ -291,6 +291,45 @@ func summarizeToolCall(name any, input any) string {
 	return jsString(name) + " " + firstVal
 }
 
+// exitCodeRE is how Claude Code opens the result of a command that failed: «Exit code 2» on the first line.
+var exitCodeRE = regexp.MustCompile(`^Exit code (\d+)`)
+
+// callDetail is what a call says of itself beyond its summary, for the feed to say what is done in words: a command's
+// description and its whole text, the lines a Read asked for. nil when there is nothing.
+func callDetail(name any, input any) *jsvalue.Object {
+	out := obj()
+	switch {
+	case isStr(name, "Bash"):
+		if d := jscompat.Trim(jsString(coalesce(get(input, "description"), ""))); d != "" {
+			out.Set("description", d)
+		}
+		if c := jsString(coalesce(get(input, "command"), "")); c != "" {
+			out.Set("command", c)
+		}
+	case isStr(name, "Read"):
+		if f, ok := get(input, "offset").(float64); ok && f > 0 {
+			out.Set("offset", f)
+		}
+		if f, ok := get(input, "limit").(float64); ok && f > 0 {
+			out.Set("limit", f)
+		}
+	}
+	if out.Len() == 0 {
+		return nil
+	}
+	return out
+}
+
+// resultText is the whole text of a tool's result for the feed's output; "" for an app's card, which its summary
+// carries whole as compact JSON.
+func resultText(content any) string {
+	text := contentText(content)
+	if cardResult(text) != "" {
+		return ""
+	}
+	return text
+}
+
 func firstLineSummary(text string) string {
 	lines := strings.Split(text, "\n")
 	if len(lines) > 1 {
@@ -773,6 +812,9 @@ func toolUseEntry(c *jsvalue.Object, b *claudeBase, ts float64) *jsvalue.Object 
 	}
 	e := obj("id", unsetID, "type", "tool-call", "timestamp", ts, "toolUseId", toolUseID, "toolName", toolName, "summary", summary,
 		"filePath", filePath, "diff", diff)
+	if call := callDetail(toolName, input); call != nil {
+		e.Set("call", call)
+	}
 	if peer != nil {
 		e.Set("peerMessage", peer)
 	}
@@ -888,6 +930,16 @@ func (p *claudeParse) user(raw any, ts float64) []*jsvalue.Object {
 		}
 		e := obj("id", unsetID, "type", "tool-result", "timestamp", ts, "toolUseId", get(item, "tool_use_id"),
 			"isError", coalesce(get(item, "is_error"), false), "summary", summary)
+		if answers == nil {
+			if text := resultText(get(item, "content")); text != "" {
+				setResultText(e, text)
+				if m := exitCodeRE.FindStringSubmatch(text); m != nil && truthy(get(item, "is_error")) {
+					if n, err := strconv.Atoi(m[1]); err == nil {
+						e.Set("exitCode", float64(n))
+					}
+				}
+			}
+		}
 		if answers != nil {
 			e.Set("answers", answers)
 		}
@@ -1077,6 +1129,11 @@ func mergeToolResults(entries []*jsvalue.Object) []*jsvalue.Object {
 			}
 			if call := toolCalls[k]; call != nil {
 				call.Set("status", status)
+				if name := get(call, "toolName"); isStr(name, "Read") || isStr(name, "NotebookRead") {
+					// A file's text: the feed shows how many lines were read, the file itself is a click away.
+					e.Delete("text")
+					e.Delete("textTail")
+				}
 				if summary != "" && !truthy(get(e, "isError")) {
 					m := linesSummaryRE.FindStringSubmatch(summary)
 					name := get(call, "toolName")

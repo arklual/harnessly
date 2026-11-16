@@ -6,7 +6,10 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
+
+	"github.com/ly-solutions/harnessly/internal/sidewidget"
 )
 
 // harnessly widget: what an agent shows in the feed of the chat it runs in (internal/apps/widgets.go).
@@ -15,6 +18,10 @@ import (
 //	harnessly widget render --title T --html @file [--css @file] [--js @file] [--data JSON|@file|-] [--id ID]
 //	harnessly widget list
 //	harnessly widget remove <id>
+//	harnessly widget create <name> --title T [--sources limits,machine,subagents] [--smart "request"] [--every MIN] …
+//	harnessly widget update <name> [the same flags]
+//	harnessly widget list --side
+//	harnessly widget remove --side <name>
 //
 // The same --id again changes that widget where it stands. A widget's answer is the line «widget <id> shown»: the feed
 // draws the widget under the command's step; shown again it answers «widget <id> changed» and draws nothing new.
@@ -30,12 +37,37 @@ const widgetUsage = `harnessly widget — a widget in the feed of this chat
   harnessly widget remove <id>
 
   --id ID   the same id changes that widget where it stands (lower-case latin letters, digits, - and _, up to 40)
-  @file     reads the value from a file; - reads it from stdin`
+  @file     reads the value from a file; - reads it from stdin
+
+harnessly widget — a widget under the chat's right column (the person's computers, every chat)
+
+  harnessly widget create <name> --title T [--sources limits,machine,subagents] [--smart "request"] [--every MIN]
+                          [--size s|m|l] [--refresh SEC] [--icon NAME] [--html @file] [--css @file] [--js @file]
+      a small card the person keeps under the right column; it joins their widgets by itself.
+      --sources  the host's data it is given: limits (5 h and week left), machine (CPU, memory, disk),
+                 subagents (delegated chats at work)
+      --smart    a request a model answers over those data in a few short lines, every --every minutes (5..1440,
+                 default 30) and at once on the card's button
+      --html/--css/--js  your own page (optional): hl.context.data = {sources, smart}, hl.on('context', fn);
+                 sandboxed: no network, no secrets, no chats
+  harnessly widget update <name> [the same flags]   only what is given changes
+  harnessly widget list --side
+  harnessly widget remove --side <name>
+
+  Built-in widgets (Лимиты, Машина, Подчаты, Выкат, Заметка, Часы) are added by the person from «+ Виджет».`
 
 func (c *cli) widget(args []string) error {
 	if len(args) == 0 || args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
 		_, _ = fmt.Fprintln(c.env.Stdout, widgetUsage)
 		return nil
+	}
+	switch {
+	case args[0] == "create" || args[0] == "update":
+		return c.sideWidgetSave(args[0], args[1:])
+	case (args[0] == "list" || args[0] == "ls") && len(args) > 1 && args[1] == "--side":
+		return c.sideWidgetList()
+	case (args[0] == "remove" || args[0] == "rm") && len(args) == 3 && args[1] == "--side":
+		return c.sideWidgetPost(map[string]any{"op": "remove", "name": args[2]})
 	}
 	session := c.session()
 	if session == "" {
@@ -83,7 +115,106 @@ func (c *cli) widget(args []string) error {
 		_, _ = fmt.Fprintf(c.env.Stdout, "widget %s removed\n", args[1])
 		return nil
 	}
-	return usageErr("unknown widget command %q (show, render, list, remove)", args[0])
+	return usageErr("unknown widget command %q (show, render, list, remove, create, update)", args[0])
+}
+
+// sideWidgetSave is `harnessly widget create|update <name> …` (internal/sidewidget): the flags make the spec, or the
+// patch of an update (only the flags given).
+func (c *cli) sideWidgetSave(op string, args []string) error {
+	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
+		return usageErr("harnessly widget %s <name> --title T [--sources …] [--smart …] (see harnessly widget --help)", op)
+	}
+	name := args[0]
+	fields := map[string]any{}
+	for i := 1; i < len(args); i++ {
+		flag, inline, hasInline := strings.Cut(args[i], "=")
+		if !strings.HasPrefix(flag, "--") {
+			return usageErr("unexpected %q (see harnessly widget --help)", args[i])
+		}
+		v := inline
+		if !hasInline {
+			if i+1 >= len(args) {
+				return usageErr("%s needs a value", flag)
+			}
+			i++
+			v = args[i]
+		}
+		val, err := c.widgetValue(v)
+		if err != nil {
+			return err
+		}
+		key := strings.TrimPrefix(flag, "--")
+		switch key {
+		case "title", "icon", "smart", "size", "html", "css":
+			fields[key] = val
+		case "js", "script":
+			fields["js"] = val
+		case "every", "refresh":
+			n, err := strconv.Atoi(strings.TrimSpace(val))
+			if err != nil {
+				return usageErr("--%s is a whole number", key)
+			}
+			fields[key] = n
+		case "sources":
+			list := []string{}
+			for _, s := range strings.Split(val, ",") {
+				if s = strings.TrimSpace(s); s != "" {
+					list = append(list, s)
+				}
+			}
+			fields["sources"] = list
+		default:
+			return usageErr("unknown flag %s (see harnessly widget --help)", flag)
+		}
+	}
+	if h, _ := fields["html"].(string); strings.Contains(strings.ToLower(h), "<script") {
+		return usageErr("put the script in --js, not in the markup: the widget's page takes no inline script")
+	}
+	if op == "create" {
+		fields["name"] = name
+		return c.sideWidgetPost(map[string]any{"op": "create", "spec": fields})
+	}
+	return c.sideWidgetPost(map[string]any{"op": "update", "name": name, "patch": fields})
+}
+
+func (c *cli) sideWidgetPost(body map[string]any) error {
+	status, raw, err := c.call("POST", "/api/cli/apps/side-widgets", nil, body)
+	if err != nil {
+		return err
+	}
+	var out struct{ Error, Message string }
+	_ = json.Unmarshal(raw, &out)
+	if status != 200 {
+		if out.Message != "" {
+			return fail("%s", out.Message)
+		}
+		return fail("the machine answered %d", status)
+	}
+	_, _ = fmt.Fprintln(c.env.Stdout, out.Message)
+	return nil
+}
+
+func (c *cli) sideWidgetList() error {
+	status, raw, err := c.call("GET", "/api/cli/apps/side-widgets", nil, nil)
+	if err != nil {
+		return err
+	}
+	if status != 200 {
+		return fail("the machine answered %d", status)
+	}
+	var out struct {
+		Widgets []sidewidget.Info `json:"widgets"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return err
+	}
+	if len(out.Widgets) == 0 {
+		_, _ = fmt.Fprintln(c.env.Stdout, "no widgets made by agents")
+	}
+	for _, w := range out.Widgets {
+		_, _ = fmt.Fprintln(c.env.Stdout, sidewidget.ListLine(w))
+	}
+	return nil
 }
 
 // widgetValue is a flag's value: as written, @file read from the file, - read from stdin.

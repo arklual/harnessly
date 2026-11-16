@@ -96,6 +96,7 @@ export const orgMachineOf = (raw: HubMachine, view: OrgView): OrgMachine => {
     host: m.hostname || undefined,
     canManage: canAdmin || (teamCaps?.manage ?? false),
     canAdmin,
+    canSeeDebug: m.canSeeDebug ?? false,
     needs: canAdmin ? null : 'tenant_admin',
   };
 };

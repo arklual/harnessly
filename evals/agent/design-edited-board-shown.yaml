@@ -1,0 +1,26 @@
+id: design-edited-board-shown
+title: Правка доски Sinopia — закончил и показал ту доску, которую правил, а не первую страницу проекта
+tags: [design, pane]
+timeout_s: 480
+setup:
+  design: [fixtures/shop]
+covers:
+  - 'internal/hlcli/design*.go'
+  - 'internal/design/routes_pages.go'
+  - 'internal/design/texts/guide*.md'
+prompt: В проекте Sinopia Design «shop» на доске «Каталог» добавь пятый товар — «Блокнот · 350 ₽». Как закончишь, покажи.
+expect:
+  - name: edited that board
+    file: {glob: 'design:shop/project/Каталог.dc.html', contains: 'Блокнот'}
+  - name: opened the design on that board
+    pane: {tab: design, target: shop, place: '(?i)каталог'}
+variants:
+  - id: v1
+    kind: short
+    text: "Sinopia Design, «shop», доска «Каталог»: добавь товар «Блокнот · 350 ₽» и покажи."
+  - id: v2
+    kind: english
+    text: "In the Sinopia Design project «shop», on the «Каталог» board, add a fifth product «Блокнот · 350 ₽». Show it to me when done."
+  - id: v3
+    kind: typos
+    text: "в sinopia desgin в «shop» на доске «каталог» добавь товар «блокнот · 350 ₽» и покажы"

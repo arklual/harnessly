@@ -96,7 +96,7 @@ func TestStartIsRefusedWhileOffOrSignedOut(t *testing.T) {
 func TestCallRelaysTheControlSocket(t *testing.T) {
 	f, srv := newFake(t)
 	s := service(t, srv, true)
-	_ = s.SaveSettings(Settings{Subscription: true, Voice: "marin"})
+	_ = s.SaveSettings(Settings{Subscription: true, Voice: "sol"})
 	st, err := s.Start(context.Background(), CallInput{SDP: "v=0 offer", Mode: ModeAgent, Context: "Доска «Главная»"})
 	if err != nil {
 		t.Fatal(err)
@@ -110,7 +110,7 @@ func TestCallRelaysTheControlSocket(t *testing.T) {
 		t.Fatalf("headers %v", f.headers)
 	}
 	sess := f.body["session"].(map[string]any)
-	if sess["model"] != Model || sess["audio"].(map[string]any)["output"].(map[string]any)["voice"] != "marin" ||
+	if sess["model"] != Model || sess["audio"].(map[string]any)["output"].(map[string]any)["voice"] != "sol" ||
 		!strings.Contains(sess["instructions"].(string), "Доска «Главная»") {
 		t.Fatalf("session %v", sess)
 	}
@@ -284,5 +284,15 @@ func TestSubscriptionDefaultIsTheInstallations(t *testing.T) {
 	}
 	if s.Settings().Subscription {
 		t.Fatal("a saved off is the person's own")
+	}
+}
+
+// A voice saved before the subscription route's list was cut to ChatGPT's own (an API name such as marin) falls back
+// to the default: with it the call would be made but never connect.
+func TestSubscriptionDropsAPIVoices(t *testing.T) {
+	for _, v := range []string{"marin", "cedar", "verse", "alloy"} {
+		if pick("", v, Voices[RouteSubscription]) != "cove" {
+			t.Fatalf("%s kept on the subscription route", v)
+		}
 	}
 }

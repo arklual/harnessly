@@ -41,9 +41,9 @@ import {
   type PermissionMode,
 } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
-import PillRing from '@/next/features/composer/pill-ring';
-import { LimitsCard, useNow } from '@/next/features/limits/limits-chip';
-import { leftOf, ringOf, windowShort, windowsOf, type LimitsView } from '@/next/features/limits/model';
+import { useNow } from '@/next/features/limits/limits-chip';
+import LimitsBrief from '@/next/features/limits/limits-brief';
+import { leftOf, windowShort, windowsOf, type LimitsView } from '@/next/features/limits/model';
 import Tooltip from '@/next/ui/tooltip';
 import { usePresentFlag } from '@/next/ui/presence';
 import { useGlide } from '@/next/ui/use-glide';
@@ -62,6 +62,10 @@ import {
   type IPickerGroup,
 } from '@/next/features/composer/picker-groups';
 
+/** The popover's gap to the pill and to the window's edge, px, and the least it shrinks to. */
+const POP_GAP = 10;
+const POP_EDGE = 8;
+const POP_MIN = 160;
 const EXIT_MS = 240;
 
 const VIEW = { effort: 'effort', models: 'models', machines: 'machines' } as const;
@@ -243,10 +247,7 @@ const ModelPicker = ({
   const permission = value.permission ?? agent.defaultPermission ?? 'ask';
   const permissionWaits = permissionAsked !== null && permissionAsked !== permission ? permissionAsked : null;
   const permissionShown = permissionWaits ?? permission;
-  const permissionHint =
-    permissionWaits === null
-      ? t(`next.picker.permissionHint.${permission}`)
-      : t('next.picker.permissionWaits');
+  const permissionHint = t('next.picker.permissionWaits');
   // What a change sends keeps the asks of the other modes that still wait: a turn of one control does not take them back.
   const keep = {
     ...(fastWaits !== null ? { fast: fastWaits } : {}),
@@ -309,6 +310,18 @@ const ModelPicker = ({
     const carousel = pane.querySelector<HTMLElement>('.hx-carousel');
     const list = carousel?.querySelector<HTMLElement>('.hx-options[data-active="true"]');
     if (carousel && list) height -= carousel.offsetHeight - list.offsetHeight;
+    // It always fits the window: over the pill while there is room, under it when there is more room there, and
+    // scrolled inside (the limits stuck to its foot) when neither side holds it whole.
+    const anchor = anchorRef.current?.getBoundingClientRect();
+    if (anchor) {
+      const above = anchor.top - POP_GAP - POP_EDGE;
+      const below = window.innerHeight - anchor.bottom - POP_GAP - POP_EDGE;
+      const under = height > above && below > above;
+      pop.dataset.side = under ? 'below' : 'above';
+      const room = Math.max(POP_MIN, under ? below : above);
+      pop.style.setProperty('--hx-picker-max', `${room}px`);
+      height = Math.min(height, room);
+    }
     pop.style.height = `${height}px`;
   });
 
@@ -361,9 +374,8 @@ const ModelPicker = ({
     'width',
   );
 
-  // The limit on the pill: its outline.
+  // The limits in the pill's hint (the bars by the context ring show them in the field).
   const nowSec = useNow() / 1000;
-  const ring = ringOf(limits, nowSec);
   const limitsTip =
     limits?.state === 'ready'
       ? windowsOf(limits.limits, nowSec)
@@ -384,7 +396,6 @@ const ModelPicker = ({
         type="button"
         className="hx-model hx-tipped"
         data-ultracode={ultracode || undefined}
-        data-ring={ring ? ring.level : undefined}
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-busy={busy || undefined}
@@ -395,7 +406,6 @@ const ModelPicker = ({
             {limitsTip ? `${t('next.composer.modelTip')} · ${limitsTip}` : t('next.composer.modelTip')}
           </span>
         )}
-        {ring && <PillRing host={pill} used={ring.used} level={ring.level} />}
         <i className="hx-agent" data-agent={agent.vendor ?? value.provider} aria-hidden="true" />
         {ultracode && (
           <i
@@ -445,9 +455,6 @@ const ModelPicker = ({
                     setView(VIEW.models);
                   }}
                 >
-                  <span className="hx-picker__effort">
-                    {effort ? effortLabel(effort) : t('next.picker.effortUnknown')}
-                  </span>
                   <span className="hx-picker__model">
                     <i className="hx-agent" data-agent={agent.vendor ?? value.provider} aria-hidden="true" />
                     <span className="hx-picker__model-text">{modelLine(agent, value.model)}</span>
@@ -470,6 +477,7 @@ const ModelPicker = ({
                     aria-valuenow={step < 0 ? undefined : step}
                     aria-valuetext={effort ? effortLabel(effort) : t('next.picker.effortUnknown')}
                     aria-disabled={frozen || undefined}
+                    title={hint()}
                     onPointerDown={onSliderDown}
                     onPointerMove={onSliderMove}
                   >
@@ -505,7 +513,8 @@ const ModelPicker = ({
                   </div>
                 </>
               )}
-              <div className="hx-picker__hint">{hint()}</div>
+              {/* The depth's words are the slider's hint; a line stays only where there is no slider to hover. */}
+              {(blocked || stops.length < 2) && <div className="hx-picker__hint">{hint()}</div>}
               <div className="hx-perm" data-frozen={frozen || undefined}>
                 <div
                   className="hx-perm__seg"
@@ -524,6 +533,7 @@ const ModelPicker = ({
                       className="hx-perm__item"
                       aria-checked={mode === permissionShown}
                       data-mode={mode}
+                      title={t(`next.picker.permissionHint.${mode}`)}
                       disabled={frozen}
                       onClick={() => {
                         if (mode !== permissionShown) onChange({ ...value, ...keep, permission: mode });
@@ -534,9 +544,12 @@ const ModelPicker = ({
                     </button>
                   ))}
                 </div>
-                <div className="hx-perm__hint" data-pending={permissionWaits !== null || undefined}>
-                  {permissionHint}
-                </div>
+                {/* What a mode does is its hint; a line only while a change waits for the agent. */}
+                {permissionWaits !== null && (
+                  <div className="hx-perm__hint" data-pending>
+                    {permissionHint}
+                  </div>
+                )}
               </div>
               {(fastOffered || ultracodeOffered) && (
                 <div className="hx-picker__chips">
@@ -605,7 +618,7 @@ const ModelPicker = ({
               )}
               {limits && (
                 <div className="hx-picker__limits">
-                  <LimitsCard view={limits} />
+                  <LimitsBrief view={limits} />
                 </div>
               )}
             </div>

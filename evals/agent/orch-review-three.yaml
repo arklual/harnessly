@@ -1,0 +1,31 @@
+id: orch-review-three
+title: Ревью с трёх сторон разными агентами — один сведённый отчёт, код не тронут
+tags: [orchestration]
+agents: [claude, codex]
+timeout_s: 1200
+settle_s: 45
+setup:
+  workspace: [fixtures/orch-review]
+  run: git init -q && git add -A && git -c user.name=eval -c user.email=eval@example.test commit -qm init
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/delegation/**'
+  - 'internal/mcpserver/**'
+prompt: |-
+  Сделай ревью app/users.py с трёх сторон параллельно — три ревьюера, у каждого своя: безопасность, производительность, корректность. Код не правь. Сведи их находки в один отчёт review.md: по разделу на сторону, у каждой находки строка кода и что исправить, без повторов между разделами.
+expect:
+  - name: three reviewers
+    any_of:
+      - called: harnessly\.delegate_task
+      - called: Agent|Task
+      - called: Bash
+        args: {command: 'harnessly tab create\b.*--prompt'}
+  - name: the injection is found
+    file: {glob: review.md, contains: '(?i)inject|инъекц'}
+  - name: the N+1 / quadratic work is found
+    file: {glob: review.md, contains: '(?i)N ?\+ ?1|O\(n(\^2|²| ?\* ?n)\)|квадрат|quadratic|в цикле|per user|на каждого'}
+  - name: the pagination off-by-one is found
+    file: {glob: review.md, contains: '(?i)off-by-one|\(n ?- ?1\)|n ?- ?1|перв\w+ страниц|first page|пропуска\w* перв'}
+  - name: the code is untouched
+    check: git diff --exit-code HEAD -- app/

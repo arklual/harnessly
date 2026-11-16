@@ -332,6 +332,7 @@ export const hubMachine = obj({
   access: arr(accessSubject),
   problems: arr(lit('offline', 'idle_week', 'agent_old', 'disk_low', 'login_expired', 'disabled')),
   opensRuntime: opt(bool),
+  canSeeDebug: opt(bool),
   cloud: nullable(machineCloud),
   hardware: nullable(machineHardware),
   load: nullable(machineLoad),

@@ -379,16 +379,20 @@ func (s *Service) serveFleet(w http.ResponseWriter, r *http.Request) {
 	s.fleetCall(w, r, p.User, false)
 }
 
+// serveRollout says whether the hub or the runtimes are being rolled out: the page says so over its losses of connection.
+func (s *Service) serveRollout(w http.ResponseWriter, r *http.Request) {
+	if s.rollout == nil {
+		httpx.WriteJSON(w, http.StatusOK, map[string]bool{"active": false})
+		return
+	}
+	s.rollout(w, r)
+}
+
 // fleetCall answers /api/v2/… for a signed-in person; onHub is the workspace's way in (workspace.go), where only the
 // machines that may answer on the hub's own origin are there.
 func (s *Service) fleetCall(w http.ResponseWriter, r *http.Request, u store.User, onHub bool) {
 	if r.URL.Path == "/api/v2/rollout" && r.Method == http.MethodGet && r.URL.Query().Get("machine") == "" {
-		// Whether the hub or the runtimes are being rolled out: the page says so over its losses of connection.
-		if s.rollout == nil {
-			httpx.WriteJSON(w, http.StatusOK, map[string]bool{"active": false})
-			return
-		}
-		s.rollout(w, r)
+		s.serveRollout(w, r)
 		return
 	}
 	if r.URL.Path == "/api/v2/web-vitals" {

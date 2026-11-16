@@ -1,0 +1,12 @@
+# Control arm of the orchestration comparison: Claude Code's experimental agent teams.
+name: orch-teams
+runtime_env:
+  RUNTIME_GITLAB_HOSTS: gitlab.example.test
+  RUNTIME_TRACKER_HOSTS: tracker.example.test
+  RUNTIME_TASK_KEY_RE: '\b(?:PRJ|OPS)-\d+\b'
+  RUNTIME_TASK_EXAMPLES: PRJ-128
+  RUNTIME_STAND_DOMAIN: .preview.example.test
+  RUNTIME_DOCS_HOST: docs.example.test
+agent_env:
+  CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1"
+prompt_suffix: Помощников заводи командой агентов Claude Code (agent team, тиммейты) на той же модели, что у тебя; подчаты harnessly и обычных сабагентов не используй.

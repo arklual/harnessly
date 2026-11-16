@@ -851,6 +851,21 @@ type Entry struct {
 	Detail       *string         `json:"detail"`
 	Peers        []PeerNote      `json:"peers"`  // peer: what other agents' sessions wrote to this one
 	Images       *ImageGen       `json:"images"` // tool: the picture card of a picture-drawing call; left out for any other
+	Call         *ToolCall       `json:"call"`   // tool: what the call says of itself and how it ended; left out when nothing is known
+}
+
+// ToolCall is what a tool step knows beyond its one-line summary, so the feed can say what is done in words: the
+// agent's own description of a command, the whole command, the lines of a file it read, how long it ran, how it ended
+// and the tail of its output (the event's output is cut to its first ToolOutputMax bytes).
+type ToolCall struct {
+	Description string `json:"description,omitempty"` // Claude's Bash `description`: what the command does, in words
+	Command     string `json:"command,omitempty"`     // the whole command of a shell call, all its lines
+	Offset      int64  `json:"offset,omitempty"`      // Read: the first line asked for (1-based), 0 from the top
+	Limit       int64  `json:"limit,omitempty"`       // Read: how many lines were asked for, 0 the whole file
+	DurationMs  *int64 `json:"durationMs,omitempty"`  // from the call to its result, once it has one
+	Exit        *int64 `json:"exit,omitempty"`        // a shell call's exit code, when the agent told it
+	Lines       int64  `json:"lines,omitempty"`       // how many lines the whole output has
+	Tail        string `json:"tail,omitempty"`        // the last few non-empty lines of the whole output
 }
 
 // ImageGenStates are the states of a picture call.

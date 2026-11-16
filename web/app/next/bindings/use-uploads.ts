@@ -82,7 +82,10 @@ const heldBy = (key: DraftKey): Set<string> => {
 };
 
 /** The draft's files with the same one twice left out (by id, or by what it holds): a message sends each once. */
-export const distinctRefs = (files: readonly AttachmentRef[], contents: ReadonlyMap<string, string>): AttachmentRef[] => {
+export const distinctRefs = (
+  files: readonly AttachmentRef[],
+  contents: ReadonlyMap<string, string>,
+): AttachmentRef[] => {
   const ids = new Set<string>();
   const held = new Set<string>();
   return files.filter((file) => {

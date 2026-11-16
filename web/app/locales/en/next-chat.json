@@ -38,7 +38,7 @@
   "next.composer.dropHere": "Release to attach",
   "next.composer.placeholderStopped": "The agent is stopped — a message resumes the chat where it left off",
   "next.composer.placeholderAnswer": "Your own answer to the question…",
-  "next.composer.placeholderWorking": "Add more — ↵ into the queue, {mod}↵ straight into the turn",
+  "next.composer.placeholderWorking": "Add more — ↵ into the turn now, {mod}↵ after the turn",
   "next.composer.placeholderShort": "Message the agent…",
   "next.composer.placeholderStoppedShort": "Resume the chat…",
   "next.composer.placeholderWorkingShort": "Add more…",
@@ -217,6 +217,7 @@
   "next.link.openPane": "Open in the pane",
   "next.link.openOutside": "Open in the browser",
   "next.link.copy": "Copy link",
+  "next.link.share": "Share…",
   "next.link.copied": "Link copied",
   "next.time.durHours": "{h} h {m} min",
   "next.time.durMinutes": "{m} min",
@@ -232,7 +233,6 @@
   "next.tool.search": "Searched",
   "next.tool.showAll": "Show all",
   "next.tool.showAllFailed": "Did not open — try again",
-  "next.tool.truncated": "Showing {shown} of {total}",
   "next.tool.web": "Opened",
   "next.turnEnd.actionFailed": "did not work, try again",
   "next.turnEnd.agentExited": "the agent exited",
@@ -638,5 +638,53 @@
   "next.picker.modeTitle": "How it works",
   "next.picker.mode.harnessly": "harnessly agent",
   "next.picker.mode.codex": "Codex",
-  "next.picker.mode.chat": "Chat"
+  "next.picker.mode.chat": "Chat",
+  "next.tool.exit": "exit {code}",
+  "next.tool.linesRange": "lines {from}–{to}",
+  "next.tool.linesFrom": "from line {from}",
+  "next.tool.linesFirst": "first {n} lines",
+  "next.tool.linesRead": {
+    "one": "{n} line",
+    "other": "{n} lines"
+  },
+  "next.tool.linesNew": {
+    "one": "{n} line",
+    "other": "{n} lines"
+  },
+  "next.tool.found": "{n} found",
+  "next.tool.nothingFound": "nothing found",
+  "next.tool.more": {
+    "one": "{n} more line",
+    "other": "{n} more lines"
+  },
+  "next.tool.command": "Command",
+  "next.tool.output": "Output",
+  "next.tool.copyCommand": "Copy command",
+  "next.tool.copied": "Copied",
+  "next.work.commands": {
+    "one": "{n} command",
+    "other": "{n} commands"
+  },
+  "next.work.reads": {
+    "one": "Read {n} file",
+    "other": "Read {n} files"
+  },
+  "next.work.edits": {
+    "one": "{n} edit",
+    "other": "{n} edits"
+  },
+  "next.work.searches": {
+    "one": "{n} search",
+    "other": "{n} searches"
+  },
+  "next.ref.chat": "Chat",
+  "next.ref.chatOpen": "Open the chat",
+  "next.ref.chatGone": "The chat was deleted",
+  "next.tool.shownLines": {
+    "one": "Showing {shown} of {n} line",
+    "other": "Showing {shown} of {n} lines"
+  },
+  "next.tool.firstBytes": "First {shown} of {total}",
+  "next.size.kb": "{n} KB",
+  "next.size.mb": "{n} MB"
 }

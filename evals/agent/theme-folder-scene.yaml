@@ -1,0 +1,30 @@
+id: theme-folder-scene
+title: «Поставь на эту папку матрицу» — живой фон на папку чата, не на всё
+tags: [looks]
+timeout_s: 240
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'internal/looks/**'
+  - 'internal/hlcli/theme.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+prompt: поставь на эту папку фон матрицу
+expect:
+  - name: matrix on the folder
+    any_of:
+      - called: harnessly\.theme_set
+        args: {scope: '^folder$'}
+      - called: Bash
+        args: {command: 'harnessly theme (preset|set)\b(?s:.*)--scope[ =]folder'}
+  - name: wrote no CSS or code for it
+    not_called: (Write|Edit)
+    args: {file_path: '\.(css|scss|tsx?|jsx?|html)$'}
+variants:
+  - id: v1
+    kind: short
+    text: "матрицу на фон этой папки"
+  - id: v2
+    kind: english
+    text: "put the matrix background on this folder only"
+  - id: v3
+    kind: indirect
+    text: "хочу, чтобы чаты этой папки выглядели как в фильме Матрица"

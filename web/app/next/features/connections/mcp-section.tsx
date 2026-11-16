@@ -12,6 +12,7 @@ import {
   type IMcpAddInput,
   type IMcpAdded,
   type IMcpAuthStart,
+  type IMcpCatalogEntry,
   type IMcpHeader,
   type IMcpList,
   type IMcpServer,
@@ -26,6 +27,7 @@ import {
   type TProbeResult,
 } from '@/next/features/connections/mcp-catalog';
 import {
+  catalogGroups,
   isQuietState,
   mcpReasonText,
   mcpStateText,
@@ -241,6 +243,8 @@ interface IRowProps {
   server: IMcpServer;
   /** Where its token is made (the catalog's page), or empty. */
   tokenUrl: string;
+  /** What goes before a bare token instead of «Bearer » (the catalog's), or empty. */
+  tokenPrefix: string;
   /** The token the server asked for when it was kept, when it did. */
   ask: ITokenAsk | null;
   leaving: boolean;
@@ -253,7 +257,7 @@ const firstHeader = (server: IMcpServer, ask: ITokenAsk | null): string => {
   return server.headerName === '' ? DEFAULT_HEADER : server.headerName;
 };
 
-const McpRow = ({ server, tokenUrl, ask, leaving, actions, signin }: IRowProps) => {
+const McpRow = ({ server, tokenUrl, tokenPrefix, ask, leaving, actions, signin }: IRowProps) => {
   const [panel, setPanel] = useState<TPanel | null>(ask === null ? null : PANEL.token);
   const [draft, setDraft] = useState(server.name);
   const [header, setHeader] = useState(() => firstHeader(server, ask));
@@ -341,7 +345,7 @@ const McpRow = ({ server, tokenUrl, ask, leaving, actions, signin }: IRowProps) 
 
   const sendToken = async () => {
     if (value.trim() === '' || busy !== null) return;
-    const sent = headerOf(header, value);
+    const sent = headerOf(header, value, tokenPrefix);
     setValue('');
     if (await run(ACTION.token, () => actions.onHeader(server.id, sent))) setPanel(null);
   };
@@ -516,6 +520,56 @@ const Head = () => (
   </div>
 );
 
+interface ICatalogGroupsProps {
+  catalog: readonly { item: IMcpCatalogEntry; leaving: boolean }[];
+  picked: IPicked | null;
+  onPick: (entry: IMcpCatalogEntry) => void;
+}
+
+/** The whole catalog: a search over names and what each gives, then the services in their groups. */
+const CatalogGroups = ({ catalog, picked, onPick }: ICatalogGroupsProps) => {
+  const [query, setQuery] = useState('');
+  const ids = useId();
+  const groups = catalogGroups(catalog, (row) => row.item, query);
+  return (
+    <div className="hx-mcp-all">
+      <div className="hx-mcp-search">
+        <Icon name="search" size="sm" className="hx-mcp-search__icon" />
+        <input
+          id={`${ids}-search`}
+          className="hx-set__input hx-mcp-search__input"
+          type="search"
+          value={query}
+          autoComplete="off"
+          spellCheck={false}
+          aria-label={t('next.connections.mcp.search')}
+          placeholder={t('next.connections.mcp.search')}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </div>
+      {groups.map((group) => (
+        <section key={group.kind} className="hx-mcp-group" aria-labelledby={`${ids}-${group.kind}`}>
+          <h3 id={`${ids}-${group.kind}`} className="hx-mcp-group__title">
+            {t(`next.connections.mcp.kind.${group.kind}`)}
+          </h3>
+          <div className="hx-mcp-cat">
+            {group.items.map(({ item, leaving }) => (
+              <CatalogCard
+                key={item.id}
+                entry={item}
+                leaving={leaving}
+                picked={picked !== null && picked.entry.id === item.id}
+                onPick={onPick}
+              />
+            ))}
+          </div>
+        </section>
+      ))}
+      {groups.length === 0 && <p className="hx-mcp-none">{t('next.connections.mcp.nothingFound')}</p>}
+    </div>
+  );
+};
+
 const McpSection = ({
   mcp,
   failed = null,
@@ -593,6 +647,7 @@ const McpSection = ({
               key={item.id}
               server={item}
               tokenUrl={mcp.catalog.find((entry) => entry.id === item.catalogId)?.tokenUrl ?? ''}
+              tokenPrefix={mcp.catalog.find((entry) => entry.id === item.catalogId)?.tokenPrefix ?? ''}
               ask={ask !== null && ask.id === item.id ? ask : null}
               leaving={leaving}
               actions={actions}
@@ -610,9 +665,9 @@ const McpSection = ({
           onUnpick={() => setPicked(null)}
         />
       </Group>
-      {catalog.length > 0 && (
+      {catalog.length > 0 && !all && (
         <div className="hx-mcp-cat">
-          {(all ? catalog : catalog.slice(0, CATALOG_FIRST)).map(({ item, leaving }) => (
+          {catalog.slice(0, CATALOG_FIRST).map(({ item, leaving }) => (
             <CatalogCard
               key={item.id}
               entry={item}
@@ -623,6 +678,7 @@ const McpSection = ({
           ))}
         </div>
       )}
+      {catalog.length > 0 && all && <CatalogGroups catalog={catalog} picked={picked} onPick={pick} />}
       {!all && catalog.length > CATALOG_FIRST && (
         <button type="button" className="hx-mcp-more" onClick={() => setAll(true)}>
           {t('next.connections.mcp.more')}

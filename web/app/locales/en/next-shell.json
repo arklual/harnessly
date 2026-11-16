@@ -1230,6 +1230,7 @@
   "next.sidebar.groupRenameFailed": "Couldn't rename the group",
   "next.sidebar.groupDeleteFailed": "Couldn't delete the group",
   "next.sidebar.groupMoveFailed": "Couldn't move the group",
+  "next.sidebar.navFailed": "Could not save the menu",
   "next.sidebar.newGroup": "New group",
   "next.sidebar.groupEmpty": "Drop a chat here",
   "next.sidebar.favoritesEmpty": "Pin a chat or drop it here",

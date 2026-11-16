@@ -101,6 +101,21 @@ func TestFirstRunClaudeFreshMachine(t *testing.T) {
 	}
 }
 
+// The CLI's own false shows the auto-mode offer, which holds the chat at a dialog: it is made true.
+func TestFirstRunClaudeTurnsTheAutoOfferOff(t *testing.T) {
+	s, home := firstRunStore(t)
+	if err := os.WriteFile(filepath.Join(home, ".claude.json"), []byte(`{"hasCompletedOnboarding":true,"theme":"light","hasSeenAutoDefaultNudge":false}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.FirstRun(wire.ProviderClaude, home); err != nil {
+		t.Fatal(err)
+	}
+	state := readJSON(t, filepath.Join(home, ".claude.json"))
+	if state["hasSeenAutoDefaultNudge"] != true || state["hasSeenAutoDefaultNotice"] != true || state["theme"] != "light" {
+		t.Fatalf(".claude.json: %v", state)
+	}
+}
+
 func TestFirstRunClaudeLeavesBrokenFiles(t *testing.T) {
 	s, home := firstRunStore(t)
 	broken := []byte(`{"theme": `)

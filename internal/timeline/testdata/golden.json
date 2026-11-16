@@ -33,6 +33,10 @@
       "toolUseId": "toolu_1",
       "toolName": "Bash",
       "summary": "$ ls -la → 2 lines",
+      "call": {
+       "description": "List files",
+       "command": "ls -la"
+      },
       "status": "success"
      },
      {
@@ -41,7 +45,11 @@
       "timestamp": 1792317604000,
       "toolUseId": "toolu_1",
       "isError": false,
-      "summary": "2 lines"
+      "summary": "2 lines",
+      "text": "total 8\nparser.go",
+      "textLines": 2,
+      "textBytes": 17,
+      "textTail": "total 8\nparser.go"
      },
      {
       "id": "entry-5",
@@ -95,7 +103,11 @@
       "timestamp": 1792317607000,
       "toolUseId": "toolu_2",
       "isError": false,
-      "summary": "The file was updated."
+      "summary": "The file was updated.",
+      "text": "The file was updated.",
+      "textLines": 1,
+      "textBytes": 21,
+      "textTail": "The file was updated."
      }
     ]
    },
@@ -212,6 +224,10 @@
       "toolUseId": "toolu_1",
       "toolName": "Bash",
       "summary": "$ ls -la → 2 lines",
+      "call": {
+       "description": "List files",
+       "command": "ls -la"
+      },
       "status": "success"
      },
      {
@@ -220,7 +236,11 @@
       "timestamp": 1792317604000,
       "toolUseId": "toolu_1",
       "isError": false,
-      "summary": "2 lines"
+      "summary": "2 lines",
+      "text": "total 8\nparser.go",
+      "textLines": 2,
+      "textBytes": 17,
+      "textTail": "total 8\nparser.go"
      },
      {
       "id": "entry-5",
@@ -254,7 +274,11 @@
       "timestamp": 1792317607000,
       "toolUseId": "toolu_2",
       "isError": false,
-      "summary": "The file was updated."
+      "summary": "The file was updated.",
+      "text": "The file was updated.",
+      "textLines": 1,
+      "textBytes": 21,
+      "textTail": "The file was updated."
      },
      {
       "id": "entry-8",
@@ -336,6 +360,10 @@
       "toolUseId": "toolu_1",
       "toolName": "Bash",
       "summary": "$ ls -la → 2 lines",
+      "call": {
+       "description": "List files",
+       "command": "ls -la"
+      },
       "status": "success"
      },
      {
@@ -344,7 +372,11 @@
       "timestamp": 1792317604000,
       "toolUseId": "toolu_1",
       "isError": false,
-      "summary": "2 lines"
+      "summary": "2 lines",
+      "text": "total 8\nparser.go",
+      "textLines": 2,
+      "textBytes": 17,
+      "textTail": "total 8\nparser.go"
      },
      {
       "id": "entry-5",
@@ -378,7 +410,11 @@
       "timestamp": 1792317607000,
       "toolUseId": "toolu_2",
       "isError": false,
-      "summary": "The file was updated."
+      "summary": "The file was updated.",
+      "text": "The file was updated.",
+      "textLines": 1,
+      "textBytes": 21,
+      "textTail": "The file was updated."
      },
      {
       "id": "entry-8",
@@ -476,6 +512,10 @@
       "toolUseId": "toolu_1",
       "toolName": "Bash",
       "summary": "$ ls -la → 2 lines",
+      "call": {
+       "description": "List files",
+       "command": "ls -la"
+      },
       "status": "success"
      },
      {
@@ -484,7 +524,11 @@
       "timestamp": 1792317604000,
       "toolUseId": "toolu_1",
       "isError": false,
-      "summary": "2 lines"
+      "summary": "2 lines",
+      "text": "total 8\nparser.go",
+      "textLines": 2,
+      "textBytes": 17,
+      "textTail": "total 8\nparser.go"
      },
      {
       "id": "entry-5",
@@ -518,7 +562,11 @@
       "timestamp": 1792317607000,
       "toolUseId": "toolu_2",
       "isError": false,
-      "summary": "The file was updated."
+      "summary": "The file was updated.",
+      "text": "The file was updated.",
+      "textLines": 1,
+      "textBytes": 21,
+      "textTail": "The file was updated."
      },
      {
       "id": "entry-8",

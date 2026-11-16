@@ -16,8 +16,10 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/chatrole"
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/peers"
 	"github.com/ly-solutions/harnessly/internal/wire"
@@ -67,6 +69,9 @@ const (
 	DeliverNow Deliver = "now"
 	// DeliverQueue: when the turn ends, as the head of the queue.
 	DeliverQueue Deliver = "queue"
+	// DeliverInterrupt: the running turn is cut (Escape: the command the agent runs is stopped, not handed to the
+	// background) and the message starts the next turn. For a stop that must hold at once.
+	DeliverInterrupt Deliver = "interrupt"
 	// deliverStep: into the running turn whatever the setting says. Not a value of the tools: the runtime uses it for
 	// a child's question, which nobody answers while it waits for the parent's turn to end.
 	deliverStep Deliver = "step"
@@ -85,6 +90,9 @@ type Sent struct {
 
 // Service is the delegation of one runtime.
 type Service struct {
+	fullMu      sync.Mutex
+	fullPending map[string]int // parent → delegations with full_context starting now
+
 	Convs Conversations
 	// Settings are the person's limits, read at every call.
 	Settings func() wire.DelegationSettings
@@ -101,6 +109,16 @@ type Service struct {
 	Poll time.Duration
 	// Log hears the wake-ups that could not go; nil hears nothing.
 	Log func(msg string, kv ...any)
+	// Check runs a task's check command (tasks.go); nil runs it with sh in the folder.
+	Check CheckRunner
+	// Roles marks a chat's agent with its role (roles.go); nil marks nothing (the roles are then words only).
+	Roles RoleMarker
+	// Permission is the permission mode a chat runs in, its own or the machine's default. A task's check is a command
+	// the runtime runs, so only chats that run without asking may set or trigger one; nil takes every chat for asking.
+	Permission func(conv string) wire.PermissionMode
+
+	pace   pace
+	boards boards
 }
 
 // Refusal is a call the service did not do, in words for the agent.
@@ -153,6 +171,32 @@ func (s *Service) depth(rec wire.Conversation) int {
 	return d
 }
 
+// Lean tells whether the chat id starts with less context (claude.LeanSettings): a delegated chat does, unless its
+// parent asked for the whole one (full_context). A chat that is not delegated starts as ever.
+func (s *Service) Lean(id string) bool {
+	rec, ok := s.Convs.Record(id)
+	if !ok || rec.ParentID == nil {
+		return false
+	}
+	if p, ok := s.Book.Get(id); ok && p.Full {
+		return false
+	}
+	s.fullMu.Lock()
+	defer s.fullMu.Unlock()
+	return s.fullPending[*rec.ParentID] == 0
+}
+
+func (s *Service) fullStarts(parent string, d int) {
+	s.fullMu.Lock()
+	defer s.fullMu.Unlock()
+	if s.fullPending == nil {
+		s.fullPending = map[string]int{}
+	}
+	if s.fullPending[parent] += d; s.fullPending[parent] <= 0 {
+		delete(s.fullPending, parent)
+	}
+}
+
 // descends tells whether id is a chat the caller delegated, or one of theirs.
 func (s *Service) descends(id, caller string) bool {
 	for range MaxDepth + 1 {
@@ -171,6 +215,9 @@ func (s *Service) descends(id, caller string) bool {
 // target is a chat the caller may read, write to and wait for.
 func (s *Service) target(caller wire.Conversation, id string) (wire.Conversation, error) {
 	rec, ok := s.Convs.Record(id)
+	if !ok && id == ParentAlias {
+		return wire.Conversation{}, refuse("not-allowed", "this chat was not delegated, so it has no parent")
+	}
 	if !ok {
 		return wire.Conversation{}, refuse("not-found", "no chat %s on this machine", id)
 	}
@@ -178,7 +225,7 @@ func (s *Service) target(caller wire.Conversation, id string) (wire.Conversation
 		return wire.Conversation{}, refuse("not-allowed", "that is this agent's own chat")
 	}
 	if !s.descends(id, caller.ID) && !s.settings().AnyChat {
-		return wire.Conversation{}, refuse("not-allowed", "chat %s was not delegated by this agent; the person has not let agents write to other chats", id)
+		return wire.Conversation{}, refuse("not-allowed", "chat %s was not delegated by this agent, nor is it this chat's parent or a chat delegated beside it; the person has not let agents write to other chats", id)
 	}
 	return rec, nil
 }
@@ -213,6 +260,10 @@ type Task struct {
 	Notify bool
 	// Test makes the chat a test chat: the sidebar leaves it out.
 	Test bool
+	// PlanFirst holds the chat to planning until its parent approves the plan.
+	PlanFirst bool
+	// FullContext starts the chat with the person's whole context instead of a lean start (Service.Lean).
+	FullContext bool
 }
 
 // Delegate starts a chat with the task, under the caller.
@@ -243,8 +294,12 @@ func (s *Service) Delegate(ctx context.Context, callerID string, t Task) (wire.C
 		return wire.Conversation{}, err
 	}
 	key := peers.NewID()
+	rules := Rules + TeamRules
+	if t.PlanFirst {
+		rules += PlanRules
+	}
 	cmd := wire.ConversationCreateCmd{OpID: "delegate-" + key, Provider: t.Provider, Model: model, Profile: profile, ParentID: caller.ID,
-		Title: strings.TrimSpace(t.Title), Test: t.Test, First: &wire.FirstMessage{ClientID: "delegate-" + key, Text: prompt + Rules, AttachmentIDs: []string{}}}
+		Title: strings.TrimSpace(t.Title), Test: t.Test, First: &wire.FirstMessage{ClientID: "delegate-" + key, Text: prompt + rules, AttachmentIDs: []string{}}}
 	if title := []rune(cmd.Title); len(title) > wire.RefTitleMax {
 		cmd.Title = string(title[:wire.RefTitleMax])
 	}
@@ -263,12 +318,26 @@ func (s *Service) Delegate(ctx context.Context, callerID string, t Task) (wire.C
 		cmd.Cwd = caller.Cwd
 	}
 	asked := s.now().UnixMilli()
+	if t.FullContext {
+		// The agent may start before the book has the chat: until then, a start under this parent is a full one.
+		s.fullStarts(caller.ID, 1)
+		defer s.fullStarts(caller.ID, -1)
+	}
 	res := s.Convs.Do(ctx, Device, cmd)
 	if res.R != wire.ResultAccepted || res.ID == nil {
 		return wire.Conversation{}, refuse(string(res.Code), "the chat was not started")
 	}
 	id := *res.ID
-	s.Book.Update(id, func(p *Page) { p.Notify, p.Contract = t.Notify, true; p.asked(asked) })
+	s.Book.Update(id, func(p *Page) {
+		p.Notify, p.Contract, p.Full = t.Notify, true, t.FullContext
+		p.asked(asked)
+		if t.PlanFirst {
+			p.Plan, p.Role = PlanDrafting, string(chatrole.Plan)
+		}
+	})
+	if t.PlanFirst && s.Roles != nil {
+		s.Roles(id, chatrole.Plan)
+	}
 	rec, ok := s.Convs.Record(id)
 	if !ok {
 		return wire.Conversation{}, refuse("not-found", "the chat went right after it started")
@@ -367,6 +436,16 @@ func (s *Service) plainModel(t Task) (*wire.Model, error) {
 	}
 	i := slices.IndexFunc(models, func(am wire.AgentModel) bool { return am.ID == id })
 	if i < 0 {
+		// A full id of the family (claude-sonnet-5-5 for sonnet) is the model the picker names: refusing it cost an
+		// agent a turn per chat.
+		i = slices.IndexFunc(models, func(am wire.AgentModel) bool {
+			return len(am.ID) >= 3 && strings.Contains(strings.ToLower(id), "-"+strings.ToLower(am.ID))
+		})
+		if i >= 0 {
+			id, m.ID = models[i].ID, models[i].ID
+		}
+	}
+	if i < 0 {
 		ids := make([]string, len(models))
 		for j, am := range models {
 			ids[j] = am.ID
@@ -413,11 +492,16 @@ func (s *Service) Read(ctx context.Context, callerID, id, since string, limit in
 // into its queue, as how says, and the answer tells which it was. A message that could not go into the turn stays in
 // the queue and goes in when the agent can take it; it is never typed twice.
 func (s *Service) Send(ctx context.Context, callerID, id, text string, how Deliver) (Sent, error) {
-	caller, err := s.caller(callerID)
-	if err != nil {
-		return Sent{}, err
+	if how == DeliverInterrupt {
+		return Sent{}, refuse("bad-request", "deliver: now or queue")
 	}
-	rec, err := s.target(caller, id)
+	return s.send(ctx, callerID, id, text, how)
+}
+
+// send is Send with DeliverInterrupt allowed, which only a parent's broadcast to the chats it delegated uses: a chat
+// never cuts the turn of its parent, of a sibling or of a chat that is not under it.
+func (s *Service) send(ctx context.Context, callerID, id, text string, how Deliver) (Sent, error) {
+	caller, err := s.caller(callerID)
 	if err != nil {
 		return Sent{}, err
 	}
@@ -425,8 +509,23 @@ func (s *Service) Send(ctx context.Context, callerID, id, text string, how Deliv
 	if text == "" || len([]rune(text)) > PromptMax {
 		return Sent{}, refuse("bad-request", "text: 1 to %d characters", PromptMax)
 	}
-	if how != DeliverDefault && how != DeliverNow && how != DeliverQueue {
-		return Sent{}, refuse("bad-request", "deliver: now or queue")
+	if how != DeliverDefault && how != DeliverNow && how != DeliverQueue && how != DeliverInterrupt {
+		return Sent{}, refuse("bad-request", "deliver: now, interrupt or queue")
+	}
+	rec, err := s.target(caller, id)
+	if err != nil {
+		// A delegated chat writes to its parent and to the chats beside it, at a pace.
+		mate, ok := s.teammate(caller, id)
+		if !ok {
+			return Sent{}, err
+		}
+		if how == DeliverInterrupt {
+			how = DeliverNow
+		}
+		if err := s.pace.take(caller.ID, mate.ID, s.now()); err != nil {
+			return Sent{}, err
+		}
+		return s.sendTeam(ctx, caller, mate, text+replyHint(caller), how)
 	}
 	asked := s.now().UnixMilli()
 	// Queued is delivered too: the chat takes it when it can. Calling that a refusal made an agent send the message again.
@@ -438,7 +537,7 @@ func (s *Service) Send(ctx context.Context, callerID, id, text string, how Deliv
 		s.Book.Update(id, func(p *Page) { p.asked(asked) })
 	}
 	sent := Sent{To: rec, How: how, PeerOutcome: convo.PeerOutcome{Where: convo.PeerQueued, Reason: wire.QueuedAgentBusy}}
-	if s.steers(how) {
+	if s.steers(how) || how == DeliverInterrupt {
 		sent.PeerOutcome = s.Convs.PeerOutcome(ctx, id, clientID, SentWait)
 	}
 	if now, ok := s.Convs.Record(id); ok {
@@ -461,6 +560,19 @@ func (s *Service) deliver(ctx context.Context, from wire.Conversation, to, text 
 		env.Ref = s.Self.Machine + "/" + from.ID
 	}
 	clientID := convo.PeerClientPrefix + id
+	if how == DeliverInterrupt && !s.descends(to, from.ID) {
+		how = DeliverNow // only a chat's own delegated chats are cut
+	}
+	if how == DeliverInterrupt {
+		if rec, ok := s.Convs.Record(to); ok && !free(rec) && live(rec) {
+			keep := false
+			if res := s.Convs.Do(ctx, Device, wire.InterruptCmd{OpID: "delegate-stop-" + id, ConversationID: to, PauseQueue: &keep}); res.R == wire.ResultRefused && s.Log != nil {
+				s.Log("delegation: the running turn was not interrupted", "chat", to, "code", string(res.Code))
+			}
+		}
+		env.Text = "[Your running turn was interrupted for this message: anything you ran in the foreground was stopped.]\n\n" + env.Text
+		return clientID, s.Convs.DeliverPeer(ctx, to, clientID, peers.Wrap(env), false)
+	}
 	if how == DeliverNow {
 		return clientID, s.Convs.DeliverPeerAtOnce(ctx, to, clientID, peers.Wrap(env))
 	}
@@ -597,6 +709,7 @@ func (s *Service) Children(ctx context.Context, callerID string) ([]wire.Convers
 
 // Sweep looks at every delegated chat that is watched (see Observe): what the runtime runs every few seconds.
 func (s *Service) Sweep() {
+	s.applyRoles()
 	for _, id := range s.Book.watched() {
 		if rec, ok := s.Convs.Record(id); ok {
 			s.Observe(rec)
@@ -617,6 +730,7 @@ func (s *Service) Observe(rec wire.Conversation) {
 	if !ok {
 		return
 	}
+	s.deliverHeld(rec, page)
 	o := outcome(rec, page.AskedAt)
 	var held bool
 	if o == Done && rec.LastTurn != nil {
@@ -628,7 +742,15 @@ func (s *Service) Observe(rec wire.Conversation) {
 	} else if s.resumeCut(rec, page) {
 		return
 	}
+	// A chat that took part in its team's list and finished empty-handed gets the next free task and works on.
+	if o == Done && s.assignNext(rec) {
+		return
+	}
 	if !page.Notify {
+		return
+	}
+	// A plan sent for approval reached the parent already (submit_plan); the turn that ends on it is no news.
+	if o == Done && page.Plan == PlanSubmitted {
 		return
 	}
 	var key string

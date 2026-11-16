@@ -871,23 +871,6 @@ func TestSlugsRenameEnable(t *testing.T) {
 	}
 }
 
-func TestCatalog(t *testing.T) {
-	s, _ := newService(t)
-	seen := map[string]bool{}
-	for _, e := range s.Catalog() {
-		if seen[e.ID] || e.Name == "" || e.Blurb == "" || e.BlurbRu == "" || !httpURL(e.URL) {
-			t.Errorf("entry %+v", e)
-		}
-		seen[e.ID] = true
-		if _, _, err := canonical(e.URL); err != nil {
-			t.Errorf("%s: %v", e.ID, err)
-		}
-	}
-	if len(seen) != 18 {
-		t.Fatalf("%d entries", len(seen))
-	}
-}
-
 func TestReadEventsMultiline(t *testing.T) {
 	var got []string
 	err := readEvents(strings.NewReader("event: message\r\ndata: {\"a\":\r\ndata: 1}\r\n\r\ndata: tail"), func(event, data string) (bool, error) {

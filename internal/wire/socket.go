@@ -148,7 +148,9 @@ type Server struct {
 	// RuntimeSettings are the runtime's own settings: GET and PUT /api/v2/runtime-settings; nil: both are 404s.
 	RuntimeSettings RuntimeSettingsStore
 	// Me is the person of a runtime on its own; nil: /api/v2/me is a 404 (the cluster's gateway answers it itself).
-	Me       MeStore
+	Me MeStore
+	// Looks keeps the pictures of the person's looks (POST/GET /api/v2/me/looks, looks.go); nil: 404s.
+	Looks    LookBlobs
 	Version  string
 	Features []Feature
 	Limits   Limits

@@ -1,0 +1,101 @@
+{
+ "day": 16,
+ "records": [
+  {
+   "order": "o16-0",
+   "city": "Казань",
+   "status": "pending",
+   "amount_rub": 6861
+  },
+  {
+   "order": "o16-1",
+   "city": "Сочи",
+   "status": "paid",
+   "amount_rub": 5746
+  },
+  {
+   "order": "o16-2",
+   "city": "Пермь",
+   "status": "refunded",
+   "amount_rub": 8414
+  },
+  {
+   "order": "o16-3",
+   "city": "Сочи",
+   "status": "paid",
+   "amount_rub": 4225
+  },
+  {
+   "order": "o16-4",
+   "city": "Пермь",
+   "status": "paid",
+   "amount_rub": 3107
+  },
+  {
+   "order": "o16-5",
+   "city": "Пермь",
+   "status": "paid",
+   "amount_rub": 2219
+  },
+  {
+   "order": "o16-6",
+   "city": "Тула",
+   "status": "refunded",
+   "amount_rub": 2157
+  },
+  {
+   "order": "o16-7",
+   "city": "Тула",
+   "status": "paid",
+   "amount_rub": 2734
+  },
+  {
+   "order": "o16-8",
+   "city": "Казань",
+   "status": "paid",
+   "amount_rub": 6275
+  },
+  {
+   "order": "o16-9",
+   "city": "Тула",
+   "status": "paid",
+   "amount_rub": 3885
+  },
+  {
+   "order": "o16-10",
+   "city": "Казань",
+   "status": "paid",
+   "amount_rub": 7830
+  },
+  {
+   "order": "o16-11",
+   "city": "Тула",
+   "status": "paid",
+   "amount_rub": 4491
+  },
+  {
+   "order": "o16-12",
+   "city": "Пермь",
+   "status": "refunded",
+   "amount_rub": 4228
+  },
+  {
+   "order": "o16-13",
+   "city": "Сочи",
+   "status": "refunded",
+   "amount_rub": 2373
+  },
+  {
+   "order": "o16-14",
+   "city": "Москва",
+   "status": "paid",
+   "amount_rub": 2039
+  },
+  {
+   "order": "o16-15",
+   "city": "Москва",
+   "status": "paid",
+   "amount_rub": 4786
+  }
+ ]
+}

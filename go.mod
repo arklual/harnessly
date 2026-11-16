@@ -10,6 +10,10 @@ require (
 	github.com/coder/websocket v1.8.15
 	github.com/creack/pty v1.1.24
 	github.com/dlclark/regexp2 v1.12.0
+	github.com/emersion/go-imap v1.2.1
+	github.com/emersion/go-message v0.18.2
+	github.com/emersion/go-sasl v0.0.0-20200509203442-7bfe0ed36a21
+	github.com/emersion/go-smtp v0.21.3
 	github.com/evanw/esbuild v0.28.2
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/segmentio/asm v1.2.1
@@ -30,8 +34,10 @@ require (
 
 require (
 	filippo.io/age v1.3.2
+	github.com/emersion/go-ical v0.0.0-20240127095438-fc1c9d8fb2b6
 	github.com/minio/minio-go/v7 v7.4.1
 	github.com/pion/webrtc/v4 v4.1.6
+	github.com/teambition/rrule-go v1.8.2
 	go.yaml.in/yaml/v3 v3.0.6
 	golang.org/x/net v0.62.0
 	google.golang.org/grpc v1.85.0

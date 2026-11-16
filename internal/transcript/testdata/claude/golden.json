@@ -1765,31 +1765,31 @@
   {
    "file": "recorded-2.1.284-replies-after-idle-prompts.jsonl",
    "op": "content",
-   "hash": "cf6fef1207480228fcd934a797ab93dcb46cc5f5a13ecc4c2fdb7b2ee5bfaf74"
+   "hash": "e5ba506b9afbba2781124e06188e8ce93a15fa636ffcf3109a59d619669d70c1"
   },
   {
    "file": "recorded-2.1.284-replies-after-idle-prompts.jsonl",
    "op": "file",
-   "hash": "cf6fef1207480228fcd934a797ab93dcb46cc5f5a13ecc4c2fdb7b2ee5bfaf74"
+   "hash": "e5ba506b9afbba2781124e06188e8ce93a15fa636ffcf3109a59d619669d70c1"
   },
   {
    "file": "recorded-2.1.284-replies-after-idle-prompts.jsonl",
    "op": "content",
    "to": 9965,
-   "hash": "afa7073bce04418c3c0a486ccd82f93e1da1deed651367f0d5160bb923b96613"
+   "hash": "8a8df09ea555dc06667e169e3c04e01375bab402d416ed8d08327befa304acb1"
   },
   {
    "file": "recorded-2.1.284-replies-after-idle-prompts.jsonl",
    "op": "content",
    "from": 5072,
    "to": 13171,
-   "hash": "df13fc5bec179c9cecab84ea6528bd8f34cdddc34b054c2ce7a61b117dee60f2"
+   "hash": "f21a4d33a581c34ba8a2b6217822d9b271378890be634ab0f310180580559f20"
   },
   {
    "file": "recorded-2.1.284-replies-after-idle-prompts.jsonl",
    "op": "content",
    "to": 9614,
-   "hash": "afa7073bce04418c3c0a486ccd82f93e1da1deed651367f0d5160bb923b96613"
+   "hash": "8a8df09ea555dc06667e169e3c04e01375bab402d416ed8d08327befa304acb1"
   },
   {
    "file": "recorded-2.1.284-replies-after-idle-prompts.jsonl",
@@ -1811,7 +1811,7 @@
    "op": "content",
    "from": 5320,
    "to": 14419,
-   "hash": "df13fc5bec179c9cecab84ea6528bd8f34cdddc34b054c2ce7a61b117dee60f2"
+   "hash": "f21a4d33a581c34ba8a2b6217822d9b271378890be634ab0f310180580559f20"
   },
   {
    "file": "recorded-2.1.284-replies-after-idle-prompts.jsonl",
@@ -1836,20 +1836,20 @@
    "file": "recorded-2.1.284-replies-after-idle-prompts.jsonl",
    "op": "tail",
    "max": 25,
-   "hash": "2481eb161907814886a18273e1b528803dbe94db65e57e01debf2d92c2d101ab"
+   "hash": "5d5d3bb508f3841906b45ff1773369df0ac5cbbaf108d9f12464d4879569328b"
   },
   {
    "file": "recorded-2.1.284-replies-after-idle-prompts.jsonl",
    "op": "tail",
    "max": 1000,
-   "hash": "2481eb161907814886a18273e1b528803dbe94db65e57e01debf2d92c2d101ab"
+   "hash": "5d5d3bb508f3841906b45ff1773369df0ac5cbbaf108d9f12464d4879569328b"
   },
   {
    "file": "recorded-2.1.284-replies-after-idle-prompts.jsonl",
    "op": "tail",
    "cut": 8126,
    "max": 1000,
-   "hash": "99302adab7badc8f88192f8081cb3a42e2c30199b56cbdb7141c45c36963a6b6"
+   "hash": "7b56d0321036a443e2034db1494a93490398bd8d3454a2a8fb9d367c0934a5ba"
   },
   {
    "file": "recorded-2.1.284-replies-after-idle-prompts.jsonl",
@@ -1872,7 +1872,7 @@
    "op": "before",
    "before": 14888,
    "max": 1000,
-   "hash": "d84ed392933577f8a6a92433306a6e0c934adb6296c44271ac2b086e7377b865"
+   "hash": "493ee2c9434a929d8bce53b7b26422c24aa6306c6ea127487742975394d43740"
   },
   {
    "file": "recorded-2.1.284-replies-after-idle-prompts.jsonl",
@@ -1887,7 +1887,7 @@
    "op": "before",
    "before": 14895,
    "max": 1000,
-   "hash": "db734d2cd741e5a3d64b5b16e31f42cafaaea82276e44ad148f47f8058fb1d01"
+   "hash": "720347f1f4c165dc081f18fee6c4812cf85cbfc57ca892d4aa999a0dd799a11e"
   },
   {
    "file": "recorded-2.1.284-replies-after-idle-prompts.jsonl",
@@ -2006,7 +2006,7 @@
     14476,
     14888
    ],
-   "hash": "b77ab25f144d0d834b95f5b28dc76c270eeb2c11ece02bc2487f9fa9ba322d23"
+   "hash": "cd489aaf2c4322766d85e566c4972cc4ff4b6d1f7e5fb0a1607d2fd6af0f2659"
   },
   {
    "file": "recorded-2.1.284-replies-after-idle-prompts.jsonl",
@@ -2019,7 +2019,7 @@
     13696,
     14229
    ],
-   "hash": "51d85b0be70635f7b8d501c1712efa1f162f88f27b7a4e340498d9d1598f57f2"
+   "hash": "f51c24685bfa1d6de1cd5e24d6219f8c0a42aecc5c9b8db3eedb93fe5e2cb8d2"
   },
   {
    "file": "recorded-2.1.284-replies-after-idle-prompts.jsonl",
@@ -2029,7 +2029,7 @@
     7444,
     14888
    ],
-   "hash": "75d3cc985ba3a900e3eb97de11e94235d4f7c1e484652adf9e65ebe8d161d770"
+   "hash": "4a5e0487b4c5ea8573a8a111abee2c6c7d773eabdf8b6491cb2ba75f1aa83112"
   },
   {
    "file": "recorded-2.1.284-replies-after-idle-prompts.jsonl",
@@ -2039,13 +2039,13 @@
     14888,
     14888
    ],
-   "hash": "37618553124973e8905864295cc3a3e9073f59fe694e39caa4306d58aafc95e2"
+   "hash": "07bace892f0bc82630f4913bcf9460030c283199e5b9850f44ddc7d82d6ee80c"
   },
   {
    "file": "recorded-2.1.284-replies-after-idle-prompts.jsonl",
    "op": "file",
    "cut": 9909,
-   "hash": "afa7073bce04418c3c0a486ccd82f93e1da1deed651367f0d5160bb923b96613"
+   "hash": "8a8df09ea555dc06667e169e3c04e01375bab402d416ed8d08327befa304acb1"
   },
   {
    "file": "recorded-2.1.284-teammate-messages.jsonl",
@@ -2613,21 +2613,19 @@
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
    "op": "content",
-   "hash": "8c0f9969a714d5ce32a6ee1c0d8e83c4b147afc5fedb7a1a7a004c732039c8dc",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"status\":\"error\"},{\"id\":\"x:805#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\"},{\"id\":\"x:1237#0\",\"type\":\"interrupt\",\"timestamp\":1791831221341},{\"id\":\"x:1409#0\",\"type\":\"user-message\",\"timestamp\":1791831221384,\"text\":\"queued for esc test: say Q-ESC\"},{\"id\":\"x:1541#0\",\"type\":\"assistant-message\",\"timestamp\":1791831222429,\"markdown\":\"Q-ESC\\n\\nThe `ok9` sleep command was rejected, so it didn't run and I haven't said DONE9. I'm waiting for your next instruction.\"}]"
+   "hash": "22b88a6b2b9d1494b8a30a8568bdb7e0a5b3aabdcdee74422512f72a2ae196b4"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
    "op": "file",
-   "hash": "8c0f9969a714d5ce32a6ee1c0d8e83c4b147afc5fedb7a1a7a004c732039c8dc",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"status\":\"error\"},{\"id\":\"x:805#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\"},{\"id\":\"x:1237#0\",\"type\":\"interrupt\",\"timestamp\":1791831221341},{\"id\":\"x:1409#0\",\"type\":\"user-message\",\"timestamp\":1791831221384,\"text\":\"queued for esc test: say Q-ESC\"},{\"id\":\"x:1541#0\",\"type\":\"assistant-message\",\"timestamp\":1791831222429,\"markdown\":\"Q-ESC\\n\\nThe `ok9` sleep command was rejected, so it didn't run and I haven't said DONE9. I'm waiting for your next instruction.\"}]"
+   "hash": "22b88a6b2b9d1494b8a30a8568bdb7e0a5b3aabdcdee74422512f72a2ae196b4"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
    "op": "content",
    "to": 1075,
-   "hash": "b3a250fcc5f6b66ecfbf107f949794eeb27d42a8e607c08e82a550142f94254d",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"status\":\"pending\"},{\"id\":\"x:574#0\",\"type\":\"user-message\",\"timestamp\":1791831218562,\"text\":\"queued for esc test: say Q-ESC\",\"queued\":true,\"pending\":true}]"
+   "hash": "cf50327ce851985cb324ed6b8005263b68f745e1ebc362b0f25c0c8324063fd2",
+   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"call\":{\"description\":\"Sleep 25 seconds then print ok9\",\"command\":\"python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},\"status\":\"pending\"},{\"id\":\"x:574#0\",\"type\":\"user-message\",\"timestamp\":1791831218562,\"text\":\"queued for esc test: say Q-ESC\",\"queued\":true,\"pending\":true}]"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
@@ -2641,31 +2639,31 @@
    "file": "recorded-2.1.296-escape-queued.jsonl",
    "op": "content",
    "to": 1723,
-   "hash": "627ecfa0c4b77ea86ea3325c6f8ee2fde13bbf23fa745b46bc99fce0b1f2f7ee",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"status\":\"error\"},{\"id\":\"x:805#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\"},{\"id\":\"x:1237#0\",\"type\":\"interrupt\",\"timestamp\":1791831221341},{\"id\":\"x:1409#0\",\"type\":\"user-message\",\"timestamp\":1791831221384,\"text\":\"queued for esc test: say Q-ESC\"}]"
+   "hash": "ac079350b718c99a6decd63991070aad6c2e1ca8743976af469d4181f46190bb",
+   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"call\":{\"description\":\"Sleep 25 seconds then print ok9\",\"command\":\"python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},\"status\":\"error\"},{\"id\":\"x:805#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\",\"text\":\"The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.\",\"textLines\":1,\"textBytes\":225,\"textTail\":\"The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.\"},{\"id\":\"x:1237#0\",\"type\":\"interrupt\",\"timestamp\":1791831221341},{\"id\":\"x:1409#0\",\"type\":\"user-message\",\"timestamp\":1791831221384,\"text\":\"queued for esc test: say Q-ESC\"}]"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
    "op": "content",
    "from": 805,
    "to": 1354,
-   "hash": "b6ba39b4c8b4ec016d182ffaed2911bba0389472a3b9a9eebc52b48cb5636280",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\"}]"
+   "hash": "bfa1ff71ca293df34e6b071b3bd567fd1f0b9b6c3c64ae836db19c8d23e144fb",
+   "json": "[{\"id\":\"x:0#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\",\"text\":\"The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.\",\"textLines\":1,\"textBytes\":225,\"textTail\":\"The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.\"}]"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
    "op": "content",
    "to": 1669,
-   "hash": "627ecfa0c4b77ea86ea3325c6f8ee2fde13bbf23fa745b46bc99fce0b1f2f7ee",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"status\":\"error\"},{\"id\":\"x:805#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\"},{\"id\":\"x:1237#0\",\"type\":\"interrupt\",\"timestamp\":1791831221341},{\"id\":\"x:1409#0\",\"type\":\"user-message\",\"timestamp\":1791831221384,\"text\":\"queued for esc test: say Q-ESC\"}]"
+   "hash": "ac079350b718c99a6decd63991070aad6c2e1ca8743976af469d4181f46190bb",
+   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"call\":{\"description\":\"Sleep 25 seconds then print ok9\",\"command\":\"python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},\"status\":\"error\"},{\"id\":\"x:805#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\",\"text\":\"The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.\",\"textLines\":1,\"textBytes\":225,\"textTail\":\"The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.\"},{\"id\":\"x:1237#0\",\"type\":\"interrupt\",\"timestamp\":1791831221341},{\"id\":\"x:1409#0\",\"type\":\"user-message\",\"timestamp\":1791831221384,\"text\":\"queued for esc test: say Q-ESC\"}]"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
    "op": "content",
    "from": 712,
    "to": 1496,
-   "hash": "3343a9a8d8ae00feddb72c3701134f22281d33125121a3726599f0756d388531",
-   "json": "[{\"id\":\"x:93#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\"},{\"id\":\"x:525#0\",\"type\":\"interrupt\",\"timestamp\":1791831221341}]"
+   "hash": "add28a8e2e10f9f647e9d89fc6be423ad7657277ccbcac7c14976054af1f79fd",
+   "json": "[{\"id\":\"x:93#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\",\"text\":\"The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.\",\"textLines\":1,\"textBytes\":225,\"textTail\":\"The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.\"},{\"id\":\"x:525#0\",\"type\":\"interrupt\",\"timestamp\":1791831221341}]"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
@@ -2685,22 +2683,19 @@
    "file": "recorded-2.1.296-escape-queued.jsonl",
    "op": "tail",
    "max": 5,
-   "hash": "ca16a4206c6cc7051bb2256e17b894ac358368f831b0d8e1cee10548b1593a84",
-   "json": "{\"entries\":[{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"status\":\"error\"},{\"id\":\"x:805#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\"},{\"id\":\"x:1237#0\",\"type\":\"interrupt\",\"timestamp\":1791831221341},{\"id\":\"x:1409#0\",\"type\":\"user-message\",\"timestamp\":1791831221384,\"text\":\"queued for esc test: say Q-ESC\"},{\"id\":\"x:1541#0\",\"type\":\"assistant-message\",\"timestamp\":1791831222429,\"markdown\":\"Q-ESC\\n\\nThe `ok9` sleep command was rejected, so it didn't run and I haven't said DONE9. I'm waiting for your next instruction.\"}],\"startByteOffset\":226,\"fileSize\":1809,\"hasMore\":true,\"errorCount\":0,\"summary\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"}"
+   "hash": "cc6c89510993c179a33c788819f8d60b45edb238f5745c0c48f6698c159020c6"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
    "op": "tail",
    "max": 25,
-   "hash": "5fe63d042c19e926f9a4208a4cfc23eae88a2588ccc00baf483b2cb0729b676e",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"status\":\"error\"},{\"id\":\"x:805#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\"},{\"id\":\"x:1237#0\",\"type\":\"interrupt\",\"timestamp\":1791831221341},{\"id\":\"x:1409#0\",\"type\":\"user-message\",\"timestamp\":1791831221384,\"text\":\"queued for esc test: say Q-ESC\"},{\"id\":\"x:1541#0\",\"type\":\"assistant-message\",\"timestamp\":1791831222429,\"markdown\":\"Q-ESC\\n\\nThe `ok9` sleep command was rejected, so it didn't run and I haven't said DONE9. I'm waiting for your next instruction.\"}],\"startByteOffset\":0,\"fileSize\":1809,\"hasMore\":false,\"errorCount\":0,\"summary\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"}"
+   "hash": "2a739ce3d5c618c9da9aef9f2b4e63805737776941421271475acdcbcefa8478"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
    "op": "tail",
    "max": 1000,
-   "hash": "5fe63d042c19e926f9a4208a4cfc23eae88a2588ccc00baf483b2cb0729b676e",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"status\":\"error\"},{\"id\":\"x:805#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\"},{\"id\":\"x:1237#0\",\"type\":\"interrupt\",\"timestamp\":1791831221341},{\"id\":\"x:1409#0\",\"type\":\"user-message\",\"timestamp\":1791831221384,\"text\":\"queued for esc test: say Q-ESC\"},{\"id\":\"x:1541#0\",\"type\":\"assistant-message\",\"timestamp\":1791831222429,\"markdown\":\"Q-ESC\\n\\nThe `ok9` sleep command was rejected, so it didn't run and I haven't said DONE9. I'm waiting for your next instruction.\"}],\"startByteOffset\":0,\"fileSize\":1809,\"hasMore\":false,\"errorCount\":0,\"summary\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"}"
+   "hash": "2a739ce3d5c618c9da9aef9f2b4e63805737776941421271475acdcbcefa8478"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
@@ -2715,8 +2710,8 @@
    "op": "tail",
    "cut": 654,
    "max": 1,
-   "hash": "0d5b920d9f5e3adeafdf54d6f38ac4ea847eeed63ab3de4b0708b3487a4a908c",
-   "json": "{\"entries\":[{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"status\":\"pending\"}],\"startByteOffset\":226,\"fileSize\":574,\"hasMore\":true,\"errorCount\":0,\"summary\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"}"
+   "hash": "12af2abbc4d391d6859d94cc6b225c0538910b11731b0cc553d4dee2a0b76614",
+   "json": "{\"entries\":[{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"call\":{\"description\":\"Sleep 25 seconds then print ok9\",\"command\":\"python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},\"status\":\"pending\"}],\"startByteOffset\":226,\"fileSize\":574,\"hasMore\":true,\"errorCount\":0,\"summary\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"}"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
@@ -2731,8 +2726,7 @@
    "op": "before",
    "before": 1809,
    "max": 1000,
-   "hash": "dfbb31d6c449bc78082080e03af6d0d096f0173f4a508b80157508feeac0c731",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"status\":\"error\"},{\"id\":\"x:805#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\"},{\"id\":\"x:1237#0\",\"type\":\"interrupt\",\"timestamp\":1791831221341},{\"id\":\"x:1409#0\",\"type\":\"user-message\",\"timestamp\":1791831221384,\"text\":\"queued for esc test: say Q-ESC\"},{\"id\":\"x:1541#0\",\"type\":\"assistant-message\",\"timestamp\":1791831222429,\"markdown\":\"Q-ESC\\n\\nThe `ok9` sleep command was rejected, so it didn't run and I haven't said DONE9. I'm waiting for your next instruction.\"}],\"startByteOffset\":0,\"fileSize\":1809,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "86690709cce8a79d29c88deca8bdc5f26213aed4ab8ef46ee024bb582bd2c526"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
@@ -2747,8 +2741,7 @@
    "op": "before",
    "before": 1816,
    "max": 1000,
-   "hash": "1628ee34c5fa857e154c48aad32d64376ac9314f01f84035cd30175a017aa604",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"status\":\"error\"},{\"id\":\"x:805#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\"},{\"id\":\"x:1237#0\",\"type\":\"interrupt\",\"timestamp\":1791831221341},{\"id\":\"x:1409#0\",\"type\":\"user-message\",\"timestamp\":1791831221384,\"text\":\"queued for esc test: say Q-ESC\"},{\"id\":\"x:1541#0\",\"type\":\"assistant-message\",\"timestamp\":1791831222429,\"markdown\":\"Q-ESC\\n\\nThe `ok9` sleep command was rejected, so it didn't run and I haven't said DONE9. I'm waiting for your next instruction.\"}],\"startByteOffset\":0,\"fileSize\":1809,\"hasMore\":false,\"errorCount\":1}"
+   "hash": "665bffbc6c5a1686314821e3872f7a608dd1d13ead0898a6eedf690f0d49e64a"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
@@ -2795,8 +2788,8 @@
    "op": "before",
    "before": 1081,
    "max": 1000,
-   "hash": "88edfdbe521ed90f847889a0732d9ec6be7966ddb26324dd38280bb370a84b36",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"status\":\"pending\"},{\"id\":\"x:574#0\",\"type\":\"user-message\",\"timestamp\":1791831218562,\"text\":\"queued for esc test: say Q-ESC\",\"queued\":true,\"pending\":true}],\"startByteOffset\":0,\"fileSize\":1809,\"hasMore\":false,\"errorCount\":1}"
+   "hash": "e923669bb0b6f2101de5f5dad4cb574d1eea04e7bd1c2acfa32e2fc80688de5f",
+   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"call\":{\"description\":\"Sleep 25 seconds then print ok9\",\"command\":\"python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},\"status\":\"pending\"},{\"id\":\"x:574#0\",\"type\":\"user-message\",\"timestamp\":1791831218562,\"text\":\"queued for esc test: say Q-ESC\",\"queued\":true,\"pending\":true}],\"startByteOffset\":0,\"fileSize\":1809,\"hasMore\":false,\"errorCount\":1}"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
@@ -2811,8 +2804,8 @@
    "op": "before",
    "before": 1756,
    "max": 1000,
-   "hash": "259b0080ed19419ee5e826d143d8a34dcb85a5ae6dc411ed71c51d6b203727a8",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"status\":\"error\"},{\"id\":\"x:805#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\"},{\"id\":\"x:1237#0\",\"type\":\"interrupt\",\"timestamp\":1791831221341},{\"id\":\"x:1409#0\",\"type\":\"user-message\",\"timestamp\":1791831221384,\"text\":\"queued for esc test: say Q-ESC\"}],\"startByteOffset\":0,\"fileSize\":1809,\"hasMore\":false,\"errorCount\":1}"
+   "hash": "ffa0559aacbd075dca906497ddf9627cb7b77842355eec53f96cca9c04dc479d",
+   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"call\":{\"description\":\"Sleep 25 seconds then print ok9\",\"command\":\"python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},\"status\":\"error\"},{\"id\":\"x:805#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\",\"text\":\"The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.\",\"textLines\":1,\"textBytes\":225,\"textTail\":\"The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.\"},{\"id\":\"x:1237#0\",\"type\":\"interrupt\",\"timestamp\":1791831221341},{\"id\":\"x:1409#0\",\"type\":\"user-message\",\"timestamp\":1791831221384,\"text\":\"queued for esc test: say Q-ESC\"}],\"startByteOffset\":0,\"fileSize\":1809,\"hasMore\":false,\"errorCount\":1}"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
@@ -2859,8 +2852,7 @@
     1541,
     1809
    ],
-   "hash": "f23bddc5e2305e00afaea5efa992a319edff28273b137d9d995866505a1fd68e",
-   "json": "[{\"newEntries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"}],\"newOffset\":226,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"status\":\"pending\"}],\"newOffset\":574,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:574#0\",\"type\":\"user-message\",\"timestamp\":1791831218562,\"text\":\"queued for esc test: say Q-ESC\",\"queued\":true,\"pending\":true}],\"newOffset\":712,\"pendingBuffer\":\"\"},{\"newEntries\":[],\"newOffset\":805,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:805#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\"}],\"newOffset\":1237,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:1237#0\",\"type\":\"interrupt\",\"timestamp\":1791831221341}],\"newOffset\":1409,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:1409#0\",\"type\":\"user-message\",\"timestamp\":1791831221384,\"text\":\"queued for esc test: say Q-ESC\"}],\"newOffset\":1541,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:1541#0\",\"type\":\"assistant-message\",\"timestamp\":1791831222429,\"markdown\":\"Q-ESC\\n\\nThe `ok9` sleep command was rejected, so it didn't run and I haven't said DONE9. I'm waiting for your next instruction.\"}],\"newOffset\":1809,\"pendingBuffer\":\"\"}]"
+   "hash": "ce611767ef3b2391780040f1bfb82410c60472f0cd851a7dc02d02d4b5955f0d"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
@@ -2873,7 +2865,7 @@
     977,
     1617
    ],
-   "hash": "b8c07ca490803470e3f1894eb34034cbe1f60b3bc9e5e5fffebf0c810f15af62"
+   "hash": "fd925cc8fa3fc2a097d5195c2aee48e04c3c8575533d924e509c41da4d7ac38d"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
@@ -2883,7 +2875,7 @@
     904,
     1809
    ],
-   "hash": "7ca4963e36f03ed1a0666d6901a410e8235d15d3b74de717801556a45af1cb25"
+   "hash": "62904be9222b7c8d385968de0a555e0174d13a00b246ee22f72d7edd28cb372a"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
@@ -2893,27 +2885,24 @@
     1809,
     1809
    ],
-   "hash": "7fb5ed260dee040619ab2824264fd7e42dc42a0fad336b5f84965c55e7e2ea05",
-   "json": "[{\"newEntries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"status\":\"pending\"}],\"newOffset\":661,\"pendingBuffer\":\"{\\\"type\\\": \\\"queue-operation\\\", \\\"timestamp\\\": \\\"2026-10-12T18:53:38.562Z\\\", \\\"operation\\\": \\\"enqu\"},{\"newEntries\":[{\"id\":\"x:805#0\",\"type\":\"tool-result\",\"timestamp\":1791831221321,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"isError\":true,\"summary\":\"error\"},{\"id\":\"x:1237#0\",\"type\":\"interrupt\",\"timestamp\":1791831221341},{\"id\":\"x:1409#0\",\"type\":\"user-message\",\"timestamp\":1791831221384,\"text\":\"queued for esc test: say Q-ESC\"},{\"id\":\"x:1541#0\",\"type\":\"assistant-message\",\"timestamp\":1791831222429,\"markdown\":\"Q-ESC\\n\\nThe `ok9` sleep command was rejected, so it didn't run and I haven't said DONE9. I'm waiting for your next instruction.\"}],\"newOffset\":1809,\"pendingBuffer\":\"\"},{\"newEntries\":[],\"newOffset\":1809,\"pendingBuffer\":\"\"}]"
+   "hash": "65a57579418b1114dd2fff5aa2768aa0156128e81ecb395c757cac7b1555be41"
   },
   {
    "file": "recorded-2.1.296-escape-queued.jsonl",
    "op": "file",
    "cut": 1206,
-   "hash": "b3a250fcc5f6b66ecfbf107f949794eeb27d42a8e607c08e82a550142f94254d",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"status\":\"pending\"},{\"id\":\"x:574#0\",\"type\":\"user-message\",\"timestamp\":1791831218562,\"text\":\"queued for esc test: say Q-ESC\",\"queued\":true,\"pending\":true}]"
+   "hash": "cf50327ce851985cb324ed6b8005263b68f745e1ebc362b0f25c0c8324063fd2",
+   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831211138,\"text\":\"Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831212288,\"toolUseId\":\"toolu_019QZgkguHzo4pruNnV5gyrC\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\",\"call\":{\"description\":\"Sleep 25 seconds then print ok9\",\"command\":\"python3 -c 'import time; time.sleep(25); print(\\\"ok9\\\")'\"},\"status\":\"pending\"},{\"id\":\"x:574#0\",\"type\":\"user-message\",\"timestamp\":1791831218562,\"text\":\"queued for esc test: say Q-ESC\",\"queued\":true,\"pending\":true}]"
   },
   {
    "file": "recorded-2.1.296-queued-default.jsonl",
    "op": "content",
-   "hash": "d1795292be1f797d1aa4aaf2cb6f7409f4abecc6c3ace427304e37af79c45717",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791830946361,\"text\":\"Run exactly this one Bash command in the foreground (not in background) and then say DONE2: python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().t…\"},{\"id\":\"x:349#0\",\"type\":\"tool-call\",\"timestamp\":1791830947379,\"toolUseId\":\"toolu_01KqBEqQUcaMFxU4kfyy1wB5\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().time())' → 2 lines\",\"status\":\"success\"},{\"id\":\"x:1154#0\",\"type\":\"tool-result\",\"timestamp\":1791830972830,\"toolUseId\":\"toolu_01KqBEqQUcaMFxU4kfyy1wB5\",\"isError\":false,\"summary\":\"2 lines\"},{\"id\":\"x:1404#0\",\"type\":\"user-message\",\"timestamp\":1791830953886,\"text\":\"After that reply with exactly QUEUED-MSG-2 as the first word\",\"queued\":true},{\"id\":\"x:1609#0\",\"type\":\"assistant-message\",\"timestamp\":1791830973649,\"markdown\":\"QUEUED-MSG-2 DONE2\\n\\nThe foreground command ran for about 25 seconds and exited normally:\\n- start 18:49:07.643204\\n- end 18:49:32.657378\"}]"
+   "hash": "7ab34fdadbb2eea55221cfd034a3e26dff78a371aae708613778b69043a9aaff"
   },
   {
    "file": "recorded-2.1.296-queued-default.jsonl",
    "op": "file",
-   "hash": "d1795292be1f797d1aa4aaf2cb6f7409f4abecc6c3ace427304e37af79c45717",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791830946361,\"text\":\"Run exactly this one Bash command in the foreground (not in background) and then say DONE2: python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().t…\"},{\"id\":\"x:349#0\",\"type\":\"tool-call\",\"timestamp\":1791830947379,\"toolUseId\":\"toolu_01KqBEqQUcaMFxU4kfyy1wB5\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().time())' → 2 lines\",\"status\":\"success\"},{\"id\":\"x:1154#0\",\"type\":\"tool-result\",\"timestamp\":1791830972830,\"toolUseId\":\"toolu_01KqBEqQUcaMFxU4kfyy1wB5\",\"isError\":false,\"summary\":\"2 lines\"},{\"id\":\"x:1404#0\",\"type\":\"user-message\",\"timestamp\":1791830953886,\"text\":\"After that reply with exactly QUEUED-MSG-2 as the first word\",\"queued\":true},{\"id\":\"x:1609#0\",\"type\":\"assistant-message\",\"timestamp\":1791830973649,\"markdown\":\"QUEUED-MSG-2 DONE2\\n\\nThe foreground command ran for about 25 seconds and exited normally:\\n- start 18:49:07.643204\\n- end 18:49:32.657378\"}]"
+   "hash": "7ab34fdadbb2eea55221cfd034a3e26dff78a371aae708613778b69043a9aaff"
   },
   {
    "file": "recorded-2.1.296-queued-default.jsonl",
@@ -2978,19 +2967,19 @@
    "file": "recorded-2.1.296-queued-default.jsonl",
    "op": "tail",
    "max": 5,
-   "hash": "b4b9b43c786f508bf2d7ad2788d3078d8702427d6486e4ef34c7b86207c6d107"
+   "hash": "e6f41173d106f54784650673c4b348edda8ef6a2e7cf6e3d12c2f35fb4567c24"
   },
   {
    "file": "recorded-2.1.296-queued-default.jsonl",
    "op": "tail",
    "max": 25,
-   "hash": "b4b9b43c786f508bf2d7ad2788d3078d8702427d6486e4ef34c7b86207c6d107"
+   "hash": "e6f41173d106f54784650673c4b348edda8ef6a2e7cf6e3d12c2f35fb4567c24"
   },
   {
    "file": "recorded-2.1.296-queued-default.jsonl",
    "op": "tail",
    "max": 1000,
-   "hash": "b4b9b43c786f508bf2d7ad2788d3078d8702427d6486e4ef34c7b86207c6d107"
+   "hash": "e6f41173d106f54784650673c4b348edda8ef6a2e7cf6e3d12c2f35fb4567c24"
   },
   {
    "file": "recorded-2.1.296-queued-default.jsonl",
@@ -3021,8 +3010,7 @@
    "op": "before",
    "before": 1887,
    "max": 1000,
-   "hash": "9004fdfd85eb168a61f96929d36400ea14f1e6201b2ad8d0330af0c35809ea6b",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791830946361,\"text\":\"Run exactly this one Bash command in the foreground (not in background) and then say DONE2: python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().t…\"},{\"id\":\"x:349#0\",\"type\":\"tool-call\",\"timestamp\":1791830947379,\"toolUseId\":\"toolu_01KqBEqQUcaMFxU4kfyy1wB5\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().time())' → 2 lines\",\"status\":\"success\"},{\"id\":\"x:1154#0\",\"type\":\"tool-result\",\"timestamp\":1791830972830,\"toolUseId\":\"toolu_01KqBEqQUcaMFxU4kfyy1wB5\",\"isError\":false,\"summary\":\"2 lines\"},{\"id\":\"x:1404#0\",\"type\":\"user-message\",\"timestamp\":1791830953886,\"text\":\"After that reply with exactly QUEUED-MSG-2 as the first word\",\"queued\":true},{\"id\":\"x:1609#0\",\"type\":\"assistant-message\",\"timestamp\":1791830973649,\"markdown\":\"QUEUED-MSG-2 DONE2\\n\\nThe foreground command ran for about 25 seconds and exited normally:\\n- start 18:49:07.643204\\n- end 18:49:32.657378\"}],\"startByteOffset\":0,\"fileSize\":1887,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "977abb7571fbce72d766720cb5fdf955b3adda14cf528b88980833010149bebc"
   },
   {
    "file": "recorded-2.1.296-queued-default.jsonl",
@@ -3037,8 +3025,7 @@
    "op": "before",
    "before": 1894,
    "max": 1000,
-   "hash": "5b602c1c31019510d0270aaf9bbe6e342982ae2c0a17cb6673207b00e354e962",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791830946361,\"text\":\"Run exactly this one Bash command in the foreground (not in background) and then say DONE2: python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().t…\"},{\"id\":\"x:349#0\",\"type\":\"tool-call\",\"timestamp\":1791830947379,\"toolUseId\":\"toolu_01KqBEqQUcaMFxU4kfyy1wB5\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().time())' → 2 lines\",\"status\":\"success\"},{\"id\":\"x:1154#0\",\"type\":\"tool-result\",\"timestamp\":1791830972830,\"toolUseId\":\"toolu_01KqBEqQUcaMFxU4kfyy1wB5\",\"isError\":false,\"summary\":\"2 lines\"},{\"id\":\"x:1404#0\",\"type\":\"user-message\",\"timestamp\":1791830953886,\"text\":\"After that reply with exactly QUEUED-MSG-2 as the first word\",\"queued\":true},{\"id\":\"x:1609#0\",\"type\":\"assistant-message\",\"timestamp\":1791830973649,\"markdown\":\"QUEUED-MSG-2 DONE2\\n\\nThe foreground command ran for about 25 seconds and exited normally:\\n- start 18:49:07.643204\\n- end 18:49:32.657378\"}],\"startByteOffset\":0,\"fileSize\":1887,\"hasMore\":false,\"errorCount\":1}"
+   "hash": "16a041c114f281eb5ec06ca85aedc39ee080dc908f2d97badbd927ef4a040d1b"
   },
   {
    "file": "recorded-2.1.296-queued-default.jsonl",
@@ -3053,24 +3040,24 @@
    "op": "before",
    "before": 1609,
    "max": 1000,
-   "hash": "65ca9fca9cb73391a5e781a86d66eb5ea8af68d897624f3e73f2ef9c701f1221",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791830946361,\"text\":\"Run exactly this one Bash command in the foreground (not in background) and then say DONE2: python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().t…\"},{\"id\":\"x:349#0\",\"type\":\"tool-call\",\"timestamp\":1791830947379,\"toolUseId\":\"toolu_01KqBEqQUcaMFxU4kfyy1wB5\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().time())' → 2 lines\",\"status\":\"success\"},{\"id\":\"x:1154#0\",\"type\":\"tool-result\",\"timestamp\":1791830972830,\"toolUseId\":\"toolu_01KqBEqQUcaMFxU4kfyy1wB5\",\"isError\":false,\"summary\":\"2 lines\"},{\"id\":\"x:1404#0\",\"type\":\"user-message\",\"timestamp\":1791830953886,\"text\":\"After that reply with exactly QUEUED-MSG-2 as the first word\",\"queued\":true}],\"startByteOffset\":0,\"fileSize\":1887,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "0e78585ae3ff582a32f4e86871b238c78d17d206bb13e193d49b27e804998bf5",
+   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791830946361,\"text\":\"Run exactly this one Bash command in the foreground (not in background) and then say DONE2: python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().t…\"},{\"id\":\"x:349#0\",\"type\":\"tool-call\",\"timestamp\":1791830947379,\"toolUseId\":\"toolu_01KqBEqQUcaMFxU4kfyy1wB5\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().time())' → 2 lines\",\"call\":{\"description\":\"Print start time, sleep 25 seconds, print end time\",\"command\":\"python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().time())'\"},\"status\":\"success\"},{\"id\":\"x:1154#0\",\"type\":\"tool-result\",\"timestamp\":1791830972830,\"toolUseId\":\"toolu_01KqBEqQUcaMFxU4kfyy1wB5\",\"isError\":false,\"summary\":\"2 lines\",\"text\":\"start 18:49:07.643204\\nend 18:49:32.657378\",\"textLines\":2,\"textBytes\":41,\"textTail\":\"start 18:49:07.643204\\nend 18:49:32.657378\"},{\"id\":\"x:1404#0\",\"type\":\"user-message\",\"timestamp\":1791830953886,\"text\":\"After that reply with exactly QUEUED-MSG-2 as the first word\",\"queued\":true}],\"startByteOffset\":0,\"fileSize\":1887,\"hasMore\":false,\"errorCount\":0}"
   },
   {
    "file": "recorded-2.1.296-queued-default.jsonl",
    "op": "before",
    "before": 819,
    "max": 1,
-   "hash": "748ed8c711949dd54fb7ccb633729c69df29863a4f7073460bdb2a099ba3e6f1",
-   "json": "{\"entries\":[{\"id\":\"x:349#0\",\"type\":\"tool-call\",\"timestamp\":1791830947379,\"toolUseId\":\"toolu_01KqBEqQUcaMFxU4kfyy1wB5\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().time())'\",\"status\":\"pending\"}],\"startByteOffset\":349,\"fileSize\":1887,\"hasMore\":true,\"errorCount\":0}"
+   "hash": "8f41fcb220ee5e8b592860a541e1fdf7ee72b6e967f5d1ebd80564131f8407c4",
+   "json": "{\"entries\":[{\"id\":\"x:349#0\",\"type\":\"tool-call\",\"timestamp\":1791830947379,\"toolUseId\":\"toolu_01KqBEqQUcaMFxU4kfyy1wB5\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().time())'\",\"call\":{\"description\":\"Print start time, sleep 25 seconds, print end time\",\"command\":\"python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().time())'\"},\"status\":\"pending\"}],\"startByteOffset\":349,\"fileSize\":1887,\"hasMore\":true,\"errorCount\":0}"
   },
   {
    "file": "recorded-2.1.296-queued-default.jsonl",
    "op": "before",
    "before": 819,
    "max": 1000,
-   "hash": "b55958c02abb681a90ad9ffaa28cdcacd5d51938be41478474390c44cb4d057c",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791830946361,\"text\":\"Run exactly this one Bash command in the foreground (not in background) and then say DONE2: python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().t…\"},{\"id\":\"x:349#0\",\"type\":\"tool-call\",\"timestamp\":1791830947379,\"toolUseId\":\"toolu_01KqBEqQUcaMFxU4kfyy1wB5\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().time())'\",\"status\":\"pending\"}],\"startByteOffset\":0,\"fileSize\":1887,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "78636338e635fc30b92b36c9b8a88b8c2ae6b0091bec7e6de5c78f2e5bd8f650",
+   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791830946361,\"text\":\"Run exactly this one Bash command in the foreground (not in background) and then say DONE2: python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().t…\"},{\"id\":\"x:349#0\",\"type\":\"tool-call\",\"timestamp\":1791830947379,\"toolUseId\":\"toolu_01KqBEqQUcaMFxU4kfyy1wB5\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().time())'\",\"call\":{\"description\":\"Print start time, sleep 25 seconds, print end time\",\"command\":\"python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time(), flush=True); time.sleep(25); print(\\\"end\\\", datetime.datetime.now().time())'\"},\"status\":\"pending\"}],\"startByteOffset\":0,\"fileSize\":1887,\"hasMore\":false,\"errorCount\":0}"
   },
   {
    "file": "recorded-2.1.296-queued-default.jsonl",
@@ -3148,7 +3135,7 @@
     1609,
     1887
    ],
-   "hash": "fb0ab97839c5dd37714b67b6ad22c45b04a96e7500ab87e4488ee2c1dcda3fd7"
+   "hash": "c68ccf85dd8b3a005192243aa627bf6c598aa098b37b33e21de875cf087ec1f3"
   },
   {
    "file": "recorded-2.1.296-queued-default.jsonl",
@@ -3161,7 +3148,7 @@
     1250,
     1644
    ],
-   "hash": "45eb646bd3326219721f6186f1c2c1b109e5e3468cf56088fcdd2f243bb3a035"
+   "hash": "76dbd6f9b9a3ff73bccd53aacaf41ae47e9298958e4bc990c2f00fe0509397be"
   },
   {
    "file": "recorded-2.1.296-queued-default.jsonl",
@@ -3171,7 +3158,7 @@
     943,
     1887
    ],
-   "hash": "3ef3a0c4873f204002fee3a5986c648bbc57dcc265c44996d5dde4a7e5347f6f"
+   "hash": "3693aeb410e002397fd735b8982bd895f92e3038ff0a503e1f8f167a022bf058"
   },
   {
    "file": "recorded-2.1.296-queued-default.jsonl",
@@ -3181,7 +3168,7 @@
     1887,
     1887
    ],
-   "hash": "c32ec915551ee683532095903aa7133aab7560648e7a16f6933be4d7e4df43c3"
+   "hash": "8828de428610b35a3777d0098afba91022b80bee26fae2bcc3e7c9de6a3db462"
   },
   {
    "file": "recorded-2.1.296-queued-default.jsonl",
@@ -3193,33 +3180,32 @@
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
    "op": "content",
-   "hash": "895b5d12143ab531ed5f452c9a81237ce58c00e7f1dca62e454decc14ad2a07e"
+   "hash": "4a03bea6a13c2d612971024ae195d5f260e6d949d00ee3ecd8d93941d2197314"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
    "op": "file",
-   "hash": "895b5d12143ab531ed5f452c9a81237ce58c00e7f1dca62e454decc14ad2a07e"
+   "hash": "4a03bea6a13c2d612971024ae195d5f260e6d949d00ee3ecd8d93941d2197314"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
    "op": "content",
    "to": 2235,
-   "hash": "f6fe3d5b85e434a310dad12426c420b196154feff00f03059d492562d5984355",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791830819645,\"text\":\"Run exactly this one Bash command and then say DONE: python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time()); time.sleep(45); print(\\\"end\\\", datetime.datetime.now().time())'\"},{\"id\":\"x:302#0\",\"type\":\"tool-call\",\"timestamp\":1791830821611,\"toolUseId\":\"toolu_01JaFXUJULbE1YhnfUic2U7S\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time()); time.sleep(45); print(\\\"end\\\", datetime.datetime.now().time())'\",\"status\":\"success\"},{\"id\":\"x:900#0\",\"type\":\"tool-result\",\"timestamp\":1791830844322,\"toolUseId\":\"toolu_01JaFXUJULbE1YhnfUic2U7S\",\"isError\":false,\"summary\":\"Command was moved to the background (ID: bckdznsp1) so that a message that arrived while it was runn\"},{\"id\":\"x:1515#0\",\"type\":\"user-message\",\"timestamp\":1791830834303,\"text\":\"After that reply with exactly QUEUED-MSG-1 as the first word\",\"queued\":true},{\"id\":\"x:1720#0\",\"type\":\"thinking\",\"timestamp\":1791830845935,\"thinking\":\"\"}]"
+   "hash": "eabdaa690c8bc8db52b646a6b03f121237380b20924fa699f051677ebc261cb1"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
    "op": "content",
    "from": 4182,
    "to": 4591,
-   "hash": "8ad742ec7788bca8b652339004b819e4184d95596bad036685a5b2b26edc3904",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"tool-result\",\"timestamp\":1791830869601,\"toolUseId\":\"toolu_01FYH4R8dQS2iuyjQWc4eCwr\",\"isError\":false,\"summary\":\"5 lines\"}]"
+   "hash": "6ae378a81d1d287ddc9d9ded51c71f19cf1cc0385f911d32f16dd7d783f825f1",
+   "json": "[{\"id\":\"x:0#0\",\"type\":\"tool-result\",\"timestamp\":1791830869601,\"toolUseId\":\"toolu_01FYH4R8dQS2iuyjQWc4eCwr\",\"isError\":false,\"summary\":\"5 lines\",\"text\":\"1\\tstart 18:47:02.655107\\n2\\tend 18:47:47.676930\\n3\\t\\n4\\t[exited with code 0]\\n5\\t\",\"textLines\":5,\"textBytes\":74,\"textTail\":\"3\\n4\\t[exited with code 0]\\n5\"}]"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
    "op": "content",
    "to": 3364,
-   "hash": "1f74191cb2b7af2ad4b105a5d5877da331cb246627f25464134fe90a80731d08"
+   "hash": "568cf0332cec0fa43e32f9451a4283c8a546c380f1e0ceaab49dfd64bad04bc8"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
@@ -3233,15 +3219,14 @@
    "file": "recorded-2.1.296-send-now-bash.jsonl",
    "op": "content",
    "to": 2236,
-   "hash": "f6fe3d5b85e434a310dad12426c420b196154feff00f03059d492562d5984355",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791830819645,\"text\":\"Run exactly this one Bash command and then say DONE: python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time()); time.sleep(45); print(\\\"end\\\", datetime.datetime.now().time())'\"},{\"id\":\"x:302#0\",\"type\":\"tool-call\",\"timestamp\":1791830821611,\"toolUseId\":\"toolu_01JaFXUJULbE1YhnfUic2U7S\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time()); time.sleep(45); print(\\\"end\\\", datetime.datetime.now().time())'\",\"status\":\"success\"},{\"id\":\"x:900#0\",\"type\":\"tool-result\",\"timestamp\":1791830844322,\"toolUseId\":\"toolu_01JaFXUJULbE1YhnfUic2U7S\",\"isError\":false,\"summary\":\"Command was moved to the background (ID: bckdznsp1) so that a message that arrived while it was runn\"},{\"id\":\"x:1515#0\",\"type\":\"user-message\",\"timestamp\":1791830834303,\"text\":\"After that reply with exactly QUEUED-MSG-1 as the first word\",\"queued\":true},{\"id\":\"x:1720#0\",\"type\":\"thinking\",\"timestamp\":1791830845935,\"thinking\":\"\"}]"
+   "hash": "eabdaa690c8bc8db52b646a6b03f121237380b20924fa699f051677ebc261cb1"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
    "op": "content",
    "from": 302,
    "to": 3016,
-   "hash": "fad80738a32f056ab6aabca85242a3ca35f3eaa0b6e933f1be812e9b53bfe201"
+   "hash": "f33ac5d76740f05fa3da8e050b097bc1ff1e6e9b7f41a5e111bb236aa4859d28"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
@@ -3254,34 +3239,34 @@
    "file": "recorded-2.1.296-send-now-bash.jsonl",
    "op": "tail",
    "max": 2,
-   "hash": "33a5432c1dcad983473727473669cde655846b0b4bea811bc9ad33b9c94a1800",
-   "json": "{\"entries\":[{\"id\":\"x:4182#0\",\"type\":\"tool-result\",\"timestamp\":1791830869601,\"toolUseId\":\"toolu_01FYH4R8dQS2iuyjQWc4eCwr\",\"isError\":false,\"summary\":\"5 lines\"},{\"id\":\"x:4454#0\",\"type\":\"assistant-message\",\"timestamp\":1791830870447,\"markdown\":\"DONE\\n\\nThe command ran for about 45 seconds and exited with code 0:\\n- start 18:47:02.655107\\n- end 18:47:47.676930\"}],\"startByteOffset\":4182,\"fileSize\":4710,\"hasMore\":true,\"errorCount\":0,\"summary\":\"Run exactly this one Bash command and then say DONE: python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time()); time.sleep(45); print(\\\"end\\\", datetime.datetime.now().time())'\"}"
+   "hash": "9b6048b016c03a0409625b5a4ee782c15512020bc5c6948baf628f7837cf561a",
+   "json": "{\"entries\":[{\"id\":\"x:4182#0\",\"type\":\"tool-result\",\"timestamp\":1791830869601,\"toolUseId\":\"toolu_01FYH4R8dQS2iuyjQWc4eCwr\",\"isError\":false,\"summary\":\"5 lines\",\"textLines\":5,\"textBytes\":74},{\"id\":\"x:4454#0\",\"type\":\"assistant-message\",\"timestamp\":1791830870447,\"markdown\":\"DONE\\n\\nThe command ran for about 45 seconds and exited with code 0:\\n- start 18:47:02.655107\\n- end 18:47:47.676930\"}],\"startByteOffset\":4182,\"fileSize\":4710,\"hasMore\":true,\"errorCount\":0,\"summary\":\"Run exactly this one Bash command and then say DONE: python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time()); time.sleep(45); print(\\\"end\\\", datetime.datetime.now().time())'\"}"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
    "op": "tail",
    "max": 5,
-   "hash": "0412a3bca226ed4945ff5f60b0e69a237eca0d97e9f72b9e0f51253fafdf523a"
+   "hash": "d41bb8e3cb7a1b00052eda0afe547ecbf725208d20dec8b1733ac0868908e286"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
    "op": "tail",
    "max": 25,
-   "hash": "0b5946d8306cc94f4b2e9d4e711b6c7daf5b1ffc846eb25f2e7960d05428c91d"
+   "hash": "9fce94e50c7c9e4044f4de31d90f9ac292ec49a06aa2acf61706c2ca9da8ce45"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
    "op": "tail",
    "max": 1000,
-   "hash": "0b5946d8306cc94f4b2e9d4e711b6c7daf5b1ffc846eb25f2e7960d05428c91d"
+   "hash": "9fce94e50c7c9e4044f4de31d90f9ac292ec49a06aa2acf61706c2ca9da8ce45"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
    "op": "tail",
    "cut": 3363,
    "max": 3,
-   "hash": "984b84db26d670692a3cf5b61aa53b6cf7a82ef1a51621391cbe1ad3b10dfbd1",
-   "json": "{\"entries\":[{\"id\":\"x:2244#0\",\"type\":\"tool-result\",\"timestamp\":1791830846919,\"toolUseId\":\"toolu_01XTfT7VNLdftv7d4vVjyCwE\",\"isError\":false,\"summary\":\"<system-reminder>Warning: the file exists but the contents are empty.</system-reminder>\"},{\"id\":\"x:2520#0\",\"type\":\"thinking\",\"timestamp\":1791830848864,\"thinking\":\"\"},{\"id\":\"x:2668#0\",\"type\":\"assistant-message\",\"timestamp\":1791830849134,\"markdown\":\"QUEUED-MSG-1 The background command is still running. Its output file is empty so far, because Python buffers output until the process exits. I'll report the start and end times and say DONE once it completes.\"}],\"startByteOffset\":2244,\"fileSize\":3015,\"hasMore\":true,\"errorCount\":0,\"summary\":\"Run exactly this one Bash command and then say DONE: python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time()); time.sleep(45); print(\\\"end\\\", datetime.datetime.now().time())'\"}"
+   "hash": "bd9f51d041681656f93c63d359912c252b9f2b91e975cb7a7084b3bccfc5a64c",
+   "json": "{\"entries\":[{\"id\":\"x:2244#0\",\"type\":\"tool-result\",\"timestamp\":1791830846919,\"toolUseId\":\"toolu_01XTfT7VNLdftv7d4vVjyCwE\",\"isError\":false,\"summary\":\"<system-reminder>Warning: the file exists but the contents are empty.</system-reminder>\",\"textLines\":1,\"textBytes\":87},{\"id\":\"x:2520#0\",\"type\":\"thinking\",\"timestamp\":1791830848864,\"thinking\":\"\"},{\"id\":\"x:2668#0\",\"type\":\"assistant-message\",\"timestamp\":1791830849134,\"markdown\":\"QUEUED-MSG-1 The background command is still running. Its output file is empty so far, because Python buffers output until the process exits. I'll report the start and end times and say DONE once it completes.\"}],\"startByteOffset\":2244,\"fileSize\":3015,\"hasMore\":true,\"errorCount\":0,\"summary\":\"Run exactly this one Bash command and then say DONE: python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time()); time.sleep(45); print(\\\"end\\\", datetime.datetime.now().time())'\"}"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
@@ -3304,7 +3289,7 @@
    "op": "before",
    "before": 4710,
    "max": 1000,
-   "hash": "286acc77a0b5b4548ef3eac57131dfdc57dc3c8a57ef431523a4f754f70c46f6"
+   "hash": "6492ba9f1dde923356ef11a5a20c7490b00789135afac5fe4a4b9815fa0dead4"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
@@ -3319,22 +3304,22 @@
    "op": "before",
    "before": 4717,
    "max": 1000,
-   "hash": "fada4c9deba23cbacbcb26402ffe55e24ab630e1260ab7cad235ece475df6791"
+   "hash": "a634f60a0ee95470f9d8049b7e30ad2e2dd2cdea36ab1bcdcd22aee7a1d4133d"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
    "op": "before",
    "before": 4454,
    "max": 1,
-   "hash": "8b3afa46e3503a45d93aa5a0f626d4ba11cda8ba633e4d99ed48e1c61c52e2d8",
-   "json": "{\"entries\":[{\"id\":\"x:4182#0\",\"type\":\"tool-result\",\"timestamp\":1791830869601,\"toolUseId\":\"toolu_01FYH4R8dQS2iuyjQWc4eCwr\",\"isError\":false,\"summary\":\"5 lines\"}],\"startByteOffset\":4182,\"fileSize\":4710,\"hasMore\":true,\"errorCount\":0}"
+   "hash": "8506d724a277bc658c3db0b655ef347422d6793d9e6ff5b4414a23fb2db8a20e",
+   "json": "{\"entries\":[{\"id\":\"x:4182#0\",\"type\":\"tool-result\",\"timestamp\":1791830869601,\"toolUseId\":\"toolu_01FYH4R8dQS2iuyjQWc4eCwr\",\"isError\":false,\"summary\":\"5 lines\",\"textLines\":5,\"textBytes\":74}],\"startByteOffset\":4182,\"fileSize\":4710,\"hasMore\":true,\"errorCount\":0}"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
    "op": "before",
    "before": 4454,
    "max": 1000,
-   "hash": "075268156234833c2e09d37f20c996bd224614018260311b771634a089ecb7d9"
+   "hash": "2ee0cea8eadc5045ee0d974f80abc770599c4404ae61b2d8bb66186f25b19214"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
@@ -3349,7 +3334,7 @@
    "op": "before",
    "before": 4182,
    "max": 1000,
-   "hash": "876b763a08e5fd9700376bb61a00e911e444ea067627f4f27497ce7877fe5a0c"
+   "hash": "e3b140b3c84168c6117c74110c7993f56ec30940c2224649c1611c0ec4e71974"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
@@ -3364,7 +3349,7 @@
    "op": "before",
    "before": 2917,
    "max": 1000,
-   "hash": "0ee4893ac3c54c22b7e1aa7e5cc095116fef6425e841f858af3293fd1a73ed99"
+   "hash": "beee1dee28be1f44202e88045311d31fb708ce9255eaca3df44c8c69eccb074d"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
@@ -3379,7 +3364,7 @@
    "op": "before",
    "before": 3363,
    "max": 1000,
-   "hash": "f78ac267609eaa679c5722853c04ab44c23bcab51b1b5d324b6f7d9ea4ff7cd5"
+   "hash": "ce48de23c73375fa7bec6551e8dd2ba9665e3b0d6e2975806405e695c8e1df96"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
@@ -3435,7 +3420,7 @@
     4454,
     4710
    ],
-   "hash": "3759d58f0a1001079b5544a4aed75d62981cea6d730b3375f2b0d1241c7dbb24"
+   "hash": "5bee34f9c31563cf2d1ef7b64340ffe5b85b44aca1e9f20b199374adc567a976"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
@@ -3448,7 +3433,7 @@
     4022,
     4110
    ],
-   "hash": "30416e6f38ccd66d886e58d6d005cd810d2539363eb67739a48965b2b1a29a78"
+   "hash": "1255b6eeaef69dca052ad4e20eed564f99f8d33b99171cfa48e54482867c3b73"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
@@ -3458,7 +3443,7 @@
     2355,
     4710
    ],
-   "hash": "de5334dc7bbfbb8048d7467d27def928fa73d634610bf519f79110c1310f4193"
+   "hash": "871812f4c9da5c0634be519a94cfba79d49b72a0c5f96dc8fade422176e0f968"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
@@ -3468,26 +3453,25 @@
     4710,
     4710
    ],
-   "hash": "8fa242c2e9158ff3fc74217c736afe881e53ffd05ad9319356198f7f3b852ce8"
+   "hash": "5b302b82d7414ffa5833fd308fdaee3c5f3c0952eb90c1720490c86c8f5b2e85"
   },
   {
    "file": "recorded-2.1.296-send-now-bash.jsonl",
    "op": "file",
    "cut": 2236,
-   "hash": "f6fe3d5b85e434a310dad12426c420b196154feff00f03059d492562d5984355",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791830819645,\"text\":\"Run exactly this one Bash command and then say DONE: python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time()); time.sleep(45); print(\\\"end\\\", datetime.datetime.now().time())'\"},{\"id\":\"x:302#0\",\"type\":\"tool-call\",\"timestamp\":1791830821611,\"toolUseId\":\"toolu_01JaFXUJULbE1YhnfUic2U7S\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time,datetime; print(\\\"start\\\", datetime.datetime.now().time()); time.sleep(45); print(\\\"end\\\", datetime.datetime.now().time())'\",\"status\":\"success\"},{\"id\":\"x:900#0\",\"type\":\"tool-result\",\"timestamp\":1791830844322,\"toolUseId\":\"toolu_01JaFXUJULbE1YhnfUic2U7S\",\"isError\":false,\"summary\":\"Command was moved to the background (ID: bckdznsp1) so that a message that arrived while it was runn\"},{\"id\":\"x:1515#0\",\"type\":\"user-message\",\"timestamp\":1791830834303,\"text\":\"After that reply with exactly QUEUED-MSG-1 as the first word\",\"queued\":true},{\"id\":\"x:1720#0\",\"type\":\"thinking\",\"timestamp\":1791830845935,\"thinking\":\"\"}]"
+   "hash": "eabdaa690c8bc8db52b646a6b03f121237380b20924fa699f051677ebc261cb1"
   },
   {
    "file": "recorded-2.1.296-send-now-hook.jsonl",
    "op": "content",
-   "hash": "5ecf04d75ec51c082874db2c0ab64b8c04101f8d3d17885c4636e9825b9b578a",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"},{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}]"
+   "hash": "675f8dda429eab11a6dd9e9478f63c9900f4473bc3ff981d74a408ba4aba40c6",
+   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"call\":{\"description\":\"Echo hello-hook string\",\"command\":\"echo hello-hook\"},\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\",\"text\":\"hello-hook\",\"textLines\":1,\"textBytes\":10,\"textTail\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"},{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}]"
   },
   {
    "file": "recorded-2.1.296-send-now-hook.jsonl",
    "op": "file",
-   "hash": "5ecf04d75ec51c082874db2c0ab64b8c04101f8d3d17885c4636e9825b9b578a",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"},{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}]"
+   "hash": "675f8dda429eab11a6dd9e9478f63c9900f4473bc3ff981d74a408ba4aba40c6",
+   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"call\":{\"description\":\"Echo hello-hook string\",\"command\":\"echo hello-hook\"},\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\",\"text\":\"hello-hook\",\"textLines\":1,\"textBytes\":10,\"textTail\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"},{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}]"
   },
   {
    "file": "recorded-2.1.296-send-now-hook.jsonl",
@@ -3552,22 +3536,22 @@
    "file": "recorded-2.1.296-send-now-hook.jsonl",
    "op": "tail",
    "max": 5,
-   "hash": "d2475921b09d83698ce4f32a762663b948290ab13091b63c769bd3b08bf496d5",
-   "json": "{\"entries\":[{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"},{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}],\"startByteOffset\":159,\"fileSize\":1303,\"hasMore\":true,\"errorCount\":0,\"summary\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"}"
+   "hash": "81f8dc8a0c49b7d12afacf2f630a315063b04a6bf2186a348f0ac1a159f46e33",
+   "json": "{\"entries\":[{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"call\":{\"description\":\"Echo hello-hook string\",\"command\":\"echo hello-hook\"},\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\",\"text\":\"hello-hook\",\"textLines\":1,\"textBytes\":10,\"textTail\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"},{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}],\"startByteOffset\":159,\"fileSize\":1303,\"hasMore\":true,\"errorCount\":0,\"summary\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"}"
   },
   {
    "file": "recorded-2.1.296-send-now-hook.jsonl",
    "op": "tail",
    "max": 25,
-   "hash": "cacd980e6021a0ab7666379f34ce6411b51570412c44259c22b226154dda91e2",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"},{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}],\"startByteOffset\":0,\"fileSize\":1303,\"hasMore\":false,\"errorCount\":0,\"summary\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"}"
+   "hash": "1c03e2709578a78c4451b26f5f730feb5dc93e422cd49137986213364d835848",
+   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"call\":{\"description\":\"Echo hello-hook string\",\"command\":\"echo hello-hook\"},\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\",\"text\":\"hello-hook\",\"textLines\":1,\"textBytes\":10,\"textTail\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"},{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}],\"startByteOffset\":0,\"fileSize\":1303,\"hasMore\":false,\"errorCount\":0,\"summary\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"}"
   },
   {
    "file": "recorded-2.1.296-send-now-hook.jsonl",
    "op": "tail",
    "max": 1000,
-   "hash": "cacd980e6021a0ab7666379f34ce6411b51570412c44259c22b226154dda91e2",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"},{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}],\"startByteOffset\":0,\"fileSize\":1303,\"hasMore\":false,\"errorCount\":0,\"summary\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"}"
+   "hash": "1c03e2709578a78c4451b26f5f730feb5dc93e422cd49137986213364d835848",
+   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"call\":{\"description\":\"Echo hello-hook string\",\"command\":\"echo hello-hook\"},\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\",\"text\":\"hello-hook\",\"textLines\":1,\"textBytes\":10,\"textTail\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"},{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}],\"startByteOffset\":0,\"fileSize\":1303,\"hasMore\":false,\"errorCount\":0,\"summary\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"}"
   },
   {
    "file": "recorded-2.1.296-send-now-hook.jsonl",
@@ -3598,8 +3582,8 @@
    "op": "before",
    "before": 1303,
    "max": 1000,
-   "hash": "0f99512d4d1f2f045bbad76829b730421d38ad7e40910dc412966afa985766f8",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"},{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}],\"startByteOffset\":0,\"fileSize\":1303,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "5dd9e328cb027a73b47bfc865d0acbeaa6217184c8fe9e1fb5f03dfc1ba9680d",
+   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"call\":{\"description\":\"Echo hello-hook string\",\"command\":\"echo hello-hook\"},\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\",\"text\":\"hello-hook\",\"textLines\":1,\"textBytes\":10,\"textTail\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"},{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}],\"startByteOffset\":0,\"fileSize\":1303,\"hasMore\":false,\"errorCount\":0}"
   },
   {
    "file": "recorded-2.1.296-send-now-hook.jsonl",
@@ -3614,8 +3598,8 @@
    "op": "before",
    "before": 1310,
    "max": 1000,
-   "hash": "b895701e0a9259124b0da9ff70f1a5e0ec4e40a43e0e1d9d44ac45e8399d0d72",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"},{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}],\"startByteOffset\":0,\"fileSize\":1303,\"hasMore\":false,\"errorCount\":1}"
+   "hash": "2f40ab571eaafe064cd945adf73b579edda0f848b027dcf78961ad7637340d29",
+   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"call\":{\"description\":\"Echo hello-hook string\",\"command\":\"echo hello-hook\"},\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\",\"text\":\"hello-hook\",\"textLines\":1,\"textBytes\":10,\"textTail\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"},{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}],\"startByteOffset\":0,\"fileSize\":1303,\"hasMore\":false,\"errorCount\":1}"
   },
   {
    "file": "recorded-2.1.296-send-now-hook.jsonl",
@@ -3638,16 +3622,16 @@
    "op": "before",
    "before": 871,
    "max": 1,
-   "hash": "5b7610e471ad066c13cddd94251afdce1b54486b7fcde178618a1e7fd9c9d58a",
-   "json": "{\"entries\":[{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\"}],\"startByteOffset\":653,\"fileSize\":1303,\"hasMore\":true,\"errorCount\":0}"
+   "hash": "ea888d306e8fbbeb20583daec247ec56a35916058634d80f5923827d96c66069",
+   "json": "{\"entries\":[{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\",\"text\":\"hello-hook\",\"textLines\":1,\"textBytes\":10,\"textTail\":\"hello-hook\"}],\"startByteOffset\":653,\"fileSize\":1303,\"hasMore\":true,\"errorCount\":0}"
   },
   {
    "file": "recorded-2.1.296-send-now-hook.jsonl",
    "op": "before",
    "before": 871,
    "max": 1000,
-   "hash": "71a08c7085c92818f3fa9300e60818373321ed4411690c86e7fa39fbb8a50eb8",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"status\":\"success\"},{\"id\":\"x:429#0\",\"type\":\"user-message\",\"timestamp\":1791834615716,\"text\":\"hook queued: say Q-HOOK\",\"queued\":true,\"pending\":true},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\"}],\"startByteOffset\":0,\"fileSize\":1303,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "ec793b765134b54e0f68d43814621ddbb85443bcc11cb3724287a892ac3a7ef7",
+   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"call\":{\"description\":\"Echo hello-hook string\",\"command\":\"echo hello-hook\"},\"status\":\"success\"},{\"id\":\"x:429#0\",\"type\":\"user-message\",\"timestamp\":1791834615716,\"text\":\"hook queued: say Q-HOOK\",\"queued\":true,\"pending\":true},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\",\"text\":\"hello-hook\",\"textLines\":1,\"textBytes\":10,\"textTail\":\"hello-hook\"}],\"startByteOffset\":0,\"fileSize\":1303,\"hasMore\":false,\"errorCount\":0}"
   },
   {
    "file": "recorded-2.1.296-send-now-hook.jsonl",
@@ -3662,8 +3646,8 @@
    "op": "before",
    "before": 1220,
    "max": 1000,
-   "hash": "cb04bbb930f41fd26bb4c21e126faf9773c364f61c56ffeeec024a044b68e361",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"}],\"startByteOffset\":0,\"fileSize\":1303,\"hasMore\":false,\"errorCount\":1}"
+   "hash": "d6e0b6a841559efdb9137defc0eb0682723db3297c60af4063f68c684d202437",
+   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"call\":{\"description\":\"Echo hello-hook string\",\"command\":\"echo hello-hook\"},\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\",\"text\":\"hello-hook\",\"textLines\":1,\"textBytes\":10,\"textTail\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"}],\"startByteOffset\":0,\"fileSize\":1303,\"hasMore\":false,\"errorCount\":1}"
   },
   {
    "file": "recorded-2.1.296-send-now-hook.jsonl",
@@ -3726,8 +3710,8 @@
     1144,
     1303
    ],
-   "hash": "4e5085ffb024c085245aacf62985abaa9bdac1acfddbf1d6bf1c2c2cff5d1db2",
-   "json": "[{\"newEntries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"}],\"newOffset\":159,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"status\":\"pending\"}],\"newOffset\":429,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:429#0\",\"type\":\"user-message\",\"timestamp\":1791834615716,\"text\":\"hook queued: say Q-HOOK\",\"queued\":true,\"pending\":true}],\"newOffset\":560,\"pendingBuffer\":\"\"},{\"newEntries\":[],\"newOffset\":653,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\"}],\"newOffset\":871,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"}],\"newOffset\":996,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"}],\"newOffset\":1144,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}],\"newOffset\":1303,\"pendingBuffer\":\"\"}]"
+   "hash": "c9eceebf1f440be7dd30dc9c80940e14e179e87c3606383382859d1885431687",
+   "json": "[{\"newEntries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"}],\"newOffset\":159,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"call\":{\"description\":\"Echo hello-hook string\",\"command\":\"echo hello-hook\"},\"status\":\"pending\"}],\"newOffset\":429,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:429#0\",\"type\":\"user-message\",\"timestamp\":1791834615716,\"text\":\"hook queued: say Q-HOOK\",\"queued\":true,\"pending\":true}],\"newOffset\":560,\"pendingBuffer\":\"\"},{\"newEntries\":[],\"newOffset\":653,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\",\"text\":\"hello-hook\",\"textLines\":1,\"textBytes\":10,\"textTail\":\"hello-hook\"}],\"newOffset\":871,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"}],\"newOffset\":996,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"}],\"newOffset\":1144,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}],\"newOffset\":1303,\"pendingBuffer\":\"\"}]"
   },
   {
    "file": "recorded-2.1.296-send-now-hook.jsonl",
@@ -3740,7 +3724,7 @@
     984,
     1077
    ],
-   "hash": "0d870509f9f55380c6a9b3daeba83f58f5efae76618f4c118d5f443e1bb065f8"
+   "hash": "f900777f786b30cc6bbebf9a5ac406d6a38b15595f52858aec604e77a49eab9c"
   },
   {
    "file": "recorded-2.1.296-send-now-hook.jsonl",
@@ -3750,7 +3734,7 @@
     651,
     1303
    ],
-   "hash": "03bc9e2ccd8529fb9b83ce99b9c2564867d74d68c00eeafecd2cf833616ad5e2"
+   "hash": "1373fab2392f7985fd2ea6e4654c5396a7ff0e035d004c37a8c2e0c3689e7425"
   },
   {
    "file": "recorded-2.1.296-send-now-hook.jsonl",
@@ -3760,25 +3744,25 @@
     1303,
     1303
    ],
-   "hash": "cf0cc164d2e8fe6cff940358cc487d5647acf2bbf4fd8ccb8c63b3b729d033b6",
-   "json": "[{\"newEntries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"}],\"newOffset\":403,\"pendingBuffer\":\"{\\\"type\\\": \\\"assistant\\\", \\\"timestamp\\\": \\\"2026-10-12T19:50:08.719Z\\\", \\\"message\\\": {\\\"role\\\": \\\"assistant\\\", \\\"content\\\": [{\\\"type\\\": \\\"tool_use\\\", \\\"id\\\": \\\"toolu_01WbT3yYxzyNST2k1ADfysgW\\\", \\\"name\\\": \\\"Bash\\\", \\\"input\\\": {\\\"command\\\": \\\"echo hello-hook\\\", \\\"description\\\": \\\"Ech\"},{\"newEntries\":[{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"},{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}],\"newOffset\":1303,\"pendingBuffer\":\"\"},{\"newEntries\":[],\"newOffset\":1303,\"pendingBuffer\":\"\"}]"
+   "hash": "749b8568b8cb7862fec0126580459ef0070efbd970be471991f855289f82f17f",
+   "json": "[{\"newEntries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"}],\"newOffset\":403,\"pendingBuffer\":\"{\\\"type\\\": \\\"assistant\\\", \\\"timestamp\\\": \\\"2026-10-12T19:50:08.719Z\\\", \\\"message\\\": {\\\"role\\\": \\\"assistant\\\", \\\"content\\\": [{\\\"type\\\": \\\"tool_use\\\", \\\"id\\\": \\\"toolu_01WbT3yYxzyNST2k1ADfysgW\\\", \\\"name\\\": \\\"Bash\\\", \\\"input\\\": {\\\"command\\\": \\\"echo hello-hook\\\", \\\"description\\\": \\\"Ech\"},{\"newEntries\":[{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"call\":{\"description\":\"Echo hello-hook string\",\"command\":\"echo hello-hook\"},\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\",\"text\":\"hello-hook\",\"textLines\":1,\"textBytes\":10,\"textTail\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"},{\"id\":\"x:996#0\",\"type\":\"thinking\",\"timestamp\":1791834627751,\"thinking\":\"\"},{\"id\":\"x:1144#0\",\"type\":\"assistant-message\",\"timestamp\":1791834627834,\"markdown\":\"DONE-HOOK\\n\\nQ-HOOK\"}],\"newOffset\":1303,\"pendingBuffer\":\"\"},{\"newEntries\":[],\"newOffset\":1303,\"pendingBuffer\":\"\"}]"
   },
   {
    "file": "recorded-2.1.296-send-now-hook.jsonl",
    "op": "file",
    "cut": 1061,
-   "hash": "c6ea56a5e982e5feb91a6305f62771984f886076d1ff8f4e29e49142542b2d23",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"}]"
+   "hash": "5ebca72315d29317cc9d4bdbc8495a7ea610e78d7c095fe137b140af3f7803ab",
+   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791834607262,\"text\":\"Run the Bash command: echo hello-hook  then say DONE-HOOK\"},{\"id\":\"x:159#0\",\"type\":\"tool-call\",\"timestamp\":1791834608719,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"toolName\":\"Bash\",\"summary\":\"$ echo hello-hook\",\"call\":{\"description\":\"Echo hello-hook string\",\"command\":\"echo hello-hook\"},\"status\":\"success\"},{\"id\":\"x:653#0\",\"type\":\"tool-result\",\"timestamp\":1791834626280,\"toolUseId\":\"toolu_01WbT3yYxzyNST2k1ADfysgW\",\"isError\":false,\"summary\":\"hello-hook\",\"text\":\"hello-hook\",\"textLines\":1,\"textBytes\":10,\"textTail\":\"hello-hook\"},{\"id\":\"x:871#0\",\"type\":\"user-message\",\"timestamp\":1791834626515,\"text\":\"hook queued: say Q-HOOK\"}]"
   },
   {
    "file": "recorded-2.1.296-send-now-mcp.jsonl",
    "op": "content",
-   "hash": "3fe457c668677fa261effba3027e7d3de620e3384239f50f9da3e17749941e90"
+   "hash": "e6a37d9bba8eda0c584d4ed8a2085f4e387df25d0aa84c8a78496de5418aeca7"
   },
   {
    "file": "recorded-2.1.296-send-now-mcp.jsonl",
    "op": "file",
-   "hash": "3fe457c668677fa261effba3027e7d3de620e3384239f50f9da3e17749941e90"
+   "hash": "e6a37d9bba8eda0c584d4ed8a2085f4e387df25d0aa84c8a78496de5418aeca7"
   },
   {
    "file": "recorded-2.1.296-send-now-mcp.jsonl",
@@ -3792,8 +3776,7 @@
    "op": "content",
    "from": 456,
    "to": 2952,
-   "hash": "56df07be30d61db1cf1a74301eef2eb41de41896deab9a502115907b4532859d",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"tool-result\",\"timestamp\":1791831676307,\"toolUseId\":\"toolu_01NbDFXGH726B4AkKgoPJffU\",\"isError\":false,\"summary\":\"\"},{\"id\":\"x:252#0\",\"type\":\"tool-call\",\"timestamp\":1791831677804,\"toolUseId\":\"toolu_01C5VjgsXV5M8Ed7VvoCQaQP\",\"toolName\":\"mcp__slow__slow_wait\",\"summary\":\"mcp__slow__slow_wait 40\",\"status\":\"success\"},{\"id\":\"x:739#0\",\"type\":\"tool-result\",\"timestamp\":1791831691782,\"toolUseId\":\"toolu_01C5VjgsXV5M8Ed7VvoCQaQP\",\"isError\":false,\"summary\":\"MCP tool \\\"slow/slow_wait\\\" was moved to the background as task k3dr5bz4k so that a message that arriv\"},{\"id\":\"x:1342#0\",\"type\":\"user-message\",\"timestamp\":1791831689694,\"text\":\"mcp queued: say Q-MCP\",\"queued\":true},{\"id\":\"x:1508#0\",\"type\":\"thinking\",\"timestamp\":1791831693558,\"thinking\":\"\"},{\"id\":\"x:1656#0\",\"type\":\"assistant-message\",\"timestamp\":1791831694035,\"markdown\":\"Q-MCP\\n\\nThe `slow_wait` call was moved to the background as task k3dr5bz4k, so it hasn't finished yet. I'll say MCP-DONE once its result arrives.\"}]"
+   "hash": "c75ae0de2a582605ba55271f63421d167f1fd90a33e981b71f6596160a5be444"
   },
   {
    "file": "recorded-2.1.296-send-now-mcp.jsonl",
@@ -3807,8 +3790,8 @@
    "op": "content",
    "from": 1067,
    "to": 2994,
-   "hash": "f3944a3c9d0a5e6288b446cd9691535cdb6fa52e75fd84683f33a5690d71a15a",
-   "json": "[{\"id\":\"x:128#0\",\"type\":\"tool-result\",\"timestamp\":1791831691782,\"toolUseId\":\"toolu_01C5VjgsXV5M8Ed7VvoCQaQP\",\"isError\":false,\"summary\":\"MCP tool \\\"slow/slow_wait\\\" was moved to the background as task k3dr5bz4k so that a message that arriv\"},{\"id\":\"x:731#0\",\"type\":\"user-message\",\"timestamp\":1791831689694,\"text\":\"mcp queued: say Q-MCP\",\"queued\":true},{\"id\":\"x:897#0\",\"type\":\"thinking\",\"timestamp\":1791831693558,\"thinking\":\"\"},{\"id\":\"x:1045#0\",\"type\":\"assistant-message\",\"timestamp\":1791831694035,\"markdown\":\"Q-MCP\\n\\nThe `slow_wait` call was moved to the background as task k3dr5bz4k, so it hasn't finished yet. I'll say MCP-DONE once its result arrives.\"}]"
+   "hash": "946c4dbbcc674437fa0b881bd3d66737593c6b353e250cf62f3aa5b735b14c60",
+   "json": "[{\"id\":\"x:128#0\",\"type\":\"tool-result\",\"timestamp\":1791831691782,\"toolUseId\":\"toolu_01C5VjgsXV5M8Ed7VvoCQaQP\",\"isError\":false,\"summary\":\"MCP tool \\\"slow/slow_wait\\\" was moved to the background as task k3dr5bz4k so that a message that arriv\",\"text\":\"MCP tool \\\"slow/slow_wait\\\" was moved to the background as task k3dr5bz4k so that a message that arrived while it was running can reach you; it was not interrupted and keeps running; you'll receive a notification with the result when it completes. You can keep working in the meantime. To stop it, use TaskStop with task_id \\\"k3dr5bz4k\\\". Note: it does not survive exiting this session.\",\"textLines\":1,\"textBytes\":382,\"textTail\":\"MCP tool \\\"slow/slow_wait\\\" was moved to the background as task k3dr5bz4k so that a message that arrived while it was running can reach you; it was not interrupted and keeps running; you'll receive a notification with the result when it compl…\"},{\"id\":\"x:731#0\",\"type\":\"user-message\",\"timestamp\":1791831689694,\"text\":\"mcp queued: say Q-MCP\",\"queued\":true},{\"id\":\"x:897#0\",\"type\":\"thinking\",\"timestamp\":1791831693558,\"thinking\":\"\"},{\"id\":\"x:1045#0\",\"type\":\"assistant-message\",\"timestamp\":1791831694035,\"markdown\":\"Q-MCP\\n\\nThe `slow_wait` call was moved to the background as task k3dr5bz4k, so it hasn't finished yet. I'll say MCP-DONE once its result arrives.\"}]"
   },
   {
    "file": "recorded-2.1.296-send-now-mcp.jsonl",
@@ -3850,13 +3833,13 @@
    "file": "recorded-2.1.296-send-now-mcp.jsonl",
    "op": "tail",
    "max": 25,
-   "hash": "6b5dcd4a40e7b94e3f21a9ead476c9bef613035162ee63f305a3e93eb95696b9"
+   "hash": "1d5ffcb6071a7219f739f98a03bc8ddef2943a9e3376003e9d628c48dbc6c927"
   },
   {
    "file": "recorded-2.1.296-send-now-mcp.jsonl",
    "op": "tail",
    "max": 1000,
-   "hash": "6b5dcd4a40e7b94e3f21a9ead476c9bef613035162ee63f305a3e93eb95696b9"
+   "hash": "1d5ffcb6071a7219f739f98a03bc8ddef2943a9e3376003e9d628c48dbc6c927"
   },
   {
    "file": "recorded-2.1.296-send-now-mcp.jsonl",
@@ -3887,7 +3870,7 @@
    "op": "before",
    "before": 3413,
    "max": 1000,
-   "hash": "2092a6569d5bf092a3d5591b7b320967e32505bef09b50f607c3792531661c38"
+   "hash": "fb08b209123ae5d104f44a6ec276e012fdcdf415d34c30ff4c62895ded5d728d"
   },
   {
    "file": "recorded-2.1.296-send-now-mcp.jsonl",
@@ -3902,7 +3885,7 @@
    "op": "before",
    "before": 3420,
    "max": 1000,
-   "hash": "d89bfa6f2bf6f093bf48ada08e0c6a8bf3db721bd913d104d6fed1b86ca2a4fd"
+   "hash": "8079118c59d559e74dceb21f441cb75c7838fc0723b32572b82fbe4267f1d28f"
   },
   {
    "file": "recorded-2.1.296-send-now-mcp.jsonl",
@@ -3933,8 +3916,7 @@
    "op": "before",
    "before": 2714,
    "max": 1000,
-   "hash": "b172c4db426aa98ad8d3523b2a042767f94efc2c24c686727e90a374af1996cb",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831672442,\"text\":\"Call the MCP tool slow_wait (server slow) with seconds=40, nothing else, then say MCP-DONE.\"},{\"id\":\"x:193#0\",\"type\":\"tool-call\",\"timestamp\":1791831676004,\"toolUseId\":\"toolu_01NbDFXGH726B4AkKgoPJffU\",\"toolName\":\"ToolSearch\",\"summary\":\"ToolSearch select:mcp__slow__slow_wait\",\"status\":\"success\"},{\"id\":\"x:456#0\",\"type\":\"tool-result\",\"timestamp\":1791831676307,\"toolUseId\":\"toolu_01NbDFXGH726B4AkKgoPJffU\",\"isError\":false,\"summary\":\"\"},{\"id\":\"x:708#0\",\"type\":\"tool-call\",\"timestamp\":1791831677804,\"toolUseId\":\"toolu_01C5VjgsXV5M8Ed7VvoCQaQP\",\"toolName\":\"mcp__slow__slow_wait\",\"summary\":\"mcp__slow__slow_wait 40\",\"status\":\"success\"},{\"id\":\"x:1195#0\",\"type\":\"tool-result\",\"timestamp\":1791831691782,\"toolUseId\":\"toolu_01C5VjgsXV5M8Ed7VvoCQaQP\",\"isError\":false,\"summary\":\"MCP tool \\\"slow/slow_wait\\\" was moved to the background as task k3dr5bz4k so that a message that arriv\"},{\"id\":\"x:1798#0\",\"type\":\"user-message\",\"timestamp\":1791831689694,\"text\":\"mcp queued: say Q-MCP\",\"queued\":true},{\"id\":\"x:1964#0\",\"type\":\"thinking\",\"timestamp\":1791831693558,\"thinking\":\"\"},{\"id\":\"x:2112#0\",\"type\":\"assistant-message\",\"timestamp\":1791831694035,\"markdown\":\"Q-MCP\\n\\nThe `slow_wait` call was moved to the background as task k3dr5bz4k, so it hasn't finished yet. I'll say MCP-DONE once its result arrives.\"}],\"startByteOffset\":0,\"fileSize\":3413,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "69cc2b12d8a087e09a800d36f1137d8e87e4f51fb466b6d15ab3968855bc2f75"
   },
   {
    "file": "recorded-2.1.296-send-now-mcp.jsonl",
@@ -4020,7 +4002,7 @@
     3265,
     3413
    ],
-   "hash": "8854290126a672db4e63c1dae6c4ac320f1fc71659f899ad80001d01d1797fe8"
+   "hash": "f0bebc2aa8ac53932e9045f38c72d4835b6d199ddeabf60b33b5d81f0dcb0ce5"
   },
   {
    "file": "recorded-2.1.296-send-now-mcp.jsonl",
@@ -4033,7 +4015,7 @@
     2505,
     2866
    ],
-   "hash": "1ffa4c7650a7219996ae8b488cb7d9e49434e3102b281a1e723f1c2ee0439d50"
+   "hash": "4ba8cea13366fe2a93e7e04c9bf1ab7db1c91f1ff6b3f9e0b92aefed6759fe70"
   },
   {
    "file": "recorded-2.1.296-send-now-mcp.jsonl",
@@ -4043,7 +4025,7 @@
     1706,
     3413
    ],
-   "hash": "78d6785bd1111942523f1df1648432b982f1a733887e1f0d028fec00a0cfee33"
+   "hash": "39a1258fa8576117d4daca15ba37b5eec0f60109eaae594c96d9301b010e6e0e"
   },
   {
    "file": "recorded-2.1.296-send-now-mcp.jsonl",
@@ -4053,14 +4035,13 @@
     3413,
     3413
    ],
-   "hash": "c74da0c3b77a70105ed75e1295f543c316efd381fcabf6b1812ff93b59e69374"
+   "hash": "a8f34f6c081cbf6c0a50c42886e586bf44f3f11a3f7652d5a3ccf5f2c3e76799"
   },
   {
    "file": "recorded-2.1.296-send-now-mcp.jsonl",
    "op": "file",
    "cut": 2965,
-   "hash": "13f0eaa4924fa8dec16e18cea0c51daf2152a5526465216302c5fa46bf4a7245",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831672442,\"text\":\"Call the MCP tool slow_wait (server slow) with seconds=40, nothing else, then say MCP-DONE.\"},{\"id\":\"x:193#0\",\"type\":\"tool-call\",\"timestamp\":1791831676004,\"toolUseId\":\"toolu_01NbDFXGH726B4AkKgoPJffU\",\"toolName\":\"ToolSearch\",\"summary\":\"ToolSearch select:mcp__slow__slow_wait\",\"status\":\"success\"},{\"id\":\"x:456#0\",\"type\":\"tool-result\",\"timestamp\":1791831676307,\"toolUseId\":\"toolu_01NbDFXGH726B4AkKgoPJffU\",\"isError\":false,\"summary\":\"\"},{\"id\":\"x:708#0\",\"type\":\"tool-call\",\"timestamp\":1791831677804,\"toolUseId\":\"toolu_01C5VjgsXV5M8Ed7VvoCQaQP\",\"toolName\":\"mcp__slow__slow_wait\",\"summary\":\"mcp__slow__slow_wait 40\",\"status\":\"success\"},{\"id\":\"x:1195#0\",\"type\":\"tool-result\",\"timestamp\":1791831691782,\"toolUseId\":\"toolu_01C5VjgsXV5M8Ed7VvoCQaQP\",\"isError\":false,\"summary\":\"MCP tool \\\"slow/slow_wait\\\" was moved to the background as task k3dr5bz4k so that a message that arriv\"},{\"id\":\"x:1798#0\",\"type\":\"user-message\",\"timestamp\":1791831689694,\"text\":\"mcp queued: say Q-MCP\",\"queued\":true},{\"id\":\"x:1964#0\",\"type\":\"thinking\",\"timestamp\":1791831693558,\"thinking\":\"\"},{\"id\":\"x:2112#0\",\"type\":\"assistant-message\",\"timestamp\":1791831694035,\"markdown\":\"Q-MCP\\n\\nThe `slow_wait` call was moved to the background as task k3dr5bz4k, so it hasn't finished yet. I'll say MCP-DONE once its result arrives.\"}]"
+   "hash": "da57e0d8b61a9aba345f92b4d932189930eaaa9c28d0f6d744bedd4739b14afa"
   },
   {
    "file": "recorded-2.1.296-send-now-stream.jsonl",
@@ -4356,19 +4337,18 @@
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
    "op": "content",
-   "hash": "90de65088282c482e837fee7a93c8da16b13988617798596691f369ab16be1e4"
+   "hash": "ef08b7789f822644922330c31a1bea0a65725aea88499f22cab09e27fda392a7"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
    "op": "file",
-   "hash": "90de65088282c482e837fee7a93c8da16b13988617798596691f369ab16be1e4"
+   "hash": "ef08b7789f822644922330c31a1bea0a65725aea88499f22cab09e27fda392a7"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
    "op": "content",
    "to": 2627,
-   "hash": "4e0c7b262d18789382cd28856c7f54418287594baba843f72ee1d4c13c5ca38c",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831126371,\"text\":\"Run exactly this Bash command in the foreground and then say DONE8: python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831127537,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\",\"status\":\"success\"},{\"id\":\"x:837#0\",\"type\":\"tool-result\",\"timestamp\":1791831146747,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"isError\":false,\"summary\":\"Command was moved to the background (ID: b367dhzae) so that a message that arrived while it was runn\"},{\"id\":\"x:1546#0\",\"type\":\"user-message\",\"timestamp\":1791831142955,\"text\":\"first queued: say Q-ONE\",\"queued\":true},{\"id\":\"x:1714#0\",\"type\":\"user-message\",\"timestamp\":1791831144393,\"text\":\"second queued: say Q-TWO\",\"queued\":true},{\"id\":\"x:1883#0\",\"type\":\"thinking\",\"timestamp\":1791831148073,\"thinking\":\"\"},{\"id\":\"x:2031#0\",\"type\":\"assistant-message\",\"timestamp\":1791831148250,\"markdown\":\"Q-ONE\\nQ-TWO\\n\\nThe 25-second command is still running in the background, so I'll say DONE8 once it finishes.\"}]"
+   "hash": "ad4890dfbff58e6c399af6fd7e71fb3e0eb09d5c58758cc7e7716c8347d193e7"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
@@ -4382,23 +4362,21 @@
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
    "op": "content",
    "to": 3063,
-   "hash": "4e0c7b262d18789382cd28856c7f54418287594baba843f72ee1d4c13c5ca38c",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831126371,\"text\":\"Run exactly this Bash command in the foreground and then say DONE8: python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831127537,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\",\"status\":\"success\"},{\"id\":\"x:837#0\",\"type\":\"tool-result\",\"timestamp\":1791831146747,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"isError\":false,\"summary\":\"Command was moved to the background (ID: b367dhzae) so that a message that arrived while it was runn\"},{\"id\":\"x:1546#0\",\"type\":\"user-message\",\"timestamp\":1791831142955,\"text\":\"first queued: say Q-ONE\",\"queued\":true},{\"id\":\"x:1714#0\",\"type\":\"user-message\",\"timestamp\":1791831144393,\"text\":\"second queued: say Q-TWO\",\"queued\":true},{\"id\":\"x:1883#0\",\"type\":\"thinking\",\"timestamp\":1791831148073,\"thinking\":\"\"},{\"id\":\"x:2031#0\",\"type\":\"assistant-message\",\"timestamp\":1791831148250,\"markdown\":\"Q-ONE\\nQ-TWO\\n\\nThe 25-second command is still running in the background, so I'll say DONE8 once it finishes.\"}]"
+   "hash": "ad4890dfbff58e6c399af6fd7e71fb3e0eb09d5c58758cc7e7716c8347d193e7"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
    "op": "content",
    "from": 705,
    "to": 2768,
-   "hash": "d5582879980211db4baf008e76df0b14e454cf13735a0a96d44b359f49be5c6c",
-   "json": "[{\"id\":\"x:132#0\",\"type\":\"tool-result\",\"timestamp\":1791831146747,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"isError\":false,\"summary\":\"Command was moved to the background (ID: b367dhzae) so that a message that arrived while it was runn\"},{\"id\":\"x:841#0\",\"type\":\"user-message\",\"timestamp\":1791831142955,\"text\":\"first queued: say Q-ONE\",\"queued\":true},{\"id\":\"x:1009#0\",\"type\":\"user-message\",\"timestamp\":1791831144393,\"text\":\"second queued: say Q-TWO\",\"queued\":true},{\"id\":\"x:1178#0\",\"type\":\"thinking\",\"timestamp\":1791831148073,\"thinking\":\"\"},{\"id\":\"x:1326#0\",\"type\":\"assistant-message\",\"timestamp\":1791831148250,\"markdown\":\"Q-ONE\\nQ-TWO\\n\\nThe 25-second command is still running in the background, so I'll say DONE8 once it finishes.\"}]"
+   "hash": "28113021ce323db9086e5b8c74b67856d4ec2238827b78c98289760ab408291d",
+   "json": "[{\"id\":\"x:132#0\",\"type\":\"tool-result\",\"timestamp\":1791831146747,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"isError\":false,\"summary\":\"Command was moved to the background (ID: b367dhzae) so that a message that arrived while it was runn\",\"text\":\"Command was moved to the background (ID: b367dhzae) so that a message that arrived while it was running can reach you; it was not interrupted. Output is being written to: /tmp/claude-1001/-tmp-claude-1001--home-coder-workspace-acme-bc172…\",\"textLines\":1,\"textBytes\":240,\"textTail\":\"Command was moved to the background (ID: b367dhzae) so that a message that arrived while it was running can reach you; it was not interrupted. Output is being written to: /tmp/claude-1001/-tmp-claude-1001--home-coder-workspace-acme-bc172…\"},{\"id\":\"x:841#0\",\"type\":\"user-message\",\"timestamp\":1791831142955,\"text\":\"first queued: say Q-ONE\",\"queued\":true},{\"id\":\"x:1009#0\",\"type\":\"user-message\",\"timestamp\":1791831144393,\"text\":\"second queued: say Q-TWO\",\"queued\":true},{\"id\":\"x:1178#0\",\"type\":\"thinking\",\"timestamp\":1791831148073,\"thinking\":\"\"},{\"id\":\"x:1326#0\",\"type\":\"assistant-message\",\"timestamp\":1791831148250,\"markdown\":\"Q-ONE\\nQ-TWO\\n\\nThe 25-second command is still running in the background, so I'll say DONE8 once it finishes.\"}]"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
    "op": "content",
    "to": 2626,
-   "hash": "4e0c7b262d18789382cd28856c7f54418287594baba843f72ee1d4c13c5ca38c",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831126371,\"text\":\"Run exactly this Bash command in the foreground and then say DONE8: python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831127537,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\",\"status\":\"success\"},{\"id\":\"x:837#0\",\"type\":\"tool-result\",\"timestamp\":1791831146747,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"isError\":false,\"summary\":\"Command was moved to the background (ID: b367dhzae) so that a message that arrived while it was runn\"},{\"id\":\"x:1546#0\",\"type\":\"user-message\",\"timestamp\":1791831142955,\"text\":\"first queued: say Q-ONE\",\"queued\":true},{\"id\":\"x:1714#0\",\"type\":\"user-message\",\"timestamp\":1791831144393,\"text\":\"second queued: say Q-TWO\",\"queued\":true},{\"id\":\"x:1883#0\",\"type\":\"thinking\",\"timestamp\":1791831148073,\"thinking\":\"\"},{\"id\":\"x:2031#0\",\"type\":\"assistant-message\",\"timestamp\":1791831148250,\"markdown\":\"Q-ONE\\nQ-TWO\\n\\nThe 25-second command is still running in the background, so I'll say DONE8 once it finishes.\"}]"
+   "hash": "ad4890dfbff58e6c399af6fd7e71fb3e0eb09d5c58758cc7e7716c8347d193e7"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
@@ -4433,13 +4411,13 @@
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
    "op": "tail",
    "max": 25,
-   "hash": "ad78fcb2868e4bfdb9119e6fa4f261a13eb9af44e735b542df1115d7c8290b04"
+   "hash": "c74567ddeadd9613ba4f65063b81c5529710a3d1b1fc08d59354c096e145c856"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
    "op": "tail",
    "max": 1000,
-   "hash": "ad78fcb2868e4bfdb9119e6fa4f261a13eb9af44e735b542df1115d7c8290b04"
+   "hash": "c74567ddeadd9613ba4f65063b81c5529710a3d1b1fc08d59354c096e145c856"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
@@ -4454,8 +4432,8 @@
    "op": "tail",
    "cut": 1258,
    "max": 3,
-   "hash": "ab47b8d043ef9b1e59128006cc60d2c4d4cbd1488c5310d3d2b8e6f7bb5cbd27",
-   "json": "{\"entries\":[{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831127537,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\",\"status\":\"pending\"},{\"id\":\"x:574#0\",\"type\":\"user-message\",\"timestamp\":1791831142963,\"text\":\"first queued: say Q-ONE\",\"queued\":true,\"pending\":true},{\"id\":\"x:705#0\",\"type\":\"user-message\",\"timestamp\":1791831144417,\"text\":\"second queued: say Q-TWO\",\"queued\":true,\"pending\":true}],\"startByteOffset\":226,\"fileSize\":835,\"hasMore\":true,\"errorCount\":0,\"summary\":\"Run exactly this Bash command in the foreground and then say DONE8: python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\"}"
+   "hash": "3c36cad8a5576730986694af24e109214d83960b19f01b2a6ba519e245718c16",
+   "json": "{\"entries\":[{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831127537,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\",\"call\":{\"description\":\"Sleep 25 seconds then print ok8\",\"command\":\"python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\"},\"status\":\"pending\"},{\"id\":\"x:574#0\",\"type\":\"user-message\",\"timestamp\":1791831142963,\"text\":\"first queued: say Q-ONE\",\"queued\":true,\"pending\":true},{\"id\":\"x:705#0\",\"type\":\"user-message\",\"timestamp\":1791831144417,\"text\":\"second queued: say Q-TWO\",\"queued\":true,\"pending\":true}],\"startByteOffset\":226,\"fileSize\":835,\"hasMore\":true,\"errorCount\":0,\"summary\":\"Run exactly this Bash command in the foreground and then say DONE8: python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\"}"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
@@ -4470,7 +4448,7 @@
    "op": "before",
    "before": 3214,
    "max": 1000,
-   "hash": "c2ba576cfc975254a4978a295712b806d4d586e5486ff21fda37386fb1aee701"
+   "hash": "2e29b42f170a3004bf5e3f10713479aff5c66801eed97d4ede11c849506e3a27"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
@@ -4485,23 +4463,22 @@
    "op": "before",
    "before": 3221,
    "max": 1000,
-   "hash": "fc92078c1ef00bfc81c335647e90de67c7f4137bd4647f20e4144503ea3ae3de"
+   "hash": "915b31ed60b221180ea40cbf3168f196706b04ea8bd5982c37cbd4dc1f9d135a"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
    "op": "before",
    "before": 1546,
    "max": 1,
-   "hash": "ca2c20b633e2ffe46ba2c8a729085c4113bd450ade00ef9c81066c044723e017",
-   "json": "{\"entries\":[{\"id\":\"x:837#0\",\"type\":\"tool-result\",\"timestamp\":1791831146747,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"isError\":false,\"summary\":\"Command was moved to the background (ID: b367dhzae) so that a message that arrived while it was runn\"}],\"startByteOffset\":837,\"fileSize\":3214,\"hasMore\":true,\"errorCount\":0}"
+   "hash": "8f00f4107eabc8a1a856f0516cdafb0b0a7499baccaaaec58c1cc382a221046c",
+   "json": "{\"entries\":[{\"id\":\"x:837#0\",\"type\":\"tool-result\",\"timestamp\":1791831146747,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"isError\":false,\"summary\":\"Command was moved to the background (ID: b367dhzae) so that a message that arrived while it was runn\",\"text\":\"Command was moved to the background (ID: b367dhzae) so that a message that arrived while it was running can reach you; it was not interrupted. Output is being written to: /tmp/claude-1001/-tmp-claude-1001--home-coder-workspace-acme-bc172…\",\"textLines\":1,\"textBytes\":240,\"textTail\":\"Command was moved to the background (ID: b367dhzae) so that a message that arrived while it was running can reach you; it was not interrupted. Output is being written to: /tmp/claude-1001/-tmp-claude-1001--home-coder-workspace-acme-bc172…\"}],\"startByteOffset\":837,\"fileSize\":3214,\"hasMore\":true,\"errorCount\":0}"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
    "op": "before",
    "before": 1546,
    "max": 1000,
-   "hash": "73da18bbdc6aef73afcce02f78bc49a4d32fd42c34041d04920f4042425de3ce",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831126371,\"text\":\"Run exactly this Bash command in the foreground and then say DONE8: python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831127537,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\",\"status\":\"success\"},{\"id\":\"x:574#0\",\"type\":\"user-message\",\"timestamp\":1791831142963,\"text\":\"first queued: say Q-ONE\",\"queued\":true,\"pending\":true},{\"id\":\"x:705#0\",\"type\":\"user-message\",\"timestamp\":1791831144417,\"text\":\"second queued: say Q-TWO\",\"queued\":true,\"pending\":true},{\"id\":\"x:837#0\",\"type\":\"tool-result\",\"timestamp\":1791831146747,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"isError\":false,\"summary\":\"Command was moved to the background (ID: b367dhzae) so that a message that arrived while it was runn\"}],\"startByteOffset\":0,\"fileSize\":3214,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "96ed46f246a281051cb68d213fc11a57a60a8589966dd0d79f58086f0af6bd95"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
@@ -4516,8 +4493,7 @@
    "op": "before",
    "before": 2724,
    "max": 1000,
-   "hash": "8c8573bef26565464e465eb7b4c22639731c14ad48e1fef3f83bc5eed5d61c18",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831126371,\"text\":\"Run exactly this Bash command in the foreground and then say DONE8: python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831127537,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\",\"status\":\"success\"},{\"id\":\"x:837#0\",\"type\":\"tool-result\",\"timestamp\":1791831146747,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"isError\":false,\"summary\":\"Command was moved to the background (ID: b367dhzae) so that a message that arrived while it was runn\"},{\"id\":\"x:1546#0\",\"type\":\"user-message\",\"timestamp\":1791831142955,\"text\":\"first queued: say Q-ONE\",\"queued\":true},{\"id\":\"x:1714#0\",\"type\":\"user-message\",\"timestamp\":1791831144393,\"text\":\"second queued: say Q-TWO\",\"queued\":true},{\"id\":\"x:1883#0\",\"type\":\"thinking\",\"timestamp\":1791831148073,\"thinking\":\"\"},{\"id\":\"x:2031#0\",\"type\":\"assistant-message\",\"timestamp\":1791831148250,\"markdown\":\"Q-ONE\\nQ-TWO\\n\\nThe 25-second command is still running in the background, so I'll say DONE8 once it finishes.\"}],\"startByteOffset\":0,\"fileSize\":3214,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "c2e70c3ea38c69961b47c598487a8e74c333ad2a1eda830e5199935a05151d70"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
@@ -4548,8 +4524,7 @@
    "op": "before",
    "before": 3064,
    "max": 1000,
-   "hash": "1cb8f32b7f22eddb7578796a82f8fb8c2d7420980956534df66424f6d4e25415",
-   "json": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831126371,\"text\":\"Run exactly this Bash command in the foreground and then say DONE8: python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831127537,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\",\"status\":\"success\"},{\"id\":\"x:837#0\",\"type\":\"tool-result\",\"timestamp\":1791831146747,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"isError\":false,\"summary\":\"Command was moved to the background (ID: b367dhzae) so that a message that arrived while it was runn\"},{\"id\":\"x:1546#0\",\"type\":\"user-message\",\"timestamp\":1791831142955,\"text\":\"first queued: say Q-ONE\",\"queued\":true},{\"id\":\"x:1714#0\",\"type\":\"user-message\",\"timestamp\":1791831144393,\"text\":\"second queued: say Q-TWO\",\"queued\":true},{\"id\":\"x:1883#0\",\"type\":\"thinking\",\"timestamp\":1791831148073,\"thinking\":\"\"},{\"id\":\"x:2031#0\",\"type\":\"assistant-message\",\"timestamp\":1791831148250,\"markdown\":\"Q-ONE\\nQ-TWO\\n\\nThe 25-second command is still running in the background, so I'll say DONE8 once it finishes.\"}],\"startByteOffset\":0,\"fileSize\":3214,\"hasMore\":false,\"errorCount\":1}"
+   "hash": "784a0662ffe2877ec27cf4c82ca63edd88a1df71d756c7243751d069c30f5ca8"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
@@ -4603,7 +4578,7 @@
     3069,
     3214
    ],
-   "hash": "0c0d89f2b7f374a6949bcd8156191d37f9ff10974d4d3eed05239fa5ec63d681"
+   "hash": "f9a358e6d448bba3cb25d4f1e54667b41a770a0e49536867e2fa7c3963491882"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
@@ -4616,7 +4591,7 @@
     3063,
     3064
    ],
-   "hash": "221b87ec3df4db77433c585d124f33ee78154841b85589e6acca562ae82a7cea"
+   "hash": "2c246e64bc47eb6de50c5a47e13f752b3428fd6e306aec0734740f3ce5a5751e"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
@@ -4626,7 +4601,7 @@
     1607,
     3214
    ],
-   "hash": "f253b397d5f639aa8f28b5be841415e4cbcd8eee64750f9546f26040798f6109"
+   "hash": "b83888b8e73d698294be43a8cdf87bc64e248c7ce8fc0184838f2a94664ad150"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
@@ -4636,14 +4611,13 @@
     3214,
     3214
    ],
-   "hash": "278fa5e67778b6575734cf3a8b708da02dda1f0c72ef4b1fd22dd051f6b7fe95"
+   "hash": "7f1e9b6c9593d6d8466d7b6e829748de23dd2ff7a416d81f77ff03e6f7923086"
   },
   {
    "file": "recorded-2.1.296-send-now-two-queued.jsonl",
    "op": "file",
    "cut": 2626,
-   "hash": "4e0c7b262d18789382cd28856c7f54418287594baba843f72ee1d4c13c5ca38c",
-   "json": "[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1791831126371,\"text\":\"Run exactly this Bash command in the foreground and then say DONE8: python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\"},{\"id\":\"x:226#0\",\"type\":\"tool-call\",\"timestamp\":1791831127537,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"toolName\":\"Bash\",\"summary\":\"$ python3 -c 'import time; time.sleep(25); print(\\\"ok8\\\")'\",\"status\":\"success\"},{\"id\":\"x:837#0\",\"type\":\"tool-result\",\"timestamp\":1791831146747,\"toolUseId\":\"toolu_014w5pUFJg3SkZBg5E1Wj8DX\",\"isError\":false,\"summary\":\"Command was moved to the background (ID: b367dhzae) so that a message that arrived while it was runn\"},{\"id\":\"x:1546#0\",\"type\":\"user-message\",\"timestamp\":1791831142955,\"text\":\"first queued: say Q-ONE\",\"queued\":true},{\"id\":\"x:1714#0\",\"type\":\"user-message\",\"timestamp\":1791831144393,\"text\":\"second queued: say Q-TWO\",\"queued\":true},{\"id\":\"x:1883#0\",\"type\":\"thinking\",\"timestamp\":1791831148073,\"thinking\":\"\"},{\"id\":\"x:2031#0\",\"type\":\"assistant-message\",\"timestamp\":1791831148250,\"markdown\":\"Q-ONE\\nQ-TWO\\n\\nThe 25-second command is still running in the background, so I'll say DONE8 once it finishes.\"}]"
+   "hash": "ad4890dfbff58e6c399af6fd7e71fb3e0eb09d5c58758cc7e7716c8347d193e7"
   },
   {
    "file": "recorded-legacy-custom-command.jsonl",
@@ -6381,14 +6355,14 @@
   {
    "file": "synthetic-plan-reference.jsonl",
    "op": "content",
-   "hash": "19cf70c5d5261cf9613b7e3d7fe70fb245dc70163859f60ae25cde3d76be331d",
-   "json": "[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]},{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\"}]"
+   "hash": "09dd878b38769f0677e0e07363613c13c3b7061409138119aa19f04bdedf1233",
+   "json": "[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]},{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\",\"text\":\"result for the reference plan\",\"textLines\":1,\"textBytes\":29,\"textTail\":\"result for the reference plan\"}]"
   },
   {
    "file": "synthetic-plan-reference.jsonl",
    "op": "file",
-   "hash": "19cf70c5d5261cf9613b7e3d7fe70fb245dc70163859f60ae25cde3d76be331d",
-   "json": "[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]},{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\"}]"
+   "hash": "09dd878b38769f0677e0e07363613c13c3b7061409138119aa19f04bdedf1233",
+   "json": "[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]},{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\",\"text\":\"result for the reference plan\",\"textLines\":1,\"textBytes\":29,\"textTail\":\"result for the reference plan\"}]"
   },
   {
    "file": "synthetic-plan-reference.jsonl",
@@ -6439,36 +6413,36 @@
    "file": "synthetic-plan-reference.jsonl",
    "op": "tail",
    "max": 1,
-   "hash": "3e5a8a5b7b23c4b19fa1186653a919fdf3c025ca8249f6a7403340714c4476ef",
-   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\"}],\"startByteOffset\":1444,\"fileSize\":1906,\"hasMore\":true,\"errorCount\":0}"
+   "hash": "366e4e47bd9370596a388738825c65147b1df1bc94b8922f54c7bcda2689d7a6",
+   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\",\"text\":\"result for the reference plan\",\"textLines\":1,\"textBytes\":29,\"textTail\":\"result for the reference plan\"}],\"startByteOffset\":1444,\"fileSize\":1906,\"hasMore\":true,\"errorCount\":0}"
   },
   {
    "file": "synthetic-plan-reference.jsonl",
    "op": "tail",
    "max": 2,
-   "hash": "1c6f74b259df16640c362aaea794933144540dc1c4a0c87664f24c0740cdb762",
-   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\"}],\"startByteOffset\":842,\"fileSize\":1906,\"hasMore\":true,\"errorCount\":0}"
+   "hash": "6da63ed51b9818c098c319991e66cf8945544720a4020126f134c8021716f43a",
+   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\",\"text\":\"result for the reference plan\",\"textLines\":1,\"textBytes\":29,\"textTail\":\"result for the reference plan\"}],\"startByteOffset\":842,\"fileSize\":1906,\"hasMore\":true,\"errorCount\":0}"
   },
   {
    "file": "synthetic-plan-reference.jsonl",
    "op": "tail",
    "max": 5,
-   "hash": "7439222d8dd26cb23b9ec7e7eb083bacf8ccb45287fdfe1cf236d3943e0c73ee",
-   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]},{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\"}],\"startByteOffset\":0,\"fileSize\":1906,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "c65f884f922fd6cd96d7b31c408e46eeb0c42957eb78f80a87c8c1f90f08ac2e",
+   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]},{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\",\"text\":\"result for the reference plan\",\"textLines\":1,\"textBytes\":29,\"textTail\":\"result for the reference plan\"}],\"startByteOffset\":0,\"fileSize\":1906,\"hasMore\":false,\"errorCount\":0}"
   },
   {
    "file": "synthetic-plan-reference.jsonl",
    "op": "tail",
    "max": 25,
-   "hash": "7439222d8dd26cb23b9ec7e7eb083bacf8ccb45287fdfe1cf236d3943e0c73ee",
-   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]},{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\"}],\"startByteOffset\":0,\"fileSize\":1906,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "c65f884f922fd6cd96d7b31c408e46eeb0c42957eb78f80a87c8c1f90f08ac2e",
+   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]},{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\",\"text\":\"result for the reference plan\",\"textLines\":1,\"textBytes\":29,\"textTail\":\"result for the reference plan\"}],\"startByteOffset\":0,\"fileSize\":1906,\"hasMore\":false,\"errorCount\":0}"
   },
   {
    "file": "synthetic-plan-reference.jsonl",
    "op": "tail",
    "max": 1000,
-   "hash": "7439222d8dd26cb23b9ec7e7eb083bacf8ccb45287fdfe1cf236d3943e0c73ee",
-   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]},{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\"}],\"startByteOffset\":0,\"fileSize\":1906,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "c65f884f922fd6cd96d7b31c408e46eeb0c42957eb78f80a87c8c1f90f08ac2e",
+   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]},{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\",\"text\":\"result for the reference plan\",\"textLines\":1,\"textBytes\":29,\"textTail\":\"result for the reference plan\"}],\"startByteOffset\":0,\"fileSize\":1906,\"hasMore\":false,\"errorCount\":0}"
   },
   {
    "file": "synthetic-plan-reference.jsonl",
@@ -6491,32 +6465,32 @@
    "op": "before",
    "before": 1906,
    "max": 1,
-   "hash": "3e5a8a5b7b23c4b19fa1186653a919fdf3c025ca8249f6a7403340714c4476ef",
-   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\"}],\"startByteOffset\":1444,\"fileSize\":1906,\"hasMore\":true,\"errorCount\":0}"
+   "hash": "366e4e47bd9370596a388738825c65147b1df1bc94b8922f54c7bcda2689d7a6",
+   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\",\"text\":\"result for the reference plan\",\"textLines\":1,\"textBytes\":29,\"textTail\":\"result for the reference plan\"}],\"startByteOffset\":1444,\"fileSize\":1906,\"hasMore\":true,\"errorCount\":0}"
   },
   {
    "file": "synthetic-plan-reference.jsonl",
    "op": "before",
    "before": 1906,
    "max": 1000,
-   "hash": "7439222d8dd26cb23b9ec7e7eb083bacf8ccb45287fdfe1cf236d3943e0c73ee",
-   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]},{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\"}],\"startByteOffset\":0,\"fileSize\":1906,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "c65f884f922fd6cd96d7b31c408e46eeb0c42957eb78f80a87c8c1f90f08ac2e",
+   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]},{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\",\"text\":\"result for the reference plan\",\"textLines\":1,\"textBytes\":29,\"textTail\":\"result for the reference plan\"}],\"startByteOffset\":0,\"fileSize\":1906,\"hasMore\":false,\"errorCount\":0}"
   },
   {
    "file": "synthetic-plan-reference.jsonl",
    "op": "before",
    "before": 1913,
    "max": 1,
-   "hash": "76fc0959f2ea9489d379e51cc1ea84156af23154edc9b1e084d959a5f03e6239",
-   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\"}],\"startByteOffset\":1444,\"fileSize\":1906,\"hasMore\":true,\"errorCount\":1}"
+   "hash": "e4013576e7d81b15346e502fe04c6756b417eb40eab743670e96f6be957712cd",
+   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\",\"text\":\"result for the reference plan\",\"textLines\":1,\"textBytes\":29,\"textTail\":\"result for the reference plan\"}],\"startByteOffset\":1444,\"fileSize\":1906,\"hasMore\":true,\"errorCount\":1}"
   },
   {
    "file": "synthetic-plan-reference.jsonl",
    "op": "before",
    "before": 1913,
    "max": 1000,
-   "hash": "32e6ad7444fe64e2219a93f862539a9b45951bc6410ac0d57f1a0729e407a740",
-   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]},{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\"}],\"startByteOffset\":0,\"fileSize\":1906,\"hasMore\":false,\"errorCount\":1}"
+   "hash": "86766e8598e79920731ad0f985894bf732558549fb329c4f766e6d38c8c3d45e",
+   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]},{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\",\"text\":\"result for the reference plan\",\"textLines\":1,\"textBytes\":29,\"textTail\":\"result for the reference plan\"}],\"startByteOffset\":0,\"fileSize\":1906,\"hasMore\":false,\"errorCount\":1}"
   },
   {
    "file": "synthetic-plan-reference.jsonl",
@@ -6623,8 +6597,8 @@
     1444,
     1906
    ],
-   "hash": "a461c0c691fd35e503412c57fc98c96d15e3ed4bd7febee92db556a284f7fba2",
-   "json": "[{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"}],\"newOffset\":430,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]}],\"newOffset\":842,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"}],\"newOffset\":1444,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\"}],\"newOffset\":1906,\"pendingBuffer\":\"\"}]"
+   "hash": "4b0aa2a455a05b12a37ff73ce289b6ca49d0c7703004ceebbb1245e2bdcdb7b2",
+   "json": "[{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"}],\"newOffset\":430,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]}],\"newOffset\":842,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"}],\"newOffset\":1444,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\",\"text\":\"result for the reference plan\",\"textLines\":1,\"textBytes\":29,\"textTail\":\"result for the reference plan\"}],\"newOffset\":1906,\"pendingBuffer\":\"\"}]"
   },
   {
    "file": "synthetic-plan-reference.jsonl",
@@ -6647,7 +6621,7 @@
     953,
     1906
    ],
-   "hash": "19183a604df5a0606c30e360edaeb2c46e0621644800bfaa939ee3f02457994d"
+   "hash": "cf593017099124d10cdac76cc71eba8413f43bdf7491743a12b64d303ff690de"
   },
   {
    "file": "synthetic-plan-reference.jsonl",
@@ -6657,8 +6631,8 @@
     1906,
     1906
    ],
-   "hash": "204a4703fbfea686861ce3c6a15bd9627f3347d1587d0e3d09c7b963699a04a0",
-   "json": "[{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"}],\"newOffset\":634,\"pendingBuffer\":\"{\\\"parentUuid\\\": \\\"00000000-0000-4000-8000-000000000123\\\", \\\"isSidechain\\\": true, \\\"type\\\": \\\"attachment\\\", \\\"uuid\\\": \\\"00000000-0000-4000-8000-000000000124\\\", \\\"timestamp\\\": \\\"2026-03-01T10:02:04.124Z\\\", \\\"userType\\\": \\\"exte\"},{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]},{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\"}],\"newOffset\":1906,\"pendingBuffer\":\"\"},{\"newEntries\":[],\"newOffset\":1906,\"pendingBuffer\":\"\"}]"
+   "hash": "6ad075f52db87d7189d9ece336e964902690f365cc559b5acc0196c4c8c8b284",
+   "json": "[{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000123#0\",\"type\":\"plan\",\"timestamp\":1772359323123,\"toolUseId\":\"\",\"markdown\":\"# Referenced plan\",\"filePath\":\"/home/agent/.plans/s.md\",\"status\":\"success\"}],\"newOffset\":634,\"pendingBuffer\":\"{\\\"parentUuid\\\": \\\"00000000-0000-4000-8000-000000000123\\\", \\\"isSidechain\\\": true, \\\"type\\\": \\\"attachment\\\", \\\"uuid\\\": \\\"00000000-0000-4000-8000-000000000124\\\", \\\"timestamp\\\": \\\"2026-03-01T10:02:04.124Z\\\", \\\"userType\\\": \\\"exte\"},{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000124#0\",\"type\":\"plan\",\"timestamp\":1772359324124,\"toolUseId\":\"\",\"markdown\":\"# No path\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000124#1\",\"type\":\"agent-group\",\"timestamp\":1772359324124,\"agentType\":\"Unknown\",\"description\":\"Sub-agent\",\"entryCount\":1,\"entries\":[]},{\"id\":\"c:00000000-0000-4000-8000-000000000125#0\",\"type\":\"tool-call\",\"timestamp\":1772359325125,\"toolUseId\":\"w4\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/s.md\",\"filePath\":\"/home/agent/.plans/s.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/s.md\",\"oldString\":\"\",\"newString\":\"stays a write\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000126#0\",\"type\":\"tool-result\",\"timestamp\":1772359326126,\"toolUseId\":\"\",\"isError\":false,\"summary\":\"result for the reference plan\",\"text\":\"result for the reference plan\",\"textLines\":1,\"textBytes\":29,\"textTail\":\"result for the reference plan\"}],\"newOffset\":1906,\"pendingBuffer\":\"\"},{\"newEntries\":[],\"newOffset\":1906,\"pendingBuffer\":\"\"}]"
   },
   {
    "file": "synthetic-plan-reference.jsonl",
@@ -6670,14 +6644,14 @@
   {
    "file": "synthetic-plan-write.jsonl",
    "op": "content",
-   "hash": "dbeaba1f1d351b9afdf354a523507151cd224672239806c093038e058a922f98",
-   "json": "[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"plan\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"markdown\":\"# Final plan\",\"filePath\":\"/home/agent/.plans/r.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\"},{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}]"
+   "hash": "5cc8b86c6ca6ad993fd7a6a015f9b7f57404b923e195fc04453ff5f1cb2eeeab",
+   "json": "[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"plan\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"markdown\":\"# Final plan\",\"filePath\":\"/home/agent/.plans/r.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\",\"text\":\"written\",\"textLines\":1,\"textBytes\":7,\"textTail\":\"written\"},{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}]"
   },
   {
    "file": "synthetic-plan-write.jsonl",
    "op": "file",
-   "hash": "dbeaba1f1d351b9afdf354a523507151cd224672239806c093038e058a922f98",
-   "json": "[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"plan\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"markdown\":\"# Final plan\",\"filePath\":\"/home/agent/.plans/r.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\"},{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}]"
+   "hash": "5cc8b86c6ca6ad993fd7a6a015f9b7f57404b923e195fc04453ff5f1cb2eeeab",
+   "json": "[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"plan\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"markdown\":\"# Final plan\",\"filePath\":\"/home/agent/.plans/r.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\",\"text\":\"written\",\"textLines\":1,\"textBytes\":7,\"textTail\":\"written\"},{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}]"
   },
   {
    "file": "synthetic-plan-write.jsonl",
@@ -6735,37 +6709,37 @@
    "file": "synthetic-plan-write.jsonl",
    "op": "tail",
    "max": 2,
-   "hash": "4a57004e9e20a3b3b9c6fdfc7149ad94adbbcd7fece07494c79f50901f1bf2d8",
-   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\"},{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}],\"startByteOffset\":1582,\"fileSize\":2609,\"hasMore\":true,\"errorCount\":0}"
+   "hash": "f3357924e769ef728fa7a3321ee3383b5b1806f006e3f8603e51fc7d349236a7",
+   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\",\"text\":\"written\",\"textLines\":1,\"textBytes\":7,\"textTail\":\"written\"},{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}],\"startByteOffset\":1582,\"fileSize\":2609,\"hasMore\":true,\"errorCount\":0}"
   },
   {
    "file": "synthetic-plan-write.jsonl",
    "op": "tail",
    "max": 5,
-   "hash": "ef12b5e2b3a5c82e88593d553ce67cb1292b11b6cfa2cc94aedbb038b2ad338e",
-   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"plan\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"markdown\":\"# Final plan\",\"filePath\":\"/home/agent/.plans/r.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\"},{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}],\"startByteOffset\":0,\"fileSize\":2609,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "6309ed35b42c4f7aef8d8ef89adaffcd26f55f4abd9abbb95802536cd3939a39",
+   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"plan\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"markdown\":\"# Final plan\",\"filePath\":\"/home/agent/.plans/r.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\",\"text\":\"written\",\"textLines\":1,\"textBytes\":7,\"textTail\":\"written\"},{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}],\"startByteOffset\":0,\"fileSize\":2609,\"hasMore\":false,\"errorCount\":0}"
   },
   {
    "file": "synthetic-plan-write.jsonl",
    "op": "tail",
    "max": 25,
-   "hash": "ef12b5e2b3a5c82e88593d553ce67cb1292b11b6cfa2cc94aedbb038b2ad338e",
-   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"plan\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"markdown\":\"# Final plan\",\"filePath\":\"/home/agent/.plans/r.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\"},{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}],\"startByteOffset\":0,\"fileSize\":2609,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "6309ed35b42c4f7aef8d8ef89adaffcd26f55f4abd9abbb95802536cd3939a39",
+   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"plan\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"markdown\":\"# Final plan\",\"filePath\":\"/home/agent/.plans/r.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\",\"text\":\"written\",\"textLines\":1,\"textBytes\":7,\"textTail\":\"written\"},{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}],\"startByteOffset\":0,\"fileSize\":2609,\"hasMore\":false,\"errorCount\":0}"
   },
   {
    "file": "synthetic-plan-write.jsonl",
    "op": "tail",
    "max": 1000,
-   "hash": "ef12b5e2b3a5c82e88593d553ce67cb1292b11b6cfa2cc94aedbb038b2ad338e",
-   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"plan\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"markdown\":\"# Final plan\",\"filePath\":\"/home/agent/.plans/r.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\"},{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}],\"startByteOffset\":0,\"fileSize\":2609,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "6309ed35b42c4f7aef8d8ef89adaffcd26f55f4abd9abbb95802536cd3939a39",
+   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"plan\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"markdown\":\"# Final plan\",\"filePath\":\"/home/agent/.plans/r.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\",\"text\":\"written\",\"textLines\":1,\"textBytes\":7,\"textTail\":\"written\"},{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}],\"startByteOffset\":0,\"fileSize\":2609,\"hasMore\":false,\"errorCount\":0}"
   },
   {
    "file": "synthetic-plan-write.jsonl",
    "op": "tail",
    "cut": 2583,
    "max": 1000,
-   "hash": "9f2a469fc433de5b20bdb5cd73b2a5a451c3940c9838480c956ec926077b612d",
-   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"plan\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"markdown\":\"# Final plan\",\"filePath\":\"/home/agent/.plans/r.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\"}],\"startByteOffset\":0,\"fileSize\":2024,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "71cdda8b6419d06b1088bee112c632e3c3cac6c7cd4a3b5c9c9a40a861f77092",
+   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"plan\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"markdown\":\"# Final plan\",\"filePath\":\"/home/agent/.plans/r.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\",\"text\":\"written\",\"textLines\":1,\"textBytes\":7,\"textTail\":\"written\"}],\"startByteOffset\":0,\"fileSize\":2024,\"hasMore\":false,\"errorCount\":0}"
   },
   {
    "file": "synthetic-plan-write.jsonl",
@@ -6788,8 +6762,8 @@
    "op": "before",
    "before": 2609,
    "max": 1000,
-   "hash": "ef12b5e2b3a5c82e88593d553ce67cb1292b11b6cfa2cc94aedbb038b2ad338e",
-   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"plan\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"markdown\":\"# Final plan\",\"filePath\":\"/home/agent/.plans/r.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\"},{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}],\"startByteOffset\":0,\"fileSize\":2609,\"hasMore\":false,\"errorCount\":0}"
+   "hash": "6309ed35b42c4f7aef8d8ef89adaffcd26f55f4abd9abbb95802536cd3939a39",
+   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"plan\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"markdown\":\"# Final plan\",\"filePath\":\"/home/agent/.plans/r.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\",\"text\":\"written\",\"textLines\":1,\"textBytes\":7,\"textTail\":\"written\"},{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}],\"startByteOffset\":0,\"fileSize\":2609,\"hasMore\":false,\"errorCount\":0}"
   },
   {
    "file": "synthetic-plan-write.jsonl",
@@ -6804,8 +6778,8 @@
    "op": "before",
    "before": 2616,
    "max": 1000,
-   "hash": "0b13a7f625eeb0706e448499d88c9fedb14d035f9b0607633075ba7742a1acb4",
-   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"plan\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"markdown\":\"# Final plan\",\"filePath\":\"/home/agent/.plans/r.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\"},{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}],\"startByteOffset\":0,\"fileSize\":2609,\"hasMore\":false,\"errorCount\":1}"
+   "hash": "fb78a9ad25b92e0287d2adfad2447216381b95608dbcd5668bc219839b9b0e4a",
+   "json": "{\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"},{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"plan\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"markdown\":\"# Final plan\",\"filePath\":\"/home/agent/.plans/r.md\",\"status\":\"success\"},{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\",\"text\":\"written\",\"textLines\":1,\"textBytes\":7,\"textTail\":\"written\"},{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}],\"startByteOffset\":0,\"fileSize\":2609,\"hasMore\":false,\"errorCount\":1}"
   },
   {
    "file": "synthetic-plan-write.jsonl",
@@ -6913,8 +6887,8 @@
     2024,
     2609
    ],
-   "hash": "beefe129ca89d2ba036e14f472ef2b1c0858229eb49ccbd1afec2fe6cf7b2288",
-   "json": "[{\"newEntries\":[],\"newOffset\":384,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"}],\"newOffset\":981,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"tool-call\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"# Final plan\"},\"status\":\"pending\"}],\"newOffset\":1582,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\"}],\"newOffset\":2024,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}],\"newOffset\":2609,\"pendingBuffer\":\"\"}]"
+   "hash": "f92c952089071beae01d077168c868ea91050209a7c272bba5fb5fac7c959d8e",
+   "json": "[{\"newEntries\":[],\"newOffset\":384,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000119#0\",\"type\":\"tool-call\",\"timestamp\":1772359319119,\"toolUseId\":\"w1\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"old plan\"},\"status\":\"pending\"}],\"newOffset\":981,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000120#0\",\"type\":\"tool-call\",\"timestamp\":1772359320120,\"toolUseId\":\"w2\",\"toolName\":\"Write\",\"summary\":\"Write /home/agent/.plans/r.md\",\"filePath\":\"/home/agent/.plans/r.md\",\"diff\":{\"filePath\":\"/home/agent/.plans/r.md\",\"oldString\":\"\",\"newString\":\"# Final plan\"},\"status\":\"pending\"}],\"newOffset\":1582,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000121#0\",\"type\":\"tool-result\",\"timestamp\":1772359321121,\"toolUseId\":\"w2\",\"isError\":false,\"summary\":\"written\",\"text\":\"written\",\"textLines\":1,\"textBytes\":7,\"textTail\":\"written\"}],\"newOffset\":2024,\"pendingBuffer\":\"\"},{\"newEntries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000122#0\",\"type\":\"tool-call\",\"timestamp\":1772359322122,\"toolUseId\":\"w3\",\"toolName\":\"Write\",\"summary\":\"Write /other.md\",\"filePath\":\"/other.md\",\"diff\":{\"filePath\":\"/other.md\",\"oldString\":\"\",\"newString\":\"not a plan\"},\"status\":\"pending\"}],\"newOffset\":2609,\"pendingBuffer\":\"\"}]"
   },
   {
    "file": "synthetic-plan-write.jsonl",
@@ -6927,7 +6901,7 @@
     1943,
     2480
    ],
-   "hash": "e810f27f40d6df52ceb75d694d2aed49c170d5b8e364e28d4109ea2f87be7ce1"
+   "hash": "c71a12b6a320868ff04f0fb80806a57ef38fd88764b61b76a06841ee0010344c"
   },
   {
    "file": "synthetic-plan-write.jsonl",
@@ -6937,7 +6911,7 @@
     1304,
     2609
    ],
-   "hash": "dad566d9342ae9677fda4fa8c80bb20a8349adf89e5ec38b9b015ff89ad135e0"
+   "hash": "d141206220958b1cce30e0be3bd697cbf273f11461cd4e4d0857076e65cd30e2"
   },
   {
    "file": "synthetic-plan-write.jsonl",
@@ -6947,7 +6921,7 @@
     2609,
     2609
    ],
-   "hash": "e18909003998642ba0ead0067d5b256e184d8c5ea3e402993de78216b14b009e"
+   "hash": "936efc892b74582163e3f1f9e75548bc4fe4c8c950e4cc5ed524d11f25322124"
   },
   {
    "file": "synthetic-plan-write.jsonl",
@@ -8687,32 +8661,32 @@
   {
    "file": "synthetic-tools.jsonl",
    "op": "content",
-   "hash": "0e6bb11574c8112caa2a529f18b2a675059cc120fe7cd7416e8a817cb10d1b6b"
+   "hash": "af220635931f23be572c2935036ed3b15a7084d7c990acf89582b26b17da2c70"
   },
   {
    "file": "synthetic-tools.jsonl",
    "op": "file",
-   "hash": "0e6bb11574c8112caa2a529f18b2a675059cc120fe7cd7416e8a817cb10d1b6b"
+   "hash": "af220635931f23be572c2935036ed3b15a7084d7c990acf89582b26b17da2c70"
   },
   {
    "file": "synthetic-tools.jsonl",
    "op": "content",
    "to": 19734,
-   "hash": "74bc01164ce1e14cc9af8956709caac3ebda3f878e8156d3ab0b8d47147d507a"
+   "hash": "cde763a08adf24df67ee854a4c754f2fffba4095bb1daebbf0425901783fde96"
   },
   {
    "file": "synthetic-tools.jsonl",
    "op": "content",
    "from": 11131,
    "to": 13372,
-   "hash": "3656bdde7af7eaf9b73f3b23929db0e73024ea31064e59c078995d625bbd7e15",
-   "json": "[{\"id\":\"c:00000000-0000-4000-8000-000000000009#0\",\"type\":\"tool-result\",\"timestamp\":1772359209009,\"toolUseId\":\"t-send2\",\"isError\":false,\"summary\":\"sent\"},{\"id\":\"c:00000000-0000-4000-8000-000000000010#0\",\"type\":\"tool-result\",\"timestamp\":1772359210010,\"toolUseId\":\"t-file1\",\"isError\":false,\"summary\":\"sent\"},{\"id\":\"c:00000000-0000-4000-8000-000000000011#0\",\"type\":\"tool-call\",\"timestamp\":1772359211011,\"toolUseId\":\"t-agent1\",\"toolName\":\"Agent\",\"summary\":\"Agent general\",\"status\":\"pending\",\"agent\":{}},{\"id\":\"c:00000000-0000-4000-8000-000000000012#1\",\"type\":\"agent-group\",\"timestamp\":1772359212012,\"agentType\":\"general\",\"description\":\"PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP\",\"entryCount\":1,\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000012#0\",\"type\":\"user-message\",\"timestamp\":1772359212012,\"text\":\"Sidechain prompt\"}]}]"
+   "hash": "b7bc89189f78d6000085a08f1e8c7223d66fdb01c344e4041e1b89b8f285b9e8",
+   "json": "[{\"id\":\"c:00000000-0000-4000-8000-000000000009#0\",\"type\":\"tool-result\",\"timestamp\":1772359209009,\"toolUseId\":\"t-send2\",\"isError\":false,\"summary\":\"sent\",\"text\":\"sent\",\"textLines\":1,\"textBytes\":4,\"textTail\":\"sent\"},{\"id\":\"c:00000000-0000-4000-8000-000000000010#0\",\"type\":\"tool-result\",\"timestamp\":1772359210010,\"toolUseId\":\"t-file1\",\"isError\":false,\"summary\":\"sent\",\"text\":\"sent\",\"textLines\":1,\"textBytes\":4,\"textTail\":\"sent\"},{\"id\":\"c:00000000-0000-4000-8000-000000000011#0\",\"type\":\"tool-call\",\"timestamp\":1772359211011,\"toolUseId\":\"t-agent1\",\"toolName\":\"Agent\",\"summary\":\"Agent general\",\"status\":\"pending\",\"agent\":{}},{\"id\":\"c:00000000-0000-4000-8000-000000000012#1\",\"type\":\"agent-group\",\"timestamp\":1772359212012,\"agentType\":\"general\",\"description\":\"PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP\",\"entryCount\":1,\"entries\":[{\"id\":\"c:00000000-0000-4000-8000-000000000012#0\",\"type\":\"user-message\",\"timestamp\":1772359212012,\"text\":\"Sidechain prompt\"}]}]"
   },
   {
    "file": "synthetic-tools.jsonl",
    "op": "content",
    "to": 15819,
-   "hash": "8c4ee5fdeab4eba912432a1d2e48c7732a77e9d891cb1f7e8a9c0eed785e5b7e"
+   "hash": "20fef1c0df04b741a99e788c2afb45d00292a78113c78d8e55c78b18c0c95514"
   },
   {
    "file": "synthetic-tools.jsonl",
@@ -8726,7 +8700,7 @@
    "file": "synthetic-tools.jsonl",
    "op": "content",
    "to": 19704,
-   "hash": "74bc01164ce1e14cc9af8956709caac3ebda3f878e8156d3ab0b8d47147d507a"
+   "hash": "cde763a08adf24df67ee854a4c754f2fffba4095bb1daebbf0425901783fde96"
   },
   {
    "file": "synthetic-tools.jsonl",
@@ -8761,20 +8735,20 @@
    "file": "synthetic-tools.jsonl",
    "op": "tail",
    "max": 25,
-   "hash": "deea70d51fa76a5238cbfc043fc3b063854b8736f350ecb3ecdbec8b575cbacb"
+   "hash": "524eeda9d8213ef6ed4294a117a6ac3f929b377b5a90ba5761131bfb525b6eb7"
   },
   {
    "file": "synthetic-tools.jsonl",
    "op": "tail",
    "max": 1000,
-   "hash": "eeb2e556ae4787090c93961a9a96869d5e1a628cf8587c13aff00d5e046cb1e2"
+   "hash": "6d4493f484367b72d4ece43111f56f43d0a2ae5f454deef16a3985cd8e2ebc51"
   },
   {
    "file": "synthetic-tools.jsonl",
    "op": "tail",
    "cut": 19730,
    "max": 1000,
-   "hash": "70f90cddc1f3fd842e05c63608a3ea5607c5a57f00bd9f891e203d342fdd607b"
+   "hash": "bf71b8c460fe9d77c9d6c2fa8eb46c79a2427ad63f0556a86fc0183f13b5f7c3"
   },
   {
    "file": "synthetic-tools.jsonl",
@@ -8797,7 +8771,7 @@
    "op": "before",
    "before": 25274,
    "max": 1000,
-   "hash": "73d2b3cc87bdc31c75ef1f03349ce99ed66c87a5bbc4453af8231489eb4cfbfd"
+   "hash": "c990abf51b0d78d30236ff5dee8928cc487f2e0a8cb98c17c63ac69534cdbb1c"
   },
   {
    "file": "synthetic-tools.jsonl",
@@ -8812,7 +8786,7 @@
    "op": "before",
    "before": 25281,
    "max": 1000,
-   "hash": "c00c504d947e7f4b587bf5130bf860b00a68a7cd33b1e6c96fdd29ea2c76bf47"
+   "hash": "47d673b25069e951cec23c1a92069d5045d21180b4e30e6f8b4562063ed3e4bc"
   },
   {
    "file": "synthetic-tools.jsonl",
@@ -8827,7 +8801,7 @@
    "op": "before",
    "before": 18748,
    "max": 1000,
-   "hash": "e235f08c11d65f1e3648fc48517b341eb3f194ced5e932d236bb7e610ab57f3c"
+   "hash": "e248a079a177480a70658d1445d4bdc32c911a5fc9172f58eb097eb9c43df619"
   },
   {
    "file": "synthetic-tools.jsonl",
@@ -8858,7 +8832,7 @@
    "op": "before",
    "before": 24168,
    "max": 1000,
-   "hash": "41f0a2cf528fdf4a13a76c701527d87d8d5a781faf075d5eaef853b8bf87f209"
+   "hash": "dc53b5a8f209c982edab34a711b75ecde764c39d42a7f2754f8ec7ec65b0389b"
   },
   {
    "file": "synthetic-tools.jsonl",
@@ -8873,7 +8847,7 @@
    "op": "before",
    "before": 19750,
    "max": 1000,
-   "hash": "784e84b8c94e9aff6176898a6c848294226af7b67ae43fba13b633c4a96bccb8"
+   "hash": "371e6d3a843c4f3ea9255feac45273cc0b297b9af830cd813ee2d4d4a3879f2b"
   },
   {
    "file": "synthetic-tools.jsonl",
@@ -8947,7 +8921,7 @@
     24752,
     25274
    ],
-   "hash": "4066c3f720ba819bbd721bbf4148e1e7158d186fc2a87924c0e1fd501b4390a4"
+   "hash": "3a902dfb074ceaf43b34f2a50ed147ceda8a65877751a52e94f67afaecda90e2"
   },
   {
    "file": "synthetic-tools.jsonl",
@@ -8960,7 +8934,7 @@
     19785,
     19854
    ],
-   "hash": "01c2720c6915f0cb56c17ffb096fde91378ed91439b9d316191d0a71cca85104"
+   "hash": "ac4de929901c3d7078fcb6137efb7fd7eb2be3139a51b5c8cadbd94941e3baee"
   },
   {
    "file": "synthetic-tools.jsonl",
@@ -8970,7 +8944,7 @@
     12637,
     25274
    ],
-   "hash": "dc666f473f02ff1171e8596ae44c8d253b9a7cff3f25f6903929d834dec49214"
+   "hash": "717a5eee17df7c9634ef11fc12a4787831680cc274642d228be35ef771e13776"
   },
   {
    "file": "synthetic-tools.jsonl",
@@ -8980,13 +8954,13 @@
     25274,
     25274
    ],
-   "hash": "ecce8a242a380d889a9fafb1d2fa768cfa3e17ff91de7570a55b5b0e10f6b331"
+   "hash": "a4f4d22874c089952e474bc0e1b0e54a2f3f756d024fda9cc4ebf44cc15df8f1"
   },
   {
    "file": "synthetic-tools.jsonl",
    "op": "file",
    "cut": 19881,
-   "hash": "74bc01164ce1e14cc9af8956709caac3ebda3f878e8156d3ab0b8d47147d507a"
+   "hash": "cde763a08adf24df67ee854a4c754f2fffba4095bb1daebbf0425901783fde96"
   },
   {
    "file": "synthetic-user.jsonl",
@@ -9362,12 +9336,12 @@
   {
    "file": "built-big.jsonl",
    "op": "content",
-   "hash": "7345ec724a843c9f0670f5d8d9a052c97a15a468f4c79dd72e84aab68b082e02"
+   "hash": "e81d9fd3833e421e5277f2699743daa4a7044c3d6c4a16079605e6c9a4a7c203"
   },
   {
    "file": "built-big.jsonl",
    "op": "file",
-   "hash": "942190c071d383e04989453895759655bf54a04999044268ce7382ad0c81c0ad"
+   "hash": "1dc6587a8e8d76699dc7e42a8eaa86a607b832d302eb993bce46798877831154"
   },
   {
    "file": "built-big.jsonl",
@@ -9380,20 +9354,20 @@
    "file": "built-big.jsonl",
    "op": "tail",
    "max": 200,
-   "hash": "3ea338492b0744b04005b4046bfb4387752476f97c40f1cbef5f5d4b51f6f2ef"
+   "hash": "ff054c3104156e2f5e57b9d4da78509ae39ab1be5e025350671ca66ee9a1e254"
   },
   {
    "file": "built-big.jsonl",
    "op": "tail",
    "max": 100000,
-   "hash": "9fd8034684e472e92e2f8a5d14b39ba8a9de0ffc5901daf755e3599b9bd00c6c"
+   "hash": "55f0d763714787684c72d728846a98913421f52a7e193604e19b1aefc1ca4f2a"
   },
   {
    "file": "built-big.jsonl",
    "op": "tail",
    "cut": 256000,
    "max": 100000,
-   "hash": "cd86d6eb795903ede162b8ca52fdbc2133d6fb4bf898ad7f22ae1bb904e20034"
+   "hash": "9d1ca87b02d434c543b7935321c4bfa2975336b298cb23fd1c4a86ae55699248"
   },
   {
    "file": "built-big.jsonl",
@@ -9414,21 +9388,21 @@
    "op": "before",
    "before": 1389592,
    "max": 100000,
-   "hash": "9f614a99e74474d71c0b3c4a24fd842c9333febb5aa9cb6f3381d3029f23a841"
+   "hash": "b73fd9bad2110558de01988a39441cdccf023ed342b9aa4d18a4b639224a0f89"
   },
   {
    "file": "built-big.jsonl",
    "op": "before",
    "before": 300000,
    "max": 100000,
-   "hash": "af8895350f0c908cf41aac0349f34c67bc8f5d51dafce6582c0df5853dd60a35"
+   "hash": "fa27c57a4d0f6c0dd619b109c12dffcfd98cc07eaaaf16c99729d0811cab4377"
   },
   {
    "file": "built-big.jsonl",
    "op": "before",
    "before": 700000,
    "max": 100000,
-   "hash": "fa435c20dbb0bc93f06fa03977fe0e334e0103604dd7ea6188418aa6d85094ac"
+   "hash": "aea542acb6f66ec8a93242072189c2aecd023efc5919b322fc1296882e2ac9d6"
   },
   {
    "file": "built-big.jsonl",
@@ -9445,19 +9419,19 @@
     463530,
     1390592
    ],
-   "hash": "eb897652923274b744ec5cdbd39c8ea842108a5b3aebb37cfdbfb536b8c66fa7"
+   "hash": "dee9a18a348aeea91616fc96791bbbd0590959b429d6251142df68f692db1ce2"
   },
   {
    "file": "built-big.jsonl",
    "op": "file",
    "cut": 1048576,
-   "hash": "f0fe3d4a5618ed81f5bd9ff29b59639ce766b4e3313cae2784579bc6f5187385"
+   "hash": "fa8f4f7558b833433a3a01ddc8f79a9ff14130c0d147cccfe80314f326901b81"
   },
   {
    "file": "built-big.jsonl",
    "op": "file",
    "cut": 1048577,
-   "hash": "ffdbe638e64426f30af8779512b50dd98e2cc398188b4e9eef205142a5d21275"
+   "hash": "530d97a9402dfadc99a209eedfe7fcd9ba1fcd3bd330d7a8b4b222a8bd17cab6"
   }
  ]
 }

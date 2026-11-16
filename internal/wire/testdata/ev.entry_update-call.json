@@ -1,0 +1,28 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 512,
+  "e": {
+    "type": "entry_update",
+    "entry": {
+      "id": "c:4a2e1b7f-0c3d-4e5f-8a9b-1c2d3e4f5a6b#1",
+      "turnId": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+      "at": 1792655998000,
+      "rev": 2,
+      "t": "tool",
+      "toolUseId": "toolu_01Bench",
+      "tool": "Bash",
+      "summary": "$ S=/tmp/run; cd $S && node bench.mjs",
+      "ok": false,
+      "output": {"text": "Exit code 2\nboom", "truncated": null},
+      "call": {
+        "description": "Runs the bench",
+        "command": "S=/tmp/run; cd $S && node bench.mjs",
+        "durationMs": 1300,
+        "exit": 2,
+        "lines": 2,
+        "tail": "boom"
+      }
+    }
+  }
+}

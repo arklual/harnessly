@@ -30,6 +30,8 @@ const (
 	FeatureSearchAnswer = "search-answer"
 	// FeatureUIAgent: the agent of the window, which answers a request in words and takes the person where they asked.
 	FeatureUIAgent = "ui-agent"
+	// FeatureWidget: the short line a smart widget of the chat's right column asks for.
+	FeatureWidget = "widget"
 )
 
 // Feature is one background feature as Settings lists it.
@@ -63,6 +65,9 @@ func Features() []Feature {
 		{ID: FeatureUIAgent, Live: true,
 			Title:       locale.Pick("Window assistant", "Помощник окна"),
 			Description: locale.Pick("The field of Settings: opens what you name and offers to change a setting, at once and without a chat. A quick, cheap model is enough.", "Поле в Настройках: открывает названное и предлагает поменять настройку — сразу и без чата. Хватает быстрой дешёвой модели.")},
+		{ID: FeatureWidget, Live: true,
+			Title:       locale.Pick("Smart widgets", "Умные виджеты"),
+			Description: locale.Pick("A widget under the chat's right column that asks a model now and then and shows its short answer. Without a pick it runs on the machine's Claude Haiku.", "Виджет под правой колонкой чата, который время от времени спрашивает модель и показывает её короткий вывод. Без выбора — Claude Haiku машины по подписке.")},
 	}
 }
 
@@ -265,6 +270,13 @@ func (r *Runner) resolve(feature string) (Choice, bool) {
 	}
 	if c, ok := r.Store.Get(feature); ok {
 		return c, true
+	}
+	// A smart widget runs on the machine's own Claude by its subscription when nothing is picked for it.
+	if feature == FeatureWidget {
+		if r.Agent == nil {
+			return Choice{}, false
+		}
+		return Choice{Provider: AgentClaude, Model: WidgetDefaultModel}, true
 	}
 	if feature != FeatureSearchAnswer && feature != FeatureUIAgent {
 		return Choice{}, false

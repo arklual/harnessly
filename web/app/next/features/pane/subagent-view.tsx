@@ -10,6 +10,7 @@ import { subagentName, subagentNote } from '@/next/features/subagents/subs-block
 import type { TWorkflowTask } from '@/next/features/workflows/run';
 import WorkflowPane from '@/next/features/workflows/workflow-pane';
 import { t } from '@/next/i18n';
+import { cutBySize } from '@/next/i18n/format';
 
 const CARD_STATUS = { running: 'run', done: 'done', failed: 'failed' } as const satisfies Record<
   SubagentEntry['status'],
@@ -42,10 +43,7 @@ const Result = ({ entry, focused }: { entry: SubagentEntry; focused: boolean }) 
         <Md md={full ? text : excerpt.text} />
         {full && entry.output?.truncated && (
           <div className="hx-tv__muted">
-            {t('next.tool.truncated', {
-              shown: entry.output.truncated.shown,
-              total: entry.output.truncated.total,
-            })}
+            {cutBySize(entry.output.truncated.shown, entry.output.truncated.total)}
           </div>
         )}
       </div>

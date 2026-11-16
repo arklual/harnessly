@@ -59,6 +59,8 @@ func (e Expect) label() string {
 		return "did not say " + e.TextNot
 	case e.MaxCalls > 0:
 		return fmt.Sprintf("at most %d calls", e.MaxCalls)
+	case e.Check != "":
+		return "check " + clip(e.Check, 80)
 	}
 	parts := make([]string, 0, len(e.AnyOf))
 	for _, a := range e.AnyOf {
@@ -213,6 +215,17 @@ func (e Expect) holds(f Facts) (bool, string) {
 			return true, ""
 		}
 		return false, fmt.Sprintf("%d calls", len(f.Calls))
+	case e.Check != "":
+		for _, c := range f.Checks {
+			if c.Command != e.Check {
+				continue
+			}
+			if c.Exit == 0 {
+				return true, ""
+			}
+			return false, fmt.Sprintf("exit %d: %s", c.Exit, clip(strings.TrimSpace(c.Output), 400))
+		}
+		return false, "the check did not run"
 	}
 	var whys []string
 	for _, a := range e.AnyOf {
@@ -242,4 +255,22 @@ func callNames(f Facts) string {
 		names = append(names, n)
 	}
 	return clip(strings.Join(names, ", "), 600)
+}
+
+// Checks are the check commands of the expectations, any_of included, each once.
+func (s *Scenario) Checks() []string {
+	var out []string
+	seen := map[string]bool{}
+	var walk func([]Expect)
+	walk = func(es []Expect) {
+		for _, e := range es {
+			if e.Check != "" && !seen[e.Check] {
+				seen[e.Check] = true
+				out = append(out, e.Check)
+			}
+			walk(e.AnyOf)
+		}
+	}
+	walk(s.Expect)
+	return out
 }

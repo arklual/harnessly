@@ -904,13 +904,22 @@ func (b *Box) Tick(now time.Time) Change {
 		case st.K == wire.MsgInInput && r.Carried && (b.Starting || t < b.started+CarryDeadline.Milliseconds()):
 			// The launch that carries it is still under way, or only just over: the agent takes it when it is up.
 		case st.K == wire.MsgInInput && st.Wait != nil && t >= st.Wait.DeadlineAt && !mine && (r.Steered || r.Carried):
-			if b.flight == r.Message.ClientID {
+			held := b.flight == r.Message.ClientID
+			if held {
 				b.flight = ""
 			}
 			if id, ok := b.readAfterAll(r); ok {
 				// Its entry came and was not matched to it on the way: the feed already read says the agent
 				// has it. One lookup in what is read, at its term, once.
 				b.accept(&ch, r, &id, now)
+				continue
+			}
+			if b.transcriptBehind() && t < st.Wait.DeadlineAt+CarryLongest.Milliseconds() {
+				// The transcript is not read to its end (not found yet, or written faster than read): what it says is not
+				// known yet, so the message waits for it, on its way.
+				if held {
+					b.flight = r.Message.ClientID
+				}
 				continue
 			}
 			b.fail(&ch, r, wire.MsgFailedUnconfirmed, true, now)
@@ -942,6 +951,11 @@ func (b *Box) Tick(now time.Time) Change {
 		}
 	}
 	return ch
+}
+
+// transcriptBehind: the agent's transcript is not found or not read to its end, so «no entry» proves nothing yet.
+func (b *Box) transcriptBehind() bool {
+	return b.Transcript != nil && b.TranscriptRead != nil && !b.TranscriptRead()
 }
 
 // readAfterAll looks for a message at its term in the transcript already read: its own entry, or one it shares with

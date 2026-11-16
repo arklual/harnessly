@@ -48,7 +48,6 @@ func spaceDirRoutes(d deps) []gate.Route {
 	})
 	var routes []gate.Route
 	for _, path := range []string{platformAPI + "/spaces/dir", "/agents" + platformAPI + "/spaces/dir"} {
-		path := path
 		routes = append(routes, gate.Route{Match: func(r *http.Request) bool { return r.URL.Path == path }, Handler: handler})
 	}
 	return routes

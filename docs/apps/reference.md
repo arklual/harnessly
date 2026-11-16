@@ -11,6 +11,7 @@ Everything an app can use, from the one table the manifest check and the bridge 
 | `chat` | The chat: the agent profile, /-commands of the palette, cards and widgets in the feed. |
 | `pane` | A tab of the right pane beside the chat. |
 | `app` | A full screen of its own, opened from the apps page or by link. |
+| `side` | A widget under the chat's right column on a computer: a small card the person adds from «+ Виджет», moves, folds and removes. The view's `widget` block sets its height (s, m, l), how often the host gives it its data again, which of the host's data it gets (limits, machine, subagents) and a `smart` request the host puts to a model now and then; the view reads them in hl.context.data. |
 | `settings` | A page in the settings. |
 | `onboarding` | A step of the first run. |
 | `object-action` | A button at an object (a machine, a chat) that opens the view. |
@@ -26,7 +27,7 @@ The host's own kinds, then the points the builtin apps declare.
 
 | Kind | Declared in | Shows in | What it is |
 | --- | --- | --- | --- |
-| `view` | `views[]` | `pane`, `app`, `chat`, `settings`, `onboarding`, `object-action`, `hub-settings`, `home`, `sinopia.<kind>` | A page of the app in a frame. |
+| `view` | `views[]` | `pane`, `app`, `side`, `chat`, `settings`, `onboarding`, `object-action`, `hub-settings`, `home`, `sinopia.<kind>` | A page of the app in a frame. |
 | `chat.command` | `chat.commands[]` | `chat` | A /-command of the chat's palette. |
 | `chat.card` | `chat.cards[]` | `chat` | A view of the app the chat's feed shows as a card. |
 | `chat.starter` | `chat.starters[]` | `chat` | A line an empty chat offers under its field; a click puts it into the field. |
@@ -108,6 +109,8 @@ Every right has a class of risk. The class forbids nothing: it orders the instal
 | `harnessly/chat.read` | `chat.read` | `hl.chat.read({last})` | The chat's last messages. |
 | `harnessly/chat.card` | `chat.card` | `hl.chat.card(view, data)` | A card of the app in the feed. |
 | `harnessly/pane.open` | `pane.open` | `hl.pane.open(target)` | Open a view of the app in the right pane. |
+| `harnessly/host.actions` | — | `hl.host.actions()` | The host's actions for a view that draws its own bar (chrome none): [{id, label, icon, pressed, danger}] — share, the right pane, the host's menu — for the view to show in its bar or menu. |
+| `harnessly/host.run` | — | `hl.host.run(id)` | Run one of hl.host.actions() by its id, as the host's own button would. |
 | `harnessly/agents.list` | `agents.read` | `hl.agents.list()` | The agents of the workspace. |
 | `harnessly/agents.run` | `agents.run` | `hl.agents.run(prompt, {title})` | Start a task in a new chat under this one: {id}. The person sees it in the sidebar; counts against budget.runsPerDay. |
 | `harnessly/ai.complete` | `ai` | `hl.ai.complete(prompt, {system, maxTokens, model})` | One answer of a model, no tools: {text, usd, spentToday, budget}. model is fast (default) or smart; refused as over_budget when the day's budget is spent. |

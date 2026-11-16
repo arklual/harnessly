@@ -15,3 +15,7 @@ web/e2e-hub-results/
 
 # tools/ci/local-checks.sh (HRN-1448)
 /.local-checks/
+
+# Python bytecode of the eval fixtures: a local build product, never published (oss-leak-check)
+__pycache__/
+*.pyc

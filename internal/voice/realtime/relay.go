@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -79,7 +81,9 @@ func newRelay(note func(level, text string)) (*relay, error) {
 	}, webrtc.RTPCodecTypeAudio); err != nil {
 		return nil, err
 	}
-	pc, err := webrtc.NewAPI(webrtc.WithMediaEngine(m)).NewPeerConnection(webrtc.Configuration{})
+	var se webrtc.SettingEngine
+	se.SetInterfaceFilter(outward)
+	pc, err := webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithSettingEngine(se)).NewPeerConnection(webrtc.Configuration{})
 	if err != nil {
 		return nil, err
 	}
@@ -129,12 +133,20 @@ func newRelay(note func(level, text string)) (*relay, error) {
 	pc.OnICEConnectionStateChange(func(s webrtc.ICEConnectionState) {
 		level, text := "info", fmt.Sprintf("ice=%s after %s", s, r.since())
 		switch s {
+		case webrtc.ICEConnectionStateChecking:
+			// Over a healthy network the checks end in a fraction of a second; one still at it says why in the journal.
+			time.AfterFunc(relayChecksSlow, func() {
+				if pc.ICEConnectionState() == webrtc.ICEConnectionStateChecking {
+					r.note("warn", fmt.Sprintf("ice still checking after %s: %s", r.since(), checksOf(pc.GetStats())))
+				}
+			})
 		case webrtc.ICEConnectionStateConnected:
 			if p, err := pc.SCTP().Transport().ICETransport().GetSelectedCandidatePair(); err == nil && p != nil {
 				text += fmt.Sprintf(" pair=%s %s → %s %s", p.Local.Protocol, p.Local.Typ, p.Remote.Protocol, p.Remote.Typ)
 			}
 		case webrtc.ICEConnectionStateFailed, webrtc.ICEConnectionStateDisconnected:
 			level = "warn"
+			text += ": " + checksOf(pc.GetStats())
 		}
 		r.note(level, text)
 	})
@@ -154,6 +166,53 @@ func newRelay(note func(level, text string)) (*relay, error) {
 		}
 	})
 	return r, nil
+}
+
+// outward leaves out the interfaces no packet to the voice's media servers leaves by: the bridges of containers and
+// virtual machines and their ends. A machine with a dozen of them pairs each with every server candidate, and the
+// checks multiply for nothing.
+func outward(name string) bool {
+	for _, p := range []string{"docker", "br-", "veth", "virbr", "cni", "flannel", "lxc", "lxd"} {
+		if strings.HasPrefix(name, p) {
+			return false
+		}
+	}
+	return true
+}
+
+// relayChecksSlow is how long the machine's connectivity checks may go before the journal hears how they go.
+const relayChecksSlow = 4 * time.Second
+
+// checksOf tells how the connectivity checks go: the pairs by state, the checks sent and answered both ways and the
+// machine's own candidates by network and address (the machine's addresses, never the page's or the person's).
+func checksOf(rep webrtc.StatsReport) string {
+	states := map[string]int{}
+	var sent, answered, asked uint64
+	var local []string
+	remote := 0
+	for _, st := range rep {
+		switch v := st.(type) {
+		case webrtc.ICECandidatePairStats:
+			states[string(v.State)]++
+			sent += v.RequestsSent
+			answered += v.ResponsesReceived
+			asked += v.RequestsReceived
+		case webrtc.ICECandidateStats:
+			if v.Type == webrtc.StatsTypeLocalCandidate {
+				local = append(local, fmt.Sprintf("%s %s %s", v.Protocol, v.CandidateType, v.IP))
+			} else if v.Type == webrtc.StatsTypeRemoteCandidate {
+				remote++
+			}
+		}
+	}
+	var pairs []string
+	for k, n := range states {
+		pairs = append(pairs, fmt.Sprintf("%s %d", k, n))
+	}
+	sort.Strings(pairs)
+	sort.Strings(local)
+	return fmt.Sprintf("pairs [%s], checks sent %d answered %d, checks from the server %d, local [%s], remote %d",
+		strings.Join(pairs, ", "), sent, answered, asked, strings.Join(local, ", "), remote)
 }
 
 func (r *relay) since() time.Duration { return time.Since(r.start).Round(10 * time.Millisecond) }

@@ -13,7 +13,8 @@ const note: INoteChip = {
 };
 
 const chip = () => document.querySelector('button[aria-haspopup="dialog"]') as HTMLButtonElement;
-const field = () => screen.getByRole('dialog', { hidden: true }).querySelector('textarea') as HTMLTextAreaElement;
+const field = () =>
+  screen.getByRole('dialog', { hidden: true }).querySelector('textarea') as HTMLTextAreaElement;
 
 afterEach(cleanup);
 
@@ -45,7 +46,9 @@ describe('a press on an annotation chip', () => {
 
 describe('the card of a chip', () => {
   const opened = (onEdit = vi.fn(), onRemove = vi.fn()) => {
-    render(<NoteChips notes={[note]} onEdit={onEdit} onRemove={onRemove} onOpen={(_, missing) => missing()} />);
+    render(
+      <NoteChips notes={[note]} onEdit={onEdit} onRemove={onRemove} onOpen={(_, missing) => missing()} />,
+    );
     act(() => fireEvent.click(chip()));
     return { onEdit, onRemove };
   };

@@ -81,7 +81,7 @@ func noneMatch(values []string, tag string) bool {
 }
 
 // serveMachineHub answers, on a machine's own page (/m/<id>/…), the paths that belong to the hub and not to the runtime:
-// the hub's copy of the chats (history) and where a chat went (chat-move). The page asks for them under the machine's
+// the hub's copy of the chats (history), where a chat went (chat-move) and whether a rollout is under way. The page asks for them under the machine's
 // base, as the platform's page asks its gateway; the runtime next to it has neither route and would answer 404, so a
 // clean installation (hub and one machine, no gateway) read no chats there. It reports whether the request was answered.
 func (s *Service) serveMachineHub(w http.ResponseWriter, r *http.Request, p *auth.Principal, id string) bool {
@@ -93,6 +93,9 @@ func (s *Service) serveMachineHub(w http.ResponseWriter, r *http.Request, p *aut
 	switch {
 	case s.history && historyPath.MatchString(rest):
 		s.serveHistory(w, r, p, rest)
+		return true
+	case rest == "/api/v2/rollout" && r.Method == http.MethodGet:
+		s.serveRollout(w, r)
 		return true
 	case rest == "/api/v2/chat-move" || strings.HasPrefix(rest, "/api/v2/chat-move/"):
 		clone := r.Clone(r.Context())

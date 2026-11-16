@@ -2,7 +2,7 @@
 // its name, where it lives) instead of a bare link; a tap opens it in the pane like the chip of any other link.
 // Which hosts are ours comes from the page's config (the artifacts, the boards and the reader).
 // ⌘/Ctrl-click opens it in a new tab of the browser, and a right click or a held finger opens the link's menu.
-import { useContext } from 'react';
+import { lazy, Suspense, useContext, useState } from 'react';
 import { useLinkMenu } from '@/next/features/chat/link-menu';
 import { previewSrc, useLinkCardMeta, whenText } from '@/next/features/chat/link-card-meta';
 import { openOutside } from '@/next/features/chat/pane-sites';
@@ -10,6 +10,10 @@ import { isOutsideClick, RefContext } from '@/next/features/chat/ref-chip';
 import { appConfig, type IAppConfig } from '@/platform/config';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
+
+// The share window (Sinopia's access dialog) is loaded on «Share» only: a static import put the whole dialog into the
+// feed's Markdown chunk, which every message with a link loads.
+const ObjectShare = lazy(() => import('@/next/features/app-main/object-share'));
 
 export type TCardKind = 'doc' | 'board';
 
@@ -129,7 +133,10 @@ const LinkCard = ({ kind, href, text }: ILinkCardProps) => {
     </>
   );
   const onPane = onOpen && (() => onOpen('link', href, href));
-  const { handlers, held, menu } = useLinkMenu({ href, onPane, outside: true });
+  // A board or a document the hub tells about (the person may read it) is shared in the one dialog.
+  const [sharing, setSharing] = useState(false);
+  const onShare = meta && slug ? () => setSharing(true) : null;
+  const { handlers, held, menu } = useLinkMenu({ href, onPane, outside: true, onShare });
   return (
     <>
       <a
@@ -150,6 +157,17 @@ const LinkCard = ({ kind, href, text }: ILinkCardProps) => {
         {body}
       </a>
       {menu}
+      {sharing && slug && (
+        <Suspense fallback={null}>
+          <ObjectShare
+            kind={kind === 'board' ? 'board' : 'artifact'}
+            slug={slug}
+            open
+            onClose={() => setSharing(false)}
+            fallbackLink={href}
+          />
+        </Suspense>
+      )}
     </>
   );
 };

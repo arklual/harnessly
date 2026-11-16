@@ -1,0 +1,25 @@
+id: cm-parse-30
+title: Сводка по 30 JSON-файлам — разбор многих файлов (замер Code Mode)
+tags: [code-mode]
+agents: [claude]
+timeout_s: 900
+setup:
+  workspace: [fixtures/cm-logs]
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'internal/hooksetup/**'
+  - 'internal/codemode/**'
+prompt: |-
+  В папке logs/ 30 файлов с заказами за день. Посчитай сумму оплаченных (status paid) заказов по каждому городу за все дни и запиши в totals.json объектом {"город": сумма}. В ответе назови город с наибольшей суммой.
+expect:
+  - name: the totals are exact
+    check: |
+      python3 - <<'PY'
+      import json
+      want = {"Тула": 535029, "Пермь": 430990, "Сочи": 409716, "Казань": 453701, "Москва": 427590}
+      got = json.load(open("totals.json", encoding="utf-8"))
+      got = {k: int(v) for k, v in got.items()}
+      assert got == want, f"got {got}"
+      PY
+  - name: named the top city
+    text: 'Тула'

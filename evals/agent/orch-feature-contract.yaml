@@ -1,0 +1,51 @@
+id: orch-feature-contract
+title: Фича «бэк + фронт + тест» разными агентами — части сходятся по контракту
+tags: [orchestration]
+agents: [claude, codex]
+timeout_s: 1500
+settle_s: 45
+setup:
+  workspace: [fixtures/orch-promo]
+  run: git init -q && git add -A && git -c user.name=eval -c user.email=eval@example.test commit -qm init
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/delegation/**'
+  - 'internal/agents/claude/lean.go'
+  - 'internal/mcpserver/**'
+prompt: |-
+  В этом проекте (магазин: server/ — API заказов, web/ — страница заказа, tests/) нужна фича «промокод».
+  1) Бэк: в server/orders.py функция apply_promo(order_id, code) — ответ заказа со скидкой. Промокоды положи в server/promo.json: SAVE10 — минус 10%, MINUS200 — минус 200 ₽; итог не бывает меньше нуля; неизвестный код — ошибка unknown_promo.
+  2) Фронт: render_order(resp) в web/render.py показывает и ответ apply_promo — строку «Скидка: … ₽» и итог со скидкой («Итого: … ₽»), а на неизвестный код — текст «Промокод не найден».
+  3) Тест tests/test_promo.py проверяет связку бэк → фронт на всех трёх случаях.
+  Сделай это командой: бэк, фронт и тест — три разных агента параллельно, каждый своё. Формат ответа бэка договорите до начала, чтобы части сошлись. В конце прогони все тесты и коротко скажи, что получилось.
+expect:
+  - name: helpers did the parts
+    any_of:
+      - called: harnessly\.delegate_task
+      - called: Agent|Task
+      - called: Bash
+        args: {command: 'harnessly tab create\b.*--prompt'}
+  - name: the parts agree (hidden check of back → front)
+    check: |
+      python3 - <<'PY'
+      import json, re, sys
+      sys.path.insert(0, ".")
+      from server import orders
+      from web import render
+      def page(code, oid=1):
+          return render.render_order(orders.apply_promo(oid, code))
+      p = page("SAVE10")
+      assert re.search(r"Скидка", p), "no discount line: " + p
+      assert re.search(r"Итого:\s*900([.,]00)?\s*₽", p), "SAVE10 total is not 900: " + p
+      p = page("MINUS200")
+      assert re.search(r"Итого:\s*800([.,]00)?\s*₽", p), "MINUS200 total is not 800: " + p
+      p = page("MINUS200", 2)
+      assert re.search(r"Итого:\s*0([.,]00)?\s*₽", p), "total below zero for order 2: " + p
+      p = page("NOPE")
+      assert "Промокод не найден" in p, "unknown code: " + p
+      assert json.load(open("server/promo.json")), "no promo.json"
+      print("ok")
+      PY
+  - name: their tests pass, the new one among them
+    check: test -s tests/test_promo.py && python3 -m unittest discover -s tests -t .

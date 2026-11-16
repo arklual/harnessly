@@ -11,7 +11,8 @@ import { t } from '@/next/i18n';
 import type { AttachmentRef } from '@/next/protocol/v2';
 import type { DraftKey } from '@/next/stores/drafts';
 
-const picture = (bytes: number[], name: string) => new File([new Uint8Array(bytes)], name, { type: 'image/png' });
+const picture = (bytes: number[], name: string) =>
+  new File([new Uint8Array(bytes)], name, { type: 'image/png' });
 let n = 0;
 // No machine: the rows stand with their reason and nothing uploads, which is all these tests need.
 const draft = (): DraftKey => `design:paste-${(n += 1)}`;
@@ -67,10 +68,8 @@ describe('what a message sends', () => {
       ['b', 'sha-1'],
       ['c', 'sha-2'],
     ]);
-    expect(distinctRefs([ref('a'), ref('a'), ref('b'), ref('c'), ref('d')], contents).map((r) => r.id)).toEqual([
-      'a',
-      'c',
-      'd',
-    ]);
+    expect(
+      distinctRefs([ref('a'), ref('a'), ref('b'), ref('c'), ref('d')], contents).map((r) => r.id),
+    ).toEqual(['a', 'c', 'd']);
   });
 });

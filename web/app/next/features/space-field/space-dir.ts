@@ -25,7 +25,11 @@ export const spaceDirOf = async (m: MachineId): Promise<string | null> => {
  * The folder a space's chat starts in: the machine's spaces' folder, or `fallback` on a machine without one. Undefined
  * while it is asked: the chat does not start in another project's folder meanwhile.
  */
-export const useSpaceDir = (m: MachineId | null, on: boolean, fallback: string | null): string | null | undefined => {
+export const useSpaceDir = (
+  m: MachineId | null,
+  on: boolean,
+  fallback: string | null,
+): string | null | undefined => {
   const [dir, setDir] = useState<string | null | undefined>(() => (m ? known.get(m) : undefined));
   useEffect(() => {
     if (!on || m === null) return;

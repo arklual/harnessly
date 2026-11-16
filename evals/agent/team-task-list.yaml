@@ -1,0 +1,23 @@
+id: team-task-list
+title: Работа из двух зависимых частей — общий список задач подчатов с порядком и проверкой
+tags: [delegation, orchestration]
+agents: [claude]
+timeout_s: 900
+settle_s: 45
+setup:
+  files:
+    src/sum.sh: "#!/bin/sh\n# TODO: print the sum of the numbers given as arguments\n"
+covers:
+  - 'internal/delegation/**'
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+prompt: >-
+  Раздай двум агентам в отдельных чатах: один дописывает src/sum.sh (печатает сумму аргументов), второй — после него —
+  пишет src/test.sh, который проверяет sum.sh и падает при ошибке. Тест должен проходить. Принеси итог.
+expect:
+  # HRN-1524 round 3: with one chat per part the list cost 95–157% more tokens for no gain, so it is not pushed: the
+  # lead delegates and waits; the order and the passing test are what count.
+  - name: delegated the work
+    called: harnessly\.delegate_task
+  - name: the test passes on the sum
+    check: sh src/test.sh && test "$(sh src/sum.sh 2 3 5)" = 10

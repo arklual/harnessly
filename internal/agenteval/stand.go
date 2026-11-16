@@ -8,11 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -40,13 +42,20 @@ type StandConfig struct {
 	AgentEnv map[string]string
 	// RuntimeEnv are the runtime's settings (RUNTIME_GITLAB_HOSTS, RUNTIME_TASK_KEY_RE…): the setup under test.
 	RuntimeEnv map[string]string
+	// ClaudeConfig are keys merged into the agents' ~/.claude.json: a consent given once, as a person would
+	// (Code Mode's codeModeCaveatsAcceptedV1 and codeModeAutoModeCaveatAcceptedV1).
+	ClaudeConfig map[string]any
+	// PromptSuffix is added to the person's words: an arm of a comparison that names the way to work («use subchats»).
+	PromptSuffix string
 }
 
 // SetupFile is a setup kept as a file: the environment under test, as configuration.
 type SetupFile struct {
-	Name       string            `yaml:"name"`
-	RuntimeEnv map[string]string `yaml:"runtime_env"`
-	AgentEnv   map[string]string `yaml:"agent_env"`
+	Name         string            `yaml:"name"`
+	RuntimeEnv   map[string]string `yaml:"runtime_env"`
+	AgentEnv     map[string]string `yaml:"agent_env"`
+	ClaudeConfig map[string]any    `yaml:"claude_config"`
+	PromptSuffix string            `yaml:"prompt_suffix"`
 }
 
 var runtimeEnvKey = regexp.MustCompile(`^RUNTIME_[A-Z0-9_]+$`)
@@ -91,6 +100,7 @@ type Stand struct {
 	name  string
 	token string
 	proc  *exec.Cmd
+	cfg   StandConfig
 }
 
 // ErrInfra marks a failure of the stand, not of the agent: such a run is retried and never counted.
@@ -116,7 +126,7 @@ func Up(cfg StandConfig, name string, port int) (*Stand, error) {
 	}
 	// The workspace lives in the home, as a person's does: the runtime serves a chat's files only from there.
 	s := &Stand{Dir: dir, Home: filepath.Join(dir, "home"), Data: filepath.Join(dir, "data"), Work: filepath.Join(dir, "home", "work"),
-		Library: filepath.Join(dir, "design"), Port: port, name: name}
+		Library: filepath.Join(dir, "design"), Port: port, name: name, cfg: cfg}
 	for _, d := range []string{s.Home, s.Data, s.Work, s.Library, filepath.Join(s.Home, ".claude"), filepath.Join(s.Home, ".codex"),
 		filepath.Join(s.Home, ".local", "bin"), filepath.Join(s.Data, "agent-env")} {
 		if err := os.MkdirAll(d, 0o700); err != nil {
@@ -150,8 +160,17 @@ func (s *Stand) writeHome(cfg StandConfig) error {
 	if len(acct.OAuthAccount) == 0 {
 		acct.OAuthAccount = json.RawMessage("null")
 	}
-	cj, _ := json.Marshal(map[string]any{"hasCompletedOnboarding": true, "bypassPermissionsModeAccepted": true, "oauthAccount": acct.OAuthAccount,
-		"projects": map[string]any{s.Work: map[string]any{"hasTrustDialogAccepted": true}}})
+	conf := map[string]any{}
+	for k, v := range cfg.ClaudeConfig {
+		conf[k] = v
+	}
+	// hasSeenAutoDefaultNudge: the one-time offer to make auto mode the default (2.1.32x) would hold the chat at a
+	// question nobody answers.
+	for k, v := range map[string]any{"hasCompletedOnboarding": true, "bypassPermissionsModeAccepted": true, "hasSeenAutoDefaultNudge": true, "oauthAccount": acct.OAuthAccount,
+		"projects": map[string]any{s.Work: map[string]any{"hasTrustDialogAccepted": true}}} {
+		conf[k] = v
+	}
+	cj, _ := json.Marshal(conf)
 	if err := os.WriteFile(filepath.Join(s.Home, ".claude.json"), cj, 0o600); err != nil {
 		return err
 	}
@@ -449,8 +468,14 @@ func (s *Stand) Collect(agent, tab, keep string) (Facts, error) {
 			return f, infra("no Claude session in the workspace")
 		}
 		subs, _ := filepath.Glob(filepath.Join(strings.TrimSuffix(t, ".jsonl"), "subagents", "*.jsonl"))
+		paths := append([]string{t}, subs...)
+		for _, o := range s.sessionFiles() {
+			if !slices.Contains(paths, o) {
+				paths = append(paths, o)
+			}
+		}
 		var err error
-		if f, err = ReadClaudeTranscript(append([]string{t}, subs...)...); err != nil {
+		if f, err = ReadClaudeTranscript(paths...); err != nil {
 			return f, infra("transcript: %v", err)
 		}
 		_ = copyFile(t, keep)
@@ -459,6 +484,153 @@ func (s *Stand) Collect(agent, tab, keep string) (Facts, error) {
 	f.Images = ReadImageJobs(filepath.Join(s.Data, "images"), tab)
 	f.Files = append(ReadFiles(s.Work, ""), ReadFiles(s.Library, "design:")...)
 	return f, nil
+}
+
+// sessionFiles are every Claude Code transcript of the stand, of any folder: the person's chat, its subagents, the
+// chats it delegated to (they work in folders of their own) and their subagents, teammates.
+func (s *Stand) sessionFiles() []string {
+	var out []string
+	_ = filepath.WalkDir(filepath.Join(s.Home, ".claude", "projects"), func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && strings.HasSuffix(p, ".jsonl") {
+			out = append(out, p)
+		}
+		return nil
+	})
+	sort.Strings(out)
+	return out
+}
+
+// pendingFor is how long a tool call without its result keeps an agent counted as working: longer than the longest
+// Bash (10 min), so a session killed mid-call does not hold the run past it.
+const pendingFor = 11 * time.Minute
+
+// working says whether an agent of the stand is in the middle of a tool call (a long Bash, a wait for a chat): its
+// transcript is quiet then, and only the call without a result tells it still works.
+func (s *Stand) working() bool {
+	for _, p := range s.sessionFiles() {
+		st, err := os.Stat(p)
+		if err != nil || time.Since(st.ModTime()) > pendingFor {
+			continue
+		}
+		if pendingCalls(p) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// pendingCalls counts a transcript's tool calls that have no result yet.
+func pendingCalls(file string) int {
+	raw, err := os.ReadFile(file)
+	if err != nil {
+		return 0
+	}
+	open := map[string]bool{}
+	for _, line := range bytes.Split(raw, []byte{'\n'}) {
+		if !bytes.Contains(line, []byte(`"tool_use`)) && !bytes.Contains(line, []byte(`"tool_result`)) {
+			continue
+		}
+		var e struct {
+			Type    string `json:"type"`
+			Message struct {
+				Content json.RawMessage `json:"content"`
+			} `json:"message"`
+		}
+		if json.Unmarshal(line, &e) != nil || (e.Type != "assistant" && e.Type != "user") {
+			continue
+		}
+		var blocks []struct {
+			Type      string `json:"type"`
+			ID        string `json:"id"`
+			ToolUseID string `json:"tool_use_id"`
+		}
+		if json.Unmarshal(e.Message.Content, &blocks) != nil {
+			continue
+		}
+		for _, b := range blocks {
+			switch {
+			case b.Type == "tool_use" && b.ID != "":
+				open[b.ID] = true
+			case b.Type == "tool_result":
+				delete(open, b.ToolUseID)
+			}
+		}
+	}
+	return len(open)
+}
+
+// lastActivity is when an agent of the stand last wrote to its transcript.
+func (s *Stand) lastActivity() time.Time {
+	var last time.Time
+	for _, p := range s.sessionFiles() {
+		if st, err := os.Stat(p); err == nil && st.ModTime().After(last) {
+			last = st.ModTime()
+		}
+	}
+	if st, err := os.Stat(s.codexRollout()); err == nil && st.ModTime().After(last) {
+		last = st.ModTime()
+	}
+	return last
+}
+
+func (s *Stand) chatState(tab string) string {
+	var st struct {
+		CLIState string `json:"cliState"`
+	}
+	if err := s.api(http.MethodGet, "/api/cli/tabs/"+tab+"/status?workspaceId="+s.Workspace, nil, &st); err != nil {
+		return ""
+	}
+	return st.CLIState
+}
+
+// Settle waits, after the person's chat ended its turn, until no agent of the stand wrote for quiet and the chat is not
+// working, or until the deadline. The answer is when the agents last did something, and whether they went quiet.
+func (s *Stand) Settle(ctx context.Context, tab string, quiet time.Duration, deadline time.Time) (time.Time, bool) {
+	for ctx.Err() == nil {
+		last := s.lastActivity()
+		if time.Since(last) >= quiet && s.chatState(tab) != "busy" && !s.working() {
+			return last, true
+		}
+		if time.Now().After(deadline) {
+			return last, false
+		}
+		time.Sleep(3 * time.Second)
+	}
+	return s.lastActivity(), false
+}
+
+// Send types a message into a chat, as the person would while it works.
+func (s *Stand) Send(tab, text string) error {
+	return s.api(http.MethodPost, "/api/cli/tabs/"+tab+"/send?workspaceId="+s.Workspace, map[string]any{"content": text}, nil)
+}
+
+// Exec runs a shell script in the workspace inside the stand's sandbox, with the stand's home and extra variables.
+func (s *Stand) Exec(ctx context.Context, script string, extra []string, timeout time.Duration) (int, string) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	argv := append([]string{s.cfg.Harnessly, "eval", "sandbox"}, s.sandboxArgs(s.cfg)...)
+	argv = append(argv, "--", "/bin/sh", "-c", script)
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	tmp := filepath.Join(s.Dir, "tmp")
+	_ = os.MkdirAll(tmp, 0o700)
+	cmd.Dir = s.Work
+	cmd.Env = append([]string{"HOME=" + s.Home, "USER=" + os.Getenv("USER"), "LANG=C.UTF-8", "TMPDIR=" + tmp,
+		"PATH=" + filepath.Join(s.Home, ".local", "bin") + ":/usr/local/bin:/usr/bin:/bin", "GIT_CONFIG_NOSYSTEM=1"}, extra...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	out, err := cmd.CombinedOutput()
+	code := 0
+	if err != nil {
+		code = -1
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			code = ee.ExitCode()
+		}
+		if ctx.Err() != nil {
+			out = append(out, []byte("\n(timed out)")...)
+		}
+	}
+	return code, clip(string(out), 4000)
 }
 
 func (s *Stand) codexRollout() string {

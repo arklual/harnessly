@@ -39,7 +39,8 @@ harnessly --help                     # everything, with examples
 4. **Hand work to another agent as a nested chat.** `delegate_task` (MCP) or `harnessly tab create --prompt` make a chat under
    yours that the person sees, with the hooks and the prompt, readable and wakeable (`notify`); a `claude` typed into a
    shell does not. Both end in the same nested chat; `tab create --prompt` outside a chat (a plain terminal) falls back to
-   a separate tab and says so.
+   a separate tab and says so. Several delegated chats work as a team — a shared task list, messages mid-turn, a
+   broadcast, plan approval, a coordinator mode: [A team of delegated chats](orchestration.md).
 5. **Ask the docs first.** How harnessly works and how this team has set things up is written down: `harnessly docs
    search`. When you found out something the docs lacked, offer to [add it](docs.md).
 

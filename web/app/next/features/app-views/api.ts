@@ -29,6 +29,8 @@ export interface IAppView {
   title?: string;
   targets: string[];
   height?: string;
+  /** none: the view draws its own bar on the app's screen, and the host shows none above it. */
+  chrome?: 'none';
   /** The view's entry on the runtime's view server, for a view the package carries. */
   path?: string;
   /** The address of a view the app's own server hosts. */
@@ -47,6 +49,16 @@ export interface IAppView {
   feed?: string;
   /** The feed through the machine's runtime, which signs it in with the app's secret (`feedSecret`): read it there. */
   feedPath?: string;
+  /** A widget under the chat's right column (the `side` target): its height, refresh, data and smart request. */
+  widget?: IViewWidget;
+}
+
+export interface IViewWidget {
+  size?: 's' | 'm' | 'l';
+  /** Seconds between the host's data given again; none: once. */
+  refresh?: number;
+  sources?: ('limits' | 'machine' | 'subagents')[];
+  smart?: { prompt: string; every?: number };
 }
 
 export interface IBranding {

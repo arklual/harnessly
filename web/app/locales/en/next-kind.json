@@ -1,0 +1,8 @@
+{
+  "next.kind.aria": "What this chat is",
+  "next.kind.task": "Task",
+  "next.kind.talk": "Talk",
+  "next.kind.keyHint": "Task — an agent works on the machine; Talk — just a conversation with a model. ⇧Tab in an empty field switches",
+  "next.kind.talkPlaceholder": "Ask anything — just a conversation with a model",
+  "next.kind.talkSignIn": "Sign in to ChatGPT to talk"
+}

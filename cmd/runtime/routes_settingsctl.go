@@ -668,7 +668,9 @@ func settingsCtlRoutes(d deps, c *core) []gate.Route {
 	below := func(p string) func(*http.Request) bool {
 		return func(r *http.Request) bool { _, ok := under(r, p); return ok }
 	}
-	return []gate.Route{
+	inbox := lookInbox
+	inbox.Moved = svc.Touch
+	return append([]gate.Route{
 		{Match: is(catalogBase), Handler: http.HandlerFunc(catalog)},
 		{Match: below(catalogBase), Handler: http.HandlerFunc(catalogOne)},
 		{Match: is(changesBase), Handler: http.HandlerFunc(changes)},
@@ -678,7 +680,7 @@ func settingsCtlRoutes(d deps, c *core) []gate.Route {
 		{Match: is(platformAPI + "/settings-watch"), Handler: http.HandlerFunc(watch)},
 		{Match: is("/api/cli/settings"), Handler: http.HandlerFunc(cliList)},
 		{Match: is("/api/cli/settings/set"), Handler: http.HandlerFunc(cliSet)},
-	}
+	}, lookRoutes(inbox, actorOf, pageOK, cliOK)...)
 }
 
 // providersItem is the person's own model providers as an agent sets them up: the whole list in JSON to read, one

@@ -1,0 +1,32 @@
+id: orch-bug-hypotheses
+title: Баг с тремя конкурирующими гипотезами — проверить параллельно, починить только настоящую причину
+tags: [orchestration]
+agents: [claude, codex]
+timeout_s: 1500
+settle_s: 45
+setup:
+  workspace: [fixtures/orch-revenue]
+  run: git init -q && git add -A && git -c user.name=eval -c user.email=eval@example.test commit -qm init
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/delegation/**'
+  - 'internal/mcpserver/**'
+prompt: |-
+  Бухгалтер жалуется: `python3 report.py 2026-10` показывает выручку за октябрь 96410.59, а по выписке банка (банк живёт по московскому времени) — 96043.59. Есть три гипотезы: 1) округление копеек (billing/money.py), 2) граница месяца и часовой пояс (billing/revenue.py), 3) возвраты учитываются дважды (billing/refunds.py).
+  Проверь все три параллельно — по агенту на гипотезу, каждый доказывает или опровергает свою на данных из data/. Почини только настоящую причину, остальное не трогай, добавь тест на неё и скажи, какая гипотеза подтвердилась.
+expect:
+  - name: helpers checked the hypotheses
+    any_of:
+      - called: harnessly\.delegate_task
+      - called: Agent|Task
+      - called: Bash
+        args: {command: 'harnessly tab create\b.*--prompt'}
+  - name: the report matches the bank
+    check: test "$(python3 report.py 2026-10)" = "96043.59"
+  - name: the other two hypotheses were left alone
+    check: git diff --exit-code HEAD -- billing/money.py billing/refunds.py data/ report.py
+  - name: tests pass
+    check: python3 -m unittest discover -s tests -t .
+  - name: named the cause
+    text: '(?i)час\w* пояс|time ?zone|UTC|моск|MSK|гипотез\w* (№ ?)?2|втор\w* гипотез'

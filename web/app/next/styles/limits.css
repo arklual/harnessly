@@ -296,3 +296,123 @@
     transform: translateY(2px);
   }
 }
+
+/* The quiet card of the model pill's popover (features/limits/limits-brief.tsx): a subscription's name, a line a window
+   (name, a thin bar, what is left, the reset), a grey forecast only when the limit runs out before its reset. Colour
+   only on a number that runs low. */
+.hx-limbs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.hx-limb {
+  display: grid;
+  grid-template-columns: auto minmax(24px, 1fr) auto auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 5px;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-2);
+  font-variant-numeric: tabular-nums;
+}
+.hx-limb__head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.hx-limb__name {
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-fg-1);
+}
+.hx-limb__win {
+  display: contents;
+}
+.hx-limb__wname,
+.hx-limb__reset {
+  color: var(--hx-fg-3);
+  white-space: nowrap;
+}
+.hx-limb__pct {
+  text-align: right;
+  white-space: nowrap;
+}
+.hx-limb__win[data-level='low'] .hx-limb__pct {
+  color: var(--hx-warning);
+}
+.hx-limb__win[data-level='out'] .hx-limb__pct {
+  color: var(--hx-danger);
+}
+.hx-limb__bar {
+  position: relative;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--hx-bg-active);
+  overflow: hidden;
+}
+.hx-limb__bar::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--fill, 0%);
+  border-radius: inherit;
+  background: var(--hx-fg-3);
+  transition: width 500ms var(--hx-ease-out);
+}
+.hx-limb__fc {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+}
+
+/* The field's meter of the chat's limits (features/limits/limits-mini.tsx): two thin bars by the context ring, the
+   five hours over the week; the words on hover. A bar takes the level's colour as it runs low. */
+.hx-limmini {
+  display: inline-grid;
+  align-content: center;
+  gap: 4px;
+  width: 22px;
+  height: 32px;
+  padding: 0 5px;
+  box-sizing: content-box;
+  border-radius: var(--hx-radius-full);
+  cursor: default;
+  transition: background var(--hx-dur-sm);
+}
+.hx-limmini:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-limmini i {
+  position: relative;
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--hx-bg-active);
+  overflow: hidden;
+}
+.hx-limmini i::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--fill, 0%);
+  border-radius: inherit;
+  background: var(--hx-fg-3);
+  transition:
+    width 500ms var(--hx-ease-out),
+    background var(--hx-dur-md);
+}
+.hx-limmini i[data-level='low']::before {
+  background: var(--hx-warning);
+}
+.hx-limmini i[data-level='out']::before {
+  background: var(--hx-danger);
+}
+/* A narrow field (the phone) has no room for it: the pill's popover keeps the card. */
+@container hx-field (max-width: 580px) {
+  .hx-composer__bar .hx-limmini {
+    display: none;
+  }
+}

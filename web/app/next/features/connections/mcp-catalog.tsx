@@ -128,10 +128,10 @@ export const HeaderFields = ({
   );
 };
 
-/** The header as it is sent: a bare token in Authorization gets its «Bearer». */
-export const headerOf = (name: string, value: string): IMcpHeader => {
+/** The header as it is sent: a bare token in Authorization gets its «Bearer» (or the catalog entry's own prefix). */
+export const headerOf = (name: string, value: string, prefix: string): IMcpHeader => {
   const header = name.trim() === '' ? DEFAULT_HEADER : name.trim();
-  return { name: header, value: headerValue(header, value) };
+  return { name: header, value: headerValue(header, value, prefix) };
 };
 
 interface ICatalogCardProps {
@@ -186,7 +186,12 @@ const nameOf = (probe: IMcpProbe, entry: IMcpCatalogEntry | null): string => {
 
 /** The probed server signs in on its own page (and lets this app register there). */
 const signsInByPage = (probe: IMcpProbe): boolean => probe.auth === MCP_AUTH.oauth && !probe.oauthUnavailable;
-const asksToken = (probe: IMcpProbe): boolean => probe.auth === MCP_AUTH.header || probe.oauthUnavailable;
+/**
+ * The server takes a typed token: the probe says so, or the catalog does for a server that answers initialize without
+ * one but refuses its tools (Yandex 360).
+ */
+const asksToken = (probe: IMcpProbe, entry: IMcpCatalogEntry | null): boolean =>
+  probe.auth === MCP_AUTH.header || probe.oauthUnavailable || entry?.auth === MCP_AUTH.header;
 
 /** «MCP server address»: type it or pick a service below, see what it is and how it signs in, then connect. */
 export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConnectFormProps) => {
@@ -203,7 +208,7 @@ export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConn
   const card = usePresence(probe, CARD_EXIT_MS);
   const shown = card.value;
   const closing = card.state === PRESENCE.closing;
-  const token = shown !== null && asksToken(shown);
+  const token = shown !== null && asksToken(shown, entry);
 
   const find = async (link: string, from: IMcpCatalogEntry | null) => {
     const address = link.trim();
@@ -238,7 +243,7 @@ export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConn
     takePick(picked);
   }, [picked]);
 
-  const ready = probe !== null && (!asksToken(probe) || value.trim() !== '');
+  const ready = probe !== null && (!asksToken(probe, entry) || value.trim() !== '');
 
   const reset = () => {
     setProbe(null);
@@ -259,7 +264,9 @@ export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConn
         name: entry === null ? name.trim() : '',
         catalogId: entry === null ? '' : entry.id,
         transport: probe.transport,
-        header: asksToken(probe) ? headerOf(header, value) : null,
+        header: asksToken(probe, entry)
+          ? headerOf(header, value, entry === null ? '' : entry.tokenPrefix)
+          : null,
       },
       signsInByPage(probe),
     );
@@ -329,7 +336,9 @@ export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConn
             <McpGlyph id={entry === null ? '' : entry.id} name={title} />
             <span className="hx-conn-found__text">
               <span className="hx-conn-found__name">{title}</span>
-              <span className="hx-conn-found__sub">{probeLine(shown)}</span>
+              <span className="hx-conn-found__sub">
+                {probeLine(token ? { ...shown, auth: MCP_AUTH.header } : shown)}
+              </span>
             </span>
           </div>
           {shown.oauthUnavailable && (

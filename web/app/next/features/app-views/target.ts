@@ -18,3 +18,10 @@ export const objectTarget = (target: string): string | null | undefined => {
   if (object === '') return null;
   return APP_OBJECT_RE.test(object) ? object : undefined;
 };
+
+/** «Поделиться» of one of the app's objects (`share:<slug>`); null for a target that is not one. */
+export const shareTarget = (target: string): string | null => {
+  if (!target.startsWith('share:')) return null;
+  const object = target.slice('share:'.length);
+  return APP_OBJECT_RE.test(object) ? object : null;
+};

@@ -49,7 +49,7 @@ describe('Composer while the agent works', () => {
     render(<Composer {...props({ onSubmit })} />);
     expect(screen.queryByRole('button', { name: 'Now' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Stop the agent' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Into the turn now · ⌃↵ — after the turn' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Into the turn now · Alt+↵ — after the turn' }));
     expect(onSubmit).toHaveBeenLastCalledWith('now');
   });
 
@@ -61,17 +61,17 @@ describe('Composer while the agent works', () => {
     expect(screen.getByRole('button', { name: 'Send' })).toBeTruthy();
   });
 
-  it('Enter sends into the turn, Ctrl+Enter after the turn (the queue)', () => {
+  it('Enter sends into the turn, Alt/⌥+Enter after the turn (the queue)', () => {
     const onSubmit = vi.fn();
     render(<Composer {...props({ onSubmit })} />);
     const field = screen.getByRole('textbox');
-    fireEvent.keyDown(field, { key: 'Enter', ctrlKey: true });
+    fireEvent.keyDown(field, { key: 'Enter', code: 'Enter', altKey: true });
     expect(onSubmit).toHaveBeenLastCalledWith('queue');
     fireEvent.keyDown(field, { key: 'Enter' });
     expect(onSubmit).toHaveBeenLastCalledWith('now');
   });
 
-  it('every Ctrl/Cmd+Enter queues the message after the turn (GitHub #53)', () => {
+  it('every Ctrl/Cmd+Enter sends into the turn, as Enter does (GitHub #53)', () => {
     const onSubmit = vi.fn();
     render(<Composer {...props({ onSubmit })} />);
     const field = screen.getByRole('textbox');
@@ -82,7 +82,7 @@ describe('Composer while the agent works', () => {
     ]) {
       onSubmit.mockClear();
       fireEvent.keyDown(field, press);
-      expect(onSubmit, JSON.stringify(press)).toHaveBeenLastCalledWith('queue');
+      expect(onSubmit, JSON.stringify(press)).toHaveBeenLastCalledWith('now');
     }
   });
 });

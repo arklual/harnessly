@@ -4,7 +4,7 @@
 // The pane opening always takes it away, even when the person had opened it; the pane shutting gives back what the room
 // says. The header's button shows it or folds it, and a fold stays until the chat is changed. A stop goes to the
 // runtime as bg.stop and waits for it.
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useCodeAsks } from '@/next/bindings/code-asks';
 import { settled } from '@/next/bindings/outcome';
 import { stopBackground } from '@/next/commands';
@@ -25,6 +25,7 @@ import NoticeStack from '@/next/features/smart-notice/stack';
 import { SMART_KIND } from '@/next/features/smart-notice/smart-notice';
 import { NOTIFICATION_KIND } from '@/next/features/notifications/kinds';
 import MachineDrop from '@/next/bindings/machine-drop';
+import SideWidgetsBinding from '@/next/bindings/side-widgets';
 import { WaitBinding } from '@/next/bindings/notification-center';
 import { askDropBack, dismissDrops, useDrops, type IDrop } from '@/next/stores/smart-drops';
 import { useConversationList } from '@/next/stores/conversations';
@@ -112,11 +113,41 @@ export const useChatBackground = (
   const shown = has && (override ?? auto);
   // A chat with nothing for the column takes it away with its slide and fade (data-shown), not from one frame to the next.
   const hasMounted = usePresentFlag(has, SIDE_EXIT_MS).mounted;
+  // The person's widgets stand under the column on a computer, where it has room beside the chat and the pane
+  // is shut, or where the person opened them by the header's button; on a phone there is no room beside the chat (the limits are on the model's pill there). Away, they are not
+  // drawn at all: no frame, no ask.
+  const widgetsWanted = !phone && conv !== null && machine !== null;
+  const widgetsShown = widgetsWanted && !pane && (override ?? room);
+  // A chat with nothing for the column but the widgets: the header's button folds and unfolds them.
+  const open = has ? shown : widgetsShown;
+  const widgetsMounted = usePresentFlag(widgetsShown, SIDE_EXIT_MS).mounted;
+  // Where the column has no room beside the chat, the widgets the button opened are a popover at the button over the
+  // feed's edge, not a column: nothing of the feed moves, and a click away or Esc shuts them.
+  const widgetsPop = widgetsShown && !room;
+  useEffect(() => {
+    if (!widgetsPop) return;
+    const shut = () => setAsked(null);
+    const away = (event: PointerEvent) => {
+      const el = event.target instanceof Element ? event.target : null;
+      // The cards' menus and the gallery stand in portals: a click there is a click in the popover.
+      if (el?.closest('.hx-wgs-wrap, .hx-bg-btn, [role="menu"], [role="dialog"]')) return;
+      shut();
+    };
+    const esc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) shut();
+    };
+    document.addEventListener('pointerdown', away, true);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', away, true);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [widgetsPop]);
 
   // What the button asks for: what the room already says is no ask at all, so the column keeps following the room.
   const toggle = () => {
-    const next = !shown;
-    setAsked(next === auto ? null : { conv, shown: next });
+    const next = !open;
+    setAsked(next === (has ? auto : room && !pane) ? null : { conv, shown: next });
   };
 
   const onStop = (task: BackgroundTask) => {
@@ -143,13 +174,14 @@ export const useChatBackground = (
   );
 
   const header: IHeaderBackground | null =
-    conv && has
+    conv && (has || widgetsWanted)
       ? {
           running: tasks.filter((x) => x.status === 'running').length,
           total: tasks.length,
           recap: recap !== null,
           waits: drops.length > 0,
-          open: shown,
+          widgets: !has,
+          open,
           onToggle: toggle,
         }
       : null;
@@ -164,7 +196,7 @@ export const useChatBackground = (
   };
 
   const panel =
-    hasMounted || machineMounted ? (
+    hasMounted || machineMounted || widgetsWanted ? (
       <BackgroundPanel
         ref={setRail}
         chat={conv}
@@ -178,15 +210,24 @@ export const useChatBackground = (
         onStop={onStop}
         onHide={shown ? toggle : undefined}
         below={
-          machineMounted ? (
-            <NoticeStack
-              drops={machineDrops}
-              now={now}
-              label={t('next.smart.stack.machine')}
-              onBack={askDropBack}
-              onDismiss={dismissDrops}
-              renderAnswer={renderMachine}
-            />
+          machineMounted || widgetsMounted ? (
+            <>
+              {machineMounted && (
+                <NoticeStack
+                  drops={machineDrops}
+                  now={now}
+                  label={t('next.smart.stack.machine')}
+                  onBack={askDropBack}
+                  onDismiss={dismissDrops}
+                  renderAnswer={renderMachine}
+                />
+              )}
+              {widgetsMounted && machine && (
+                <div className="hx-wgs-wrap" data-shown={widgetsShown} data-pop={widgetsPop || undefined}>
+                  <SideWidgetsBinding machine={machine} onOpenChat={onOpenChat} />
+                </div>
+              )}
+            </>
           ) : null
         }
         codes={

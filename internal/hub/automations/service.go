@@ -120,6 +120,8 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("GET "+p+"/runs", s.guard(s.listRuns))
 	mux.Handle("POST "+p+"/runs/{id}/decision", s.guard(s.decision))
 	mux.Handle("POST "+p+"/hook", httpx.Handler(s.hook))
+	mux.HandleFunc("POST "+p+"/hook/m/{machine}/{conn}", s.webhook)
+	mux.HandleFunc("POST "+p+"/hook/m/{machine}/{conn}/{secret}", s.webhook)
 	mux.Handle("POST "+p+"/callback", httpx.Handler(s.callback))
 }
 
@@ -318,11 +320,21 @@ func (s *Service) decision(w http.ResponseWriter, r *http.Request, p *auth.Princ
 	return nil
 }
 
+// matchesFilter says whether the event has every field of the filter with the same value. An object in the filter is
+// matched the same way, field by field: {"facts": {"kind": "ci.failed"}} takes an event whose facts have that kind among
+// others.
 func matchesFilter(filter map[string]any, event map[string]any) bool {
 	for k, want := range filter {
 		got, ok := event[k]
 		if !ok {
 			return false
+		}
+		if sub, isObj := want.(map[string]any); isObj {
+			have, ok := got.(map[string]any)
+			if !ok || !matchesFilter(sub, have) {
+				return false
+			}
+			continue
 		}
 		a, _ := json.Marshal(got)
 		b, _ := json.Marshal(want)
@@ -358,9 +370,21 @@ func (s *Service) hook(w http.ResponseWriter, r *http.Request) error {
 	if reserved(b.Source) {
 		return invalid(`Источники "schedule" и "wait" хаб ставит сам`)
 	}
-	rules, err := s.rules(r.Context(), "", true)
+	results, waits, err := s.take(r.Context(), "", b.Source, b.Fingerprint, event, b.Event)
 	if err != nil {
 		return err
+	}
+	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"matched": len(results), "results": results, "waits": waits})
+	return nil
+}
+
+// take queues the runs of an event for the enabled rules of its source, of every owner ("" — the deployment's /hook) or
+// of one owner (a machine's connector event): every rule whose filter the event meets gets a queued run, and every wait
+// the event starts or stops moves.
+func (s *Service) take(ctx context.Context, owner, source, fingerprint string, event map[string]any, raw json.RawMessage) ([]map[string]any, []WaitOutcome, error) {
+	rules, err := s.rules(ctx, owner, true)
+	if err != nil {
+		return nil, nil, err
 	}
 	results := []map[string]any{}
 	waits := []WaitOutcome{}
@@ -369,15 +393,15 @@ func (s *Service) hook(w http.ResponseWriter, r *http.Request) error {
 		if rule.Trigger.Wait != nil {
 			v, seen := on[rule.OwnerID]
 			if !seen {
-				v = s.triggersOn(r.Context(), rule.OwnerID)
+				v = s.triggersOn(ctx, rule.OwnerID)
 				on[rule.OwnerID] = v
 			}
 			if !v {
 				continue
 			}
-			out, ok, err := s.onWait(r.Context(), rule, b.Source, event, b.Event)
+			out, ok, err := s.onWait(ctx, rule, source, event, raw)
 			if err != nil {
-				return err
+				return nil, nil, err
 			}
 			if ok {
 				s.log.Info("automation event touched a wait", "rule", rule.ID, "armed", out.Armed, "cleared", out.Cleared)
@@ -385,18 +409,17 @@ func (s *Service) hook(w http.ResponseWriter, r *http.Request) error {
 			}
 			continue
 		}
-		if rule.Trigger.Source != b.Source || !matchesFilter(rule.Trigger.Filter, event) {
+		if rule.Trigger.Source != source || !matchesFilter(rule.Trigger.Filter, event) {
 			continue
 		}
-		out, err := s.queueRun(r.Context(), rule, b.Fingerprint, b.Event)
+		out, err := s.queueRun(ctx, rule, fingerprint, raw)
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 		s.log.Info("automation event matched a rule", "rule", rule.ID, "queued", out.Queued, "reason", out.Reason)
 		results = append(results, map[string]any{"ruleId": rule.ID, "queued": out.Queued, "runId": out.RunID, "reason": out.Reason})
 	}
-	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"matched": len(results), "results": results, "waits": waits})
-	return nil
+	return results, waits, nil
 }
 
 var (
@@ -404,9 +427,62 @@ var (
 	mrRe    = regexp.MustCompile(`^https://[^\s/]+/\S*$`)
 )
 
-// Event takes the automations.result of a machine's agent. It never blocks the link.
+// textKeys are what a connector event must not carry to the hub: the text of a letter or a message stays on the
+// machine, and the agent of a run reads it there by the event's ref (docs/connectors.md).
+var textKeys = []string{"title", "excerpt", "text", "body", "content", "snippet"}
+
+// connectorEvent takes the automations.event of a machine: a connector's event, for the rules of the machine's owner
+// only. It never blocks the link.
+func (s *Service) connectorEvent(m store.Machine, ev link.Event) {
+	safego.Go("automations connector event", func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		results, err := s.machineEvent(ctx, m, ev.Raw)
+		if err != nil {
+			s.log.Warn("connector event not taken", "machine", m.ID, "error", err)
+			return
+		}
+		s.log.Info("connector event taken", "machine", m.ID, "matched", len(results))
+	})
+}
+
+// machineEvent queues the runs of a machine's connector event for the rules of the machine's owner, with the text keys
+// dropped. The frame is {event: "automations.event", source, fingerprint, data}: what /hook takes, with the event under
+// data because "event" names the frame.
+func (s *Service) machineEvent(ctx context.Context, m store.Machine, raw json.RawMessage) ([]map[string]any, error) {
+	var b struct {
+		Source      string         `json:"source"`
+		Fingerprint string         `json:"fingerprint"`
+		Event       map[string]any `json:"data"`
+	}
+	if json.Unmarshal(raw, &b) != nil || b.Source == "" || b.Fingerprint == "" || len(b.Fingerprint) > 500 || b.Event == nil {
+		return nil, invalid("Нужны source, fingerprint и event (объект)")
+	}
+	if reserved(b.Source) || m.CreatedBy == "" {
+		return nil, invalid("Источник или машина не подходят")
+	}
+	for _, k := range textKeys {
+		delete(b.Event, k)
+	}
+	clean, err := json.Marshal(b.Event)
+	if err != nil {
+		return nil, err
+	}
+	results, _, err := s.take(ctx, m.CreatedBy, b.Source, b.Fingerprint, b.Event, clean)
+	return results, err
+}
+
+// Event takes what a machine's agent sends about automations: a run's report (automations.result) or a connector's
+// event (automations.event). It never blocks the link.
 func (s *Service) Event(m store.Machine, ev link.Event) {
-	if ev.Name != hubproto.EventAutomationResult || !s.Enabled() {
+	if !s.Enabled() {
+		return
+	}
+	if ev.Name == hubproto.EventAutomationEvent {
+		s.connectorEvent(m, ev)
+		return
+	}
+	if ev.Name != hubproto.EventAutomationResult {
 		return
 	}
 	var e struct {

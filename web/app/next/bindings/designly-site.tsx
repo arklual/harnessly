@@ -17,7 +17,7 @@ import ShareDialog from '@/next/features/designly/access/share-dialog';
 import { guestViewOf } from '@/next/features/designly/access/guest-view';
 import { LINK_KIND, type ILinkContext } from '@/next/features/designly/access/link-form';
 import ResourceShare from '@/next/features/designly/access/resource-share';
-import { useResourceView } from '@/next/features/designly/access/use-resource';
+import { isResourceView, useResourceView, VIEW_STATE } from '@/next/features/designly/access/use-resource';
 import PublishSection from '@/next/features/designly/publish/publish-section';
 import { usePublish } from '@/next/features/designly/publish/use-publish';
 import NoAccess from '@/next/features/designly/access/no-access';
@@ -266,7 +266,9 @@ const DesignlySiteInner = ({
   };
   // the one «Поделиться» of every kind reads the gateway's common access API; an older gateway answers nothing
   // there and the older dialog stays.
-  const shared = useResourceView('design', id, gate.state.k === ACCESS.ready);
+  // Read beside the project's access, not after it: both are the hub's, one round trip instead of two in a
+  // row; only a gateway known to be absent (standalone) is not asked.
+  const shared = useResourceView('design', id, gate.state.k !== ACCESS.absent);
   // A deck's slides and a video's built formats, as their views read them: what the screen of a link offers.
   const deckRead = useDeck(id);
   const videoRead = useVideo(id);
@@ -802,14 +804,14 @@ const DesignlySiteInner = ({
   });
   // The one dialog of every kind (a design, a deck, a video), once the gateway answers its API and the project has an
   // owner; a project without one is still claimed in the older dialog, and a deck or a video keeps its older popover.
+  // The machine's library (project) is not waited for: the access is the hub's, and a machine that is away or updating
+  // must not keep the dialog from opening.
   const oneDialog =
-    project !== null &&
-    shared.state !== null &&
-    shared.state !== 'absent' &&
-    shared.state.stored &&
-    shared.state.owner !== null
-      ? shared.state
-      : null;
+    isResourceView(shared.state) && shared.state.stored && shared.state.owner !== null ? shared.state : null;
+  // Until the view is read (or when it failed) the one dialog still opens at once, with the owner already known from
+  // the project's access, a skeleton for the rest, «Повторить» after a failure. Only a view that says «absent» or «not
+  // stored» hands over to the older dialog.
+  const onePending = gated !== null && (shared.state === null || shared.state === VIEW_STATE.failed);
   // A deck's PDF for guests is built by the runtime while a live link offers it, and stops when none does: the one
   // dialog changes the links, this keeps the runtime in step (the older popover did it itself).
   // The latest end among the live links that offer the PDF (Infinity: one never ends); null: none offers it, or the
@@ -852,13 +854,24 @@ const DesignlySiteInner = ({
     if (gated.canManage)
       return {
         label: t('next.pane.designShare'),
-        onOpen: () => sinopia.gate(() => openShare(false)),
+        onOpen: () =>
+          sinopia.gate(
+            () => openShare(false),
+            () => setShareOpen(false),
+          ),
         // A deck and a video open their older share popover only where the one dialog is not there.
-        manage: oneDialog === null,
+        manage: oneDialog === null && !onePending,
       };
     if (gated.role === 'view' || gated.role === 'comment')
       return { label: t('next.access.askEdit'), onOpen: () => openShare(false) };
-    return { label: t('next.pane.designShare'), onOpen: () => sinopia.gate(() => openShare(false)) };
+    return {
+      label: t('next.pane.designShare'),
+      onOpen: () =>
+        sinopia.gate(
+          () => openShare(false),
+          () => setShareOpen(false),
+        ),
+    };
   })();
 
   // The versions of the project and of its kit: «Версии» beside the mode switch, the kit's band over the view.
@@ -874,7 +887,7 @@ const DesignlySiteInner = ({
         project={id}
         access={gated}
         onAsked={gate.apply}
-        view={shared.state !== null && shared.state !== 'absent' ? shared.state : null}
+        view={isResourceView(shared.state) ? shared.state : null}
         onView={shared.apply}
         onBack={back}
       />
@@ -1167,13 +1180,24 @@ const DesignlySiteInner = ({
           {t('next.site.snapshot', { time: snapshotTime(snapshot.at) })}
         </div>
       )}
-      {gated !== null && oneDialog !== null && (
+      {gated !== null && (oneDialog !== null || onePending) && (
         <ResourceShare
           open={shareOpen}
           onClose={() => setShareOpen(false)}
           target={{ kind: 'design', id }}
-          title={project?.design.title ?? ''}
+          title={project?.design.title ?? oneDialog?.resource.title ?? id}
           view={oneDialog}
+          failed={shared.state === VIEW_STATE.failed}
+          onRetry={shared.reload}
+          knownOwner={
+            gated.owner !== null || gated.ownerName
+              ? {
+                  name: gated.ownerName || (gated.owner ?? ''),
+                  email: gated.owner,
+                  you: gated.role === 'owner',
+                }
+              : null
+          }
           onNext={(next) => {
             shared.apply(next);
             // The page's own gate (who may edit pictures, the share button) follows what changed.
@@ -1193,7 +1217,7 @@ const DesignlySiteInner = ({
           linkContext={linkContext}
         />
       )}
-      {gated !== null && oneDialog === null && (
+      {gated !== null && oneDialog === null && !onePending && (
         <ShareDialog
           open={shareOpen}
           onClose={() => setShareOpen(false)}

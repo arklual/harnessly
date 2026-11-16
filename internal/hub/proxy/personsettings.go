@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/sameorigin"
+	"github.com/ly-solutions/harnessly/internal/sites"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -25,6 +28,9 @@ func mePath(p string) (me, settings bool) {
 	rest, ok := strings.CutPrefix(p, "/api/v2/")
 	if !ok {
 		return false, false
+	}
+	if _, look := wire.LookPath(rest); look {
+		return true, false
 	}
 	if _, owner, ok := wire.SettingsDocOf(rest); !ok || owner != wire.OwnerPerson {
 		return false, false
@@ -46,12 +52,48 @@ func machineMePath(p, id string) (me, settings bool) {
 // serveMe answers the person's settings for the hub user u. A path that is not one of the two is refused 404: the
 // caller has told it apart already.
 func (s *Service) serveMe(w http.ResponseWriter, r *http.Request, u store.User, settings bool) {
+	if hash, look := lookOf(r.URL.Path); look {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && sameorigin.CrossSite(r) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		wire.ServeLooks(w, r, s.lookBlobs(), hash)
+		return
+	}
 	st := &hubMe{s: s, r: r, user: u}
 	if settings {
 		wire.ServeMeSettings(w, r, st)
 		return
 	}
 	wire.ServeMe(w, r, st)
+}
+
+// lookOf finds a looks' picture path (wire.LookPath) in a fleet, workspace or machine address.
+func lookOf(p string) (hash string, ok bool) {
+	i := strings.Index(p, "/api/v2/")
+	if i < 0 {
+		return "", false
+	}
+	return wire.LookPath(p[i+len("/api/v2/"):])
+}
+
+// lookBlobs is where the hub keeps the pictures of its people's looks: the hub's bucket under looks/ when
+// it keeps its files in S3, else <data>/looks. Made once; nil when it cannot be, and the paths answer 404.
+func (s *Service) lookBlobs() wire.LookBlobs {
+	s.looksOnce.Do(func() {
+		if s.cfg.StorageS3() && s.cfg.S3.Endpoint != "" {
+			b, err := sites.NewS3Blobs(sites.S3Config{Endpoint: s.cfg.S3.Endpoint, Region: s.cfg.S3.Region, Bucket: s.cfg.S3.Bucket,
+				Prefix: s.cfg.S3.Prefix + "looks/", AccessKey: s.cfg.S3.AccessKey, SecretKey: s.cfg.S3.SecretKey})
+			if err == nil {
+				s.looks = b
+			}
+			return
+		}
+		if b, err := sites.NewFolderBlobs(filepath.Join(s.cfg.DataDir, "looks")); err == nil {
+			s.looks = b
+		}
+	})
+	return s.looks
 }
 
 // hubMe is the wire.MeStore of one hub user, for one request.

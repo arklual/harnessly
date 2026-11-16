@@ -35,6 +35,10 @@ import { DOC_THREAD_STATUS } from '@/types/doc-threads';
 import { MessageText, Pill } from '@/components/agents/docs/mention-field';
 import { plainMentions } from '@/lib/doc-mentions';
 import { DocShare } from '@/components/agents/docs/doc-share';
+
+/** `?share=1`: the page was opened by «Поделиться» of the board or the document on its own site. */
+const SHARE_ON_OPEN =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('share') === '1';
 import { DocEditorCard, useDocEditor, type IEditInfo } from '@/components/agents/docs/doc-editor';
 import { DiffPanel, VersionMenu, VersionNotice } from '@/components/agents/docs/doc-versions';
 import type { TDiffState } from '@/components/agents/docs/doc-versions';
@@ -686,7 +690,14 @@ const DocViewer = ({
                 <ExternalLink />
               </a>
             )}
-            {detail && <DocShare slug={detail.doc.slug} title={detail.doc.title} kind={detail.doc.kind} />}
+            {detail && (
+              <DocShare
+                slug={detail.doc.slug}
+                title={detail.doc.title}
+                kind={detail.doc.kind}
+                autoOpen={SHARE_ON_OPEN}
+              />
+            )}
             <button
               type="button"
               className="td-comments-toggle"

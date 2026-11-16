@@ -115,6 +115,44 @@ func TestMachinesList(t *testing.T) {
 	if r := v.anna.Do("GET", v.url("/machines?problems=2"), nil); r.Code != http.StatusBadRequest {
 		t.Errorf("bad problems: %s", r)
 	}
+
+	// canSeeDebug is GET /api/machines/{id}/debug's own rule: the creator (a member, whoever else may use the machine),
+	// and who manages the tenant; not a lead (the lead's drawer asked and got 403).
+	ownID := "m-vera"
+	if err := st.CreateMachine(ctx, &store.Machine{ID: ownID, SpaceID: v.tenant, Name: "Верина", KeyPub: "k2", EncPub: "e2",
+		AgentVersion: "1.0.0", CreatedBy: v.vera.ID, CreatedAt: v.s.Clock.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	if r := v.patchMachine(v.anna, ownID, map[string]any{"access": []map[string]any{
+		{"kind": "user", "id": v.vera.ID}, {"kind": "user", "id": v.boris.ID}}}); r.Code != http.StatusOK {
+		t.Fatalf("share: %s", r)
+	}
+	see := func(p *hubtest.Person, name string) bool {
+		t.Helper()
+		m := machineByName(v.machinesList(t, p, ""), name)
+		if m == nil {
+			t.Fatalf("%s does not see %s", p.Email, name)
+		}
+		return m.CanSeeDebug
+	}
+	if !see(v.vera, "Верина") || see(v.vera, "Рабочая") {
+		t.Error("the creator of a shared machine sees its openings, and only of her own")
+	}
+	if see(v.boris, "Рабочая") || see(v.boris, "Верина") {
+		t.Error("a lead without the tenant's management sees no openings")
+	}
+	if !see(v.anna, "Рабочая") || !see(v.anna, "Верина") {
+		t.Error("the tenant's administrator sees every machine's openings")
+	}
+	for _, c := range []struct {
+		p    *hubtest.Person
+		id   string
+		code int
+	}{{v.vera, ownID, 200}, {v.boris, a.MachineID, 403}, {v.anna, ownID, 200}} {
+		if r := c.p.Do("GET", "/api/machines/"+c.id+"/debug", nil); r.Code != c.code {
+			t.Errorf("%s reads the openings of %s: %s, want %d", c.p.Email, c.id, r, c.code)
+		}
+	}
 }
 
 func TestMachinesPatchTeamAndAccess(t *testing.T) {

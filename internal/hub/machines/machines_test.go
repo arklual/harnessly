@@ -378,7 +378,7 @@ func TestConnectedMachineAsTheAPISendsIt(t *testing.T) {
 	sub := a.Calls("link.subscribe")[0]
 	var events []string
 	_ = json.Unmarshal(sub.Params["events"], &events)
-	if strings.Join(events, ",") != "job,login,agents,preflight,policy,automations.result,chatwork" {
+	if strings.Join(events, ",") != "job,login,agents,preflight,policy,automations.result,automations.event,chatwork" {
 		t.Errorf("subscribed events = %v", events)
 	}
 

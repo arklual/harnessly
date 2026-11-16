@@ -1,4 +1,5 @@
 import { useState, type KeyboardEvent } from 'react';
+import { openLookEditor } from '@/next/features/looks/store';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
 import usePendingList, { PENDING } from '@/next/ui/use-pending-list';
@@ -173,6 +174,7 @@ const ChatHeader = ({
       projects={projects}
       actions={actions}
       onStartRename={() => setRename({ value: chat.title, saving: false })}
+      onLook={() => openLookEditor({ k: 'chat', id: chat.id })}
       onPin={() => {
         const onPin = actions.onPin;
         if (onPin)

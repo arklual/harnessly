@@ -24,6 +24,15 @@ const (
 	// EventAutomationResult is {runId, resultToken, summary, bugIssueId?, mrUrl?}: a conversation the hub started for an
 	// automation run reports what it did (docs/hub/automations.md).
 	EventAutomationResult = "automations.result"
+	// EventAutomationEvent is {source, fingerprint, data}: an event of a connector of this machine (docs/connectors.md),
+	// the body POST /automations/hook takes with its event under data ("event" names the frame), for the rules of the
+	// machine's owner only. The event carries no text of a letter or a message: the hub drops title, excerpt, text and
+	// body if a machine sends them anyway.
+	EventAutomationEvent = "automations.event"
+	// OpConnectorsWebhook passes a request that came to a webhook's address on the hub (POST
+	// <automations>/hook/m/<machine>/<connection>[/<secret>]) to the machine: {connection, path, header, body (base64)},
+	// answered with {status} for the sender. The hub keeps neither the body nor the path's secret.
+	OpConnectorsWebhook = "connectors.webhook"
 
 	// OpDocResult is the hub's answer to a doc.publish or doc.acl: {requestId, status, body}.
 	OpDocResult = "doc.result"

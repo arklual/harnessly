@@ -333,6 +333,27 @@ describe('v2 parser in a production build', () => {
     expect('failure' in frame.e.conv.lastTurn).toBe(false);
     expect(frame.e.conv.lastTurn.status).toBe('done');
   });
+  // a tool entry's `call` of a newer runtime — with fields this page has no name for — keeps the entry.
+  it('keeps a tool entry whose call holds fields of a newer runtime', () => {
+    const update = Object.entries(fixtures).find(([p]) => name(p) === 'ev.entry_update-call')![1] as {
+      e: { entry: Record<string, unknown> & { call: Record<string, unknown> } };
+    };
+    const moved = structuredClone(update);
+    moved.e.entry.call.fromTheFuture = 1;
+    moved.e.entry.fromTheFuture = { any: true };
+    expect(() => parseServerFrame(moved)).toThrow(ProtocolError);
+    setLenientDecoding(true);
+    const frame = parseServerFrame(moved) as unknown as typeof update;
+    expect(frame.e.entry.toolUseId).toBe('toolu_01Bench');
+    expect('fromTheFuture' in frame.e.entry).toBe(false);
+    expect('fromTheFuture' in frame.e.entry.call).toBe(false);
+    expect(frame.e.entry.call.exit).toBe(2);
+  });
+  it('keeps a tool entry of an older runtime, without a call', () => {
+    const update = Object.entries(fixtures).find(([p]) => name(p) === 'ev.entry_update')![1];
+    const frame = parseServerFrame(update) as unknown as { e: { entry: Record<string, unknown> } };
+    expect('call' in frame.e.entry).toBe(false);
+  });
   it('still refuses a missing field', () => {
     setLenientDecoding(true);
     const { limits: _, ...rest } = welcome;

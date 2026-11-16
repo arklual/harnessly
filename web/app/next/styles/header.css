@@ -324,6 +324,11 @@
   padding: 0 var(--hx-space-2) var(--hx-space-2);
   list-style: none;
 }
+/* The rows under the sheet's edge are not worked out when it opens: ~12 of 30 show. */
+.hx-chats-sheet__list > li {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 48px;
+}
 .hx-chats-sheet__row {
   display: flex;
   align-items: center;

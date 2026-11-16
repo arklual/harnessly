@@ -34,7 +34,7 @@ func TestValidatorChecksConnection(t *testing.T) {
 		name, mcp, want string
 	}{
 		{"fine", connectionMCP, ""},
-		{"sse is fine", `{"mcpServers":{"a":{"type":"sse","connection":"asana"}}}`, ""},
+		{"sse is fine", `{"mcpServers":{"a":{"type":"sse","connection":"notion"}}}`, ""},
 		{"unknown id", `{"mcpServers":{"a":{"type":"http","connection":"nope"}}}`, `connection "nope" is not in the catalog`},
 		{"has an url", `{"mcpServers":{"a":{"type":"http","connection":"linear","url":"https://x.example.com"}}}`, "no url or headers"},
 		{"has headers", `{"mcpServers":{"a":{"type":"http","connection":"linear","headers":{"X":"1"}}}}`, "no url or headers"},
@@ -111,10 +111,10 @@ func TestLaunchWaitingForConnectionStillStarts(t *testing.T) {
 }
 
 func TestPackageConnections(t *testing.T) {
-	reg, pkgDir := connectionApp(t, `{"mcpServers":{"a":{"type":"http","connection":"linear"},"b":{"type":"http","connection":"linear"},"c":{"type":"http","connection":"asana"}}}`)
+	reg, pkgDir := connectionApp(t, `{"mcpServers":{"a":{"type":"http","connection":"linear"},"b":{"type":"http","connection":"linear"},"c":{"type":"http","connection":"notion"}}}`)
 	_ = reg
 	pkg, _ := LoadPackage(pkgDir)
-	if got := strings.Join(pkg.Connections(), ","); got != "asana,linear" {
+	if got := strings.Join(pkg.Connections(), ","); got != "linear,notion" {
 		t.Fatalf("%q", got)
 	}
 }
@@ -136,7 +136,7 @@ func TestConnectionNeedsThePersonsAgreementForThisApp(t *testing.T) {
 	if _, has := launch()["linear"]; has {
 		t.Fatal("without the agreement the server is left out, signed in or not")
 	}
-	if err := reg.GrantConnection("acme.tracker", "asana"); err == nil {
+	if err := reg.GrantConnection("acme.tracker", "notion"); err == nil {
 		t.Fatal("an agreement is for a connection the package names")
 	}
 	if err := reg.GrantConnection("acme.tracker", "linear"); err != nil {
@@ -149,14 +149,14 @@ func TestConnectionNeedsThePersonsAgreementForThisApp(t *testing.T) {
 		t.Fatal("an agreement is for one app")
 	}
 	// An update that names one more connection does not widen it.
-	next := `{"mcpServers":{"linear":{"type":"http","connection":"linear"},"asana":{"type":"sse","connection":"asana"}}}`
+	next := `{"mcpServers":{"linear":{"type":"http","connection":"linear"},"notion":{"type":"sse","connection":"notion"}}}`
 	if err := os.WriteFile(filepath.Join(pkg, ".mcp.json"), []byte(next), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, ps, err := reg.Install(pkg, InstallOptions{Dev: true, HostVersion: "0.17.0"}); err != nil {
 		t.Fatalf("%v %v", err, ps)
 	}
-	if !reg.ConnectionGranted("acme.tracker", "linear") || reg.ConnectionGranted("acme.tracker", "asana") {
+	if !reg.ConnectionGranted("acme.tracker", "linear") || reg.ConnectionGranted("acme.tracker", "notion") {
 		t.Fatal("the new connection waits for its own agreement")
 	}
 	// Removing the app ends its agreements.

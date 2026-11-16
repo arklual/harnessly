@@ -178,7 +178,8 @@ export const MachineDrawer = ({
           onCancel={() => url.setTab(null)}
           onSave={saveAccess}
         />
-        <DebugLog id={id} />
+        {/* The hub says whom it lists the openings to (canSeeDebug): the creator and who manages the tenant. */}
+        {m.canSeeDebug === true && <DebugLog id={id} />}
         {m.canAdmin && (
           <div className="md-sec">
             <div className="md-sec__head">

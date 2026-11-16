@@ -236,6 +236,12 @@
   }
 }
 
+/* The phone's sheet menu (ui/sheet-menu.tsx) is plain buttons: the keys' item is the focused one. */
+.hx-cmenu__list .hx-cmenu__item:focus-visible {
+  outline: 0;
+  background: var(--cm-hl);
+}
+
 /* A choice that has nothing to do waits, dimmed. */
 .hx-cmenu__item[data-disabled] {
   opacity: 0.38;

@@ -105,7 +105,14 @@ const CENTRAL_ONLY =
   /^\/m\/[^/]+\/api\/(platform|v2)\/(history\/(conversations|sidebar)$|chat-move\/status$|offline-chats$)/;
 
 /** Puts a failed request of a person's page among the errors, or among the central-only answers. */
+/**
+ * The hub's extension views and branding (internal/hub/api/ext_ui.go): with HARNESSLY_UI_SLOTS off the route is not
+ * there, and the page reads its 404 as «no extensions» (web/app/hub/hx/ext/host.ts).
+ */
+const EXT_UI_OFF = /^\/api\/ext\/ui$/;
+
 const noteFailed = (p: Person, method: string, path: string, search: string, status: number) => {
+  if (status === 404 && EXT_UI_OFF.test(path)) return;
   if (status === 404 && CENTRAL_ONLY.test(path)) p.central.add(path.replace(/^\/m\/[^/]+/, ''));
   else p.errors.push(`${method} ${path}${search} → ${status}`);
 };

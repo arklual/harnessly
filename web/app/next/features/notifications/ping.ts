@@ -32,6 +32,8 @@ let audio: AudioContext | null = null;
 /** Browsers start sound only after the person touched the page: the context is made and woken on the first touch. */
 export const unlockSound = (): (() => void) => {
   const wake = () => {
+    // Running already: nothing to wake. A resume on every touch cost a sheet's open on a phone.
+    if (audio?.state === 'running') return;
     try {
       audio ??= new AudioContext();
       void audio.resume().catch(() => undefined);

@@ -492,6 +492,9 @@ func (s *codexState) responseItem(p *jsvalue.Object, ts float64) []*jsvalue.Obje
 		}
 		text := codexOutputText(prop(p, "output"))
 		result := codexEntry("tool-result", ts, "toolUseId", callID, "isError", false, "summary", summarizeCodexOutput(text))
+		if text != "" && cardResult(text) == "" {
+			setResultText(result, text)
+		}
 		if rep, ok := codexPictureReport(text); ok {
 			// The answer of generate_images / wait_images, straight or printed by a script: the card's job and files.
 			paths := make([]any, len(rep.Paths))

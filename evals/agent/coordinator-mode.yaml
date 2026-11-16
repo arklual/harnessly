@@ -1,0 +1,27 @@
+id: coordinator-mode
+title: «Только координируй» — главный чат включает режим координатора и раздаёт работу
+tags: [delegation, orchestration]
+agents: [claude]
+timeout_s: 600
+settle_s: 45
+setup:
+  files:
+    src/a.txt: "one\ntwo\n"
+covers:
+  - 'internal/delegation/**'
+  - 'internal/chatrole/**'
+  - 'internal/hlcli/voiceguard.go'
+  - 'cmd/runtime/agent_skills*.go'
+prompt: >-
+  В этом чате ты только координируешь, сам ничего не правь и не запускай. Пусть другой агент допишет в src/a.txt строку
+  three, а ты проверь результат.
+expect:
+  # the person's words turn the mode on.
+  - name: turned the coordinator mode on
+    called: harnessly\.coordinate_mode
+  - name: handed the edit out
+    called: harnessly\.delegate_task
+  - name: did not edit itself
+    not_called: Edit
+  - name: the line is there
+    check: grep -qx three src/a.txt

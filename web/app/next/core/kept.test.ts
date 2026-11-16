@@ -28,7 +28,14 @@ describe('keepItems (HRN-1449)', () => {
       { id: 'a', n: 1 },
       { id: 'b', n: 1 },
     ];
-    const out = keepItems(was, [{ id: 'b', n: 1 }, { id: 'a', n: 1 }], id);
+    const out = keepItems(
+      was,
+      [
+        { id: 'b', n: 1 },
+        { id: 'a', n: 1 },
+      ],
+      id,
+    );
     expect(out).not.toBe(was);
     expect(out?.[0]).toBe(was[1]);
   });

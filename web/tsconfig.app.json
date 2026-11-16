@@ -26,5 +26,12 @@
     "emitDeclarationOnly": true,
     "outDir": "./node_modules/.tmp/app"
   },
-  "include": ["app", "kit", "viz", "e2e/parity/viz/page", "e2e/parity/viz/page/fixture.json"]
+  "include": [
+    "app",
+    "kit",
+    "viz",
+    "e2e/parity/viz/page",
+    "e2e/parity/viz/page/fixture.json",
+    "app/next/features/looks/presets.json"
+  ]
 }

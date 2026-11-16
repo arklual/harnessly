@@ -181,7 +181,6 @@ func voiceEditStep(step string, took time.Duration, ok bool, note string) {
 func voiceEditRoutes(d deps) []gate.Route {
 	var routes []gate.Route
 	for _, base := range []string{platformAPI + "/voice/edit", "/agents" + platformAPI + "/voice/edit"} {
-		base := base
 		routes = append(routes, gate.Route{
 			Match: func(r *http.Request) bool {
 				return r.URL.Path == base || r.URL.Path == base+"/undo" || r.URL.Path == base+"/warm"

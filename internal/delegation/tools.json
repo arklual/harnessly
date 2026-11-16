@@ -1,21 +1,71 @@
 [
   {
     "name": "delegate_task",
-    "description": "Hand a task to another agent in a new chat of this machine that the person sees, nested under this chat, and can open, watch and take over. Use it for another provider or model than yours (e.g. Codex, or a stronger or cheaper model), for long work the person should be able to follow or continue, or work to run beside yours. For a quick subtask of your own kind inside this session, use your own subagents instead. The task must stand alone: the other agent sees nothing of this chat. Returns the chat's id at once; the agent works on it meanwhile — wait_conversation for its answer, or notify: true to be woken with it.",
+    "description": "Hand a task to another agent in a new chat of this machine that the person sees, nested under this chat, and can open, watch and take over. Use it for another provider or model than yours (e.g. Codex, or a stronger or cheaper model), for long work the person should be able to follow or continue, or work to run beside yours. For a quick subtask of your own kind whose result only you need, use your own subagents instead (Agent, spawn_agent); when the person asks for helpers or parallel work, or the parts each take a while, delegate them here so the person sees them. The task must stand alone: the other agent sees nothing of this chat. Returns the chat's id at once; the agent works on it meanwhile — wait_conversation for its answer, or notify: true to be woken with it. Several delegated chats can write to you and to each other mid-turn.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "provider": {"type": "string", "enum": ["claude", "codex"], "description": "The agent CLI to run the task."},
-        "agent_model": {"type": "string", "description": "A model id of that provider on this machine (as its model picker names it, e.g. opus or sonnet for Claude); omit for the machine's default. An unknown id is refused with the list of the ones there are."},
-        "model": {"type": "string", "description": "Deprecated, use agent_model. Claude Code replaces a parameter named exactly `model` with its own subagent model (CLAUDE_CODE_SUBAGENT_MODEL) before the call leaves it, so a model asked for here may not arrive; agent_model is never touched. When both are given, agent_model is used."},
-        "effort": {"type": "string", "enum": ["low", "medium", "high", "xhigh", "max", "ultra"], "description": "Reasoning effort; omit for the model's own."},
-        "prompt": {"type": "string", "description": "The task, complete: goal, context, files, what to answer with."},
-        "cwd": {"type": "string", "description": "Absolute folder to work in, inside this chat's folder or one of the machine's projects; omit for this chat's folder."},
-        "title": {"type": "string", "description": "A short name for the chat, as the person sees it in the sidebar."},
-        "notify": {"type": "boolean", "description": "Wake this chat with the result when the other agent finishes a turn (it arrives as a message from that agent). Default false."},
-        "test": {"type": "boolean", "description": "Mark the chat as a test chat: the person's sidebar leaves it out (they can show test chats). Set it for a chat you start only to check something. Default false."}
+        "provider": {
+          "type": "string",
+          "enum": [
+            "claude",
+            "codex"
+          ],
+          "description": "The agent CLI to run the task."
+        },
+        "agent_model": {
+          "type": "string",
+          "description": "A model id of that provider on this machine (as its model picker names it, e.g. opus or sonnet for Claude); omit for the machine's default. An unknown id is refused with the list of the ones there are."
+        },
+        "model": {
+          "type": "string",
+          "description": "Deprecated, use agent_model. Claude Code replaces a parameter named exactly `model` with its own subagent model (CLAUDE_CODE_SUBAGENT_MODEL) before the call leaves it, so a model asked for here may not arrive; agent_model is never touched. When both are given, agent_model is used."
+        },
+        "effort": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "description": "Reasoning effort; omit for the model's own."
+        },
+        "prompt": {
+          "type": "string",
+          "description": "The task, complete: goal, context, files, what to answer with."
+        },
+        "cwd": {
+          "type": "string",
+          "description": "Absolute folder to work in, inside this chat's folder or one of the machine's projects; omit for this chat's folder."
+        },
+        "title": {
+          "type": "string",
+          "description": "A short name for the chat, as the person sees it in the sidebar."
+        },
+        "notify": {
+          "type": "boolean",
+          "description": "Wake this chat with the result when the other agent finishes a turn (it arrives as a message from that agent). Default false."
+        },
+        "test": {
+          "type": "boolean",
+          "description": "Mark the chat as a test chat: the person's sidebar leaves it out (they can show test chats). Set it for a chat you start only to check something. Default false."
+        },
+        "plan_first": {
+          "type": "boolean",
+          "description": "Only when the person asked to see the plan first: the agent sends you its plan (submit_plan) and may not change files until you approve it with approve_plan. Default false."
+        },
+        "full_context": {
+          "type": "boolean",
+          "description": "Start the chat with everything the person's own chats load: their memory index and all their plugins (MCP servers, skills). Default false: a delegated chat starts lean, about a third less context, with the project's instructions, this platform's tools and the person's plugins that have hooks. Set it only when the task needs the person's notes or one of their MCP servers (a tracker, a dashboard)."
+        }
       },
-      "required": ["provider", "prompt"],
+      "required": [
+        "provider",
+        "prompt"
+      ],
       "additionalProperties": false
     }
   },
@@ -25,44 +75,277 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string", "description": "The chat's id (tab-…)."},
-        "since": {"type": "string", "description": "The cursor of an earlier read."},
-        "limit": {"type": "integer", "minimum": 1, "maximum": 200, "description": "At most this many entries, the latest ones. Default 40."}
+        "id": {
+          "type": "string",
+          "description": "The chat's id (tab-…)."
+        },
+        "since": {
+          "type": "string",
+          "description": "The cursor of an earlier read."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "description": "At most this many entries, the latest ones. Default 40."
+        }
       },
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "additionalProperties": false
     }
   },
   {
     "name": "send_to_conversation",
-    "description": "Give a chat you delegated more work, an answer or an instruction, as a message from your agent (never as the person's words). An agent that works gets it inside its running turn, at its next step (the person may have set «after the turn» for this machine); a free one starts on it at once. The answer says what happened: delivered into the running turn, delivered, or queued and why. A queued message is not lost and is typed once: do not send it again.",
+    "description": "Write to a chat: one you delegated (more work, an answer, an instruction), or — from a delegated chat — your parent (id \"parent\") or a chat delegated beside you (list_children names them), e.g. «the API contract changed: …» or a question you cannot go on without. The message goes as your agent's message (never as the person's words). An agent that works gets it inside its running turn, at its next step (the person may have set «after the turn» for this machine); a free one starts on it at once. The answer says what happened: delivered into the running turn, delivered, or queued and why. A queued message is not lost and is typed once: do not send it again. Messages within a team are paced: do not chat back and forth.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string", "description": "The chat's id (tab-…)."},
-        "text": {"type": "string", "description": "The message."},
-        "deliver": {"type": "string", "enum": ["now", "queue"], "description": "now: urgent — it goes into the running turn and the tool the agent runs is handed to the background, so it is read at once; use it for a change of plan the agent must not work past. queue: it waits for the agent's turn to end; use it for work to pick up after the current one. Omit for the machine's default (into the running turn, read at the agent's next step)."}
+        "id": {
+          "type": "string",
+          "description": "The chat's id (tab-…), or \"parent\" for the chat that delegated this one."
+        },
+        "text": {
+          "type": "string",
+          "description": "The message."
+        },
+        "deliver": {
+          "type": "string",
+          "enum": [
+            "now",
+            "queue"
+          ],
+          "description": "now: urgent — it goes into the running turn and the tool the agent runs is handed to the background, so it is read at once; use it for a change of plan the agent must not work past. queue: it waits for the agent's turn to end; use it for work to pick up after the current one. Omit for the machine's default (into the running turn, read at the agent's next step)."
+        }
       },
-      "required": ["id", "text"],
+      "required": [
+        "id",
+        "text"
+      ],
       "additionalProperties": false
     }
   },
   {
     "name": "wait_conversation",
-    "description": "Wait until a chat you delegated finishes what it was last given (or needs the person, or stops), at most timeout_s seconds, and get its last answer. A timeout means it still works: wait again or read it.",
+    "description": "Wait until a chat you delegated (or all of them: id \"all\") finishes what it was last given (or needs the person, or stops), at most timeout_s seconds, and get its last answer. A timeout means it still works: wait again or read it.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "id": {"type": "string", "description": "The chat's id (tab-…)."},
-        "timeout_s": {"type": "integer", "minimum": 1, "maximum": 600, "description": "How long to wait. Default 120; Codex's calls end at 55."}
+        "id": {
+          "type": "string",
+          "description": "The chat's id (tab-…), or \"all\" to wait for every chat you delegated in one call."
+        },
+        "timeout_s": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600,
+          "description": "How long to wait. Default 120; Codex's calls end at 55."
+        }
       },
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "additionalProperties": false
     }
   },
   {
     "name": "list_children",
-    "description": "The chats this chat delegated, with each one's agent, model and state.",
-    "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false}
+    "description": "The chats this chat delegated, with each one's agent, model and state; in a delegated chat also its parent and the chats delegated beside it, whom it may write to.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "broadcast_children",
+    "description": "Send one message to every chat this chat delegated that still runs, at once: «stop, main is frozen», «the contract changed: …», «wrap up and report». A chat at work gets it in its running turn; a free one (its turn ended) is not woken: the message waits and goes into its next turn. Stopped chats are skipped. Use it instead of a send_to_conversation per chat.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "The message."
+        },
+        "deliver": {
+          "type": "string",
+          "enum": [
+            "now",
+            "queue"
+          ],
+          "description": "now: a stop — each running turn is interrupted (the command it runs is stopped) and the message is read at once. queue: after each one's turn. Omit for the next step of each running turn."
+        },
+        "wake": {
+          "type": "boolean",
+          "description": "Also start the free chats on it now (e.g. «report what you have»). Default false: a free chat gets it with its next turn."
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "task_add",
+    "description": "Put a task on the team's shared task list (the chat that delegates and its delegated chats share one; the person sees it in the chat's plan). For a pool of parts with explicit dependencies (after) or a check that must pass, which delegated chats take one after another (task_claim without an id). When each part has its own chat, delegating them and waiting is cheaper: no list needed. Returns the task's id (t1, t2…).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "What to do, in a line."
+        },
+        "detail": {
+          "type": "string",
+          "description": "The whole task: goal, files, what «done» is. The chat that claims it reads this."
+        },
+        "after": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ids of tasks that must be done before this one can be claimed."
+        },
+        "check": {
+          "type": "string",
+          "description": "A shell command run in the claiming chat's folder when it reports the task done, e.g. `go test ./internal/x`; a non-zero exit gives the task back with the output."
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "task_list",
+    "description": "The team's task list: each task's id, whether it is free, waits for other tasks, is held (and by which chat), or done, with its check and result.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "task_claim",
+    "description": "Take a task of the team's list: the one named, or without id the first free one whose dependencies are done. A claim is a lock: no other chat can take it. A chat holds one task at a time. The chat that delegates may claim for one of its chats (for).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The task's id; omit for the next free one."
+        },
+        "for": {
+          "type": "string",
+          "description": "A chat you delegated to claim it for (then tell it with send_to_conversation)."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "task_done",
+    "description": "Report a task you hold done, with what you did. If the task has a check, it runs now: a non-zero exit keeps the task yours and the answer carries the output to fix. When it passes, the answer names the next free task. A delegated chat that ends its turn with no task in hand is given the next free one by itself.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The task's id."
+        },
+        "result": {
+          "type": "string",
+          "description": "What was done, in a few lines: files, commits, what was checked."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "task_release",
+    "description": "Give a task you hold back to the team's list, free for another chat, with why (blocked, out of your reach).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The task's id."
+        },
+        "why": {
+          "type": "string",
+          "description": "Why it is given back."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "submit_plan",
+    "description": "In a delegated chat started with plan_first: send your plan to the parent for approval. Until it is approved, edits and commands that write are refused. After it, end the turn with [[question]]; you are told when the plan is approved or what to change.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "plan": {
+          "type": "string",
+          "description": "The plan: the steps, the files each changes, how it will be checked."
+        }
+      },
+      "required": [
+        "plan"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "approve_plan",
+    "description": "Approve the plan of a chat you delegated with plan_first (its edits are allowed from then on), or send it back with feedback on what to change.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The chat's id."
+        },
+        "approve": {
+          "type": "boolean",
+          "description": "true approves; false sends it back."
+        },
+        "feedback": {
+          "type": "string",
+          "description": "What to change (required when not approving), or notes to go with the approval."
+        }
+      },
+      "required": [
+        "id",
+        "approve"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "coordinate_mode",
+    "description": "Make this chat a coordinator, or a worker again. A coordinator hands the work out (delegate_task, the task list, send_to_conversation), reads and checks results, and does not edit files or run builds and test suites itself: those calls are refused. Turn it on when the person asks this chat only to coordinate, lead or manage the delegated chats (or to keep its own context small); off when they ask it to do the work itself.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "on": {
+          "type": "boolean",
+          "description": "true: coordinate only; false: work again."
+        }
+      },
+      "required": [
+        "on"
+      ],
+      "additionalProperties": false
+    }
   }
 ]

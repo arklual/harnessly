@@ -242,6 +242,9 @@ func newV2Live(d deps, c *core) *v2Live {
 		c.agents.codexInput.rt.Store(v.rt)
 	}
 	v.delegation = newDelegation(v, runtimeSettings)
+	if v.starter != nil && os.Getenv("RUNTIME_DELEGATE_FULL_CONTEXT") != "1" {
+		v.starter.lean = v.delegation.Lean
+	}
 	v.srv = v2Server(d, v.hub, v.rt, v.machine, features, false)
 	v.srv.Uploads = uploads
 	v.work = newChatWork(v)
@@ -283,7 +286,7 @@ func newV2Live(d deps, c *core) *v2Live {
 	v.srv.GitSide = v2f.ServeGitSide
 	v.srv.FindText = v2f.ServeSearch
 	v.srv.EntryOp = v2f.ServeEntryOp
-	v.srv.Tasks = v.rt.Tasks
+	v.srv.Tasks = v.planTasks
 	if terminals != nil {
 		v.srv.Rewind = v.rt
 	}
@@ -822,6 +825,8 @@ type v2Launcher struct {
 	// promptFiles are the instruction files a launch in a folder takes, set by the one who creates the conversation
 	// (the design library's) for the folder it is made in; Launch takes them.
 	promptFiles sync.Map // cwd → []string
+	// lean tells a chat that starts with less context (agents.Launch.Lean): a delegated one.
+	lean func(conversation string) bool
 }
 
 var _ convo.Launcher = (*v2Launcher)(nil)
@@ -880,6 +885,9 @@ func (l *v2Launcher) Launch(req convo.LaunchRequest) error {
 	if c.agents.codexInput != nil && req.Provider == wire.ProviderCodex && req.ResumeSessionID == "" && !req.Fork {
 		// A new Codex chat may start beside its app-server; whether it does is the launch line's to decide.
 		chosen.Input = req.ID
+	}
+	if req.Provider == wire.ProviderClaude && l.lean != nil && l.lean(req.ID) {
+		chosen.Lean = true
 	}
 	if len(req.Apps) > 0 {
 		if chosen == nil {

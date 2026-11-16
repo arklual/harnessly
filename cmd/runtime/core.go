@@ -28,6 +28,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 	"github.com/ly-solutions/harnessly/internal/paneintents"
 	"github.com/ly-solutions/harnessly/internal/panel"
+	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/prompts"
 	"github.com/ly-solutions/harnessly/internal/push"
 	"github.com/ly-solutions/harnessly/internal/safego"
@@ -341,8 +342,12 @@ func (c *core) runLimits(ctx context.Context, m *status.Manager) {
 		m.RateLimitsChanged(data)
 		_ = hist.Record(data, now())
 	})
+	// The machine's Claude sign-in: Claude Code's own folder, then the managed one its chats sign in from.
+	claudeDirs := []string{env("CLAUDE_CONFIG_DIR", filepath.Join(c.cfg.Home, ".claude")),
+		os.Getenv("CLAUDE_SECURESTORAGE_CONFIG_DIR"), preflight.AuthDirOf(os.Getenv("RUNTIME_SIDE_CHAT_CONFIG"))}
 	(&limits.Pollers{Cache: c.limits, CodexbarBin: limits.CodexbarBin(c.cfg.CodexbarBin), CodexHome: c.cfg.CodexHome,
-		Warn: func(msg string, err error) { agent.Log("warn", "core: "+msg, agent.F{K: "err", V: err.Error()}) }}).Run(ctx)
+		ClaudeDirs: claudeDirs,
+		Warn:       func(msg string, err error) { agent.Log("warn", "core: "+msg, agent.F{K: "err", V: err.Error()}) }}).Run(ctx)
 }
 
 // stop ends the core; its sockets close and the machine agent dials again, to the old runtime.

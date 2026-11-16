@@ -229,7 +229,7 @@ func (c *cli) evalRun(args []string) error {
 	o := agenteval.Options{Scenarios: scenarios, Models: ms, Variants: *variants, Repeats: *repeats, Parallel: *parallel,
 		MaxRuns: *maxRuns, MaxUSD: *maxUSD, Retries: *retries, Setup: *setup, Out: out, PortBase: *portBase, Log: c.env.Stderr,
 		Stand: agenteval.StandConfig{Root: filepath.Join(out, "stands"), Runtime: rt, Harnessly: self, Tools: toolDirs, Login: loginDir,
-			RealImages: *realImages, RuntimeEnv: su.RuntimeEnv, AgentEnv: su.AgentEnv}}
+			RealImages: *realImages, RuntimeEnv: su.RuntimeEnv, AgentEnv: su.AgentEnv, ClaudeConfig: su.ClaudeConfig, PromptSuffix: su.PromptSuffix}}
 	if *reuse {
 		o.Reuse = map[string]agenteval.Result{}
 		for _, prev := range previousRuns(base, "") {

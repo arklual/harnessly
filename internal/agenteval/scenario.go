@@ -37,9 +37,21 @@ type Scenario struct {
 	// Judge is a rubric for a model, only where no fact can tell.
 	Judge    string `yaml:"judge" json:"judge,omitempty"`
 	TimeoutS int    `yaml:"timeout_s" json:"timeoutS,omitempty"`
+	// Interrupt is a message the person sends while the agent works: «stop, main is frozen».
+	Interrupt *Interrupt `yaml:"interrupt" json:"interrupt,omitempty"`
+	// SettleS: after the person's chat ends its turn, the run goes on until no agent of the stand (subagents, chats it
+	// delegated to, teammates) wrote to its transcript for this many seconds, and the person's chat is not working. A
+	// chat that delegates ends its turn and is woken by its chats' answers; without it the run is judged half-way.
+	SettleS int `yaml:"settle_s" json:"settleS,omitempty"`
 
 	dir string
 	raw []byte
+}
+
+// Interrupt is a message sent into the person's chat after AfterS seconds, while its turn is still going.
+type Interrupt struct {
+	AfterS int    `yaml:"after_s" json:"afterS"`
+	Text   string `yaml:"text" json:"text"`
 }
 
 // Variant is a stored rewording of the prompt.
@@ -57,6 +69,10 @@ type Setup struct {
 	Design []string `yaml:"design" json:"design,omitempty"`
 	// RuntimeEnv adds to the setup's runtime settings for this scenario.
 	RuntimeEnv map[string]string `yaml:"runtime_env" json:"runtimeEnv,omitempty"`
+	// Workspace are folders (relative to the scenario file) whose contents are copied into the workspace.
+	Workspace []string `yaml:"workspace" json:"workspace,omitempty"`
+	// Run is a shell script run in the workspace, inside the stand's sandbox, after the files are in place (git init).
+	Run string `yaml:"run" json:"run,omitempty"`
 }
 
 // Expect is one expectation; exactly one of its kinds is set.
@@ -82,6 +98,9 @@ type Expect struct {
 	AnyOf []Expect `yaml:"any_of" json:"anyOf,omitempty"`
 	// MaxCalls bounds the agent's tool calls.
 	MaxCalls int `yaml:"max_calls" json:"maxCalls,omitempty"`
+	// Check is a shell command run in the workspace after the run, inside the stand's sandbox: it holds when it exits 0.
+	// It sees EVAL_STARTED_AT and EVAL_INTERRUPT_AT (Unix seconds; empty without an interrupt).
+	Check string `yaml:"check" json:"check,omitempty"`
 }
 
 // PaneExpect is a tab the agent opened.
@@ -106,6 +125,7 @@ const (
 
 	defaultTimeoutS = 300
 	maxTimeoutS     = 1800
+	maxSettleS      = 600
 )
 
 var idRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,63}$`)
@@ -174,6 +194,12 @@ func ParseScenario(name string, raw []byte) (*Scenario, error) {
 	if s.TimeoutS < 0 || s.TimeoutS > maxTimeoutS {
 		return nil, fmt.Errorf("%s: timeout_s is 0 to %d", name, maxTimeoutS)
 	}
+	if s.SettleS < 0 || s.SettleS > maxSettleS {
+		return nil, fmt.Errorf("%s: settle_s is 0 to %d", name, maxSettleS)
+	}
+	if it := s.Interrupt; it != nil && (it.AfterS <= 0 || strings.TrimSpace(it.Text) == "" || (s.TimeoutS > 0 && it.AfterS >= s.TimeoutS)) {
+		return nil, fmt.Errorf("%s: interrupt has after_s (within timeout_s) and a text", name)
+	}
 	seen := map[string]bool{"canon": true}
 	for _, v := range s.Variants {
 		if v.ID == "" || seen[v.ID] || strings.TrimSpace(v.Text) == "" {
@@ -199,9 +225,9 @@ func ParseScenario(name string, raw []byte) (*Scenario, error) {
 			return nil, fmt.Errorf("%s: runtime_env takes RUNTIME_* settings, not %s", name, k)
 		}
 	}
-	for _, d := range s.Setup.Design {
+	for _, d := range append(append([]string{}, s.Setup.Design...), s.Setup.Workspace...) {
 		if filepath.IsAbs(d) {
-			return nil, fmt.Errorf("%s: a design fixture is relative to the scenario", name)
+			return nil, fmt.Errorf("%s: a fixture folder is relative to the scenario", name)
 		}
 	}
 	return &s, nil
@@ -210,7 +236,7 @@ func ParseScenario(name string, raw []byte) (*Scenario, error) {
 func (e Expect) kinds() int {
 	n := 0
 	for _, set := range []bool{e.Called != "", e.NotCalled != "", e.Pane != nil, e.Images > 0, e.File != nil, e.Text != "",
-		e.TextNot != "", len(e.AnyOf) > 0, e.MaxCalls > 0} {
+		e.TextNot != "", len(e.AnyOf) > 0, e.MaxCalls > 0, e.Check != ""} {
 		if set {
 			n++
 		}
@@ -220,7 +246,7 @@ func (e Expect) kinds() int {
 
 func (e Expect) validate() error {
 	if e.kinds() != 1 {
-		return errors.New("one kind per expectation: called, not_called, pane, images, file, text, text_not, any_of or max_calls")
+		return errors.New("one kind per expectation: called, not_called, pane, images, file, text, text_not, any_of, max_calls or check")
 	}
 	if len(e.Args) > 0 && e.Called == "" && e.NotCalled == "" {
 		return errors.New("args go with called or not_called")

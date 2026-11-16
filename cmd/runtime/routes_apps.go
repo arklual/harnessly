@@ -133,6 +133,8 @@ type appViewEntry struct {
 	Feed string `json:"feed,omitempty"`
 	// FeedPath: the feed through this runtime (routes_apps_feed.go), when the machine signs it in; the page reads it there.
 	FeedPath string `json:"feedPath,omitempty"`
+	// Widget: how a view of the chat's right column (the side target) is drawn and fed.
+	Widget *apps.ViewWidget `json:"widget,omitempty"`
 }
 
 // uiSlotsOn says whether the interface's slots are on (HARNESSLY_UI_SLOTS=on). Off, the page lists no slot view and no
@@ -193,7 +195,7 @@ func viewOfApp(a apps.Installed, withDir bool) appView {
 	if m := a.Manifest; m != nil {
 		v.Branding = m.Branding
 		for _, mv := range m.Views {
-			e := appViewEntry{ID: mv.ID, Title: mv.Title, Targets: mv.Targets, Height: mv.Height, Label: mv.Label, Icon: mv.Icon, Order: mv.Order, Objects: mv.Objects, Pinned: mv.Pinned}
+			e := appViewEntry{ID: mv.ID, Title: mv.Title, Targets: mv.Targets, Height: mv.Height, Label: mv.Label, Icon: mv.Icon, Order: mv.Order, Objects: mv.Objects, Pinned: mv.Pinned, Widget: mv.Widget}
 			if strings.HasPrefix(mv.Entry, "https://") {
 				// A view at an address of the app's own server is framed only when its host is listed in network.frames.
 				if u, ok := m.FrameURL(mv.Entry); ok {

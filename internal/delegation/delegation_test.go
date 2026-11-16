@@ -28,6 +28,7 @@ type fakeConvs struct {
 	sent     map[string][]string // the texts DeliverPeer queued, by conversation
 	told     map[string][]string // the texts the platform sent a chat with Do (reminders), by conversation
 	queued   bool                // DeliverPeer answers queued: the agent is starting
+	stopped  []string            // the chats whose running turn was interrupted (Escape)
 	steers   map[string][]bool   // whether each of them was steered into the running turn, by conversation
 	atOnce   map[string][]bool   // whether each of them was marked urgent (DeliverPeerAtOnce), by conversation
 	outcome  convo.PeerOutcome   // what PeerOutcome answers
@@ -95,6 +96,15 @@ func (f *fakeConvs) entry(id string, e wire.Entry) {
 }
 
 func (f *fakeConvs) Do(_ context.Context, _ string, cmd wire.Command) wire.CmdResult {
+	if m, ok := cmd.(wire.InterruptCmd); ok {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		if m.Pauses() {
+			return wire.Refused(wire.RefuseBadRequest) // a stop of the delegation never pauses the queue
+		}
+		f.stopped = append(f.stopped, m.ConversationID)
+		return wire.CmdResult{R: wire.ResultAccepted}
+	}
 	if m, ok := cmd.(wire.SendCmd); ok {
 		f.mu.Lock()
 		defer f.mu.Unlock()
@@ -358,10 +368,11 @@ func TestDelegationLimits(t *testing.T) {
 		t.Fatalf("grandchild: %s", text)
 	}
 	r.convs.add(wire.Conversation{ID: "tab-other", Title: "The person's own", Provider: wire.ProviderClaude})
-	for _, target := range []string{"tab-root", "tab-other"} {
-		if text, isErr := r.call(child, "send_to_conversation", map[string]any{"id": target, "text": "hi"}); !isErr || !strings.Contains(text, "not-allowed") {
-			t.Fatalf("send to %s: %s", target, text)
-		}
+	if text, isErr := r.call(grandchild, "send_to_conversation", map[string]any{"id": "tab-root", "text": "hi"}); !isErr || !strings.Contains(text, "not-allowed") {
+		t.Fatalf("grandchild to root: %s", text)
+	}
+	if text, isErr := r.call(child, "send_to_conversation", map[string]any{"id": "tab-other", "text": "hi"}); !isErr || !strings.Contains(text, "not-allowed") {
+		t.Fatalf("send to a stranger: %s", text)
 	}
 	r.svc.Settings = func() wire.DelegationSettings { return wire.DelegationSettings{MaxChildren: 2, AnyChat: true} }
 	if text, isErr := r.call(child, "send_to_conversation", map[string]any{"id": "tab-other", "text": "hi"}); isErr {
@@ -486,6 +497,8 @@ func TestDelegateTakesTheModelFromAgentModel(t *testing.T) {
 		{map[string]any{"agent_model": "opus"}, "opus"},
 		{map[string]any{"agent_model": "opus", "model": "sonnet"}, "opus"},
 		{map[string]any{"model": "sonnet"}, "sonnet"},
+		// The family's full id, as the picker of the lead's own model names it, is that model.
+		{map[string]any{"agent_model": "claude-sonnet-5-5"}, "sonnet"},
 	} {
 		args := map[string]any{"provider": "claude", "prompt": "x"}
 		for k, v := range c.args {

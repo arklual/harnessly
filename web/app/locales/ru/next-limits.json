@@ -82,5 +82,12 @@
   "next.limits.alert.sevenDay": "Недельный лимит {provider}",
   "next.limits.alert.fiveHour": "5-часовой лимит {provider}",
   "next.limits.alert.text": "Осталось {left}%, сброс в {at}",
-  "next.limits.alert.textOut": "Исчерпан, сброс в {at}"
+  "next.limits.alert.textOut": "Исчерпан, сброс в {at}",
+  "next.limits.brief.five": "5 ч",
+  "next.limits.brief.week": "неделя",
+  "next.limits.brief.month": "месяц",
+  "next.limits.brief.lastsTo": "Хватит до {at}",
+  "next.limits.brief.aria": "{provider}, {window}: осталось {left}%",
+  "next.limits.mini.tip": "Лимиты {provider}: {windows}",
+  "next.limits.brief.model": "{model} · неделя"
 }

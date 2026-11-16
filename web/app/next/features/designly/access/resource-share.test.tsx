@@ -334,11 +334,59 @@ describe('the view of a resource', () => {
     expect(await fetchView({ kind: 'design', id: 'p1' })).toBeNull();
   });
 
+  it('throws where the gateway is there but failed, so the dialog says «Повторить» instead of the older one', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => json({ error: 'down' }, 502)),
+    );
+    await expect(fetchView({ kind: 'design', id: 'p1' })).rejects.toThrow();
+  });
+
   it('is the view where it does', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(() => json(owner)),
     );
     expect(await fetchView({ kind: 'design', id: 'p1' })).toEqual(owner);
+  });
+});
+
+describe('the one «Поделиться» before its view is read (HRN-1530)', () => {
+  it('opens at once with the known owner and a skeleton, then fills the same dialog', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const known = { name: 'Boss', email: 'boss@x.ru', you: true };
+    const view = render(
+      <PortalContext.Provider value={host}>
+        <div className="hx-root" ref={host} />
+        <ResourceShare {...props(owner)} view={null} knownOwner={known} />
+      </PortalContext.Provider>,
+    );
+    const people = (await screen.findByText(t('next.access.whoHas'))).closest('section')!;
+    expect(within(people).getByText('Boss')).toBeTruthy();
+    expect(people.getAttribute('aria-busy')).toBe('true');
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(people.querySelectorAll('.hx-acc-row--sk').length).toBe(2);
+    expect(screen.queryByRole('alert')).toBeNull();
+    const dialog = screen.getByRole('dialog');
+    view.rerender(
+      <PortalContext.Provider value={host}>
+        <div className="hx-root" ref={host} />
+        <ResourceShare {...props(owner)} knownOwner={known} />
+      </PortalContext.Provider>,
+    );
+    expect(await screen.findByText('Ann')).toBeTruthy();
+    // The same dialog, filled — not closed and opened again.
+    expect(screen.getByRole('dialog')).toBe(dialog);
+  });
+
+  it('says it failed with «Повторить», not with an empty list', async () => {
+    const onRetry = vi.fn();
+    inRoot(<ResourceShare {...props(owner)} view={null} failed onRetry={onRetry} />);
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain(t('next.access.failure.view'));
+    fireEvent.click(within(alert).getByRole('button', { name: t('next.access.retry') }));
+    expect(onRetry).toHaveBeenCalledOnce();
   });
 });

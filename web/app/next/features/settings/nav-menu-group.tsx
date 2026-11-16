@@ -1,5 +1,5 @@
 // «Меню слева» in Settings → «Оформление»: the sidebar menu as the person lays it out — the order of the items (by hand,
-// a finger holds a row on a phone), shown or hidden, an app raised to the top level beside Sinopia Design or put back
+// a finger holds a row on a phone), an app carried between the main buttons and «Приложения», shown or hidden, raised to the top level beside Sinopia Design or put back
 // under «Приложения». Pure: the binding says what there is and saves what this asks (the person's settings, every device).
 import { useRef } from 'react';
 import { Group } from '@/next/features/settings/rows';
@@ -7,9 +7,9 @@ import {
   type INavLayout,
   appKey,
   appOfKey,
-  moved,
   navSettingsOf,
   withHidden,
+  withPlaced,
   withRaised,
 } from '@/next/features/sidebar/nav-layout';
 import type { NavSettings } from '@/next/stores/me';
@@ -39,21 +39,14 @@ const APPS = 'nav-apps';
 type TKind = typeof TOP | typeof APPS;
 const KINDS: readonly TKind[] = [TOP, APPS];
 
-interface IPlan {
-  kind: TKind;
-  from: number;
-  to: number;
-}
-
-const planOf = (layout: INavLayout, source: IDragSource<TKind>, target: IDropTarget<TKind>): IPlan | null => {
-  if (source.kind !== target.kind || !target.id || !target.edge) return null;
-  const list = source.kind === TOP ? layout.top : layout.apps.map(appKey);
-  const from = list.indexOf(source.id);
-  let to = list.indexOf(target.id);
-  if (from < 0 || to < 0) return null;
-  if (target.edge === EDGE.after) to += 1;
-  if (to > from) to -= 1;
-  return to === from ? null : { kind: source.kind, from, to };
+/** A drop within a list or across them: an app goes up to the top level and back by hand too. */
+const planOf = (
+  layout: INavLayout,
+  source: IDragSource<TKind>,
+  target: IDropTarget<TKind>,
+): INavLayout | null => {
+  if (!target.id || !target.edge) return null;
+  return withPlaced(layout, source.id, target.id, target.edge === EDGE.after);
 };
 
 const NavRow = ({
@@ -126,18 +119,13 @@ const NavRow = ({
 const NavMenuGroup = ({ layout, entries, busy, onSave, onReset }: INavMenuProps) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const save = (next: INavLayout) => onSave(navSettingsOf(next));
-  useDrag<TKind, TKind, IPlan>({
+  useDrag<TKind, TKind, INavLayout>({
     listRef: rootRef,
     dragKinds: KINDS,
     dropKinds: KINDS,
-    lined: () => true,
+    lined: (source, target) => source.kind === target.kind,
     resolve: (source, target) => (busy ? null : planOf(layout, source, target)),
-    onDrop: (plan) =>
-      save(
-        plan.kind === TOP
-          ? { ...layout, top: moved(layout.top, plan.from, plan.to) }
-          : { ...layout, apps: moved(layout.apps, plan.from, plan.to) },
-      ).catch(() => undefined),
+    onDrop: (next) => save(next).catch(() => undefined),
   });
   useFlip(rootRef);
   const row = (kind: TKind, key: string) => {

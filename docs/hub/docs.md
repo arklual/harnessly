@@ -48,7 +48,9 @@ without an address has no such app; with one, every organization has the app wit
 
 ### Rights for the documents service
 
-The documents service knows the person from the platform's token (`sub`), and the hub keeps who has access. It asks:
+The documents service knows the person from the platform's token (`sub`), and the hub keeps who has access. The
+boards service asks the same with its own secret (`HUB_BOARD_EVENTS_SECRET`) and, for a person signed in on the boards
+site, `email` in place of `sub`: only an address a person of the hub has proved names them. It asks:
 
 ```
 POST /api/platform/docs/_rights
@@ -58,10 +60,26 @@ Authorization: Bearer <HUB_ARTIFACTS_ACCESS_TOKEN>
 → {"rights": {"a": "edit", "b": "none"}}
 ```
 
-Up to 200 slugs. Each right is `none`, `view`, `comment` or `edit`, by the same rules as the person's own page (the
+The answer also names in `known` the slugs the hub keeps a record of: the boards service applies the hub's word to those
+and keeps its own rules for the rest. Up to 200 slugs. Each right is `none`, `view`, `comment` or `edit`, by the same rules as the person's own page (the
 owner and the administrators read as `edit`). A document the hub has no record of, one out of the person's reach and
 every document of a person the hub does not know are `none`. A missing or wrong token is 401. The service may keep an
 answer for up to 10 seconds.
+
+A link without sign-in to a board opens on the boards service, `<HUB_BOARDS_PUBLIC_URL>/b/<slug>?g=<token>`, while the
+hub has `HUB_BOARD_EVENTS_SECRET` and the public address; the service asks what the link allows:
+
+```
+POST /api/platform/docs/_guest
+Authorization: Bearer <HUB_BOARD_EVENTS_SECRET or HUB_ARTIFACTS_ACCESS_TOKEN>
+
+{"token": "<the link's token>", "slug": "<board>", "open": true}
+→ {"slug", "rights": "view" | "comment", "forWhom", "linkId", "expiresAt"}
+```
+
+A token nobody made, one for another slug, one switched off or run out and a board in the trash are `404`. `open: true`
+counts an opening of the link. A guest with `comment` comments on the board under the name the link was made for; with
+`view` they only read. A document's link stays the hub's page, `/d/<token>`.
 
 `GET /api/platform/docs/_status` tells what is set up and why not, without signing anything.
 
@@ -264,7 +282,6 @@ bell to `/apps/harnessly.docs?o=<slug>&th=<thread>`. A document of the hub's own
 - Editing a block in place (`/source/block`) answers 501 `not_supported`; save the whole source instead.
 - A comment written on a board in the hub's own page is not sent to the boards service; the boards service is where boards are commented.
 - Documents are shared by the whole installation, not separated by space.
-- A public link to a board is not supported.
 - Several replicas of the bundled services: they keep files on one volume. Use S3 storage for artifacts and run it
   yourself (`docs.artifacts.url`).
 

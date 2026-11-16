@@ -6,7 +6,7 @@ import Md from '@/next/features/chat/md';
 import type { SubagentEntry } from '@/next/features/chat/types';
 import { summaryOf } from '@/next/features/subagents/excerpt';
 import { openSubagent } from '@/next/features/subagents/open';
-import { duration } from '@/next/i18n/format';
+import { cutBySize, duration } from '@/next/i18n/format';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
 import { usePresentFlag } from '@/next/ui/presence';
@@ -55,9 +55,7 @@ const Report = ({ entry, open }: { entry: SubagentEntry; open: boolean }) => {
         <div className="hx-sub__report">
           <Md md={output.text} />
           {output.truncated && (
-            <div className="hx-sub__cut">
-              {t('next.tool.truncated', { shown: output.truncated.shown, total: output.truncated.total })}
-            </div>
+            <div className="hx-sub__cut">{cutBySize(output.truncated.shown, output.truncated.total)}</div>
           )}
         </div>
       </div>

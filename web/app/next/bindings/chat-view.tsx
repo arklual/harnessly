@@ -469,7 +469,10 @@ const ChatView = ({
                               onOpenRef={
                                 onOpenFile || onOpenRef
                                   ? (kind, label, href) => {
-                                      if (kind === 'file' && !href) onOpenFile?.(label.replace(/:\d+$/, ''));
+                                      // A chat the answer names opens as its row in the sidebar does.
+                                      if (kind === 'chat') goTo({ kind: ROUTE.chat, id: label });
+                                      else if (kind === 'file' && !href)
+                                        onOpenFile?.(label.replace(/:\d+$/, ''));
                                       else onOpenRef?.(href ?? label);
                                     }
                                   : undefined

@@ -12,7 +12,13 @@ export const sameFields = <T extends object>(a: T, b: T): boolean => {
     const x = a[k];
     const y = b[k];
     if (Object.is(x, y)) return true;
-    return typeof x === 'object' && typeof y === 'object' && x !== null && y !== null && JSON.stringify(x) === JSON.stringify(y);
+    return (
+      typeof x === 'object' &&
+      typeof y === 'object' &&
+      x !== null &&
+      y !== null &&
+      JSON.stringify(x) === JSON.stringify(y)
+    );
   });
 };
 

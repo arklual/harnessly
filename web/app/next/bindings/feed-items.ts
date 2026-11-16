@@ -119,6 +119,28 @@ export const autoMarkOf = (
   return go.own ? MARKS[`${go.why}:own`] : MARKS[`${go.why}:sent`];
 };
 
+/** The rows a turn's end is followed by in the feed: a turn or a message, not a mark between them. */
+const isFollower = (item: FeedItem): item is TurnItem | OutgoingItem =>
+  item.kind === 'turn' || item.kind === 'outgoing';
+
+/**
+ * A failed turn that the runtime goes on from by itself after a restart: the next turn or message is its
+ * «go on». The turn then shows no red «Ход прервался» with its buttons next to «продолжаю…»: one status, the
+ * auto line. Its «go on» failing drops that message from the feed, and the failure shows again with its buttons. The
+ * copies are kept per turn item, so the feed's rows stay the same objects while nothing changes.
+ */
+export const markWentOn = (items: FeedItem[], kept: WeakMap<TurnItem, TurnItem>): void => {
+  items.forEach((item, i) => {
+    if (item.kind !== 'turn' || item.turn.status !== 'failed' || item.turn.failure?.code === 'rate-limit')
+      return;
+    const next = items.slice(i + 1).find(isFollower);
+    if (next?.auto?.why !== 'restart') return;
+    const have = kept.get(item) ?? { ...item, wentOn: true as const };
+    kept.set(item, have);
+    items[i] = have;
+  });
+};
+
 const userOf = (entry: Entry): UserEntry | null => (entry.t === 'user' ? entry : null);
 
 const sameWords = (a: string, b: string): boolean => a.trim() === b.trim();
@@ -281,6 +303,7 @@ export class ItemsBuilder {
   private gateEntries = new Map<string, Entry>();
   private outgoing = new Map<string, { source: MessageView; handed: boolean; item: OutgoingItem }>();
   private sent = new Map<string, { source: MessageView; entry: UserEntry }>();
+  private wentOn = new WeakMap<TurnItem, TurnItem>();
   private last: FeedItem[] | null = null;
   private stale = true;
 
@@ -378,6 +401,7 @@ export class ItemsBuilder {
       else items.push(item);
     }
     for (const id of [...this.outgoing.keys()]) if (!kept.has(id)) this.outgoing.delete(id);
+    markWentOn(items, this.wentOn);
 
     return this.last && sameList(this.last, items) ? this.last : items;
   }

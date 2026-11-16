@@ -43,6 +43,9 @@ type Launch struct {
 	// Input is the chat whose structured input channel this launch may start (Codex's app-server beside the terminal).
 	// The runtime sets it for a new chat when that channel is on; "" starts the agent as ever. Not kept with the tab.
 	Input string `json:"-"`
+	// Lean starts Claude Code with less context: no memory index, no plugins of the person's that only bring MCP
+	// servers and skills (claude.LeanSettings). The runtime sets it for a delegated chat; not kept with the tab.
+	Lean bool `json:"-"`
 }
 
 // AppIDRe: an app id goes into file names and the launch line, so it stays this strict (internal/apps checks the same).

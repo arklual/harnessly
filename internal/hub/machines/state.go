@@ -183,7 +183,7 @@ func (s *Service) connected(l *link.Link, m store.Machine) {
 		events = append(slices.Clone(events), hubproto.EventHistoryEvents, hubproto.EventHistoryBackfill)
 	}
 	if s.automations != nil {
-		events = append(slices.Clone(events), hubproto.EventAutomationResult)
+		events = append(slices.Clone(events), hubproto.EventAutomationResult, hubproto.EventAutomationEvent)
 	}
 	if s.replHandlers(l, m, hello.Features) != nil {
 		events = append(slices.Clone(events), hubproto.EventReplBatch)
@@ -339,7 +339,7 @@ func (s *Service) dispatch(ctx context.Context, l *link.Link, m store.Machine, e
 				}
 			})
 		}
-	case hubproto.EventAutomationResult:
+	case hubproto.EventAutomationResult, hubproto.EventAutomationEvent:
 		if s.automations != nil {
 			s.automations.Event(m, ev)
 		}

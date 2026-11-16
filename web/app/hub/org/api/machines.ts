@@ -81,6 +81,8 @@ export interface OrgMachine {
   canManage: boolean;
   /** The viewer may resize and disable it (a tenant's admin and above); `needs` is the hint when not. */
   canAdmin: boolean;
+  /** The viewer may read its openings for debugging: the hub's own rule (its creator, who manages the tenant). */
+  canSeeDebug?: boolean;
   needs: 'org_admin' | 'tenant_admin' | 'team_lead' | null;
   /** The viewer's own machine (the «Мои» group of a participant). */
   mine?: boolean;

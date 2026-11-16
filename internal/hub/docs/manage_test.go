@@ -202,7 +202,7 @@ func TestMakeCopyRenameTrashAndRestore(t *testing.T) {
 			t.Fatal("a trashed document is listed")
 		}
 	}
-	rights, err := s.rightsOf(httptest.NewRequest("POST", "/", nil), rightsRequest{Sub: who["mate"].User.ID, Slugs: []string{doc}})
+	rights, _, err := s.rightsOf(httptest.NewRequest("POST", "/", nil), rightsRequest{Sub: who["mate"].User.ID, Slugs: []string{doc}})
 	if err != nil || rights[doc] != RightNone {
 		t.Fatalf("the documents service is told %v %v", rights, err)
 	}

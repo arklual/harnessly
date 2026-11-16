@@ -4,6 +4,8 @@ import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
 import { pointAnchor, type IMenuPoint } from '@/next/ui/context-menu';
 import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
+import { MenuItem, MenuSeparator, SheetMenu } from '@/next/ui/sheet-menu';
+import { usePhone } from '@/next/ui/use-media';
 import type { IChatActions, ISidebarProject } from '@/next/features/sidebar/types';
 
 const NO_GROUPS: readonly { id: string; name: string }[] = [];
@@ -62,6 +64,8 @@ export interface IChatMenuProps {
   machine?: string;
   /** «Цель…»: the header's menu of a Claude chat opens the goal's dialog. */
   onGoal?: () => void;
+  /** «Оформление…»: the chat's own look (features/looks). */
+  onLook?: () => void;
   /** «Поделиться…» (beta «chatShare»): the header's menu opens the sharing dialog. */
   onShare?: () => void;
   /** The header's own buttons on a narrow phone, where only the bell and «⋯» stay. */
@@ -106,6 +110,7 @@ const ChatMenu = ({
   onMoveVm,
   machine,
   onGoal,
+  onLook,
   onShare,
   extras = NO_EXTRAS,
   onRetitle,
@@ -118,8 +123,303 @@ const ChatMenu = ({
 }: IChatMenuProps) => {
   const [view, setView] = useState<TView>(VIEW.root);
   const menuActions = useMenuActions();
+  const phone = usePhone();
   // With groups in the favorites, «Избранное» is a choice of where; without, pinning is one click.
   const grouping = actions.onPlaceFavorite !== undefined && favGroups.length > 0;
+
+  const items = (
+    <>
+      {view === VIEW.root && (
+        <>
+          {machine && <div className="hx-cmenu__vm">{t('next.rowMenu.onVm', { machine })}</div>}
+          {onMoveVm && (
+            <MenuItem className="hx-cmenu__item" onClick={onMoveVm}>
+              <Icon name="server" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.moveVm')}</span>
+            </MenuItem>
+          )}
+          {(machine || onMoveVm) && <MenuSeparator className="hx-cmenu__sep" />}
+          {onTerminal && (
+            <>
+              <MenuItem className="hx-cmenu__item hx-cmenu__term" onClick={onTerminal}>
+                <Icon name="square-terminal" size="sm" />
+                <span className="hx-cmenu__txt">{t('next.rowMenu.terminal')}</span>
+              </MenuItem>
+              <MenuSeparator className="hx-cmenu__sep hx-cmenu__term" />
+            </>
+          )}
+          {extras.map((extra) => (
+            <MenuItem key={extra.key} className="hx-cmenu__item" onClick={extra.onClick}>
+              <Icon name={extra.icon} size="sm" />
+              <span className="hx-cmenu__txt">{extra.label}</span>
+            </MenuItem>
+          ))}
+          {extras.length > 0 && <MenuSeparator className="hx-cmenu__sep" />}
+          {onOpenInNewTab && (
+            <MenuItem className="hx-cmenu__item" onClick={onOpenInNewTab}>
+              <Icon name="external-link" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.openInNewTab')}</span>
+            </MenuItem>
+          )}
+          {onContinue && (
+            <MenuItem className="hx-cmenu__item" onClick={onContinue}>
+              <Icon name="arrow-left-right" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.continue')}</span>
+            </MenuItem>
+          )}
+          {onFork && (
+            <MenuItem className="hx-cmenu__item" onClick={onFork}>
+              <Icon name="git-fork" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.fork')}</span>
+            </MenuItem>
+          )}
+          {onGoal && (
+            <MenuItem className="hx-cmenu__item" onClick={onGoal}>
+              <Icon name="locate" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.goal')}</span>
+            </MenuItem>
+          )}
+          {onLook && (
+            <MenuItem className="hx-cmenu__item" onClick={onLook}>
+              <Icon name="palette" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.look')}</span>
+            </MenuItem>
+          )}
+          {actions.onRename && onStartRename && (
+            <MenuItem className="hx-cmenu__item" onClick={onStartRename}>
+              <Icon name="pencil" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.rename')}</span>
+            </MenuItem>
+          )}
+          {actions.onRetitle && onRetitle && (
+            <MenuItem className="hx-cmenu__item" onClick={onRetitle}>
+              <Icon name="sparkles" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.retitle')}</span>
+            </MenuItem>
+          )}
+          {actions.onPin && !grouping && (
+            <MenuItem className="hx-cmenu__item" onClick={onPin}>
+              <Icon name={pinned ? 'pin-off' : 'pin'} size="sm" />
+              <span className="hx-cmenu__txt">
+                {pinned ? t('next.rowMenu.unpin') : t('next.rowMenu.pin')}
+              </span>
+            </MenuItem>
+          )}
+          {grouping && (
+            <MenuItem className="hx-cmenu__item" closeOnClick={false} onClick={() => setView(VIEW.favorite)}>
+              <Icon name="pin" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.favorites')}</span>
+              <Icon name="chevron-right" size="sm" className="hx-cmenu__chev" />
+            </MenuItem>
+          )}
+          {actions.onPlaceFavorite && slot?.prev && (
+            <MenuItem className="hx-cmenu__item" onClick={() => onShift?.(-1)}>
+              <Icon name="arrow-up" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.up')}</span>
+            </MenuItem>
+          )}
+          {actions.onPlaceFavorite && slot?.next && (
+            <MenuItem className="hx-cmenu__item" onClick={() => onShift?.(1)}>
+              <Icon name="arrow-down" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.down')}</span>
+            </MenuItem>
+          )}
+          {onCopyLink && (
+            <MenuItem className="hx-cmenu__item" onClick={onCopyLink}>
+              <Icon name="share" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.copyLink')}</span>
+            </MenuItem>
+          )}
+          {onShare && (
+            <MenuItem className="hx-cmenu__item" onClick={onShare}>
+              <Icon name="share" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.share')}</span>
+            </MenuItem>
+          )}
+          {actions.onMove && (
+            <MenuItem
+              className="hx-cmenu__item"
+              closeOnClick={false}
+              disabled={projects === null}
+              onClick={() => setView(VIEW.move)}
+            >
+              <Icon name="folder-input" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.move')}</span>
+              <Icon name="chevron-right" size="sm" className="hx-cmenu__chev" />
+            </MenuItem>
+          )}
+          {onMerge && (
+            <MenuItem className="hx-cmenu__item" onClick={onMerge}>
+              <Icon name="git-merge" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.merge')}</span>
+            </MenuItem>
+          )}
+          {(actions.onDelete || onStopTerminal) && <MenuSeparator className="hx-cmenu__sep" />}
+          {onStopTerminal && (
+            <MenuItem
+              className="hx-cmenu__item"
+              data-danger="true"
+              closeOnClick={false}
+              onClick={() => setView(VIEW.stop)}
+            >
+              <Icon name="circle-stop" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.stopTerminal')}</span>
+            </MenuItem>
+          )}
+          {actions.onDelete && (
+            <>
+              <MenuItem
+                className="hx-cmenu__item"
+                data-danger="true"
+                closeOnClick={false}
+                onClick={() => setView(VIEW.remove)}
+              >
+                <Icon name="trash-2" size="sm" />
+                <span className="hx-cmenu__txt">{t('next.rowMenu.delete')}</span>
+              </MenuItem>
+            </>
+          )}
+        </>
+      )}
+
+      {view === VIEW.move && (
+        <>
+          <MenuItem className="hx-cmenu__back" closeOnClick={false} onClick={() => setView(VIEW.root)}>
+            <Icon name="chevron-left" size="sm" />
+            {t('next.rowMenu.move')}
+          </MenuItem>
+          {(projects ?? []).map((project) => (
+            <MenuItem
+              key={project.id}
+              className="hx-cmenu__item"
+              role="menuitemradio"
+              aria-checked={project.id === projectId}
+              onClick={() => {
+                if (project.id !== projectId) onMove(project.id);
+              }}
+            >
+              <Icon name="folder" size="sm" />
+              <span className="hx-cmenu__txt">{project.name}</span>
+              <Icon name="check" size="sm" className="hx-cmenu__check" />
+            </MenuItem>
+          ))}
+          {projectId !== null && (
+            <MenuItem className="hx-cmenu__item" onClick={() => onMove(null)}>
+              <Icon name="x" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.unassign')}</span>
+            </MenuItem>
+          )}
+          {actions.onNewProject && (
+            <>
+              <MenuSeparator className="hx-cmenu__sep" />
+              <MenuItem className="hx-cmenu__item" onClick={actions.onNewProject}>
+                <Icon name="folder-plus" size="sm" />
+                <span className="hx-cmenu__txt">{t('next.rowMenu.newProject')}</span>
+              </MenuItem>
+            </>
+          )}
+        </>
+      )}
+
+      {view === VIEW.favorite && (
+        <>
+          <MenuItem className="hx-cmenu__back" closeOnClick={false} onClick={() => setView(VIEW.root)}>
+            <Icon name="chevron-left" size="sm" />
+            {t('next.rowMenu.favorites')}
+          </MenuItem>
+          <MenuItem
+            className="hx-cmenu__item"
+            role="menuitemradio"
+            aria-checked={slot !== null && slot.groupId === null}
+            onClick={() => {
+              if (slot === null || slot.groupId !== null) onPlace?.(null);
+            }}
+          >
+            <Icon name="pin" size="sm" />
+            <span className="hx-cmenu__txt">{t('next.rowMenu.noGroup')}</span>
+            <Icon name="check" size="sm" className="hx-cmenu__check" />
+          </MenuItem>
+          {favGroups.map((group) => (
+            <MenuItem
+              key={group.id}
+              className="hx-cmenu__item"
+              role="menuitemradio"
+              aria-checked={slot?.groupId === group.id}
+              onClick={() => {
+                if (slot?.groupId !== group.id) onPlace?.(group.id);
+              }}
+            >
+              <Icon name="folder" size="sm" />
+              <span className="hx-cmenu__txt">{group.name}</span>
+              <Icon name="check" size="sm" className="hx-cmenu__check" />
+            </MenuItem>
+          ))}
+          {pinned && actions.onPin && (
+            <>
+              <MenuSeparator className="hx-cmenu__sep" />
+              <MenuItem className="hx-cmenu__item" onClick={onPin}>
+                <Icon name="pin-off" size="sm" />
+                <span className="hx-cmenu__txt">{t('next.rowMenu.unpin')}</span>
+              </MenuItem>
+            </>
+          )}
+        </>
+      )}
+
+      {view === VIEW.stop && onStopTerminal && (
+        <>
+          <div className="hx-cmenu__ask">
+            <b>{t('next.rowMenu.stopTerminalAsk')}</b>
+            <span>{t('next.rowMenu.stopTerminalNote')}</span>
+          </div>
+          <div className="hx-cmenu__row">
+            <MenuItem className="hx-cmenu__btn" closeOnClick={false} onClick={() => setView(VIEW.root)}>
+              {t('next.rowMenu.cancel')}
+            </MenuItem>
+            <MenuItem className="hx-cmenu__btn" data-danger="true" onClick={onStopTerminal}>
+              {t('next.rowMenu.stopTerminalYes')}
+            </MenuItem>
+          </div>
+        </>
+      )}
+
+      {view === VIEW.remove && (
+        <>
+          <div className="hx-cmenu__ask">
+            <b>{t('next.rowMenu.deleteAsk', { title })}</b>
+            <span>{t('next.rowMenu.deleteNote')}</span>
+          </div>
+          <div className="hx-cmenu__row">
+            <MenuItem className="hx-cmenu__btn" closeOnClick={false} onClick={() => setView(VIEW.root)}>
+              {t('next.rowMenu.cancel')}
+            </MenuItem>
+            <MenuItem className="hx-cmenu__btn" data-danger="true" onClick={onDelete}>
+              {t('next.rowMenu.delete')}
+            </MenuItem>
+          </div>
+        </>
+      )}
+    </>
+  );
+
+  // On the phone a sheet of our own: a Base UI menu's open is one long task there (ui/sheet-menu.tsx).
+  if (phone)
+    return (
+      <SheetMenu
+        trigger={trigger}
+        label={t('next.rowMenu.label')}
+        className="hx-cmenu hx-sheet-phone"
+        view={view}
+        defaultOpen={defaultOpen}
+        onOpenChange={onOpenChange}
+        onClosed={() => {
+          setView(VIEW.root);
+          onClosed?.();
+        }}
+      >
+        {items}
+      </SheetMenu>
+    );
 
   return (
     <MenuRoot
@@ -143,274 +443,7 @@ const ChatMenu = ({
         sideOffset={at ? 2 : 6}
         anchor={at ? pointAnchor(at) : undefined}
       >
-        {view === VIEW.root && (
-          <>
-            {machine && <div className="hx-cmenu__vm">{t('next.rowMenu.onVm', { machine })}</div>}
-            {onMoveVm && (
-              <Menu.Item className="hx-cmenu__item" onClick={onMoveVm}>
-                <Icon name="server" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.moveVm')}</span>
-              </Menu.Item>
-            )}
-            {(machine || onMoveVm) && <Menu.Separator className="hx-cmenu__sep" />}
-            {onTerminal && (
-              <>
-                <Menu.Item className="hx-cmenu__item hx-cmenu__term" onClick={onTerminal}>
-                  <Icon name="square-terminal" size="sm" />
-                  <span className="hx-cmenu__txt">{t('next.rowMenu.terminal')}</span>
-                </Menu.Item>
-                <Menu.Separator className="hx-cmenu__sep hx-cmenu__term" />
-              </>
-            )}
-            {extras.map((extra) => (
-              <Menu.Item key={extra.key} className="hx-cmenu__item" onClick={extra.onClick}>
-                <Icon name={extra.icon} size="sm" />
-                <span className="hx-cmenu__txt">{extra.label}</span>
-              </Menu.Item>
-            ))}
-            {extras.length > 0 && <Menu.Separator className="hx-cmenu__sep" />}
-            {onOpenInNewTab && (
-              <Menu.Item className="hx-cmenu__item" onClick={onOpenInNewTab}>
-                <Icon name="external-link" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.openInNewTab')}</span>
-              </Menu.Item>
-            )}
-            {onContinue && (
-              <Menu.Item className="hx-cmenu__item" onClick={onContinue}>
-                <Icon name="arrow-left-right" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.continue')}</span>
-              </Menu.Item>
-            )}
-            {onFork && (
-              <Menu.Item className="hx-cmenu__item" onClick={onFork}>
-                <Icon name="git-fork" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.fork')}</span>
-              </Menu.Item>
-            )}
-            {onGoal && (
-              <Menu.Item className="hx-cmenu__item" onClick={onGoal}>
-                <Icon name="locate" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.goal')}</span>
-              </Menu.Item>
-            )}
-            {actions.onRename && onStartRename && (
-              <Menu.Item className="hx-cmenu__item" onClick={onStartRename}>
-                <Icon name="pencil" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.rename')}</span>
-              </Menu.Item>
-            )}
-            {actions.onRetitle && onRetitle && (
-              <Menu.Item className="hx-cmenu__item" onClick={onRetitle}>
-                <Icon name="sparkles" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.retitle')}</span>
-              </Menu.Item>
-            )}
-            {actions.onPin && !grouping && (
-              <Menu.Item className="hx-cmenu__item" onClick={onPin}>
-                <Icon name={pinned ? 'pin-off' : 'pin'} size="sm" />
-                <span className="hx-cmenu__txt">
-                  {pinned ? t('next.rowMenu.unpin') : t('next.rowMenu.pin')}
-                </span>
-              </Menu.Item>
-            )}
-            {grouping && (
-              <Menu.Item
-                className="hx-cmenu__item"
-                closeOnClick={false}
-                onClick={() => setView(VIEW.favorite)}
-              >
-                <Icon name="pin" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.favorites')}</span>
-                <Icon name="chevron-right" size="sm" className="hx-cmenu__chev" />
-              </Menu.Item>
-            )}
-            {actions.onPlaceFavorite && slot?.prev && (
-              <Menu.Item className="hx-cmenu__item" onClick={() => onShift?.(-1)}>
-                <Icon name="arrow-up" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.up')}</span>
-              </Menu.Item>
-            )}
-            {actions.onPlaceFavorite && slot?.next && (
-              <Menu.Item className="hx-cmenu__item" onClick={() => onShift?.(1)}>
-                <Icon name="arrow-down" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.down')}</span>
-              </Menu.Item>
-            )}
-            {onCopyLink && (
-              <Menu.Item className="hx-cmenu__item" onClick={onCopyLink}>
-                <Icon name="share" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.copyLink')}</span>
-              </Menu.Item>
-            )}
-            {onShare && (
-              <Menu.Item className="hx-cmenu__item" onClick={onShare}>
-                <Icon name="share" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.share')}</span>
-              </Menu.Item>
-            )}
-            {actions.onMove && (
-              <Menu.Item
-                className="hx-cmenu__item"
-                closeOnClick={false}
-                disabled={projects === null}
-                onClick={() => setView(VIEW.move)}
-              >
-                <Icon name="folder-input" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.move')}</span>
-                <Icon name="chevron-right" size="sm" className="hx-cmenu__chev" />
-              </Menu.Item>
-            )}
-            {onMerge && (
-              <Menu.Item className="hx-cmenu__item" onClick={onMerge}>
-                <Icon name="git-merge" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.merge')}</span>
-              </Menu.Item>
-            )}
-            {(actions.onDelete || onStopTerminal) && <Menu.Separator className="hx-cmenu__sep" />}
-            {onStopTerminal && (
-              <Menu.Item
-                className="hx-cmenu__item"
-                data-danger="true"
-                closeOnClick={false}
-                onClick={() => setView(VIEW.stop)}
-              >
-                <Icon name="circle-stop" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.stopTerminal')}</span>
-              </Menu.Item>
-            )}
-            {actions.onDelete && (
-              <>
-                <Menu.Item
-                  className="hx-cmenu__item"
-                  data-danger="true"
-                  closeOnClick={false}
-                  onClick={() => setView(VIEW.remove)}
-                >
-                  <Icon name="trash-2" size="sm" />
-                  <span className="hx-cmenu__txt">{t('next.rowMenu.delete')}</span>
-                </Menu.Item>
-              </>
-            )}
-          </>
-        )}
-
-        {view === VIEW.move && (
-          <>
-            <Menu.Item className="hx-cmenu__back" closeOnClick={false} onClick={() => setView(VIEW.root)}>
-              <Icon name="chevron-left" size="sm" />
-              {t('next.rowMenu.move')}
-            </Menu.Item>
-            {(projects ?? []).map((project) => (
-              <Menu.Item
-                key={project.id}
-                className="hx-cmenu__item"
-                role="menuitemradio"
-                aria-checked={project.id === projectId}
-                onClick={() => {
-                  if (project.id !== projectId) onMove(project.id);
-                }}
-              >
-                <Icon name="folder" size="sm" />
-                <span className="hx-cmenu__txt">{project.name}</span>
-                <Icon name="check" size="sm" className="hx-cmenu__check" />
-              </Menu.Item>
-            ))}
-            {projectId !== null && (
-              <Menu.Item className="hx-cmenu__item" onClick={() => onMove(null)}>
-                <Icon name="x" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.unassign')}</span>
-              </Menu.Item>
-            )}
-            {actions.onNewProject && (
-              <>
-                <Menu.Separator className="hx-cmenu__sep" />
-                <Menu.Item className="hx-cmenu__item" onClick={actions.onNewProject}>
-                  <Icon name="folder-plus" size="sm" />
-                  <span className="hx-cmenu__txt">{t('next.rowMenu.newProject')}</span>
-                </Menu.Item>
-              </>
-            )}
-          </>
-        )}
-
-        {view === VIEW.favorite && (
-          <>
-            <Menu.Item className="hx-cmenu__back" closeOnClick={false} onClick={() => setView(VIEW.root)}>
-              <Icon name="chevron-left" size="sm" />
-              {t('next.rowMenu.favorites')}
-            </Menu.Item>
-            <Menu.Item
-              className="hx-cmenu__item"
-              role="menuitemradio"
-              aria-checked={slot !== null && slot.groupId === null}
-              onClick={() => {
-                if (slot === null || slot.groupId !== null) onPlace?.(null);
-              }}
-            >
-              <Icon name="pin" size="sm" />
-              <span className="hx-cmenu__txt">{t('next.rowMenu.noGroup')}</span>
-              <Icon name="check" size="sm" className="hx-cmenu__check" />
-            </Menu.Item>
-            {favGroups.map((group) => (
-              <Menu.Item
-                key={group.id}
-                className="hx-cmenu__item"
-                role="menuitemradio"
-                aria-checked={slot?.groupId === group.id}
-                onClick={() => {
-                  if (slot?.groupId !== group.id) onPlace?.(group.id);
-                }}
-              >
-                <Icon name="folder" size="sm" />
-                <span className="hx-cmenu__txt">{group.name}</span>
-                <Icon name="check" size="sm" className="hx-cmenu__check" />
-              </Menu.Item>
-            ))}
-            {pinned && actions.onPin && (
-              <>
-                <Menu.Separator className="hx-cmenu__sep" />
-                <Menu.Item className="hx-cmenu__item" onClick={onPin}>
-                  <Icon name="pin-off" size="sm" />
-                  <span className="hx-cmenu__txt">{t('next.rowMenu.unpin')}</span>
-                </Menu.Item>
-              </>
-            )}
-          </>
-        )}
-
-        {view === VIEW.stop && onStopTerminal && (
-          <>
-            <div className="hx-cmenu__ask">
-              <b>{t('next.rowMenu.stopTerminalAsk')}</b>
-              <span>{t('next.rowMenu.stopTerminalNote')}</span>
-            </div>
-            <div className="hx-cmenu__row">
-              <Menu.Item className="hx-cmenu__btn" closeOnClick={false} onClick={() => setView(VIEW.root)}>
-                {t('next.rowMenu.cancel')}
-              </Menu.Item>
-              <Menu.Item className="hx-cmenu__btn" data-danger="true" onClick={onStopTerminal}>
-                {t('next.rowMenu.stopTerminalYes')}
-              </Menu.Item>
-            </div>
-          </>
-        )}
-
-        {view === VIEW.remove && (
-          <>
-            <div className="hx-cmenu__ask">
-              <b>{t('next.rowMenu.deleteAsk', { title })}</b>
-              <span>{t('next.rowMenu.deleteNote')}</span>
-            </div>
-            <div className="hx-cmenu__row">
-              <Menu.Item className="hx-cmenu__btn" closeOnClick={false} onClick={() => setView(VIEW.root)}>
-                {t('next.rowMenu.cancel')}
-              </Menu.Item>
-              <Menu.Item className="hx-cmenu__btn" data-danger="true" onClick={onDelete}>
-                {t('next.rowMenu.delete')}
-              </Menu.Item>
-            </div>
-          </>
-        )}
+        {items}
       </MenuPanel>
     </MenuRoot>
   );

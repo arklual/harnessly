@@ -109,6 +109,15 @@ export interface ProviderLimits {
   error: string | null;
   /** The vendor refused the key at that reading. */
   rejected: boolean;
+  /** A model's own limit beside the plan's windows («Fable», a week), HRN-1538; absent from older machines. */
+  extra?: ExtraWindow[];
+}
+
+/** One model's own window: its id, the name it goes by, the window. */
+export interface ExtraWindow {
+  id: string;
+  title: string;
+  window: LimitWindow;
 }
 
 /** How Claude Code is paid on the machine, as its own files say. */
@@ -201,8 +210,20 @@ const readProvider = (v: unknown): ProviderLimits | null => {
     plan: text(p.plan),
     error: text(p.error),
     rejected: p.rejected === true,
+    extra: readExtra(p.extra),
   };
 };
+
+const readExtra = (v: unknown): ExtraWindow[] =>
+  Array.isArray(v)
+    ? v.flatMap((item) => {
+        const e = rec(item);
+        const id = text(e?.id);
+        const title = text(e?.title);
+        const window = readWindow(e);
+        return id && title && window ? [{ id, title, window }] : [];
+      })
+    : [];
 
 const readBalance = (v: unknown): Balance | null => {
   const b = rec(v);

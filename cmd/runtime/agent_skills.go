@@ -159,6 +159,8 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 		"and the person's browser downloads it at once. " +
 		"Deliver only files the person asked to receive. Files you merely write or change while working make no card, so do not deliver them, " +
 		"and do not deliver the same file twice unless you changed it.\n\n")
+	b.WriteString(sideWidgetsPromptText)
+	b.WriteString(looksPromptText)
 	b.WriteString("## The file beside the chat\n\n")
 	b.WriteString("The person may have a file open in the right pane. When they selected something in it (cells, a moment of a video, a passage " +
 		"of a PDF, a region of a picture), the message carries an `<annotation kind=\"file\">` block with the file, the place and what it holds, " +
@@ -236,7 +238,12 @@ func delegationPromptText(agentName string) string {
 	own := "Your own subagents (the Agent tool) stay the way for a quick subtask of your own kind inside this session: " +
 		"a search, a review, a parallel edit whose result only you need."
 	if agentName == "Codex" {
-		own = "Work you can finish yourself in a few steps stays in this session."
+		// Codex took its own spawn_agent for every split (0 of 54 delegations in the HRN-1525 measurement): the
+		// criteria are the same as Claude's, said with its tool's name and with the case of the person asking.
+		own = "Your own subagents (spawn_agent) stay the way for a quick subtask whose result only you need: a search, " +
+			"a look at one file. When the person asks for helpers, agents or parallel work, or the task splits into parts " +
+			"that each take a while (several hypotheses, reviews, back end + front end + tests), give each part to a " +
+			"delegated chat with `delegate_task`: the person sees it and can take it over."
 	}
 	return "## Delegating to another agent\n\n" +
 		"The `harnessly` MCP server has `delegate_task`: it starts another agent — Claude Code or Codex, any model of this machine — " +
@@ -244,5 +251,25 @@ func delegationPromptText(agentName string) string {
 		"and `list_children` follow it up. Use it when the work wants another provider or model than yours, runs long and the person " +
 		"should be able to watch it, or is work the person may take over. " + own + " " +
 		"A delegated agent sees nothing of this chat: give it the whole task. Pass `notify: true` to be woken with its answer, " +
-		"or `wait_conversation` for it; check what it reports before you build on it.\n\n"
+		"or `wait_conversation` for it; check what it reports before you build on it.\n\n" +
+		"With several delegated chats, `wait_conversation` with id `all` waits for all of them in one call; " +
+		"`broadcast_children` with `deliver: \"now\"` stops all of them at once (their running commands are interrupted). " +
+		"A delegated chat writes to you and to the chats beside it mid-turn (`send_to_conversation`, id `parent`). " +
+		"When the person asks this chat only to " +
+		"coordinate (or not to do the work itself), call `coordinate_mode` with `on: true`.\n\n"
 }
+
+// sideWidgetsPromptText is the workspace prompt's part on the widgets under the chat's right column and the left menu
+// what an agent makes itself, and what it shows the person where to do.
+const sideWidgetsPromptText = "## Widgets and the left menu\n\n" +
+	"On a computer the person keeps small cards under the chat's right column. When they ask for one that shows something " +
+	"(\"сделай виджет, который показывает…\", \"виджет с прогнозом лимитов\", \"make a widget that shows the machine's load\"), make it in " +
+	"that turn with the MCP tool `widget_create` (`mcp__harnessly__widget_create` in Claude Code) or `harnessly widget create <name> " +
+	"--title T [--sources limits,machine,subagents] [--smart \"request\"] [--every MIN]`: `sources` are the host's data it is given, " +
+	"`smart` a request a model answers over them every few minutes (5 at least), and your own `--html/--css/--js` are optional. It " +
+	"joins the person's widgets by itself on every computer; change it with `widget_update`, list with `widget_list`, remove with " +
+	"`widget_remove` (`harnessly widget update|list --side|remove --side`). The built-in ones (Лимиты, Машина, Подчаты, Выкат, Заметка, " +
+	"Часы) are not made: tell the person to add them from «+ Виджет» under the right column. " +
+	"The left menu is the person's to lay out: an app (Доски, Документы, Артефакты, one an agent made) is carried by hand from " +
+	"«Приложения» up among the main buttons and back, right in the menu or in Настройки → Оформление → «Меню слева»; say so when " +
+	"they ask to move one, there is no command for it.\n\n"

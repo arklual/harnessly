@@ -11,6 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/design"
 	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/sites"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -65,6 +66,7 @@ func v2Server(d deps, hub *wire.Hub, svc wire.Service, machine wire.MachineSourc
 		Hub: hub, Service: svc, Machine: machine, Ops: wire.NewOpLog(opsFile),
 		Uploads:  &wire.Uploads{Dir: filepath.Join(d.DataDir, "v2", "uploads"), Limits: wire.DefaultLimits},
 		Me:       &wire.FileMe{Path: filepath.Join(d.DataDir, "v2", "me.json"), Name: os.Getenv("RUNTIME_OWNER_NAME")},
+		Looks:    runtimeLooks(d.DataDir),
 		Dirs:     func(ctx context.Context) ([]wire.Dir, error) { return v2Dirs(ctx, d.WorkspaceRoot) },
 		Version:  env("AGENT_VERSION", agent.BuildVersion),
 		Features: features, Limits: wire.DefaultLimits,
@@ -84,4 +86,14 @@ func v2Session(d deps, next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r.WithContext(design.WithPerson(r.Context(), sessionPerson(d.Claims)(r))))
 	})
+}
+
+// runtimeLooks keeps the pictures of the person's looks in the data folder (wire.ServeLooks); nil when the folder
+// cannot be made, and the paths answer 404.
+func runtimeLooks(dataDir string) wire.LookBlobs {
+	b, err := sites.NewFolderBlobs(filepath.Join(dataDir, "v2", "looks"))
+	if err != nil {
+		return nil
+	}
+	return b
 }

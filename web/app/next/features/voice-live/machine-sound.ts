@@ -208,8 +208,7 @@ export const joinMachineSound = async (
       if (type.type === 'relay.state' && type.state) {
         last = type.state;
         on.state(type.state);
-      }
-      else on.event(m.data);
+      } else on.event(m.data);
       return;
     }
     frames++;

@@ -84,6 +84,9 @@ func New(d Deps) *Service {
 				_ = s.notice(ctx, to, subject, body, "")
 			}
 		}
+		// A guest link to a board opens on the boards service, which asks the hub what the link allows (_guest) and
+		// lets a guest comment there when it does.
+		s.access.LinkURL = s.boardLinkURL
 	}
 	if s.log == nil {
 		s.log = slog.Default()

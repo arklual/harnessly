@@ -8,7 +8,11 @@ import { THEMES, TEXT_SIZES, type ThemeChoice } from '@/next/features/settings/g
 import { t } from '@/next/i18n';
 import type { PersonSettings } from '@/next/stores/me';
 import Icon from '@/next/ui/icon';
+import LookPanel from '@/next/features/looks/look-panel';
+import type { TLookScope } from '@/next/features/looks/types';
 import { PALETTES, type IChangeOrigin, type TPalette } from '@/platform/theme';
+
+const ALL: TLookScope = { k: 'all' };
 
 const THEME_ICON = { light: 'sun', dark: 'moon', system: 'monitor' } as const satisfies Record<
   ThemeChoice,
@@ -118,6 +122,7 @@ const AppearanceSection = ({
         ))}
       </div>
     </Group>
+    <LookPanel scope={ALL} />
     <Group title={t('next.settings.look.text')}>
       <SegRow
         label={t('next.settings.general.textSize')}

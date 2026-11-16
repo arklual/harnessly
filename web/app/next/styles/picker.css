@@ -46,6 +46,12 @@
   transition: height 420ms var(--hx-ease-out);
   animation: hx-picker-in 380ms var(--hx-ease-out) backwards;
 }
+/* Under the pill when the window has more room there (a field in the middle of the start screen). */
+.hx-picker[data-side='below'] {
+  top: calc(100% + 10px);
+  bottom: auto;
+  transform-origin: 24px 0;
+}
 .hx-picker[data-state='closing'] {
   animation: hx-picker-out 220ms cubic-bezier(0.4, 0, 1, 1) both;
   pointer-events: none;
@@ -81,6 +87,17 @@
     opacity 280ms var(--hx-ease-out),
     transform 420ms var(--hx-ease-out),
     visibility 0s;
+}
+/* Taller than the window holds: the screen scrolls inside, the limits stay at its foot. */
+.hx-picker__pane[data-active='true'] {
+  max-height: var(--hx-picker-max, none);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+/* Scrolled, not squeezed: the rows keep their height. */
+.hx-picker__pane > * {
+  flex-shrink: 0;
 }
 .hx-picker__pane[data-active='false'] {
   opacity: 0;
@@ -141,12 +158,11 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  /* a long agent and model («GLM · Z.ai · GLM 5.3 Flash») ends in an ellipsis inside the popover, never past it */
+  /* a long agent and model («GLM · Z.ai · GLM 5.3 Flash») wraps inside the popover, never cut in the middle */
   max-width: 100%;
   min-width: 0;
   font-size: var(--hx-text-xs);
   color: var(--hx-fg-2);
-  white-space: nowrap;
 }
 .hx-picker__model .hx-agent,
 .hx-picker__model .hx-icon {
@@ -154,8 +170,7 @@
 }
 .hx-picker__model-text {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .hx-picker__model .hx-agent {
   width: 12px;
@@ -287,6 +302,24 @@
 }
 .hx-effort__label {
   min-width: 0;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity var(--hx-dur-md) var(--hx-ease-out);
+}
+/* Only the chosen depth is named; a stop under the pointer names itself instead. */
+.hx-effort__label[data-chosen='true'] {
+  opacity: 1;
+}
+.hx-effort:has(.hx-effort__stop:hover) + .hx-effort__labels .hx-effort__label {
+  opacity: 0;
+}
+.hx-effort:has(.hx-effort__stop[data-k='0']:hover) + .hx-effort__labels .hx-effort__label:nth-child(1),
+.hx-effort:has(.hx-effort__stop[data-k='1']:hover) + .hx-effort__labels .hx-effort__label:nth-child(2),
+.hx-effort:has(.hx-effort__stop[data-k='2']:hover) + .hx-effort__labels .hx-effort__label:nth-child(3),
+.hx-effort:has(.hx-effort__stop[data-k='3']:hover) + .hx-effort__labels .hx-effort__label:nth-child(4),
+.hx-effort:has(.hx-effort__stop[data-k='4']:hover) + .hx-effort__labels .hx-effort__label:nth-child(5),
+.hx-effort:has(.hx-effort__stop[data-k='5']:hover) + .hx-effort__labels .hx-effort__label:nth-child(6) {
+  opacity: 1;
 }
 .hx-effort__label:first-child {
   text-align: left;
@@ -527,9 +560,7 @@
 .hx-picker__vm-name {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 /* the fast mode on the pill, a mark before the name like ultracode's, without the glow. */
 .hx-model .hx-model__fast {
@@ -793,38 +824,12 @@
   box-shadow: inset 0 0 0 1px var(--hx-border);
 }
 
-/* The limit on the pill: its outline fills clockwise from the top as the five-hour window is spent, in the
-   level's colour; the pill's border is the track under it. The card of both windows sits under the depth. */
-.hx-model__ring {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-  fill: none;
-  stroke: var(--hx-fg-3);
-  stroke-width: 2;
-  stroke-linecap: round;
-  transition: stroke var(--hx-dur-md) var(--hx-ease-out);
-}
-.hx-model__ring path {
-  stroke-dasharray: 100 100;
-  stroke-dashoffset: calc(100 - var(--hx-ring-used, 0));
-  transition: stroke-dashoffset 700ms var(--hx-ease-out);
-}
-.hx-model__ring[data-level='low'] {
-  stroke: var(--hx-warning);
-}
-.hx-model__ring[data-level='out'] {
-  stroke: var(--hx-danger);
-}
-@media (prefers-reduced-motion: reduce) {
-  .hx-model__ring path {
-    transition: none;
-  }
-}
+/* The limits' card under the depth. */
 .hx-picker__limits {
+  position: sticky;
+  bottom: -10px;
+  z-index: 1;
+  background: var(--hx-bg-raised);
   display: flex;
   flex-direction: column;
   gap: 2px;

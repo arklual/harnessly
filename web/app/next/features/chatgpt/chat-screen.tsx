@@ -3,6 +3,8 @@
 // answer back; the model and the depth of thinking are the plan's own.
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Composer from '@/next/features/composer/composer';
+import KindSwitch, { CHAT_KIND, setChatKind } from '@/next/features/composer/kind-switch';
+import { NEW_CHAT, setDraftText } from '@/next/stores/drafts';
 import type { ComposerAttachment, ComposerMode } from '@/next/features/composer/types';
 import CopyButton from '@/next/features/chat/copy-button';
 import {
@@ -416,7 +418,17 @@ const ChatScreen = ({ machine, id, onOpenSettings, onOpenDrawer }: IChatScreenPr
             )}
           </div>
         </div>
-        <div className="hx-dock" data-screen>
+        <div className="hx-dock" data-screen data-kind="talk">
+          {/* Back to a task: a new agent chat on the start page, with the words not sent yet. */}
+          <KindSwitch
+            value={CHAT_KIND.talk}
+            onChange={(kind) => {
+              if (kind !== CHAT_KIND.task) return;
+              setChatKind(CHAT_KIND.task);
+              if (text.trim()) setDraftText(NEW_CHAT, text);
+              goTo(HOME);
+            }}
+          />
           {signedIn === false && (
             <div className="hx-gpt__signin">
               <span>{t('next.chatgpt.signInFirst')}</span>

@@ -535,11 +535,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"dGPUWe-aGzVtR7M8-TVnqouslsk\"",
+    "etag": "\"AyxENQN37g27Lj33uT7AXGrCJKo\"",
     "cache-control": "no-store",
-    "content-length": "683"
+    "content-length": "711"
    },
-   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"x:107#0\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"x:107#1\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"x:341#0\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\"},{\"id\":\"x:443#0\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"x:107#0\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"x:107#1\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"x:341#0\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\",\"textLines\":1,\"textBytes\":2},{\"id\":\"x:443#0\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
   },
   {
    "method": "POST",
@@ -756,11 +756,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"dGPUWe-aGzVtR7M8-TVnqouslsk\"",
+    "etag": "\"AyxENQN37g27Lj33uT7AXGrCJKo\"",
     "cache-control": "no-store",
-    "content-length": "683"
+    "content-length": "711"
    },
-   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"x:107#0\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"x:107#1\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"x:341#0\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\"},{\"id\":\"x:443#0\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"x:107#0\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"x:107#1\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"x:341#0\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\",\"textLines\":1,\"textBytes\":2},{\"id\":\"x:443#0\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
   },
   {
    "method": "GET",
@@ -945,11 +945,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"acxq0st8INQcve1nLHpYwN-7Y70\"",
+    "etag": "\"Rec6IH2gCTTQ9GpcoQyimvwyR6k\"",
     "cache-control": "no-store",
-    "content-length": "1053"
+    "content-length": "1191"
    },
-   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"Count the files\"},{\"id\":\"x:174#0\",\"type\":\"thinking\",\"timestamp\":1792267201000,\"thinking\":\"hm\"},{\"id\":\"x:174#1\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"Counting\",\"usage\":{\"input_tokens\":3,\"output_tokens\":5},\"model\":\"claude-x\",\"stopReason\":\"tool_use\"},{\"id\":\"x:174#2\",\"type\":\"tool-call\",\"timestamp\":1792267201000,\"toolUseId\":\"toolu_1\",\"toolName\":\"Bash\",\"summary\":\"$ ls | wc -l\",\"status\":\"success\"},{\"id\":\"x:599#0\",\"type\":\"tool-result\",\"timestamp\":1792267202000,\"toolUseId\":\"toolu_1\",\"isError\":false,\"summary\":\"12\"},{\"id\":\"x:864#0\",\"type\":\"tool-call\",\"timestamp\":1792267203000,\"toolUseId\":\"toolu_2\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/a.go\",\"filePath\":\"/srv/app/a.go\",\"status\":\"success\"},{\"id\":\"x:1138#0\",\"type\":\"tool-result\",\"timestamp\":1792267204000,\"toolUseId\":\"toolu_2\",\"isError\":false,\"summary\":\"package a\"},{\"id\":\"x:1374#0\",\"type\":\"assistant-message\",\"timestamp\":1792267205000,\"markdown\":\"There are 12 files.\",\"stopReason\":\"end_turn\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"Count the files\"},{\"id\":\"x:174#0\",\"type\":\"thinking\",\"timestamp\":1792267201000,\"thinking\":\"hm\"},{\"id\":\"x:174#1\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"Counting\",\"usage\":{\"input_tokens\":3,\"output_tokens\":5},\"model\":\"claude-x\",\"stopReason\":\"tool_use\"},{\"id\":\"x:174#2\",\"type\":\"tool-call\",\"timestamp\":1792267201000,\"toolUseId\":\"toolu_1\",\"toolName\":\"Bash\",\"summary\":\"$ ls | wc -l\",\"call\":{\"description\":\"count\",\"command\":\"ls | wc -l\"},\"status\":\"success\"},{\"id\":\"x:599#0\",\"type\":\"tool-result\",\"timestamp\":1792267202000,\"toolUseId\":\"toolu_1\",\"isError\":false,\"summary\":\"12\",\"text\":\"12\",\"textLines\":1,\"textBytes\":2,\"textTail\":\"12\"},{\"id\":\"x:864#0\",\"type\":\"tool-call\",\"timestamp\":1792267203000,\"toolUseId\":\"toolu_2\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/a.go\",\"filePath\":\"/srv/app/a.go\",\"status\":\"success\"},{\"id\":\"x:1138#0\",\"type\":\"tool-result\",\"timestamp\":1792267204000,\"toolUseId\":\"toolu_2\",\"isError\":false,\"summary\":\"package a\",\"textLines\":1,\"textBytes\":9},{\"id\":\"x:1374#0\",\"type\":\"assistant-message\",\"timestamp\":1792267205000,\"markdown\":\"There are 12 files.\",\"stopReason\":\"end_turn\"}]}"
   },
   {
    "method": "GET",
@@ -988,11 +988,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"acxq0st8INQcve1nLHpYwN-7Y70\"",
+    "etag": "\"Rec6IH2gCTTQ9GpcoQyimvwyR6k\"",
     "cache-control": "no-store",
-    "content-length": "1053"
+    "content-length": "1191"
    },
-   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"Count the files\"},{\"id\":\"x:174#0\",\"type\":\"thinking\",\"timestamp\":1792267201000,\"thinking\":\"hm\"},{\"id\":\"x:174#1\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"Counting\",\"usage\":{\"input_tokens\":3,\"output_tokens\":5},\"model\":\"claude-x\",\"stopReason\":\"tool_use\"},{\"id\":\"x:174#2\",\"type\":\"tool-call\",\"timestamp\":1792267201000,\"toolUseId\":\"toolu_1\",\"toolName\":\"Bash\",\"summary\":\"$ ls | wc -l\",\"status\":\"success\"},{\"id\":\"x:599#0\",\"type\":\"tool-result\",\"timestamp\":1792267202000,\"toolUseId\":\"toolu_1\",\"isError\":false,\"summary\":\"12\"},{\"id\":\"x:864#0\",\"type\":\"tool-call\",\"timestamp\":1792267203000,\"toolUseId\":\"toolu_2\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/a.go\",\"filePath\":\"/srv/app/a.go\",\"status\":\"success\"},{\"id\":\"x:1138#0\",\"type\":\"tool-result\",\"timestamp\":1792267204000,\"toolUseId\":\"toolu_2\",\"isError\":false,\"summary\":\"package a\"},{\"id\":\"x:1374#0\",\"type\":\"assistant-message\",\"timestamp\":1792267205000,\"markdown\":\"There are 12 files.\",\"stopReason\":\"end_turn\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"Count the files\"},{\"id\":\"x:174#0\",\"type\":\"thinking\",\"timestamp\":1792267201000,\"thinking\":\"hm\"},{\"id\":\"x:174#1\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"Counting\",\"usage\":{\"input_tokens\":3,\"output_tokens\":5},\"model\":\"claude-x\",\"stopReason\":\"tool_use\"},{\"id\":\"x:174#2\",\"type\":\"tool-call\",\"timestamp\":1792267201000,\"toolUseId\":\"toolu_1\",\"toolName\":\"Bash\",\"summary\":\"$ ls | wc -l\",\"call\":{\"description\":\"count\",\"command\":\"ls | wc -l\"},\"status\":\"success\"},{\"id\":\"x:599#0\",\"type\":\"tool-result\",\"timestamp\":1792267202000,\"toolUseId\":\"toolu_1\",\"isError\":false,\"summary\":\"12\",\"text\":\"12\",\"textLines\":1,\"textBytes\":2,\"textTail\":\"12\"},{\"id\":\"x:864#0\",\"type\":\"tool-call\",\"timestamp\":1792267203000,\"toolUseId\":\"toolu_2\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/a.go\",\"filePath\":\"/srv/app/a.go\",\"status\":\"success\"},{\"id\":\"x:1138#0\",\"type\":\"tool-result\",\"timestamp\":1792267204000,\"toolUseId\":\"toolu_2\",\"isError\":false,\"summary\":\"package a\",\"textLines\":1,\"textBytes\":9},{\"id\":\"x:1374#0\",\"type\":\"assistant-message\",\"timestamp\":1792267205000,\"markdown\":\"There are 12 files.\",\"stopReason\":\"end_turn\"}]}"
   },
   {
    "method": "GET",
@@ -1013,11 +1013,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"dGPUWe-aGzVtR7M8-TVnqouslsk\"",
+    "etag": "\"AyxENQN37g27Lj33uT7AXGrCJKo\"",
     "cache-control": "no-store",
-    "content-length": "683"
+    "content-length": "711"
    },
-   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"x:107#0\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"x:107#1\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"x:341#0\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\"},{\"id\":\"x:443#0\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"x:107#0\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"x:107#1\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"x:341#0\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\",\"textLines\":1,\"textBytes\":2},{\"id\":\"x:443#0\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
   },
   {
    "method": "GET",
@@ -1034,11 +1034,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"acxq0st8INQcve1nLHpYwN-7Y70\"",
+    "etag": "\"Rec6IH2gCTTQ9GpcoQyimvwyR6k\"",
     "cache-control": "no-store",
-    "content-length": "1053"
+    "content-length": "1191"
    },
-   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"Count the files\"},{\"id\":\"x:174#0\",\"type\":\"thinking\",\"timestamp\":1792267201000,\"thinking\":\"hm\"},{\"id\":\"x:174#1\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"Counting\",\"usage\":{\"input_tokens\":3,\"output_tokens\":5},\"model\":\"claude-x\",\"stopReason\":\"tool_use\"},{\"id\":\"x:174#2\",\"type\":\"tool-call\",\"timestamp\":1792267201000,\"toolUseId\":\"toolu_1\",\"toolName\":\"Bash\",\"summary\":\"$ ls | wc -l\",\"status\":\"success\"},{\"id\":\"x:599#0\",\"type\":\"tool-result\",\"timestamp\":1792267202000,\"toolUseId\":\"toolu_1\",\"isError\":false,\"summary\":\"12\"},{\"id\":\"x:864#0\",\"type\":\"tool-call\",\"timestamp\":1792267203000,\"toolUseId\":\"toolu_2\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/a.go\",\"filePath\":\"/srv/app/a.go\",\"status\":\"success\"},{\"id\":\"x:1138#0\",\"type\":\"tool-result\",\"timestamp\":1792267204000,\"toolUseId\":\"toolu_2\",\"isError\":false,\"summary\":\"package a\"},{\"id\":\"x:1374#0\",\"type\":\"assistant-message\",\"timestamp\":1792267205000,\"markdown\":\"There are 12 files.\",\"stopReason\":\"end_turn\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"Count the files\"},{\"id\":\"x:174#0\",\"type\":\"thinking\",\"timestamp\":1792267201000,\"thinking\":\"hm\"},{\"id\":\"x:174#1\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"Counting\",\"usage\":{\"input_tokens\":3,\"output_tokens\":5},\"model\":\"claude-x\",\"stopReason\":\"tool_use\"},{\"id\":\"x:174#2\",\"type\":\"tool-call\",\"timestamp\":1792267201000,\"toolUseId\":\"toolu_1\",\"toolName\":\"Bash\",\"summary\":\"$ ls | wc -l\",\"call\":{\"description\":\"count\",\"command\":\"ls | wc -l\"},\"status\":\"success\"},{\"id\":\"x:599#0\",\"type\":\"tool-result\",\"timestamp\":1792267202000,\"toolUseId\":\"toolu_1\",\"isError\":false,\"summary\":\"12\",\"text\":\"12\",\"textLines\":1,\"textBytes\":2,\"textTail\":\"12\"},{\"id\":\"x:864#0\",\"type\":\"tool-call\",\"timestamp\":1792267203000,\"toolUseId\":\"toolu_2\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/a.go\",\"filePath\":\"/srv/app/a.go\",\"status\":\"success\"},{\"id\":\"x:1138#0\",\"type\":\"tool-result\",\"timestamp\":1792267204000,\"toolUseId\":\"toolu_2\",\"isError\":false,\"summary\":\"package a\",\"textLines\":1,\"textBytes\":9},{\"id\":\"x:1374#0\",\"type\":\"assistant-message\",\"timestamp\":1792267205000,\"markdown\":\"There are 12 files.\",\"stopReason\":\"end_turn\"}]}"
   },
   {
    "method": "GET",
@@ -1055,11 +1055,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"dGPUWe-aGzVtR7M8-TVnqouslsk\"",
+    "etag": "\"AyxENQN37g27Lj33uT7AXGrCJKo\"",
     "cache-control": "no-store",
-    "content-length": "683"
+    "content-length": "711"
    },
-   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"x:107#0\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"x:107#1\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"x:341#0\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\"},{\"id\":\"x:443#0\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"x:107#0\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"x:107#1\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"x:341#0\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\",\"textLines\":1,\"textBytes\":2},{\"id\":\"x:443#0\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
   }
  ]
 }

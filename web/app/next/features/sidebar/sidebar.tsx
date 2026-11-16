@@ -1,4 +1,5 @@
 import { Menu } from '@base-ui/react/menu';
+import { openLookEditor } from '@/next/features/looks/store';
 import { useKeyHint } from '@/next/features/keys/keys-help';
 import Logo from '@/next/ui/logo';
 import { useKeptItems } from '@/next/core/kept';
@@ -75,15 +76,19 @@ import { designIcon } from '@/next/features/designly/design-icon';
 import {
   NAV_ITEM,
   PINNED_APPS,
+  appKey,
   appOfKey,
   navLayout,
+  navSettingsOf,
+  withPlaced,
+  type INavLayout,
   type TNavItem,
 } from '@/next/features/sidebar/nav-layout';
 import type { NavSettings } from '@/next/stores/me';
 import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import { toast } from '@/next/ui/toast';
 import ProductSwitcher from '@/next/features/sidebar/product-switcher';
-import useDrag, { afterTouchClick } from '@/next/ui/use-drag';
+import useDrag, { EDGE, afterTouchClick } from '@/next/ui/use-drag';
 import MachineAlert from '@/next/features/sidebar/machine-alert';
 import useRailTip, { opensRail } from '@/next/features/sidebar/use-rail-tip';
 import useRowCard from '@/next/features/sidebar/row-card';
@@ -254,8 +259,16 @@ export interface ISidebarProps {
   gpt?: ISidebarGpt | null;
   /** The menu as the person laid it out (Settings → «Меню»); absent, the default layout. */
   nav?: NavSettings;
+  /** Saves the menu the person laid out by hand in the rail (an app carried up to the main buttons and back);
+   *  absent, the menu does not move. Rejects when it was not taken. */
+  onNav?: (nav: NavSettings) => Promise<unknown>;
   ref?: Ref<HTMLElement>;
 }
+
+/** What the rail's menu carries by hand: a main button, an app under «Приложения». */
+const NAV_DRAG = { top: 'nav-top', app: 'nav-app' } as const;
+type TNavDrag = (typeof NAV_DRAG)[keyof typeof NAV_DRAG];
+const NAV_DRAGS: readonly TNavDrag[] = [NAV_DRAG.top, NAV_DRAG.app];
 
 const DEFAULT_NAV: NavSettings = { order: [], hidden: [], apps: [] };
 
@@ -318,6 +331,8 @@ interface INavItemProps {
   list?: boolean;
   /** A list's own chevron beside the item, that folds and unfolds the list. */
   onFold?: () => void;
+  /** The item's key in the menu: the person carries it by hand to another place. */
+  dragKey?: string;
 }
 
 const NavItem = ({
@@ -332,6 +347,7 @@ const NavItem = ({
   list,
   onFold,
   warm,
+  dragKey,
 }: INavItemProps) => (
   <div
     className="hx-nav__group hx-enter"
@@ -339,6 +355,10 @@ const NavItem = ({
     data-eb="220"
     data-i={index}
     aria-expanded={children ? expanded : undefined}
+    data-drag={dragKey ? NAV_DRAG.top : undefined}
+    data-drag-id={dragKey}
+    data-drop={dragKey ? NAV_DRAG.top : undefined}
+    data-drop-id={dragKey}
   >
     <button
       type="button"
@@ -441,6 +461,10 @@ const AppRows = ({
               type="button"
               className="hx-nav__kid"
               aria-current={b.current ? 'page' : undefined}
+              data-drag={NAV_DRAG.app}
+              data-drag-id={appKey(b.id)}
+              data-drop={NAV_DRAG.app}
+              data-drop-id={appKey(b.id)}
               onClick={b.onOpen}
             >
               <Icon name={b.icon} size="sm" className="hx-nav__kid-icon" />
@@ -455,6 +479,10 @@ const AppRows = ({
             type="button"
             className="hx-nav__kid"
             aria-current={a.id === apps.current ? 'page' : undefined}
+            data-drag={NAV_DRAG.app}
+            data-drag-id={appKey(a.id)}
+            data-drop={NAV_DRAG.app}
+            data-drop-id={appKey(a.id)}
             onClick={() => apps.onOpen(a.id, a.chat)}
             onPointerEnter={() => apps.onPrepare?.(a.id, a.chat)}
             onFocus={() => apps.onPrepare?.(a.id, a.chat)}
@@ -732,6 +760,7 @@ const Sidebar = ({
   designs = null,
   gpt = null,
   nav = DEFAULT_NAV,
+  onNav,
   ref,
 }: ISidebarProps) => {
   countRender('sidebar');
@@ -773,6 +802,19 @@ const Sidebar = ({
     const ids = apps ? [...(apps.builtins ?? []).map((b) => b.id), ...apps.rows.map((r) => r.id)] : [];
     return navLayout(nav, items, ids);
   }, [nav, apps, onDesignly]);
+  // The menu by hand: a main button among the others, an app between «Приложения» and the main buttons.
+  const navRef = useRef<HTMLElement>(null);
+  useDrag<TNavDrag, TNavDrag, INavLayout>({
+    listRef: navRef,
+    dragKinds: onNav ? NAV_DRAGS : [],
+    dropKinds: NAV_DRAGS,
+    lined: (source, target) => source.kind === target.kind,
+    tracked: false,
+    resolve: (source, target) =>
+      target.id && target.edge ? withPlaced(layout, source.id, target.id, target.edge === EDGE.after) : null,
+    onDrop: (next) =>
+      onNav?.(navSettingsOf(next)).catch(() => toast(t('next.sidebar.navFailed'), { tone: 'error' })),
+  });
   const appIds = layout.apps.filter((id) => !layout.hidden.has(`app:${id}`));
   const namedApps = nav.apps.length > 0 ? nav.apps : PINNED_APPS;
   const appRowCount = appIds.length;
@@ -1212,7 +1254,7 @@ const Sidebar = ({
         </button>
       </div>
 
-      <nav className="hx-nav" aria-label={t('next.sidebar.actions')}>
+      <nav ref={navRef} className="hx-nav" aria-label={t('next.sidebar.actions')}>
         {layout.top
           .filter((key) => !layout.hidden.has(key))
           .map((key, index) => {
@@ -1220,6 +1262,7 @@ const Sidebar = ({
               return (
                 <NavItem
                   key={key}
+                  dragKey={key}
                   icon="square-pen"
                   label={t('next.sidebar.newChat')}
                   current={false}
@@ -1231,6 +1274,7 @@ const Sidebar = ({
               return (
                 <NavItem
                   key={key}
+                  dragKey={key}
                   icon="search"
                   label={t('next.sidebar.search')}
                   current={searchOpen}
@@ -1242,6 +1286,7 @@ const Sidebar = ({
               return (
                 <NavItem
                   key={key}
+                  dragKey={key}
                   icon="palette"
                   label={t('next.sidebar.designly')}
                   warm="designly"
@@ -1261,6 +1306,7 @@ const Sidebar = ({
               return (
                 <NavItem
                   key={key}
+                  dragKey={key}
                   icon="layout-grid"
                   label={t('next.sidebar.apps')}
                   current={apps.allCurrent}
@@ -1280,6 +1326,7 @@ const Sidebar = ({
               return (
                 <NavItem
                   key={key}
+                  dragKey={key}
                   icon={own.icon}
                   label={own.name}
                   current={own.current}
@@ -1292,6 +1339,7 @@ const Sidebar = ({
             return (
               <NavItem
                 key={key}
+                dragKey={key}
                 icon={row.icon || 'layout-grid'}
                 label={row.name}
                 current={row.id === apps.current}
@@ -1442,6 +1490,15 @@ const Sidebar = ({
                       </span>
                       <span className="hx-item__title">{project.name}</span>
                       <Icon name="chevron-right" size="sm" className="hx-nav__chev" />
+                    </button>
+                    <button
+                      type="button"
+                      className="hx-nav__add hx-project__add"
+                      aria-label={t('next.sidebar.projectLook', { project: project.name })}
+                      title={t('next.sidebar.projectLook', { project: project.name })}
+                      onClick={() => openLookEditor({ k: 'folder', id: project.id })}
+                    >
+                      <Icon name="palette" size="sm" />
                     </button>
                     {actions.onProjectSettings && (
                       <button

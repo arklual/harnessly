@@ -6,6 +6,9 @@ import type { FeedItem, RefInfo, RefKind } from '@/next/features/chat/types';
 
 export type TSegment = { text: string } | { ref: RefKind; label: string };
 
+// A chat's id (tab-vh0l85vgd), alone in the text: a chip only when that chat is known (ref-chip.tsx).
+const CHAT = String.raw`(?<![\w/.:-])tab-[a-z0-9]{6,16}(?![\w-])`;
+
 // A path has a slash and an extension (web/app/next/feed.tsx, feed.tsx:12 is a file only with a slash before it, so
 // plain words with dots stay text).
 const FILE = String.raw`(?<![\w/.:-])(?:[\w@.-]+/)+[\w@-]+(?:\.[\w-]+)+(?::\d+)?`;
@@ -16,7 +19,7 @@ const pattern = (): RegExp => {
   const task = appConfig().taskKeyPattern;
   if (cached?.source === task) return cached.re;
   // Named: the tracker's pattern may hold groups of its own ((ABC|EXP)-\d+), which would shift numbered ones.
-  const re = new RegExp(String.raw`(?<task>\b(?:${task})\b)|(?<file>${FILE})`, 'g');
+  const re = new RegExp(String.raw`(?<task>\b(?:${task})\b)|(?<chat>${CHAT})|(?<file>${FILE})`, 'g');
   cached = { source: task, re };
   return re;
 };
@@ -29,7 +32,10 @@ export const splitRefs = (text: string): TSegment[] => {
   re.lastIndex = 0;
   for (let match = re.exec(text); match; match = re.exec(text)) {
     if (match.index > last) out.push({ text: text.slice(last, match.index) });
-    out.push({ ref: match.groups?.task ? 'task' : 'file', label: match[0] });
+    let ref: RefKind = 'file';
+    if (match.groups?.task) ref = 'task';
+    else if (match.groups?.chat) ref = 'chat';
+    out.push({ ref, label: match[0] });
     last = match.index + match[0].length;
   }
   if (last < text.length) out.push({ text: text.slice(last) });
@@ -49,6 +55,36 @@ export const changeLinkLabel = (href: string): string | null => {
   const commit = COMMIT_LINK.exec(href);
   if (commit?.[1] && commit[2]) return `${commit[1].split('/').pop()} ${commit[2].slice(0, 7)}`;
   return null;
+};
+
+const CHAT_ID = /^tab-[a-z0-9]{6,16}$/;
+// A ref of another machine's chat (`dev-department.example.com/tab-…`, as peer messages name it).
+const CHAT_REF = /^[\w.-]+\/(tab-[a-z0-9]{6,16})$/;
+// A chat's address in harnessly: …/c/tab-… (any base path), or the old interface's ?c=agent:<machine>:tab-….
+const CHAT_PATH = /(?:^|\/)c\/(tab-[a-z0-9]{6,16})\/?$/;
+const CHAT_KEY = /(?:^|:)(tab-[a-z0-9]{6,16})$/;
+
+/**
+ * The chat a link of the agent's text names: `[title](tab-…)`, `[title](<machine>/tab-…)` or the chat's
+ * address on this site; null for any other link. Another site's /c/tab-… is that site's, not a chat here.
+ */
+export const chatIdOfHref = (href: string, origin: string | null = null): string | null => {
+  const raw = href.trim();
+  if (CHAT_ID.test(raw)) return raw;
+  const ref = CHAT_REF.exec(raw);
+  if (ref?.[1]) return ref[1];
+  let url: URL;
+  try {
+    url = new URL(raw, origin ?? 'http://local.invalid');
+  } catch {
+    return null;
+  }
+  const relative = !/^[a-z][a-z0-9+.-]*:/i.test(raw);
+  if (!relative && (origin === null || url.origin !== origin)) return null;
+  const path = CHAT_PATH.exec(url.pathname)?.[1];
+  if (path) return path;
+  const key = url.searchParams.get('c');
+  return key ? (CHAT_KEY.exec(key)?.[1] ?? null) : null;
 };
 
 /** What a chip knows when the page has nothing more about it. */

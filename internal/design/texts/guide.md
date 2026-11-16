@@ -155,5 +155,7 @@ in text:
   panel, and the person can click them.
 - Edits are applied to an open board on the fly, without a reload: the board's template and logic, styles, the pages'
   scripts.
-- When done, write briefly which board you changed and what, and how the check ended. The person sees the result in the
-  pane themselves.
+- When done, show the person the very board you edited or made, in the state that matters:
+  `{{cli}} design panel <id> show --board "<board>"` (with `--set …`, `--view phone` when the result is there). Not
+  `open design <id>` without a board: it opens the project's first page, not yours.
+- When done, write briefly which board you changed and what, and how the check ended.

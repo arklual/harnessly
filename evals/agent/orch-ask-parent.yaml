@@ -1,0 +1,56 @@
+id: orch-ask-parent
+title: Помощник упирается в вопрос, ответ на который знает только главный чат
+tags: [orchestration, hard]
+agents: [claude, codex]
+timeout_s: 1500
+settle_s: 45
+setup:
+  workspace: [fixtures/orch-ask]
+  run: git init -q && git add -A && git -c user.name=eval -c user.email=eval@example.test commit -qm init
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/delegation/**'
+  - 'internal/mcpserver/**'
+prompt: |-
+  Нужны налоги в чеках кассы (receipts/). Раздай трём агентам параллельно:
+  1) receipts/vat.py — vat_breakdown(total_kop) → (без НДС, НДС) в копейках, НДС внутри цены, ставка и округление из receipts/settings.py (там есть вопросы — пусть разберётся);
+  2) receipts/export.py — export_csv(path) пишет чеки из receipts/orders.py: id;event;total;net;vat, суммы в копейках, разделитель «;», с заголовком;
+  3) tests/test_vat.py — тесты на vat_breakdown и экспорт.
+  В конце прогони тесты и скажи, что получилось. Тесты — на unittest, запуск `python3 -m unittest discover -s tests -t .` (pytest тут не установлен). Ставку и округление я уточняю у бухгалтерии — напишу, как ответят.
+interrupt:
+  after_s: 50
+  text: Бухгалтерия ответила — с 2026 года НДС 22%, а копейки НДС округляем математически (0,5 и больше — вверх), не отбрасываем. Остальное как было.
+expect:
+  - name: helpers did the parts
+    any_of:
+      - called: harnessly\.delegate_task
+      - called: Agent|Task
+      - called: Bash
+        args: {command: 'harnessly tab create\b.*--prompt'}
+  - name: VAT is 22% with rounding (hidden check)
+    check: |
+      python3 - <<'PY'
+      import csv, os, sys
+      from decimal import Decimal, ROUND_HALF_UP
+      sys.path.insert(0, ".")
+      from receipts.vat import vat_breakdown
+      from receipts.export import export_csv
+      def ref(t):
+          v = int((Decimal(t) * 22 / 122).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+          return (t - v, v)
+      for t in (12200, 999, 5, 1830000, 1, 61, 122, 7777):
+          assert tuple(vat_breakdown(t)) == ref(t), f"vat_breakdown({t}) = {vat_breakdown(t)}, want {ref(t)}"
+      p = os.path.join(os.environ.get("TMPDIR", "/tmp"), "receipts.csv")
+      export_csv(p)
+      rows = list(csv.reader(open(p, encoding="utf-8"), delimiter=";"))
+      assert rows[0] == ["id", "event", "total", "net", "vat"], rows[0]
+      from receipts.orders import ORDERS
+      for o, r in zip(ORDERS, rows[1:]):
+          n, v = ref(o["total"])
+          assert r == [str(o["id"]), o["event"], str(o["total"]), str(n), str(v)], r
+      assert len(rows) == len(ORDERS) + 1
+      print("ok")
+      PY
+  - name: tests pass
+    check: test -s tests/test_vat.py && python3 -m unittest discover -s tests -t .

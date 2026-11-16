@@ -7,8 +7,11 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/ly-solutions/harnessly/internal/hub/auth"
+	"github.com/ly-solutions/harnessly/internal/hub/authz"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/machaccess"
+	"github.com/ly-solutions/harnessly/internal/hub/orgs"
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hub/tenant"
@@ -78,22 +81,32 @@ func (s *Service) debugOpen(w http.ResponseWriter, r *http.Request, t *tenant.Ct
 	return nil
 }
 
+// MaySeeDebug says whether the person may read the machine's openings for debugging: its creator, an administrator of
+// the installation, or a person who manages its tenant. The machines list sends it (canSeeDebug), so the page asks only
+// when the answer is the list.
+func (s *Service) MaySeeDebug(ctx context.Context, p *auth.Principal, m store.Machine) (bool, error) {
+	if m.CreatedBy == p.User.ID {
+		return true, nil
+	}
+	admin, err := s.auth.IsInstanceAdmin(ctx, p.User.ID)
+	if err != nil || admin {
+		return admin, err
+	}
+	return authz.New(s.db.S()).Allowed(ctx, orgs.Principal(p), authz.Check{Action: authz.Manage, Scope: tenantOf(m)})
+}
+
 // debugList is GET /api/machines/{id}/debug: the openings of the machine for its owner, for the people who manage it,
 // and for the administrators of the installation.
 func (s *Service) debugList(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) error {
 	p := t.Person
 	ctx := r.Context()
 	m := *t.Machine
-	if m.CreatedBy != p.User.ID {
-		admin, err := s.auth.IsInstanceAdmin(ctx, p.User.ID)
-		if err != nil {
-			return err
-		}
-		if !admin {
-			if err := manage(ctx, s.db.S(), p, m); err != nil {
-				return err
-			}
-		}
+	ok, err := s.MaySeeDebug(ctx, p, m)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return httpx.ErrForbidden
 	}
 	st := s.db.S()
 	rows, err := st.DebugOpenings(ctx, m.ID, s.now().Add(-debugKeep), 200)

@@ -17,6 +17,22 @@ import {
 } from '@/next/features/connections/api';
 import ConnectionsSection from '@/next/features/connections/connections-section';
 import {
+  checkConnector,
+  connectConnector,
+  discoverConnector,
+  isConnectorRefusal,
+  loadConnectors,
+  reissueConnector,
+  loadConnectorRules,
+  setConnectorRule,
+  removeConnector,
+  type IConnectorConn,
+  type IConnectorRuleInput,
+  type IConnectorsList,
+  type TConnectorOutcome,
+} from '@/next/features/connectors/api';
+import ConnectorsSection from '@/next/features/connectors/connectors-section';
+import {
   addMcp,
   checkMcp,
   enableMcp,
@@ -160,6 +176,127 @@ const McpPart = ({ machine }: { machine: MachineId }) => {
   );
 };
 
+/** How often the connectors are read again while a pairing step is open. */
+const STEP_POLL_MS = 3_000;
+
+type TConnectorsLoad =
+  | { k: 'loading' }
+  | { k: 'failed'; text: string }
+  /** A machine whose runtime has no connector routes yet: the part is not shown. */
+  | { k: 'absent' }
+  | { k: 'ready'; list: IConnectorsList };
+
+/** An answer of the connector routes as the words of why it was not taken, or the value. */
+const connectorOutcome = <T,>(res: TConnectorOutcome<T>): { value: T } | { error: string } => {
+  if (!('ok' in res)) return { error: pageText(res) };
+  if (isConnectorRefusal(res.value)) return { error: res.value.message || reasonText(res.value.refused) };
+  return { value: res.value };
+};
+
+const withConnector = (all: readonly IConnectorConn[], conn: IConnectorConn): readonly IConnectorConn[] =>
+  all.some((c) => c.id === conn.id) ? all.map((c) => (c.id === conn.id ? conn : c)) : [...all, conn];
+
+/** The part of the page with the person's mail, calendars, feeds: the connections and the catalog. */
+const ConnectorsPart = ({ machine }: { machine: MachineId }) => {
+  const [state, setState] = useState<TConnectorsLoad>({ k: 'loading' });
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let live = true;
+    void loadConnectors(machine).then((res) => {
+      if (!live) return;
+      if ('r' in res && res.r === 'failed' && res.code === 'http' && res.status === 404) {
+        setState((cur) => (cur.k === 'ready' ? cur : { k: 'absent' }));
+        return;
+      }
+      const got = connectorOutcome(res);
+      if ('value' in got) setState({ k: 'ready', list: got.value });
+      else setState((cur) => (cur.k === 'ready' ? cur : { k: 'failed', text: got.error }));
+    });
+    return () => {
+      live = false;
+    };
+  }, [machine, attempt]);
+
+  const retry = useCallback(() => {
+    setState({ k: 'loading' });
+    setAttempt((n) => n + 1);
+  }, []);
+
+  // While a connection waits for a step of the person (a bot's pairing link), the list is read again every few
+  // seconds: the step goes away by itself once the bot got the code. «Check» stays the way to do it at once.
+  const stepOpen = state.k === 'ready' && state.list.connections.some((c) => c.next !== null);
+  useEffect(() => {
+    if (!stepOpen) return undefined;
+    let live = true;
+    const timer = window.setInterval(() => {
+      void loadConnectors(machine).then((res) => {
+        if (!live) return;
+        const got = connectorOutcome(res);
+        if ('value' in got) setState({ k: 'ready', list: got.value });
+      });
+    }, STEP_POLL_MS);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+    };
+  }, [machine, stepOpen]);
+
+  const change = (next: (conns: readonly IConnectorConn[]) => readonly IConnectorConn[]) =>
+    setState((cur) =>
+      cur.k === 'ready'
+        ? { k: 'ready', list: { ...cur.list, connections: next(cur.list.connections) } }
+        : cur,
+    );
+
+  const loadRules = useCallback(
+    async (id: string) => {
+      const got = connectorOutcome(await loadConnectorRules(machine, id));
+      return 'error' in got ? got.error : got.value;
+    },
+    [machine],
+  );
+  const setRule = useCallback(
+    async (id: string, input: IConnectorRuleInput) => {
+      const got = connectorOutcome(await setConnectorRule(machine, id, input));
+      return 'error' in got ? got.error : got.value;
+    },
+    [machine],
+  );
+
+  const replaced = async (res: Promise<TConnectorOutcome<IConnectorConn>>): Promise<string | null> => {
+    const got = connectorOutcome(await res);
+    if ('error' in got) return got.error;
+    change((all) => withConnector(all, got.value));
+    return null;
+  };
+
+  if (state.k === 'absent') return null;
+  return (
+    <ConnectorsSection
+      ruled={state.k === 'ready' ? state.list.ruled : undefined}
+      onRules={loadRules}
+      onSetRule={setRule}
+      catalog={state.k === 'ready' ? state.list.catalog : null}
+      connections={state.k === 'ready' ? state.list.connections : null}
+      failed={state.k === 'failed' ? { reason: state.text, onRetry: retry } : null}
+      onConnect={(input) => replaced(connectConnector(machine, input))}
+      onDiscover={async (input) => {
+        const got = connectorOutcome(await discoverConnector(machine, input));
+        return 'error' in got ? got.error : got.value;
+      }}
+      onCheck={(id) => replaced(checkConnector(machine, id))}
+      onReissue={(id) => replaced(reissueConnector(machine, id))}
+      onRemove={async (id) => {
+        const got = connectorOutcome(await removeConnector(machine, id));
+        if ('error' in got) return got.error;
+        change((all) => all.filter((c) => c.id !== id));
+        return null;
+      }}
+    />
+  );
+};
+
 export const ConnectionsPage = ({ machine, start }: { machine: MachineId; start?: string }) => {
   const [state, setState] = useState<TLoad>({ k: 'loading' });
   const [attempt, setAttempt] = useState(0);
@@ -220,6 +357,7 @@ export const ConnectionsPage = ({ machine, start }: { machine: MachineId; start?
           return null;
         }}
       />
+      <ConnectorsPart machine={machine} />
       <McpPart machine={machine} />
     </>
   );

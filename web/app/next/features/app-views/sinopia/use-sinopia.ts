@@ -86,8 +86,11 @@ export interface ISinopia {
   runAction: (action: ISelectionAction) => Promise<void>;
   /** A block selected in the presentation editor (null: none); stable, it is called from an effect. */
   pickBlock: (picked: IPickedBlock | null) => void;
-  /** Runs `proceed` (the share, the publish) if the checks that run on share let it go. */
-  gate: (proceed: () => void) => void;
+  /** Runs `proceed` (the share, the publish) if the checks that run on share let it go. With `withdraw`, `proceed`
+   *  runs at once (opening the share dialog shares nothing; its people and links are the hub's, not the machine's) and
+   *  the checks run beside it: a block calls `withdraw` and shows the findings, a machine that does not answer is said
+   *  in a toast and holds nothing up. */
+  gate: (proceed: () => void, withdraw?: () => void) => void;
   /** A Document API call of a view went through. */
   onViewCall: (app: IInstalledApp, method: string, params: Record<string, unknown>) => void;
 }
@@ -306,18 +309,37 @@ export const useSinopia = ({
   );
 
   const gate = useCallback(
-    (proceed: () => void) => {
+    (proceed: () => void, withdraw?: () => void) => {
       // Nothing to ask where no app on in the document has a check.
       if (!latest.current.active.some((a) => (a.app.sinopia?.checks?.length ?? 0) > 0)) {
         proceed();
         return;
       }
+      const shown = (results: ISinopiaCheckResult[]) => {
+        setBlocked(results);
+        // The marks the checks left are on the boards at once.
+        void syncSinopia(machine, id, latest.current.conversation).then(setState, () => undefined);
+      };
+      if (withdraw) {
+        proceed();
+        void runSinopiaChecks(machine, id, 'share').then(
+          (checked) => {
+            if (!checked.blocked) return;
+            withdraw();
+            shown(checked.results.filter((r) => r.blocks));
+          },
+          (e: unknown) =>
+            toast(t('next.sinopia.checkFailed'), {
+              description: e instanceof Error ? e.message : undefined,
+              tone: 'error',
+            }),
+        );
+        return;
+      }
       void gateShare(() => runSinopiaChecks(machine, id, 'share'), proceed).then((got) => {
         if (got.ok) return;
         if ('error' in got) toast(t('next.sinopia.checkFailed'), { description: got.error, tone: 'error' });
-        else setBlocked(got.results);
-        // The marks the checks left are on the boards at once.
-        void syncSinopia(machine, id, latest.current.conversation).then(setState, () => undefined);
+        else shown(got.results);
       });
     },
     [machine, id],

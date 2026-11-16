@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/ly-solutions/harnessly/internal/journal"
 	"github.com/ly-solutions/harnessly/internal/noticeslot"
+	"github.com/ly-solutions/harnessly/internal/sidewidget"
 	"net"
 	"net/http"
 	"net/netip"
@@ -17,6 +18,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agent"
 	browsertools "github.com/ly-solutions/harnessly/internal/agentbrowser/tools"
 	"github.com/ly-solutions/harnessly/internal/browseract"
+	"github.com/ly-solutions/harnessly/internal/chatrole"
 	"github.com/ly-solutions/harnessly/internal/coreapi/layoutapi"
 	"github.com/ly-solutions/harnessly/internal/delegation"
 	"github.com/ly-solutions/harnessly/internal/delivery"
@@ -24,6 +26,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/fileplace"
 	"github.com/ly-solutions/harnessly/internal/imagegen"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/looks"
 	"github.com/ly-solutions/harnessly/internal/mcpserver"
 	"github.com/ly-solutions/harnessly/internal/paneauto"
 	"github.com/ly-solutions/harnessly/internal/panel"
@@ -55,7 +58,22 @@ func newDelegation(v *v2Live, settings wire.RuntimeSettingsStore) *delegation.Se
 			_, _, models, _ := providers.Launcher{Store: v.profiles}.Lookup(profile)
 			return models
 		},
-		Self: peerSelf(os.Getenv),
+		Self:  peerSelf(os.Getenv),
+		Roles: roleMarker(v),
+		Permission: func(conv string) wire.PermissionMode {
+			rec, ok := v.rt.Record(conv)
+			if !ok {
+				return wire.PermissionAsk
+			}
+			if rec.Model != nil && rec.Model.Permission != "" {
+				return rec.Model.Permission
+			}
+			m := v.machine
+			if m == nil || m.skip == nil {
+				return wire.PermissionAsk
+			}
+			return defaultPermissionOf(rec.Provider, m.skip(), m.codexConfig, m.claudeSettings)
+		},
 		Book: &delegation.Book{Path: filepath.Join(v.d.DataDir, "v2", "delegations.json")},
 		Log: func(msg string, kv ...any) {
 			fs := make([]agent.F, 0, len(kv)/2)
@@ -72,6 +90,54 @@ func newDelegation(v *v2Live, settings wire.RuntimeSettingsStore) *delegation.Se
 // to a chat nested under that chat, as delegate_task makes it, not to a loose tab of the workspace. The chat
 // is the one that runs in the terminal the command names (the CLI sends its tmux session, as peers send does); a command
 // from a terminal that is no chat's gets layoutapi.ErrNoParent and the tab is made the old way.
+// roleMarker marks the agent of a chat with its role (internal/chatrole) by the tmux session it runs in, for the PreToolUse
+// hook of the agent to read. It writes only what changed; a chat whose agent has no session yet is marked by a later
+// sweep, and one that moved to another session is marked there and unmarked in the old one.
+func roleMarker(v *v2Live) delegation.RoleMarker {
+	dir := filepath.Join(v.d.DataDir, chatrole.Dir)
+	var mu sync.Mutex
+	type mark struct {
+		session string
+		role    chatrole.Role
+	}
+	done := map[string]mark{}
+	return func(conv string, r chatrole.Role) {
+		rec, ok := v.rt.Record(conv)
+		if !ok || rec.Session == "" {
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		had := done[conv]
+		if had.session == rec.Session && had.role == r {
+			return
+		}
+		if had.session != "" && had.session != rec.Session {
+			_ = chatrole.Mark(dir, had.session, chatrole.None)
+		}
+		if err := chatrole.Mark(dir, rec.Session, r); err != nil {
+			agent.Log("warn", "delegation: the role of a chat was not marked", agent.F{K: "chat", V: conv}, agent.F{K: "error", V: err.Error()})
+			return
+		}
+		done[conv] = mark{rec.Session, r}
+	}
+}
+
+// planTasks are a chat's plan for the pane (GET …/tasks): its agent's own task list, then its team's.
+func (v *v2Live) planTasks(ctx context.Context, id string) ([]wire.Task, error) {
+	own, err := v.rt.Tasks(ctx, id)
+	if err != nil || v.delegation == nil {
+		return own, err
+	}
+	team := v.delegation.PlanTasks(id, func(conv string) string {
+		if rec, ok := v.rt.Record(conv); ok {
+			return rec.Title
+		}
+		return ""
+	})
+	return append(own, team...), nil
+}
+
 func (c *core) cliDelegate(ctx context.Context, req layoutapi.DelegateRequest) (layoutapi.DelegateResult, error) {
 	v := c.v2.Load()
 	if v == nil || v.delegation == nil || v.rt == nil {
@@ -144,8 +210,11 @@ func (v *v2Live) serveDelegation(done <-chan struct{}) {
 			notices.Name = rec.Title
 		}
 		// The agent of a chat with apps stays in its wall: a chat it started or wrote to would run outside.
+		// The widgets under the right column: a sandboxed view with no permission, so a walled agent makes them too.
+		widgets := sidewidget.Tools{S: sideWidgetService(v.d)}
+		look := looks.Tools{Inbox: lookInbox, Caller: id}
 		if _, walled := v.d.CLI.AgentOf(r); walled {
-			return toolsets{hand, pics, place, browse, notices}
+			return toolsets{hand, pics, place, browse, notices, widgets, look}
 		}
 		// Only a chat that works in a video project carries the video's tools.
 		video := design.VideoTools{L: designAPI(v.d).L}
@@ -156,7 +225,7 @@ func (v *v2Live) serveDelegation(done <-chan struct{}) {
 		if rec, ok := v.rt.Record(id); ok {
 			browser.Cwd = rec.Cwd
 		}
-		return toolsets{t, hand, pics, video, design.KitTools{L: video.L}, place, browser, browse, notices}
+		return toolsets{t, hand, pics, video, design.KitTools{L: video.L}, place, browser, browse, notices, widgets, look}
 	}
 	set := previewOf(v.d)
 	set.agentTools.Store(&tools)

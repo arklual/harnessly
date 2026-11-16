@@ -318,22 +318,20 @@ describe('the limit on the pill (HRN-1496)', () => {
     spend: null,
   } as const;
 
-  it('fills the outline by the spent five hours and shows both windows in the popover', () => {
+  it('shows both windows of the provider in the popover', () => {
     const view = render(
       <ModelPicker value={choice()} agents={[agent]} locked onChange={vi.fn()} limits={limits} />,
     );
     const pill = view.container.querySelector<HTMLButtonElement>('.hx-model');
-    expect(pill?.dataset.ring).toBe('low');
-    const ring = view.container.querySelector<SVGElement>('.hx-model__ring');
-    expect(ring?.style.getPropertyValue('--hx-ring-used')).toBe('82');
     act(() => pill?.click());
-    const gauges = view.container.querySelectorAll('.hx-picker__limits .hx-gauge');
-    expect(gauges).toHaveLength(2);
+    const wins = view.container.querySelectorAll('.hx-picker__limits .hx-limb__win');
+    expect(wins).toHaveLength(2);
+    expect(view.container.querySelector('.hx-picker__limits')?.textContent).toMatch(/5 h.*18%.*week.*51%/);
   });
 
-  it('draws a plain border without limits', () => {
+  it('has no limits card without limits', () => {
     const view = render(<ModelPicker value={choice()} agents={[agent]} locked onChange={vi.fn()} />);
-    expect(view.container.querySelector('.hx-model__ring')).toBeNull();
-    expect(view.container.querySelector('.hx-model')?.hasAttribute('data-ring')).toBe(false);
+    act(() => view.container.querySelector<HTMLButtonElement>('.hx-model')?.click());
+    expect(view.container.querySelector('.hx-picker__limits')).toBeNull();
   });
 });

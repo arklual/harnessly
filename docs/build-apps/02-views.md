@@ -156,7 +156,7 @@ body { margin: 0; background: var(--t-bg); color: var(--t-text); font: 14px/1.45
 | `hl.chat.send(text)` | `chat.prompt` | A message to the agent, up to 20 000 characters, shown with the app's name on one line |
 | `hl.chat.read({last})` | `chat.read` | Latest messages as `{role, text}`: default 20, at most 200 |
 | `hl.chat.card(view, data)` | `chat.card` | A card at the end of the feed. Kept in this browser, at most 20 per chat, data up to 20 000 characters |
-| `hl.pane.open(target)` | `pane.open` | `app:<id>[/<view>]`, or `chat:<id>` to open a conversation from `hl.agents.list()` (this also needs `agents.read`; otherwise `permission_denied`) |
+| `hl.pane.open(target)` | `pane.open` | `app:<id>[/<view>]`, or `chat:<id>` to open a conversation from `hl.agents.list()` (this also needs `agents.read`; otherwise `permission_denied`). Where the app is the main thing: `object:<slug>` opens one of its objects, `share:<slug>` the «Поделиться» dialog of a board or a document (people, roles, links without sign-in) |
 | `hl.agents.list()` | `agents.read` | The person's conversations on this machine as `{id, title, status, provider, machine}`. `status` is `working`, `waiting` (a question, a permission or a plan waits for the person) or `free`. No message text, prompt or path. The `agents` event brings the same list when it changes |
 | `hl.tools.call('server.tool', args)` | none | A tool of your own **remote https** server. Returns the raw MCP result: check `isError` yourself. See [Backend](03-backend.md) |
 | `hl.storage.<scope>.get/getVersioned/set/delete/keys` | `storage` | Scopes below; `get` of a missing key is `null`. `getVersioned(key)` answers `{value, version}`; `set(key, value, {ifVersion})` answers the new version. See [Versions](#versions) |

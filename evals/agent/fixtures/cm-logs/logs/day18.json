@@ -1,0 +1,137 @@
+{
+ "day": 18,
+ "records": [
+  {
+   "order": "o18-0",
+   "city": "Сочи",
+   "status": "pending",
+   "amount_rub": 869
+  },
+  {
+   "order": "o18-1",
+   "city": "Казань",
+   "status": "paid",
+   "amount_rub": 2866
+  },
+  {
+   "order": "o18-2",
+   "city": "Тула",
+   "status": "paid",
+   "amount_rub": 1323
+  },
+  {
+   "order": "o18-3",
+   "city": "Пермь",
+   "status": "paid",
+   "amount_rub": 493
+  },
+  {
+   "order": "o18-4",
+   "city": "Тула",
+   "status": "paid",
+   "amount_rub": 1131
+  },
+  {
+   "order": "o18-5",
+   "city": "Тула",
+   "status": "refunded",
+   "amount_rub": 271
+  },
+  {
+   "order": "o18-6",
+   "city": "Казань",
+   "status": "paid",
+   "amount_rub": 6072
+  },
+  {
+   "order": "o18-7",
+   "city": "Москва",
+   "status": "pending",
+   "amount_rub": 4440
+  },
+  {
+   "order": "o18-8",
+   "city": "Казань",
+   "status": "refunded",
+   "amount_rub": 6641
+  },
+  {
+   "order": "o18-9",
+   "city": "Пермь",
+   "status": "pending",
+   "amount_rub": 1752
+  },
+  {
+   "order": "o18-10",
+   "city": "Сочи",
+   "status": "refunded",
+   "amount_rub": 6793
+  },
+  {
+   "order": "o18-11",
+   "city": "Пермь",
+   "status": "pending",
+   "amount_rub": 484
+  },
+  {
+   "order": "o18-12",
+   "city": "Москва",
+   "status": "pending",
+   "amount_rub": 2406
+  },
+  {
+   "order": "o18-13",
+   "city": "Казань",
+   "status": "paid",
+   "amount_rub": 6463
+  },
+  {
+   "order": "o18-14",
+   "city": "Пермь",
+   "status": "pending",
+   "amount_rub": 4635
+  },
+  {
+   "order": "o18-15",
+   "city": "Пермь",
+   "status": "refunded",
+   "amount_rub": 5900
+  },
+  {
+   "order": "o18-16",
+   "city": "Пермь",
+   "status": "paid",
+   "amount_rub": 1192
+  },
+  {
+   "order": "o18-17",
+   "city": "Пермь",
+   "status": "pending",
+   "amount_rub": 1642
+  },
+  {
+   "order": "o18-18",
+   "city": "Пермь",
+   "status": "paid",
+   "amount_rub": 3599
+  },
+  {
+   "order": "o18-19",
+   "city": "Казань",
+   "status": "paid",
+   "amount_rub": 868
+  },
+  {
+   "order": "o18-20",
+   "city": "Казань",
+   "status": "pending",
+   "amount_rub": 5088
+  },
+  {
+   "order": "o18-21",
+   "city": "Казань",
+   "status": "paid",
+   "amount_rub": 5793
+  }
+ ]
+}
