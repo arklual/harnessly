@@ -49,6 +49,18 @@ describe('readMeta', () => {
       kind: 'mr',
       state: 'merged',
     });
+    expect(readMeta({ kind: 'mr', title: 'Cache', iid: 4, files: '7', target: 'main' })).toMatchObject({
+      files: '7',
+      target: 'main',
+    });
+    expect(
+      readMeta({
+        kind: 'issue',
+        key: 'PAY-201',
+        title: 'Refund',
+        parent: { key: 'PAY-200', title: 'Refunds 2.0' },
+      }),
+    ).toMatchObject({ parent: { key: 'PAY-200', title: 'Refunds 2.0' } });
     expect(readMeta({ kind: 'artifact' })).toBeNull();
     expect(readMeta({ kind: 'weird', title: 'x' })).toBeNull();
     expect(readMeta(null)).toBeNull();

@@ -4,11 +4,11 @@ import (
 	"context"
 	"io"
 	"log/slog"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
@@ -20,11 +20,7 @@ func (g gateStub) On(context.Context, string, string) bool { return g.on }
 // percentage held to 0..100; an unknown provider is not kept.
 func TestOnLimitsKeepsLastReading(t *testing.T) {
 	ctx := context.Background()
-	db, err := store.Open(ctx, "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
+	db := storetest.Open(t)
 	st := db.S()
 	u := &store.User{Email: "alice@example.com", Name: "Alice"}
 	if err := st.CreateUser(ctx, u); err != nil {

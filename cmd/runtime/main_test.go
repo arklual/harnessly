@@ -21,9 +21,12 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 	syscall.Umask(0o077)
+	warmKitCards = func(string) {}
 	// The tests hold the apps' permissions as they are when on; permissions_off_test.go turns them off.
 	apps.SetPermissions(true)
 	// The goldens are the previous runtime's answers, which were in Russian.
 	os.Setenv("RUNTIME_LOCALE", "ru")
-	os.Exit(m.Run())
+	code := m.Run()
+	removeE2EBin()
+	os.Exit(code)
 }

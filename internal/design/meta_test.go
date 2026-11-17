@@ -43,7 +43,9 @@ func readFileT(t *testing.T, file string) string {
 func testLibrary(t *testing.T, root string) *Library {
 	t.Helper()
 	t.Setenv("RUNTIME_LOCALE", "")
-	l := New(Config{LibraryDir: root, Texts: Texts{Tag: "test-design", CLI: "acme"}})
+	// The data dir is the test's own: without one the dialogs' instructions went to design/library under the
+	// package's sources.
+	l := New(Config{LibraryDir: root, DataDir: t.TempDir(), Texts: Texts{Tag: "test-design", CLI: "acme"}})
 	l.osUser = func() string { return "agent" }
 	t.Cleanup(l.StopWatching)
 	return l

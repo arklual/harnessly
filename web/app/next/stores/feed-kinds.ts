@@ -7,7 +7,10 @@ import { notePrefWrite } from '@/next/core/pref-write';
 import { useSyncExternalStore } from 'react';
 import { OUTPUT_KINDS } from '@/next/protocol/v2';
 
-export const FEED_KINDS = [...OUTPUT_KINDS, 'file', 'mrDone'] as const;
+// `made`, `preview` and `bigShots` are how the cards look, not which: the block «Сделано за ход» at the answer's end
+// (off: the cards as before, and a link alone in its paragraph a card in place), the previews of documents and
+// designs, the screenshots large in a grid. All on by default.
+export const FEED_KINDS = [...OUTPUT_KINDS, 'file', 'mrDone', 'made', 'preview', 'bigShots'] as const;
 export type FeedKind = (typeof FEED_KINDS)[number];
 export type FeedKinds = Readonly<Record<FeedKind, boolean>>;
 
@@ -24,6 +27,9 @@ export const DEFAULT_FEED_KINDS: FeedKinds = {
   commit: false,
   file: false,
   mrDone: false,
+  made: true,
+  preview: true,
+  bigShots: true,
 } as const satisfies Record<FeedKind, boolean>;
 
 const listeners = new Set<() => void>();

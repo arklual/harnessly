@@ -1,0 +1,89 @@
+/* Cards on the voice's stage (features/voice-live/stage-cards.tsx). */
+.hx-vcards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hx-vcards__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-lg, 12px);
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hx-vcards__row:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-vcards__title {
+  overflow: hidden;
+  font-weight: var(--hx-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-vcards__state {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+.hx-vcards__row[data-state='waiting-question'] .hx-vcards__state,
+.hx-vcards__row[data-state='waiting-permission'] .hx-vcards__state {
+  color: var(--hx-warning, #d99a2b);
+}
+.hx-vcards__last {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-vtext {
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-md);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.hx-vread {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+.hx-vread__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+.hx-vread__btn {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  font: inherit;
+  cursor: pointer;
+}
+.hx-vread__text p {
+  margin: 0 0 12px;
+  color: var(--hx-fg-3);
+  line-height: 1.65;
+  transition: color var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-vread__text p[data-at] {
+  color: var(--hx-fg-1);
+}
+.hx-vread__text p[data-past] {
+  opacity: 0.6;
+}

@@ -1,0 +1,13 @@
+{
+  "next.voice.cards.asks": "ждёт ответа",
+  "next.voice.cards.permission": "просит разрешение",
+  "next.voice.cards.working": "работает",
+  "next.voice.cards.untitled": "Без названия",
+  "next.voice.cards.readDone": "Чтение закончено",
+  "next.voice.cards.readAt": "Часть {at} из {of}",
+  "next.voice.cards.resume": "Продолжить",
+  "next.voice.cards.pause": "Пауза",
+  "next.voice.cards.chats": "Чаты",
+  "next.voice.cards.reading": "Читаю вслух",
+  "next.voice.cards.text": "Текст"
+}

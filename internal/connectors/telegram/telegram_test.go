@@ -200,7 +200,7 @@ func (c *chats) all() []string {
 
 func eventually(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for !cond() {
 		if time.Now().After(deadline) {
 			t.Fatalf("never: %s", what)
@@ -237,7 +237,8 @@ func (w *world) start(t *testing.T) (*connectors.Service, *hub, context.CancelFu
 	s := connectors.New(w.dir, w.safe, nil)
 	h := &hub{}
 	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
+	// The relays read telegram.API, which the next test's newWorld sets: they end with this test.
+	t.Cleanup(func() { cancel(); s.WaitStopped() })
 	s.Start(ctx, h)
 	return s, h, cancel
 }

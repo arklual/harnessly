@@ -1,0 +1,34 @@
+id: pane-many-outputs
+title: «Много всего за ход» — справа одно главное, остальное ссылками, не открывать задачи по одной
+tags: [pane]
+timeout_s: 300
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'web/app/next/features/pane/intents.ts'
+setup:
+  files:
+    sprint.md: |
+      # Спринт 14
+
+      Задачи (статусы на сегодня):
+      - PRJ-11 Возврат по карте — готово
+      - PRJ-12 Частичный возврат — в работе
+      - PRJ-13 Экспорт в CSV — готово
+      - PRJ-14 Уведомления о возврате — не начата
+      - PRJ-15 Лимиты возвратов — в работе
+      - PRJ-16 Отчёт для бухгалтерии — не начата
+
+      MR https://gitlab.example.test/team/app/-/merge_requests/7 — «Частичный возврат», ждёт ревью.
+prompt: >-
+  В sprint.md задачи PRJ-11…PRJ-16 и MR спринта. Собери в plan.md план на завтра по ним — что делать первым — и
+  покажи мне, что получилось.
+expect:
+  - name: wrote the plan
+    file: {glob: plan.md, contains: 'PRJ-1[1-6]'}
+  - name: did not open the tasks one by one
+    not_called: Bash
+    args: {command: 'harnessly open\s+\S*PRJ-1[2-6]'}
+  - name: did not open the merge request on top of the plan
+    not_called: Bash
+    args: {command: 'harnessly open\s+\S*merge_requests'}

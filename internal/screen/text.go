@@ -30,7 +30,13 @@ func re(pattern string) *regexp.Regexp { return regexp.MustCompile(pattern) }
 var ansiRE = re(`\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\x5c-_]`)
 
 // StripANSI removes terminal escape sequences from a styled capture.
-func StripANSI(s string) string { return ansiRE.ReplaceAllString(s, "") }
+// Most captures the runtime reads are plain, and the regexp walked each of them whole.
+func StripANSI(s string) string {
+	if strings.IndexByte(s, 0x1b) < 0 {
+		return s
+	}
+	return ansiRE.ReplaceAllString(s, "")
+}
 
 func isSpace(r rune) bool { return jscompat.IsSpace(r) }
 

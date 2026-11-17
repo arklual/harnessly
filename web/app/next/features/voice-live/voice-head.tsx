@@ -1,11 +1,14 @@
 // The voice agent's head (the designer's «Человечек harnessly», harnessly design project → mascot/): a small living
 // sign at the start of the field's line while the voice is on. One replaceable component: the look may change, the
-// states stay (idle, listen, think, speak, barged, error). KIND picks the «h» (the default) or «Головка» (face); Settings → voice keeps the choice.
+// states stay (idle, listen, think, speak, barged, error); a mood (neutral, joy, sad, thinking, surprised) rides on them.
+// KIND picks the «h» (the default) or «Головка» (face); Settings → voice keeps the choice.
 import { useEffect, useRef } from 'react';
 import { FIELD_FLOOR, type TFieldFloor } from '@/next/features/voice-live/field';
 import VoiceHeadParts from '@/next/features/voice-live/voice-head-svg';
 import { HEAD_KIND, type THeadKind } from '@/next/features/voice-live/api';
+import { useVoiceMood, type VoiceMood } from '@/next/features/voice-live/voice-mood';
 import '@/next/styles/voice-head.css';
+import '@/next/styles/voice-mood.css';
 
 export const HEAD = {
   idle: 'idle',
@@ -34,9 +37,12 @@ interface IVoiceHeadProps {
   kind?: THeadKind;
   /** The voice's loudness, 0…1: while it speaks the mouth follows it instead of the talking loop. */
   level?: (() => number) | null;
+  /** The face on top of the state (voice-mood.ts); without it the head takes the shared one the agent set. */
+  mood?: VoiceMood;
 }
 
-const VoiceHead = ({ state, kind = HEAD_KIND.h, level = null }: IVoiceHeadProps) => {
+const VoiceHead = ({ state, kind = HEAD_KIND.h, level = null, mood }: IVoiceHeadProps) => {
+  const shared = useVoiceMood();
   const ref = useRef<SVGSVGElement | null>(null);
   const led = state === HEAD.speak && level !== null;
   useEffect(() => {
@@ -60,6 +66,7 @@ const VoiceHead = ({ state, kind = HEAD_KIND.h, level = null }: IVoiceHeadProps)
       viewBox="0 0 96 96"
       data-k={kind}
       data-s={state}
+      data-m={mood ?? shared}
       data-vol={led || undefined}
       aria-hidden="true"
     >

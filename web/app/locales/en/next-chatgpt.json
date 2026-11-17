@@ -192,5 +192,11 @@
   "next.chatgpt.voice.full.s.speaking": "Speaking",
   "next.chatgpt.voice.full.s.muted": "Mic is off",
   "next.chatgpt.voice.full.s.failed": "No connection",
+  "next.chatgpt.voice.full.stage.label": "Shown by the voice",
+  "next.chatgpt.voice.full.stage.close": "Close",
+  "next.chatgpt.voice.full.text.placeholder": "Type a message",
+  "next.chatgpt.voice.full.text.send": "Send",
+  "next.chatgpt.voice.full.text.feed": "The talk so far",
+  "next.chatgpt.voice.full.text.empty": "The microphone is off. Type — the answer is spoken aloud.",
   "next.chatgpt.voice.bar.expand": "Expand"
 }

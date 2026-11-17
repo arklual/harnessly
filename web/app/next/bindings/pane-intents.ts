@@ -7,7 +7,7 @@ import { postJson, runtimeJson } from '@/next/core/net/runtime-json';
 import { parseIntents, planIntents, SEEN_LIMIT, type IPaneIntent } from '@/next/features/pane/intents';
 import { calmPoll } from '@/next/core/net/calm-poll';
 import type { MachineId } from '@/next/protocol/v2';
-import { paneAutoSnapshot } from '@/next/stores/pane-auto';
+import { paneAutoStateSnapshot } from '@/next/stores/pane-auto';
 import { PHONE_QUERY } from '@/next/ui/use-media';
 
 /** The new interface keeps no status socket: while the conversation is on screen, its intents are asked this often. */
@@ -61,7 +61,8 @@ export const usePaneIntents = (
     last.current = said;
     const intents = parseIntents(body);
     if (changed) onList?.(intents);
-    const plan = planIntents(intents, readSeen(tab), Date.now(), { auto: paneAutoSnapshot() });
+    const auto = paneAutoStateSnapshot();
+    const plan = planIntents(intents, readSeen(tab), Date.now(), { auto: auto.on, kinds: auto.kinds });
     if (!plan) return changed;
     writeSeen(tab, plan.settled);
     if (plan.apply.length === 0) return changed;

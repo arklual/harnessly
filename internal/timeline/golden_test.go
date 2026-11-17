@@ -408,10 +408,13 @@ func playScenario(t *testing.T) string {
 			s.CodexSessionInfo(st.String("session"), agents.SessionInfo{Status: agents.SessionStatus(info.String("status")),
 				SessionID: info.String("sessionId"), JSONLPath: info.String("jsonlPath"), PID: int(pid), Cwd: info.String("cwd")})
 		case "wait":
-			ms, _ := st.Number("ms")
-			time.Sleep(time.Duration(ms) * time.Millisecond)
+			// A step that names what it waits for goes on as soon as that came; ms is then only the old runtime's pause,
+			// which the scenario does not need (it took 22 of its 25 s). A plain pause stays.
 			if until := st.Object("until"); until != nil {
 				awaitEvents(t, i, until, logs, w, seen)
+			} else {
+				ms, _ := st.Number("ms")
+				time.Sleep(time.Duration(ms) * time.Millisecond)
 			}
 		default:
 			t.Fatalf("unknown step %s", op)

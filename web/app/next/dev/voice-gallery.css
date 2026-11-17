@@ -38,3 +38,24 @@
 .hx-voice-gallery__composer {
   height: 56px;
 }
+.hx-voice-gallery__stage {
+  max-width: 520px;
+  margin: 0 auto;
+  color: var(--hx-fg-1);
+  line-height: 1.6;
+}
+.hx-voice-gallery__stage h3 {
+  margin: 0 0 8px;
+}
+@media (max-width: 480px) {
+  .hx-voice-gallery {
+    padding: 16px;
+  }
+  .hx-voice-gallery__row {
+    flex-wrap: wrap;
+  }
+  .hx-voice-gallery__set,
+  .hx-voice-gallery__field {
+    width: 100%;
+  }
+}

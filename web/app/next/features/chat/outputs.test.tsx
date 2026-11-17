@@ -56,8 +56,8 @@ const draw = (shown: TShownKinds, outputs: TurnOutput[] = [page, design]) => {
 };
 
 describe('what a turn made', () => {
-  it('shows the things it made, not the files it wrote, and opens them', () => {
-    const { onOpen } = draw(SHOWN_BY_DEFAULT);
+  it('without the block «Сделано за ход», shows the things as cards, not the files it wrote, and opens them', () => {
+    const { onOpen } = draw({ ...SHOWN_BY_DEFAULT, made: false });
     expect(screen.queryByText('turn.tsx')).toBeNull();
     // A link is a link: a tap opens it in the pane, ⌘-click and the arrow at its end in a new tab.
     const card = screen.getByRole('link', { name: /Разбор выката/ });
@@ -87,7 +87,7 @@ describe('what a turn made', () => {
   });
 
   it('a task, a merge request and a stand are cards of their services', () => {
-    draw(SHOWN_BY_DEFAULT, [
+    draw({ ...SHOWN_BY_DEFAULT, made: false }, [
       { kind: 'task', op: 'created', title: 'HRN-1426', ref: 'https://tracker.example.com/issue/HRN-1426' },
       {
         kind: 'mr',
@@ -108,6 +108,60 @@ describe('what a turn made', () => {
     expect(screen.getAllByRole('link', { name: /Открыть в новой вкладке|Open in a new tab/ })).toHaveLength(
       3,
     );
+  });
+
+  it('lists what it made at the end of the answer, «Открыть» and «Поделиться» on what is read', () => {
+    const { onOpen } = draw(SHOWN_BY_DEFAULT);
+    const block = screen.getByRole('region', { name: /Сделано за ход|Made this turn/ });
+    expect(block.textContent).toContain('2');
+    expect(screen.queryByText('turn.tsx')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Открыть в Sinopia|Open in Sinopia/ }));
+    expect(onOpen).toHaveBeenLastCalledWith(design);
+    const opens = screen.getAllByRole('button', { name: /^(Открыть|Open)$/ });
+    fireEvent.click(opens[0]);
+    expect(onOpen).toHaveBeenLastCalledWith(page);
+    expect(screen.getAllByRole('button', { name: /Поделиться|Share/ })).toHaveLength(1);
+  });
+
+  it('a merge request, a task and a stand are rows of their services; a stand shows its address to copy', () => {
+    draw(SHOWN_BY_DEFAULT, [
+      {
+        kind: 'task',
+        op: 'changed',
+        title: 'Программа прогонов',
+        ref: 'https://tracker.example.com/issue/HRN-1426',
+      },
+      {
+        kind: 'mr',
+        op: 'created',
+        title: 'Картинки без текста',
+        ref: 'https://gitlab.example.com/g/harnessly/-/merge_requests/80',
+      },
+      {
+        kind: 'stand',
+        op: 'created',
+        title: 'stand-1.preview.example.com',
+        ref: 'https://stand-1.preview.example.com/',
+      },
+    ]);
+    expect(screen.getByText('harnessly !80', { selector: '.hx-made__mono' })).toBeTruthy();
+    expect(screen.getByText('HRN-1426', { selector: '.hx-made__mono' })).toBeTruthy();
+    expect(screen.getByText('stand-1.preview.example.com', { selector: '.hx-made__url-text' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Скопировать адрес|Copy address/ })).toBeTruthy();
+  });
+
+  it('many tasks created at once are one group: three in sight, the rest by «Показать ещё»', () => {
+    const tasks: TurnOutput[] = [1, 2, 3, 4, 5].map((n) => ({
+      kind: 'task',
+      op: 'created',
+      title: `HRN-159${n}`,
+      ref: `https://tracker.example.com/issue/HRN-159${n}`,
+    }));
+    draw(SHOWN_BY_DEFAULT, tasks);
+    expect(screen.getByText(/Создано 5 задач|5 tasks created/)).toBeTruthy();
+    expect(document.querySelectorAll('.hx-made__row[data-depth="1"]')).toHaveLength(3);
+    fireEvent.click(screen.getByRole('button', { name: /Показать ещё 2|Show 2 more/ }));
+    expect(document.querySelectorAll('.hx-made__row[data-depth="1"]')).toHaveLength(5);
   });
 
   it('draws nothing for a turn that made nothing shown', () => {

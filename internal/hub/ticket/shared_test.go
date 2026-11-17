@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"net/url"
 	"os"
-	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +12,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 )
 
 // twoReplicas opens the same database twice, as two replicas of the hub do: SQLite by default, a throwaway schema of
@@ -20,7 +20,7 @@ import (
 func twoReplicas(t *testing.T) (a, b *store.DB) {
 	t.Helper()
 	ctx := context.Background()
-	dsn := "sqlite://" + filepath.Join(t.TempDir(), "hub.db")
+	dsn := storetest.SQLiteURL(t)
 	if pg := os.Getenv("HUB_TEST_POSTGRES_URL"); pg != "" {
 		admin, err := sql.Open("pgx", pg)
 		if err != nil {

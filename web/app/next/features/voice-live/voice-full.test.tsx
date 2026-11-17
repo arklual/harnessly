@@ -9,6 +9,8 @@ import {
   voiceExpanded,
   type IVoiceField,
 } from '@/next/features/voice-live/field';
+import { setVoiceMood, voiceMood } from '@/next/features/voice-live/voice-mood';
+import { showOnVoiceStage } from '@/next/features/voice-live/voice-stage';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 
 vi.mock('@/next/i18n', () => ({ t: (key: string) => key }));
@@ -45,6 +47,8 @@ beforeAll(() => {
 afterEach(() => {
   cleanup();
   setVoiceField(null);
+  showOnVoiceStage(null);
+  setVoiceMood('neutral');
 });
 
 describe('the full-screen talk', () => {
@@ -132,5 +136,95 @@ describe('the talk layer state', () => {
     expect(voiceExpanded()).toBe(true);
     setVoiceField(null);
     expect(voiceExpanded()).toBe(false);
+  });
+});
+
+describe('the mascot', () => {
+  it('stands in the middle with the orb as its aura, and wears the mood', () => {
+    const { container } = render(<VoiceFullBody voice={field()} title={null} />);
+    expect(container.querySelector('.hx-voice-full__mascot[data-view="voice"] svg.hx-head')).toBeTruthy();
+    expect(screen.getByTestId('orb')).toBeTruthy();
+    const svg = container.querySelector('svg.hx-head');
+    expect(svg?.getAttribute('data-m')).toBe('neutral');
+    act(() => setVoiceMood('joy', 0));
+    expect(svg?.getAttribute('data-m')).toBe('joy');
+  });
+
+  it('returns to neutral by itself after the time of the mood', () => {
+    vi.useFakeTimers();
+    setVoiceMood('surprised', 1000);
+    expect(voiceMood()).toBe('surprised');
+    vi.advanceTimersByTime(1001);
+    expect(voiceMood()).toBe('neutral');
+    // A new mood restarts the time.
+    setVoiceMood('sad', 1000);
+    vi.advanceTimersByTime(600);
+    setVoiceMood('joy', 1000);
+    vi.advanceTimersByTime(600);
+    expect(voiceMood()).toBe('joy');
+    vi.useRealTimers();
+  });
+});
+
+describe('the stage', () => {
+  it('takes the area with a title and a close button, the mascot steps down', () => {
+    const { container } = render(<VoiceFullBody voice={field()} title={null} />);
+    expect(container.querySelector('.hx-voice-full__panel')).toBeNull();
+    act(() => showOnVoiceStage(<p>карточка</p>, 'Квоты'));
+    expect(screen.getByText('карточка')).toBeTruthy();
+    expect(screen.getByText('Квоты')).toBeTruthy();
+    expect(container.querySelector('.hx-voice-full__mascot')?.getAttribute('data-view')).toBe('stage');
+    // The orb is a voice-layout aura only.
+    expect(screen.queryByTestId('orb')).toBeNull();
+    act(() => {
+      fireEvent.click(screen.getByLabelText('next.chatgpt.voice.full.stage.close'));
+    });
+    expect(container.querySelector('.hx-voice-full__mascot')?.getAttribute('data-view')).toBe('voice');
+    expect(container.querySelector('.hx-voice-full__panel')?.hasAttribute('data-closing')).toBe(true);
+  });
+
+  it('goes away with the talk', () => {
+    showOnVoiceStage(<p>x</p>);
+    setVoiceField(field());
+    setVoiceField(null);
+    const { container } = render(<VoiceFullBody voice={field()} title={null} />);
+    expect(container.querySelector('.hx-voice-full__panel')).toBeNull();
+  });
+});
+
+describe('the text mode', () => {
+  const turns = [
+    { role: 'user' as const, text: 'привет', done: true },
+    { role: 'assistant' as const, text: 'здравствуйте', done: true },
+  ];
+
+  it('shows the feed and a text field while the microphone is off, none while it is on', () => {
+    const { rerender, container } = render(<VoiceFullBody voice={field({ turns })} title={null} />);
+    expect(screen.queryByRole('log')).toBeNull();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    rerender(<VoiceFullBody voice={field({ turns, muted: true })} title={null} />);
+    expect(screen.getByRole('log').textContent).toContain('здравствуйте');
+    expect(screen.getByText('привет').getAttribute('data-role')).toBe('user');
+    expect(container.querySelector('.hx-voice-full__mascot')?.getAttribute('data-view')).toBe('text');
+    // Unmuting brings the voice layout back (the feed leaves with an exit).
+    rerender(<VoiceFullBody voice={field({ turns, muted: false })} title={null} />);
+    expect(container.querySelector('.hx-voice-full__mascot')?.getAttribute('data-view')).toBe('voice');
+  });
+
+  it('sends by Enter into the call, keeps Shift+Enter for a new line, and sends nothing empty', () => {
+    const voice = field({ muted: true, turns });
+    render(<VoiceFullBody voice={voice} title={null} />);
+    const input = screen.getByRole('textbox');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(voice.typed).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: 'что по релизу?' } });
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
+    expect(voice.typed).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(voice.typed).toHaveBeenCalledWith('что по релизу?');
+    expect((input as HTMLTextAreaElement).value).toBe('');
+    // Space in the field is a space, not the microphone.
+    fireEvent.keyDown(input, { key: ' ' });
+    expect(voice.mute).not.toHaveBeenCalled();
   });
 });

@@ -163,13 +163,24 @@ const (
 	confirmLimit     = 4000 * time.Millisecond
 )
 
-// confirmLeftBox: a message counts as sent only once it has left Claude Code's input line. The line is read every
+// confirmLeftBox: a message (its pictures too, when it has no text) counts as sent only once it has left Claude Code's
+// input line. The line is read every
 // 150 ms for up to 4 s; while the message is still on it, Enter is pressed again 700 ms after the last one, three
 // Enters in all. Still there after that: not sent — Deliver lets the duplicate claim go, so the next try finds the text
 // as its own and presses only its Enter. A screen that cannot be read is not held against the send.
 func confirmLeftBox(item Item, d DeliveryDriver) Outcome {
-	if blank(item.Text) {
+	// A message of pictures alone is read off the box the same way: its [Image #n] references are what stays on the
+	// line when the Enter was lost. Counting it sent unseen left the page on "collecting context" for a message the
+	// agent never got.
+	picturesOnly := blank(item.Text) && len(item.Images) > 0
+	if blank(item.Text) && !picturesOnly {
 		return OutcomeSent
+	}
+	stillInBox := func(v *DeliveryScreen) bool {
+		if picturesOnly {
+			return v.OnlyPictures
+		}
+		return screen.ClaudeStillInBox(v.Box, item.Text)
 	}
 	enters, sinceEnter, read := 1, time.Duration(0), false
 	for waited := time.Duration(0); waited < confirmLimit; waited += confirmPoll {
@@ -180,7 +191,7 @@ func confirmLeftBox(item Item, d DeliveryDriver) Outcome {
 			continue
 		}
 		read = true
-		if !screen.ClaudeStillInBox(deliveryScreen(screen.Read(styled)).Box, item.Text) {
+		if !stillInBox(deliveryScreen(screen.Read(styled))) {
 			return OutcomeSent
 		}
 		if sinceEnter >= confirmRetry && enters < confirmMaxEnters {

@@ -1,7 +1,8 @@
 // What a new chat is: «Задача» — an agent that works on the machine, or «Разговор» — a plain talk with a
 // model (the ChatGPT chat). A small segment over the field; Shift+Tab in an empty field turns it, as the mode
 // key of the agents' own terminals. The choice is remembered for the next new chat (this browser only: a convenience).
-import { useEffect, useRef, useSyncExternalStore, type RefObject } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { t } from '@/next/i18n';
 import '@/next/styles/kind.css';
 
@@ -75,15 +76,19 @@ const ORDER: readonly ChatKind[] = [CHAT_KIND.task, CHAT_KIND.talk];
 interface IKindSwitchProps {
   value: ChatKind;
   onChange: (kind: ChatKind) => void;
+  /** At the top of the screen, in the middle (as ChatGPT's «Chat | Work»): the segment leaves the field and stands
+   *  over the whole stage — the nearest `.hx-stage` or `.hx-gpt` it is drawn in. Without one it stays in place. */
+  top?: boolean;
 }
 
-const KindSwitch = ({ value, onChange }: IKindSwitchProps) => (
+const Segment = ({ value, onChange, top }: IKindSwitchProps) => (
   <div
     className="hx-kind"
     role="radiogroup"
     aria-label={t('next.kind.aria')}
     title={t('next.kind.keyHint')}
     data-at={value}
+    data-place={top ? 'top' : undefined}
   >
     {ORDER.map((kind) => (
       <button
@@ -99,5 +104,22 @@ const KindSwitch = ({ value, onChange }: IKindSwitchProps) => (
     ))}
   </div>
 );
+
+const KindSwitch = (props: IKindSwitchProps) => {
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  const mark = useRef<HTMLSpanElement>(null);
+  const { top } = props;
+  useEffect(() => {
+    if (!top) return;
+    setHost(mark.current?.closest<HTMLElement>('.hx-stage, .hx-gpt') ?? null);
+  }, [top]);
+  if (!top) return <Segment {...props} />;
+  return (
+    <>
+      <span ref={mark} hidden />
+      {host && createPortal(<Segment {...props} />, host)}
+    </>
+  );
+};
 
 export default KindSwitch;

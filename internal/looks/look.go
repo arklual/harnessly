@@ -96,7 +96,7 @@ var (
 	Composer = []string{"", "solid", "glass", "outline"}
 	Sidebars = []string{"", "plain", "tinted", "glass"}
 	// FxPresets are the built-in live effects of the page.
-	FxPresets = []string{"snowplay", "nightlamp", "laser"}
+	FxPresets = []string{"snowplay", "nightlamp", "laser", "newyear", "elves", "weather"}
 	// Scenes are the animated (and one still) backgrounds the page draws (features/looks/scenes).
 	Scenes = []string{"matrix", "stars", "aurora", "rain", "synthwave", "twinkle", "paper", "lava", "snow", "topo"}
 )
@@ -110,9 +110,12 @@ type FxPreset struct {
 
 // FxPresetList is FxPresets with what each one does.
 var FxPresetList = []FxPreset{
-	{"snowplay", "Снежная игра", "снег ложится на блоки, мышь сметает, двойной клик — снегоуборщик, пролетает Дед Мороз"},
+	{"snowplay", "Снежная игра", "реалистичный снег ложится шапками на блоки, мышь разгоняет и сметает, двойной клик — снегоуборщик, пролетает Дед Мороз"},
 	{"nightlamp", "Ночник", "тёплый свет из угла, пока агент работает"},
-	{"laser", "Лазер", "новый ответ выжигается лучом, новый промпт подсвечивается"},
+	{"laser", "Лазер", "лазер выпечатывает новый ответ строка за строкой, новый промпт обводит бегущий луч"},
+	{"newyear", "Мастерская", "уютная новогодняя мастерская вокруг чата: гирлянда, лампа, снег за окном, пар над какао; снег на блоках, бант на готовом ответе"},
+	{"elves", "Фабрика эльфов", "мастерская Деда Мороза: конвейер с подарками, промпт на ленте, эльфы мастерят, пока агент работает, готовый ответ упакован бантом"},
+	{"weather", "Погода", "небо и пейзаж по погоде и времени там, где человек: рассвет, день, закат, ночь, облака, дождь, снег, туман, гроза; двойной клик показывает варианты"},
 }
 
 // FxMagic starts every fx script (the store tells a script from a picture by it).

@@ -2833,3 +2833,394 @@ html[data-theme='dark'] .hx-ref[data-type='link'] {
     animation-duration: 1ms;
   }
 }
+
+/* «Сделано за ход» (made.tsx): one list at the end of the answer. A row is the thing's tile or picture, its name, a
+   line of what it is, the state at its end; a hover tints it. Many tasks are a group, an epic its tree. */
+.hx-outputs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+  min-width: 0;
+}
+.hx-made {
+  min-width: 0;
+  max-width: 640px;
+  overflow: hidden;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-lg);
+  background: var(--hx-bg-raised);
+}
+.hx-made__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--hx-border);
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+}
+.hx-made__row {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.hx-made__row:disabled {
+  cursor: default;
+}
+.hx-made > * + *,
+.hx-made__group > * + * {
+  border-top: 1px solid var(--hx-border);
+}
+.hx-made__row:not(:disabled):hover {
+  background: var(--hx-bg-hover);
+}
+.hx-made__row:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: -2px;
+}
+.hx-made__row[data-depth='1'] {
+  padding-left: 58px;
+}
+.hx-made__row[data-depth='2'] {
+  position: relative;
+  padding-left: 58px;
+}
+/* An epic's task hangs off the epic's tile by a thin line. */
+.hx-made__row[data-depth='2']::before {
+  content: '';
+  position: absolute;
+  left: 30px;
+  top: 0;
+  width: 14px;
+  height: 50%;
+  border-left: 1px solid var(--hx-border-strong);
+  border-bottom: 1px solid var(--hx-border-strong);
+  border-bottom-left-radius: 6px;
+}
+.hx-made__row[data-depth] .hx-made__title {
+  font-weight: var(--hx-weight-regular);
+}
+.hx-made__tile {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-2);
+}
+.hx-made__brand {
+  color: #fff;
+  background: var(--hx-fg-3);
+}
+.hx-made__brand svg {
+  width: 56%;
+  height: 56%;
+}
+.hx-made__brand[data-brand='youtrack'] {
+  background: #e8336d;
+}
+.hx-made__brand[data-brand='jira'] {
+  background: #0c66e4;
+}
+.hx-made__brand[data-brand='linear'] {
+  background: #5e6ad2;
+}
+.hx-made__brand[data-brand='gitlab'] {
+  background: #e24329;
+}
+.hx-made__brand[data-brand='github'] {
+  background: var(--hx-fg-1);
+  color: var(--hx-bg-window);
+}
+.hx-made__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.hx-made__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  color: var(--hx-fg-1);
+}
+.hx-made__title--full {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  line-height: 1.35;
+}
+.hx-made__sub {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-2);
+}
+.hx-made__sub[data-pending] {
+  opacity: 0.6;
+}
+.hx-made__sep {
+  padding: 0 5px;
+  color: var(--hx-fg-3);
+}
+.hx-made__mono {
+  font-family: var(--hx-font-mono);
+  font-size: 0.95em;
+}
+/* The state at the row's end: a dot of its tone and its word. */
+.hx-made__state {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-2);
+}
+.hx-made__state::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hx-fg-3);
+}
+.hx-made__state[data-tone='ok']::before {
+  background: var(--hx-success);
+}
+.hx-made__state[data-tone='bad']::before {
+  background: var(--hx-danger);
+}
+.hx-made__state[data-tone='busy']::before {
+  background: var(--hx-accent);
+}
+.hx-made__state[data-tone='rest']::before {
+  background: var(--hx-border-strong);
+}
+.hx-made__sub .hx-made__state {
+  display: inline-flex;
+}
+/* A row with a picture: the picture, the whole name, what it is, the two buttons; aligned to the top. */
+.hx-made__row--rich {
+  align-items: flex-start;
+  padding: 12px 14px;
+  cursor: default;
+}
+.hx-made__row--rich[data-open='true'] {
+  cursor: pointer;
+}
+.hx-made__row--rich .hx-made__text {
+  gap: 3px;
+}
+.hx-made__preview {
+  position: relative;
+  width: 120px;
+  height: 86px;
+  flex: none;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-md);
+  background: #fff;
+  color: var(--hx-fg-3);
+}
+.hx-made__preview[data-empty] {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-2);
+}
+.hx-made__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+}
+/* An HTML document's first page, laid out at a desktop width and shrunk: a still look, not a place to click. */
+.hx-made__preview iframe {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1280px;
+  height: 920px;
+  border: 0;
+  transform: scale(0.09375);
+  transform-origin: 0 0;
+  pointer-events: none;
+  background: #fff;
+}
+.hx-made__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.hx-made__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-md);
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hx-made__btn:hover {
+  background: var(--hx-bg-active);
+}
+.hx-made__btn:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 1px;
+}
+/* A stand's address with its copy button. */
+.hx-made__url {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 2px;
+  padding: 2px 2px 2px 8px;
+  border-radius: 6px;
+  background: var(--hx-bg-active);
+  font-family: var(--hx-font-mono);
+  font-size: 12px;
+  color: var(--hx-fg-2);
+  cursor: text;
+}
+.hx-made__url-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: all;
+}
+.hx-made__url-copy {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+}
+.hx-made__url-copy:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+/* A batch's «Показать все» and an epic's chevron. */
+.hx-made__toggle {
+  flex: none;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+}
+.hx-made__chev {
+  flex: none;
+  display: grid;
+  color: var(--hx-fg-3);
+  transition: transform 150ms ease;
+}
+.hx-made__chev[data-open] {
+  transform: rotate(180deg);
+}
+.hx-made__track {
+  display: block;
+  height: 3px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--hx-bg-active);
+}
+.hx-made__track > span {
+  display: block;
+  height: 100%;
+  background: var(--hx-fg-1);
+}
+.hx-made__more {
+  width: 100%;
+  padding: 9px 14px 9px 58px;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.hx-made__more:hover {
+  background: var(--hx-bg-hover);
+}
+/* The cards a turn always had, inside the list: a file handed over is a row like the others. */
+.hx-made > .hx-file {
+  width: 100%;
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding-left: 4px;
+}
+.hx-made > .hx-file[data-open='true']:hover {
+  box-shadow: none;
+  background: var(--hx-bg-hover);
+}
+.hx-made > .hx-file .hx-file__ico {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-2);
+}
+.hx-made--shots .hx-pics {
+  margin: 0;
+  padding: 12px;
+}
+@media (max-width: 520px) {
+  .hx-made__preview:not([data-empty]) {
+    width: 88px;
+    height: 64px;
+  }
+  .hx-made__preview iframe {
+    transform: scale(0.06875);
+  }
+}
+@media (hover: none) {
+  .hx-made__row:not(:disabled):hover {
+    background: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-made__row,
+  .hx-made__chev {
+    transition: none;
+  }
+}

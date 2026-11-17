@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/config"
 	"github.com/ly-solutions/harnessly/internal/hub/resaccess"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 )
 
 // circleRig is two organizations on one hub: the author and a mate in one space, a stranger in another, and an
@@ -24,11 +24,7 @@ import (
 func circleRig(t *testing.T, shared, single bool) (*Service, map[string]*auth.Principal, *bytes.Buffer) {
 	t.Helper()
 	ctx := context.Background()
-	db, err := store.Open(ctx, "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	must := func(err error) {
 		t.Helper()
 		if err != nil {

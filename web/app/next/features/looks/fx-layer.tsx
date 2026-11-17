@@ -3,9 +3,10 @@
 // (fx/runtime.js). The frame never takes the pointer (pointer-events: none); this side tells it, in the stage's
 // coordinates, where the pointer is, the boxes of the field and the messages on screen, the agent's state and a few
 // events: a prompt sent, an answer being written, its end. Never what a message says.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { clusterApi } from '@/next/core/net/machine';
-import { FX_CODE, FX_SANDBOX, fxDocument } from '@/next/features/looks/fx-frame';
+import { FX_BACK, FX_LOAD, FX_SANDBOX, fxCodeMessage, fxFrameUrl } from '@/next/features/looks/fx-frame';
+import { lastWeather, watchWeather } from '@/next/features/looks/weather-feed';
 import { useActiveLook } from '@/next/features/looks/look-layer';
 import type { TMode } from '@/next/features/looks/tokens';
 import type { ILookFx } from '@/next/features/looks/types';
@@ -54,9 +55,6 @@ const scriptOf = (hash: string): Promise<string | null> => {
   return p;
 };
 
-const nonceOf = (): string =>
-  Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
-
 /** A colour of the page as rgb(), whatever space the token is written in. */
 const probe = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
 const rgbOf = (css: string, fallback: string): string => {
@@ -68,13 +66,23 @@ const rgbOf = (css: string, fallback: string): string => {
   const [r, g, b] = probe.getImageData(0, 0, 1, 1).data;
   return `rgb(${r},${g},${b})`;
 };
-const colorsNow = () => {
+/** The colour the chat's feed is drawn on: the first painted background from the feed up (a laser masks text with it). */
+const stageColor = (from: Element | null): string => {
+  for (let el = from; el; el = el.parentElement) {
+    const c = getComputedStyle(el).backgroundColor;
+    if (c && c !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(c)) return rgbOf(c, '#111111');
+  }
+  return rgbOf(getComputedStyle(document.body).backgroundColor, '#111111');
+};
+
+const colorsNow = (stage: Element | null = null) => {
   const style = getComputedStyle(document.documentElement);
   const v = (name: string) => style.getPropertyValue(name).trim();
   return {
     accent: rgbOf(v('--hx-accent'), '#8b7cf6'),
     fg: rgbOf(v('--hx-fg-1'), '#ffffff'),
     bg: rgbOf(v('--hx-bg-pane') || v('--hx-bg'), '#111111'),
+    stage: stageColor(stage?.querySelector('.hx-feed') ?? stage),
     hues: [] as string[],
   };
 };
@@ -98,20 +106,20 @@ interface IFxFrameProps {
 
 const FxFrame = ({ fx, mode, chat, layer }: IFxFrameProps) => {
   const ref = useRef<HTMLIFrameElement>(null);
-  const [fetched, setFetched] = useState<{ hash: string; text: string | null } | null>(null);
+  // The effect's code: a built-in one loaded with its pictures, or the person's script by its hash.
+  const source = fx.preset ?? fx.script ?? '';
+  const [fetched, setFetched] = useState<{ source: string; text: string | null } | null>(null);
   useEffect(() => {
-    const hash = fx.script;
-    if (!hash) return;
+    if (!source) return;
     let off = false;
-    void scriptOf(hash).then((text) => !off && setFetched({ hash, text }));
+    const load = fx.preset ? FX_LOAD[fx.preset]().catch(() => null) : scriptOf(source);
+    void load.then((text) => !off && setFetched({ source, text }));
     return () => {
       off = true;
     };
-  }, [fx.script]);
-  let code: string | null = null;
-  if (fx.preset) code = FX_CODE[fx.preset];
-  else if (fx.script && fetched?.hash === fx.script) code = fetched.text;
-  const doc = useMemo(() => (code ? fxDocument(code, nonceOf()) : null), [code]);
+  }, [source, fx.preset]);
+  const code = fetched?.source === source ? fetched.text : null;
+  const doc = code;
   const power = (fx.power ?? 60) / 100;
   const theme = useRef({ mode, power });
   useEffect(() => {
@@ -217,7 +225,9 @@ const FxFrame = ({ fx, mode, chat, layer }: IFxFrameProps) => {
     const onMessage = (event: MessageEvent) => {
       if (event.source !== frame.contentWindow) return;
       const data = event.data as { hxFx?: string; msg?: string } | null;
-      if (data?.hxFx === 'ready') {
+      if (data?.hxFx === 'boot') {
+        if (doc) post(fxCodeMessage(doc, layer));
+      } else if (data?.hxFx === 'ready') {
         ready = true;
         box = frame.getBoundingClientRect();
         post({
@@ -226,10 +236,12 @@ const FxFrame = ({ fx, mode, chat, layer }: IFxFrameProps) => {
           layer,
           power: theme.current.power,
           mode: theme.current.mode,
-          colors: colorsNow(),
+          colors: colorsNow(stage),
           reduced: reduced(),
         });
         post({ hx: 'agent', ...agent });
+        const w = fx.preset === 'weather' ? lastWeather() : null;
+        if (w) post({ hx: 'weather', ...w });
         measure();
       } else if (data?.hxFx === 'err' && !warned) {
         warned = true;
@@ -278,6 +290,9 @@ const FxFrame = ({ fx, mode, chat, layer }: IFxFrameProps) => {
         })
       : () => {};
 
+    // «Погода»: the weather where the person is, from the page (the frame has no network).
+    const offWeather =
+      fx.preset === 'weather' ? watchWeather((w) => ready && post({ hx: 'weather', ...w })) : () => {};
     window.addEventListener('message', onMessage);
     window.addEventListener('pointermove', onMove, { passive: true, capture: true });
     window.addEventListener('pointerdown', onDown, { passive: true, capture: true });
@@ -297,12 +312,17 @@ const FxFrame = ({ fx, mode, chat, layer }: IFxFrameProps) => {
       clearInterval(timer);
       offEntries();
       offState();
+      offWeather();
     };
-  }, [doc, chat, layer]);
+  }, [doc, chat, layer, fx.preset]);
 
   // A new colour or power reaches the running effect without starting it again.
   useEffect(() => {
-    ref.current?.contentWindow?.postMessage({ hx: 'theme', mode, power, colors: colorsNow() }, '*');
+    const frame = ref.current;
+    frame?.contentWindow?.postMessage(
+      { hx: 'theme', mode, power, colors: colorsNow(frame.parentElement?.closest('.hx-stage') ?? null) },
+      '*',
+    );
   }, [mode, power]);
 
   if (!doc) return null;
@@ -312,7 +332,8 @@ const FxFrame = ({ fx, mode, chat, layer }: IFxFrameProps) => {
       className="hx-fx"
       data-layer={layer}
       sandbox={FX_SANDBOX}
-      srcDoc={doc}
+      src={fxFrameUrl()}
+      key={`${layer}:${doc.length}:${doc.slice(-64)}`}
       title=""
       aria-hidden="true"
       tabIndex={-1}
@@ -332,7 +353,7 @@ const LookFx = ({ layer }: { layer: TLayer }) => {
   }, []);
   const fx = active?.look.fx;
   if (!active || !fx || still) return null;
-  if (layer === 'back' && !fx.back) return null;
+  if (layer === 'back' && !fx.back && !(fx.preset && FX_BACK.has(fx.preset))) return null;
   return <FxFrame fx={fx} mode={active.mode} chat={active.chat} layer={layer} />;
 };
 

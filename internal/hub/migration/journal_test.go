@@ -2,12 +2,11 @@ package migration
 
 import (
 	"context"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
@@ -15,11 +14,7 @@ const move = "0001-data-to-hub"
 
 func openJournal(t *testing.T) *Journal {
 	t.Helper()
-	db, err := store.Open(context.Background(), "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	at := time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC)
 	return New(db, func() time.Time { at = at.Add(time.Second); return at })
 }

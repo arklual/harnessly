@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,17 +12,14 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/features"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 	"github.com/ly-solutions/harnessly/internal/hub/switches"
 	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 )
 
 func open(t *testing.T) store.Store {
 	t.Helper()
-	db, err := store.Open(context.Background(), "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	return db.S()
 }
 
@@ -145,11 +141,7 @@ func TestCollectorKeepsOverlapAndUpserts(t *testing.T) {
 // The money of a day is the list price of the organization's calls in usage_rollup_hour; a day with no calls stays null.
 func TestRollupCostFeedsSummary(t *testing.T) {
 	ctx := context.Background()
-	db, err := store.Open(ctx, "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	st := db.S()
 	h := func(s string) int64 { x, _ := time.Parse(time.RFC3339, s); return x.UnixMilli() }
 	for _, r := range []struct {

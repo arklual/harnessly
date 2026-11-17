@@ -24,6 +24,11 @@ const docsUsage = `harnessly docs - the documentation of harnessly and of this m
                                            the /help page at once. A section that does not exist yet is made; a picture
                                            is copied next to the page as img/<name>, to show with ![what](img/<name>).
                                            A page of the same name as a built-in one replaces it on this machine.
+  harnessly docs publish FILE.md|FILE.html [--title T] [--slug SLUG] [--note N] [--public]
+                                           publish a document for the person into the Documents app through the hub:
+                                           it gets an owner, a space and a place in the list. --slug writes a new
+                                           version of the same document. Prints the document's address. Without a hub
+                                           it says so; then (and only then) use "artifacts publish".
   harnessly docs path                      the folders of this machine's own docs (HARNESSLY_DOCS_DIR, else <data>/docs);
                                            add writes into the first
 
@@ -42,6 +47,8 @@ type docsArgs struct {
 	lang, title, sectionTitle, audience string
 	pictures                            []string
 	replace                             bool
+	slug, note                          string
+	public                              bool
 	pos                                 []string
 }
 
@@ -76,6 +83,12 @@ func parseDocsArgs(args []string) (docsArgs, error) {
 			a.pictures = append(a.pictures, p)
 		case "--replace":
 			a.replace = true
+		case "--slug":
+			a.slug, err = valued()
+		case "--note":
+			a.note, err = valued()
+		case "--public":
+			a.public = true
 		case "--":
 			a.pos = append(a.pos, args[i+1:]...)
 			i = len(args)
@@ -113,6 +126,8 @@ func (c *cli) docs(args []string) error {
 		return c.docsRead(a)
 	case "add", "write":
 		return c.docsAdd(a)
+	case "publish":
+		return c.docsPublish(a)
 	case "path", "dir":
 		for _, d := range c.docsDirs() {
 			c.out("%s\n", d)

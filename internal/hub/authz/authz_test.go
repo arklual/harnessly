@@ -3,12 +3,12 @@ package authz
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 )
 
 // world is one organization O with tenants T1 (teams A, B) and T2 (team C), and a space X of the old kind, with no
@@ -27,11 +27,7 @@ type world struct {
 func newWorld(t *testing.T) *world {
 	t.Helper()
 	ctx := context.Background()
-	db, err := store.Open(ctx, "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	s := db.S()
 	w := &world{a: New(s), users: map[string]string{}}
 	must := func(err error) {

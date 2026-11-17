@@ -94,7 +94,18 @@ const nameOf = (picture: Picture): string => picture.text.slice(picture.text.las
 const LOAD = { loading: 'loading', ready: 'ready', broken: 'broken' } as const;
 type TLoad = (typeof LOAD)[keyof typeof LOAD];
 
-const Card = ({ picture, src, onOpen }: { picture: Picture; src: string; onOpen: () => void }) => {
+const Card = ({
+  picture,
+  src,
+  onOpen,
+  more = 0,
+}: {
+  picture: Picture;
+  src: string;
+  onOpen: () => void;
+  /** The pictures past this one the grid does not show: «ещё N» over it. */
+  more?: number;
+}) => {
   const [state, setState] = useState<TLoad>(LOAD.loading);
   if (state === LOAD.broken) return null;
   const name = nameOf(picture);
@@ -117,6 +128,7 @@ const Card = ({ picture, src, onOpen }: { picture: Picture; src: string; onOpen:
         onLoad={() => setState(LOAD.ready)}
         onError={() => setState(LOAD.broken)}
       />
+      {more > 0 && <span className="hx-pic__more">{t('next.turnMade.more', { n: more })}</span>}
     </button>
   );
 };
@@ -126,9 +138,14 @@ interface IPictureCardsProps {
   srcOf: IMessagePictures['srcOf'];
   /** The person's message lines its cards up on its side. */
   side?: 'user' | 'agent';
+  /** Large, in a grid: the first one big, five at most, «ещё N» over the last (a turn's screenshots). */
+  big?: boolean;
 }
 
-export const PictureCards = ({ pictures, srcOf, side = 'agent' }: IPictureCardsProps) => {
+/** The pictures a large grid shows; the rest are reached from the viewer. */
+const BIG_SHOWN = 5;
+
+export const PictureCards = ({ pictures, srcOf, side = 'agent', big = false }: IPictureCardsProps) => {
   const [viewing, setViewing] = useState<string | null>(null);
   const chat = useContext(ImageHost);
   const shown = viewing === null ? undefined : pictures.find((one) => one.id === viewing);
@@ -138,6 +155,7 @@ export const PictureCards = ({ pictures, srcOf, side = 'agent' }: IPictureCardsP
   // Any picture of the feed can be marked by the person; the marked one goes into the field.
   const annotate = useMarkupTarget({ to: chat?.conv });
   if (pictures.length === 0) return null;
+  const grid = big;
   const at = viewing === null ? -1 : pictures.findIndex((one) => one.id === viewing);
   const current = at >= 0 ? pictures[at] : null;
   const item: IImageViewItem | null = current ? { src: srcOf(current), name: nameOf(current) } : null;
@@ -146,9 +164,19 @@ export const PictureCards = ({ pictures, srcOf, side = 'agent' }: IPictureCardsP
     setViewing(pictures[(at + delta + pictures.length) % pictures.length].id);
   };
   return (
-    <div className="hx-pics" data-side={side}>
-      {pictures.map((picture) => (
-        <Card key={picture.id} picture={picture} src={srcOf(picture)} onOpen={() => setViewing(picture.id)} />
+    <div
+      className="hx-pics"
+      data-side={side}
+      data-big={grid ? Math.min(pictures.length, BIG_SHOWN) : undefined}
+    >
+      {(grid ? pictures.slice(0, BIG_SHOWN) : pictures).map((picture, index) => (
+        <Card
+          key={picture.id}
+          picture={picture}
+          src={srcOf(picture)}
+          onOpen={() => setViewing(picture.id)}
+          more={grid && index === BIG_SHOWN - 1 ? pictures.length - BIG_SHOWN : 0}
+        />
       ))}
       <ImageEditView
         item={item}
@@ -161,6 +189,9 @@ export const PictureCards = ({ pictures, srcOf, side = 'agent' }: IPictureCardsP
     </div>
   );
 };
+
+/** The agent's answer shows its screenshots large (Settings → General, «Скриншоты крупно»). */
+export const BigPictures = createContext(false);
 
 /** The cards of the pictures an agent's text names, under it. */
 export const NamedPictures = ({ text }: { text: string }) => {

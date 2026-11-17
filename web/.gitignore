@@ -5,3 +5,6 @@ playwright-report/
 *.tsbuildinfo
 .vitest-cache/
 dist-hub/
+
+# A worktree may link its packages in; the link is never the repository's (a committed one replaced the real folder).
+node_modules

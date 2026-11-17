@@ -11,13 +11,15 @@ import { PictureCards } from '@/next/features/chat/pictures';
 import { LINK_ICON, linkOf, viewOf, type ILinkOutput } from '@/next/features/chat/link-output';
 import { usePortUp } from '@/next/features/chat/port-up';
 import OutputRow from '@/next/features/chat/output-row';
+import Made from '@/next/features/chat/made';
 import { useArtifactMetas } from '@/next/features/artifacts/meta-store';
 import type { IArtifactItem } from '@/next/features/artifacts/model';
 import type { MachineId } from '@/next/protocol/v2';
 import { appConfig } from '@/platform/config';
 
-/** `mrDone`: the block of the chat's merge requests under a finished task (mr-done.tsx). */
-export type TShownKind = OutputKind | 'file' | 'mrDone';
+/** `mrDone`: the block of the chat's merge requests under a finished task (mr-done.tsx). `made`, `preview` and
+ *  `bigShots` are how the cards look (stores/feed-kinds.ts). */
+export type TShownKind = OutputKind | 'file' | 'mrDone' | 'made' | 'preview' | 'bigShots';
 export type TShownKinds = Readonly<Record<TShownKind, boolean>>;
 
 /** Everything but the plain files and the merge request card: what the feed shows until the host says otherwise. */
@@ -32,6 +34,9 @@ export const SHOWN_BY_DEFAULT: TShownKinds = {
   commit: true,
   file: false,
   mrDone: false,
+  made: true,
+  preview: true,
+  bigShots: true,
 } as const;
 
 export interface IOutputsContext {
@@ -265,8 +270,12 @@ export const drawnOf = (item: TurnItem): readonly string[] =>
 
 const Outputs = ({ item }: { item: TurnItem }) => {
   const context = useContext(OutputsContext);
+  const outputs = item.turn.outputs ?? [];
+  const files = context.shown.file ? item.turn.files.filter((f) => f.op !== 'read') : [];
   return (
     <OutputCards
+      outputs={outputs}
+      files={files}
       cards={cardsOf(item, context)}
       links={linksOf(item, context)}
       deliveries={deliveriesOf(item, context)}
@@ -284,23 +293,36 @@ export const OutputList = ({ outputs }: { outputs: readonly TurnOutput[] }) => {
   const deliveries = context.shown.delivery ? outputs.filter((o) => o.kind === 'delivery') : [];
   return (
     <OutputCards
+      outputs={outputs}
+      files={[]}
       cards={cardsAmong(outputs, [], context)}
       links={linksAmong(outputs, context)}
       deliveries={deliveries}
+      head={false}
     />
   );
 };
 
+/** The things of the kinds shown that are no links and no files handed over: a document of the folder, a design. */
+const plainAmong = (all: readonly TurnOutput[], context: IOutputsContext): TurnOutput[] =>
+  all.filter((o) => context.shown[o.kind] && o.kind !== 'delivery' && linkOf(o, appConfig()) === null);
+
 const OutputCards = ({
+  outputs,
+  files,
   cards,
   links,
   deliveries,
   drawn = [],
+  head = true,
 }: {
+  outputs: readonly TurnOutput[];
+  files: readonly { path: string; op: FileOp }[];
   cards: ICard[];
   links: { output: TurnOutput; link: ILinkOutput }[];
   deliveries: TurnOutput[];
   drawn?: readonly string[];
+  head?: boolean;
 }) => {
   const context = useContext(OutputsContext);
   if (cards.length === 0 && deliveries.length === 0 && links.length === 0 && drawn.length === 0) return null;
@@ -308,32 +330,66 @@ const OutputCards = ({
   // viewer keeps the way to save it. Without a way to show the file (a gallery) it stays a line.
   const view = context.viewUrl;
   const pictures = view ? deliveries.filter(isPictureFile) : [];
-  const files = deliveries.filter((output) => !pictures.includes(output));
+  const lines = deliveries.filter((output) => !pictures.includes(output));
   // What the turn drew and what it handed over, each once: a drawn picture it also delivered is one card.
   const shown = view ? [...new Set([...drawn, ...pictures.map((output) => output.ref)])] : [];
+  const big = context.shown.made && context.shown.bigShots;
+  const grid = shown.length > 0 && view && (
+    <PictureCards
+      pictures={shown.map((path) => ({ id: path, text: path }))}
+      srcOf={(picture) =>
+        view(
+          picture.text,
+          pictures.find((output) => output.ref === picture.text),
+        )
+      }
+      big={big}
+    />
+  );
+  // Several screenshots large are a block of their own, «Скриншоты · N», as the list of what the turn made is.
+  const pictureCards =
+    big && shown.length > 1 ? (
+      <section className="hx-made hx-made--shots" aria-label={t('next.turnMade.shots', { n: shown.length })}>
+        <div className="hx-made__head">
+          <span>{t('next.turnMade.shots', { n: shown.length })}</span>
+        </div>
+        {grid}
+      </section>
+    ) : (
+      grid
+    );
+  const deliveryCards = lines.map((output, index) => (
+    <DeliveryCard
+      key={output.ref}
+      output={output}
+      index={index}
+      onOpen={context.onOpen}
+      downloadUrl={context.downloadUrl}
+      viewUrl={context.viewUrl}
+    />
+  ));
+  // «Сделано за ход»: one list at the end of the answer (made.tsx).
+  if (context.shown.made) {
+    const plain = plainAmong(outputs, context);
+    return (
+      <div className="hx-outputs">
+        {pictureCards}
+        <Made
+          context={context}
+          links={links}
+          outputs={plain}
+          files={files}
+          deliveries={deliveryCards}
+          count={links.length + plain.length + files.length + lines.length}
+          head={head}
+        />
+      </div>
+    );
+  }
   return (
     <div className="hx-files">
-      {shown.length > 0 && view && (
-        <PictureCards
-          pictures={shown.map((path) => ({ id: path, text: path }))}
-          srcOf={(picture) =>
-            view(
-              picture.text,
-              pictures.find((output) => output.ref === picture.text),
-            )
-          }
-        />
-      )}
-      {files.map((output, index) => (
-        <DeliveryCard
-          key={output.ref}
-          output={output}
-          index={index}
-          onOpen={context.onOpen}
-          downloadUrl={context.downloadUrl}
-          viewUrl={context.viewUrl}
-        />
-      ))}
+      {pictureCards}
+      {deliveryCards}
       {links.map(({ output, link }, index) => (
         <LinkOutputCard key={`${output.kind}:${output.ref}`} output={output} link={link} index={index} />
       ))}

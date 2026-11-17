@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 	"github.com/ly-solutions/harnessly/internal/hub/vaultsvc"
 )
 
@@ -23,11 +23,7 @@ var (
 
 func rig(t *testing.T, keys string) (*vaultsvc.Service, *store.DB) {
 	t.Helper()
-	db, err := store.Open(context.Background(), "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
+	db := storetest.Open(t)
 	cfg := vaultsvc.Config{SharedMembers: vaultsvc.Emails("alice@example.com,bob@example.com"), SharedEditors: vaultsvc.Emails("alice@example.com")}
 	if keys != "" {
 		kr, err := vaultsvc.ParseKeys(keys)

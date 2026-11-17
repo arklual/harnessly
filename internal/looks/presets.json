@@ -6,14 +6,25 @@
     "look": {
       "v": 1,
       "mode": "dark",
-      "hues": [{ "h": 142, "s": 80 }],
+      "hues": [
+        {
+          "h": 142,
+          "s": 80
+        }
+      ],
       "intensity": 55,
-      "bg": { "kind": "scene", "scene": "matrix" },
+      "bg": {
+        "kind": "scene",
+        "scene": "matrix"
+      },
       "grain": 12,
       "dim": 35,
       "blur": 0,
       "font": "mono",
-      "parts": { "bubble": "outline", "composer": "glass" }
+      "parts": {
+        "bubble": "outline",
+        "composer": "glass"
+      }
     }
   },
   {
@@ -24,15 +35,26 @@
       "v": 1,
       "mode": "dark",
       "hues": [
-        { "h": 255, "s": 55 },
-        { "h": 290, "s": 40 }
+        {
+          "h": 255,
+          "s": 55
+        },
+        {
+          "h": 290,
+          "s": 40
+        }
       ],
       "intensity": 50,
-      "bg": { "kind": "scene", "scene": "stars" },
+      "bg": {
+        "kind": "scene",
+        "scene": "stars"
+      },
       "grain": 6,
       "dim": 20,
       "blur": 0,
-      "parts": { "composer": "glass" }
+      "parts": {
+        "composer": "glass"
+      }
     }
   },
   {
@@ -43,16 +65,31 @@
       "v": 1,
       "mode": "dark",
       "hues": [
-        { "h": 160, "s": 75 },
-        { "h": 200, "s": 65 },
-        { "h": 290, "s": 55 }
+        {
+          "h": 160,
+          "s": 75
+        },
+        {
+          "h": 200,
+          "s": 65
+        },
+        {
+          "h": 290,
+          "s": 55
+        }
       ],
       "intensity": 60,
-      "bg": { "kind": "scene", "scene": "aurora" },
+      "bg": {
+        "kind": "scene",
+        "scene": "aurora"
+      },
       "grain": 14,
       "dim": 30,
       "blur": 0,
-      "parts": { "composer": "glass", "turns": "glass" }
+      "parts": {
+        "composer": "glass",
+        "turns": "glass"
+      }
     }
   },
   {
@@ -62,13 +99,23 @@
     "look": {
       "v": 1,
       "mode": "dark",
-      "hues": [{ "h": 215, "s": 45 }],
+      "hues": [
+        {
+          "h": 215,
+          "s": 45
+        }
+      ],
       "intensity": 45,
-      "bg": { "kind": "scene", "scene": "rain" },
+      "bg": {
+        "kind": "scene",
+        "scene": "rain"
+      },
       "grain": 10,
       "dim": 30,
       "blur": 0,
-      "parts": { "composer": "glass" }
+      "parts": {
+        "composer": "glass"
+      }
     }
   },
   {
@@ -79,17 +126,32 @@
       "v": 1,
       "mode": "dark",
       "hues": [
-        { "h": 325, "s": 85 },
-        { "h": 280, "s": 70 },
-        { "h": 195, "s": 75 }
+        {
+          "h": 325,
+          "s": 85
+        },
+        {
+          "h": 280,
+          "s": 70
+        },
+        {
+          "h": 195,
+          "s": 75
+        }
       ],
       "intensity": 70,
-      "bg": { "kind": "scene", "scene": "synthwave" },
+      "bg": {
+        "kind": "scene",
+        "scene": "synthwave"
+      },
       "grain": 16,
       "dim": 35,
       "blur": 0,
       "radius": "sharp",
-      "parts": { "bubble": "outline", "composer": "glass" }
+      "parts": {
+        "bubble": "outline",
+        "composer": "glass"
+      }
     }
   },
   {
@@ -99,9 +161,17 @@
     "look": {
       "v": 1,
       "mode": "auto",
-      "hues": [{ "h": 45, "s": 60 }],
+      "hues": [
+        {
+          "h": 45,
+          "s": 60
+        }
+      ],
       "intensity": 35,
-      "bg": { "kind": "scene", "scene": "twinkle" },
+      "bg": {
+        "kind": "scene",
+        "scene": "twinkle"
+      },
       "grain": 0,
       "dim": 10,
       "blur": 0,
@@ -115,14 +185,24 @@
     "look": {
       "v": 1,
       "mode": "light",
-      "hues": [{ "h": 70, "s": 30 }],
+      "hues": [
+        {
+          "h": 70,
+          "s": 30
+        }
+      ],
       "intensity": 55,
-      "bg": { "kind": "scene", "scene": "paper" },
+      "bg": {
+        "kind": "scene",
+        "scene": "paper"
+      },
       "grain": 40,
       "dim": 0,
       "blur": 0,
       "font": "serif",
-      "parts": { "bubble": "soft" }
+      "parts": {
+        "bubble": "soft"
+      }
     }
   },
   {
@@ -133,16 +213,27 @@
       "v": 1,
       "mode": "dark",
       "hues": [
-        { "h": 25, "s": 85 },
-        { "h": 340, "s": 75 }
+        {
+          "h": 25,
+          "s": 85
+        },
+        {
+          "h": 340,
+          "s": 75
+        }
       ],
       "intensity": 60,
-      "bg": { "kind": "scene", "scene": "lava" },
+      "bg": {
+        "kind": "scene",
+        "scene": "lava"
+      },
       "grain": 18,
       "dim": 35,
       "blur": 0,
       "radius": "round",
-      "parts": { "composer": "glass" }
+      "parts": {
+        "composer": "glass"
+      }
     }
   },
   {
@@ -152,9 +243,17 @@
     "look": {
       "v": 1,
       "mode": "auto",
-      "hues": [{ "h": 210, "s": 40 }],
+      "hues": [
+        {
+          "h": 210,
+          "s": 40
+        }
+      ],
       "intensity": 40,
-      "bg": { "kind": "scene", "scene": "snow" },
+      "bg": {
+        "kind": "scene",
+        "scene": "snow"
+      },
       "grain": 4,
       "dim": 10,
       "blur": 0,
@@ -168,9 +267,17 @@
     "look": {
       "v": 1,
       "mode": "auto",
-      "hues": [{ "h": 170, "s": 50 }],
+      "hues": [
+        {
+          "h": 170,
+          "s": 50
+        }
+      ],
       "intensity": 40,
-      "bg": { "kind": "scene", "scene": "topo" },
+      "bg": {
+        "kind": "scene",
+        "scene": "topo"
+      },
       "grain": 8,
       "dim": 0,
       "blur": 0,
@@ -185,16 +292,30 @@
       "v": 1,
       "mode": "dark",
       "hues": [
-        { "h": 320, "s": 80 },
-        { "h": 265, "s": 65 },
-        { "h": 195, "s": 70 }
+        {
+          "h": 320,
+          "s": 80
+        },
+        {
+          "h": 265,
+          "s": 65
+        },
+        {
+          "h": 195,
+          "s": 70
+        }
       ],
       "intensity": 65,
-      "bg": { "kind": "gradient" },
+      "bg": {
+        "kind": "gradient"
+      },
       "grain": 22,
       "dim": 15,
       "blur": 0,
-      "parts": { "composer": "glass", "sidebar": "tinted" }
+      "parts": {
+        "composer": "glass",
+        "sidebar": "tinted"
+      }
     }
   },
   {
@@ -206,20 +327,41 @@
       "name": "Снежная игра",
       "mode": "dark",
       "hues": [
-        { "h": 208, "s": 70 },
-        { "h": 190, "s": 45 },
-        { "h": 355, "s": 70 }
+        {
+          "h": 208,
+          "s": 70
+        },
+        {
+          "h": 190,
+          "s": 45
+        },
+        {
+          "h": 355,
+          "s": 70
+        }
       ],
-      "accent": { "h": 200, "s": 80 },
+      "accent": {
+        "h": 200,
+        "s": 80
+      },
       "intensity": 55,
-      "bg": { "kind": "gradient" },
+      "bg": {
+        "kind": "gradient"
+      },
       "grain": 6,
       "dim": 10,
       "blur": 0,
       "radius": "round",
       "font": "rounded",
-      "parts": { "bubble": "glass", "composer": "glass", "sidebar": "glass" },
-      "fx": { "preset": "snowplay", "power": 65 }
+      "parts": {
+        "bubble": "glass",
+        "composer": "glass",
+        "sidebar": "glass"
+      },
+      "fx": {
+        "preset": "snowplay",
+        "power": 65
+      }
     }
   },
   {
@@ -231,16 +373,30 @@
       "name": "Ночник",
       "mode": "dark",
       "hues": [
-        { "h": 32, "s": 60 },
-        { "h": 250, "s": 35 }
+        {
+          "h": 32,
+          "s": 60
+        },
+        {
+          "h": 250,
+          "s": 35
+        }
       ],
       "intensity": 40,
-      "bg": { "kind": "color" },
+      "bg": {
+        "kind": "color"
+      },
       "grain": 10,
       "dim": 0,
       "blur": 0,
-      "parts": { "bubble": "soft", "composer": "solid" },
-      "fx": { "preset": "nightlamp", "power": 70 }
+      "parts": {
+        "bubble": "soft",
+        "composer": "solid"
+      },
+      "fx": {
+        "preset": "nightlamp",
+        "power": 70
+      }
     }
   },
   {
@@ -252,18 +408,170 @@
       "name": "Лазер",
       "mode": "dark",
       "hues": [
-        { "h": 345, "s": 85 },
-        { "h": 280, "s": 60 }
+        {
+          "h": 345,
+          "s": 85
+        },
+        {
+          "h": 280,
+          "s": 60
+        }
       ],
-      "accent": { "h": 345, "s": 90 },
+      "accent": {
+        "h": 345,
+        "s": 90
+      },
       "intensity": 45,
-      "bg": { "kind": "scene", "scene": "stars", "speed": 30 },
+      "bg": {
+        "kind": "none"
+      },
       "grain": 8,
-      "dim": 30,
+      "dim": 0,
       "blur": 0,
       "font": "mono",
-      "parts": { "bubble": "outline", "composer": "glass" },
-      "fx": { "preset": "laser", "power": 70 }
+      "parts": {
+        "bubble": "outline",
+        "turns": "plain",
+        "composer": "glass"
+      },
+      "fx": {
+        "preset": "laser",
+        "power": 70
+      }
+    }
+  },
+  {
+    "id": "newyear",
+    "name": "Мастерская",
+    "nameEn": "Workshop",
+    "look": {
+      "v": 1,
+      "name": "Мастерская",
+      "mode": "dark",
+      "hues": [
+        {
+          "h": 140,
+          "s": 45
+        },
+        {
+          "h": 28,
+          "s": 60
+        },
+        {
+          "h": 355,
+          "s": 70
+        }
+      ],
+      "accent": {
+        "h": 355,
+        "s": 75
+      },
+      "intensity": 50,
+      "bg": {
+        "kind": "color"
+      },
+      "grain": 0,
+      "dim": 0,
+      "blur": 0,
+      "radius": "round",
+      "parts": {
+        "bubble": "glass",
+        "turns": "glass",
+        "composer": "glass",
+        "sidebar": "tinted"
+      },
+      "fx": {
+        "preset": "newyear",
+        "back": true,
+        "power": 70
+      }
+    }
+  },
+  {
+    "id": "elves",
+    "name": "Фабрика эльфов",
+    "nameEn": "Elf factory",
+    "look": {
+      "v": 1,
+      "name": "Фабрика эльфов",
+      "mode": "dark",
+      "hues": [
+        {
+          "h": 135,
+          "s": 55
+        },
+        {
+          "h": 40,
+          "s": 70
+        },
+        {
+          "h": 355,
+          "s": 75
+        }
+      ],
+      "accent": {
+        "h": 45,
+        "s": 85
+      },
+      "intensity": 55,
+      "bg": {
+        "kind": "color"
+      },
+      "grain": 0,
+      "dim": 0,
+      "blur": 0,
+      "radius": "round",
+      "font": "rounded",
+      "parts": {
+        "bubble": "glass",
+        "turns": "glass",
+        "composer": "glass",
+        "sidebar": "tinted"
+      },
+      "fx": {
+        "preset": "elves",
+        "back": true,
+        "power": 75
+      }
+    }
+  },
+  {
+    "id": "weather",
+    "name": "Погода",
+    "nameEn": "Weather",
+    "look": {
+      "v": 1,
+      "name": "Погода",
+      "mode": "dark",
+      "hues": [
+        {
+          "h": 212,
+          "s": 50
+        },
+        {
+          "h": 30,
+          "s": 40
+        }
+      ],
+      "intensity": 35,
+      "bg": {
+        "kind": "color"
+      },
+      "grain": 0,
+      "dim": 0,
+      "blur": 0,
+      "radius": "round",
+      "parts": {
+        "bubble": "glass",
+        "turns": "glass",
+        "composer": "glass",
+        "sidebar": "glass"
+      },
+      "fx": {
+        "preset": "weather",
+        "back": true,
+        "power": 70
+      }
     }
   }
 ]

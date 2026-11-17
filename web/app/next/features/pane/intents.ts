@@ -105,9 +105,32 @@ export interface IIntentPlan {
   settled: string[];
 }
 
+/** What the runtime opens by itself, by the person's switches (stores/pane-auto.ts). */
+export const PANE_AUTO_KINDS = ['design', 'artifacts', 'browser', 'files'] as const;
+export type TPaneAutoKind = (typeof PANE_AUTO_KINDS)[number];
+export type TPaneAutoKinds = Readonly<Record<TPaneAutoKind, boolean>>;
+
+/** The tab an auto intent opens, as the switch that lets it: the design, a document or board, the agent's browser, the rest. */
+export const autoKindOf = (command: TIntentCommand): TPaneAutoKind => {
+  if (command.kind !== 'open') return 'files';
+  if (command.tab === 'design') return 'design';
+  if (command.tab === 'artifacts') return 'artifacts';
+  if (command.tab === 'agent-browser' || command.tab === 'browser') return 'browser';
+  return 'files';
+};
+
+/**
+ * A turn that publishes ten documents does not throw ten tabs at the person: within this window the runtime's own
+ * opens are AUTO_PER_WINDOW at most, the newest first; the rest stay cards in the chat, a click away.
+ */
+export const AUTO_WINDOW_MS = 10 * 60_000;
+export const AUTO_PER_WINDOW = 3;
+
 export interface IPlanOptions {
   /** «Открывать то, над чем работает агент»: off, what the runtime asked by itself is settled without acting. */
   auto: boolean;
+  /** Which kinds of it: a kind switched off is settled without acting. All on when absent. */
+  kinds?: TPaneAutoKinds;
 }
 
 /**
@@ -128,8 +151,27 @@ export const planIntents = (
     .filter((intent) => intent.createdAt >= now - INTENT_TTL_MS)
     .filter((intent) => seen !== null || intent.appliedAt === null)
     .filter((intent) => options.auto || !isAuto(intent))
+    .filter(
+      (intent) =>
+        !isAuto(intent) || isReload(intent) || (options.kinds?.[autoKindOf(intent.command)] ?? true),
+    )
     .sort((a, b) => a.createdAt - b.createdAt);
-  const opens = new Set(live.filter((intent) => !isReload(intent)).slice(-INTENTS_AT_ONCE));
+  // The window's budget: what the runtime opened by itself lately (applied on some page) counts against the new.
+  const spent = intents.filter(
+    (intent) =>
+      known.has(intent.id) &&
+      isAuto(intent) &&
+      !isReload(intent) &&
+      intent.appliedAt !== null &&
+      intent.createdAt >= now - AUTO_WINDOW_MS,
+  ).length;
+  const quiet = live.filter((intent) => isAuto(intent) && !isReload(intent));
+  const allowed = new Set(quiet.slice(quiet.length - Math.max(0, AUTO_PER_WINDOW - spent)));
+  const opens = new Set(
+    live
+      .filter((intent) => !isReload(intent) && (!isAuto(intent) || allowed.has(intent)))
+      .slice(-INTENTS_AT_ONCE),
+  );
   return {
     apply: live.filter((intent) => isReload(intent) || opens.has(intent)),
     settled: fresh.map((intent) => intent.id),

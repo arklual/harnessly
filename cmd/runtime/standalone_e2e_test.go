@@ -102,9 +102,7 @@ func TestStandaloneMachineEndToEnd(t *testing.T) {
 	}
 	root := t.TempDir()
 	bin := filepath.Join(root, "runtime")
-	if out, err := exec.Command(goBin, "build", "-o", bin, ".").CombinedOutput(); err != nil {
-		t.Fatalf("build: %v\n%s", err, out)
-	}
+	buildRuntime(t, goBin, bin)
 	home := filepath.Join(root, "home")
 	data := filepath.Join(home, ".acme-ai")
 	fakes := filepath.Join(home, "bin")

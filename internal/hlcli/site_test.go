@@ -2,7 +2,6 @@ package hlcli
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 	"github.com/ly-solutions/harnessly/internal/sites"
 )
 
@@ -20,11 +19,7 @@ const siteAdmin = "admin-token-admin-token-1234"
 // sitesServer is a real sites module behind HTTP: the CLI is tested against what it will talk to.
 func sitesServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	db, err := store.Open(context.Background(), "sqlite://"+filepath.Join(t.TempDir(), "s.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	blobs, _ := sites.NewFolderBlobs(t.TempDir())
 	key := []byte("0123456789abcdef0123456789abcdef")
 	svc, err := sites.New(sites.Deps{DB: db, Blobs: blobs, Config: sites.Config{Domain: "sites.test", Secure: true, Key: key},

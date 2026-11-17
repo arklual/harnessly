@@ -1,7 +1,7 @@
 // The agent's text in the feed. Markdown arrives in its own chunk; until it does, the same text shows as plain
 // paragraphs in the same box, so nothing jumps or spins while it loads. The pictures the text names stand under it.
-import { lazy, memo, Suspense } from 'react';
-import { PictureCards, useNamedPictures, withoutPaths } from '@/next/features/chat/pictures';
+import { lazy, memo, Suspense, useContext } from 'react';
+import { BigPictures, PictureCards, useNamedPictures, withoutPaths } from '@/next/features/chat/pictures';
 
 const Markdown = lazy(() => import('@/next/features/chat/markdown'));
 
@@ -16,13 +16,14 @@ const Plain = ({ md }: { md: string }) => (
 /** `paths`: paths in inline code open as files, for another agent's report. A picture's path is not repeated above it. */
 const Md = ({ md, paths = false }: { md: string; paths?: boolean }) => {
   const pictures = useNamedPictures(md);
+  const big = useContext(BigPictures);
   const text = pictures.named.length > 0 ? withoutPaths(md, pictures.named) : md;
   return (
     <>
       <Suspense fallback={<Plain md={text} />}>
         <Markdown md={text} paths={paths} />
       </Suspense>
-      <PictureCards pictures={pictures.named} srcOf={pictures.srcOf} />
+      <PictureCards pictures={pictures.named} srcOf={pictures.srcOf} big={big} />
     </>
   );
 };

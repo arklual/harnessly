@@ -192,5 +192,11 @@
   "next.chatgpt.voice.full.s.speaking": "Говорю",
   "next.chatgpt.voice.full.s.muted": "Микрофон выключен",
   "next.chatgpt.voice.full.s.failed": "Нет связи",
+  "next.chatgpt.voice.full.stage.label": "Показано голосом",
+  "next.chatgpt.voice.full.stage.close": "Закрыть",
+  "next.chatgpt.voice.full.text.placeholder": "Напишите сообщение",
+  "next.chatgpt.voice.full.text.send": "Отправить",
+  "next.chatgpt.voice.full.text.feed": "Ход разговора",
+  "next.chatgpt.voice.full.text.empty": "Микрофон выключен. Пишите — ответ прозвучит вслух.",
   "next.chatgpt.voice.bar.expand": "Развернуть"
 }

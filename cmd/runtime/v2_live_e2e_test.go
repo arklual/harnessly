@@ -59,9 +59,7 @@ func TestV2LiveRuntimeEndToEnd(t *testing.T) {
 		_ = os.RemoveAll(root)
 	})
 	bin := filepath.Join(root, "runtime")
-	if out, err := exec.Command(goBin, "build", "-o", bin, ".").CombinedOutput(); err != nil {
-		t.Fatalf("build: %v\n%s", err, out)
-	}
+	buildRuntime(t, goBin, bin)
 	home := filepath.Join(root, "h")
 	fakes := filepath.Join(home, "bin")
 	project := filepath.Join(home, "project")

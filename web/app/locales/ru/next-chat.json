@@ -717,5 +717,37 @@
   },
   "next.tool.firstBytes": "Первые {shown} из {total}",
   "next.size.kb": "{n} КБ",
-  "next.size.mb": "{n} МБ"
+  "next.size.mb": "{n} МБ",
+  "next.turnMade.head": "Сделано за ход",
+  "next.turnMade.open": "Открыть",
+  "next.turnMade.openDesign": "Открыть в Sinopia",
+  "next.turnMade.share": "Поделиться",
+  "next.turnMade.copyUrl": "Скопировать адрес",
+  "next.turnMade.copied": "Адрес скопирован",
+  "next.turnMade.copyId": "Скопировать ID",
+  "next.turnMade.copyIds": "Скопировать список ID",
+  "next.turnMade.idCopied": "ID скопирован",
+  "next.turnMade.files": {
+    "one": "{n} файл",
+    "few": "{n} файла",
+    "many": "{n} файлов",
+    "other": "{n} файла"
+  },
+  "next.turnMade.into": "в {branch}",
+  "next.turnMade.batch": {
+    "one": "Создана {n} задача",
+    "few": "Создано {n} задачи",
+    "many": "Создано {n} задач",
+    "other": "Создано {n} задачи"
+  },
+  "next.turnMade.allOn": "все на {who}",
+  "next.turnMade.showMore": "Показать ещё {n}",
+  "next.turnMade.showAll": "Показать все",
+  "next.turnMade.collapse": "Свернуть",
+  "next.turnMade.epic": "Эпик",
+  "next.turnMade.epicDone": "{done} из {n} готово",
+  "next.turnMade.new": "новая · агент",
+  "next.turnMade.more": "ещё {n}",
+  "next.turnMade.shots": "Скриншоты · {n}",
+  "next.turnMade.design": "Макет Sinopia"
 }

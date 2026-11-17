@@ -2,22 +2,18 @@ package env
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 )
 
 // The version an app's row shows is the newest a machine named, and «обновлено» is when a machine put it on — a later
 // run that found it already there does not move it.
 func TestAppVersionComesFromTheMachinesRuns(t *testing.T) {
 	ctx := context.Background()
-	db, err := store.Open(ctx, "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	st := db.S()
 	now := time.Date(2026, 11, 15, 6, 0, 0, 0, time.UTC)
 	put := func(id string, ago time.Duration, steps string) {

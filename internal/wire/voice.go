@@ -14,6 +14,25 @@ import (
 // page is told unsupported. Any other error of Server.Voice is a recording that failed: internal.
 var ErrVoiceUnavailable = errors.New("voice: not available on this machine")
 
+// VoiceFailure is a recording that failed for a reason the person can act on (no key saved for the recognition model
+// they picked, a recording the decoder cannot read, the service restarting). Message is worded for them; the answer is
+// still the protocol's internal refusal, with the words beside the code (like a files page's refusal).
+type VoiceFailure struct{ Message string }
+
+func (e *VoiceFailure) Error() string { return e.Message }
+
+// VoiceRefusal is the answer of the voice page when a recording failed: the code of the protocol and, when the machine
+// knows it, why, in words for the person. An empty Message is a failure without words: the page says its own.
+type VoiceRefusal struct {
+	R       ResultKind `json:"r"`
+	Code    RefuseCode `json:"code"`
+	Message string     `json:"message,omitempty"`
+}
+
+func (v VoiceRefusal) Validate() error {
+	return errors.Join(in("r", v.R, []ResultKind{ResultRefused}), in("code", v.Code, RefuseCodes))
+}
+
 // VoiceBodyMax is the largest recording POST /api/v2/voice takes, in bytes: some ten minutes of speech in a compressed
 // container.
 const VoiceBodyMax = 20 << 20
@@ -79,6 +98,11 @@ func (s *Server) voice(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		jsonlog.Log("warn", "v2: a recording was not recognized", jsonlog.F{K: "error", V: err.Error()})
+		var failed *VoiceFailure
+		if errors.As(err, &failed) && failed.Message != "" {
+			writeJSON(w, refusalStatus[RefuseInternal], VoiceRefusal{R: ResultRefused, Code: RefuseInternal, Message: failed.Message})
+			return
+		}
 		refuse(w, RefuseInternal)
 	}
 }

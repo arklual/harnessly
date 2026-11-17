@@ -2,22 +2,18 @@ package docs
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 )
 
 // An administrator of the installation who opens a document of a space they are not in leaves one line in that
 // space's journal, however often they open it; a member of the space leaves none.
 func TestOperatorOpeningADocumentIsInTheJournal(t *testing.T) {
 	ctx := context.Background()
-	db, err := store.Open(ctx, "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	st := db.S()
 	owner, boss := &store.User{Email: "owner@example.com"}, &store.User{Email: "boss@example.com"}
 	for _, u := range []*store.User{owner, boss} {

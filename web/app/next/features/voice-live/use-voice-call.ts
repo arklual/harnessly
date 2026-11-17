@@ -15,7 +15,7 @@ import {
   type IVoiceEvent,
   type TVoiceMode,
 } from '@/next/features/voice-live/api';
-import { BARGE_START, bargeStep } from '@/next/features/voice-live/barge';
+import { BARGE_START, bargeBar, bargeStep } from '@/next/features/voice-live/barge';
 import { dropEcho } from '@/next/features/voice-live/echo';
 import {
   joinMachineSound,
@@ -493,7 +493,9 @@ export const useVoiceCall = ({
             }
           })();
           if (type !== 'input_audio_buffer.speech_started' || !handlers.current.bargeOn) return;
-          barge = { over: null, ducked: performance.now(), loudAt };
+          // The server hears speech in a noise too: the page's own bar for this room has the last word (barge.ts).
+          if (own() < bargeBar(barge) * 0.8) return;
+          barge = { ...barge, over: null, ducked: performance.now(), loudAt };
           audio.muted = true;
           setInterrupted(true);
           cutAnswer();

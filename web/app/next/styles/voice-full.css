@@ -1,5 +1,7 @@
-/* The full-screen talk (features/voice-live/voice-full.tsx): a layer over the app with the orb in the middle.
- * Tokens only, so the light, the dark and the contrast themes each get their own; the orb is a canvas (orb.tsx). */
+/* The full-screen talk (features/voice-live/voice-full.tsx): a layer over the app with the mascot in the middle
+ * (the orb is only its aura). Tokens only, so the light, the dark and the contrast themes each get their own.
+ * Three layouts by [data-view]: voice (the mascot big in the middle), stage (something shown, the mascot small at the
+ * bottom) and text (the microphone is off: a feed, a text field, the mascot small at the top). */
 .hx-voice-full {
   position: fixed;
   inset: 0;
@@ -126,22 +128,68 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
+  padding-bottom: 10px;
   cursor: grab;
 }
-.hx-voice-full__orb {
+/* The mascot: one box that changes its size and its place between the layouts; the head fills it. */
+.hx-voice-full__mascot {
+  --hx-vm: min(72vw, 42vh, 400px);
+  position: relative;
   flex: none;
-  width: min(78vw, 46vh, 460px);
-  aspect-ratio: 1;
-  max-width: 100%;
+  order: 1;
+  width: var(--hx-vm);
+  height: var(--hx-vm);
+  margin-bottom: 8px;
+  transition:
+    width 520ms cubic-bezier(0.32, 0.72, 0, 1),
+    height 520ms cubic-bezier(0.32, 0.72, 0, 1),
+    margin 520ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.hx-voice-full__mascot > .hx-head {
+  --hx-head-size: 100%;
+  position: relative;
+  z-index: 1;
+}
+.hx-voice-full__mascot[data-view='stage'] {
+  --hx-vm: 88px;
+  margin-bottom: 0;
+}
+.hx-voice-full__mascot[data-view='text'] {
+  --hx-vm: 76px;
+  margin-bottom: 0;
+}
+/* The aura: the orb stays behind the mascot, soft, as the colour of who has the floor. */
+.hx-voice-full__orb {
+  position: absolute;
+  inset: -42%;
+  width: 184%;
+  height: 184%;
+  opacity: 0.26;
+  pointer-events: none;
+  animation: hx-voice-full-aura 600ms var(--hx-ease-out) backwards;
+}
+@keyframes hx-voice-full-aura {
+  from {
+    opacity: 0;
+    scale: 0.8;
+  }
 }
 .hx-voice-full__state {
+  order: 2;
   margin: 0;
   font-size: clamp(20px, 5vw, 26px);
   font-weight: 500;
   letter-spacing: -0.01em;
   color: var(--hx-fg-1);
+  transition: font-size 360ms var(--hx-ease-out);
+}
+.hx-voice-full__stage:not([data-view='voice']) > .hx-voice-full__state {
+  font-size: var(--hx-text-sm);
+  font-weight: 400;
+  color: var(--hx-fg-3);
 }
 .hx-voice-full__line {
+  order: 3;
   margin: 4px 0 0;
   min-height: 3.2em;
   max-width: min(560px, 100%);
@@ -155,7 +203,14 @@
   line-height: 1.6;
   color: var(--hx-fg-2);
   opacity: 0;
-  transition: opacity 0.3s;
+  transition:
+    opacity 0.3s,
+    min-height 360ms var(--hx-ease-out);
+}
+.hx-voice-full__stage:not([data-view='voice']) > .hx-voice-full__line {
+  min-height: 0;
+  max-height: 0;
+  margin: 0;
 }
 .hx-voice-full__line[data-on] {
   opacity: 1;
@@ -167,6 +222,240 @@
     transform: translateY(6px);
     filter: blur(3px);
   }
+}
+
+/* Stage: what the voice shows takes the whole area above the mascot. */
+.hx-voice-full__stage[data-view='stage'] > .hx-voice-full__mascot {
+  order: 3;
+}
+.hx-voice-full__stage[data-view='stage'] > .hx-voice-full__state {
+  order: 4;
+}
+.hx-voice-full__panel {
+  order: 1;
+  flex: 1 1 0;
+  min-height: 0;
+  width: min(900px, 100%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-xl);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-md);
+  cursor: auto;
+  transform-origin: 50% 100%;
+  animation: hx-voice-full-panel-in 520ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
+}
+.hx-voice-full__panel[data-closing] {
+  animation: hx-voice-full-panel-out 320ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  pointer-events: none;
+}
+@keyframes hx-voice-full-panel-in {
+  from {
+    flex-grow: 0.001;
+    opacity: 0;
+    scale: 0.94;
+    translate: 0 24px;
+  }
+}
+@keyframes hx-voice-full-panel-out {
+  to {
+    flex-grow: 0.001;
+    opacity: 0;
+    scale: 0.94;
+    translate: 0 24px;
+  }
+}
+.hx-voice-full__panel-top {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px 2px 18px;
+  border-bottom: 1px solid var(--hx-border);
+}
+.hx-voice-full__panel-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--hx-fg-1);
+}
+.hx-voice-full__panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 18px;
+  touch-action: pan-x pan-y;
+  user-select: text;
+  -webkit-user-select: text;
+  overscroll-behavior: contain;
+}
+
+/* Text: the feed of the call's turns above, the mascot small at the top, a text field at the bottom. */
+.hx-voice-full__stage[data-view='text'] {
+  justify-content: flex-start;
+}
+.hx-voice-full__stage[data-view='text'] > .hx-voice-full__mascot {
+  order: 1;
+}
+.hx-voice-full__stage[data-view='text'] > .hx-voice-full__state {
+  order: 2;
+}
+.hx-voice-full__feed {
+  order: 3;
+  flex: 1 1 0;
+  min-height: 0;
+  width: min(720px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 8px 2px;
+  overflow-y: auto;
+  cursor: auto;
+  touch-action: pan-y;
+  user-select: text;
+  -webkit-user-select: text;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  animation: hx-voice-full-feed-in 480ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
+}
+.hx-voice-full__feed[data-closing] {
+  animation: hx-voice-full-feed-out 300ms var(--hx-ease-out) forwards;
+  pointer-events: none;
+}
+@keyframes hx-voice-full-feed-in {
+  from {
+    flex-grow: 0.001;
+    opacity: 0;
+    translate: 0 16px;
+  }
+}
+@keyframes hx-voice-full-feed-out {
+  to {
+    flex-grow: 0.001;
+    opacity: 0;
+    translate: 0 16px;
+  }
+}
+.hx-voice-full__turn {
+  margin: 0;
+  max-width: min(85%, 560px);
+  padding: 9px 14px;
+  border-radius: var(--hx-radius-xl);
+  font-size: var(--hx-text-md);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  animation: hx-voice-full-line 320ms var(--hx-ease-out) backwards;
+}
+.hx-voice-full__turn[data-role='user'] {
+  align-self: flex-end;
+  background: var(--hx-accent-soft);
+  color: var(--hx-fg-1);
+  border-bottom-right-radius: var(--hx-radius-sm);
+}
+.hx-voice-full__turn[data-role='assistant'] {
+  align-self: flex-start;
+  background: var(--hx-bg-raised);
+  border: 1px solid var(--hx-border);
+  color: var(--hx-fg-1);
+  border-bottom-left-radius: var(--hx-radius-sm);
+}
+.hx-voice-full__turn[data-live] {
+  opacity: 0.75;
+}
+.hx-voice-full__empty {
+  margin: auto;
+  max-width: 28ch;
+  text-align: center;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  line-height: 1.5;
+}
+.hx-voice-full__text {
+  flex: none;
+  align-self: center;
+  width: min(720px, 100%);
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 8px 0 14px;
+  cursor: auto;
+  touch-action: manipulation;
+  user-select: auto;
+  -webkit-user-select: auto;
+  animation: hx-voice-full-feed-in 420ms cubic-bezier(0.32, 0.72, 0, 1) backwards;
+}
+.hx-voice-full__text[data-closing] {
+  animation: hx-voice-full-feed-out 260ms var(--hx-ease-out) forwards;
+  pointer-events: none;
+}
+.hx-voice-full__input {
+  flex: 1;
+  min-width: 0;
+  max-height: 132px;
+  box-sizing: border-box;
+  padding: 11px 16px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 22px;
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  font: inherit;
+  /* 16px: a smaller one makes a phone zoom the page when the field is focused. */
+  font-size: 16px;
+  line-height: 1.4;
+  resize: none;
+  outline: none;
+}
+.hx-voice-full__input::placeholder {
+  color: var(--hx-fg-3);
+}
+.hx-voice-full__input:focus-visible {
+  border-color: var(--hx-focus);
+  box-shadow: 0 0 0 1px var(--hx-focus);
+}
+.hx-voice-full__send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--hx-accent);
+  color: #fff;
+  cursor: pointer;
+  transition:
+    opacity 160ms ease-out,
+    transform 160ms var(--hx-ease-out);
+}
+.hx-voice-full__send:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.hx-voice-full__send:not(:disabled):active {
+  transform: scale(0.92);
+}
+.hx-voice-full__send:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 2px;
+}
+/* The buttons shrink when the text field needs the room. */
+.hx-voice-full[data-view='text'] .hx-voice-full__c {
+  width: 48px;
+  height: 48px;
+}
+.hx-voice-full__c {
+  transition:
+    width 360ms var(--hx-ease-out),
+    height 360ms var(--hx-ease-out),
+    background 160ms ease-out,
+    transform 160ms var(--hx-ease-out);
 }
 
 .hx-voice-full__bar {
@@ -218,8 +507,8 @@
 }
 
 @media (max-height: 520px) {
-  .hx-voice-full__orb {
-    width: min(50vh, 60vw);
+  .hx-voice-full__mascot[data-view='voice'] {
+    --hx-vm: min(46vh, 60vw);
   }
   .hx-voice-full__line {
     min-height: 0;
@@ -234,8 +523,24 @@
   .hx-voice-full[data-closing] {
     animation: hx-voice-full-fade-out 200ms linear forwards;
   }
-  .hx-voice-full__line[data-on] {
+  .hx-voice-full__line[data-on],
+  .hx-voice-full__turn,
+  .hx-voice-full__orb {
     animation: none;
+  }
+  .hx-voice-full__panel,
+  .hx-voice-full__feed,
+  .hx-voice-full__text {
+    animation: hx-voice-full-fade 200ms linear backwards;
+  }
+  .hx-voice-full__panel[data-closing],
+  .hx-voice-full__feed[data-closing],
+  .hx-voice-full__text[data-closing] {
+    animation: hx-voice-full-fade-out 200ms linear forwards;
+  }
+  .hx-voice-full__mascot,
+  .hx-voice-full__c {
+    transition: none;
   }
   .hx-voice-full__b:active > .hx-voice-full__c {
     transform: none;

@@ -461,12 +461,14 @@ func TestSafeAccessRoutesWaitingAskRechecksReadyAccess(t *testing.T) {
 				return secrets.Use{Conv: "chat-a", Project: project, Title: "Verified a"}
 			}
 			rig.routes = rig.sf.routes(rig.d, func(string) (string, string) { return "", "" }, resolver)
+			// The ask waits for the card long enough that a loaded -race runner does not end the wait first: it would answer
+			// "waiting", and the test would check the answer to a different question.
 			done := make(chan *httptest.ResponseRecorder, 1)
 			go func() {
-				done <- rig.call("POST", "/api/cli/secrets/ask", map[string]any{"name": "new-key", "session": "session-a", "origin": "https://example.com", "why": "sign in", "wait": 2}, "a", nil)
+				done <- rig.call("POST", "/api/cli/secrets/ask", map[string]any{"name": "new-key", "session": "session-a", "origin": "https://example.com", "why": "sign in", "wait": 20}, "a", nil)
 			}()
 			var pending []secrets.Ask
-			deadline := time.Now().Add(time.Second)
+			deadline := time.Now().Add(30 * time.Second)
 			for time.Now().Before(deadline) {
 				pending = rig.sf.asks.Pending()
 				if len(pending) == 1 {
@@ -506,7 +508,7 @@ func TestSafeAccessRoutesWaitingAskRechecksReadyAccess(t *testing.T) {
 				if body.Status != want {
 					t.Errorf("ask after %s = %q, want %q", change, body.Status, want)
 				}
-			case <-time.After(3 * time.Second):
+			case <-time.After(30 * time.Second):
 				t.Fatal("waiting ask did not settle")
 			}
 		})

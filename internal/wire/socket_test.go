@@ -1091,6 +1091,17 @@ func TestVoicePage(t *testing.T) {
 			t.Errorf("%s: %d %+v", c.name, code, refused)
 		}
 	}
+	// A failure the person can act on comes with its words beside the internal code; one without words has none.
+	var worded wire.VoiceRefusal
+	fail = &wire.VoiceFailure{Message: "No key is saved for this recognition model"}
+	if code := g.do("POST", "/api/v2/voice", audio, &worded); code != 500 || worded.Code != wire.RefuseInternal || worded.Message != "No key is saved for this recognition model" {
+		t.Errorf("worded failure: %d %+v", code, worded)
+	}
+	worded = wire.VoiceRefusal{}
+	fail = errors.New("ffmpeg exited")
+	if code := g.do("POST", "/api/v2/voice", audio, &worded); code != 500 || worded.Code != wire.RefuseInternal || worded.Message != "" {
+		t.Errorf("failure without words: %d %+v", code, worded)
+	}
 	if code := g.do("GET", "/api/v2/voice", nil, nil); code != http.StatusMethodNotAllowed {
 		t.Errorf("GET: %d", code)
 	}

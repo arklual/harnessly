@@ -72,10 +72,10 @@ const ChatkindGallery = () => {
   }, [query.auto]);
   const talk = kind === CHAT_KIND.talk;
   return (
-    <div className="hx-root" style={{ width: '100vw', minHeight: '100vh', background: 'var(--hx-bg-app)' }}>
+    <div className="hx-root hx-stage" style={{ width: '100vw', height: '100vh', background: 'var(--hx-bg-app)' }}>
       <div style={{ width: '100%', maxWidth: 880, margin: '0 auto', padding: '120px 16px 0', boxSizing: 'border-box' }}>
         <div className="hx-dock" data-screen data-kind={kind} style={{ width: '100%' }}>
-          <KindSwitch value={kind} onChange={setKind} />
+          <KindSwitch value={kind} onChange={setKind} top />
           <Composer
             value={text}
             onChange={setText}

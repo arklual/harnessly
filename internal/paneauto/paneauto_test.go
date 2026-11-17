@@ -178,3 +178,16 @@ func TestAHandedOverFileOpensOnce(t *testing.T) {
 		t.Fatalf("%d intents", len(list))
 	}
 }
+
+func TestHubDocsPublishOpensDocument(t *testing.T) {
+	for _, cmd := range []string{"$ harnessly docs publish plan.md --title Plan", "$ cd /w && harnessly doc publish plan.md", "$ artifacts publish --file plan.md"} {
+		r := newRig(t)
+		r.w.Entry("c1", r.tool("Bash", cmd, "https://a.example.org/a/plan-x\npublished plan-x, version 1\n", &yes))
+		if got := r.commands(); len(got) != 1 {
+			t.Fatalf("%s: %v", cmd, got)
+		}
+	}
+	if publishRe.MatchString("harnessly docs search publish") {
+		t.Fatal("docs search is no publish")
+	}
+}

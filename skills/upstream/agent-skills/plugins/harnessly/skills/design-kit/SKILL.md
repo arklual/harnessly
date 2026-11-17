@@ -58,7 +58,7 @@ For a public React package (antd, @mui/material, @chakra-ui/react, a React 19 ki
 `harnessly design kit add npm:<package> <folder>` makes the kit. It finds the provider (`KitRoot`, no `--root`), reads
 the tokens of a CSS-in-JS theme and resolves `calc()` / `color-mix()` in headless Chrome, takes `react: "19"` from the
 package (or `--react 19`), and writes descriptions, When to use / When not to use and keywords from the package's JSDoc,
-README, docs and stories, then, with `--draft` only, one `claude -p` call per 40 components for the rest (it runs the machine's own login, so build-1 has none; without `--draft` the texts are generated from names and props; the card's Status says what
+README, docs and stories, then, with `--draft` only, one `claude -p` call per 40 components for the rest (it runs the machine's own login, so a build machine without one has none; without `--draft` the texts are generated from names and props; the card's Status says what
 is a draft). Then read the README's «Not in the kit», fix the samples of what did not draw, and
 `harnessly design kit check <folder> --render`.
 
@@ -92,8 +92,7 @@ immutable — a fix is a new version.
 
 ## Designing in a project on a kit
 
-A project that is on a kit (`harnessly design kit use <project> <kit>`, `design new --kit`, or the button «Подключить
-UI-кит») is drawn ONLY from that kit, and you do not wait to be reminded:
+A project that is on a kit (`harnessly design kit use <project> <kit>`, `design new --kit`) is drawn ONLY from that kit, and you do not wait to be reminded:
 
 1. Read it: `kit_index`, then `kit_component` for every component you use, `kit_tokens`, `kit_templates`.
 2. Start boards with `design new` / `design page create`: they come with the kit's files and provider; write the content

@@ -146,7 +146,8 @@ func (h *fakeHub) count() int { h.mu.Lock(); defer h.mu.Unlock(); return len(h.f
 
 func waitFor(t *testing.T, what string, ok func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	// A long deadline costs nothing when the condition comes; a loaded -race runner can be slow for seconds.
+	deadline := time.Now().Add(30 * time.Second)
 	for !ok() {
 		if time.Now().After(deadline) {
 			t.Fatalf("timed out waiting for %s", what)
@@ -211,6 +212,9 @@ func TestSourceSurvivesRestartWithoutDoublesOrLoss(t *testing.T) {
 		t.Fatal("delivered while the hub was down")
 	}
 	cancel()
+	// The old runtime's source may still be polling for a moment: it would take the batch queued below and hand it to
+	// the hub that is up again, so the test waits until it is gone, as a real restart does.
+	s.WaitStopped()
 
 	// A new runtime: the source starts from the kept cursor, the same event read again is not doubled.
 	queue(Event{Type: "mail.received", ID: "m1", Title: "Hello"}, Event{Type: "mail.received", ID: "m2", Title: "Second"})

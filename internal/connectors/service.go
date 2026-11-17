@@ -737,8 +737,10 @@ func (s *Service) Start(ctx context.Context, deliver ...Destination) {
 	s.runner.run(ctx, deliver)
 }
 
-// WaitStopped waits, after the context given to Start is done, until every source it started has returned: a test that
-// starts a second runtime on the same folder, or changes a connector's package state, waits for the first one's sources.
+// WaitStopped waits, after the context given to Start is done, until every source it started has returned and every
+// proposal sent to a chat has been sent: a test that starts a second runtime on the same folder, or changes a
+// connector's package state, waits for the first one's sources and relays.
 func (s *Service) WaitStopped() {
 	s.runner.sources.Wait()
+	s.runner.relays.Wait()
 }

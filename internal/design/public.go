@@ -25,13 +25,15 @@ import (
 // and fetches the board list and the project's files with it, so a guest sees the design without a session. The token's
 // key is derived from the pair's secret under its own info, so it is never a session or a share-read token.
 
+// PublicFileLimit is the largest file the public route sends. A variable only so that a test of the limit does not
+// push 32 MB of HTML through the page's expansion under -race.
+var PublicFileLimit int64 = 32 << 20
+
 const (
 	publicInfo   = "design-public/v1"
 	publicMaxAge = 120
 	// publicSkew is how far in the future an iat may be: the runtime's clock may lag the gateway's.
 	publicSkew = 30
-	// PublicFileLimit is the largest file the public route sends.
-	PublicFileLimit = 32 << 20
 	// PublicAppDir and PublicGuestDir are first segments of a public path that are not project files: the guest page's
 	// bundle, and the script the boards load.
 	PublicAppDir    = "_app"
@@ -610,7 +612,7 @@ func (a *API) servePublic(w http.ResponseWriter, r *http.Request, project string
 		if lib.IsVideo(project) {
 			body = []byte(lib.withVideoRuntime(string(body), prefix))
 		}
-		if len(body) > PublicFileLimit {
+		if int64(len(body)) > PublicFileLimit {
 			publicText(w, 404, "Not found")
 			return
 		}

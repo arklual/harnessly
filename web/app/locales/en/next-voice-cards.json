@@ -1,0 +1,13 @@
+{
+  "next.voice.cards.asks": "waits for an answer",
+  "next.voice.cards.permission": "asks for permission",
+  "next.voice.cards.working": "working",
+  "next.voice.cards.untitled": "Untitled",
+  "next.voice.cards.readDone": "Reading finished",
+  "next.voice.cards.readAt": "Part {at} of {of}",
+  "next.voice.cards.resume": "Go on",
+  "next.voice.cards.pause": "Pause",
+  "next.voice.cards.chats": "Chats",
+  "next.voice.cards.reading": "Reading aloud",
+  "next.voice.cards.text": "Text"
+}

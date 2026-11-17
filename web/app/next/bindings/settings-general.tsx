@@ -51,7 +51,7 @@ import {
 import { toast } from '@/next/ui/toast';
 import { setTopTabs, useTopTabs } from '@/next/stores/tabs';
 import { setBeta, useBeta } from '@/next/stores/beta';
-import { setPaneAuto, usePaneAuto } from '@/next/stores/pane-auto';
+import { setPaneAuto, setPaneAutoKind, usePaneAutoState } from '@/next/stores/pane-auto';
 import {
   addPaneSite,
   paneSitesChanged,
@@ -290,7 +290,7 @@ export const GeneralPage = ({ machine, name, pending, changes }: IGeneralPagePro
   const me = useMe();
   const password = useSignIn(machine);
   const topTabs = useTopTabs();
-  const paneAuto = usePaneAuto();
+  const paneAuto = usePaneAutoState();
   const paneSites = usePaneSites();
   const browserAgent = useBrowserAgent();
   const feedKinds = useFeedKinds();
@@ -311,7 +311,8 @@ export const GeneralPage = ({ machine, name, pending, changes }: IGeneralPagePro
       enterSends={settings.enterSends}
       dayStartHour={settings.dayStartHour}
       topTabs={topTabs}
-      paneAuto={paneAuto}
+      paneAuto={paneAuto.on}
+      paneAutoKinds={paneAuto.kinds}
       links={
         <>
           <PaneSitesGroup
@@ -342,6 +343,7 @@ export const GeneralPage = ({ machine, name, pending, changes }: IGeneralPagePro
       onDayStartHour={(dayStartHour) => void run('dayStartHour', failure, () => savePerson({ dayStartHour }))}
       onTopTabs={setTopTabs}
       onPaneAuto={setPaneAuto}
+      onPaneAutoKind={setPaneAutoKind}
       onFeedKind={setFeedKind}
       onIdleStop={(idleStop) => void run('idleStop', failure, () => runtime.save({ idleStop }))}
       onLimitContinue={(on) =>

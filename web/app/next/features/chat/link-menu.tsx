@@ -20,14 +20,28 @@ interface IPoint {
   y: number;
 }
 
+/** One more item of the menu: «Скопировать ID» of a task, «Скопировать адрес» of a stand. */
+export interface ILinkMenuItem {
+  icon: string;
+  label: string;
+  run: () => void;
+}
+
 export interface ILinkMenuActions {
-  href: string;
+  /** The link; null for a thing of the chat that has none (a design, a document of the folder). */
+  href: string | null;
   /** Opens it in the pane; null where there is no pane (the menu has no such item). */
   onPane: (() => void) | null;
   /** The person's browser can open it (not a server of the machine). */
   outside: boolean;
   /** «Поделиться…» of a board or a document of the installation; absent: no such item. */
   onShare?: (() => void) | null;
+  /** The items of its kind, after «Поделиться…». */
+  extra?: readonly ILinkMenuItem[];
+  /** The menu's name for the screen reader; «Ссылка» when absent. */
+  label?: string;
+  /** What «Открыть в панели» says: «Открыть в Sinopia» of a design. */
+  paneLabel?: string;
 }
 
 export const copyLink = (href: string): void => {
@@ -41,7 +55,15 @@ export const copyLink = (href: string): void => {
  * What a link needs for its menu: the handlers to spread on it and the menu to draw beside it. `held()` says the click
  * that follows is the one a held finger ends with, which opens nothing.
  */
-export const useLinkMenu = ({ href, onPane, outside, onShare = null }: ILinkMenuActions) => {
+export const useLinkMenu = ({
+  href,
+  onPane,
+  outside,
+  onShare = null,
+  extra = [],
+  label,
+  paneLabel,
+}: ILinkMenuActions) => {
   const [at, setAt] = useState<IPoint | null>(null);
   const [open, setOpen] = useState(false);
   const hold = useRef<{ timer: number; x: number; y: number } | null>(null);
@@ -108,17 +130,17 @@ export const useLinkMenu = ({ href, onPane, outside, onShare = null }: ILinkMenu
         actions={actions}
         className="hx-cmenu"
         menu="link"
-        label={t('next.link.menu')}
+        label={label ?? t('next.link.menu')}
         anchor={{ getBoundingClientRect: () => new DOMRect(at.x, at.y, 0, 0) }}
         finalFocus={() => anchorEl.current ?? true}
       >
         {onPane && (
           <Menu.Item className="hx-cmenu__item" onClick={onPane}>
             <Icon name="panel-right" size="sm" />
-            <span className="hx-cmenu__txt">{t('next.link.openPane')}</span>
+            <span className="hx-cmenu__txt">{paneLabel ?? t('next.link.openPane')}</span>
           </Menu.Item>
         )}
-        {outside && (
+        {outside && href && (
           <Menu.Item className="hx-cmenu__item" onClick={() => openOutside(href)}>
             <Icon name="external-link" size="sm" />
             <span className="hx-cmenu__txt">{t('next.link.openOutside')}</span>
@@ -130,10 +152,18 @@ export const useLinkMenu = ({ href, onPane, outside, onShare = null }: ILinkMenu
             <span className="hx-cmenu__txt">{t('next.link.share')}</span>
           </Menu.Item>
         )}
-        <Menu.Item className="hx-cmenu__item" onClick={() => copyLink(href)}>
-          <Icon name="copy" size="sm" />
-          <span className="hx-cmenu__txt">{t('next.link.copy')}</span>
-        </Menu.Item>
+        {extra.map((item) => (
+          <Menu.Item key={item.label} className="hx-cmenu__item" onClick={item.run}>
+            <Icon name={item.icon} size="sm" />
+            <span className="hx-cmenu__txt">{item.label}</span>
+          </Menu.Item>
+        ))}
+        {href && (
+          <Menu.Item className="hx-cmenu__item" onClick={() => copyLink(href)}>
+            <Icon name="link" size="sm" />
+            <span className="hx-cmenu__txt">{t('next.link.copy')}</span>
+          </Menu.Item>
+        )}
       </MenuPanel>
     </MenuRoot>
   );

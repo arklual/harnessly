@@ -344,7 +344,7 @@ func TestE2ESteerHandsOver(t *testing.T) {
 
 func waitScreen(t *testing.T, tm *tmux.Tmux, want string) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		if s, ok := tm.Capture("hs-e2e"); ok && strings.Contains(s, want) {
 			return

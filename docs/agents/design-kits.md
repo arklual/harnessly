@@ -756,8 +756,8 @@ What it changes:
   `design check <project> --board FILE`, then open the screenshot (`.check/`) and look. The text is printed by
   `design new`, `design page create` and `design kit use`, held back once by the `design-guard` hook on the chat's first
   edit of a board of such a project, and written into the design dialog's instructions and the MCP instructions;
-- a new design in a project with no kit, no kit named in the request, while kits are installed on the machine: the agent
-  asks once with a card (`notice_ask`: the fitting kit recommended, another installed one, no kit) and runs
+- a new design from scratch, no kit named in the request or clear from the conversation, while kits are installed on the machine: the agent
+  asks in the chat BEFORE `design new` (there is no kit button in the Sinopia panel; never for an existing project); in a project made without the question it asks once with a card (`notice_ask`: the fitting kit recommended, another installed one, no kit) and runs
   `design kit use`; the answer is kept in `meta/project.json` (`kitAsk`) and never asked again.
 
 ## Strict mode

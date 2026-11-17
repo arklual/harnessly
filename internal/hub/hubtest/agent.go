@@ -417,10 +417,11 @@ func (a *Agent) OpenTunnels() int {
 	return len(a.tunnels)
 }
 
-// Eventually waits for a condition, polling.
+// Eventually waits for a condition, polling. The deadline is only how long a broken test hangs: a loaded runner under
+// -race took more than the 5 s it had.
 func (s *Stack) Eventually(what string, cond func() bool) {
 	s.T.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		if cond() {
 			return

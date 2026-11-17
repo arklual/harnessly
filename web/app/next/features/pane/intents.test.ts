@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AUTO_WINDOW_MS,
   INTENT_TTL_MS,
   parseIntents,
   planIntents,
@@ -94,6 +95,32 @@ describe('planIntents', () => {
     const plan = planIntents(list, [], NOW, { auto: false });
     expect(plan?.apply.map((x) => x.id)).toEqual(['own']);
     expect(plan?.settled).toEqual(['auto', 'own']);
+  });
+
+  it('a kind switched off is settled without acting; its reloads still reach an open tab', () => {
+    const list = [
+      intent('d', open('design', 'landing', { auto: true })),
+      intent('a', open('artifacts', '/agents/docs/x', { auto: true })),
+      intent('r', open('artifacts', '/agents/docs/y', { auto: true, reload: true })),
+    ];
+    const kinds = { design: true, artifacts: false, browser: true, files: true };
+    const plan = planIntents(list, [], NOW, { auto: true, kinds });
+    expect(plan?.apply.map((x) => x.id)).toEqual(['d', 'r']);
+    expect(plan?.settled).toEqual(['d', 'a', 'r']);
+  });
+
+  it('the runtime opens three tabs in ten minutes at most, one look or many; the agent’s own open is not counted', () => {
+    const doc = (n: number) => open('artifacts', `/agents/docs/d${n}`, { auto: true });
+    const earlier = [1, 2].map((n) => intent(`d${n}`, doc(n), NOW + n, NOW + n));
+    const later = [3, 4, 5].map((n) => intent(`d${n}`, doc(n), NOW + n));
+    const own = intent('own', open('task', 'PROJ-1'), NOW + 6);
+    const plan = planIntents([...earlier, ...later, own], ['d1', 'd2'], NOW + 10, { auto: true });
+    expect(plan?.apply.map((x) => x.id)).toEqual(['d5', 'own']);
+    expect(plan?.settled).toEqual(['d3', 'd4', 'd5', 'own']);
+    // Out of the window the budget is whole again.
+    const after = intent('d9', doc(9), NOW + AUTO_WINDOW_MS + 100);
+    const next = planIntents([...earlier, after], ['d1', 'd2'], NOW + AUTO_WINDOW_MS + 200, { auto: true });
+    expect(next?.apply.map((x) => x.id)).toEqual(['d9']);
   });
 
   it('reloads do not take the place of opens in a burst', () => {

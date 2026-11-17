@@ -29,7 +29,7 @@ export const COMPOSERS = ['solid', 'glass', 'outline'] as const;
 export const SIDEBARS = ['plain', 'tinted', 'glass'] as const;
 export const FITS = ['cover', 'tile'] as const;
 /** The built-in live effects (features/looks/fx/*.js). */
-export const FX_PRESETS = ['snowplay', 'nightlamp', 'laser'] as const;
+export const FX_PRESETS = ['snowplay', 'nightlamp', 'laser', 'newyear', 'elves', 'weather'] as const;
 export type TFxPreset = (typeof FX_PRESETS)[number];
 
 export type TLookMode = (typeof LOOK_MODES)[number];

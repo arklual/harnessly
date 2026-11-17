@@ -4,6 +4,10 @@
 //
 //   &head=face          the other head (default h)
 //   &s=idle|listen|think|speak|barged|error   the field's head state (default speak)
+//   &mood=neutral|joy|sad|thinking|surprised   the mood the shared mascot wears (voice-mood.ts; default neutral)
+//   &full=1             the full-screen talk itself, with the mascot of &head= in the state &s=:
+//     &stage=1          something shown on the stage (voice-stage.ts), the mascot small at the bottom
+//     &text=1           the microphone is off: the feed of turns and a text field
 //   &theme=light|dark&lang=ru|en
 import { useEffect, useRef } from 'react';
 import { Group } from '@/next/features/settings/rows';
@@ -16,10 +20,15 @@ import {
   FIELD_FLOOR,
   setVoiceExpanded,
   setVoiceField,
+  type IVoiceField,
+  type IVoiceTurn,
   type TFieldFloor,
   VOICE_LOOK,
 } from '@/next/features/voice-live/field';
 import VoiceHead, { HEAD, type THead } from '@/next/features/voice-live/voice-head';
+import { VoiceFullBody } from '@/next/features/voice-live/voice-full';
+import { setVoiceMood, VOICE_MOOD, type VoiceMood } from '@/next/features/voice-live/voice-mood';
+import { showOnVoiceStage } from '@/next/features/voice-live/voice-stage';
 import { pinLocale, type TLang } from '@/next/i18n';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { PortalContext } from '@/next/ui/portal';
@@ -43,6 +52,11 @@ const STATES: readonly THead[] = [HEAD.idle, HEAD.listen, HEAD.think, HEAD.speak
 const S = (STATES as readonly string[]).includes(params.get('s') ?? '')
   ? (params.get('s') as THead)
   : HEAD.speak;
+const MOODS = Object.values(VOICE_MOOD) as VoiceMood[];
+const MOOD = MOODS.find((m) => m === params.get('mood')) ?? VOICE_MOOD.neutral;
+const FULL = params.get('full') === '1';
+const STAGE = params.get('stage') === '1';
+const TEXT = params.get('text') === '1';
 const FLOOR_OF: Record<THead, TFieldFloor> = {
   idle: FIELD_FLOOR.muted,
   listen: FIELD_FLOOR.listening,
@@ -50,6 +64,86 @@ const FLOOR_OF: Record<THead, TFieldFloor> = {
   speak: FIELD_FLOOR.speaking,
   barged: FIELD_FLOOR.listening,
   error: FIELD_FLOOR.failed,
+};
+
+const TURNS: IVoiceTurn[] =
+  LANG === 'ru'
+    ? [
+        { role: 'user', text: 'Что у меня сегодня по релизу?', done: true },
+        {
+          role: 'assistant',
+          text: 'С утра созвон по релизу в 10:30, потом два часа свободны. Хотите, поставлю туда разбор доски?',
+          done: true,
+        },
+        { role: 'user', text: 'Да, поставь. И напомни про квоты.', done: true },
+        {
+          role: 'assistant',
+          text: 'Поставил на 12:00. Квоты: осталось перенести две организации.',
+          done: true,
+        },
+      ]
+    : [
+        { role: 'user', text: 'What do I have on the release today?', done: true },
+        {
+          role: 'assistant',
+          text: 'The release call at 10:30, then two free hours. Shall I put the board review there?',
+          done: true,
+        },
+        { role: 'user', text: 'Yes, please. And remind me about quotas.', done: true },
+        { role: 'assistant', text: 'Done for 12:00. Quotas: two organisations left to move.', done: true },
+      ];
+
+const StageDemo = () => (
+  <div className="hx-voice-gallery__stage">
+    <h3>{LANG === 'ru' ? 'Миграция квот' : 'Quota migration'}</h3>
+    <ul>
+      <li>{LANG === 'ru' ? 'Организация «Север» — перенесена' : 'North — moved'}</li>
+      <li>{LANG === 'ru' ? 'Организация «Юг» — ждёт' : 'South — waiting'}</li>
+      <li>{LANG === 'ru' ? 'Организация «Восток» — ждёт' : 'East — waiting'}</li>
+    </ul>
+    <p>
+      {LANG === 'ru'
+        ? 'Перенести целиком за выходные или по одной организации до понедельника.'
+        : 'Move everything over the weekend or one by one until Monday.'}
+    </p>
+  </div>
+);
+
+/** The full-screen talk on a made-up call. */
+const FullGallery = () => {
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.theme = DARK ? 'dark' : 'light';
+    root.classList.toggle('dark', DARK);
+    root.style.colorScheme = DARK ? 'dark' : 'light';
+    setVoiceMood(MOOD, 0);
+    if (STAGE) showOnVoiceStage(<StageDemo />, LANG === 'ru' ? 'Квоты' : 'Quotas');
+    return () => {
+      showOnVoiceStage(null);
+      setVoiceMood(VOICE_MOOD.neutral);
+    };
+  }, []);
+  const voice: IVoiceField = {
+    host: null,
+    conv: 'c-board' as ConvId,
+    machine: 'gallery' as MachineId,
+    end: () => undefined,
+    floor: TEXT ? FIELD_FLOOR.muted : FLOOR_OF[S],
+    level: () => 0.35 + 0.3 * Math.sin(performance.now() / 120),
+    heard: '',
+    said: '',
+    turns: TURNS,
+    typed: () => undefined,
+    head: KIND,
+    interrupted: S === HEAD.barged,
+    muted: TEXT,
+    mute: () => undefined,
+  };
+  return (
+    <div className="hx-root" data-testid="gallery">
+      <VoiceFullBody voice={voice} title={LANG === 'ru' ? 'План на день' : 'Day plan'} />
+    </div>
+  );
 };
 
 const Gallery = () => {
@@ -77,7 +171,11 @@ const Gallery = () => {
       mute: () => undefined,
     });
     setVoiceExpanded(false);
-    return () => setVoiceField(null);
+    setVoiceMood(MOOD, 0);
+    return () => {
+      setVoiceField(null);
+      setVoiceMood(VOICE_MOOD.neutral);
+    };
   }, []);
   return (
     <PortalContext value={portal}>
@@ -93,6 +191,20 @@ const Gallery = () => {
               </span>
               <VoiceHead state={s} kind={KIND} />
               <figcaption>{s}</figcaption>
+            </figure>
+          ))}
+        </section>
+        <section className="hx-voice-gallery__row">
+          {MOODS.map((m) => (
+            <figure key={m} className="hx-voice-gallery__cell">
+              <span className="hx-voice-gallery__s96">
+                <VoiceHead state={HEAD.idle} kind={KIND} mood={m} />
+              </span>
+              <span className="hx-voice-gallery__s48">
+                <VoiceHead state={HEAD.speak} kind={KIND} mood={m} level={() => 0.5} />
+              </span>
+              <VoiceHead state={HEAD.listen} kind={KIND} mood={m} />
+              <figcaption>{m}</figcaption>
             </figure>
           ))}
         </section>
@@ -154,6 +266,6 @@ const Gallery = () => {
   );
 };
 
-const VoiceGallery = () => <Gallery />;
+const VoiceGallery = () => (FULL ? <FullGallery /> : <Gallery />);
 
 export default VoiceGallery;

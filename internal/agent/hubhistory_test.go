@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -188,6 +189,8 @@ func TestHistoryLeavesTheClustersStreamAlone(t *testing.T) {
 func dropHub(t *testing.T, o *hubRig, c *hubConn) {
 	startHistory(c, map[string]any{})
 	o.agent.hubReplica.hello("ep-9")
+	// The hub's door is shut first: an agent that redials at once has a link again before the test sees none.
+	o.hub.reject.Store(http.StatusServiceUnavailable)
 	for _, l := range o.agent.hub.hubLinks() {
 		l.closeAfterFlush(websocket.StatusGoingAway, "test")
 	}

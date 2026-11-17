@@ -1,8 +1,19 @@
 // The full-screen talk (like the voice mode of ChatGPT): while a live voice is on, a layer over the app shows
-// the orb in the middle — it listens, thinks, speaks — a word for the state, the last phrase as a caption, and three
-// buttons: microphone, «Чат» (folds the layer; the talk goes on) and «Завершить». Pulling the layer down does the same
-// as «Чат»; the bar at the top («Вернуться») opens it again. Esc folds (voice-live.tsx), Space turns the microphone.
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+// the mascot of the person's choice big in the middle — it listens, thinks, speaks, makes a face (voice-mood.ts)
+// — a word for the state, the last phrase as a caption, and three buttons: microphone, «Чат» (folds the layer; the talk
+// goes on) and «Завершить». Pulling the layer down does the same as «Чат»; the bar at the top («Вернуться») opens it
+// again. Esc folds (voice-live.tsx), Space turns the microphone. Three layouts, one mascot that moves between them:
+//   voice  the mascot in the middle, the caption under it;
+//   stage  something shown by showOnVoiceStage (voice-stage.ts) takes the area, the mascot is small at the bottom;
+//   text   the microphone is off: the turns of the call as a feed, a text field at the bottom, the mascot small at the top.
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import VoiceHead from '@/next/features/voice-live/voice-head';
 import { headOf } from '@/next/features/voice-live/voice-head';
 import {
@@ -10,13 +21,15 @@ import {
   useVoiceExpanded,
   useVoiceNow,
   type IVoiceField,
+  type IVoiceTurn,
 } from '@/next/features/voice-live/field';
 import VoiceOrb from '@/next/features/voice-live/orb';
 import { orbOf, tailOf } from '@/next/features/voice-live/orb-model';
 import { t } from '@/next/i18n';
 import type { ConvId } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
-import { PRESENCE, usePresence } from '@/next/ui/presence';
+import { PRESENCE, usePresence, usePresentFlag } from '@/next/ui/presence';
+import { showOnVoiceStage, useVoiceStage } from '@/next/features/voice-live/voice-stage';
 import '@/next/styles/voice-full.css';
 
 /** The layer leaves in this long (hx-voice-full-out). */
@@ -67,6 +80,13 @@ export const VoiceFullBody = ({
   const [subs, setSubs] = useState(readSubs);
   const mode = orbOf(voice.floor);
   const head = voice.interrupted ? 'barged' : headOf(voice.floor);
+  const stage = useVoiceStage();
+  const shown = usePresence(stage, EXIT_MS);
+  // The text mode: the microphone is off, the call goes on in words. A stage in the way takes the area first.
+  const typing = voice.muted;
+  const feedOn = usePresentFlag(typing && !stage, EXIT_MS);
+  const fieldOn = usePresentFlag(typing, EXIT_MS);
+  const view = stage ? 'stage' : typing ? 'text' : 'voice';
 
   // The caption: the phrase being said now, kept until the other side starts one (state set while drawing, not in an effect).
   const [line, setLine] = useState('');
@@ -110,7 +130,7 @@ export const VoiceFullBody = ({
     el.style.transform = `translateY(${y}px) scale(${1 - Math.min(0.06, Math.max(0, y) / 4000)})`;
   };
   const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0 || (e.target as HTMLElement).closest('button')) return;
+    if (e.button !== 0 || (e.target as HTMLElement).closest('button, input, textarea, [data-nodrag]')) return;
     drag.current = {
       id: e.pointerId,
       y0: e.clientY,
@@ -171,6 +191,7 @@ export const VoiceFullBody = ({
       aria-label={t('next.chatgpt.voice.full.label')}
       tabIndex={-1}
       data-s={mode}
+      data-view={view}
       data-closing={closing || undefined}
       onPointerDown={onDown}
       onPointerMove={onMove}
@@ -187,7 +208,6 @@ export const VoiceFullBody = ({
           <Icon name="chevron-down" size="md" />
         </button>
         <span className="hx-voice-full__who">
-          <VoiceHead state={head} kind={voice.head} level={voice.level} />
           <span className="hx-voice-full__name">{title ?? t('next.chatgpt.voice.bar.untitled')}</span>
         </span>
         <button
@@ -201,20 +221,50 @@ export const VoiceFullBody = ({
         </button>
       </header>
       <div className="hx-voice-full__grab" aria-hidden="true" />
-      <main className="hx-voice-full__stage">
-        <VoiceOrb mode={mode} level={voice.level} className="hx-voice-full__orb" />
+      <main className="hx-voice-full__stage" data-view={view}>
+        {shown.value && (
+          <section
+            className="hx-voice-full__panel"
+            data-nodrag
+            data-closing={shown.state === PRESENCE.closing || undefined}
+            aria-label={shown.value.title ?? t('next.chatgpt.voice.full.stage.label')}
+          >
+            <header className="hx-voice-full__panel-top">
+              <span className="hx-voice-full__panel-title">{shown.value.title}</span>
+              <button
+                type="button"
+                className="hx-voice-full__i"
+                aria-label={t('next.chatgpt.voice.full.stage.close')}
+                onClick={() => showOnVoiceStage(null)}
+              >
+                <Icon name="x" size="md" />
+              </button>
+            </header>
+            <div className="hx-voice-full__panel-body">{shown.value.node}</div>
+          </section>
+        )}
+        {feedOn.mounted && (
+          <VoiceFeed turns={voice.turns ?? []} closing={feedOn.state === PRESENCE.closing} />
+        )}
+        <div className="hx-voice-full__mascot" data-view={view} data-s={mode}>
+          {view === 'voice' && <VoiceOrb mode={mode} level={voice.level} className="hx-voice-full__orb" />}
+          <VoiceHead state={head} kind={voice.head} level={voice.level} />
+        </div>
         <p className="hx-voice-full__state" role="status" aria-live="polite">
           {word}
         </p>
         <p
           className="hx-voice-full__line"
           key={line}
-          data-on={(subs && !!line) || undefined}
-          aria-hidden={!subs}
+          data-on={(subs && !!line && view === 'voice') || undefined}
+          aria-hidden={!subs || view !== 'voice'}
         >
           {subs ? tailOf(line) : ''}
         </p>
       </main>
+      {fieldOn.mounted && (
+        <VoiceTextField onSend={voice.typed} closing={fieldOn.state === PRESENCE.closing} />
+      )}
       <footer className="hx-voice-full__bar">
         <button
           type="button"
@@ -242,6 +292,103 @@ export const VoiceFullBody = ({
         </button>
       </footer>
     </div>
+  );
+};
+
+/** The call's turns as a chat feed (the text mode): the person's on the right, the voice's on the left, the newest at the bottom. */
+const VoiceFeed = ({ turns, closing }: { turns: readonly IVoiceTurn[]; closing: boolean }) => {
+  const box = useRef<HTMLDivElement>(null);
+  const last = turns[turns.length - 1];
+  // Follows the newest words, unless the person scrolled up to read.
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    if (near || el.dataset.fresh !== 'false') el.scrollTop = el.scrollHeight;
+    el.dataset.fresh = 'false';
+  }, [turns.length, last?.text]);
+  return (
+    <div
+      ref={box}
+      className="hx-voice-full__feed"
+      data-nodrag
+      data-closing={closing || undefined}
+      data-fresh="true"
+      role="log"
+      aria-live="polite"
+      aria-label={t('next.chatgpt.voice.full.text.feed')}
+    >
+      {turns.length === 0 ? (
+        <p className="hx-voice-full__empty">{t('next.chatgpt.voice.full.text.empty')}</p>
+      ) : (
+        turns.map((turn, i) => (
+          <p
+            key={i}
+            className="hx-voice-full__turn"
+            data-role={turn.role}
+            data-live={!turn.done || undefined}
+          >
+            {turn.text}
+          </p>
+        ))
+      )}
+    </div>
+  );
+};
+
+/** The text field of the text mode: Enter sends the words into the call, Shift+Enter breaks the line. */
+const VoiceTextField = ({ onSend, closing }: { onSend: (text: string) => void; closing: boolean }) => {
+  const [text, setText] = useState('');
+  const area = useRef<HTMLTextAreaElement>(null);
+  const send = () => {
+    const words = text.trim();
+    if (!words) return;
+    onSend(words);
+    setText('');
+    if (area.current) area.current.style.height = '';
+  };
+  const onKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return;
+    e.preventDefault();
+    send();
+  };
+  const grow = (el: HTMLTextAreaElement) => {
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
+  };
+  return (
+    <form
+      className="hx-voice-full__text"
+      data-nodrag
+      data-closing={closing || undefined}
+      onSubmit={(e: FormEvent) => {
+        e.preventDefault();
+        send();
+      }}
+    >
+      <textarea
+        ref={area}
+        className="hx-voice-full__input"
+        rows={1}
+        value={text}
+        placeholder={t('next.chatgpt.voice.full.text.placeholder')}
+        aria-label={t('next.chatgpt.voice.full.text.placeholder')}
+        enterKeyHint="send"
+        onChange={(e) => {
+          setText(e.target.value);
+          grow(e.target);
+        }}
+        onKeyDown={onKey}
+      />
+      <button
+        type="submit"
+        className="hx-voice-full__send"
+        disabled={!text.trim()}
+        aria-label={t('next.chatgpt.voice.full.text.send')}
+      >
+        <Icon name="arrow-up" size="md" />
+      </button>
+    </form>
   );
 };
 

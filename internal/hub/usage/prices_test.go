@@ -3,10 +3,10 @@ package usage
 import (
 	"context"
 	"math"
-	"path/filepath"
 	"testing"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 	"github.com/ly-solutions/harnessly/internal/pricing"
 )
 
@@ -105,11 +105,7 @@ func TestPriceProvider(t *testing.T) {
 
 func TestSeedKeepsCorrections(t *testing.T) {
 	ctx := context.Background()
-	db, err := store.Open(ctx, "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
+	db := storetest.Open(t)
 	if _, err := db.S().AddPrice(ctx, store.Price{Provider: ProviderAnthropic, ModelPattern: "opus-4-6", EffectiveFrom: 0, Input: 99, Unit: "usd"}); err != nil {
 		t.Fatal(err)
 	}
@@ -130,11 +126,7 @@ func TestSeedKeepsCorrections(t *testing.T) {
 // A call that came before its model had a price is priced once the list has one, and its hour is summed anew.
 func TestPriceUnpricedCalls(t *testing.T) {
 	ctx := context.Background()
-	db, err := store.Open(ctx, "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
+	db := storetest.Open(t)
 	s := db.S()
 	ts := int64(1_761_900_000_000)
 	for i, m := range []string{"vendor-x-1", "vendor-y-1"} {

@@ -2,21 +2,17 @@ package switches
 
 import (
 	"context"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 )
 
 func open(t *testing.T) *store.DB {
 	t.Helper()
-	db, err := store.Open(context.Background(), "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	return db
 }
 

@@ -3,9 +3,10 @@ package searchindex
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
+
+	"github.com/ly-solutions/harnessly/internal/racetest"
 )
 
 func open(t *testing.T) *SQL {
@@ -102,13 +103,9 @@ func TestTenThousandUnder400ms(t *testing.T) {
 		start := time.Now()
 		h, err := ix.Search(ctx, Query{Space: "s", Text: q, Limit: 20, Allow: func(Hit) bool { return true }})
 		took := time.Since(start)
-		if err != nil || (took > 400*time.Millisecond && strictTiming()) {
+		if err != nil || (took > 400*time.Millisecond && racetest.StrictTiming()) {
 			t.Errorf("%q: %v in %v", q, err, took)
 		}
 		t.Logf("%q: %d hits in %v", q, len(h), took)
 	}
 }
-
-// strictTiming: the 400 ms bound holds on a developer's machine. Under the race detector and on CI, where the test runs
-// in a pod with a CPU quota beside the other packages (1,5–4,7 s seen for 26–42 ms locally), the timing only logs.
-func strictTiming() bool { return !raceOn && os.Getenv("CI") == "" }

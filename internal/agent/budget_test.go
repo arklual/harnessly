@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -103,13 +104,17 @@ func TestHubBudgetIsKeptWhileUnlinked(t *testing.T) {
 	r := startHubAgent(t, rigOptions{})
 	c := r.connect()
 	c.mustCall(hubproto.OpBudgetSet, budgetParams(9, "stop", "a@x.ru"))
+	// The hub's door is shut before the link goes: an agent that redials at once is linked again within a few
+	// milliseconds, and the test, polling the state file, would never see it unlinked.
+	r.hub.reject.Store(http.StatusServiceUnavailable)
 	_ = c.conn.CloseNow()
 	r.waitLinkState(func(s LinkState) bool { return !s.Linked })
 	set, err := budget.Load(budget.Path(filepath.Join(r.rig.Home, ".harnessly")))
 	if err != nil || set.Version != 9 {
 		t.Fatalf("%+v %v", set, err)
 	}
-	// The agent redials and says the version it still holds.
+	// The door opens and the agent redials and says the version it still holds.
+	r.hub.reject.Store(0)
 	c = r.connect()
 	deadline := time.Now().Add(10 * time.Second)
 	for {

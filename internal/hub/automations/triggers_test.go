@@ -4,13 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/config"
-	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 )
 
 func TestParseCron(t *testing.T) {
@@ -77,11 +76,7 @@ type clock struct{ at time.Time }
 
 func clocked(t *testing.T, gate Gate) (*Service, *clock) {
 	t.Helper()
-	db, err := store.Open(context.Background(), "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	c := &clock{at: noon()}
 	s := New(Deps{Config: &config.Config{Automations: true, AutomationsSecret: "s3cret"}, DB: db, Gate: gate, Now: func() time.Time { return c.at }})
 	return s, c

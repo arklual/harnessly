@@ -31,6 +31,7 @@
       "access": [],
       "problems": ["offline"],
       "opensRuntime": true,
+      "canSeeDebug": true,
       "cloud": null,
       "hardware": null,
       "load": null,
@@ -59,6 +60,7 @@
       "access": [],
       "problems": ["disabled"],
       "opensRuntime": true,
+      "canSeeDebug": true,
       "cloud": null,
       "hardware": null,
       "load": null,
@@ -97,6 +99,7 @@
       ],
       "problems": [],
       "opensRuntime": true,
+      "canSeeDebug": true,
       "cloud": {
         "provider": "example-cloud",
         "plan": "4 / 16",
@@ -188,6 +191,7 @@
       ],
       "problems": [],
       "opensRuntime": true,
+      "canSeeDebug": true,
       "cloud": null,
       "hardware": {
         "cores": 2,

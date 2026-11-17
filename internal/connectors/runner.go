@@ -59,6 +59,8 @@ type runner struct {
 	running map[string]context.CancelFunc
 	// sources counts the sources' goroutines still running, for WaitStopped.
 	sources sync.WaitGroup
+	// relays counts the proposals still being offered or settled in a chat, for WaitStopped.
+	relays sync.WaitGroup
 	// states are serialized per connection by stateMu.
 	stateMu sync.Mutex
 	kick    chan struct{}

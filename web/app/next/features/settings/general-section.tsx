@@ -1,10 +1,12 @@
 // «General»: the window, how the field sends, the work of the machine, and the account. The look (theme, palette, text
 // size) is «Оформление» (appearance-section.tsx); the Enter key is the person's setting and follows them to every
 // device.
+import { PANE_AUTO_KINDS, type TPaneAutoKind, type TPaneAutoKinds } from '@/next/features/pane/intents';
 import { markOf, type TChangedMarks } from '@/next/features/settings/changed-mark';
 import { LANGUAGE_NAMES, parseLanguage, type TLanguage } from '@/platform/languages';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Group, LinkRow, MenuRow, SegRow, SwitchRow } from '@/next/features/settings/rows';
+import FeedLookRows from '@/next/features/settings/feed-look-rows';
 import { t } from '@/next/i18n';
 import type { PersonSettings } from '@/next/stores/me';
 import type { TShownKind, TShownKinds } from '@/next/features/chat/outputs';
@@ -47,6 +49,8 @@ export interface IGeneralSectionProps {
   topTabs: boolean;
   /** The pane opens by itself what the agent works on: a design, a document, a board (this browser's). */
   paneAuto: boolean;
+  /** Which kinds the pane opens by itself, under «Открывать то, над чем работает агент». */
+  paneAutoKinds: TPaneAutoKinds;
   /** Which things a turn made get a card under its answer (this browser's). */
   feedKinds: TShownKinds;
   /** The language of the page: the one chosen in this browser, else the installation's. */
@@ -77,6 +81,7 @@ export interface IGeneralSectionProps {
   onDayStartHour: (hour: number) => void;
   onTopTabs: (on: boolean) => void;
   onPaneAuto: (on: boolean) => void;
+  onPaneAutoKind: (kind: TPaneAutoKind, on: boolean) => void;
   onFeedKind: (kind: TShownKind, on: boolean) => void;
   onIdleStop: (value: IdleStop) => void;
   onLimitContinue: (on: boolean) => void;
@@ -122,6 +127,7 @@ const GeneralSection = ({
   dayStartHour,
   topTabs,
   paneAuto,
+  paneAutoKinds,
   feedKinds,
   language,
   languages,
@@ -136,6 +142,7 @@ const GeneralSection = ({
   onDayStartHour,
   onTopTabs,
   onPaneAuto,
+  onPaneAutoKind,
   onFeedKind,
   onIdleStop,
   onLimitContinue,
@@ -162,6 +169,16 @@ const GeneralSection = ({
         on={paneAuto}
         onChange={onPaneAuto}
       />
+      {paneAuto &&
+        PANE_AUTO_KINDS.map((kind) => (
+          <SwitchRow
+            key={kind}
+            label={t(`next.settings.general.paneAuto.${kind}`)}
+            hint={t(`next.settings.general.paneAuto.${kind}.hint`)}
+            on={paneAutoKinds[kind]}
+            onChange={(on) => onPaneAutoKind(kind, on)}
+          />
+        ))}
       <MenuRow
         label={t('next.settings.general.language')}
         hint={t('next.settings.general.language.hint')}
@@ -275,6 +292,7 @@ const GeneralSection = ({
           onChange={(on) => onFeedKind(kind, on)}
         />
       ))}
+      <FeedLookRows feedKinds={feedKinds} onFeedKind={onFeedKind} />
     </Group>
     {updates}
     <Group title={t('next.settings.general.account')}>

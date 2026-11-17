@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -12,7 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/config"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/link"
-	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 )
 
 // fakeLinks is the machines of a test: which are connected and what a start answers.
@@ -43,11 +42,7 @@ type movingClock struct{ at time.Time }
 
 func dispatcher(t *testing.T) (*Service, *fakeLinks, *movingClock) {
 	t.Helper()
-	db, err := store.Open(context.Background(), "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	links := &fakeLinks{online: map[string]bool{}}
 	clock := &movingClock{at: noon()}
 	s := New(Deps{Config: &config.Config{Automations: true, AutomationsSecret: "s3cret", AutomationsTokenEnv: "HARNESS_AUTOMATION_RESULT_TOKEN"}, DB: db, Links: links, Now: func() time.Time { return clock.at }})

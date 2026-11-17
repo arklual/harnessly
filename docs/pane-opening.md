@@ -29,7 +29,13 @@ it. An address the agent writes in its answer is a chip in the text, not an open
 | A dev server the agent starts, a stand it deploys | — | Nothing by itself: the agent runs `open` or names it as a chip |
 | The person's click on a chip, a card, a view's button | `right-pane.tsx` `openRef`, `applyRequests(…, asked)` | Its tab in front, the pane comes out |
 
-The person can turn off even the quiet tabs: Settings → General → «Open what the agent works on».
+The quiet tabs are rationed: within ten minutes the runtime's own opens are three at most, the newest first
+(`web/app/next/features/pane/intents.ts`, `AUTO_PER_WINDOW`); the rest stay cards in the chat. A turn that made many
+things asks the agent to `open` one of them, or none: tasks, merge requests and screenshots are cards, never tabs.
+
+The person can turn off even the quiet tabs, or some kinds of them: Settings → General → «Open what the agent works on»
+and, under it, the design it draws, documents and boards, the agent's browser, files it hands over (one synced key,
+`hl:pane-auto-open`: `0` off, absent all on, a JSON record of the kinds otherwise).
 
 ## Kinds of addresses
 

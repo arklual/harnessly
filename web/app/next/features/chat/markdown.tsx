@@ -7,7 +7,7 @@ import renderTree, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import HtmlBlock from '@/next/features/chat/html-block';
 import { AnswerText } from '@/next/features/chat/mockup-to-design';
-import LinkCard, { cardKindOf } from '@/next/features/chat/link-card';
+import { cardKindOf, LoneLink } from '@/next/features/chat/link-card';
 import { AppLinkParagraph } from '@/next/features/app-views/link-card';
 import MermaidBlock from '@/next/features/chat/mermaid-block';
 import { changeLinkLabel, chatIdOfHref, docOfCode, splitRefs } from '@/next/features/chat/refs';
@@ -165,7 +165,11 @@ const components = {
     const kind = href ? cardKindOf(href) : null;
     if (kind) {
       const text = link?.children.map((c) => ('value' in c ? c.value : '')).join('') ?? '';
-      return <LinkCard kind={kind} href={href} text={text} />;
+      return (
+        <LoneLink kind={kind} href={href} text={text}>
+          {children}
+        </LoneLink>
+      );
     }
     // Any other https link alone in its paragraph may be one an app on in the chat shows a card for.
     if (href.startsWith('https://')) return <AppLinkParagraph href={href}>{children}</AppLinkParagraph>;

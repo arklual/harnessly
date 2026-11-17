@@ -23,10 +23,16 @@ RUN corepack enable
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY web/ ./
-RUN pnpm build
+# The bundles only: the type check (`tsc -b` of `pnpm build`) is the web-build job's, and here it took a minute of the
+# candidate image's path (HRN-1596).
+RUN pnpm build:bundle
 
-FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-${DEBIAN_VERSION} AS build
+# The Go sources without the page. The build cache lives in a cache mount, not in a layer: in a layer it was a gigabyte
+# the candidate image exported to the registry cache on every merge request, and no later build could use it, since any
+# change of the code makes a new layer anyway (HRN-1596).
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-${DEBIAN_VERSION} AS gosrc
 WORKDIR /src
+ENV CGO_ENABLED=0
 COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd ./cmd
@@ -35,12 +41,15 @@ COPY docs ./docs
 COPY skills ./skills
 COPY deploy ./deploy
 COPY web/*.go ./web/
+
+FROM gosrc AS build
 COPY --from=web /src/web/dist ./web/dist
 ARG VERSION=dev
 ARG TARGETOS
 ARG TARGETARCH
-ENV CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH
-RUN ldflags="-s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=${VERSION} -X github.com/ly-solutions/harnessly/internal/hlcli.Version=${VERSION}" \
+ENV GOOS=$TARGETOS GOARCH=$TARGETARCH
+RUN --mount=type=cache,id=harnessly-go-build,target=/root/.cache/go-build \
+    ldflags="-s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=${VERSION} -X github.com/ly-solutions/harnessly/internal/hlcli.Version=${VERSION}" \
  && go build -trimpath -tags webui -ldflags "$ldflags" -o /out/runtime ./cmd/runtime \
  && go build -trimpath -ldflags "$ldflags" -o /out/agent ./cmd/agent \
  && go build -trimpath -ldflags "$ldflags" -o /out/harnessly ./cmd/harnessly
@@ -149,17 +158,41 @@ USER agent
 # --- the hub ------------------------------------------------------------------------------------------------------
 # The hub with its page compiled in, and what it serves to machines: the runtime (with its page) and the agent for the
 # four systems a machine can be, and the installer. /dl/manifest.json is made by the hub from the files it finds.
-FROM build AS build-hub
+#
+# The compilation does not wait for the page: `build-warm` compiles every package of the same builds against an empty
+# page while the web stage runs, and `build-hub` then compiles again only the page's package and the commands that embed
+# it, and links. Both use one cache mount; `build-hub` takes the marker of `build-warm` so that it starts after it.
+FROM gosrc AS build-warm
+ARG TARGETOS
+ARG TARGETARCH
+RUN --mount=type=cache,id=harnessly-go-build,target=/root/.cache/go-build \
+    set -e; \
+    mkdir -p web/dist web/dist-hub; touch web/dist/index.html web/dist-hub/index.html; \
+    # Two packages to a `go build` compile and link nothing: the links are build-hub's, with the real page.
+    GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -tags "hubui webui" ./cmd/hub ./web & pids="$!"; \
+    for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do \
+      ( GOOS=${target%/*} GOARCH=${target#*/} go build -trimpath -tags webui ./cmd/runtime ./web \
+        && GOOS=${target%/*} GOARCH=${target#*/} go build -trimpath ./cmd/agent ./cmd/harnessly ) & pids="$pids $!"; \
+    done; \
+    for p in $pids; do wait "$p"; done; \
+    touch /warm
+
+FROM gosrc AS build-hub
 ARG VERSION=dev
-# `pnpm build` of the web stage builds the hub page too (web/dist-hub): one install and one type check for both. The hub
-# carries the runtime's page as well (web/dist, the webui tag): the fleet's workspace at /agents/.
+ARG TARGETOS
+ARG TARGETARCH
+# `pnpm build:bundle` of the web stage builds the hub page too (web/dist-hub). The hub carries the runtime's page as well
+# (web/dist, the webui tag): the fleet's workspace at /agents/.
+COPY --from=web /src/web/dist ./web/dist
 COPY --from=web /src/web/dist-hub ./web/dist-hub
+COPY --from=build-warm /warm /tmp/warm
 # The hub and the four systems a machine can be build side by side: one after another they took four minutes.
-RUN set -e; \
+RUN --mount=type=cache,id=harnessly-go-build,target=/root/.cache/go-build \
+    set -e; \
     hubflags="-s -w -X github.com/ly-solutions/harnessly/internal/hub/buildinfo.Version=${VERSION}"; \
     ldflags="-s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=${VERSION} -X github.com/ly-solutions/harnessly/internal/hlcli.Version=${VERSION}"; \
     mkdir -p /out/dist; \
-    go build -trimpath -tags "hubui webui" -ldflags "$hubflags" -o /out/hub ./cmd/hub & pids="$!"; \
+    GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -tags "hubui webui" -ldflags "$hubflags" -o /out/hub ./cmd/hub & pids="$!"; \
     for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do \
       os=${target%/*}; arch=${target#*/}; \
       ( GOOS=$os GOARCH=$arch go build -trimpath -tags webui -ldflags "$ldflags" -o /out/dist/runtime-$os-$arch ./cmd/runtime \

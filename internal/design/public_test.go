@@ -282,9 +282,13 @@ func TestPublicHTMLReadStaysBoundedAfterOpen(t *testing.T) {
 }
 
 func TestPublicHTMLResponseStaysWithinFileLimit(t *testing.T) {
+	// The rule does not depend on the size: a smaller limit tests it without 32 MB of HTML.
+	old := PublicFileLimit
+	PublicFileLimit = 256 << 10
+	t.Cleanup(func() { PublicFileLimit = old })
 	a, root := publicAPI(t, "")
 	tok := publicToken(t, "pair-secret", "acme", "p1", nil)
-	body := []byte("<html>" + strings.Repeat("x", PublicFileLimit-len("<html>")))
+	body := []byte("<html>" + strings.Repeat("x", int(PublicFileLimit)-len("<html>")))
 	if err := os.WriteFile(filepath.Join(root, "p1", "project", "large.html"), body, 0o644); err != nil {
 		t.Fatal(err)
 	}

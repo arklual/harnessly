@@ -85,33 +85,42 @@ func (o *OpLog) Run(ctx context.Context, cmd Command, budget time.Duration, run 
 	key, fp := cmd.OpKey(), Fingerprint(cmd)
 	timer := time.NewTimer(budget)
 	defer timer.Stop()
-	o.mu.Lock()
-	e := o.m[key]
-	if e != nil && e.FP != fp {
-		o.mu.Unlock()
-		return Refused(RefuseConflict)
-	}
-	if e == nil {
-		e = &opEntry{FP: fp, done: make(chan struct{})}
-		o.m[key] = e
-		o.mu.Unlock()
-		// The command outlives the request (a page that leaves does not cancel it) but keeps what the request carries,
-		// such as whose page session sent it.
-		values := context.WithoutCancel(ctx)
-		safego.Go("wire command", func() { o.finish(values, key, e, budget, run) })
-	} else {
-		o.mu.Unlock()
-	}
-	if e.done == nil {
-		return e.Res
-	}
-	select {
-	case <-e.done:
-		return e.Res
-	case <-timer.C:
-		return Refused(RefuseTimeout)
-	case <-ctx.Done():
-		return Refused(RefuseTimeout)
+	for {
+		o.mu.Lock()
+		e := o.m[key]
+		if e != nil && e.FP != fp {
+			o.mu.Unlock()
+			return Refused(RefuseConflict)
+		}
+		joined := e != nil
+		if e == nil {
+			e = &opEntry{FP: fp, done: make(chan struct{})}
+			o.m[key] = e
+			o.mu.Unlock()
+			// The command outlives the request (a page that leaves does not cancel it) but keeps what the request
+			// carries, such as whose page session sent it.
+			values := context.WithoutCancel(ctx)
+			safego.Go("wire command", func() { o.finish(values, key, e, budget, run) })
+		} else {
+			o.mu.Unlock()
+		}
+		if e.done == nil {
+			return e.Res
+		}
+		select {
+		case <-e.done:
+			// A retry that came while the attempt it retries was still running (its caller was told timeout a moment
+			// before the attempt itself ended) joined an attempt that is over by now with the same timeout. That is not
+			// the retry's own answer: the entry is forgotten, so it makes its own attempt, within its own budget.
+			if joined && e.Res.R == ResultRefused && e.Res.Code == RefuseTimeout {
+				continue
+			}
+			return e.Res
+		case <-timer.C:
+			return Refused(RefuseTimeout)
+		case <-ctx.Done():
+			return Refused(RefuseTimeout)
+		}
 	}
 }
 

@@ -1053,7 +1053,7 @@ func startHubAgentRejected(t *testing.T, status int32) *hubRig {
 // waitStops: after the first call the agent makes no second one for a few seconds.
 func waitStops(t *testing.T, r *hubRig) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for r.hub.dials.Load() < 1 && time.Now().Before(deadline) {
 		time.Sleep(20 * time.Millisecond)
 	}

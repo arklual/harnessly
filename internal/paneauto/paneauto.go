@@ -69,7 +69,7 @@ var (
 	shellTools  = map[string]bool{"Bash": true, "exec": true, "command": true}
 	absPathRe   = regexp.MustCompile(`(?:^|[\s'"=(])(/(?:[\w.@+-]+/)*[\w.@+-]+)`)
 	linkRe      = regexp.MustCompile(`https?://[^\s'"<>()\[\]` + "`" + `]+`)
-	publishRe   = regexp.MustCompile(`(?:^|[\s;&|(/])[\w-]*artifact\s+(?:publish|update)\b`)
+	publishRe   = regexp.MustCompile(`(?:^|[\s;&|(/])(?:[\w-]*artifacts?\s+(?:publish|update)|harnessly\s+docs?\s+publish)\b`)
 	boardEditRe = regexp.MustCompile(`(?:^|[\s;&|(/])[\w-]*board\s+(?:create|edit|bind)\b`)
 )
 

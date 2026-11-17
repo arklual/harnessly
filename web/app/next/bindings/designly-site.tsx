@@ -70,7 +70,6 @@ import { t } from '@/next/i18n';
 import { onBoardAsked, takeNoteBoard } from '@/next/features/designly/open-note';
 import DesignlyDeck from '@/next/bindings/designly-deck';
 import KitBand, { hasKitBand, useProjectKit } from '@/next/features/designly/versions/kit-band';
-import KitAttach, { canAttachKit } from '@/next/features/designly/versions/kit-attach';
 import {
   changeProjectKit,
   KIT_ACTION,
@@ -993,17 +992,6 @@ const DesignlySiteInner = ({
         onOpenProject={(other) => goTo({ kind: ROUTE.site, id: other })}
         onOpenKit={(kit) => goTo({ kind: ROUTE.kit, id: kit, version: KIT_DRAFT_VERSION })}
         onKitChanged={() => setReloadKey((n) => n + 1)}
-      />
-    ) : project !== null && mayEdit && canAttachKit(kitInfo.kit) ? (
-      <KitAttach
-        machine={machine}
-        id={id}
-        installed={kitInfo.kit.installed ?? []}
-        onDone={(next) => {
-          kitInfo.setKit(next);
-          kitInfo.reload();
-          setReloadKey((n) => n + 1);
-        }}
       />
     ) : undefined;
   const versionsPanel = versionsShown ? (

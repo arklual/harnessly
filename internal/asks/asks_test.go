@@ -123,7 +123,7 @@ func waitFinal(t *testing.T, s *Service, id string) Ask {
 
 func eventually(t *testing.T, ok func() bool) {
 	t.Helper()
-	for deadline := time.Now().Add(3 * time.Second); !ok(); time.Sleep(10 * time.Millisecond) {
+	for deadline := time.Now().Add(30 * time.Second); !ok(); time.Sleep(10 * time.Millisecond) {
 		if time.Now().After(deadline) {
 			t.Fatal("not in time")
 		}

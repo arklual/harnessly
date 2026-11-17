@@ -1,0 +1,507 @@
+{
+ "about": "Evals of the voice's router (internal/voice/router, HRN-1602): a task the voice handed over -> the plan. Each case is the task, the screen and the expectations over the plan's actions: need (each must match one action; fields are regexps), not (no action may match), say (a regexp the spoken line must match), no_actions. Fixture chats and the catalog are shared; a case may replace the chats. Run: go test -tags voiceeval ./internal/voice/router -run TestVoiceRouterEvals -v (VOICE_EVAL_MODEL, VOICE_EVAL_REPEAT).",
+ "screen": "route: chat «Лендинг для кофейни» (id c1)\ntheme: dark\nsidebar: open\npane: closed",
+ "chats": [
+  {
+   "id": "c1",
+   "title": "Лендинг для кофейни",
+   "current": true,
+   "state": "idle",
+   "agent": "claude",
+   "updated": "сегодня 10:12",
+   "last": "Сверстал главную, осталось меню и форма брони"
+  },
+  {
+   "id": "c2",
+   "title": "Бэкенд платежей",
+   "state": "needs_permission",
+   "agent": "codex",
+   "updated": "сегодня 10:05",
+   "last": "Дописал вебхук, хочу прогнать тесты",
+   "permission": "npm test -- payments"
+  },
+  {
+   "id": "c3",
+   "title": "Ресерч конкурентов",
+   "state": "asks",
+   "agent": "claude",
+   "updated": "сегодня 09:40",
+   "ask": {
+    "question": "Какой формат отчёта сделать?",
+    "options": [
+     "Таблица сравнения",
+     "Документ на 2 страницы",
+     "Презентация на 5 слайдов"
+    ]
+   }
+  },
+  {
+   "id": "c4",
+   "title": "Миграция базы на Postgres 17",
+   "state": "working",
+   "agent": "codex",
+   "updated": "сегодня 10:14",
+   "last": "Переношу схемы, 3 из 12"
+  },
+  {
+   "id": "c5",
+   "title": "Тарифы и цены",
+   "state": "done",
+   "agent": "claude",
+   "updated": "вчера 18:40",
+   "last": "Решили три тарифа: бесплатный, Про за 20$, Команда за 50$"
+  }
+ ],
+ "catalog": {
+  "pages": [
+   {
+    "id": "home",
+    "label": "Главная, новый чат"
+   },
+   {
+    "id": "settings",
+    "label": "Настройки"
+   },
+   {
+    "id": "tasks",
+    "label": "Задачи и MR"
+   },
+   {
+    "id": "apps",
+    "label": "Приложения"
+   },
+   {
+    "id": "designly",
+    "label": "Sinopia Design, дизайн"
+   },
+   {
+    "id": "manage",
+    "label": "Управление"
+   },
+   {
+    "id": "stats",
+    "label": "Статистика"
+   },
+   {
+    "id": "help",
+    "label": "Помощь"
+   }
+  ],
+  "sections": [
+   {
+    "id": "general",
+    "label": "Общие"
+   },
+   {
+    "id": "appearance",
+    "label": "Внешний вид"
+   },
+   {
+    "id": "voice",
+    "label": "Голос"
+   },
+   {
+    "id": "notifications",
+    "label": "Уведомления"
+   },
+   {
+    "id": "accounts",
+    "label": "Аккаунты"
+   },
+   {
+    "id": "safe",
+    "label": "Сейф"
+   },
+   {
+    "id": "connections",
+    "label": "Подключения"
+   },
+   {
+    "id": "machines",
+    "label": "Машины"
+   }
+  ],
+  "themes": [
+   {
+    "id": "dark",
+    "label": "Тёмная"
+   },
+   {
+    "id": "light",
+    "label": "Светлая"
+   },
+   {
+    "id": "system",
+    "label": "Как в системе"
+   }
+  ],
+  "settings": [
+   {
+    "key": "enterSends",
+    "label": "Enter отправляет сообщение",
+    "values": [
+     "on",
+     "off"
+    ],
+    "now": "on"
+   },
+   {
+    "key": "voiceMascot",
+    "label": "Маскот голоса",
+    "values": [
+     "h",
+     "face"
+    ],
+    "now": "h"
+   }
+  ],
+  "agents": [
+   {
+    "id": "claude:opus",
+    "label": "Claude Opus, самый сильный"
+   },
+   {
+    "id": "claude:sonnet",
+    "label": "Claude Sonnet"
+   },
+   {
+    "id": "claude:haiku",
+    "label": "Claude Haiku, быстрый"
+   },
+   {
+    "id": "codex:gpt-5.6-sol",
+    "label": "GPT-5.6 Sol, сильный"
+   },
+   {
+    "id": "codex:gpt-5.6-luna",
+    "label": "GPT-5.6 Luna, быстрый"
+   }
+  ],
+  "efforts": [
+   "low",
+   "medium",
+   "high",
+   "max"
+  ],
+  "pane_tabs": [
+   "browser",
+   "terminal",
+   "files",
+   "changes",
+   "artifacts"
+  ]
+ },
+ "cases": [
+  {
+   "id": "open-settings",
+   "task": "открой настройки",
+   "need": [
+    {
+     "do": "open",
+     "page": "^settings$"
+    }
+   ]
+  },
+  {
+   "id": "open-voice-settings",
+   "task": "покажи настройки голоса",
+   "need": [
+    {
+     "do": "open",
+     "page": "^settings$",
+     "section": "^voice$"
+    }
+   ]
+  },
+  {
+   "id": "theme-light",
+   "task": "сделай светлую тему",
+   "need": [
+    {
+     "do": "theme",
+     "value": "^light$"
+    }
+   ]
+  },
+  {
+   "id": "theme-en",
+   "task": "switch to dark mode please",
+   "screen": "theme: light",
+   "need": [
+    {
+     "do": "theme",
+     "value": "^dark$"
+    }
+   ]
+  },
+  {
+   "id": "sidebar-close",
+   "task": "убери боковую панель, мешает",
+   "need": [
+    {
+     "do": "sidebar",
+     "open": "^false$"
+    }
+   ]
+  },
+  {
+   "id": "pane-terminal",
+   "task": "открой терминал справа",
+   "need": [
+    {
+     "do": "pane",
+     "tab": "^terminal$"
+    }
+   ]
+  },
+  {
+   "id": "mascot-face",
+   "task": "поменяй маскота на того, что с лицом",
+   "need": [
+    {
+     "do": "setting",
+     "key": "^voiceMascot$",
+     "value": "^face$"
+    }
+   ]
+  },
+  {
+   "id": "open-tasks",
+   "task": "что у меня в задачах и мерж реквестах, открой",
+   "need": [
+    {
+     "do": "open",
+     "page": "^tasks$"
+    }
+   ]
+  },
+  {
+   "id": "open-chat-by-name",
+   "task": "переключись на чат про миграцию базы",
+   "need": [
+    {
+     "do": "open_chat",
+     "chat": "^c4$"
+    }
+   ]
+  },
+  {
+   "id": "send-other-chat",
+   "task": "напиши в чат с платежами, чтобы добавил ретраи на вебхук",
+   "need": [
+    {
+     "do": "send",
+     "chat": "^c2$",
+     "text": "(?i)ретра|retr|повтор"
+    }
+   ],
+   "not": [
+    {
+     "do": "agent"
+    }
+   ]
+  },
+  {
+   "id": "work-current",
+   "task": "добавь на лендинг форму брони столика",
+   "need": [
+    {
+     "do": "agent",
+     "text": "(?i)брон"
+    }
+   ],
+   "not": [
+    {
+     "do": "send"
+    },
+    {
+     "do": "new_chat"
+    }
+   ]
+  },
+  {
+   "id": "work-home-new-chat",
+   "task": "напиши скрипт, который чистит старые логи старше недели",
+   "screen": "route: home (no chat open)\ntheme: dark",
+   "chats_current": "none",
+   "need": [
+    {
+     "do": "new_chat",
+     "text": "(?i)лог"
+    }
+   ],
+   "not": [
+    {
+     "do": "agent"
+    }
+   ]
+  },
+  {
+   "id": "big-task-orchestrate",
+   "task": "сделай полностью новый сервис уведомлений: бэкенд, фронт, тесты и деплой, раздели работу между агентами",
+   "need": [
+    {
+     "do": "new_chat",
+     "orchestrate": "^true$"
+    }
+   ]
+  },
+  {
+   "id": "new-chat-model",
+   "task": "создай новый чат на опусе с максимальным уровнем и попроси его отревьюить миграцию базы",
+   "need": [
+    {
+     "do": "new_chat",
+     "model": "(?i)opus",
+     "effort": "^max$"
+    }
+   ]
+  },
+  {
+   "id": "answer-option",
+   "task": "в ресерче выбери второй вариант",
+   "need": [
+    {
+     "do": "answer",
+     "chat": "^c3$",
+     "option": "^2$"
+    }
+   ]
+  },
+  {
+   "id": "answer-option-words",
+   "task": "по конкурентам давай презентацию",
+   "need": [
+    {
+     "do": "answer",
+     "chat": "^c3$",
+     "option": "^3$"
+    }
+   ]
+  },
+  {
+   "id": "answer-free-text",
+   "task": "на вопрос про формат ответь: сделай короткую сводку в чате, без файлов",
+   "need": [
+    {
+     "do": "answer",
+     "chat": "^c3$",
+     "text": "(?i)сводк"
+    }
+   ]
+  },
+  {
+   "id": "permit-allow",
+   "task": "да, разреши ему прогнать тесты",
+   "need": [
+    {
+     "do": "permit",
+     "chat": "^c2$",
+     "allow": "^true$"
+    }
+   ]
+  },
+  {
+   "id": "permit-deny",
+   "task": "нет, платежам тесты пока не запускай",
+   "need": [
+    {
+     "do": "permit",
+     "chat": "^c2$",
+     "allow": "^false$"
+    }
+   ]
+  },
+  {
+   "id": "status-question",
+   "task": "кто из чатов сейчас ждёт меня?",
+   "say": "(?i)ресерч|конкурент|платеж|разреш|вопрос",
+   "not": [
+    {
+     "do": "agent"
+    },
+    {
+     "do": "send"
+    },
+    {
+     "do": "new_chat"
+    }
+   ]
+  },
+  {
+   "id": "recall-yesterday",
+   "task": "помнишь, вчера мы обсуждали тарифы? давай продолжим",
+   "say": "(?i)тариф|20|50"
+  },
+  {
+   "id": "small-talk",
+   "task": "как думаешь, стоит ли мне сегодня отдохнуть?",
+   "no_actions": true
+  },
+  {
+   "id": "stop",
+   "task": "всё, спасибо, заканчиваем",
+   "need": [
+    {
+     "do": "stop"
+    }
+   ]
+  },
+  {
+   "id": "read-aloud",
+   "task": "прочитай мне вслух целиком последний ответ агента",
+   "need": [
+    {
+     "do": "read_aloud"
+    }
+   ]
+  },
+  {
+   "id": "show-chats",
+   "task": "покажи все мои чаты списком",
+   "need": [
+    {
+     "do": "show",
+     "what": "^chats$"
+    }
+   ]
+  },
+  {
+   "id": "two-actions",
+   "task": "открой ресерч конкурентов и выбери там таблицу",
+   "need": [
+    {
+     "do": "open_chat",
+     "chat": "^c3$"
+    },
+    {
+     "do": "answer",
+     "chat": "^c3$",
+     "option": "^1$"
+    }
+   ]
+  },
+  {
+   "id": "read-resume",
+   "task": "продолжай читать",
+   "screen": "route: chat «Лендинг для кофейни» (id c1)\nreading aloud: PAUSED at part 4 of 18",
+   "need": [
+    {
+     "do": "read_aloud",
+     "source": "^resume$"
+    }
+   ]
+  },
+  {
+   "id": "agent-question-current",
+   "task": "пусть будет вариант с таблицей",
+   "need": [
+    {
+     "do": "answer",
+     "chat": "^c3$",
+     "option": "^1$"
+    }
+   ]
+  }
+ ]
+}

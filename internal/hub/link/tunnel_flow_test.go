@@ -115,7 +115,7 @@ func waitCut(t *testing.T, tn *Tunnel) {
 
 func waitUsed(t *testing.T, want int64) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for TunnelMemory().Used != want {
 		if time.Now().After(deadline) {
 			t.Fatalf("tunnels hold %d, want %d", TunnelMemory().Used, want)

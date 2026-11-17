@@ -6,11 +6,11 @@ import (
 	"errors"
 	"net/url"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 )
 
 // Row ids of the audit log and of guest comments start at the millisecond and three random digits; a millisecond
@@ -22,11 +22,7 @@ func openRowDB(t *testing.T) *store.DB {
 	ctx := context.Background()
 	dsn := os.Getenv("HUB_TEST_POSTGRES_URL")
 	if dsn == "" {
-		db, err := store.Open(ctx, "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { db.Close() })
+		db := storetest.Open(t)
 		return db
 	}
 	admin, err := sql.Open("pgx", dsn)

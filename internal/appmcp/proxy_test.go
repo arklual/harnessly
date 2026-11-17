@@ -308,10 +308,13 @@ func TestRuntimeRestart(t *testing.T) {
 	serve(t, before, l)
 	p := proxyTo("http://" + addr + "/mcp")
 	p.Wait = 5 * time.Second
+	// A new connection for every request: with a kept one, the proxy may write the call into the connection the old
+	// runtime closed a moment ago, before its client noticed, and that is a call lost in flight (EOF), not one not sent.
+	p.Client = &http.Client{Transport: &http.Transport{DisableKeepAlives: true}}
 	a := start(t, p)
 	a.send(initialized)
 	for i := 0; before.gets.Load() == 0; i++ {
-		if i > 500 {
+		if i > 6000 {
 			t.Fatal("the stream did not open")
 		}
 		time.Sleep(5 * time.Millisecond)

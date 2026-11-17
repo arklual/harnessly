@@ -189,7 +189,7 @@ func TestAFailureToListTheMachinesIsNotTheCopyOff(t *testing.T) {
 
 func waitFor(t *testing.T, ok func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for !ok() {
 		if time.Now().After(deadline) {
 			t.Fatal("timed out")

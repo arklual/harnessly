@@ -510,6 +510,13 @@ const history = (now: Ms): FeedItem[] => [
       },
       { kind: 'stand', op: 'created', title: 'localhost:4400', ref: 'http://localhost:4400/adminpanel' },
       { kind: 'task', op: 'created', title: 'ABC-3156', ref: 'https://tracker.example.com/issue/ABC-3156' },
+      // Five tasks created at once: one group «Создано 5 задач» (made.tsx).
+      ...[3160, 3161, 3162, 3163].map((n) => ({
+        kind: 'task' as const,
+        op: 'created' as const,
+        title: `ABC-${n}`,
+        ref: `https://tracker.example.com/issue/ABC-${n}`,
+      })),
       {
         kind: 'commit',
         op: 'created',

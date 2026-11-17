@@ -98,9 +98,9 @@
   "next.looks.fx.nightlamp": "Night lamp",
   "next.looks.fx.laser": "Laser",
   "next.looks.fx.own": "Own…",
-  "next.looks.fx.about.snowplay": "Snow settles on the field and the messages and drifts away from the pointer. A quick swipe sweeps a drift, a double click on an empty place calls a snowplough, on a block shakes its snow off. Now and then Santa flies by.",
+  "next.looks.fx.about.snowplay": "Real-looking snow: caps on the field and the messages, icicles, glints; flakes drift from the pointer. A quick swipe sweeps it, a double click on an empty place calls a snowplough, on a block shakes its snow off. Now and then Santa flies by.",
   "next.looks.fx.about.nightlamp": "A warm light from the corner: it comes up while the agent works, dims to an ember when it is done and pulses in the accent when it waits for you.",
-  "next.looks.fx.about.laser": "A new answer is burnt in by a beam as it is written, a flash runs along it at the end; a new prompt is outlined by a running light.",
+  "next.looks.fx.about.laser": "A laser prints the new answer line by line as it is written: the hot trail cools, sparks and smoke fly. A new prompt is outlined by a running beam.",
   "next.looks.fx.about.own": "Your script on the hx SDK (docs/looks.md): it runs in a sandbox without network and sees only the pointer, the blocks' boxes and the agent's state.",
   "next.looks.fx.power": "Strength",
   "next.looks.fx.replace": "Another script",
@@ -110,5 +110,14 @@
   "next.looks.fx.uploadFailed": "The script did not upload (256 KB at most)",
   "next.looks.preset.snowplay": "Snow play",
   "next.looks.preset.nightlamp": "Night lamp",
-  "next.looks.preset.laser": "Laser"
+  "next.looks.preset.laser": "Laser",
+  "next.looks.fx.newyear": "Workshop",
+  "next.looks.fx.elves": "Elf factory",
+  "next.looks.fx.weather": "Weather",
+  "next.looks.preset.newyear": "Workshop",
+  "next.looks.preset.elves": "Elf factory",
+  "next.looks.preset.weather": "Weather",
+  "next.looks.fx.about.newyear": "A cozy New Year workshop around the chat: the garland twinkles, the lamp breathes, snow falls behind the window, steam rises over the cocoa. Snow lies on the blocks, a finished answer gets a bow and a tag.",
+  "next.looks.fx.about.elves": "Santa's workshop: gifts ride the conveyor into the oven. Every prompt stands on a belt of its own; while the agent works elves craft it with sparks and bring gifts; a finished answer is wrapped with a bow.",
+  "next.looks.fx.about.weather": "The sky and the land as the real weather and time where you are: dawn, day, sunset, a starry night, clouds, rain, snow, fog, storms. The browser asks for the place; the weather is Open-Meteo. A double click on an empty place shows the variations."
 }

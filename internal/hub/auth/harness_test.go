@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -18,6 +17,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/config"
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 )
 
 // captureMailer remembers the last code and invite sent to each address.
@@ -102,11 +102,7 @@ func newEnv(t *testing.T, opts ...envOpt) *testEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	db, err := store.Open(context.Background(), "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	d.Config, d.DB = cfg, db
 	d.Limiter = ratelimit.New().WithClock(e.clock.Now)
 	svc, err := New(d)

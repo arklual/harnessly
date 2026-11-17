@@ -2,20 +2,15 @@ package storehub
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 
-	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 )
 
 // The collection of garbage is told of the blobs the hub's tables refer to, each under the room it lies in.
 func TestPinsNameTheHubsOwnBlobsByRoom(t *testing.T) {
 	ctx := context.Background()
-	db, err := store.Open(ctx, "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
+	db := storetest.Open(t)
 	q := db.S().Q()
 	for _, stmt := range []string{
 		`INSERT INTO chat_shares (id, space_id, machine_id, owner_id, sha256, expires_at, created_at) VALUES ('s1', 'sp1', 'm1', 'u1', 'aaa', 1, 1)`,

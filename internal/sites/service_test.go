@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 )
 
 const adminToken = "admin-secret-token-for-tests"
@@ -33,12 +34,7 @@ type env struct {
 
 func newEnv(t *testing.T, mod func(*Config)) *env {
 	t.Helper()
-	ctx := context.Background()
-	db, err := store.Open(ctx, "sqlite://"+t.TempDir()+"/sites.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	blobs, err := NewFolderBlobs(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

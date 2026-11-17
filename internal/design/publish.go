@@ -102,7 +102,7 @@ func (l *Library) PublishSnapshot(project string, pages []string) (title string,
 		if err != nil {
 			return err
 		}
-		if len(data) > PublicFileLimit {
+		if int64(len(data)) > PublicFileLimit {
 			return nil
 		}
 		total += int64(len(data))
@@ -146,7 +146,7 @@ func (l *Library) PublishSnapshot(project string, pages []string) (title string,
 			if err != nil {
 				return err
 			}
-			if len(data) > PublicFileLimit {
+			if int64(len(data)) > PublicFileLimit {
 				return nil
 			}
 			total += int64(len(data))

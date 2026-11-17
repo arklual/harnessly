@@ -2,13 +2,13 @@ package eval
 
 import (
 	"context"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/efficiency"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 )
 
 // the hub's scheduler of the evaluation. Slots are counted in Moscow time from a fixed Monday; nothing is queued
@@ -80,11 +80,7 @@ type env struct {
 func setup(t *testing.T, week, five float64) *env {
 	t.Helper()
 	ctx := context.Background()
-	db, err := store.Open(ctx, "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	e := &env{db: db, now: at("2026-11-09 10:05"), link: &fakeLink{connected: true}, gate: fakeGate{SwitchScheduler + "|ann@example.com": true}}
 	q := db.S().Q()
 	for _, stmt := range []string{

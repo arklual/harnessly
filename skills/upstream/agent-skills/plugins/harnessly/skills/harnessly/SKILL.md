@@ -44,6 +44,11 @@ harnessly open https://gitlab.example.com/g/p/-/merge_requests/12 # a merge requ
 - `harnessly panel show` brings the pane out if the person hid it. `harnessly status` tells you what it shows and
   what you already asked for today; read it before opening the same thing again.
 
+A turn that made many things (several documents, a batch of tasks, merge requests, screenshots) opens one, the one to
+look at first, or none: the chat already shows what the turn made as cards under your answer. Name the rest as links;
+never open tasks or merge requests one by one. `harnessly open` shows a thing to the person and reads
+nothing for you: read a task with `harnessly issue <KEY>`, a merge request with `glab` or the GitLab API. The pane itself opens at most three quiet tabs in ten minutes.
+
 In your reply, still name the link or path in words: the pane is a convenience, the reply is the record.
 
 ## Widgets under the right column
@@ -145,7 +150,7 @@ The chats you delegate (the `delegate_task` tool of the `harnessly` MCP server) 
 
 ## Boards and documents
 
-Make a diagram with the `boards` skill and publish a write-up with the `artifacts` skill; both print links. Then
+Make a diagram with the `boards` skill and publish a write-up with `harnessly docs publish FILE.md [--slug S]` (through the hub, so it shows in the person's Documents app; `artifacts publish` is the fallback only when it says there is no hub); both print links. Then
 `harnessly open` them. Every document you publish records this conversation, so the pane can list the
 documents of the conversation.
 
@@ -166,6 +171,13 @@ A screen by a screenshot or a mockup on a UI kit installed on the machine is a b
 `harnessly design new "<title>" --kit <id>`, use the kit's real components (`<x-import component-from-global-scope=…>`,
 as `kit_component` gives them), and make the scenes (a sheet, a transition, a toast) `data-props` switches and `DCLogic`
 handlers.
+
+A NEW design made from scratch (before `harnessly design new`): if the person did not name a UI kit and the conversation does
+not make clear which one to use, first ask in the chat which installed kit to take (`kit_list`), offering «без кита» as the
+last option (`notice_ask`, or AskUserQuestion where that agent has it, else one short question). Wait for the answer, then
+`harnessly design new "<title>" --kit <id>` (no `--kit` for «без кита»). Do not ask when the kit is named or clear, for an
+existing project (edits, a new page of it), or when no kit is installed. The Sinopia panel has no button for it: the chat is
+the only place a kit is chosen.
 
 Do not write a separate HTML file, build a separate app or start `python3 -m http.server` or another localhost server to
 show a mockup. Code is for when the person asks for an app or the product's code; even then offer the board as the

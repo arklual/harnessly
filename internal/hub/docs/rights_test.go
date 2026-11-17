@@ -91,3 +91,31 @@ func TestRightsNeedTheServiceSecret(t *testing.T) {
 		t.Errorf("no sub: %d, want 400", code)
 	}
 }
+
+// A document the hub has no record of (published straight to the documents service) is decided by the author the
+// service names, as in the hub's own list: its author sees it in the documents app, a stranger does not.
+func TestRightsOfADocumentWithoutARecordFollowItsAuthor(t *testing.T) {
+	s, who, _ := circleRig(t, false, false)
+	s.cfg.ArtifactsAccessToken = "service-secret"
+	h := s.Handler()
+	ask := func(sub string, authors map[string]string) map[string]string {
+		t.Helper()
+		body, _ := json.Marshal(map[string]any{"sub": sub, "slugs": []string{"loose"}, "authors": authors})
+		code, rights, _ := askRights(t, h, "service-secret", string(body))
+		if code != http.StatusOK {
+			t.Fatalf("%s: status %d", sub, code)
+		}
+		return rights
+	}
+	named := map[string]string{"loose": who["author"].User.Email}
+	if got := ask(who["author"].User.ID, named)["loose"]; got == RightNone || got == "" {
+		t.Errorf("author of a document without a record: %q, want a right to read it", got)
+	}
+	if got := ask(who["stranger"].User.ID, named)["loose"]; got != RightNone {
+		t.Errorf("stranger: %q, want none", got)
+	}
+	// Without the author nothing changes: closed.
+	if got := ask(who["author"].User.ID, nil)["loose"]; got != RightNone {
+		t.Errorf("no author named: %q, want none", got)
+	}
+}

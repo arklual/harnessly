@@ -15,7 +15,7 @@ import {
   type TMeta,
   type TPipeline,
 } from '@/next/features/artifacts/model';
-import { t } from '@/next/i18n';
+import { plural, t } from '@/next/i18n';
 import type { TurnOutput } from '@/next/protocol/v2';
 import type { IAppConfig } from '@/platform/config';
 
@@ -252,5 +252,98 @@ export const viewOf = (link: ILinkOutput, meta: TMeta | null, look: TLook, up: b
       };
     case 'artifact':
       return { ...plain, title: meta.title };
+  }
+};
+
+/** A card's line in the block «Сделано за ход» (made.tsx): the title, the code-like name (a key, a sha, `repo !12`),
+ *  the other parts of the line, and the state at the row's end. */
+export interface ILinkParts {
+  title: string | null;
+  /** The name in monospace: «HRN-1590», «harnessly !212», «c5cb49e». */
+  mono: string | null;
+  /** The rest of the line, in order: «7 файлов», «в main», who has the task. */
+  sub: string[];
+  state: string | null;
+  tone: TStateTone | null;
+  pending: boolean;
+}
+
+/** «harnessly !212» of a merge request's address, «checkout #31» of a pull request's; null for another. */
+const changeName = (url: string): string | null => {
+  const at = parse(url);
+  if (!at) return null;
+  const number = /\/(?:merge_requests|pull)\/(\d+)/.exec(at.pathname)?.[1];
+  if (!number) return null;
+  return `${projectOf(at)} ${at.pathname.includes('/pull/') ? '#' : '!'}${number}`;
+};
+
+const capital = (text: string | null): string | null =>
+  text ? text.slice(0, 1).toLocaleUpperCase() + text.slice(1) : null;
+
+/** What a row of the block says of its link; the same reading as viewOf, cut into its parts. */
+export const partsOf = (
+  link: ILinkOutput,
+  meta: TMeta | null,
+  look: TLook,
+  up: boolean | null,
+): ILinkParts => {
+  const view = viewOf(link, meta, look, up);
+  const kind = t(`next.outputs.link.${link.kind}`);
+  const named = link.kind === LINK.task || link.kind === LINK.mr || link.kind === LINK.pr;
+  const base: ILinkParts = {
+    title: view.title,
+    mono:
+      link.kind === LINK.mr || link.kind === LINK.pr
+        ? (changeName(link.url) ?? link.key)
+        : named || link.kind === LINK.commit
+          ? link.key
+          : null,
+    sub: named ? [] : [kind],
+    state: null,
+    tone: view.tone,
+    pending: view.pending,
+  };
+  if (link.kind === LINK.server) {
+    return {
+      ...base,
+      mono: link.key,
+      state: up === null ? null : capital(t(up ? 'next.outputs.up' : 'next.outputs.serverDown')),
+    };
+  }
+  if (meta === null) return base;
+  switch (meta.kind) {
+    case 'issue':
+      return {
+        ...base,
+        mono: meta.key || link.key,
+        sub: meta.assignee ? [meta.assignee.name] : [],
+        state: meta.state,
+      };
+    case 'mr': {
+      const files = meta.files ? plural(Number.parseInt(meta.files, 10), 'next.turnMade.files') : null;
+      const shownFiles = files && meta.files?.endsWith('+') ? files.replace(/\d+/, meta.files) : files;
+      const pipeline = meta.state === 'opened' ? pipelineText(meta.pipeline) : null;
+      return {
+        ...base,
+        sub: [shownFiles, meta.target ? t('next.turnMade.into', { branch: meta.target }) : null].filter(
+          (p): p is string => !!p,
+        ),
+        state: capital(pipeline ?? mrState(meta.state, meta.draft)),
+      };
+    }
+    case 'commit':
+      return {
+        ...base,
+        mono: meta.sha || link.key,
+        sub: meta.project ? [meta.project] : [],
+        state: capital(pipelineText(meta.pipeline)),
+      };
+    case 'stand':
+      return {
+        ...base,
+        state: t(meta.up ? 'next.outputs.up' : 'next.outputs.standDown'),
+      };
+    case 'artifact':
+      return base;
   }
 };

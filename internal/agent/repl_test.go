@@ -43,7 +43,7 @@ func newTestOut(t *testing.T, window int) (*replOut, *sentLog, chan struct{}) {
 
 func replWaitFor(t *testing.T, what string, ok func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for !ok() {
 		if time.Now().After(deadline) {
 			t.Fatal(what)

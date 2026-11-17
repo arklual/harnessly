@@ -45,9 +45,18 @@ lamp, a laser. It is the look's `fx`:
 - Exactly one of `preset` and `script` (`internal/looks/look.go`, `Fx`): `preset` is one of the page's built-in effects
   (`FxPresets`), `script` the lowercase hex sha256 of a script kept like a picture. `back` puts it behind the chat's
   blocks instead of over them; `power` is 0–100 (default: the effect's own).
-- Built-in effects: `snowplay` (Снежная игра: snow settles on the blocks, the mouse sweeps it, a double click calls a
-  snowplough, Ded Moroz flies by), `nightlamp` (Ночник: a warm light from a corner while the agent works), `laser`
-  (Лазер: a new answer is burnt in by a beam, a new prompt is lit up). `harnessly theme fx-presets` lists them.
+- Built-in effects (`fx/*.js` next to the runtime, each loaded only when a look wears it, with its pictures as data:
+  URLs): `snowplay` (Снежная игра: real-looking snow caps on the blocks, the mouse sweeps them, a double click calls a
+  snowplough, Ded Moroz flies by), `nightlamp` (Ночник: a lamp that lights up while the agent works), `laser` (Лазер:
+  prints a new answer line by line under a mask of `hx.colors.stage`, a new prompt is outlined), `newyear` (Мастерская:
+  a New Year workshop painted under the chat, snow and bows over it), `elves` (Фабрика эльфов: the elves' workshop, each
+  prompt on a conveyor belt, elves crafting while the agent works, a bow on the finished answer), `weather` (Погода: the
+  sky and the land by the sun's height and the real weather where the person is). `newyear`, `elves` and `weather` always
+  run a back layer as well. `harnessly theme fx-presets` lists them. Shared code: `snow-lib.js` (flakes at three depths,
+  snow caps drawn once per change), `scene-lib.js` (a picture fitted like cover, twinkling lights, steam, bows).
+- «Погода» asks the browser for the place (the person allows it once), rounds it to 0.1° and asks Open-Meteo for the
+  weather every 15 minutes (`features/looks/weather-feed.ts`); the frame gets it as `hx.weather` and the `weather` event.
+  Without a place it follows the clock and the time zone.
 - A script is kept by `PUT /api/v2/me/looks` next to the pictures: bytes that begin with the exact line `//hx-fx v1`
   (then a newline), valid UTF-8, at most 256 KB (`wire.MaxLookFx`); recognised by their content, not by what the request
   says. `GET /api/v2/me/looks/<sha256>` serves them like a picture: `text/plain`, `nosniff`,
@@ -74,7 +83,8 @@ The script runs in a transparent frame covering the chat's stage, with `pointer-
   `hx.dpr`.
 - `hx.layer`: `"front"` or `"back"`; `hx.power`: 0–1; `hx.mode`: `"light"` or `"dark"`; `hx.reduced`: the person
   prefers reduced motion.
-- `hx.colors`: `{accent, fg, bg, hues: [css colors]}`, the look's own tokens.
+- `hx.colors`: `{accent, fg, bg, stage, hues: [css colors]}`, the look's own tokens; `stage` is the colour the feed is drawn on.
+- `hx.weather` (`weather` only): `{source, lat, lon, code, cloud, temp, wind, windDir, rain, snowfall, sunrise, sunset}`.
 - `hx.pointer`: `{x, y, vx, vy, down, inside}`, in frame coordinates.
 - `hx.blocks`: an array of `{id, kind, x, y, w, h}` in frame coordinates, `kind` one of `composer`, `user` (a prompt),
   `answer`. Rectangles only, of what is on screen (at most 48), measured on scroll and about three times a second.

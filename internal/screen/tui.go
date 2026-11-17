@@ -184,11 +184,17 @@ func (m *Menu) YesFocused() bool {
 // Footers of TUI panels and pickers. Case matters: Claude's "(shift+tab to cycle)" and "esc to interrupt" are no panels.
 var panelHintRE = re(`Esc to (?:cancel|close|exit|go back|dismiss)|esc to (?:close|go back|cancel|exit|dismiss)|Enter to (?:select|confirm|set|continue)|enter to (?:select|confirm|continue)|↑/↓|←/→|Tab to (?:switch|cycle)`)
 
+// mayHoldPanelHint is what every match of panelHintRE contains: the unanchored alternation tried each position of
+// every line, the most of the runtime's time on a screen.
+func mayHoldPanelHint(line string) bool {
+	return strings.Contains(line, " to ") || strings.Contains(line, "↑/↓") || strings.Contains(line, "←/→")
+}
+
 // CountPanelHints counts the panel footer lines among the last 20 lines of a plain screen.
 func CountPanelHints(plain string) int {
 	n := 0
 	for _, line := range tail(trimEndLines(plain), panelHintLines) {
-		if panelHintRE.MatchString(line) {
+		if mayHoldPanelHint(line) && panelHintRE.MatchString(line) {
 			n++
 		}
 	}

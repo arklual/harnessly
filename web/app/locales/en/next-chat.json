@@ -687,5 +687,33 @@
   },
   "next.tool.firstBytes": "First {shown} of {total}",
   "next.size.kb": "{n} KB",
-  "next.size.mb": "{n} MB"
+  "next.size.mb": "{n} MB",
+  "next.turnMade.head": "Made this turn",
+  "next.turnMade.open": "Open",
+  "next.turnMade.openDesign": "Open in Sinopia",
+  "next.turnMade.share": "Share",
+  "next.turnMade.copyUrl": "Copy address",
+  "next.turnMade.copied": "Address copied",
+  "next.turnMade.copyId": "Copy ID",
+  "next.turnMade.copyIds": "Copy the IDs",
+  "next.turnMade.idCopied": "ID copied",
+  "next.turnMade.files": {
+    "one": "{n} file",
+    "other": "{n} files"
+  },
+  "next.turnMade.into": "into {branch}",
+  "next.turnMade.batch": {
+    "one": "{n} task created",
+    "other": "{n} tasks created"
+  },
+  "next.turnMade.allOn": "all on {who}",
+  "next.turnMade.showMore": "Show {n} more",
+  "next.turnMade.showAll": "Show all",
+  "next.turnMade.collapse": "Collapse",
+  "next.turnMade.epic": "Epic",
+  "next.turnMade.epicDone": "{done} of {n} done",
+  "next.turnMade.new": "new · agent",
+  "next.turnMade.more": "{n} more",
+  "next.turnMade.shots": "Screenshots · {n}",
+  "next.turnMade.design": "Sinopia design"
 }

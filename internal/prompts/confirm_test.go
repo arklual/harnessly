@@ -168,3 +168,67 @@ func TestChatAboutThisFromTheCard(t *testing.T) {
 		t.Fatalf("sent %v", got)
 	}
 }
+
+// pictureDriver is an idle Claude pane for a message of pictures alone: once they are pasted, the input line holds their
+// [Image #1] reference until the agent has taken `lost` Enters more than it should.
+type pictureDriver struct {
+	*recordingDriver
+	idle, stuck string
+	lost        int
+	pasted      bool
+	enters      int
+}
+
+func (d *pictureDriver) PasteImages(paths []string) bool {
+	d.pasted = true
+	return d.recordingDriver.PasteImages(paths)
+}
+
+func (d *pictureDriver) Enter() error {
+	d.enters++
+	return d.recordingDriver.Enter()
+}
+
+func (d *pictureDriver) Capture() (string, bool) {
+	if d.pasted && d.enters <= d.lost {
+		return d.stuck, true
+	}
+	return d.idle, true
+}
+
+func picturesOnly(i *Item) { i.Text, i.Images = "", []string{"a.png"} }
+
+func newPictureDriver(t *testing.T, lost int) *pictureDriver {
+	return &pictureDriver{recordingDriver: newDriver(""), idle: tui(t, "claude-idle-placeholder.ansi.txt"), stuck: withInput(t, "[Image #1]"), lost: lost}
+}
+
+// The screenshot of a chat that said "collecting context" with [Image #12] left in the input line: a message of pictures
+// alone was counted as sent after its first Enter without looking at the line, so a lost Enter was never pressed again.
+func TestALostEnterOfAPicturesOnlyMessageIsPressedAgain(t *testing.T) {
+	reg := NewRegistry(newFakeClock(), nil)
+	d := newPictureDriver(t, 1)
+	if got := Deliver(item(picturesOnly), d, reg, false, ""); got != OutcomeSent || !reflect.DeepEqual(d.calls, []string{"images:a.png", "enter", "enter"}) {
+		t.Fatalf("%v %v", got, d.calls)
+	}
+}
+
+func TestPicturesLeftInTheInputAreNotCountedAsSent(t *testing.T) {
+	reg := NewRegistry(newFakeClock(), nil)
+	d := newPictureDriver(t, 100)
+	if got := Deliver(item(picturesOnly), d, reg, false, ""); got != OutcomeFailed || !reflect.DeepEqual(d.calls, []string{"images:a.png", "enter", "enter", "enter"}) {
+		t.Fatalf("stuck: %v %v", got, d.calls)
+	}
+	// The next try finds the pictures as its own: it presses Enter, never pastes them a second time.
+	d.calls, d.lost = nil, d.enters
+	if got := Deliver(item(picturesOnly), d, reg, false, ""); got != OutcomeSent || !reflect.DeepEqual(d.calls, []string{"enter"}) {
+		t.Fatalf("retry: %v %v", got, d.calls)
+	}
+}
+
+func TestAPicturesOnlyMessageThatLeftTheInputIsSentAtOnce(t *testing.T) {
+	reg := NewRegistry(newFakeClock(), nil)
+	d := newPictureDriver(t, 0)
+	if got := Deliver(item(picturesOnly), d, reg, false, ""); got != OutcomeSent || !reflect.DeepEqual(d.calls, []string{"images:a.png", "enter"}) {
+		t.Fatalf("%v %v", got, d.calls)
+	}
+}

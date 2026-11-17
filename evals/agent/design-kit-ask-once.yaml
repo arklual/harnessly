@@ -1,11 +1,12 @@
 id: design-kit-ask-once
-title: Проект без кита, а на машине кит есть — агент один раз спрашивает человека, какой кит взять, и не рисует молча без него
+title: Новый дизайн с нуля без названного кита, а на машине кит есть — агент до `design new` спрашивает в чате, какой кит взять (есть «без кита»), и не рисует молча без него
 tags: [design, kits]
 timeout_s: 600
 setup:
   kits: [fixtures/kits/acme-ui]
 covers:
   - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
   - 'internal/hlcli/design*.go'
   - 'internal/hlcli/help.go'
   - 'internal/design/kitproject.go'

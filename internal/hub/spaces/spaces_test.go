@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -25,6 +24,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 )
 
 type capMail struct {
@@ -99,11 +99,7 @@ func newEnv(t *testing.T, kv ...string) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	db, err := store.Open(context.Background(), "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	lim := ratelimit.New().WithClock(e.clock)
 	e.au, err = auth.New(auth.Deps{Config: cfg, DB: db, Mailer: e.mail, Limiter: lim, Log: log, Now: e.clock})

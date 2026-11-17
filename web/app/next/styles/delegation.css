@@ -65,7 +65,8 @@
   min-height: 0;
   overflow: hidden;
 }
-.hx-deleg__list-in > .hx-files {
+.hx-deleg__list-in > .hx-files,
+.hx-deleg__list-in > .hx-outputs {
   padding-top: var(--hx-space-1);
 }
 @media (prefers-reduced-motion: reduce) {

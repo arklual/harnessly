@@ -7,6 +7,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/hub/rates"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 )
 
 func TestParseUSD(t *testing.T) {
@@ -34,11 +35,7 @@ func TestMoney(t *testing.T) {
 
 func TestBookKeepsManual(t *testing.T) {
 	ctx := context.Background()
-	db, err := store.Open(ctx, "sqlite://"+t.TempDir()+"/hub.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
+	db := storetest.Open(t)
 	st := db.S()
 	if err := st.PutRate(ctx, store.CurrencyRate{Code: "RUB", Day: "2026-10-01", PerUSD: 90, Source: store.RateManual}); err != nil {
 		t.Fatal(err)

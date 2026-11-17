@@ -53,7 +53,7 @@ func TestProfileDirectorySizeBoundaries(t *testing.T) {
 
 func waitProfileSize(t *testing.T, c *profileSizes, id string) profileSizeEntry {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		c.mu.Lock()
 		entry, ok := c.entries[id]

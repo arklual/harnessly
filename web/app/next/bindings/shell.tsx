@@ -114,6 +114,7 @@ import { useShellTabs, wantsNewTab } from '@/next/bindings/tabs';
 import { useShellKeys } from '@/next/bindings/shell-keys';
 import { keepScreensOnPhone, TabScopeContext, useTabs, useTopTabs } from '@/next/stores/tabs';
 import { deviceKeptScreensMax, keptScreens } from '@/next/features/shell/kept-screens';
+import { screenChatOf, screenMachine } from '@/next/features/shell/screen-machine';
 import { keptBudget } from '@/next/features/shell/kept-budget';
 import { usePhone } from '@/next/ui/use-media';
 import Sidebar from '@/next/features/sidebar/sidebar';
@@ -404,6 +405,10 @@ const KeptPage = ({
 const KeptScreen = memo(
   ({ tabId, active, machine, path, terminal, onTermSlot, toolPane, shell }: IKeptScreenProps) => {
     const tabRoute = parseRoute(path);
+    // The screen is drawn where its chat is, not on the machine active in the shell: a chat is one entity.
+    const chatId = screenChatOf(tabRoute);
+    const chatRecord = useConversation(chatId && isConvId(chatId) ? chatId : null);
+    const screenOn = screenMachine(tabRoute, chatRecord?.machineId ?? null, machine) as MachineId;
     const scope = useMemo(() => ({ tabId, active }), [tabId, active]);
     // The pane's openers, the same object for the screen's life: each one calls the shell's current one.
     const open = useMemo<NonNullable<IKeptScreensProps['open']>>(
@@ -424,7 +429,7 @@ const KeptScreen = memo(
                 <KeptPage
                   route={tabRoute}
                   active={active}
-                  machine={machine}
+                  machine={screenOn}
                   toolPane={toolPane}
                   open={open}
                   shell={shell}

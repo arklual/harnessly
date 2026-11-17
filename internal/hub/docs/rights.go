@@ -35,6 +35,9 @@ type rightsRequest struct {
 	// address a person of the hub has proved names them.
 	Email string   `json:"email"`
 	Slugs []string `json:"slugs"`
+	// Authors is the author each document names, as the documents service knows it. A document the hub has no record
+	// of is decided by it, the way the hub's own list decides it (summaries): without it such a document stays closed.
+	Authors map[string]string `json:"authors"`
 }
 
 // serviceSecret checks the bearer a documents or boards service sends (serviceToken, manage.go).
@@ -164,7 +167,7 @@ func (s *Service) rightsOf(r *http.Request, req rightsRequest) (map[string]strin
 		}
 	}
 	p := &auth.Principal{User: u, Admin: admin}
-	metas, _, err := s.metas(ctx, slugs, s.reachOf(ctx, p))
+	metas, away, err := s.metas(ctx, slugs, s.reachOf(ctx, p))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -174,6 +177,16 @@ func (s *Service) rightsOf(r *http.Request, req rightsRequest) (map[string]strin
 			continue // in the trash: none
 		}
 		out[slug] = rightOf(s.rank(ctx, slug, &m, "", p, c))
+	}
+	// A document the hub has no record of anywhere: its author decides, as in the hub's own list, so the documents app
+	// shows a person what the hub's list shows them.
+	for _, slug := range slugs {
+		if _, ok := all[slug]; ok || elsewhere[slug] || away[slug] {
+			continue
+		}
+		if a := strings.TrimSpace(req.Authors[slug]); a != "" {
+			out[slug] = rightOf(s.rank(ctx, slug, nil, a, p, c))
+		}
 	}
 	return out, known, nil
 }

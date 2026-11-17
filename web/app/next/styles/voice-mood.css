@@ -1,0 +1,224 @@
+/* The mascot's moods (features/voice-live/voice-mood.ts): neutral, joy, sad, thinking, surprised. They ride on
+ * the head's six states (voice-head.css, generated: not edited, this file comes after it) through the same registered
+ * variables the states use, so a mood fades in and out as an expression does. Eyes and mouth for «Головка», posture,
+ * bounce and tilt for «h» (both share the eye and the mouth, only the coordinates of the lip differ). «error» and
+ * «barged» are urgent: no mood on them. Reduced motion: the face changes, nothing moves (voice-head.css stops every
+ * animation under .hx-head). */
+.hx-head .hx-head__who {
+  transition:
+    rotate var(--m-t) var(--m-ease),
+    translate var(--m-t) var(--m-ease),
+    scale var(--m-t) var(--m-ease);
+}
+.hx-head .hx-head__body,
+.hx-head .hx-head__lip {
+  transition:
+    fill var(--m-t) var(--m-ease),
+    stroke var(--m-t) var(--m-ease),
+    d var(--m-t) var(--m-ease),
+    opacity var(--m-t) var(--m-ease);
+}
+
+/* The mood's own colours: the hue circles and strokes (the body's colour in every state) take them in turn. */
+.hx-head[data-m='joy'] {
+  --m-c1: oklch(0.8 0.15 75);
+  --m-c2: oklch(0.76 0.17 350);
+  --m-c3: oklch(0.78 0.15 40);
+}
+.hx-head[data-m='sad'] {
+  --m-c1: oklch(0.62 0.07 255);
+  --m-c2: oklch(0.58 0.08 275);
+  --m-c3: oklch(0.64 0.06 235);
+}
+.hx-head[data-m='thinking'] {
+  --m-c1: oklch(0.64 0.14 270);
+  --m-c2: oklch(0.6 0.16 295);
+  --m-c3: oklch(0.68 0.12 235);
+}
+.hx-head[data-m='surprised'] {
+  --m-c1: oklch(0.82 0.13 200);
+  --m-c2: oklch(0.8 0.15 160);
+  --m-c3: oklch(0.84 0.14 100);
+}
+.hx-head[data-m]:not([data-m='neutral'], [data-s='error']) circle.hx-head__hue:not(.hx-head__hue-err) {
+  animation-name: hx-mood-hue;
+}
+.hx-head[data-m]:not([data-m='neutral'], [data-s='error']) path.hx-head__hue:not(.hx-head__hue-err) {
+  animation-name: hx-mood-hue-s;
+}
+.hx-head[data-k='h'][data-m='joy']:not([data-s='error']) .hx-head__body {
+  fill: #fff4e6;
+}
+.hx-head[data-k='h'][data-m='sad']:not([data-s='error']) .hx-head__body {
+  fill: #eceff7;
+}
+.hx-head[data-k='h'][data-m='surprised']:not([data-s='error']) .hx-head__body {
+  fill: #eafaff;
+}
+
+/* Joy: eyes squeezed into happy crescents, a wide smile, rosy cheeks, a little hop and sway. */
+.hx-head[data-m='joy']:not([data-s='error'], [data-s='barged']) {
+  --m-es: 1.06;
+  --m-ey: 0.42;
+  --m-ed: 2.2;
+  --m-mx: 1.2;
+}
+.hx-head[data-m='joy']:not([data-s='error'], [data-s='barged']) .hx-head__cheek {
+  opacity: 0.9;
+}
+.hx-head[data-m='joy']:not([data-s='error'], [data-s='barged']) .hx-head__k-face .hx-head__lip {
+  d: path('M32 55Q48 78 64 55');
+}
+.hx-head[data-m='joy']:not([data-s='error'], [data-s='barged']) .hx-head__k-h .hx-head__lip {
+  d: path('M37 59.5Q48 72.5 59 59.5');
+}
+.hx-head[data-m='joy']:not([data-s='error'], [data-s='barged']) .hx-head__who {
+  animation: hx-mood-hop 0.95s ease-in-out infinite;
+}
+
+/* Sad: eyes sink and shrink, the mouth turns down, the head droops and sways slowly, the colours go grey-blue. */
+.hx-head[data-m='sad']:not([data-s='error'], [data-s='barged']) {
+  --m-es: 0.94;
+  --m-ey: 0.78;
+  --m-ed: 3;
+  --m-gy: 2;
+  --m-my: 0.28;
+}
+.hx-head[data-m='sad']:not([data-s='error'], [data-s='barged']) .hx-head__cheek {
+  opacity: 0.12;
+}
+.hx-head[data-m='sad']:not([data-s='error'], [data-s='barged']) .hx-head__k-face .hx-head__lip {
+  d: path('M37 69Q48 57 59 69');
+}
+.hx-head[data-m='sad']:not([data-s='error'], [data-s='barged']) .hx-head__k-h .hx-head__lip {
+  d: path('M41 67.5Q48 60.5 55 67.5');
+}
+.hx-head[data-m='sad']:not([data-s='error'], [data-s='barged']) .hx-head__who {
+  translate: 0 3px;
+  scale: 0.94;
+  animation: hx-mood-droop 5.5s ease-in-out infinite;
+}
+.hx-head[data-m='sad']:not([data-s='error'], [data-s='barged']) .hx-head__br {
+  animation-duration: 6s;
+}
+
+/* Thinking: eyes up and to the side, a crooked mouth, the head tilted and slowly nodding. */
+.hx-head[data-m='thinking']:not([data-s='error'], [data-s='barged']) {
+  --m-gx: -2.6;
+  --m-gy: -3.2;
+  --m-es: 0.95;
+}
+.hx-head[data-m='thinking']:not([data-s='error'], [data-s='barged']) .hx-head__k-face .hx-head__lip {
+  d: path('M39 62Q48 59 59 55');
+}
+.hx-head[data-m='thinking']:not([data-s='error'], [data-s='barged']) .hx-head__k-h .hx-head__lip {
+  d: path('M43 63Q48 61.5 54.5 59.5');
+}
+.hx-head[data-m='thinking']:not([data-s='error'], [data-s='barged']) .hx-head__who {
+  animation: hx-mood-ponder 3.4s ease-in-out infinite;
+}
+
+/* Surprised: wide eyes, a round open mouth, a pop and then held. */
+.hx-head[data-m='surprised']:not([data-s='error'], [data-s='barged']) {
+  --m-es: 1.26;
+  --m-ey: 1.1;
+  --m-ed: -1;
+  --m-gx: 0;
+  --m-gy: -1;
+  --m-mx: 0.8;
+  --m-my: 1.3;
+  --m-ta: 0.15;
+}
+.hx-head[data-m='surprised']:not([data-s='error'], [data-s='barged']) .hx-head__cheek {
+  opacity: 0.3;
+}
+.hx-head[data-m='surprised']:not([data-s='error'], [data-s='barged']) .hx-head__lip {
+  opacity: 0;
+}
+.hx-head[data-m='surprised']:not([data-s='error'], [data-s='barged']) .hx-head__mo {
+  opacity: 1;
+}
+.hx-head[data-m='surprised']:not([data-s='error'], [data-s='barged']) .hx-head__who {
+  scale: 1.06;
+  animation: hx-mood-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes hx-mood-hue {
+  0%,
+  100% {
+    fill: var(--m-c1);
+  }
+  30% {
+    fill: var(--m-c2);
+  }
+  65% {
+    fill: var(--m-c3);
+  }
+}
+@keyframes hx-mood-hue-s {
+  0%,
+  100% {
+    stroke: var(--m-c1);
+  }
+  30% {
+    stroke: var(--m-c2);
+  }
+  65% {
+    stroke: var(--m-c3);
+  }
+}
+@keyframes hx-mood-hop {
+  0%,
+  100% {
+    translate: 0 0;
+    rotate: -3deg;
+  }
+  30% {
+    translate: 0 -4px;
+    rotate: 2deg;
+  }
+  55% {
+    translate: 0 0;
+    rotate: 3deg;
+  }
+  75% {
+    translate: 0 -2px;
+    rotate: -1deg;
+  }
+}
+@keyframes hx-mood-droop {
+  0%,
+  100% {
+    rotate: -2.5deg;
+    translate: 0 3px;
+  }
+  50% {
+    rotate: 2deg;
+    translate: 0 4px;
+  }
+}
+@keyframes hx-mood-ponder {
+  0%,
+  100% {
+    rotate: 5deg;
+  }
+  50% {
+    rotate: 9deg;
+  }
+}
+@keyframes hx-mood-pop {
+  from {
+    scale: 0.9;
+  }
+  45% {
+    scale: 1.14;
+  }
+  to {
+    scale: 1.06;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-head .hx-head__who {
+    animation: none !important;
+  }
+}

@@ -16,7 +16,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -27,6 +26,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
@@ -48,11 +48,7 @@ type testHub struct {
 func newTestHub(t *testing.T) *testHub {
 	t.Helper()
 	h := &testHub{t: t, reg: NewRegistry(), connected: make(chan *Link, 8), events: make(chan Event, 64), disconnected: make(chan bool, 8)}
-	db, err := store.Open(context.Background(), "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	h.db = db
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {

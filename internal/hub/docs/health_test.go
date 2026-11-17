@@ -5,13 +5,13 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/config"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 )
 
 type healthRig struct {
@@ -25,11 +25,7 @@ type healthRig struct {
 func newHealthRig(t *testing.T, boards bool) healthRig {
 	t.Helper()
 	ctx := context.Background()
-	db, err := store.Open(ctx, "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	u := &store.User{Email: "owner@example.com", Name: "Owner", IsAdmin: true}
 	if err := db.S().CreateUser(ctx, u); err != nil {
 		t.Fatal(err)

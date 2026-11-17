@@ -471,10 +471,11 @@ const HomeComposer = ({
       <div className="hx-dock" data-creating={creating || undefined} data-kind={plainTalk ? 'talk' : 'task'}>
         {above}
         <div className="hx-enter" data-enter="up" data-eb="520" data-ed="700">
+          {/* The switch stands at the top of the stage, in the middle (kind-switch.tsx «top»), not over the field. */}
+          {gptExtra && <KindSwitch value={kind} onChange={setChatKind} top />}
           <DockBar
             notice={voiceNotice ?? (allMachinesOff ? NO_MACHINES : signIn && !plainTalk ? SIGN_IN : null)}
           />
-          {gptExtra && <KindSwitch value={kind} onChange={setChatKind} />}
           <ScreenField
             glideOut="chat"
             enterSends={enterSends}

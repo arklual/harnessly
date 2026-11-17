@@ -6,14 +6,12 @@ package hubtest
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -25,6 +23,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/api"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/store/storetest"
 )
 
 // Mail remembers what the hub would have mailed.
@@ -260,50 +259,15 @@ func (s *Stack) Restart() {
 	}
 }
 
-// openDB is a SQLite file of its own. With HUB_TEST_POSTGRES_URL set it is a throwaway schema of that Postgres
+// openDB is a migrated SQLite file of its own. With HUB_TEST_POSTGRES_URL set it is a throwaway schema of that Postgres
 // instead, so the services' tests and the end-to-end tests run on both databases:
 //
 //	HUB_TEST_POSTGRES_URL='postgres://user@127.0.0.1:5432/db?sslmode=disable' go test ./internal/hub/...
+//
+// (storetest.Open)
 func openDB(t *testing.T) *store.DB {
 	t.Helper()
-	ctx := context.Background()
-	dsn := os.Getenv("HUB_TEST_POSTGRES_URL")
-	if dsn == "" {
-		path := filepath.Join(t.TempDir(), "hub.db")
-		if tmpl := sqliteTemplate(); tmpl != nil {
-			if err := os.WriteFile(path, tmpl, 0o600); err != nil {
-				t.Fatal(err)
-			}
-		}
-		db, err := store.Open(ctx, "sqlite://"+path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { db.Close() })
-		return db
-	}
-	admin, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	schema := "hubtest_" + store.RandomBase32(8)
-	if _, err := admin.ExecContext(ctx, `CREATE SCHEMA `+schema); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _, _ = admin.Exec(`DROP SCHEMA ` + schema + ` CASCADE`); admin.Close() })
-	u, err := url.Parse(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	q := u.Query()
-	q.Set("search_path", schema)
-	u.RawQuery = q.Encode()
-	db, err := store.Open(ctx, u.String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
-	return db
+	return storetest.Open(t)
 }
 
 // WriteDist puts a file in the folder the hub serves binaries and the installer from.
@@ -453,38 +417,4 @@ func (p *Person) Join(spaceID string, guest *Person) {
 	if r := guest.Do("POST", "/api/invites/"+token+"/accept", map[string]any{}); r.Code != 200 {
 		p.S.T.Fatalf("accept: %s", r)
 	}
-}
-
-var (
-	templateOnce  sync.Once
-	templateBytes []byte
-)
-
-// sqliteTemplate is an empty hub database with every migration applied, made once a process: a test starts from a
-// copy of it and store.Open finds nothing left to migrate. Under -race the migrations took 2.5 s of every test
-// (140 tests of hub/proxy ran into go test's 10 minutes). nil when it could not be made; a test then
-// migrates a database of its own, as before.
-func sqliteTemplate() []byte {
-	templateOnce.Do(func() {
-		dir, err := os.MkdirTemp("", "hubtest-template-")
-		if err != nil {
-			return
-		}
-		defer os.RemoveAll(dir)
-		path := filepath.Join(dir, "hub.db")
-		db, err := store.Open(context.Background(), "sqlite://"+path)
-		if err != nil {
-			return
-		}
-		// Close folds the write-ahead log into the file; a log left beside it means the file alone is not the whole
-		// database, and the template is not used.
-		if db.Close() != nil {
-			return
-		}
-		if _, err := os.Stat(path + "-wal"); err == nil {
-			return
-		}
-		templateBytes, _ = os.ReadFile(path)
-	})
-	return templateBytes
 }

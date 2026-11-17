@@ -120,9 +120,13 @@ func designAPI(d deps) *design.API {
 	// The kits' seals are checked once now, behind the start: the first open of the kits' screens after a restart
 	// found them cold and waited for every version's files to be hashed (half a minute and more on a big library).
 	// The home's kit cards are read with them: the first home after a start does not wait for them.
-	design.WarmKitCards(a.L.KitsDir())
+	warmKitCards(a.L.KitsDir())
 	return a
 }
+
+// warmKitCards reads the kits behind the start; the tests turn it off: it went on writing into a test's temporary
+// directory after the test, whose cleanup then failed.
+var warmKitCards = design.WarmKitCards
 
 // sessionPerson is the address a page session was signed for: the hub's runtime.session names the person, the
 // machine agent signs with its name (no address), so only a value with an @ is a person.

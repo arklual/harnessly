@@ -75,8 +75,8 @@ var (
 	mrLinkRe = regexp.MustCompile(`^https?://[^/]+/.+?/(?:-/)?(?:merge_requests|pull)/\d+$`)
 	// A claude.ai artifact; a page of the team's catalogue is told by its host (artifactLink).
 	claudeArtifactRe = regexp.MustCompile(`^https?://claude\.ai/(?:code/)?artifact/`)
-	// The artifacts CLI publishing a page: `<name>-artifact publish …`, `harnessly artifact publish …`.
-	artifactCmdRe = regexp.MustCompile(`(?:^|[\s;&|(/-])artifacts?\s+publish\b`)
+	// The artifacts CLI publishing a page: `<name>-artifact publish …`, `harnessly artifact publish …`, `harnessly docs publish …` (through the hub).
+	artifactCmdRe = regexp.MustCompile(`(?:^|[\s;&|(/-])(?:artifacts?\s+publish|harnessly\s+docs?\s+publish)\b`)
 	// The name of one feature stand under the stands' domain.
 	standNameRe = regexp.MustCompile(`^[\w-]+$`)
 	// A dev server the agent shows: `harnessly open http://localhost:5173` (or the deployment's name of the command).

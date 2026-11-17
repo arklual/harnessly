@@ -11,6 +11,32 @@
   border-radius: var(--hx-radius-full);
   background: var(--hx-bg-hover);
 }
+/* At the top of the stage, in the middle (ChatGPT's «Chat | Work»): bigger, out of the field's way, over everything
+   the stage draws; the greeting and the field stay where they were. */
+.hx-kind[data-place='top'] {
+  position: absolute;
+  top: var(--hx-space-4);
+  left: 50%;
+  z-index: 5;
+  margin: 0;
+  transform: translateX(-50%);
+  background: color-mix(in srgb, var(--hx-bg-hover) 80%, var(--hx-bg-stage));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--hx-fg-3) 10%, transparent);
+}
+.hx-kind[data-place='top'] .hx-kind__opt {
+  min-width: 116px;
+  height: 38px;
+  padding: 0 22px;
+}
+.hx-kind[data-place='top']::before {
+  background: color-mix(in srgb, var(--hx-fg-1) 9%, var(--hx-bg-raised));
+}
+.hx-gpt > .hx-kind[data-place='top'] {
+  top: 5px;
+}
+.hx-gpt {
+  position: relative;
+}
 /* The plate under the chosen one slides over to the other, with a little give at the end. */
 .hx-kind::before {
   content: '';

@@ -10,7 +10,7 @@ import (
 // waitIntents waits for the lift, which runs off the caller.
 func waitIntents(t *testing.T, s *Store, tab string, n int) {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for len(s.List(tab)) < n {
 		if time.Now().After(deadline) {
 			t.Fatalf("%s: %d intents, want %d", tab, len(s.List(tab)), n)

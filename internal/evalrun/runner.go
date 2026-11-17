@@ -165,19 +165,36 @@ func (r *Runner) Poll(ids []string) map[string]State {
 			continue
 		}
 		if !s.Terminal() {
-			r.mu.Lock()
-			_, going := r.active[id]
-			r.mu.Unlock()
-			if !going {
-				s.State, s.Error = Failed, "агент перезапущен во время прогона"
-				s.FinishedAt = time.Now().UTC().Format(timeFormat)
-				r.writeState(id, s)
-				r.cleanup(id, s.State)
-			}
+			s = r.settleStale(id, s)
 		}
 		out[id] = s
 	}
 	return out
+}
+
+// settleStale fails a run whose state says it is going but which this process does not run. The state is read again
+// under the lock: a run writes its last state before it leaves r.active, so a state read before that write and the
+// check made after it called a run that had just ended a restarted one.
+func (r *Runner) settleStale(id string, s State) State {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, going := r.active[id]; going {
+		return s
+	}
+	if b, err := os.ReadFile(filepath.Join(r.runDir(id), "state.json")); err == nil {
+		var now State
+		if json.Unmarshal(b, &now) == nil {
+			s = now
+		}
+	}
+	if s.Terminal() {
+		return s
+	}
+	s.State, s.Error = Failed, "агент перезапущен во время прогона"
+	s.FinishedAt = time.Now().UTC().Format(timeFormat)
+	r.writeState(id, s)
+	r.cleanup(id, s.State)
+	return s
 }
 
 // Stop ends a run. A run the machine does not have is not an error.

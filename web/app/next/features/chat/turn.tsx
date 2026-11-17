@@ -14,6 +14,8 @@ import ErrorLine, { errorHeadline } from '@/next/features/chat/error-line';
 import { isRetryable, parseErrorText, type ParsedError } from '@/next/features/chat/error-text';
 import UserMessage from '@/next/features/chat/user-message';
 import Outputs, { drawnOf, OutputsContext } from '@/next/features/chat/outputs';
+import { LinkCardsInline } from '@/next/features/chat/link-card';
+import { BigPictures } from '@/next/features/chat/pictures';
 import DelegationCards from '@/next/features/chat/delegation-card';
 import type {
   Entry,
@@ -231,7 +233,8 @@ const TurnView = ({ item, open, machineName, handlers }: ITurnViewProps) => {
   // A finished turn keeps its dynamic workflows in view under the folded work: they run on after the turn.
   const flows = live ? [] : worked.filter(isWorkflowCall);
   // A finished turn shows what it drew under its answer (Outputs); the work keeps only the cards not shown there.
-  const below = useContext(OutputsContext).viewUrl ? drawnOf(item) : [];
+  const outputs = useContext(OutputsContext);
+  const below = outputs.viewUrl ? drawnOf(item) : [];
   const expanded = live || open;
   const seen = useSeen(expanded);
   // Once the turn's page has loaded, what it holds is all there is: a turn whose steps loaded empty has nothing to
@@ -322,7 +325,12 @@ const TurnView = ({ item, open, machineName, handlers }: ITurnViewProps) => {
       {/* The answer, measured by the feed: a finished one taller than the screen is read from its start (feed.tsx). */}
       {item.answer && (
         <div className="hx-answer" data-final={!live || item.settled || undefined}>
-          <Md md={item.answer.md} />
+          {/* With the block «Сделано за ход» a link alone in its paragraph stays a link: its card is at the end. */}
+          <LinkCardsInline value={outputs.shown.made}>
+            <BigPictures value={outputs.shown.made && outputs.shown.bigShots}>
+              <Md md={item.answer.md} />
+            </BigPictures>
+          </LinkCardsInline>
         </div>
       )}
       <DelegationCards startedAt={turn.startedAt} endedAt={turn.endedAt} />

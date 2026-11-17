@@ -84,8 +84,11 @@ func keySession(model, voice, mode, instructions string) map[string]any {
 		"instructions": instructions,
 		"audio": map[string]any{
 			"input": map[string]any{
-				"transcription":  map[string]any{"model": "gpt-4o-mini-transcribe"},
-				"turn_detection": map[string]any{"type": "semantic_vad"},
+				"transcription": map[string]any{"model": "gpt-4o-mini-transcribe"},
+				// A turn ends when the words do, not on a pause for breath; the room's noise is taken out before the
+				// model hears it, so a fan or a street does not start a turn.
+				"turn_detection":  map[string]any{"type": "semantic_vad", "eagerness": "low"},
+				"noise_reduction": map[string]any{"type": "near_field"},
 			},
 			"output": map[string]any{"voice": voice},
 		},

@@ -3,6 +3,8 @@
 // time; the field knows it is its own by the element the voice's button stands in.
 import { useSyncExternalStore, type RefObject } from 'react';
 import type { THeadKind } from '@/next/features/voice-live/api';
+import { setVoiceMood, VOICE_MOOD } from '@/next/features/voice-live/voice-mood';
+import { showOnVoiceStage } from '@/next/features/voice-live/voice-stage';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 
 export const FIELD_FLOOR = {
@@ -14,6 +16,13 @@ export const FIELD_FLOOR = {
   failed: 'failed',
 } as const;
 export type TFieldFloor = (typeof FIELD_FLOOR)[keyof typeof FIELD_FLOOR];
+
+/** One turn of the call as the feed of the text mode shows it: who, what, and whether it is still going. */
+export interface IVoiceTurn {
+  role: 'user' | 'assistant';
+  text: string;
+  done: boolean;
+}
 
 export interface IVoiceField {
   /** The field (.hx-composer) the voice stands in now; null while its chat is not on screen (the voice goes on). */
@@ -30,6 +39,8 @@ export interface IVoiceField {
   heard: string;
   /** What the voice is saying now, as it goes (the line of its reply). */
   said: string;
+  /** The turns of the call so far, in order (the text mode's feed); empty while the talk writes nothing down. */
+  turns?: readonly IVoiceTurn[];
   /** Typed words go to the voice, which answers out loud. */
   typed: (text: string) => void;
   /** The voice agent's look (Settings). */
@@ -48,7 +59,12 @@ const listeners = new Set<() => void>();
 export const setVoiceField = (next: IVoiceField | null) => {
   // A talk that begins opens the full-screen layer (voice-full.tsx); folding it is the person's, until the talk ends.
   if (current === null && next !== null) expanded = true;
-  if (next === null) expanded = false;
+  if (next === null) {
+    expanded = false;
+    // What the talk showed leaves with it.
+    showOnVoiceStage(null);
+    setVoiceMood(VOICE_MOOD.neutral);
+  }
   current = next;
   for (const listen of listeners) listen();
 };

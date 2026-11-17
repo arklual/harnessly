@@ -176,6 +176,15 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		if dirs := os.Getenv("HARNESSLY_DOCS_DIR"); dirs != "" {
 			env = append(env, "HARNESSLY_DOCS_DIR="+dirs)
 		}
+		// The name (not the value) of the machine agent's loopback header: `harnessly docs publish` and `harnessly chat`
+		// call the agent with the token of agent.json under it, and a deployment may rename it.
+		if header := os.Getenv("RUNTIME_AGENT_TOKEN_HEADER"); header != "" {
+			env = append(env, "RUNTIME_AGENT_TOKEN_HEADER="+header)
+		}
+		// The documents host, so `harnessly docs publish` prints the document's address (a card in the chat, a tab).
+		if host := os.Getenv("RUNTIME_DOCS_HOST"); host != "" {
+			env = append(env, "RUNTIME_DOCS_HOST="+host)
+		}
 		if integ.Enabled() {
 			env = append(env, integ.AgentEnv(conversation)...)
 		}
@@ -550,6 +559,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(chatgptRoutes(d)...)
 	f.Add(voiceLiveRoutes(d)...)
 	f.Add(voiceEditRoutes(d)...)
+	f.Add(voiceRouteRoutes(d)...)
 	f.Add(spaceDirRoutes(d)...)
 	f.Add(backgroundRoutes(d)...)
 	f.Add(searchRoutes(d)...)

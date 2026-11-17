@@ -30,7 +30,8 @@
     w: 0,
     h: 0,
     dpr: 1,
-    layer: 'front',
+    // Known before the effect's code runs (fx-frame.ts writes it on <html>): an effect picks its layer at once.
+    layer: document.documentElement.dataset.layer === 'back' ? 'back' : 'front',
     power: 0.6,
     mode: 'dark',
     reduced: false,
@@ -38,6 +39,8 @@
     pointer: { x: -1, y: -1, vx: 0, vy: 0, down: false, inside: false },
     blocks: [],
     agent: { state: 'idle', since: 0 },
+    /** The weather where the person is («Погода» only; null until the page tells it). */
+    weather: null,
     /** Subscribes fn to an event; returns the unsubscribe. */
     on(name, fn) {
       (handlers[name] = handlers[name] || []).push(fn);
@@ -139,6 +142,12 @@
         hx.agent = { state: m.state, since: m.since };
         emit('state', hx.agent);
         break;
+      case 'weather': {
+        const { hx: _k, ...w } = m;
+        hx.weather = w;
+        emit('weather', w);
+        break;
+      }
       case 'ev': {
         const data = m.data || {};
         if (data.block) data.block = hx.blocks.find((b) => b.id === data.block) || null;

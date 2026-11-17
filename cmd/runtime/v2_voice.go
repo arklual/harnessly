@@ -18,6 +18,11 @@ func v2Voice(s *voice.Server) func(context.Context, io.Reader, string, string) (
 		if errors.As(err, &verr) && verr.Unavailable {
 			return "", wire.ErrVoiceUnavailable
 		}
+		if verr != nil {
+			// The service's or the decoder's own words (no key for the picked model, an unreadable recording): the person
+			// sees them instead of "an error on the machine".
+			return text, &wire.VoiceFailure{Message: verr.Message}
+		}
 		return text, err
 	}
 }

@@ -127,7 +127,9 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 		"harnessly --help                  # everything, with examples\n" +
 		"```\n\n")
 	b.WriteString("Show the person what they should look at: after you publish a document or draw a board, or when a dev server is running, " +
-		"`harnessly open` it. To hand a task to another agent, make a nested chat: the MCP tool `delegate_task` or `harnessly tab create --prompt` " +
+		"`harnessly open` it. A turn that made many things (several documents, a batch of tasks, merge requests, screenshots) opens one, " +
+		"the one to look at first, or none: the chat already shows what the turn made as cards under your answer, so name the rest as links " +
+		"and never open tasks or merge requests one by one. `harnessly open` shows a thing to the person; it reads nothing for you (read a task with `harnessly issue <KEY>`, a merge request with `glab` or the GitLab API). To hand a task to another agent, make a nested chat: the MCP tool `delegate_task` or `harnessly tab create --prompt` " +
 		"(both give the person a chat under yours, the workspace's hooks, and a way to read the answer or be woken by it with `notify`). " +
 		"A chat you start only to check something: create it with `--test` (`delegate_task` with `test: true`), so it stays out of the person's chat list; " +
 		"`harnessly chat test current` marks the chat you are in.\n" +
@@ -181,8 +183,10 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 		b.WriteString("## Documents and boards\n\n")
 		if integ.ArtifactsURL != "" {
 			b.WriteString("- Documents: the `artifacts` command (catalog at " + integ.ArtifactsURL + "). Search before you write " +
-				"(`artifacts find …`), publish with `artifacts publish --file report.md --title \"…\"`, update the same slug for a new version. " +
-				"Give the person the link it prints.\n")
+				"(`artifacts find …`). Publish a document for the person with `harnessly docs publish report.md --title \"…\"` " +
+				"(`--slug <slug>` for a new version of the same document): it goes through the hub, so it appears in the person's " +
+				"Documents app. `artifacts publish` writes past the hub and the document is not listed there; use it only when " +
+				"`harnessly docs publish` says there is no hub. Give the person the link it prints.\n")
 		}
 		if integ.BoardsURL != "" {
 			b.WriteString("- Boards: the `boards` command (server at " + integ.BoardsURL + "). Read a board from its link with `boards read <link>`, " +
@@ -231,8 +235,13 @@ const designPromptText = "## Sinopia Design\n\n" +
 	"`kit_list`, `kit_index`, `kit_search`, `kit_component` and `kit_tokens`, start with `harnessly design new \"<title>\" --kit <id>`, " +
 	"build it of the kit's real components (`<x-import component-from-global-scope=…>`, as `kit_component` gives them). " +
 	"A project on a kit is drawn only from it (the output of `design new` / `design page create` says which kit and how to check: " +
-	"`design check <project> --strict`, then `--board FILE` and look at the screenshot). A new design with no kit named while kits are " +
-	"installed: ask once with `notice_ask`, then `harnessly design kit use <project> <kit>|none`. " +
+	"`design check <project> --strict`, then `--board FILE` and look at the screenshot). A NEW design made from scratch " +
+	"(before `harnessly design new`): if the person did not name a UI kit and the conversation does not make clear which one to use, " +
+	"first ask in the chat which installed kit to take (`kit_list`), offering «без кита» as the last option: with `notice_ask` " +
+	"(or AskUserQuestion where that agent has it), else one short question; wait for the answer, then " +
+	"`harnessly design new \"<title>\" --kit <id>` (no `--kit` for «без кита»). Do not ask when the kit is named or clear from the " +
+	"conversation, for an existing project (edits, a new page of it), or when no kit is installed. The panel of Sinopia has no " +
+	"button for a kit: the chat is the only place it is chosen. If `design new` came before the answer: `harnessly design kit use <project> <kit>|none`. " +
 	"Make its scenes (a sheet, a transition, a toast) `data-props` switches and handlers of the `DCLogic` class. " +
 	"Do not write a separate HTML file, build a separate app or start `python3 -m http.server`, a dev server or another localhost " +
 	"server to show a mockup. Only when the person asks for an app or the product's code is it code; even then offer the board " +

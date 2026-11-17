@@ -164,7 +164,9 @@ func (s *Service) relay(p Proposal, settle bool) {
 			continue
 		}
 		in := s.instance(c, nil)
+		s.runner.relays.Add(1)
 		go func() {
+			defer s.runner.relays.Done()
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			var err error

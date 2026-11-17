@@ -76,7 +76,7 @@ func cardList(t *testing.T, p *hubtest.Person) map[string]cardItem {
 
 func waitCard(t *testing.T, p *hubtest.Person, id string, ok func(cardItem) bool) cardItem {
 	t.Helper()
-	deadline := time.Now().Add(6 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for {
 		m := cardList(t, p)[id]
 		if ok(m) {

@@ -26,6 +26,9 @@ func TestLinkMetaOfAStandAndACommit(t *testing.T) {
 		case strings.HasSuffix(r.Host, ".preview.example.com"):
 			w.Header().Set("Content-Type", "text/html")
 			_, _ = w.Write([]byte("<head><title>Аналитика</title></head>"))
+		case strings.HasSuffix(r.URL.Path, "/merge_requests/212"):
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"iid":212,"title":"Картинки","state":"opened","changes_count":"7","target_branch":"main"}`))
 		case strings.Contains(r.URL.Path, "/repository/commits/"):
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"title":"fix: стенд","short_id":"8ebd61a7","last_pipeline":{"status":"failed","web_url":"https://gitlab.example.com/p/-/pipelines/1"}}`))
@@ -71,5 +74,10 @@ func TestLinkMetaOfAStandAndACommit(t *testing.T) {
 	m := s.linkMeta(ctx, c)
 	if opt(m, "kind") != "commit" || opt(m, "title") != "fix: стенд" || opt(opt(m, "pipeline"), "status") != "failed" {
 		t.Fatalf("commit meta: %v", m)
+	}
+
+	mr := s.linkMeta(ctx, s.parseLinkTarget("https://gitlab.example.com/harnessly/harnessly/-/merge_requests/212"))
+	if opt(mr, "kind") != "mr" || opt(mr, "files") != "7" || opt(mr, "target") != "main" {
+		t.Fatalf("merge request meta: %v", mr)
 	}
 }

@@ -1,0 +1,23 @@
+id: publish-document
+title: «Опубликуй документ» — публикация через хаб (harnessly docs publish), не через artifacts publish
+tags: [docs]
+timeout_s: 300
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/hlcli/docs*.go'
+  - 'internal/paneauto/**'
+  - 'internal/outputs/**'
+prompt: Напиши короткий документ «План релиза 2.4» (три пункта, markdown) и опубликуй его, чтобы он появился у меня в приложении «Документы».
+expect:
+  - name: published through the hub command (a stand has no hub, so the call fails there and still counts)
+    called: Bash
+    even_failed: true
+    args: {command: '(?s).*harnessly\s+docs?\s+publish\s.*'}
+variants:
+  - id: v1
+    kind: short
+    text: "Опубликуй документ «План релиза 2.4» в Документы, три пункта"
+  - id: v2
+    kind: english
+    text: "Write a short release plan 2.4 document (three bullet points) and publish it so it shows up in my Documents app."

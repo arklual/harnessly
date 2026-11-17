@@ -47,6 +47,9 @@ func LookPath(v2path string) (hash string, ok bool) {
 		return "", true
 	}
 	rest, ok := strings.CutPrefix(p, "me/looks/")
+	if ok && rest == LookFxFrame {
+		return rest, true
+	}
 	if !ok || !validLookHash(rest) {
 		return "", false
 	}
@@ -79,8 +82,48 @@ func lookType(head []byte) string {
 	return ""
 }
 
-// ServeLooks answers the two paths of the looks' pictures from a store.
+// LookFxFrame is the path (under me/looks/) of the document a live effect runs in.
+const LookFxFrame = "fx-frame"
+
+// lookFxFrameCSP is the frame's own policy. Served from its own URL, the frame does not inherit the page's policy (a
+// srcdoc frame would, and the hub's page allows no inline script). It is a sandbox (an opaque origin: no cookies, no
+// storage, no reach into the page) with no network at all; its one script waits for the page to send the effect's
+// code and runs it, which is what 'unsafe-eval' allows — inside that sandbox only.
+const lookFxFrameCSP = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; " +
+	"img-src data: blob:; font-src data:; form-action 'none'; base-uri 'none'; sandbox allow-scripts"
+
+// lookFxFrameHTML takes the code from its parent only (the hx SDK and the effect, features/looks/fx-frame.ts), once.
+const lookFxFrameHTML = `<!doctype html><html><head><meta charset="utf-8">` +
+	`<style>html,body{margin:0;padding:0;background:transparent;overflow:hidden}canvas{display:block}</style>` +
+	`</head><body><script>(function(){` +
+	`function take(e){if(e.source!==parent||!e.data||e.data.hx!=="code"||typeof e.data.code!=="string")return;` +
+	`removeEventListener("message",take);document.documentElement.dataset.layer=e.data.layer==="back"?"back":"front";` +
+	`try{(0,eval)(e.data.code)}catch(err){parent.postMessage({hxFx:"err",msg:String(err&&err.stack||err).slice(0,400)},"*")}}` +
+	`addEventListener("message",take);parent.postMessage({hxFx:"boot"},"*")})()</script></body></html>`
+
+func serveFxFrame(w http.ResponseWriter, r *http.Request) {
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Content-Security-Policy", lookFxFrameCSP)
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Referrer-Policy", "no-referrer")
+	h.Set("Cache-Control", "private, max-age=3600")
+	if r.Method == http.MethodHead {
+		return
+	}
+	_, _ = io.WriteString(w, lookFxFrameHTML)
+}
+
+// ServeLooks answers the two paths of the looks' pictures from a store, and the live effects' frame.
 func ServeLooks(w http.ResponseWriter, r *http.Request, blobs LookBlobs, hash string) {
+	if hash == LookFxFrame {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		serveFxFrame(w, r)
+		return
+	}
 	if blobs == nil {
 		refuse(w, RefuseNotFound)
 		return

@@ -42,7 +42,7 @@ func readPID(t *testing.T, file string) int {
 
 func waitGone(t *testing.T, pids ...int) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for _, pid := range pids {
 		for alive(pid) {
 			if time.Now().After(deadline) {

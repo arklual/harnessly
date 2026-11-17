@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import presetsJson from '@/next/features/looks/presets.json';
-import { fxDocument } from '@/next/features/looks/fx-frame';
+import { FX_MAGIC, fxCodeMessage } from '@/next/features/looks/fx-frame';
 import { contrast, ensure, lookTokens } from '@/next/features/looks/tokens';
 import {
   NO_LOOKS,
@@ -100,10 +100,12 @@ describe('live effects', () => {
     expect(look?.fx).toEqual({ preset: 'laser' });
     expect(readLook({ ...STARTER_LOOK, fx: { code: 'alert(1)' } })?.fx).toBeUndefined();
   });
-  it('cannot close its script element', () => {
-    const doc = fxDocument('const a = "</script><img src=x onerror=alert(1)>"; <!-- x', 'n0');
-    expect(doc.match(/<\/script>/g)).toHaveLength(2);
-    expect(doc).not.toContain('<!--');
-    expect(doc).toContain("default-src 'none'");
+  it('sends the frame the SDK first and the effect without its magic line', () => {
+    const m = fxCodeMessage(`${FX_MAGIC}hx.on('frame', () => {});`, 'back');
+    expect(m.hx).toBe('code');
+    expect(m.layer).toBe('back');
+    expect(m.code.indexOf('window.hx = hx')).toBeGreaterThanOrEqual(0);
+    expect(m.code.indexOf('window.hx = hx')).toBeLessThan(m.code.indexOf("hx.on('frame'"));
+    expect(m.code).not.toContain(FX_MAGIC);
   });
 });

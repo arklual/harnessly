@@ -44,6 +44,8 @@ export type TMeta =
       state: string | null;
       resolved: boolean;
       assignee: IMetaPerson | null;
+      /** The epic it belongs to, when the tracker says. */
+      parent?: { key: string; title: string } | null;
     }
   | {
       kind: 'mr';
@@ -53,6 +55,10 @@ export type TMeta =
       iid: number;
       draft: boolean;
       pipeline: TPipeline | null;
+      /** How many files it changes, as GitLab says («7», «1000+»); null when not told. */
+      files?: string | null;
+      /** The branch it goes to. */
+      target?: string | null;
     }
   | { kind: 'artifact'; title: string; description: string | null }
   | { kind: 'commit'; title: string; sha: string; project: string; pipeline: TPipeline | null }
@@ -90,6 +96,12 @@ const readPerson = (v: unknown): IMetaPerson | null => {
   return name ? { name, avatar: text(v.avatar) } : null;
 };
 
+const readParent = (v: unknown): { key: string; title: string } | null => {
+  if (!isRecord(v)) return null;
+  const key = text(v.key);
+  return key ? { key, title: text(v.title) ?? key } : null;
+};
+
 /** The runtime's answer, read strictly; null for a shape that is not one of the three (nothing is guessed). */
 export const readMeta = (v: unknown): TMeta | null => {
   if (!isRecord(v)) return null;
@@ -107,6 +119,8 @@ export const readMeta = (v: unknown): TMeta | null => {
       iid: typeof v.iid === 'number' ? v.iid : 0,
       draft: v.draft === true,
       pipeline: readPipeline(v.pipeline),
+      files: text(v.files),
+      target: text(v.target),
     };
   if (v.kind === 'commit')
     return {
@@ -124,6 +138,7 @@ export const readMeta = (v: unknown): TMeta | null => {
       state: text(v.state),
       resolved: v.resolved === true,
       assignee: readPerson(v.assignee),
+      parent: readParent(v.parent),
     };
   return null;
 };

@@ -26,6 +26,7 @@ vi.mock('@/platform/config', () => ({
 
 import Markdown from '@/next/features/chat/markdown';
 import { RefContext } from '@/next/features/chat/ref-chip';
+import { LinkCardsInline } from '@/next/features/chat/link-card';
 
 afterEach(cleanup);
 
@@ -87,6 +88,18 @@ describe('a link to our own page', () => {
       'https://boards.example.com/b/abc',
       'https://boards.example.com/b/abc',
     );
+  });
+
+  it('in an answer with the block «Сделано за ход» stays a chip: its card is at the end', () => {
+    const { container } = render(
+      <LinkCardsInline value>
+        <RefContext.Provider value={{ refs: {}, onOpen: vi.fn() }}>
+          <Markdown md="[Payments flow](https://boards.example.com/b/abc)" />
+        </RefContext.Provider>
+      </LinkCardsInline>,
+    );
+    expect(container.querySelector('.hx-linkcard')).toBeNull();
+    expect(container.querySelectorAll('.hx-ref')).toHaveLength(1);
   });
 
   it('inside a sentence, or to another host, stays a chip', () => {

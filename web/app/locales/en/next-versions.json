@@ -60,10 +60,5 @@
   "next.versions.kit.settings": "Kit settings",
   "next.versions.kit.startFailed": "Could not open the kit's draft",
   "next.versions.kit.inChat": "Added to the message in the kit's chat",
-  "next.versions.kit.where": "The theme's files in the draft",
-  "next.versions.attach": "Connect a UI kit",
-  "next.versions.attachTitle": "The project's UI kit",
-  "next.versions.attachPackage": "Package: npm:@scope/name",
-  "next.versions.attachRegistry": "Registry (if not public)",
-  "next.versions.attachConnect": "Connect the package"
+  "next.versions.kit.where": "The theme's files in the draft"
 }

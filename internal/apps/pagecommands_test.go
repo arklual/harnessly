@@ -88,7 +88,7 @@ func (r *commandRig) call(ctx context.Context, key string) chan callEnd {
 func (r *commandRig) taken(page string) PageCall {
 	r.t.Helper()
 	// A deadline, not a count of tries: under -race on a loaded runner the call's journal write took over 2 s.
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); {
+	for deadline := time.Now().Add(30 * time.Second); time.Now().Before(deadline); {
 		if calls := r.pages.TakeBy("tab-1", page, page != ""); len(calls) == 1 {
 			return calls[0]
 		} else if len(calls) > 1 {
@@ -119,7 +119,7 @@ func (r *commandRig) status(id string) string {
 // made waits until the page tools hold n commands.
 func made(t *testing.T, pages *PageTools, n int) {
 	t.Helper()
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 15000; i++ {
 		pages.mu.Lock()
 		have := len(pages.cmds)
 		pages.mu.Unlock()
@@ -136,7 +136,7 @@ func ended(t *testing.T, ch chan callEnd) callEnd {
 	select {
 	case e := <-ch:
 		return e
-	case <-time.After(5 * time.Second):
+	case <-time.After(30 * time.Second):
 		t.Fatal("the call did not end")
 		return callEnd{}
 	}
@@ -241,7 +241,8 @@ func TestCommandHandedOutAgainWithoutAck(t *testing.T) {
 	r.screen("/form")
 	old := r.call(context.Background(), "")
 	var legacy PageCall
-	for i := 0; i < 400 && legacy.ID == ""; i++ {
+	// A deadline, not a count of tries: the call's journal write can take seconds under -race on a loaded runner.
+	for deadline := time.Now().Add(30 * time.Second); legacy.ID == "" && time.Now().Before(deadline); {
 		if calls := r.pages.Take("tab-1"); len(calls) == 1 {
 			legacy = calls[0]
 		}
@@ -299,8 +300,9 @@ func TestCommandExpires(t *testing.T) {
 func TestCommandDeadAfterRefusal(t *testing.T) {
 	enabled := []string{"acme.form"}
 	h, pages := windowRig(t, &enabled)
-	// Long enough for the call to be taken before it expires on a loaded runner under -race (120 ms was not, GitHub CI).
-	pages.CallTTL = 600 * time.Millisecond
+	// Long enough for the call to be taken before it expires on a loaded runner under -race (120 ms and 600 ms were
+	// not): the call's term runs on the real clock, and the test pays it in full once, waiting for the refusal.
+	pages.CallTTL = 4 * time.Second
 	if err := pages.OpenCommands(filepath.Join(t.TempDir(), PageCommandsFile)); err != nil {
 		t.Fatal(err)
 	}
@@ -314,11 +316,16 @@ func TestCommandDeadAfterRefusal(t *testing.T) {
 		done <- text
 	}()
 	var got []PageCall
-	for i := 0; i < 1000 && len(got) == 0; i++ {
+	for i := 0; i < 1500 && len(got) == 0; i++ {
 		got = pages.TakeBy("tab-1", "page-a", true)
 		time.Sleep(2 * time.Millisecond)
 	}
 	if len(got) != 1 {
+		select {
+		case x := <-done:
+			t.Fatalf("calls: %+v; agent got %s", got, x)
+		default:
+		}
 		t.Fatalf("calls: %+v", got)
 	}
 	if _, dead, _ := pages.Ack("tab-1", got[0].ID, "page-a"); dead {

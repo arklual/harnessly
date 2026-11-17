@@ -421,6 +421,7 @@ const ChatScreen = ({ machine, id, onOpenSettings, onOpenDrawer }: IChatScreenPr
         <div className="hx-dock" data-screen data-kind="talk">
           {/* Back to a task: a new agent chat on the start page, with the words not sent yet. */}
           <KindSwitch
+            top
             value={CHAT_KIND.talk}
             onChange={(kind) => {
               if (kind !== CHAT_KIND.task) return;

@@ -413,6 +413,13 @@ func (s *Service) fetchMr(ctx context.Context, t *linkTarget) (any, error) {
 	if p := pipelineOf(opt(mr, "head_pipeline")); p != nil {
 		out.Set("pipeline", p)
 	}
+	// The card's line in the chat: how many files it changes («7», GitLab's «1000+») and the branch it goes to.
+	if n, ok := opt(mr, "changes_count").(string); ok && n != "" {
+		out.Set("files", n)
+	}
+	if b, ok := opt(mr, "target_branch").(string); ok && b != "" {
+		out.Set("target", b)
+	}
 	return out, nil
 }
 

@@ -43,11 +43,11 @@ func heapInUse() uint64 {
 // once (the ids kept were slices of the read, and kept every read — gigabytes — alive).
 func TestLoadedFeedsDoNotKeepTheirReads(t *testing.T) {
 	if testing.Short() {
-		t.Skip("reads a hundred transcripts")
+		t.Skip("reads thirty transcripts")
 	}
 	path := write(t, heavyConversation(3, 40, 16<<10)) // ~2 MB, three turns: the first read takes all of it
 	st, _ := os.Stat(path)
-	const chats = 100
+	const chats = 30 // the share kept does not depend on how many; 100 took 25 s under -race (HRN-1596)
 	base := heapInUse()
 	feeds := make([]*Feed, 0, chats)
 	var took []time.Duration

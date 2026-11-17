@@ -2,7 +2,7 @@
 // its name, where it lives) instead of a bare link; a tap opens it in the pane like the chip of any other link.
 // Which hosts are ours comes from the page's config (the artifacts, the boards and the reader).
 // ⌘/Ctrl-click opens it in a new tab of the browser, and a right click or a held finger opens the link's menu.
-import { lazy, Suspense, useContext, useState } from 'react';
+import { createContext, lazy, Suspense, useContext, useState, type ReactNode } from 'react';
 import { useLinkMenu } from '@/next/features/chat/link-menu';
 import { previewSrc, useLinkCardMeta, whenText } from '@/next/features/chat/link-card-meta';
 import { openOutside } from '@/next/features/chat/pane-sites';
@@ -16,6 +16,9 @@ import { t } from '@/next/i18n';
 const ObjectShare = lazy(() => import('@/next/features/app-main/object-share'));
 
 export type TCardKind = 'doc' | 'board';
+
+/** The answer's links stay links: their cards are in the block «Сделано за ход» at its end (outputs.tsx). */
+export const LinkCardsInline = createContext(false);
 
 const parse = (url: string | null): URL | null => {
   if (!url) return null;
@@ -171,5 +174,9 @@ const LinkCard = ({ kind, href, text }: ILinkCardProps) => {
     </>
   );
 };
+
+/** A link alone in its paragraph: its card, or the paragraph as it is where the answer keeps its links inline. */
+export const LoneLink = ({ children, ...card }: ILinkCardProps & { children: ReactNode }) =>
+  useContext(LinkCardsInline) ? <p>{children}</p> : <LinkCard {...card} />;
 
 export default LinkCard;

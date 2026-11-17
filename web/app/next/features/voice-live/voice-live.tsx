@@ -3,7 +3,7 @@
 // written on the line as it is heard, and what they type goes to the voice, which answers out loud. Nothing grows over
 // the screen; a refusal says its reason in a toast with the way out. Esc or the same button ends it; ⌥ Space starts it
 // from anywhere (the shell opens the last chat and asks its field).
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@/next/i18n';
 import { loadVoiceState, VOICE_TALK, type TVoiceMode } from '@/next/features/voice-live/api';
@@ -16,6 +16,7 @@ import {
   takeVoiceStart,
   takeWakeStart,
   VOICE_START_EVENT,
+  type IVoiceTurn,
   type TFieldFloor,
 } from '@/next/features/voice-live/field';
 import { useVoiceState } from '@/next/features/voice-live/use-voice-state';
@@ -42,11 +43,16 @@ import { resetCallStyle } from '@/next/features/voice-live/style';
 
 const failKey = (fail: TVoiceFail) => `next.chatgpt.voice.fail.${fail}`;
 
+/** Asks the call that is on to end (controls.end). */
+const VOICE_END_EVENT = 'hx-voice-end';
+
 export interface IVoiceLiveControls {
   /** Tells the voice what a task came to, or a quiet note on how it goes. */
   say: (text: string, task?: string, speak?: boolean) => Promise<boolean>;
   /** A quiet line over the field on something done or asked («Заголовок крупнее · Отменить», «Удалить? · Да»). */
   note: (text: string, action?: IVoiceNoteAction) => void;
+  /** Ends the call (the router's «stop»: the person said goodbye). */
+  end?: () => void;
 }
 
 /** The one button of a quiet line; after it ran, the line says `after` (or stays) and has no button. */
@@ -163,7 +169,11 @@ const VoiceLive = ({
     onEnd,
   });
   useEffect(() => {
-    if (controlsRef) controlsRef.current = call === CALL.live ? { say, note } : null;
+    if (controlsRef)
+      controlsRef.current =
+        call === CALL.live
+          ? { say, note, end: () => window.dispatchEvent(new Event(VOICE_END_EVENT)) }
+          : null;
   }, [controlsRef, call, say]);
 
   // The state is read when the voice is turned on: the switch may have changed in Settings since.
@@ -210,6 +220,16 @@ const VoiceLive = ({
     window.addEventListener(VOICE_START_EVENT, onStart);
     return () => window.removeEventListener(VOICE_START_EVENT, onStart);
     // begin reads the state of the moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [on]);
+
+  // The router's «stop» (controls.end): the call ends as by its button.
+  useEffect(() => {
+    if (!on) return;
+    const onEnd = () => end();
+    window.addEventListener(VOICE_END_EVENT, onEnd);
+    return () => window.removeEventListener(VOICE_END_EVENT, onEnd);
+    // end reads the call's own refs only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [on]);
 
@@ -287,6 +307,15 @@ const VoiceLive = ({
   const said = lines.findLast((l) => l.role === 'assistant' && !l.done)?.text.trim() ?? '';
   // Only voice (Settings): nothing is written on the field's line, no quiet notes; the wave alone shows who speaks.
   const voiceOnly = state?.talk === VOICE_TALK.voice;
+  // The feed of the text mode: every line with words in it, the person's without what the microphone heard of the voice.
+  const turns = useMemo<IVoiceTurn[]>(() => {
+    if (voiceOnly) return [];
+    const voiceSaid = lines.filter((l) => l.role === 'assistant').map((l) => l.text);
+    return lines.flatMap((l) => {
+      const text = l.role === 'user' && l.done ? dropEcho(l.text, voiceSaid.slice(-6)) : l.text.trim();
+      return text.trim() ? [{ role: l.role, text: text.trim(), done: l.done }] : [];
+    });
+  }, [lines, voiceOnly]);
   const endRef = useRef<() => void>(() => undefined);
   useEffect(() => {
     endRef.current = end;
@@ -304,6 +333,7 @@ const VoiceLive = ({
       level,
       heard: voiceOnly ? '' : heard,
       said: voiceOnly ? '' : said,
+      turns,
       typed: type,
       head: mascot,
       interrupted,
@@ -316,6 +346,7 @@ const VoiceLive = ({
     level,
     heard,
     said,
+    turns,
     type,
     voiceOnly,
     mascot,
