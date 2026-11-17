@@ -293,6 +293,11 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 			return nil, nil, h.allow(op, false, "changes of the organization's environment")
 		}
 		return h.opEnvProposed(req)
+	case hubproto.OpEnvOwned:
+		if h.observe {
+			return nil, nil, h.allow(op, false, "changes of the person's own environment")
+		}
+		return h.opEnvOwned(req)
 	case hubproto.OpDocResult, hubproto.OpDocsDeliver:
 		// Served on an observe link only when the operator opted in with AGENT_HUB_DOCS=on (hubdocs.go).
 		return h.opDocs(op, req)

@@ -4,7 +4,9 @@
 // window of its own; the page asks for the day again when that window closes.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { openConversation } from '@/next/features/app-views/agents';
-import { cardChatOf, chatOf, itemChatOf } from '@/next/features/day/chat-link';
+import { cardChatOf, chatOf, itemChatOf, runChatOf } from '@/next/features/day/chat-link';
+import { conversationsStore } from '@/next/stores/conversations';
+import { useHomeReset } from '@/next/stores/new-chat';
 import { sendMessage } from '@/next/commands';
 import type { MachineId } from '@/next/protocol/v2';
 import {
@@ -50,6 +52,7 @@ import { DIGEST_ITEM } from '@/next/features/voice-live/digest-line';
 import { DIGEST_PHRASE, DIGEST_READING, DIGEST_VOICE } from '@/next/features/voice-live/digest-listen';
 import { t } from '@/next/i18n';
 import { goTo, ROUTE } from '@/next/routes/routes';
+import { Button } from '@/next/ui/button';
 import { usePresence } from '@/next/ui/presence';
 import { Delayed, Skeleton } from '@/next/ui/skeleton';
 import { toast } from '@/next/ui/toast';
@@ -104,6 +107,8 @@ export interface IDayStageProps {
   clockNow?: () => number;
   /** The page's machine: an agent's chat of a thing that runs on it opens inside the thing. */
   machine?: MachineId | null;
+  /** «Настроить» for a feed that offers it (`tune`): the host shows the app's own page in its rehearsal. */
+  onTune?: () => void;
 }
 
 const smooth = (): ScrollBehavior =>
@@ -207,6 +212,7 @@ const Digest = ({
   phrases,
   dv,
   onTalkOpen,
+  onTune,
 }: {
   day: IDay;
   clock: IDayClock;
@@ -216,6 +222,8 @@ const Digest = ({
   /** The voice that reads the digest; null where the page has no machine to call through. */
   dv: IDayVoice | null;
   onTalkOpen: (anchor: string) => void;
+  /** «Настроить»: the feed lets the person replay a past day and tune the app. */
+  onTune?: () => void;
 }) => {
   const part = clock.part(now);
   const tomorrow = day.tomorrow;
@@ -225,7 +233,20 @@ const Digest = ({
   const head = (title: ReactNode) => (
     <div className="hx-day-sum__h">
       <span className="hx-day-sum__t">{title}</span>
-      {dv && phrases.length > 0 && <DayListen dv={dv} />}
+      <span className="hx-day-sum__acts">
+        {onTune && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="sliders-horizontal"
+            title={t('next.day.tune.hint')}
+            onClick={onTune}
+          >
+            {t('next.day.tune.open')}
+          </Button>
+        )}
+        {dv && phrases.length > 0 && <DayListen dv={dv} />}
+      </span>
     </div>
   );
   const talk = dv && <DayTalk dv={dv} onOpen={onTalkOpen} />;
@@ -242,7 +263,7 @@ const Digest = ({
       </section>
     );
   }
-  if (phrases.length === 0) return null;
+  if (phrases.length === 0 && !onTune) return null;
   return (
     <section className="hx-day-sum" {...voiceAttr}>
       {head(t(`next.day.digest.${part}`, { weekday: capitalize(clock.weekday(now)) }))}
@@ -252,7 +273,7 @@ const Digest = ({
   );
 };
 
-const DayStage = ({ app, feed, onGreet, clockNow = Date.now, machine = null }: IDayStageProps) => {
+const DayStage = ({ app, feed, onGreet, clockNow = Date.now, machine = null, onTune }: IDayStageProps) => {
   const [load, setLoad] = useState<TLoad>({ k: LOAD.loading });
   const [now, setNow] = useState(clockNow);
   const [item, setItem] = useState<IOpenItem | null>(null);
@@ -305,13 +326,32 @@ const DayStage = ({ app, feed, onGreet, clockNow = Date.now, machine = null }: I
   const day = load.k === LOAD.ready ? load.day : null;
   const clock = useMemo(() => dayClock(day?.tz), [day?.tz]);
 
+  // A thing an agent has worked on opens as its chat, in a tab of its own: the chat is where the work is seen and talked
+  // about. One this hub does not know (a machine not connected) opens at its address beside the day.
+  const openRun = (named: IActResult & { chat?: string }): boolean => {
+    const conv = runChatOf(named);
+    if (conv === null) return false;
+    if (conversationsStore.has(conv)) {
+      openConversation(conv);
+      return true;
+    }
+    const url = webUrl(named.run?.url ?? named.url);
+    if (url === undefined) return false;
+    window.open(url, '_blank', 'noopener');
+    return true;
+  };
+
   const openItem = useStableFn(async (id: TItemId, from: HTMLElement) => {
     const origin = from.isConnected ? from.getBoundingClientRect() : null;
     opening.current += 1;
     const turn = opening.current;
+    const run = day?.priorities?.find((p) => sameItem(p.itemId, id))?.runUrl;
+    if (run && openRun({ url: run })) return;
     try {
       const card = await loadCard(feed, id);
-      if (turn === opening.current) setItem({ card, origin });
+      if (turn !== opening.current) return;
+      if (card.run && openRun(card.run)) return;
+      setItem({ card, origin });
     } catch (error) {
       const stands = standsFor(error, feed);
       if (stands) setLoad(stands);
@@ -497,6 +537,16 @@ const DayStage = ({ app, feed, onGreet, clockNow = Date.now, machine = null }: I
   };
 
   const close = useStableFn(() => setItem(null));
+  // «Новый диалог» pressed again on the start page: the thing open on it closes, the day stands clean.
+  const reset = useHomeReset();
+  const resetSeen = useRef(reset);
+  useEffect(() => {
+    if (resetSeen.current === reset) return;
+    resetSeen.current = reset;
+    opening.current += 1;
+    setItem(null);
+    rootRef.current?.querySelector('[data-home-scroll]')?.scrollTo({ top: 0 });
+  }, [reset]);
   const open = shown.value;
 
   return (
@@ -559,6 +609,7 @@ const DayStage = ({ app, feed, onGreet, clockNow = Date.now, machine = null }: I
             phrases={phrases}
             dv={machine === null ? null : dayVoice}
             onTalkOpen={openTalked}
+            onTune={day.tune ? onTune : undefined}
           />
           <Timeline day={day} clock={clock} now={now} slotEls={slotEls} onItem={actions.onItem} />
           <Priorities

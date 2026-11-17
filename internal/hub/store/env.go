@@ -13,6 +13,9 @@ const (
 	EnvLayerOrg    = "org"
 	EnvLayerTenant = "tenant"
 	EnvLayerTeam   = "team"
+	// EnvLayerUser is a person's own layer: scope_id is the person's user id. Its entries reach the person's
+	// own machines only, and only the person changes them (/api/me/env/own); the organization's screens do not list them.
+	EnvLayerUser = "user"
 )
 
 // Kinds of a catalog item.
@@ -236,6 +239,27 @@ func (s Store) EnvPersonOffs(ctx context.Context, userID, scope string) (map[str
 			return nil, err
 		}
 		out[id] = true
+	}
+	return out, rows.Err()
+}
+
+// EnvPersonOffsInScope are the switches of every person in a tenant: user id → the item ids they switched off.
+func (s Store) EnvPersonOffsInScope(ctx context.Context, scope string) (map[string]map[string]bool, error) {
+	rows, err := s.q.Query(ctx, `SELECT user_id, item_id FROM env_person_off WHERE scope = ?`, scope)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]map[string]bool{}
+	for rows.Next() {
+		var u, id string
+		if err := rows.Scan(&u, &id); err != nil {
+			return nil, err
+		}
+		if out[u] == nil {
+			out[u] = map[string]bool{}
+		}
+		out[u][id] = true
 	}
 	return out, rows.Err()
 }

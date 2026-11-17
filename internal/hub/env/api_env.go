@@ -311,7 +311,7 @@ func (q *req) summary(layers []LayerView, use *usageIndex, spaces map[string]boo
 // entryOf finds an entry of the organization.
 func (q *req) entryOf(id string) (store.EnvEntry, error) {
 	e, err := q.st.EnvEntryByID(q.ctx, id)
-	if store.IsNotFound(err) || (err == nil && e.OrgID != q.w.org.ID) {
+	if store.IsNotFound(err) || (err == nil && (e.OrgID != q.w.org.ID || e.Layer == store.EnvLayerUser)) {
 		return e, httpx.ErrNotFound
 	}
 	return e, err
@@ -512,7 +512,7 @@ func (s *Service) addEntry(w http.ResponseWriter, r *http.Request, p *auth.Princ
 			return err
 		}
 		it, ok := q.w.items[in.ItemID]
-		if !ok || it.ArchivedAt != nil || (it.OrgID != "" && it.OrgID != q.w.org.ID) {
+		if !ok || it.ArchivedAt != nil || (it.OrgID != "" && it.OrgID != q.w.org.ID) || it.OwnerLayer == store.EnvLayerUser {
 			return httpx.Invalid("itemId", "Такого элемента нет в каталоге")
 		}
 		if !FitsLayer(it.OwnerLayer, it.OwnerScope, in.Layer, in.ScopeID) {

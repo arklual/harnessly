@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -21,6 +22,7 @@ func ReadCodexRollout(path string) (Facts, error) {
 		return f, err
 	}
 	idx := map[string][2]int{}
+	completedCommands := map[int]bool{}
 	sc := bufio.NewScanner(bytes.NewReader(raw))
 	sc.Buffer(make([]byte, 0, 1<<20), 64<<20)
 	for sc.Scan() {
@@ -39,7 +41,12 @@ func ReadCodexRollout(path string) (Facts, error) {
 					Text string `json:"text"`
 				} `json:"content"`
 				Model string `json:"model"`
-				Info  *struct {
+				Item  *struct {
+					Type     string   `json:"type"`
+					Command  []string `json:"command"`
+					ExitCode *int     `json:"exit_code"`
+				} `json:"item"`
+				Info *struct {
 					Total struct {
 						In     int `json:"input_tokens"`
 						Cached int `json:"cached_input_tokens"`
@@ -59,6 +66,18 @@ func ReadCodexRollout(path string) (Facts, error) {
 			f.TokensIn = p.Info.Total.In - p.Info.Total.Cached
 			f.CacheRead = p.Info.Total.Cached
 			f.TokensOut = p.Info.Total.Out
+		case e.Type == "event_msg" && p.Type == "item_completed" && p.Item != nil && p.Item.Type == "CommandExecution" && p.Item.ExitCode != nil:
+			// Code-mode text(r.output) may omit exit status from the tool output.
+			// Keep the authoritative terminal event even when that output says "Script completed".
+			args, _ := json.Marshal(map[string]any{"command": p.Item.Command})
+			_, normalized := codexTool("shell", string(args))
+			for k := range f.Calls {
+				if !completedCommands[k] && f.Calls[k].Name == "Bash" && bytes.Equal(f.Calls[k].Args, normalized) {
+					f.Calls[k].Error = f.Calls[k].Error || *p.Item.ExitCode != 0
+					completedCommands[k] = true
+					break
+				}
+			}
 		case e.Type != "response_item":
 		case p.Type == "message" && p.Role == "assistant":
 			var b strings.Builder
@@ -102,7 +121,7 @@ func ReadCodexRollout(path string) (Facts, error) {
 			if json.Unmarshal([]byte(out), &wrapped) == nil && wrapped.Output != "" {
 				out = wrapped.Output
 				for k := span[0]; k < span[1]; k++ {
-					f.Calls[k].Error = wrapped.Metadata.ExitCode != nil && *wrapped.Metadata.ExitCode != 0
+					f.Calls[k].Error = f.Calls[k].Error || (wrapped.Metadata.ExitCode != nil && *wrapped.Metadata.ExitCode != 0)
 				}
 			}
 			for k := span[0]; k < span[1]; k++ {
@@ -136,7 +155,7 @@ func codexTool(name, args string) (string, json.RawMessage) {
 			for _, p := range c {
 				parts = append(parts, toString(p))
 			}
-			if len(parts) >= 3 && (parts[0] == "bash" || parts[0] == "sh") && strings.HasPrefix(parts[1], "-") {
+			if len(parts) >= 3 && (filepath.Base(parts[0]) == "bash" || filepath.Base(parts[0]) == "sh") && strings.HasPrefix(parts[1], "-") {
 				cmd = parts[len(parts)-1]
 			} else {
 				cmd = strings.Join(parts, " ")

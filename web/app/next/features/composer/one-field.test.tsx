@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IComposerProps } from '@/next/features/composer/composer';
@@ -67,7 +67,7 @@ const fields = () => document.querySelectorAll('textarea');
 const mainField = () => screen.getByPlaceholderText(/chat|settings/);
 
 describe('the window’s one field', () => {
-  it('is one element that moves from screen to screen and takes each screen’s words', () => {
+  it('is one element that moves from screen to screen and takes each screen’s words', async () => {
     const { rerender } = render(<Window at="chat" />);
     const field = mainField();
     expect(screen.getByTestId('chat').contains(field)).toBe(true);
@@ -78,7 +78,8 @@ describe('the window’s one field', () => {
     rerender(<Window at="settings" />);
     expect(mainField()).toBe(field);
     expect(screen.getByTestId('settings').contains(field)).toBe(true);
-    expect(field).toHaveProperty('placeholder', 'settings');
+    // The old words fade out before the screen's own fade in (composer.tsx, useHintSwap).
+    await waitFor(() => expect(field).toHaveProperty('placeholder', 'settings'));
     expect(field).toHaveProperty('value', '');
     expect(document.activeElement).toBe(field);
 

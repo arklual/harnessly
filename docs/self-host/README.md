@@ -29,3 +29,5 @@ flowchart TB
 - [Update channels](update-channels.md): `stable` (the default) or `latest`, how to change it, how a release becomes stable.
 - [Known limits of shared and team installations](multi-user-limits.md): what to plan around when several people share a machine or a hub.
 - [Your own documentation](own-docs.md): put your team's pages into the /help page and the agents' `harnessly docs`.
+- [Telemetry](telemetry.md): the anonymous error reports a release sends its makers, and how to turn them off.
+- [Logs and metrics](observability.md): the journal as OpenTelemetry logs and Prometheus metrics for your own Grafana stack.

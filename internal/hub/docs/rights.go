@@ -136,9 +136,24 @@ func (s *Service) rightsOf(r *http.Request, req rightsRequest) (map[string]strin
 	if err != nil {
 		return nil, nil, err
 	}
+	// A board without a record whose access somebody has set is known too: the boards service then does what its
+	// people and links say, not its own rules.
+	var shared []string
 	for _, slug := range slugs {
 		if _, ok := all[slug]; ok || elsewhere[slug] {
 			known = append(known, slug)
+			continue
+		}
+		if s.access == nil {
+			continue
+		}
+		stored, err := s.access.Stored(ctx, refOf(slug, nil))
+		if err != nil {
+			return nil, nil, err
+		}
+		if stored {
+			known = append(known, slug)
+			shared = append(shared, slug)
 		}
 	}
 	sub := req.Sub
@@ -187,6 +202,9 @@ func (s *Service) rightsOf(r *http.Request, req rightsRequest) (map[string]strin
 		if a := strings.TrimSpace(req.Authors[slug]); a != "" {
 			out[slug] = rightOf(s.rank(ctx, slug, nil, a, p, c))
 		}
+	}
+	for _, slug := range shared {
+		out[slug] = rightOf(s.rank(ctx, slug, nil, strings.TrimSpace(req.Authors[slug]), p, c))
 	}
 	return out, known, nil
 }

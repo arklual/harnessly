@@ -14,6 +14,7 @@ import type {
   EnvPreset,
   PatchGroupRequest,
   PatchPresetRequest,
+  MeEnvOwnRequest,
 } from '../../../../hub-api/env';
 import { OrgApiError, orgErrorText } from '../../../org/api/errors';
 import { useOrg } from '../../../org/context';
@@ -333,6 +334,13 @@ export const useActions = (
       () => api.envMineGroup(groupId, !on, space),
     );
 
+  /** A member's own skill or MCP server: added, or taken out. */
+  const ownAdd = (req: MeEnvOwnRequest, space?: string): Promise<boolean> =>
+    change(() => api.envOwnAdd(req, space), `«${req.name}» добавлено — машина поставит`);
+
+  const ownRemove = (id: string, name: string, space?: string): Promise<boolean> =>
+    change(() => api.envOwnRemove(id, space), `«${name}» убрано`);
+
   const addPreset = (t: Target, name: string, groupIds: string[]): Promise<boolean> =>
     change(
       () => api.envPresetAdd(org, { layer: t.layer, scopeId: t.scopeId, name, groupIds }),
@@ -461,6 +469,8 @@ export const useActions = (
     removeGroup,
     moveToGroup,
     mineGroup,
+    ownAdd,
+    ownRemove,
     addPreset,
     patchPreset,
     removePreset,

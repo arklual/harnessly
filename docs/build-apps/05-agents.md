@@ -129,7 +129,7 @@ Everything in the system prompt is paid for on every turn, so it is counted:
 | Delegation tools | yes | **no** | yes |
 | `tab create`, `send`, `close`, `result`, `peers send` | yes | **no** (`agent_outside_the_wall`) | yes |
 | `tab list`, `tab status`, `workspaces`, `peers` | yes | yes | yes |
-| `deliver`, `notify`, `ask`, `secret`, `design`, `site`, `api-guide` | yes | yes | yes |
+| `deliver`, `notify`, `ask`, `secret`, `design`, `site`, `api-guide`, `connections`, `connector read`, `connector act` | yes | yes | yes |
 | `harnessly-app` tools | no | yes | no |
 | The app's instructions, skills, commands, tool rules | no | yes | no |
 | Wall | no | yes, where bwrap works | no |

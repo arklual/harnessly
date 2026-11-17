@@ -7,6 +7,8 @@ import (
 	"cmp"
 	"encoding/json"
 	"slices"
+	"strings"
+	"unicode"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
@@ -56,8 +58,11 @@ type Item struct {
 
 // FitsLayer says whether an item may be carried by an entry of the layer's scope: an item the organization owns is
 // usable anywhere, an item a tenant or a team owns only in its own layer. Otherwise whoever edits the item (a team's
-// lead) could change what runs on machines of wider layers.
+// lead) could change what runs on machines of wider layers. A person's own layer carries only the person's own items.
 func FitsLayer(ownerLayer, ownerScope, layer, scopeID string) bool {
+	if layer == store.EnvLayerUser {
+		return ownerLayer == store.EnvLayerUser && ownerScope == scopeID
+	}
 	return ownerLayer == "" || (ownerLayer == layer && ownerScope == scopeID)
 }
 
@@ -89,6 +94,8 @@ type Group struct {
 
 // Person is whom the environment is computed for: where they are and what they switched off.
 type Person struct {
+	// UserID is the person; "" computes without a person's own layer: their own items are not in.
+	UserID  string
 	OrgID   string          // "" in a tenant without an organization: there is no organization layer then
 	SpaceID string          // the tenant
 	Teams   []string        // the teams the person is in, in this tenant
@@ -118,6 +125,8 @@ func LayerRank(layer string) int {
 		return 0
 	case store.EnvLayerTenant:
 		return 1
+	case store.EnvLayerUser:
+		return 3
 	}
 	return 2
 }
@@ -138,6 +147,8 @@ func reaches(e Entry, p Person) bool {
 			return false
 		}
 		return e.Audience.Mode != AudienceOff
+	case store.EnvLayerUser:
+		return p.UserID != "" && e.ScopeID == p.UserID
 	default:
 		return false
 	}
@@ -207,10 +218,38 @@ func Resolve(items map[string]Item, entries []Entry, p Person) []Effective {
 		eff.Off = (p.Off[id] || eff.GroupOff) && !eff.Pinned
 		out = append(out, eff)
 	}
+	out = withoutShadowed(out)
 	slices.SortFunc(out, func(a, b Effective) int {
 		return cmp.Or(cmp.Compare(a.Kind, b.Kind), cmp.Compare(a.Name, b.Name), cmp.Compare(a.ID, b.ID))
 	})
 	return out
+}
+
+// withoutShadowed leaves out a person's own item when an item of the same kind and name comes from a layer of the
+// organization: what the organization gives (pinned or not) is never replaced by one's own on the machine.
+func withoutShadowed(eff []Effective) []Effective {
+	given := map[string]bool{}
+	for _, e := range eff {
+		if e.Layer != store.EnvLayerUser {
+			given[OwnKey(e.Kind, e.Name)] = true
+		}
+	}
+	return slices.DeleteFunc(eff, func(e Effective) bool { return e.Layer == store.EnvLayerUser && given[OwnKey(e.Kind, e.Name)] })
+}
+
+// OwnKey is how an own item and a given one are found to be the same: the kind and the name as the machine names it
+// (an MCP server by its plain-word name in .mcp.json, a skill by its name), letters case-folded.
+func OwnKey(kind, name string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(name) {
+		switch {
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			b.WriteRune(r)
+		case b.Len() > 0 && !strings.HasSuffix(b.String(), "-"):
+			b.WriteByte('-')
+		}
+	}
+	return kind + "\x00" + strings.Trim(b.String(), "-")
 }
 
 // Active leaves out what the person switched off.

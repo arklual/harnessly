@@ -252,4 +252,23 @@ describe('the page of the day from a feed (HRN-1457)', () => {
     expect(await findByText('The day did not load')).toBeTruthy();
     expect(queryByText('Sign in')).toBeNull();
   });
+
+  it('offers «Настроить» only when the feed lets the person tune the app (HRN-1590)', async () => {
+    serve();
+    const plain = draw();
+    expect(await plain.findByText('Review the export merge request')).toBeTruthy();
+    expect(plain.queryByText('Tune')).toBeNull();
+    cleanup();
+
+    const day = { ...JSON.parse(file('day.json')), tune: true };
+    serve((call) =>
+      call.method === 'GET' && call.url === FEED ? new Response(JSON.stringify(day)) : undefined,
+    );
+    const onTune = vi.fn();
+    const view = render(
+      <DayStage app={APP} feed={FEED} onGreet={() => {}} clockNow={() => NOW} onTune={onTune} />,
+    );
+    fireEvent.click(await view.findByText('Tune'));
+    expect(onTune).toHaveBeenCalledOnce();
+  });
 });

@@ -8,6 +8,18 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Anonymous telemetry (docs/self-host/telemetry.md): a release reports harnessly's own errors (page, runtime, Sinopia)
+  as `$exception`, scrubbed of addresses, e-mails, paths, ids and tokens, and a daily heartbeat with the version, to the
+  PostHog linked in at release time. Off with `install.sh --disable-telemetry`, `HARNESSLY_TELEMETRY=off`,
+  `DO_NOT_TRACK=1` or Settings → Privacy; a build from a checkout sends nothing.
+- Logs and metrics for your own stack (docs/self-host/observability.md): the journal as OTLP/HTTP logs (the standard
+  `OTEL_EXPORTER_OTLP_*` variables) and Prometheus metrics on `RUNTIME_METRICS_LISTEN`.
+- A person's own layer of the hub's environment (docs/hub/environment.md «Own layer»), behind the organization
+  flag `env.own`: a person adds their own skills and MCP servers from the runtime's settings (`RUNTIME_HUB_ENV_OWN=on`)
+  or from «Моё окружение» in the hub, and they reach only that person's machines. An own item never replaces what the
+  organization gives: a name the organization uses is refused, and one it gives later leaves the person's machines.
+  With the flag, the personal switches take items off the person's machines too.
+
 - Agent evals for new features (docs/agent-evals.md «New features»): `evals/agent/surface.txt` lists the
   agent's surface (workspace prompt, skills, MCP tools, `harnessly` commands) and every scenario names the paths it
   checks (`covers:`). `harnessly eval affected` names the scenarios a change touches and, with `--check`, exits 3 when

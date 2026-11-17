@@ -31,8 +31,12 @@ const PAGES: Record<string, { headers?: Record<string, string>; html: string }> 
     ),
   },
   '/csp': {
-    headers: { 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'" },
-    html: doc(`<article><h1>Strict CSP</h1><p id="words">Some words to annotate</p><button id="buy">Buy now</button></article>`),
+    headers: {
+      'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'",
+    },
+    html: doc(
+      `<article><h1>Strict CSP</h1><p id="words">Some words to annotate</p><button id="buy">Buy now</button></article>`,
+    ),
   },
   '/shadow': {
     html: doc(

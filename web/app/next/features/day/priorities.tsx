@@ -33,6 +33,17 @@ const writeSeen = (seen: Set<string>) => {
   }
 };
 
+// What the agent has to do with the thing, said on its card: done and waiting for a look, working, will take it,
+// waiting, done by it. A thing that is the person's own alone says nothing.
+const WHO = ['prepared', 'running', 'queue', 'wait', 'done'] as const;
+type TWho = (typeof WHO)[number];
+const whoOf = (p: IDayPriority): TWho | null => {
+  if (p.done === true) return p.runUrl ? 'done' : null;
+  if (p.section === 'prepared') return p.runUrl ? 'prepared' : null;
+  if (p.group !== 'agent') return null;
+  return (WHO as readonly string[]).includes(p.section ?? '') ? (p.section as TWho) : null;
+};
+
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 interface IPrioritiesProps {
@@ -151,6 +162,12 @@ const Priorities = ({ items, onItem, voiceItem = null }: IPrioritiesProps) => {
                 {p.due && <time data-soon={p.soon === true ? '' : undefined}>{p.due}</time>}
                 {p.done === true && <em className="hx-day-pr__donet">{p.doneAt ?? t('next.day.done')}</em>}
               </div>
+              {whoOf(p) && (
+                <p className="hx-day-pr__who" data-who={whoOf(p)}>
+                  <Icon name="sparkles" size="sm" />
+                  {t(`next.day.who.${whoOf(p)}`)}
+                </p>
+              )}
               {p.sub && <p className="hx-day-pr__sub">{p.sub}</p>}
               {p.points && p.points.length > 0 && (
                 <ul className="hx-day-pr__pts">

@@ -72,6 +72,8 @@ type builtIns struct {
 	// apps are the platform's apps (nil: HUB_ENV_APPS=off); install are the installation's values (InstallValues).
 	apps    []BuiltInApp
 	install map[string]string
+	// feat says which organizations have a person's own layer (FeatureOwn); nil: none.
+	feat FeatureGate
 }
 
 const builtInAppPrefix = "app-"

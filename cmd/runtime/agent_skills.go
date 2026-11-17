@@ -192,7 +192,19 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 			b.WriteString("- Boards: the `boards` command (server at " + integ.BoardsURL + "). Read a board from its link with `boards read <link>`, " +
 				"draw a diagram with `boards create \"<title>\" graph.json`, edit with `boards edit <link> -`.\n")
 		}
-		b.WriteString("- Their tokens are already in your environment (`ARTIFACTS_URL`, `ARTIFACTS_TOKEN`, `BOARDS_URL`, `BOARDS_TOKEN`); never print them.\n\n")
+		b.WriteString("- Service addresses and configured credentials are supplied through `ARTIFACTS_URL`, `ARTIFACTS_TOKEN`, `BOARDS_URL`, `BOARDS_TOKEN`. " +
+			"An address does not mean a token is configured. Never print credential values.\n")
+		if integ.BoardsURL != "" {
+			b.WriteString("- Board authentication: prefer the boards app's MCP tools when available; its platform identity is not a CLI API token. " +
+				"For the `boards` CLI, if a token is missing or a request returns 401, run `harnessly secret list` (names only). " +
+				"Use the matching safe entry, or request one with `harnessly secret ask boards-token --origin <boards-origin> --why \"access the board you requested\" --wait 0`. " +
+				"This opens a private input card immediately; continue waiting yourself in the background with `--wait 1800`, without asking for another chat message. " +
+				"When ready, retry through `harnessly secret run --env BOARDS_TOKEN=boards-token -- boards read <link>`. " +
+				"Use the actual safe name and exact server origin. An expired saved token needs `--replace`; a declined request must not be repeated. " +
+				"Never ask for a token in the chat or read a credential file. A 403 for an authenticated user means insufficient board rights: " +
+				"ask for access, do not rotate tokens or make the board public. `board_signin` signs the app's browser in; it does not grant board rights or configure CLI credentials.\n")
+		}
+		b.WriteString("\n")
 	}
 	b.WriteString("## Skills\n\n")
 	b.WriteString("Skills for the above are installed for you: `harnessly`")

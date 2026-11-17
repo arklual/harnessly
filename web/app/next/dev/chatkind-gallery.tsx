@@ -67,13 +67,27 @@ const ChatkindGallery = () => {
   }, [theme]);
   useEffect(() => {
     if (query.auto !== '1') return;
-    const timer = setInterval(() => setKind((k) => (k === CHAT_KIND.task ? CHAT_KIND.talk : CHAT_KIND.task)), AUTO_MS);
+    const timer = setInterval(
+      () => setKind((k) => (k === CHAT_KIND.task ? CHAT_KIND.talk : CHAT_KIND.task)),
+      AUTO_MS,
+    );
     return () => clearInterval(timer);
   }, [query.auto]);
   const talk = kind === CHAT_KIND.talk;
   return (
-    <div className="hx-root hx-stage" style={{ width: '100vw', height: '100vh', background: 'var(--hx-bg-app)' }}>
-      <div style={{ width: '100%', maxWidth: 880, margin: '0 auto', padding: '120px 16px 0', boxSizing: 'border-box' }}>
+    <div
+      className="hx-root hx-stage"
+      style={{ width: '100vw', height: '100vh', background: 'var(--hx-bg-app)' }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 880,
+          margin: '0 auto',
+          padding: '120px 16px 0',
+          boxSizing: 'border-box',
+        }}
+      >
         <div className="hx-dock" data-screen data-kind={kind} style={{ width: '100%' }}>
           <KindSwitch value={kind} onChange={setKind} top />
           <Composer

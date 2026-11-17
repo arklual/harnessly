@@ -1573,7 +1573,8 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
   // A frame inside the page (not the pane's own frame) answers to the page that holds it, in its own origin: a mark
   // put in it travels up through the frames to the pane. A frame of another origin, or an opaque one, is not reached.
   const nested = parent !== win.top;
-  const frameOrigin: string | null = win.location.origin && win.location.origin !== 'null' ? win.location.origin : null;
+  const frameOrigin: string | null =
+    win.location.origin && win.location.origin !== 'null' ? win.location.origin : null;
   const post = (message: Record<string, unknown>) => {
     if (!nested) {
       parent.postMessage(slotKey ? { ...message, hlSlot: slotKey } : message, parentOrigin);
@@ -1982,7 +1983,8 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
       if (picking) tellFrame(el);
       return;
     }
-    const inner = data.tkFrame === 'up' && data.message && typeof data.message === 'object' ? data.message : null;
+    const inner =
+      data.tkFrame === 'up' && data.message && typeof data.message === 'object' ? data.message : null;
     if (!inner) return;
     if (inner.type === 'tk:pick' && inner.on === false) {
       setPicking(false, true);

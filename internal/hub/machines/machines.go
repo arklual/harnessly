@@ -57,7 +57,7 @@ type Deps struct {
 	Projects ProjectsSink
 	// Docs answers the machines' doc.publish and doc.acl (internal/hub/docs); nil: nobody answers.
 	Docs DocsSink
-	// Proposals answers the machines' env.propose; nil: nobody answers.
+	// Proposals answers the machines' env.propose and env.own; nil: nobody answers.
 	Proposals EnvProposals
 	// Automations takes the reports of automation conversations (internal/hub/automations); nil: nobody does.
 	Automations AutomationsSink
@@ -105,6 +105,8 @@ type DocsSink interface {
 // EnvProposals answers a change of the environment a machine's agent proposes for its person (internal/hub/env).
 type EnvProposals interface {
 	Proposed(ctx context.Context, m store.Machine, raw json.RawMessage) hubproto.EnvProposalResult
+	// Own changes the own layer of the machine's owner.
+	Own(ctx context.Context, m store.Machine, raw json.RawMessage) hubproto.EnvOwnResult
 }
 
 // DesignSink is what keeps a machine's design access (internal/hub/designaccess).

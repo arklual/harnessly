@@ -35,14 +35,19 @@ const ObjectShare = ({ kind, slug, open, onClose, fallbackLink }: IObjectSharePr
   const onReady = useCallback(
     (ready: boolean) => {
       if (ready || !open) return;
-      // No access model here: the old behaviour, the link to the app.
+      // No access model here, or the hub did not answer: the board's or the document's own page where its service is
+      // known (<boards host>/b/<slug>), the link to the app only on a standalone runtime without one.
       onClose();
-      navigator.clipboard.writeText(fallbackLink).then(
-        () => toast(t('next.appmain.shared'), { description: t('next.appmain.sharedHint') }),
-        () => toast(t('next.appmain.shareFailed'), { tone: 'error', description: fallbackLink }),
+      const config = appConfig();
+      const own = (meta?.kind ?? kind) === 'board' ? config.boardsUrl : config.artifactsUrl;
+      const link = own ? objectAddress(meta?.kind ?? kind, slug) : fallbackLink;
+      const hint = own ? t('next.appmain.sharedObjectHint') : t('next.appmain.sharedHint');
+      navigator.clipboard.writeText(link).then(
+        () => toast(t('next.appmain.shared'), { description: hint }),
+        () => toast(t('next.appmain.shareFailed'), { tone: 'error', description: link }),
       );
     },
-    [open, onClose, fallbackLink],
+    [open, onClose, fallbackLink, kind, slug, meta?.kind],
   );
   return (
     <DocShareDialog

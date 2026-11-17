@@ -32,36 +32,18 @@ import VoiceLive, { type IVoiceLiveControls } from '@/next/features/voice-live/v
 import type { IVoiceTask } from '@/next/features/voice-live/use-voice-call';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { useAgentState, sendModeNow } from '@/next/stores/chat-state';
-import { gatesStore, openGates, useGates, useNow } from '@/next/stores/conversation';
+import { openGates, useGates, useNow } from '@/next/stores/conversation';
 import { progressPhrase, shouldSay } from '@/next/features/voice-live/progress';
 import { useFileSelectionChip } from '@/next/stores/file-selection';
 import { useChatPane } from '@/next/stores/pane-state';
 import { recentLines, screenText } from '@/next/bindings/voice-screen';
 import { callStyle, DELIVERY } from '@/next/features/voice-live/style';
-import {
-  routeRequest,
-  routeVoice,
-  runPlan,
-  watchWaiting,
-  type IRouteAction,
-} from '@/next/bindings/voice-router';
 import { isNoiseText } from '@/next/features/voice-live/noise';
-import {
-  nextPart,
-  pauseReading,
-  readInstruction,
-  reading,
-  resumeReading,
-  startReading,
-  stopReading,
-} from '@/next/features/voice-live/reader';
-import { ChatsCard, ReadingCard, TextCard } from '@/next/features/voice-live/stage-cards';
-import { showOnVoiceStage } from '@/next/features/voice-live/voice-stage';
-import { useTheme } from '@/platform/theme';
-import { useRail } from '@/next/bindings/rail';
-import { goTo, ROUTE } from '@/next/routes/routes';
-import { conversationsByActivity, conversationsStore } from '@/next/stores/conversations';
-import { startFolder } from '@/next/bindings/home-composer';
+import { useVoiceHands } from '@/next/bindings/voice-hands';
+
+/** Words about the page, the chats, the model or the talk itself, not about the open board: the router takes them. */
+const COMMAND_RE =
+  /(открой|откро|закрой|покажи|переключ|тем[уаеы]\b|сайдбар|боков|панел|настройк|чат|модел|опус|сонет|хайку|уров[ен]|глубж|быстрее|разреш|вариант|вспомн|помнишь|прочитай|читай|продолж|новый|новую|создай|заверш|стоп|хватит|open|theme|sidebar|settings|chat|model|switch|read)/i;
 
 /** «Верни», «отмени», «откати»: the last quick edit put back. */
 const UNDO_RE = /^(верни|отмени|откати|undo|revert)/i;
@@ -122,13 +104,7 @@ const VoiceLiveAgent = ({ machine, conv, extra = null }: IVoiceLiveAgentProps) =
       }
     : null;
   const voiceEdit = extra?.voiceEdit ?? paneEdit;
-  const { resolvedTheme, setTheme } = useTheme();
-  const railFolded = useRail();
-  // The call's last lines, for the router (what «второй», «да», «продолжи» answer).
-  const history = useRef<string[]>([]);
-  const [live, setLive] = useState(false);
-  // The part of a long reading the voice was given and has not finished saying (reader.ts).
-  const readingSent = useRef(false);
+  const hands = useVoiceHands({ machine, conv, controls });
   const started = useRef(false);
   // A task that waits for «да» (confirm.ts): the next words decide.
   const held = useRef<IVoiceTask | null>(null);
@@ -234,152 +210,6 @@ const VoiceLiveAgent = ({ machine, conv, extra = null }: IVoiceLiveAgentProps) =
     );
   };
 
-  // During a call every chat that starts waiting for the person (a question, a permission) is told by voice: the
-  // person answers out loud and the router answers the chat. Its channel is opened so its words are known.
-  useEffect(() => {
-    if (!live) return;
-    const release = watchWaiting();
-    const told = new Set<string>();
-    const waitingNow = () =>
-      conversationsByActivity().filter(
-        (c) => !c.test && (c.state.k === 'waiting-question' || c.state.k === 'waiting-permission'),
-      );
-    // What waits already when the call starts is told too, once its words arrive.
-    const check = () => {
-      for (const c of waitingNow()) {
-        const g = openGates(gatesStore.get(c.id) ?? { questions: [], permissions: [] });
-        const q = g.questions[0]?.items[0];
-        const p = g.permissions[0];
-        const key = `${c.id}:${q ? g.questions[0]?.id : p?.id}`;
-        if (told.has(key) || (!q && !p)) continue;
-        // The voice's own chat's permission is asked by the old way (permission.ts).
-        if (c.id === conv && p && !q) continue;
-        told.add(key);
-        const what = q
-          ? `asks: «${q.question || q.header}»; options: ${q.options.map((o, i) => `${i + 1}) ${o.label}`).join('; ')}`
-          : `wants permission to run: «${[p?.tool, p?.command].filter(Boolean).join(': ')}»`;
-        void controls.current?.say(
-          `The chat «${c.title || 'untitled'}» ${what}. Tell the person in one or two short sentences (options by ` +
-            'their short names) and ask what to answer; when they answer, hand it over.',
-        );
-      }
-    };
-    const timer = window.setInterval(check, 2000);
-    const unsub = conversationsStore.subscribeAll(check);
-    return () => {
-      window.clearInterval(timer);
-      unsub();
-      release();
-    };
-  }, [live, conv]);
-
-  /** Says the next part of a long reading, or ends it. */
-  const readOn = useCallback((say: IVoiceLiveControls['say']) => {
-    const r = reading();
-    if (!r || r.paused) return;
-    const part = readingSent.current ? nextPart() : (r.parts[r.at] ?? null);
-    const now = reading();
-    if (part === null || !now) {
-      readingSent.current = false;
-      return;
-    }
-    readingSent.current = true;
-    void say(readInstruction(part, now.at, now.parts.length));
-  }, []);
-
-  /** The text a read_aloud action asks for: given, or the chat's last answer. */
-  const readSource = (a: IRouteAction): string => {
-    if (a.text && a.source !== 'chat' && a.source !== 'answer') return a.text;
-    const target = (a.chat && conversationsStore.get(a.chat as ConvId)) || null;
-    const id = target?.id ?? conv;
-    const m = target?.machineId ?? machine;
-    const last = chatLines(new ItemsBuilder(id, m).snapshot(), 6)
-      .filter((l) => l.role === 'assistant')
-      .pop();
-    return last?.text ?? a.text ?? '';
-  };
-
-  /** A task through the router (voice-router.ts): the plan done here; false when the old way should take it. */
-  const routed = async (
-    task: IVoiceTask,
-    say: IVoiceLiveControls['say'],
-    toAgent: (text?: string) => void,
-  ): Promise<boolean> => {
-    const ctx = {
-      machine,
-      conv,
-      screen: '',
-      history: history.current,
-      theme: resolvedTheme,
-      sidebarFolded: railFolded,
-    };
-    let plan;
-    try {
-      plan = await routeVoice(machine, routeRequest(task.text, task.said, ctx));
-    } catch {
-      return false;
-    }
-    const onlyAgent = plan.actions.length > 0 && plan.actions.every((a) => a.do === 'agent');
-    if (onlyAgent) {
-      toAgent(plan.actions.map((a) => a.text).join('\n'));
-      return true;
-    }
-    const cur = conversationsStore.get(conv);
-    const ok = await runPlan(plan, {
-      machine,
-      conv,
-      folder: cur?.cwd ?? startFolder([...conversationsByActivity()], machine),
-      setTheme,
-      sidebarFolded: railFolded,
-      toAgent: (text) => toAgent(text),
-      show: (what, a) => {
-        if (what === 'chats') {
-          showOnVoiceStage(
-            <ChatsCard
-              chats={conversationsByActivity()
-                .filter((c) => !c.test)
-                .slice(0, 30)}
-              onOpen={(c) => goTo({ kind: ROUTE.chat, id: c.id })}
-            />,
-            t('next.voice.cards.chats'),
-          );
-          return;
-        }
-        const text = what === 'chat' ? readSource({ ...a, source: 'chat' }) : (a.text ?? '');
-        if (text) showOnVoiceStage(<TextCard text={text} />, t('next.voice.cards.text'));
-      },
-      readAloud: (a) => {
-        if (a.source === 'resume') {
-          // The plan's line («продолжаю») is said first; the part follows when it is over (onLine).
-          resumeReading();
-          readingSent.current = false;
-          return;
-        }
-        const text = readSource(a);
-        if (!text.trim() || !startReading(t('next.voice.cards.reading'), text)) return;
-        readingSent.current = false;
-        showOnVoiceStage(
-          <ReadingCard
-            onResume={() => {
-              readingSent.current = false;
-              readOn(say);
-            }}
-          />,
-          t('next.voice.cards.reading'),
-        );
-        // The plan's line first («читаю»), then the text: the part goes when that line is over (onLine).
-      },
-      stop: () => {
-        stopReading();
-        // The goodbye is said first; then the call ends.
-        window.setTimeout(() => controls.current?.end?.(), 3500);
-      },
-    });
-    if (!ok) return false;
-    void say(`Say just this to the person, in a few words: «${plan.say}»`, task.id);
-    return true;
-  };
-
   /** A spoken task, let go: a quick edit of the open board, or a message to the chat's agent. */
   const run = (task: IVoiceTask, say: IVoiceLiveControls['say'], note: IVoiceLiveControls['note']) => {
     const toAgent = (routedText?: string) => {
@@ -392,9 +222,17 @@ const VoiceLiveAgent = ({ machine, conv, extra = null }: IVoiceLiveAgentProps) =
       extra?.onSent();
     };
     const edit = voiceEdit;
+    // Through the router: what it cannot place goes on as `fallback` says (the agent, or «занято»).
+    const viaRouter = (fallback: () => void) =>
+      void hands.route(task, say, toAgent).then((done) => {
+        if (!done) fallback();
+      });
+    // Over an open board or file a command about the page, the chats or the talk is not an edit (00:18 17.11: «открой
+    // …» over a design went to the quick edit and came back «занято»): it goes through the router too.
+    if (edit && COMMAND_RE.test(task.said?.trim() || task.text)) return viaRouter(toAgent);
     if (!edit) {
       // Everything but a quick edit goes through the router first; when it is not there, to the agent as before.
-      void routed(task, say, toAgent).then((done) => {
+      void hands.route(task, say, toAgent).then((done) => {
         if (!done) toAgent();
       });
       return;
@@ -438,7 +276,7 @@ const VoiceLiveAgent = ({ machine, conv, extra = null }: IVoiceLiveAgentProps) =
             return;
           }
           if (code === 'edit_taken' || code === 'edit_conflict')
-            return void say(t('next.chatgpt.voice.taken'), task.id);
+            return viaRouter(() => void say(t('next.chatgpt.voice.taken'), task.id));
           toAgent();
         },
       );
@@ -487,7 +325,8 @@ const VoiceLiveAgent = ({ machine, conv, extra = null }: IVoiceLiveAgentProps) =
       (refused: unknown) => {
         unmark(false);
         if (refusalCode(refused) === 'edit_taken') {
-          void say(t('next.chatgpt.voice.taken'), task.id);
+          // The agent holds the board: the words go through the router (the agent's chat, or what else they ask).
+          viaRouter(() => void say(t('next.chatgpt.voice.taken'), task.id));
           return;
         }
         toAgent();
@@ -576,29 +415,12 @@ const VoiceLiveAgent = ({ machine, conv, extra = null }: IVoiceLiveAgentProps) =
         decide(piece, say, note);
       }}
       onBegin={() => {
-        setLive(true);
+        hands.onBegin();
         if (voiceEdit) void warmQuickEdit(machine).catch(() => undefined);
       }}
-      onLine={(line) => {
-        if (!line.done || !line.text.trim()) return;
-        history.current = [
-          ...history.current,
-          `${line.role === 'user' ? 'person' : 'voice'}: ${line.text}`,
-        ].slice(-12);
-        const r = reading();
-        if (!r || !controls.current) return;
-        // The person spoke: the reading waits for them («продолжи» goes on); the voice finished a part: the next one.
-        if (line.role === 'user') {
-          if (!r.paused) pauseReading();
-          readingSent.current = false;
-          return;
-        }
-        if (!r.paused) readOn(controls.current.say);
-      }}
+      onLine={hands.onLine}
       onEnd={() => {
-        setLive(false);
-        stopReading();
-        showOnVoiceStage(null);
+        hands.onEnd();
         window.clearTimeout(pending.current?.timer);
         pending.current = null;
         setTasks([]);

@@ -86,8 +86,9 @@ type Journal struct {
 	flushed chan chan struct{}
 
 	// OnEntry, when set, is told every warning and error after it is written (an optional export): from the writer's
-	// goroutine, so it must not block.
+	// goroutine, so it must not block. Set it before lines come; AddSink is the way to add one later.
 	OnEntry func(Entry)
+	sinks   atomic.Pointer[[]Sink]
 
 	mu sync.Mutex // the files: the writer's against a pruning read
 }
@@ -109,6 +110,30 @@ func Open(dir string, opts Options) *Journal {
 	j := &Journal{dir: dir, opts: opts, ch: make(chan Entry, opts.Queue), done: make(chan struct{}), flushed: make(chan chan struct{})}
 	go j.run()
 	return j
+}
+
+// Sink is told the lines the journal wrote, from the writer's goroutine: it must not block (queue and return).
+type Sink struct {
+	// All takes info lines too; otherwise only warnings and errors.
+	All   bool
+	Entry func(Entry)
+}
+
+// AddSink adds a receiver of the lines written from now on; safe while the journal writes.
+func (j *Journal) AddSink(s Sink) {
+	if j == nil || s.Entry == nil {
+		return
+	}
+	for {
+		old := j.sinks.Load()
+		next := []Sink{s}
+		if old != nil {
+			next = append(append([]Sink(nil), (*old)...), s)
+		}
+		if j.sinks.CompareAndSwap(old, &next) {
+			return
+		}
+	}
 }
 
 // Dir is where the files are.
@@ -225,6 +250,13 @@ func (j *Journal) run() {
 		cur.size += int64(len(b)) + 1
 		if e.Level != Info && j.OnEntry != nil {
 			j.OnEntry(e)
+		}
+		if sinks := j.sinks.Load(); sinks != nil {
+			for _, s := range *sinks {
+				if e.Level != Info || s.All {
+					s.Entry(e)
+				}
+			}
 		}
 	}
 	for {

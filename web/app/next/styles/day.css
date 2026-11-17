@@ -115,6 +115,14 @@
 .hx-day-sum__t {
   min-width: 0;
 }
+.hx-day-sum__acts {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.hx-day-sum__acts:empty {
+  display: none;
+}
 .hx-day-sum__h > :not(.hx-day-sum__t) {
   flex: none;
 }
@@ -2058,4 +2066,25 @@ html[data-theme='dark']
     .hx-day-ds__s
   ) {
   border-color: transparent;
+}
+/* Whose the thing is: the agent did it, works on it, will take it, waits; opening it goes to the agent's chat */
+.hx-day-pr__who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  line-height: 18px;
+  font-weight: var(--hx-weight-medium);
+  color: var(--hx-accent);
+}
+.hx-day-pr__who[data-who='queue'],
+.hx-day-pr__who[data-who='wait'] {
+  color: var(--hx-fg-3);
+}
+.hx-day-pr[data-done] .hx-day-pr__who {
+  color: var(--hx-fg-3);
+}
+.hx-day-pr[data-folded] .hx-day-pr__who {
+  display: none;
 }

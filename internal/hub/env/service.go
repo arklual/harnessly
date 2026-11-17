@@ -21,6 +21,9 @@ const (
 	FeatureCatalog = "catalog"
 	// FeaturePacks is the flag of environment packs (features.EnvPacks); off by default.
 	FeaturePacks = "env.packs"
+	// FeatureOwn is a person's own layer (features.EnvOwn; off by default): their own skills and MCP servers, and their switches, on their own
+	// machines' lists.
+	FeatureOwn = "env.own"
 )
 
 // ChangeKind is the kind of the org_changes rows this package writes.
@@ -80,7 +83,7 @@ type Service struct {
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{db: d.DB, gate: d.Gate, feat: d.Features, pub: d.Publisher, changed: d.Changed, reg: d.Reg, log: d.Log, now: d.Now, builtIn: builtIns{recommended: d.Recommended, apps: d.Apps, install: d.Install}, applyDelay: applyDelay}
+	s := &Service{db: d.DB, gate: d.Gate, feat: d.Features, pub: d.Publisher, changed: d.Changed, reg: d.Reg, log: d.Log, now: d.Now, builtIn: builtIns{recommended: d.Recommended, apps: d.Apps, install: d.Install, feat: d.Features}, applyDelay: applyDelay}
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -110,6 +113,9 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("GET /api/me/env/runs", s.gate(s.meRuns))
 	mux.Handle("GET /api/me/env", s.gate(s.meEnv))
 	mux.Handle("PUT /api/me/env/{itemId}", s.gate(s.putMeEnv))
+	mux.Handle("POST /api/me/env/own", s.gate(s.postMeOwn))
+	mux.Handle("PATCH /api/me/env/own/{itemId}", s.gate(s.patchMeOwn))
+	mux.Handle("DELETE /api/me/env/own/{itemId}", s.gate(s.deleteMeOwn))
 	mux.Handle("PUT /api/me/env/groups/{groupId}", s.gate(s.putMeGroup))
 	mux.Handle("PUT /api/me/env/presets/{presetId}", s.gate(s.putMePreset))
 	mux.Handle("POST /api/orgs/{org}/env/presets", s.gate(s.addPreset))
@@ -170,6 +176,10 @@ type world struct {
 	choices map[string]map[string]map[string]bool
 	// install are the installation's values for the apps' ${install:<name>} (InstallValues).
 	install map[string]string
+	// own: the organization has a person's own layer (FeatureOwn). Then a machine's list is its owner's: their own items
+	// and their switches are applied (offs: tenant id → user id → item ids switched off).
+	own  bool
+	offs map[string]map[string]map[string]bool
 }
 
 // loadWorld reads an organization; b is what the platform itself puts into it.
@@ -215,6 +225,15 @@ func loadWorld(ctx context.Context, st store.Store, o store.Org, b builtIns) (*w
 		return nil, err
 	}
 	w.addBuiltInApps(b, off)
+	w.own = b.feat != nil && b.feat.On(ctx, o.ID, FeatureOwn)
+	w.offs = map[string]map[string]map[string]bool{}
+	if w.own {
+		for _, sp := range w.tenants {
+			if w.offs[sp.ID], err = st.EnvPersonOffsInScope(ctx, sp.ID); err != nil {
+				return nil, err
+			}
+		}
+	}
 	w.choices = map[string]map[string]map[string]bool{}
 	if len(w.groups) > 0 {
 		for _, sp := range w.tenants {

@@ -367,6 +367,11 @@ func (s *Stand) api(method, path string, body, out any) error {
 
 // Chat starts a chat of agent (claude, codex) on model with the person's words, the platform's way.
 func (s *Stand) Chat(agent, model, prompt string) (string, error) {
+	return s.ChatWithEffort(agent, model, "", prompt)
+}
+
+// ChatWithEffort starts a chat without silently using the model's default effort.
+func (s *Stand) ChatWithEffort(agent, model, effort, prompt string) (string, error) {
 	panel := "claude-code"
 	if agent == "codex" {
 		panel = "codex-cli"
@@ -374,6 +379,9 @@ func (s *Stand) Chat(agent, model, prompt string) (string, error) {
 	body := map[string]any{"workspaceId": s.Workspace, "panelType": panel, "prompt": prompt}
 	if model != "" {
 		body["model"] = model
+	}
+	if effort != "" {
+		body["effort"] = effort
 	}
 	var tab struct {
 		TabID    string `json:"tabId"`

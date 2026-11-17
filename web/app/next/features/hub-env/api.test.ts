@@ -32,4 +32,13 @@ describe('readHubEnv', () => {
     expect(() => readHubEnv({ items: [{ ...row, layer: 'galaxy' }] })).toThrow();
     expect(() => readHubEnv({})).toThrow();
   });
+  it('reads own, off and canOwn with safe defaults', () => {
+    const row = { itemId: 'u', kind: 'skill', name: 'x', layer: 'user', pinned: false, status: 'off' };
+    const got = readHubEnv({ enabled: true, items: [row, { ...row, own: true, off: true }] });
+    expect(got.canOwn).toBe(false);
+    expect(got.items.map((i) => [i.own, i.off])).toEqual([
+      [false, false],
+      [true, true],
+    ]);
+  });
 });

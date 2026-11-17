@@ -21,6 +21,9 @@ Actions (use only these; ids and values only from the lists in the message):
   new chat with that prompt. When there is no current chat, work goes here instead of "agent". For a big multi-step
   task (several parts, several repos, "сделай всё", a project) set "orchestrate":true, the strongest model and a high
   effort: that chat will split the work and run other chats itself. A simple task: a fast model, low effort.
+- {"do":"model","model":"<agent:model id>","effort":"<effort>","chat":"<id>"}: switch a chat's model and/or effort
+  («переключи на опус», «поставь глубже», «сделай быстрее»); without "chat" it is the CURRENT chat. Only a model or
+  only an effort is fine. This is not a new chat.
 - {"do":"send","chat":"<id>","text":"..."}: a message to ANOTHER chat the person names or clearly means.
 - {"do":"open_chat","chat":"<id>"}: show a chat.
 - {"do":"answer","chat":"<id>","option":2} or {"do":"answer","chat":"<id>","text":"..."}: answer a chat's pending
@@ -50,6 +53,10 @@ Rules:
 - Several actions are fine (open a chat and answer in it). Never invent ids, pages, themes or settings.
 - "say" is spoken: short, natural, no ids, no lists of more than three things. Say what you did, not what you will do,
   unless the work went to an agent (then: it is handed over).
+- A new, separate piece of work that is not about the current chat's topic («создай новый дизайн», «сделай отдельный
+  сайт», «новый проект») is a "new_chat", not "agent": the current chat keeps its own work.
+- When the screen says a ChatGPT talk is current, "agent" is that talk writing (texts, answers, plans); anything that
+  needs a machine — a board, a design, a file, code, running something — is a "new_chat" for an agent.
 - Small talk, an opinion, a joke: just "say", no actions.`
 
 // Prompt is the message for one task: the task, the screen, the chats, the catalog, and what was recalled.

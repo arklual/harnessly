@@ -3,7 +3,7 @@
 // work of that chat and the chats it delegated (its worktrees, read on their machines, or a pushed branch from GitLab
 // when the machine is off). It stands in Sinopia's stage (app-stage.tsx): the chat beside the review is the stage's, at
 // the left or the right, in a window or only its field, with the choice of the chat, kept for the review.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { pageText } from '@/next/bindings/outcome';
 import { loadApps } from '@/next/features/apps/api';
 import AppStage from '@/next/features/app-main/app-stage';
@@ -159,7 +159,12 @@ const ReviewStagePage = ({
     app: { address, onCreated: () => undefined },
   });
   const onChat = stage.conv ?? null;
-  const send = useCallback((message: string) => stage.ask?.(message), [stage]);
+  // The stage is a new object each render: a `send` that followed it would start the review's reads over each time.
+  const asking = useRef(stage.ask);
+  useEffect(() => {
+    asking.current = stage.ask;
+  });
+  const send = useCallback((message: string) => asking.current?.(message), []);
   const ask = useCallback(
     (text: string) => send(`${t('next.reviewApp.notes.msgQuestion')}\n${url ?? ''}\n\n${text}`),
     [send, url],

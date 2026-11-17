@@ -15,6 +15,21 @@ expect:
   - name: exported the project as a zip with the project's exporter
     called: Bash
     args: {command: '(?s).*harnessly design export\s+\S*shop\S*.*--(zip|all).*'}
+  - name: opened the exported ZIP in the file pane
+    pane: {tab: files, target: '(?i)harnessly-delivered/.*\.zip$'}
+  - name: delivered archive is intact and contains the original catalogue
+    check: |
+      python3 -I - <<'PY'
+      import os, pathlib, zipfile
+      files = list((pathlib.Path(os.environ['TMPDIR']) / 'harnessly-delivered').glob('**/*.zip'))
+      assert files, 'no delivered ZIP'
+      for file in files:
+          with zipfile.ZipFile(file) as archive:
+              assert archive.testzip() is None, 'corrupt ZIP member'
+              boards = [name for name in archive.namelist() if name.endswith('Каталог.dc.html')]
+              assert boards, 'catalogue board missing'
+              assert 'Кружка' in archive.read(boards[0]).decode(), 'catalogue content missing'
+      PY
   - name: did not zip it by hand
     not_called: Bash
     args: {command: '(?s).*(^|[;&| ])(zip|tar -c)\s.*'}

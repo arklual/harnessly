@@ -3,7 +3,7 @@
 // the page can do (pages, settings sections, themes, settings, models) — and the plan that comes back is carried out
 // here: a page opened, the theme or the sidebar changed, a message sent to another chat, an agent's question answered,
 // a card put on the voice's stage. Work for the chat's own agent comes back as an "agent" action and goes the old way.
-import { answerQuestion, createConversation, decidePermission, sendMessage } from '@/next/commands';
+import { answerQuestion, createConversation, decidePermission, sendMessage, setModel } from '@/next/commands';
 import { settled } from '@/next/bindings/outcome';
 import { hub } from '@/next/core/realtime/hub';
 import { launchModel } from '@/next/features/composer/agents';
@@ -251,6 +251,8 @@ export const routeRequest = (task: string, said: string | undefined, ctx: IRoute
 export interface IPlanHands {
   machine: MachineId;
   conv: ConvId | null;
+  /** A ChatGPT talk is current (its title): «agent» is that talk writing, not a new chat. */
+  chatHere?: string | null;
   /** The new chat's folder: the current chat's, or the start page's. */
   folder: string | null;
   setTheme: (theme: string) => void;
@@ -284,7 +286,7 @@ const runAction = async (a: IRouteAction, h: IPlanHands): Promise<boolean> => {
   switch (a.do) {
     case 'agent':
       if (!a.text) return false;
-      if (!h.conv) return newChat({ ...a, do: 'new_chat' }, h);
+      if (!h.conv && !h.chatHere) return newChat({ ...a, do: 'new_chat' }, h);
       h.toAgent(a.text);
       return true;
     case 'send': {
@@ -326,6 +328,19 @@ const runAction = async (a: IRouteAction, h: IPlanHands): Promise<boolean> => {
     }
     case 'new_chat':
       return newChat(a, h);
+    case 'model': {
+      // The chat's model or depth (the current one unless named): it takes at the chat's next safe moment.
+      const c = chatOf(a.chat ?? h.conv ?? undefined);
+      if (!c) return false;
+      const name = (a.model ?? '').replace(/^.*:/, '');
+      const model = name && name !== 'default' ? name : c.model?.id;
+      if (!model) return false;
+      const effort = (
+        EFFORTS.includes(a.effort ?? '') ? a.effort : (c.model?.effort ?? null)
+      ) as Effort | null;
+      await settled(setModel(c.machineId, c.id, model, effort, false));
+      return true;
+    }
     case 'open': {
       if (a.page === 'home') goTo(HOME);
       else if (a.page === 'settings') {

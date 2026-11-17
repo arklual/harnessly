@@ -502,6 +502,85 @@
      "option": "^1$"
     }
    ]
+  },
+  {
+   "id": "model-switch-current",
+   "task": "переключи этот чат на опус с глубоким уровнем",
+   "need": [
+    {
+     "do": "model",
+     "model": "(?i)opus",
+     "effort": "^(high|xhigh|max)$"
+    }
+   ],
+   "not": [
+    {
+     "do": "new_chat"
+    }
+   ]
+  },
+  {
+   "id": "effort-only",
+   "task": "сделай уровень пониже, пусть быстрее отвечает",
+   "need": [
+    {
+     "do": "model",
+     "effort": "^(low|medium)$"
+    }
+   ],
+   "not": [
+    {
+     "do": "new_chat"
+    }
+   ]
+  },
+  {
+   "id": "gpt-talk-board",
+   "task": "создай мне какую-нибудь доску",
+   "screen": "route: ChatGPT talk «Привет, как дела» (a plain talk: it answers and writes texts; it has no machine)",
+   "chats_current": "none",
+   "need": [
+    {
+     "do": "new_chat",
+     "text": "(?i)доск"
+    }
+   ],
+   "not": [
+    {
+     "do": "agent"
+    }
+   ]
+  },
+  {
+   "id": "gpt-talk-write",
+   "task": "напиши мне план на завтрашний день",
+   "screen": "route: ChatGPT talk «Привет, как дела» (a plain talk: it answers and writes texts; it has no machine)",
+   "chats_current": "none",
+   "need": [
+    {
+     "do": "agent"
+    }
+   ],
+   "not": [
+    {
+     "do": "new_chat"
+    }
+   ]
+  },
+  {
+   "id": "new-separate-work",
+   "task": "создай новый дизайн в синопии, современный и выразительный",
+   "need": [
+    {
+     "do": "new_chat",
+     "text": "(?i)дизайн|sinopia|синопи"
+    }
+   ],
+   "not": [
+    {
+     "do": "agent"
+    }
+   ]
   }
  ]
 }

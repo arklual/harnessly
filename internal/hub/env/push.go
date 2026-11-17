@@ -26,9 +26,13 @@ type Caller interface {
 // machine has the feature environment.setup: it gets the scripts, with their place in the run (Order), and the
 // accesses; a machine without it gets neither, so that the list and its hash are exactly what an older agent
 // computes from what it received. owner is the person the machine is theirs (store.Machine.CreatedBy, "" for none): an
-// optional group they switched off (or that starts off and they did not switch on) is not on the machine.
+// optional group they switched off (or that starts off and they did not switch on) is not on the machine. With a
+// person's own layer (FeatureOwn) the list is the owner's: their own items are in it, and what they switched off is not.
 func MachineItems(w *world, spaceID, teamID, owner string, setup bool, ex Extra) []hubproto.EnvItem {
 	person := Person{OrgID: w.org.ID, SpaceID: spaceID, Groups: w.resolverGroups(), GroupOn: w.choicesOf(spaceID, owner)}
+	if w.own && owner != "" {
+		person.UserID, person.Off = owner, w.offs[spaceID][owner]
+	}
 	if teamID != "" {
 		person.Teams = []string{teamID}
 	}
@@ -36,8 +40,8 @@ func MachineItems(w *world, spaceID, teamID, owner string, setup bool, ex Extra)
 	order := scriptOrder(eff)
 	out := []hubproto.EnvItem{}
 	for _, e := range eff {
-		if e.GroupOff {
-			continue
+		if e.Off {
+			continue // a group off for the owner, or (with the own layer) an item they switched off
 		}
 		src := json.RawMessage(e.Source)
 		if e.Kind == hubproto.EnvKindApp {
@@ -176,7 +180,7 @@ type Pusher struct {
 
 // NewPusher starts the pusher.
 func NewPusher(d PushDeps) *Pusher {
-	p := &Pusher{builtIn: builtIns{recommended: d.Recommended, apps: d.Apps, install: d.Install}, db: d.DB, reg: d.Reg, feat: d.Features, log: d.Log, now: d.Now, every: d.Every, pub: d.Publisher, kick: make(chan struct{}, 1), held: map[string]string{}, setup: map[string]bool{}, extra: map[string]Extra{}, newRuns: map[string][]time.Time{}}
+	p := &Pusher{builtIn: builtIns{recommended: d.Recommended, apps: d.Apps, install: d.Install, feat: d.Features}, db: d.DB, reg: d.Reg, feat: d.Features, log: d.Log, now: d.Now, every: d.Every, pub: d.Publisher, kick: make(chan struct{}, 1), held: map[string]string{}, setup: map[string]bool{}, extra: map[string]Extra{}, newRuns: map[string][]time.Time{}}
 	if p.log == nil {
 		p.log = slog.Default()
 	}

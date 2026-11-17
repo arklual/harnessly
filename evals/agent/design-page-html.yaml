@@ -15,6 +15,19 @@ expect:
   - name: exported the page with the project's exporter (it hands the file over itself)
     called: Bash
     args: {command: '(?s).*harnessly design export\s+\S*shop\S*\s.*Каталог.*'}
+  - name: opened the exported HTML in the file pane
+    pane: {tab: files, target: '(?i)harnessly-delivered/.*\.html$'}
+  - name: delivered HTML exists and contains a standalone catalogue
+    check: |
+      python3 -I - <<'PY'
+      import os, pathlib, re
+      files = list((pathlib.Path(os.environ['TMPDIR']) / 'harnessly-delivered').glob('**/*.html'))
+      assert files, 'no delivered HTML'
+      for file in files:
+          text = file.read_text()
+          assert 'Каталог' in text and 'Кружка' in text, 'catalogue content missing'
+          assert not re.search(r'(?:src|href)=["\']\./(?:support\.js|_ds/|lib/)', text), 'external local dependency'
+      PY
   - name: did not hand over a page written by hand
     not_called: Write
     args: {file_path: '(?i).*\.html?$'}

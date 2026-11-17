@@ -393,8 +393,11 @@ const AppStagePage = ({
     else now.fill?.(text);
   }, []);
 
+  // What the app shows now: the object of the address, or the board or document opened inside its view, which never
+  // reaches the address. «Поделиться» shares that, not the app's home.
+  const current = object ?? inView[id] ?? null;
   // The page's own base (/m/<machine> on the hub) goes into the link, as the chat's «Скопировать ссылку» does.
-  const appLink = `${window.location.origin}${appBasePath()}${routePath({ kind: ROUTE.app, id, ...(object ? { object } : {}) })}`;
+  const appLink = `${window.location.origin}${appBasePath()}${routePath({ kind: ROUTE.app, id, ...(current ? { object: current } : {}) })}`;
   // A board or a document is shared as in Sinopia, with its people and links; the app's home and other apps
   // copy the link to the app.
   const [sharing, setSharing] = useState<{ kind: TShareKind; slug: string } | null>(null);
@@ -403,8 +406,8 @@ const AppStagePage = ({
     if (kind) setSharing({ kind, slug });
   }, []);
   const share = () => {
-    if (object && (id === BOARDS_APP || id === DOCS_APP)) {
-      shareObject(id, object);
+    if (current && (id === BOARDS_APP || id === DOCS_APP)) {
+      shareObject(id, current);
       return;
     }
     const link = appLink;

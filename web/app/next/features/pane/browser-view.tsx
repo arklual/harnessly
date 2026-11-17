@@ -378,7 +378,12 @@ const BrowserView = (props: IBrowserViewProps) => {
         {props.pickNote && (
           <div className="hx-tbrowser__offer" role="alert" aria-label={t('next.pane.pickNote.label')}>
             <span className="hx-tbrowser__offer-text">{props.pickNote.text}</span>
-            <button type="button" className="hx-tbrowser__offer-btn" data-primary onClick={props.pickNote.onRetry}>
+            <button
+              type="button"
+              className="hx-tbrowser__offer-btn"
+              data-primary
+              onClick={props.pickNote.onRetry}
+            >
               {t('next.pane.pickNote.retry')}
             </button>
             <button

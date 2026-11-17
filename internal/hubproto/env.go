@@ -114,7 +114,7 @@ func EnvSetHash(itemsHash, appsConsent string) string {
 
 // EnvItem is one item of the list. Source is the item's JSON from the catalog, without a secret: a secret is named in
 // source.secretRefs and the machine looks it up by that name. Layer is the highest layer that puts the item in
-// (org, tenant, team); Pinned says nobody below may switch it off.
+// (org, tenant, team; user: the person's own item); Pinned says nobody below may switch it off.
 type EnvItem struct {
 	ItemID string `json:"itemId"`
 	Kind   string `json:"kind"`

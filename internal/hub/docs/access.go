@@ -81,24 +81,20 @@ func (s *Service) aclRoute(w http.ResponseWriter, r *http.Request, p *auth.Princ
 		return errNoAccess
 	}
 	author := ""
-	if m == nil {
-		list, err := s.art.list(r.Context())
-		if err != nil {
+	info := resaccess.Info{}
+	if m != nil {
+		info = resaccess.Info{Owner: m.OwnerEmail, OwnerName: m.OwnerName}
+	} else {
+		found, board := false, false
+		if found, board, author, err = s.unrecorded(r.Context(), slug); err != nil {
 			return err
-		}
-		found := false
-		for _, a := range list {
-			if a.Slug == slug {
-				found, author = true, a.Author
-			}
 		}
 		if !found {
 			return errNoDoc
 		}
-	}
-	info := resaccess.Info{}
-	if m != nil {
-		info = resaccess.Info{Owner: m.OwnerEmail, OwnerName: m.OwnerName}
+		if board {
+			info.Owner, info.OwnerName = s.unrecordedBoardOwner(r.Context(), slug, author, p)
+		}
 	}
 	rest := []string{}
 	for _, v := range strings.Split(r.PathValue("rest"), "/") {
@@ -310,4 +306,49 @@ func (s *Service) mention(ctx context.Context, doc summary, commentID, body stri
 		}
 		_, _ = s.db.S().Q().Exec(ctx, `UPDATE doc_comment_mentions SET notified_at = ? WHERE comment_id = ? AND email = ?`, now, commentID, email)
 	}
+}
+
+// unrecorded finds a document or a board the hub keeps no record of in its service, and names its author. A board
+// drawn straight on the boards service, or by an agent, has no record until somebody shares it: its «Поделиться» must
+// open all the same, not answer 404 (the dialog took that for a hub without access and copied a link to the app).
+func (s *Service) unrecorded(ctx context.Context, slug string) (found, board bool, author string, err error) {
+	if s.art != nil {
+		list, err := s.art.list(ctx)
+		if err != nil {
+			return false, false, "", err
+		}
+		for _, a := range list {
+			if a.Slug == slug {
+				return true, false, a.Author, nil
+			}
+		}
+	}
+	bs, err := s.boards(ctx)
+	if err != nil {
+		return false, false, "", err
+	}
+	for _, b := range bs {
+		if b.Slug == slug {
+			return true, true, b.Author, nil
+		}
+	}
+	return false, false, "", nil
+}
+
+// unrecordedBoardOwner is who owns a board the hub keeps no record of: the owner of the machine whose agent drew it,
+// or the person asking when the boards service names them its author (it names the person it signed in, by name or
+// address). Anybody else sees the board's access and owns nothing of it.
+func (s *Service) unrecordedBoardOwner(ctx context.Context, slug, author string, p *auth.Principal) (string, string) {
+	if b, err := s.boardBinding(ctx, slug); err == nil && b != nil {
+		if u, ok := s.boardOwner(ctx, b.Owner); ok {
+			return u.Email, displayName(u)
+		}
+	}
+	if p == nil || author == "" {
+		return "", ""
+	}
+	if strings.EqualFold(author, p.User.Email) || author == displayName(p.User) {
+		return p.User.Email, displayName(p.User)
+	}
+	return "", ""
 }

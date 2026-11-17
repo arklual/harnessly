@@ -53,13 +53,16 @@ var (
 		"/api/cli/ok", "/api/cli/api-guide", "/api/cli/open", "/api/cli/panel", "/api/cli/deliver",
 		"/api/cli/asks", "/api/cli/apps", "/api/cli/design",
 		"/api/cli/notify/send", "/api/cli/notify/bots",
+		// The person's mail, calendars, folders (harnessly connector read | act): reads go through the runtime, which
+		// holds the tokens, and an act is only a proposal, sent after the person's yes on a card in the chat.
+		"/api/cli/connectors/read", "/api/cli/connectors/act",
 		"/api/cli/secrets", "/api/cli/secrets/ask", "/api/cli/secrets/use", "/api/cli/secrets/file",
 		"/api/cli/secrets/code", "/api/cli/secrets/code/wait", "/api/cli/secrets/code/cancel",
 		"/api/sites-token",
 	}
 	agentRoutePrefixes = [...]string{"/api/cli/preview/", "/api/cli/asks/", "/api/cli/apps/", "/api/cli/design/", "/api/sites/"}
 	// Reading only: the agent's CLI lists these, and sending or creating through them is what the list above keeps out.
-	agentReadRoutes = [...]string{"/api/cli/workspaces", "/api/cli/tabs", "/api/cli/peers"}
+	agentReadRoutes = [...]string{"/api/cli/workspaces", "/api/cli/tabs", "/api/cli/peers", "/api/cli/connectors"}
 )
 
 // errAgentOutsideTheWall is the refusal an agent token gets on any other route.

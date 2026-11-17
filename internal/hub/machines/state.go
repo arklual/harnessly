@@ -339,6 +339,21 @@ func (s *Service) dispatch(ctx context.Context, l *link.Link, m store.Machine, e
 				}
 			})
 		}
+	case hubproto.EventEnvOwn:
+		if s.proposals != nil {
+			raw := ev.Raw
+			safego.Go("machines env.own", func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+				defer cancel()
+				res := s.proposals.Own(ctx, m, raw)
+				if res.RequestID == "" {
+					return
+				}
+				if _, err := l.Call(ctx, hubproto.OpEnvOwned, res); err != nil {
+					s.log.Warn("env.owned not delivered", "machine", m.ID, "error", err)
+				}
+			})
+		}
 	case hubproto.EventAutomationResult, hubproto.EventAutomationEvent:
 		if s.automations != nil {
 			s.automations.Event(m, ev)

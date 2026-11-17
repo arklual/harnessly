@@ -130,6 +130,7 @@ func (c *cli) evalRun(args []string) error {
 	fs.SetOutput(io.Discard)
 	dir := fs.String("dir", "", "the scenarios' folder (default evals/agent)")
 	models := fs.String("models", "haiku", "models: haiku, opus, claude:<id>, codex:<model>")
+	effort := fs.String("effort", "", "explicit reasoning effort: low or medium (empty: model default)")
 	only := fs.String("scenarios", "", "only these scenario ids")
 	set := fs.String("set", "dev", "dev, heldout or all")
 	variants := fs.String("variants", "canon", "canon, all or a number of stored variants")
@@ -149,6 +150,9 @@ func (c *cli) evalRun(args []string) error {
 	setupFile := fs.String("setup-file", "", "the setup under test: runtime and agent settings (default <dir>/setups/default.yaml)")
 	if err := fs.Parse(args); err != nil {
 		return usageErr("eval run: %v", err)
+	}
+	if *effort != "" && *effort != "low" && *effort != "medium" {
+		return usageErr("eval run: --effort must be low or medium")
 	}
 	all, err := agenteval.Load(c.evalDir(*dir))
 	if err != nil {
@@ -176,6 +180,7 @@ func (c *cli) evalRun(args []string) error {
 		if err != nil {
 			return usageErr("eval run: %v", err)
 		}
+		mm.Effort = *effort
 		ms = append(ms, mm)
 	}
 	self, _ := os.Executable()

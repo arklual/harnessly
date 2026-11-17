@@ -15,6 +15,8 @@ import UiSlot from '@/next/features/app-views/ui-slot';
 import { Group } from '@/next/features/settings/rows';
 import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
+import { useHomeReset } from '@/next/stores/new-chat';
+import { Button } from '@/next/ui/button';
 import Icon from '@/next/ui/icon';
 
 // The page of the day the host draws from a stage view's feed: loaded only for a person who has such a view.
@@ -173,6 +175,13 @@ export interface IHomeGreeting {
  * Where the page reads a view's feed: through its own runtime when the machine signs the feed in (`feedPath`), so no
  * sign-in of the feed's site shows on the page; otherwise the feed's address itself, with the person's cookie there.
  */
+/** The view's address with one more query parameter, kept by the page the view opens. */
+const withParam = (address: string, key: string, value: string): string => {
+  const url = new URL(address);
+  url.searchParams.set(key, value);
+  return url.toString();
+};
+
 export const feedOf = (view: IAppView, machine: MachineId): string | undefined =>
   view.feedPath?.startsWith('/')
     ? runtimePath(platformPath(view.feedPath as `/${string}`), machine)
@@ -184,6 +193,12 @@ export const useHomeStage = (
   const { list } = useInstalledApps(machine ?? ('' as MachineId), 0, machine !== null);
   const entry = slotViews(list, 'home').find(isStageView) ?? null;
   const key = entry ? keyOf(entry) : null;
+  // «Новый диалог» again on the start page: a view drawn by the app starts anew, closing what it had open.
+  const reset = useHomeReset();
+  // «Настроить» on the day of the feed: the stage shows the app's own page in its rehearsal until the start page is
+  // opened anew («Главная», «Новый диалог») or the person goes back.
+  const [tuneAt, setTuneAt] = useState<number | null>(null);
+  const tuning = tuneAt === reset;
   const [greeting, setGreeting] = useState<{ key: string; value: IHomeGreeting } | null>(null);
   const onGreet = (title: string, sub: ReactNode) => {
     if (key !== null) setGreeting(title === '' ? null : { key, value: { title, sub } });
@@ -193,19 +208,37 @@ export const useHomeStage = (
   return {
     stage: (
       <div className="hx-home-stage">
-        {feed ? (
+        {feed && tuning && entry.view.url ? (
+          <>
+            <div className="hx-home-stage__back">
+              <Button variant="ghost" size="sm" icon="arrow-left" onClick={() => setTuneAt(null)}>
+                {t('next.day.tune.back')}
+              </Button>
+            </div>
+            <UiSlot
+              key={`${keyOf(entry)}:tune:${reset}`}
+              machine={machine}
+              app={entry.app}
+              view={{ ...entry.view, url: withParam(entry.view.url, 'tune', '1') }}
+              target="home"
+              viewPort={list.viewPort}
+              fill
+            />
+          </>
+        ) : feed ? (
           <Suspense fallback={null}>
             <DayStage
               key={feed}
               app={{ id: entry.app.id, name: entry.app.name }}
               feed={feed}
               onGreet={onGreet}
+              onTune={entry.view.url ? () => setTuneAt(reset) : undefined}
               machine={machine}
             />
           </Suspense>
         ) : (
           <UiSlot
-            key={keyOf(entry)}
+            key={`${keyOf(entry)}:${reset}`}
             machine={machine}
             app={entry.app}
             view={entry.view}

@@ -5,6 +5,7 @@ import { KEY_SCOPE, type TKeyScope } from '@/next/features/keys/commands';
 import KeysHelp from '@/next/features/keys/keys-help';
 import { keyScopesStore, useKeyOverrides, useKeys } from '@/next/features/keys/use-keys';
 import { useBeta } from '@/next/stores/beta';
+import { resetHome } from '@/next/stores/new-chat';
 import { HOME, ROUTE, type TRoute } from '@/next/routes/routes';
 
 interface IShellKeysChat {
@@ -63,7 +64,10 @@ export const useShellKeys = ({
       setHelp((h) => (h.open ? { ...h, open: false } : { open: true, scopes: keyScopesStore.get() })),
     'global.search': toggleSearch,
     'global.rail': toggleRail,
-    'global.newChat': () => navigate(HOME),
+    'global.newChat': () => {
+      resetHome();
+      navigate(HOME);
+    },
     'global.settings': () => navigate({ kind: ROUTE.settings, section: null }),
     'global.newerChat': () => step(-1),
     'global.olderChat': () => step(1),

@@ -230,6 +230,9 @@ export function ThemeProvider({
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
+/** The theme when there is a provider, null outside one (a part that may be drawn alone, as the voice's hands in a test). */
+export const useThemeMaybe = (): IThemeContext | null => useContext(Ctx);
+
 export const useTheme = (): IThemeContext => {
   const value = useContext(Ctx);
   if (!value) throw new Error('useTheme outside ThemeProvider');

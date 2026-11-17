@@ -648,7 +648,7 @@ const catalogOf = (it: Item, layer?: EnvLayerKind, scopeId?: string): CatalogIte
 // ── runs ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 const KIND_RANK: Record<string, number> = { access: 0, repo: 1, script: 2, skill: 3, mcp: 4, doc: 5 };
-const LAYER_RANK: Record<EnvLayerKind, number> = { org: 0, tenant: 1, team: 2 };
+const LAYER_RANK: Record<EnvLayerKind, number> = { org: 0, tenant: 1, team: 2, user: 3 };
 
 /** The list a layer's people get, in the order the machine does it: access, repositories, scripts (top layer first), the rest. */
 const listFor = (layer: EnvLayerKind, scopeId: string): { itemId: string; layer: EnvLayerKind }[] => {
@@ -826,6 +826,8 @@ const mineOf = (e: Entry): MeEnvItem => {
     groupId: e.groupId ?? '',
   };
 };
+
+const ownItems: MeEnvItem[] = [];
 
 const startMine = (mode: 'update' | 'check'): string => {
   serial += 1;
@@ -1081,12 +1083,45 @@ export const envMock = (ctx: MockCtx): EnvApi => ({
     return later({
       space: { id: TENANT_ID, slug: 'product', name: tenantName() },
       org: { id: ORG_ID, name: 'Акме' },
-      items: mine.map(mineOf),
+      items: [...mine.map(mineOf), ...ownItems],
       groups,
       presets: minePresets(groups),
       outdated: !m.current || m.failed > 0,
       machines: [m],
+      own: true,
     });
+  },
+
+  envOwnAdd: async (req) => {
+    if (ownItems.some((x) => x.name === req.name))
+      throw new OrgApiError('name_taken', 'У вас уже есть такое название');
+    const id = `own-${ownItems.length + 1}-${req.name}`;
+    const item: MeEnvItem = {
+      itemId: id,
+      entryId: id,
+      kind: req.kind,
+      name: req.name,
+      hint: req.hint ?? '',
+      layer: 'user',
+      scopeId: '',
+      layerTitle: 'Своё',
+      pinned: false,
+      off: false,
+      canToggle: true,
+      groupId: '',
+      own: true,
+      shadowed: false,
+      source: req.source,
+    };
+    ownItems.push(item);
+    return later(item, 300);
+  },
+
+  envOwnRemove: async (itemId) => {
+    const at = ownItems.findIndex((x) => x.itemId === itemId);
+    if (at < 0) throw new OrgApiError('not_found', 'item not found');
+    ownItems.splice(at, 1);
+    return later(undefined, 200);
   },
 
   envMineGroup: async (groupId, on) => {

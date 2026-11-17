@@ -96,6 +96,13 @@ func (s *Service) Role(ctx context.Context, ref Ref, a Actor) (string, error) {
 	return f.Role, nil
 }
 
+// Stored says whether anybody has set access on the resource: a board the hub keeps no record of becomes known to the
+// boards service once its owner shares it (docs/rights.go).
+func (s *Service) Stored(ctx context.Context, ref Ref) (bool, error) {
+	r, err := s.read(ctx).stored(ref, false)
+	return r != nil, err
+}
+
 // View is the access state of a resource as the person sees it.
 func (s *Service) View(ctx context.Context, ref Ref, a Actor) (map[string]any, error) {
 	return s.read(ctx).view(ref, a, Info{})

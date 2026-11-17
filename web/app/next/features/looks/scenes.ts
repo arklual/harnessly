@@ -23,7 +23,7 @@ export interface IScene {
 export const SCENE_SCALE: Record<TScene, number> = {
   matrix: 1,
   stars: 1,
-  aurora: 0.25,
+  aurora: 0.5,
   rain: 1,
   synthwave: 0.75,
   twinkle: 1,
@@ -150,38 +150,118 @@ const stars = (w: number, h: number, c: ISceneColors, speed: number, detail: num
   };
 };
 
-const aurora = (w: number, h: number, c: ISceneColors, speed: number): IScene => ({
-  frame: (ctx, t) => {
-    ctx.fillStyle = c.bg;
-    ctx.fillRect(0, 0, w, h);
-    ctx.globalCompositeOperation = c.mode === 'dark' ? 'lighter' : 'source-over';
-    const bands = Math.max(3, c.hues.length);
-    for (let b = 0; b < bands; b++) {
-      const color = c.hues[b % c.hues.length];
-      ctx.globalAlpha = c.mode === 'dark' ? 0.32 : 0.22;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      const base = h * (0.25 + b * 0.14);
-      const amp = h * 0.08;
-      ctx.moveTo(0, h);
-      for (let x = 0; x <= w; x += Math.max(2, w / 48)) {
-        const y =
-          base +
-          Math.sin(x / (w * 0.22) + t * 0.35 * speed + b * 1.7) * amp +
-          Math.sin(x / (w * 0.09) - t * 0.6 * speed + b) * amp * 0.35;
-        ctx.lineTo(x, y);
+/** One ray of an aurora: a thin vertical strip, bright at its lower edge (green oxygen light), fading up through
+ *  teal into the faint red-violet of the high atmosphere. Drawn stretched for every ray of every curtain. */
+const auroraRay = (low: [number, number, number], high: [number, number, number]): TCanvas | null => {
+  const H = 256;
+  const c = spriteCanvas(4, H);
+  const g = c?.getContext('2d') as TCtx | null;
+  if (!c || !g) return null;
+  const grad = g.createLinearGradient(0, H, 0, 0);
+  const rgba = (k: [number, number, number], a: number) => `rgba(${k[0]},${k[1]},${k[2]},${a})`;
+  grad.addColorStop(0, rgba(low, 0));
+  grad.addColorStop(0.035, 'rgba(215,255,225,0.95)');
+  grad.addColorStop(0.1, rgba(low, 0.85));
+  grad.addColorStop(0.32, rgba(low, 0.42));
+  grad.addColorStop(0.6, rgba(high, 0.2));
+  grad.addColorStop(1, rgba(high, 0));
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 4, H);
+  return c;
+};
+
+/** Northern lights: curtains of thin rays hanging from a folded, slowly drifting lower edge; bright pulses run along
+ *  each curtain, its rays flicker on their own, a starry night behind. */
+const aurora = (w: number, h: number, c: ISceneColors, speed: number, detail: number, px: number): IScene => {
+  const r = rng(41);
+  const dark = c.mode === 'dark';
+  const rays = [
+    auroraRay([70, 255, 150], [150, 70, 210]),
+    auroraRay([60, 230, 190], [120, 90, 230]),
+    auroraRay([120, 255, 120], [210, 70, 140]),
+  ];
+  // The curtains: where each hangs, how deep it folds, its own drift.
+  const curtains = [0, 1, 2].map((i) => ({
+    base: h * (0.42 + i * 0.13 + r() * 0.05),
+    len: h * (0.34 - i * 0.06),
+    fold: 0.6 + r() * 0.8,
+    ph: r() * 10,
+    sp: 0.6 + r() * 0.6,
+    a: [1, 0.7, 0.45][i],
+    tilt: (r() - 0.5) * 0.35,
+    ray: rays[i],
+  }));
+  const step = Math.max(1.2, 2.2 / Math.max(0.25, px)) / Math.max(0.5, detail);
+  const nRay = Math.ceil((w * 1.3) / step);
+  const flick = Float32Array.from({ length: nRay }, () => r() * 6.28);
+  const vary = Float32Array.from({ length: nRay }, () => 0.55 + r() * 0.45);
+  // Stars, drawn once into their own layer.
+  const sky = spriteCanvas(Math.max(1, Math.round(w * px)), Math.max(1, Math.round(h * px)));
+  const sg = sky?.getContext('2d') as TCtx | null;
+  if (sky && sg) {
+    sg.scale(px, px);
+    const grad = sg.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, dark ? 'rgba(2,4,14,0.55)' : 'rgba(255,255,255,0)');
+    grad.addColorStop(1, dark ? 'rgba(14,32,44,0.35)' : 'rgba(200,235,225,0.35)');
+    sg.fillStyle = grad;
+    sg.fillRect(0, 0, w, h);
+    if (dark) {
+      const n = Math.round((w * h) / 2600);
+      for (let i = 0; i < n; i++) {
+        const z = r();
+        sg.globalAlpha = 0.25 + z * 0.75;
+        sg.fillStyle = z > 0.93 ? '#ffe9d0' : '#e8f0ff';
+        const s = (z > 0.97 ? 2.4 : 1.3) / Math.max(0.5, px);
+        sg.fillRect(r() * w, r() * h * 0.85, s, s);
       }
-      for (let x = w; x >= 0; x -= Math.max(2, w / 48)) {
-        const y = base + h * 0.16 + Math.sin(x / (w * 0.3) + t * 0.25 * speed + b) * amp * 0.6;
-        ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      ctx.fill();
+      sg.globalAlpha = 1;
     }
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
-  },
-});
+  }
+  return {
+    frame: (ctx, t) => {
+      const ts = t * speed;
+      ctx.fillStyle = c.bg;
+      ctx.fillRect(0, 0, w, h);
+      if (sky) ctx.drawImage(sky, 0, 0, w, h);
+      ctx.globalCompositeOperation = dark ? 'lighter' : 'source-over';
+      for (const cu of curtains) {
+        if (!cu.ray) continue;
+        const ph = cu.ph;
+        for (let i = 0; i < nRay; i++) {
+          const s = i * step - w * 0.15;
+          // The folds: the curtain's line bends back and forth along x, so rays bunch where it turns (brighter).
+          const fx =
+            s +
+            Math.sin(s / (w * 0.11) + ts * 0.11 * cu.sp + ph) * w * 0.05 * cu.fold +
+            Math.sin(s / (w * 0.035) - ts * 0.23 * cu.sp + ph * 2) * w * 0.012;
+          if (fx < -4 || fx > w + 4) continue;
+          // Where along its length the curtain is lit: ribbons with gaps between them, slowly shifting.
+          const e = 0.5 + 0.5 * Math.sin(s / (w * 0.21) + ph * 1.3 + ts * 0.03) * 0.8 + 0.5 * 0.2 * Math.sin(s / (w * 0.08) + ph);
+          const env = e * e * (3 - 2 * e);
+          if (env < 0.04) continue;
+          const y =
+            cu.base +
+            (s / w - 0.5) * h * cu.tilt +
+            Math.sin(s / (w * 0.19) + ts * 0.07 * cu.sp + ph) * h * 0.07 +
+            Math.sin(s / (w * 0.06) - ts * 0.15 * cu.sp + ph * 1.7) * h * 0.018;
+          // Pulses running along the curtain and each ray's own flicker.
+          const pulse =
+            0.35 +
+            0.45 * Math.max(0, Math.sin(s / (w * 0.07) - ts * 0.9 + ph)) +
+            0.2 * Math.sin(s / (w * 0.23) + ts * 0.31 + ph);
+          const fl = 0.75 + 0.25 * Math.sin(ts * (1.3 + vary[i]) + flick[i]);
+          const a = cu.a * env * pulse * fl * vary[i] * (dark ? 0.6 : 0.34);
+          if (a <= 0.01) continue;
+          const len = cu.len * (0.6 + 0.4 * Math.sin(s / (w * 0.13) + ph * 3 + ts * 0.05)) * (0.8 + 0.2 * vary[i]) * (0.55 + 0.45 * env);
+          ctx.globalAlpha = Math.min(1, a);
+          ctx.drawImage(cu.ray, fx, y - len, step * 1.25, len);
+        }
+      }
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    },
+  };
+};
 
 const rain = (w: number, h: number, c: ISceneColors, speed: number, detail: number): IScene => {
   const r = rng(23);

@@ -131,6 +131,11 @@ type openAIPrice struct {
 func usd(v float64) *float64 { return &v }
 
 var openAIPrices = map[string]openAIPrice{
+	// Standard list prices verified on the official model pages, 2026-11-16.
+	// Per-request long-context surcharges (>272k) are not represented by OpenAICost.
+	"gpt-6.1-terra":       {1, 5, usd(0.05)}, // https://developers.openai.com/api/docs/models/gpt-6.1-terra
+	"gpt-6-luna":          {0.1, 0.5, usd(0.01)},
+	"gpt-5.6-luna":        {0.2, 1.2, usd(0.02)},
 	"gpt-6-astra":         {10, 50, usd(1)},  // list price, November 2026 (past 272k input: 20 / 75 / 2, not modelled)
 	"gpt-6.1-sol":         {2, 10, usd(0.1)}, // list price at launch, 29.09.2026
 	"gpt-5.6-sol":         {4, 20, usd(0.4)}, // list price since 21.08.2026 (was 5 / 30 / 0.5)
@@ -159,7 +164,7 @@ var openAIPrices = map[string]openAIPrice{
 }
 
 // openAIOrder is the table's own order (the order a model id tries the rows in breaks ties of length by it).
-var openAIOrder = []string{"gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.2-codex", "gpt-5.2-chat-latest", "gpt-5.2",
+var openAIOrder = []string{"gpt-6.1-terra", "gpt-6-luna", "gpt-5.6-luna", "gpt-6-astra", "gpt-6.1-sol", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.2-codex", "gpt-5.2-chat-latest", "gpt-5.2",
 	"gpt-5.1-codex-max", "gpt-5.1-codex", "gpt-5.1-chat-latest", "gpt-5.1", "gpt-5-codex", "gpt-5-chat-latest", "gpt-5-mini",
 	"gpt-5-nano", "gpt-5", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-4.1", "gpt-4o-mini", "gpt-4o"}
 

@@ -119,3 +119,55 @@ func TestRightsOfADocumentWithoutARecordFollowItsAuthor(t *testing.T) {
 		t.Errorf("no author named: %q, want none", got)
 	}
 }
+
+// A board drawn straight on the boards service has no record on the hub. Its «Поделиться» opens all the same, and what
+// its owner sets there is what the boards service is told from then on.
+func TestABoardWithoutARecordIsShared(t *testing.T) {
+	s, who, _ := circleRig(t, true, false)
+	s.cfg.ArtifactsAccessToken = "service-secret"
+	acl := func(p string, method, rest, body string) *httptest.ResponseRecorder {
+		t.Helper()
+		slug, tail, _ := strings.Cut(rest, "/")
+		req := httptest.NewRequest(method, "/api/platform/docs/"+rest, strings.NewReader(body))
+		req.SetPathValue("slug", slug)
+		req.SetPathValue("rest", tail)
+		w := httptest.NewRecorder()
+		if err := s.aclRoute(w, req, who[p]); err != nil {
+			s.answer(w, req, err)
+		}
+		return w
+	}
+	if w := acl("author", http.MethodGet, "wall", ""); w.Code != http.StatusOK {
+		t.Fatalf("the access of a board without a record: %d %s", w.Code, w.Body.String())
+	}
+	if w := acl("author", http.MethodGet, "nowhere", ""); w.Code != http.StatusNotFound {
+		t.Fatalf("a slug neither service has: %d, want 404", w.Code)
+	}
+	known := func(sub string) (map[string]string, []string) {
+		t.Helper()
+		body, _ := json.Marshal(map[string]any{"sub": sub, "slugs": []string{"wall"}})
+		req := httptest.NewRequest(http.MethodPost, "/api/platform/docs/_rights", strings.NewReader(string(body)))
+		req.Header.Set("Authorization", "Bearer service-secret")
+		w := httptest.NewRecorder()
+		s.Handler().ServeHTTP(w, req)
+		var out struct {
+			Rights map[string]string `json:"rights"`
+			Known  []string          `json:"known"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil || w.Code != http.StatusOK {
+			t.Fatalf("rights: %d %s", w.Code, w.Body.String())
+		}
+		return out.Rights, out.Known
+	}
+	// Nobody shared it yet: the boards service keeps its own rules.
+	if _, k := known(who["stranger"].User.ID); len(k) != 0 {
+		t.Fatalf("an unshared board is known: %v", k)
+	}
+	if w := acl("author", http.MethodPut, "wall/people/stranger@example.com", `{"role":"view"}`); w.Code >= 300 {
+		t.Fatalf("share with a person: %d %s", w.Code, w.Body.String())
+	}
+	rights, k := known(who["stranger"].User.ID)
+	if len(k) != 1 || rights["wall"] != RightView {
+		t.Fatalf("the person it was shared with: %v %v, want view of a known board", rights, k)
+	}
+}

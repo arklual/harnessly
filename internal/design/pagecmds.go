@@ -37,9 +37,12 @@ func IsPageError(err error) bool {
 }
 
 func (l *Library) noMetaError(id string) error {
+	// CLI processes do not inherit the runtime's library env. Give the exact,
+	// shell-quoted library and one project, never an implicit whole-library migration.
+	command := l.cfg.Texts.CLI + " design migrate --library '" + strings.ReplaceAll(l.Root(), "'", "'\"'\"'") + "' " + id
 	return pageErr(409, locale.Pick(
-		"Project "+id+" keeps no page model yet (no meta/): run `"+l.cfg.Texts.CLI+" design migrate` first",
-		"У проекта "+id+" ещё нет модели страниц (нет meta/): сначала `"+l.cfg.Texts.CLI+" design migrate`"))
+		"Project "+id+" keeps no page model yet (no meta/): run `"+command+"` first",
+		"У проекта "+id+" ещё нет модели страниц (нет meta/): сначала `"+command+"`"))
 }
 
 func (l *Library) requireModel(id string) (*ProjectModel, error) {

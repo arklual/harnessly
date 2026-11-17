@@ -201,3 +201,25 @@ func TestAGPTChatLineCarriesThePaneHeader(t *testing.T) {
 		t.Fatalf("glm: %q %v", glm, err)
 	}
 }
+
+// The reasoning of a GPT chat asks for its summary, so the chat shows what the model thinks (CLIProxyAPI sends the
+// effort alone); a summary of the request's own, no reasoning object, or not JSON: as it came.
+func TestTheGPTRelayAsksForTheReasoningSummary(t *testing.T) {
+	got := WithReasoningSummary([]byte(`{"model":"gpt-6.1-sol","reasoning":{"effort":"medium"},"input":"<a&b>"}`))
+	var b struct {
+		Reasoning struct{ Effort, Summary string } `json:"reasoning"`
+		Input     string                           `json:"input"`
+	}
+	if err := json.Unmarshal(got, &b); err != nil || b.Reasoning.Summary != "auto" || b.Reasoning.Effort != "medium" || b.Input != "<a&b>" {
+		t.Fatalf("%s: %v", got, err)
+	}
+	if !strings.Contains(string(got), `"<a&b>"`) {
+		t.Fatalf("escaped: %s", got)
+	}
+	for _, body := range []string{`{"model":"m","reasoning":{"effort":"high","summary":"none"}}`, `{"model":"m","input":[]}`,
+		`{"reasoning":null}`, `not json`, `[1]`} {
+		if got := string(WithReasoningSummary([]byte(body))); got != body {
+			t.Fatalf("%s became %s", body, got)
+		}
+	}
+}

@@ -9,16 +9,17 @@ import (
 
 // CellStat is one scenario × model of a report.
 type CellStat struct {
-	Scenario string  `json:"scenario"`
-	Set      string  `json:"set"`
-	Model    string  `json:"model"`
-	Pass     int     `json:"pass"`
-	Runs     int     `json:"runs"`
-	Infra    int     `json:"infra"`
-	Lo       float64 `json:"lo"`
-	Hi       float64 `json:"hi"`
-	PassHat3 float64 `json:"passHat3,omitempty"`
-	USD      float64 `json:"usd"`
+	Scenario    string  `json:"scenario"`
+	Set         string  `json:"set"`
+	Model       string  `json:"model"`
+	Pass        int     `json:"pass"`
+	Runs        int     `json:"runs"`
+	Infra       int     `json:"infra"`
+	Lo          float64 `json:"lo"`
+	Hi          float64 `json:"hi"`
+	PassHat3    float64 `json:"passHat3,omitempty"`
+	USD         float64 `json:"usd"`
+	CostUnknown bool    `json:"costUnknown,omitempty"`
 	// The medians of the judged runs: work time (s), tokens, dollars; their spread is (max − min) / median.
 	ActiveS      float64 `json:"activeS,omitempty"`
 	ActiveSpread float64 `json:"activeSpread,omitempty"`
@@ -45,12 +46,13 @@ type CellStat struct {
 
 // Report is a run summed up.
 type Report struct {
-	Setup  string     `json:"setup"`
-	Cells  []CellStat `json:"cells"`
-	Models []string   `json:"models"`
-	Runs   int        `json:"runs"`
-	Infra  int        `json:"infra"`
-	USD    float64    `json:"usd"`
+	Setup       string     `json:"setup"`
+	Cells       []CellStat `json:"cells"`
+	Models      []string   `json:"models"`
+	Runs        int        `json:"runs"`
+	Infra       int        `json:"infra"`
+	USD         float64    `json:"usd"`
+	CostUnknown bool       `json:"costUnknown,omitempty"`
 	// Failures are the failed runs, each with its first failed expectation.
 	Failures []Result `json:"-"`
 }
@@ -64,6 +66,7 @@ func Summarize(results, against []Result, noise float64) Report {
 	models := map[string]bool{}
 	var rep Report
 	for _, r := range results {
+		r.Model = reportModel(r)
 		c := cells[k{r.Scenario, r.Model}]
 		if c == nil {
 			c = &CellStat{Scenario: r.Scenario, Set: r.Set, Model: r.Model}
@@ -73,6 +76,8 @@ func Summarize(results, against []Result, noise float64) Report {
 		rep.Setup = r.Setup
 		rep.USD += r.USD
 		c.USD += r.USD
+		rep.CostUnknown = rep.CostUnknown || r.CostUnknown
+		c.CostUnknown = c.CostUnknown || r.CostUnknown
 		switch r.State {
 		case Infra:
 			c.Infra++
@@ -116,6 +121,7 @@ func Summarize(results, against []Result, noise float64) Report {
 	}
 	before := map[k][2]int{}
 	for _, r := range against {
+		r.Model = reportModel(r)
 		if r.State == Infra {
 			continue
 		}
@@ -165,6 +171,13 @@ func Summarize(results, against []Result, noise float64) Report {
 	return rep
 }
 
+func reportModel(r Result) string {
+	if r.Effort != "" {
+		return r.Model + "@effort=" + r.Effort
+	}
+	return r.Model
+}
+
 func pct(x float64) string { return fmt.Sprintf("%.0f", math.Round(x*100)) }
 
 var changeMark = map[string]string{"better": " ▲", "worse": " ▼", "new": " (new)"}
@@ -173,7 +186,11 @@ var changeMark = map[string]string{"better": " ▲", "worse": " ▼", "new": " (
 func (rep Report) Markdown(title string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# %s\n\n", title)
-	fmt.Fprintf(&b, "Setup `%s` · %d runs judged, %d infrastructure failures not counted · $%.2f\n\n", rep.Setup, rep.Runs, rep.Infra, rep.USD)
+	costText := fmt.Sprintf("$%.2f", rep.USD)
+	if rep.CostUnknown {
+		costText = fmt.Sprintf("cost unknown (known subtotal $%.2f; not a free run)", rep.USD)
+	}
+	fmt.Fprintf(&b, "Setup `%s` · %d runs judged, %d infrastructure failures not counted · %s\n\n", rep.Setup, rep.Runs, rep.Infra, costText)
 	b.WriteString("Each cell: passed/runs, 95% Wilson interval in brackets; ▲/▼ a change beyond noise against the earlier run.\n\n")
 	b.WriteString("| Scenario |")
 	for _, m := range rep.Models {
@@ -239,8 +256,12 @@ func (rep Report) Markdown(title string) string {
 		if c.Runs == 0 {
 			continue
 		}
-		fmt.Fprintf(&b, "| %s | %s | %.0f (±%s%%) | %.0f (±%s%%) | %.2f | %.1f/%.1f/%.1f | %.1f | %.1f | %.1f | %.1f | %.1f | %.1f | %d |\n",
-			c.Scenario, c.Model, c.ActiveS, pct(c.ActiveSpread/2), c.Tokens/1000, pct(c.TokenSpread/2), c.USDMedian,
+		price := fmt.Sprintf("%.2f", c.USDMedian)
+		if c.CostUnknown {
+			price = "unknown"
+		}
+		fmt.Fprintf(&b, "| %s | %s | %.0f (±%s%%) | %.0f (±%s%%) | %s | %.1f/%.1f/%.1f | %.1f | %.1f | %.1f | %.1f | %.1f | %.1f | %d |\n",
+			c.Scenario, c.Model, c.ActiveS, pct(c.ActiveSpread/2), c.Tokens/1000, pct(c.TokenSpread/2), price,
 			c.Subagents, c.Delegations, c.Teammates, c.Conflicts, c.Duplicates, c.Asks, c.LeadEdits, c.Messages, c.Repl, c.Timeouts)
 	}
 	if len(rep.Failures) > 0 {

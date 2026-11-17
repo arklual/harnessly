@@ -92,9 +92,11 @@ const LookFxFrame = "fx-frame"
 const lookFxFrameCSP = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; " +
 	"img-src data: blob:; font-src data:; form-action 'none'; base-uri 'none'; sandbox allow-scripts"
 
+// lookFxFrameHTML is light, as its iframe (.hx-fx): Chrome paints a frame whose colour scheme differs from its
+// element's opaque, and a dark page would get a white sheet over the chat.
 // lookFxFrameHTML takes the code from its parent only (the hx SDK and the effect, features/looks/fx-frame.ts), once.
-const lookFxFrameHTML = `<!doctype html><html><head><meta charset="utf-8">` +
-	`<style>html,body{margin:0;padding:0;background:transparent;overflow:hidden}canvas{display:block}</style>` +
+const lookFxFrameHTML = `<!doctype html><html><head><meta charset="utf-8"><meta name="color-scheme" content="light">` +
+	`<style>:root{color-scheme:light}html,body{margin:0;padding:0;background:transparent;overflow:hidden}canvas{display:block}</style>` +
 	`</head><body><script>(function(){` +
 	`function take(e){if(e.source!==parent||!e.data||e.data.hx!=="code"||typeof e.data.code!=="string")return;` +
 	`removeEventListener("message",take);document.documentElement.dataset.layer=e.data.layer==="back"?"back":"front";` +

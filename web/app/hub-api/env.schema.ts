@@ -12,7 +12,7 @@ const catalogKind = lit(
   'app',
   'provider',
 );
-const layerKind = lit('org', 'tenant', 'team');
+const layerKind = lit('org', 'tenant', 'team', 'user');
 const lockedReason = nullable(lit('pinned_by_org', 'pinned_by_tenant', 'no_rights', 'built_in'));
 const kindCounts = obj({
   skill: num,
@@ -194,6 +194,9 @@ export const meEnvItem = obj({
   off: bool,
   canToggle: bool,
   groupId: str,
+  own: opt(bool),
+  shadowed: opt(bool),
+  source: opt(source),
 });
 export const meEnvPreset = obj({
   id: str,
@@ -262,4 +265,5 @@ export const meEnvResponse = obj({
   presets: arr(meEnvPreset),
   outdated: bool,
   machines: arr(meMachine),
+  own: bool,
 });

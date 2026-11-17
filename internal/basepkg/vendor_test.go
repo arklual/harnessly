@@ -103,9 +103,13 @@ func TestViewDoesNotCountTheSnapShim(t *testing.T) {
 func TestIsSnapReadsTheWrapper(t *testing.T) {
 	dir := t.TempDir()
 	shim := filepath.Join(dir, "chromium-browser")
-	os.WriteFile(shim, []byte("#! /bin/sh\nexec /snap/bin/chromium \"$@\"\n"), 0o755)
+	if err := os.WriteFile(shim, []byte("#! /bin/sh\nexec /snap/bin/chromium \"$@\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	real := filepath.Join(dir, "chrome")
-	os.WriteFile(real, []byte("\x7fELF..."), 0o755)
+	if err := os.WriteFile(real, []byte("\x7fELF..."), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if !IsSnap(shim) || IsSnap(real) || IsSnap(filepath.Join(dir, "none")) {
 		t.Fatal("IsSnap")
 	}

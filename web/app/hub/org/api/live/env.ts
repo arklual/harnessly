@@ -65,6 +65,10 @@ export const liveEnv = (): EnvApi => ({
   envMine: (space) => http.get<MeEnvResponse>('/api/me/env', { space }),
   envMineSet: (itemId, off, space) =>
     http.put<MeEnvItem>(`/api/me/env/${encodeURIComponent(itemId)}`, { off, space }),
+  envOwnAdd: (req, space) => http.post<MeEnvItem>('/api/me/env/own', { ...req, space }),
+  envOwnRemove: async (itemId, space) => {
+    await http.del(`/api/me/env/own/${encodeURIComponent(itemId)}`, { space });
+  },
   envMineGroup: (groupId, on, space) =>
     http.put<MeEnvGroup>(`/api/me/env/groups/${encodeURIComponent(groupId)}`, { on, space }),
   envGroupAdd: async (org, req) => (await http.post<GroupResponse>(orgPath(org, '/env/groups'), req)).group,

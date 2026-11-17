@@ -125,7 +125,7 @@ MCP-сервер по умолчанию называется `harnessly`; ра�
 | Инструменты делегирования | да | **нет** | да |
 | `tab create`, `send`, `close`, `result`, `peers send` | да | **нет** (`agent_outside_the_wall`) | да |
 | `tab list`, `tab status`, `workspaces`, `peers` | да | да | да |
-| `deliver`, `notify`, `ask`, `secret`, `design`, `site`, `api-guide` | да | да | да |
+| `deliver`, `notify`, `ask`, `secret`, `design`, `site`, `api-guide`, `connections`, `connector read`, `connector act` | да | да | да |
 | Инструменты `harnessly-app` | нет | да | нет |
 | Инструкции, скиллы, команды, правила инструментов приложения | нет | да | нет |
 | Стена | нет | да, где работает bwrap | нет |

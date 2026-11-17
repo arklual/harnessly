@@ -3,13 +3,13 @@
 import { type KeyboardEvent, useState } from 'react';
 
 import type { EnvEntryRow, EnvLayer } from '../../../../hub-api/env';
-import { Icon } from '../../ui';
+import { Btn, Icon } from '../../ui';
 import { Help } from './bits';
 import { type DragLock, keyMove, scriptOrder, startDrag } from './drag';
 import { type GroupActions, GroupHead, MoveTo, NewGroup } from './groups';
 import { KIND } from './model';
 import { type PresetActions, PresetChips, PresetsEditor } from './presets';
-import { type Block, blocksOf, type LayerMeta } from './scope';
+import { type Block, type OwnInfo, blocksOf, type LayerMeta } from './scope';
 
 const onKey = (fn: () => void) => (e: KeyboardEvent) => {
   if (e.target !== e.currentTarget) return;
@@ -40,6 +40,8 @@ export interface LayerActions {
   onReorder: (entryIds: string[]) => Promise<boolean>;
   groups: GroupActions;
   presets: PresetActions;
+  /** A member's own items: which rows are theirs; null for an editor. */
+  own: { info: OwnInfo; onRemove: (row: EnvEntryRow) => void } | null;
 }
 
 const SCRIPT_TIP = (edit: boolean): string =>
@@ -66,6 +68,7 @@ const Row = ({
   const canEdit = vm.edit && !r.locked;
   const canDrag = canEdit && r.kind === 'script' && scriptIds.length > 1;
   const group = `${vm.layer.layer}:${vm.layer.scopeId}`;
+  const own = a.own?.info.items.get(r.itemId);
   const open = () => a.onOpen?.(r);
   const opts = { ids: scriptIds, commit: a.onReorder, group };
   return (
@@ -97,6 +100,7 @@ const Row = ({
       <span className="ev-row__t">
         <b>{r.name}</b>
         <small>{r.hint}</small>
+        {own?.shadowed && <small>Организация выдаёт такое же — своё не ставится</small>}
       </span>
       {canEdit ? (
         <>
@@ -143,7 +147,23 @@ const Row = ({
         </>
       ) : (
         <>
-          {!inGroup && <span className="ev-req__ro">{roLabel(r)}</span>}
+          {own && a.own ? (
+            <>
+              <span className="ev-req__ro">Своё</span>
+              <Btn
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  a.own?.onRemove(r);
+                }}
+              >
+                Убрать
+              </Btn>
+            </>
+          ) : (
+            !inGroup && <span className="ev-req__ro">{roLabel(r)}</span>
+          )}
           {a.onOpen && (
             <span className="ev-go">
               <Icon i="chevron-right" size="sm" />

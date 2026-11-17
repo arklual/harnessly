@@ -13,12 +13,15 @@ out="${1:?usage: release-linux.sh <out-dir> <version>}"
 version="${2:?usage: release-linux.sh <out-dir> <version>}"
 test -f web/dist/index.html || { echo 'no web/dist: build the page first' >&2; exit 1; }
 mkdir -p "$out"
+# Where anonymous telemetry goes (docs/self-host/telemetry.md): CI variables of the release project. Both are public (an
+# ingest address and a write-only project key); a checkout without them sends nothing.
+tflags="-X 'github.com/ly-solutions/harnessly/internal/telemetry.DefaultURL=${HARNESSLY_TELEMETRY_URL:-}' -X 'github.com/ly-solutions/harnessly/internal/telemetry.DefaultKey=${HARNESSLY_TELEMETRY_KEY:-}'"
 for bin in agent harnessly runtime; do
   tags=""
   [ "$bin" = runtime ] && tags="-tags webui"
   # shellcheck disable=SC2086 # tags is empty or one flag with its value
   CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath $tags \
-    -ldflags "-s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=$version -X github.com/ly-solutions/harnessly/internal/hlcli.Version=$version" \
+    -ldflags "-s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=$version -X github.com/ly-solutions/harnessly/internal/hlcli.Version=$version $tflags" \
     -o "$out/$bin-linux-amd64" "./cmd/$bin"
 done
 printf 'RELEASE_SHA=%s\nRELEASE_VERSION=%s\n' "$(git rev-parse HEAD)" "$version" > "$out/release.env"

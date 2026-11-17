@@ -13,7 +13,13 @@ import {
   type IAgentSettingsHandle,
   type Loaded,
 } from '@/next/bindings/settings-data';
-import { switchHubEnv } from '@/next/features/hub-env/api';
+import {
+  addOwnHubEnv,
+  refusalOf,
+  removeOwnHubEnv,
+  switchHubEnv,
+  type IOwnItem,
+} from '@/next/features/hub-env/api';
 import HubEnvSection from '@/next/features/settings/hub-env-section';
 import { CodexLogins } from '@/next/bindings/settings-codex-logins';
 import { useAgentCredentials } from '@/next/bindings/settings-credentials';
@@ -276,7 +282,6 @@ export const SkillsPage = ({ machine, pages, pending }: ISkillsPageProps) => {
   const [filter, setFilter] = useState<ExtFilter>('all');
   const catalog = useCatalog(machine, provider, tab === 'skills');
   const hubEnv = useHubEnv(machine);
-  const [off, setOff] = useState<ReadonlySet<string>>(new Set());
   const handle = pages[provider];
   const { run, pending: waiting } = pending;
   const prefix = `${provider}/${tab}`;
@@ -334,15 +339,21 @@ export const SkillsPage = ({ machine, pages, pending }: ISkillsPageProps) => {
   const hubItems = hub ? hub.items.filter((item) => (tab === 'mcp') === (item.kind === 'mcp')) : [];
   const switchOff = (id: string, value: boolean) =>
     void run(`hub/${id}`, t('next.settings.hubEnv.failed'), async () => {
-      const res = await switchHubEnv(machine, id, value);
-      if (!('ok' in res)) throw new Error(t('next.settings.hubEnv.failed'));
-      setOff((now) => {
-        const next = new Set(now);
-        if (value) next.add(id);
-        else next.delete(id);
-        return next;
-      });
+      const refused = refusalOf(await switchHubEnv(machine, id, value), t('next.settings.hubEnv.failed'));
+      if (refused !== null) throw new Error(refused);
+      hubEnv.retry();
     });
+  const removeOwn = (id: string) =>
+    void run(`hub/${id}`, t('next.settings.hubEnv.removeFailed'), async () => {
+      const refused = refusalOf(await removeOwnHubEnv(machine, id), t('next.settings.hubEnv.removeFailed'));
+      if (refused !== null) throw new Error(refused);
+      hubEnv.retry();
+    });
+  const addOwn = async (item: IOwnItem): Promise<string | null> => {
+    const refused = refusalOf(await addOwnHubEnv(machine, item), t('next.settings.hubEnv.addFailed'));
+    if (refused === null) hubEnv.retry();
+    return refused;
+  };
 
   return (
     <>
@@ -351,8 +362,11 @@ export const SkillsPage = ({ machine, pages, pending }: ISkillsPageProps) => {
           items={hubItems}
           canSwitch={hub.canSwitch}
           busy={busyOf(waiting, 'hub')}
-          off={off}
+          canOwn={hub.canOwn}
+          kind={tab === 'mcp' ? 'mcp' : 'skill'}
           onSwitch={switchOff}
+          onRemove={removeOwn}
+          onAdd={addOwn}
         />
       )}
       <SkillsSection

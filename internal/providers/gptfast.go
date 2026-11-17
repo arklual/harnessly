@@ -64,17 +64,54 @@ func (g *GPTProxy) HasFast(model string) bool { return g.FastTier != nil && g.Fa
 // prepare takes the pane header off a request of the proxy and, on a turn of a chat in fast mode, asks for the fast tier.
 func (g *GPTProxy) prepare(r *http.Request, rest string, body []byte) []byte {
 	pane, socket, ok := chatPane(r.Header.Get(chatHeader))
-	if !ok {
+	if ok {
+		r.Header.Del(chatHeader)
+	}
+	if body == nil || !strings.HasSuffix(rest, "/responses") || r.Header.Get("Content-Encoding") != "" {
 		return body
 	}
-	r.Header.Del(chatHeader)
-	if body == nil || !strings.HasSuffix(rest, "/responses") || r.Header.Get("Content-Encoding") != "" || g.FastPane == nil {
-		return body
-	}
-	if !g.FastPane(pane, socket) {
+	body = WithReasoningSummary(body)
+	if !ok || g.FastPane == nil || !g.FastPane(pane, socket) {
 		return body
 	}
 	return WithFastTier(body, g.HasFast)
+}
+
+// reasoningSummary is the summary the Codex CLI asks for (`model_reasoning_summary = "auto"`).
+const reasoningSummary = "auto"
+
+// WithReasoningSummary is a Responses request whose reasoning asks for its summary. CLIProxyAPI (8.0.x) sets only
+// reasoning.effort when it turns Claude Code's request into the backend's, and without a summary the backend sends
+// the reasoning encrypted alone: Claude Code gets empty thinking blocks and the chat shows nothing of what the model
+// thinks for the whole of a long step. A request with a summary of its own, without a reasoning object, or that is not
+// a JSON object goes as it came.
+func WithReasoningSummary(body []byte) []byte {
+	var head map[string]json.RawMessage
+	if err := json.Unmarshal(body, &head); err != nil {
+		return body
+	}
+	var reasoning map[string]json.RawMessage
+	if raw, has := head["reasoning"]; !has || json.Unmarshal(raw, &reasoning) != nil || reasoning == nil {
+		return body
+	}
+	if _, has := reasoning["summary"]; has {
+		return body
+	}
+	reasoning["summary"], _ = json.Marshal(reasoningSummary)
+	var r bytes.Buffer
+	enc := json.NewEncoder(&r)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(reasoning); err != nil {
+		return body
+	}
+	head["reasoning"] = bytes.TrimRight(r.Bytes(), "\n")
+	var out bytes.Buffer
+	enc = json.NewEncoder(&out)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(head); err != nil {
+		return body
+	}
+	return bytes.TrimRight(out.Bytes(), "\n")
 }
 
 // chatPane reads the pane header: the pane's id and the name of its tmux server's socket (the last part of the path

@@ -88,6 +88,12 @@ export interface IDayCalendar {
 export interface IDayPriority {
   itemId: TItemId;
   title: string;
+  /** Whose the thing is now: the person's (`you`), the agent's (`agent`), or done (`done`). */
+  group?: string;
+  /** The feed's section: `prepared` the agent made it ready, `running` it works now, `queue` it will take it, `wait`. */
+  section?: string;
+  /** The agent's chat about the thing, once an agent worked on it: opening the thing goes there. */
+  runUrl?: string;
   due?: string;
   soon?: boolean;
   sub?: string;
@@ -109,6 +115,8 @@ export interface IDay {
   name?: string;
   headline?: { text?: string; itemId?: TItemId; rich?: TRichPart[] };
   digest?: { text?: string; rich?: TRichPart[] };
+  /** The app can replay a past day for this person and tune itself on it: the page offers «Настроить». */
+  tune?: boolean;
   tomorrow?: {
     title?: string;
     text?: string;

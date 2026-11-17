@@ -34,7 +34,9 @@ func TestBuiltInWorkspacePrompts(t *testing.T) {
 				t.Errorf("%s prompt lacks %q:\n%s", provider, want, text)
 			}
 		}
-		if strings.Contains(text, "TOKEN=") || strings.Contains(text, "{{") {
+		// The documented secret-run reference is a safe entry name, not a token value.
+		withoutSafeReference := strings.ReplaceAll(text, "BOARDS_TOKEN=boards-token", "")
+		if strings.Contains(withoutSafeReference, "TOKEN=") || strings.Contains(text, "{{") {
 			t.Errorf("%s prompt has a placeholder or a token:\n%s", provider, text)
 		}
 	}

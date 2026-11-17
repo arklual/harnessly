@@ -19,6 +19,7 @@ import { useSlashSource } from '@/next/bindings/slash-source';
 import { UI_REQUEST, requestUi } from '@/next/stores/ui-requests';
 import type { ISlashActions } from '@/next/features/composer/slash-model';
 import ScreenField from '@/next/features/composer/one-field';
+import { useVoiceNow } from '@/next/features/voice-live/field';
 import KindSwitch, {
   CHAT_KIND,
   setChatKind,
@@ -128,6 +129,8 @@ const HomeComposer = ({
   const gptExtra = useGptExtra(machine, text, () => setText(''));
   // «Задача | Разговор» over the field: a talk sends the words to a plain chat with a model instead of an agent.
   const kind = useChatKind();
+  // A talk on the voice has its bar at the top of the screen: the switch gives it the place.
+  const voiceNow = useVoiceNow();
   const plainTalk = kind === CHAT_KIND.talk && gptExtra !== null;
   useKindKey(field, kind, setChatKind);
   // The apps picked in «+» for the chat to be: turned on in it as soon as the machine has made it.
@@ -472,7 +475,7 @@ const HomeComposer = ({
         {above}
         <div className="hx-enter" data-enter="up" data-eb="520" data-ed="700">
           {/* The switch stands at the top of the stage, in the middle (kind-switch.tsx «top»), not over the field. */}
-          {gptExtra && <KindSwitch value={kind} onChange={setChatKind} top />}
+          {gptExtra && !voiceNow && <KindSwitch value={kind} onChange={setChatKind} top />}
           <DockBar
             notice={voiceNotice ?? (allMachinesOff ? NO_MACHINES : signIn && !plainTalk ? SIGN_IN : null)}
           />

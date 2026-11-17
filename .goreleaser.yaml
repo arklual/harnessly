@@ -46,6 +46,7 @@ builds:
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion={{ .Version }}
+      - -X github.com/ly-solutions/harnessly/internal/telemetry.DefaultURL={{ envOrDefault "HARNESSLY_TELEMETRY_URL" "" }} -X github.com/ly-solutions/harnessly/internal/telemetry.DefaultKey={{ envOrDefault "HARNESSLY_TELEMETRY_KEY" "" }}
 
 archives:
   - formats: [tar.gz]

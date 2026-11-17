@@ -10,6 +10,7 @@ import type {
   EnvGroup,
   EnvPreset,
   MeEnvGroup,
+  MeEnvOwnRequest,
   MeEnvPresetResponse,
   PatchGroupRequest,
   PatchPresetRequest,
@@ -54,6 +55,9 @@ export interface EnvApi {
   /** A person's own environment in a tenant (its slug; absent: the hub picks the one they are in). */
   envMine(space?: string): Promise<MeEnvResponse>;
   envMineSet(itemId: string, off: boolean, space?: string): Promise<MeEnvItem>;
+  /** The person's own skill or MCP server (the own layer, when the organization has it). */
+  envOwnAdd(req: MeEnvOwnRequest, space?: string): Promise<MeEnvItem>;
+  envOwnRemove(itemId: string, space?: string): Promise<void>;
   /** The person turns an optional group on or off for themselves and their machines. */
   envMineGroup(groupId: string, on: boolean, space?: string): Promise<MeEnvGroup>;
   /** A group of a layer's entries: required pins its items, optional lets each person choose. */

@@ -120,7 +120,7 @@ func mockupAttr(n *html.Node, key string) string {
 
 // noSubstitution breaks every {{ of a mockup's text with a zero-width space: the board engine reads {{ }} as a path, the
 // mockup meant the characters.
-func noSubstitution(s string) string { return strings.ReplaceAll(s, "{{", "{​{") }
+func noSubstitution(s string) string { return strings.ReplaceAll(s, "{{", "{\u200b{") }
 
 func cutMockupTree(n *html.Node) {
 	for c := n.FirstChild; c != nil; {

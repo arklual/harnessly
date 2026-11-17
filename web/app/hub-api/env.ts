@@ -4,7 +4,8 @@
 
 export type CatalogKind =
   'skill' | 'mcp' | 'repo' | 'doc' | 'script' | 'access' | 'plugin' | 'claude-settings' | 'app' | 'provider';
-export type EnvLayerKind = 'org' | 'tenant' | 'team';
+// 'user': a person's own layer: only in what `/api/me/env` gives, never in the organization's screens.
+export type EnvLayerKind = 'org' | 'tenant' | 'team' | 'user';
 export type AudienceMode = 'tenant' | 'teams' | 'off';
 
 // Why a row cannot be changed by the person looking at it; null: it can.
@@ -321,13 +322,18 @@ export type MeEnvItem = {
   kind: CatalogKind;
   name: string;
   hint: string;
-  layer: EnvLayerKind; // the layer that gives the person the item
+  layer: EnvLayerKind; // the layer that gives the person the item; 'user': their own (HRN-768)
   scopeId: string;
   layerTitle: string;
   pinned: boolean;
   off: boolean; // the person's own switch
   canToggle: boolean; // false for a pinned item
   groupId: string; // '' for none; an optional group switched off makes `off` true
+  // The person's own item (layer 'user'): theirs to change and remove; `source` comes with it.
+  own?: boolean;
+  // Their own item the organization gives under the same name: left out of their machines' lists.
+  shadowed?: boolean;
+  source?: CatalogSource;
 };
 // A group the person's items are in.
 export type MeEnvGroup = {
@@ -366,9 +372,16 @@ export type MeEnvResponse = {
   // Some machine of theirs in the tenant is not current or has a failed item.
   outdated: boolean;
   machines: MeMachine[];
+  // The organization has the own layer (flag env.own): the person may add their own skills and MCP servers.
+  own: boolean;
 };
 // PUT /api/me/env/{itemId}?space= → 200 MeEnvItem
 export type MeEnvToggleRequest = { off: boolean; space?: string };
+// POST /api/me/env/own?space= → 201 MeEnvItem; PATCH /api/me/env/own/{itemId}?space= → 200 MeEnvItem (kind stays);
+// DELETE /api/me/env/own/{itemId}?space= → 204. 409 name_taken (their own) or given (the organization's name),
+// 429 too_many, 404 not_enabled without the flag.
+export type MeEnvOwnRequest = { kind: 'skill' | 'mcp'; name: string; hint?: string; source: CatalogSource };
+export type MeEnvOwnPatch = { name?: string; hint?: string; source?: CatalogSource };
 
 // ── machine setup (docs/hub/environment.md, «Machine setup») ──────────────────────────────────────────────────────
 

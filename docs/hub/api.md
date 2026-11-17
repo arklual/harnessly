@@ -256,6 +256,7 @@ off. A choice made by this process is seen at once, one made by another replica 
 | `ui.hx.live` | the lively hub: the common motion on every screen, free periods, sortable tables, the «Инструменты» screen |
 | `org.events` | the organization's live stream, «Organization events» below |
 | `env` | the machines' environment screen |
+| `env.own` | a person's own layer of the environment: their own skills and MCP servers on their machines only, and their switches taking items off them ([environment.md](environment.md#own-layer)) |
 | `catalog` | the catalog of tools and skills |
 | `machine.resources` | editing a machine's resources and showing their price |
 | `runtime.fleet` | one runtime for all of a person's machines, «Fleet» below |

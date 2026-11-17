@@ -141,8 +141,7 @@ export const useFrameBridge = ({
       else if (message.k === 'pick') {
         resume.current = message.on;
         setPicking(message.on);
-      }
-      else if (message.k === 'picked') picked(message.picked);
+      } else if (message.k === 'picked') picked(message.picked);
       else if (message.k === 'anchored') anchors.set(message.report);
       else if (message.k === 'redirect') {
         // The page's bridge holds back a page that leaves by script until it hears whether the tab goes there itself.
@@ -158,7 +157,6 @@ export const useFrameBridge = ({
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
   }, [frame, origin, anchors]);
-
 
   return {
     /** The page asked for a security key or Touch ID; false again with its next document. */

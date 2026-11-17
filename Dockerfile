@@ -45,11 +45,14 @@ COPY web/*.go ./web/
 FROM gosrc AS build
 COPY --from=web /src/web/dist ./web/dist
 ARG VERSION=dev
+# Where anonymous telemetry goes (docs/telemetry.md); empty, the image sends nothing.
+ARG HARNESSLY_TELEMETRY_URL=
+ARG HARNESSLY_TELEMETRY_KEY=
 ARG TARGETOS
 ARG TARGETARCH
 ENV GOOS=$TARGETOS GOARCH=$TARGETARCH
 RUN --mount=type=cache,id=harnessly-go-build,target=/root/.cache/go-build \
-    ldflags="-s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=${VERSION} -X github.com/ly-solutions/harnessly/internal/hlcli.Version=${VERSION}" \
+    ldflags="-s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=${VERSION} -X github.com/ly-solutions/harnessly/internal/hlcli.Version=${VERSION} -X 'github.com/ly-solutions/harnessly/internal/telemetry.DefaultURL=${HARNESSLY_TELEMETRY_URL}' -X 'github.com/ly-solutions/harnessly/internal/telemetry.DefaultKey=${HARNESSLY_TELEMETRY_KEY}'" \
  && go build -trimpath -tags webui -ldflags "$ldflags" -o /out/runtime ./cmd/runtime \
  && go build -trimpath -ldflags "$ldflags" -o /out/agent ./cmd/agent \
  && go build -trimpath -ldflags "$ldflags" -o /out/harnessly ./cmd/harnessly
@@ -181,6 +184,8 @@ FROM gosrc AS build-hub
 ARG VERSION=dev
 ARG TARGETOS
 ARG TARGETARCH
+ARG HARNESSLY_TELEMETRY_URL=
+ARG HARNESSLY_TELEMETRY_KEY=
 # `pnpm build:bundle` of the web stage builds the hub page too (web/dist-hub). The hub carries the runtime's page as well
 # (web/dist, the webui tag): the fleet's workspace at /agents/.
 COPY --from=web /src/web/dist ./web/dist
@@ -190,7 +195,7 @@ COPY --from=build-warm /warm /tmp/warm
 RUN --mount=type=cache,id=harnessly-go-build,target=/root/.cache/go-build \
     set -e; \
     hubflags="-s -w -X github.com/ly-solutions/harnessly/internal/hub/buildinfo.Version=${VERSION}"; \
-    ldflags="-s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=${VERSION} -X github.com/ly-solutions/harnessly/internal/hlcli.Version=${VERSION}"; \
+    ldflags="-s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=${VERSION} -X github.com/ly-solutions/harnessly/internal/hlcli.Version=${VERSION} -X 'github.com/ly-solutions/harnessly/internal/telemetry.DefaultURL=${HARNESSLY_TELEMETRY_URL}' -X 'github.com/ly-solutions/harnessly/internal/telemetry.DefaultKey=${HARNESSLY_TELEMETRY_KEY}'"; \
     mkdir -p /out/dist; \
     GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -tags "hubui webui" -ldflags "$hubflags" -o /out/hub ./cmd/hub & pids="$!"; \
     for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do \

@@ -46,10 +46,13 @@ const (
 	// EnvPacks lets an organization put environment packs (tools, hooks, MCP and the safe's rules in a versioned
 	// repository folder) in its catalog (docs/hub/packs.md).
 	EnvPacks = "env.packs"
+	// EnvOwn is a person's own layer of the environment: their own skills and MCP servers, and their switches, on their
+	// own machines' lists (docs/hub/environment.md «Own layer»).
+	EnvOwn = "env.own"
 )
 
 // Known are the flag names in the order they are shown.
-var Known = []string{UIHX, Env, Catalog, MachineResources, OrgEvents, UIHXLive, RuntimeFleet, SecretsVault, Efficiency, ChatResume, MachineSeats, EnvPacks}
+var Known = []string{UIHX, Env, Catalog, MachineResources, OrgEvents, UIHXLive, RuntimeFleet, SecretsVault, Efficiency, ChatResume, MachineSeats, EnvPacks, EnvOwn}
 
 // IsKnown says that name is a flag of the hub.
 func IsKnown(name string) bool { return slices.Contains(Known, name) }

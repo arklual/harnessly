@@ -36,6 +36,9 @@ harnessly installer
   --no-service      install the programs only, do not start anything
   --no-deps         do not install tmux and git, only check for them
   --no-browser      skip optional browser libraries, Xvfb and fonts (or HARNESSLY_NO_BROWSER=1)
+  --disable-telemetry
+                    send no anonymous error reports to harnessly's makers, now and after updates (or
+                    HARNESSLY_TELEMETRY=off, DO_NOT_TRACK=1; docs/telemetry.md)
   --archive FILE    install a locally built release archive (trusted input)
   --check           check this machine (system, tools, disk, port, network, CA) and install nothing
   --ca-file FILE    PEM file with your company's CA certificates (downloads and every component trust it)
@@ -84,6 +87,9 @@ parse_args() {
 	DEPS=1
 	UNINSTALL=0
 	BROWSER=1
+	TELEMETRY_OFF=0
+	case ${HARNESSLY_TELEMETRY:-} in off | 0 | false | no | none | disable | disabled) TELEMETRY_OFF=1 ;; esac
+	case ${DO_NOT_TRACK:-} in 1 | true | yes) TELEMETRY_OFF=1 ;; esac
 	LOCAL_ARCHIVE=
 	CHECK=0
 	CA_FILE=${HARNESSLY_CA_FILE:-}
@@ -127,6 +133,7 @@ parse_args() {
 		--no-service) SERVICE=0 ;;
 		--no-deps) DEPS=0 ;;
 		--no-browser) BROWSER=0 ;;
+		--disable-telemetry | --no-telemetry) TELEMETRY_OFF=1 ;;
 		--uninstall) UNINSTALL=1 ;;
 		-h | --help)
 			usage
@@ -703,6 +710,7 @@ EOF
 	# The update channel of this installation: the runtime's "new version" notice and the next run of this script
 	# read it here.
 	[ -z "${CHANNEL:-}" ] || set_env_line RUNTIME_UPDATE_CHANNEL "$CHANNEL"
+	[ "$TELEMETRY_OFF" = 0 ] || set_env_line RUNTIME_TELEMETRY off
 	umask 022
 }
 

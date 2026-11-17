@@ -389,6 +389,9 @@ func (a *API) CLIDesign(r *http.Request) Answer {
 		}{id, a.L.State(id)}, h)
 	}
 	if r.Method == http.MethodGet {
+		if err := a.L.EnsureGuide(); err != nil {
+			return JSON(r, http.StatusInternalServerError, errorBody(err.Error()), h)
+		}
 		arts := a.L.VisibleTo(a.L.ListArtifacts())
 		list := make([]cliArtifact, 0, len(arts))
 		for _, x := range arts {

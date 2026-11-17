@@ -368,16 +368,6 @@
   color: var(--hx-fg-3);
 }
 
-/* The field's meter of the chat's limits (features/limits/limits-mini.tsx): thin bars in the context ring's chip, the
-   five hours over the week; on hover the card of every window (HRN-1552). A bar takes the level's colour as it runs
-   low. On a narrow field it gives way with the ring: the pill's popover keeps the windows. */
-.hx-ctx__chip.hx-limmini {
-  align-content: center;
-  place-items: stretch;
-  gap: 4px;
-  padding: 0 6px;
-  box-sizing: border-box;
-}
 .hx-limmini i {
   position: relative;
   display: block;

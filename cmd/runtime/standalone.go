@@ -249,7 +249,7 @@ func mismatchTelemetry(configFile string) *telemetry.Queue {
 			}
 			return env("RUNTIME_OWNER_EMAIL", env("RUNTIME_TELEMETRY_ANONYMOUS_ID", "runtime"))
 		},
-		Log: machinesLog})
+		Allow: telemetryAllowed, Log: machinesLog})
 }
 
 // slicedSockets are the socket paths a slice answers: while it is not up yet they are unavailable.

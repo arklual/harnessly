@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CatalogItem, EnvLayer, EnvResponse, MeMachine } from '../../../../hub-api/env';
 import { useOrg } from '../../../org/context';
 import type { Target } from './scope';
-import { layersOfMe } from './scope';
+import { layersOfMe, NO_OWN, type OwnInfo, ownOf } from './scope';
 
 export interface EnvData {
   /** The layers (a member's: what their team gets); null while loading. */
@@ -13,6 +13,8 @@ export interface EnvData {
   /** The teams of the layers, for the picker's counts (a member has none). */
   view: EnvResponse | null;
   machines: MeMachine[];
+  /** A member's own layer: may they add, which rows are theirs. */
+  own: OwnInfo;
   outdated: boolean;
   error: unknown;
   reload: () => void;
@@ -30,25 +32,32 @@ export const useEnvData = (): EnvData => {
     view: EnvResponse | null;
     layers: EnvLayer[] | null;
     machines: MeMachine[];
+    own: OwnInfo;
     outdated: boolean;
     error: unknown;
-  }>({ view: null, layers: null, machines: [], outdated: false, error: null });
+  }>({ view: null, layers: null, machines: [], own: NO_OWN, outdated: false, error: null });
   const [seen, setSeen] = useState(key);
   const [tick, setTick] = useState(0);
   const alive = useRef(true);
 
   if (seen !== key) {
     setSeen(key);
-    setState({ view: null, layers: null, machines: [], outdated: false, error: null });
+    setState({ view: null, layers: null, machines: [], own: NO_OWN, outdated: false, error: null });
   }
 
   const fetchNow = useCallback(async () => {
     if (member) {
       const me = await api.envMine(space);
-      return { view: null, layers: layersOfMe(me), machines: me.machines, outdated: me.outdated };
+      return {
+        view: null,
+        layers: layersOfMe(me),
+        machines: me.machines,
+        own: ownOf(me),
+        outdated: me.outdated,
+      };
     }
     const view = await api.envView(org, scope.kind === 'org' ? 'all' : scope.tenant.slug);
-    return { view, layers: view.layers, machines: [], outdated: false };
+    return { view, layers: view.layers, machines: [], own: NO_OWN, outdated: false };
   }, [api, org, member, space, scope]);
 
   useEffect(() => {
@@ -67,7 +76,7 @@ export const useEnvData = (): EnvData => {
   }, [fetchNow, tick]);
 
   const reload = useCallback(() => {
-    setState({ view: null, layers: null, machines: [], outdated: false, error: null });
+    setState({ view: null, layers: null, machines: [], own: NO_OWN, outdated: false, error: null });
     setTick((n) => n + 1);
   }, []);
 

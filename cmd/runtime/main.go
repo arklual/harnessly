@@ -666,6 +666,12 @@ func run(ctx context.Context, cfg gate.Config) error {
 	if jl := openJournal(cfg.DataDir); jl != nil {
 		defer jl.Close()
 	}
+	telemetryMode := "cluster"
+	if cfg.Standalone() {
+		telemetryMode = "standalone"
+	}
+	startProductTelemetry(ctx, cfg.DataDir, journal.Default(), telemetryMode)
+	startObservability(ctx, journal.Default())
 	// The organization's links go over the environment before the routes read it (hub_links.go).
 	links := newHubLinks(hubLinkDirs(cfg.DataDir, os.Getenv("AGENT_HUB_OBSERVE_FILE")))
 	links.apply()

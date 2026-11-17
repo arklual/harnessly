@@ -140,7 +140,9 @@ const Win = ({ slot, provider }: { slot: ISlot; provider: string }) => {
         aria-valuenow={slot.left}
       />
       <span className="hx-limb__pct">{`${slot.left}%`}</span>
-      <span className="hx-limb__reset">{t('next.limits.brief.reset', { at: resetClock(slot.kind, slot.window.resetsAt) })}</span>
+      <span className="hx-limb__reset">
+        {t('next.limits.brief.reset', { at: resetClock(slot.kind, slot.window.resetsAt) })}
+      </span>
     </div>
   );
 };

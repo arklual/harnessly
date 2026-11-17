@@ -121,6 +121,17 @@ export const blocksOf = (rows: readonly EnvEntryRow[], q: string): Block[] => {
   );
 };
 
+/** What a member's own layer adds to the view: whether they may add, and which rows are theirs (and shadowed). */
+export interface OwnInfo {
+  can: boolean;
+  items: ReadonlyMap<string, { shadowed: boolean }>;
+}
+export const NO_OWN: OwnInfo = { can: false, items: new Map() };
+export const ownOf = (me: MeEnvResponse): OwnInfo => ({
+  can: me.own === true,
+  items: new Map(me.items.filter((i) => i.own).map((i) => [i.itemId, { shadowed: i.shadowed === true }])),
+});
+
 /** A preset in the layers of a member: `active` says their choice of groups is the preset's. */
 export interface MemberPreset extends EnvPreset {
   active: boolean;
@@ -187,7 +198,7 @@ export const layersOfMe = (me: MeEnvResponse): EnvLayer[] => {
       position: l.items.length + 1, // a member cannot reorder: the list keeps the order it came in
     });
   }
-  const rank: Record<EnvLayerKind, number> = { org: 0, tenant: 1, team: 2 };
+  const rank: Record<EnvLayerKind, number> = { org: 0, tenant: 1, team: 2, user: 3 };
   return out.sort((a, b) => rank[a.layer] - rank[b.layer]);
 };
 

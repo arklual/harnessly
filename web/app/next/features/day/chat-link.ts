@@ -115,3 +115,28 @@ export const leadsTo = (
   if (!named) return false;
   return chatOnMachine(named, chat.machine, origin)?.conv === chat.conv;
 };
+
+/**
+ * The agent's chat a thing of the day leads to, by its id (`run.chat`) or its hub address (`?c=agent:<machine>:<chat>`
+ * of any hub host, or `/c/<chat>` here): opening the thing goes straight into it. Null when it names no chat.
+ */
+export const runChatOf = (
+  named: IActResult & { chat?: string },
+  origin: string = window.location.origin,
+): ConvId | null => {
+  const id = named.chat ?? named.run?.chat;
+  if (id !== undefined) return chatTarget(`chat:${id}`);
+  const address = named.run?.url ?? named.url;
+  if (address === undefined) return null;
+  let url: URL;
+  try {
+    url = new URL(address, origin);
+  } catch {
+    return null;
+  }
+  const onMachine = /^agent:([^:]+):(.+)$/.exec(url.searchParams.get('c') ?? '');
+  if (onMachine) return chatTarget(`chat:${onMachine[2]}`);
+  if (url.origin !== origin) return null;
+  const route = parseRoute(url.pathname);
+  return route.kind === ROUTE.chat ? chatTarget(`chat:${route.id}`) : null;
+};

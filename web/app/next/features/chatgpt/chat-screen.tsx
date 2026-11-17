@@ -38,6 +38,7 @@ import { useMe } from '@/next/stores/me';
 import { goTo, HOME } from '@/next/routes/routes';
 import { GPT_VOICE_EVENT, gptConv, onGptVoice, setGptPick } from '@/next/features/chatgpt/voice-bridge';
 import { VoiceSlot } from '@/next/features/voice-live/voice-layer';
+import { useVoiceNow } from '@/next/features/voice-live/field';
 import type { MachineId } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
 import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
@@ -164,6 +165,7 @@ type TLoad = { k: 'loading' } | { k: 'failed'; reason: string } | { k: 'ready'; 
 
 const ChatScreen = ({ machine, id, onOpenSettings, onOpenDrawer }: IChatScreenProps) => {
   const me = useMe();
+  const voiceNow = useVoiceNow();
   const myName = me.k === 'ready' ? me.me.name : null;
   const [load, setLoad] = useState<TLoad>({ k: 'loading' });
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
@@ -349,6 +351,8 @@ const ChatScreen = ({ machine, id, onOpenSettings, onOpenDrawer }: IChatScreenPr
   if (running) mode = 'working';
   else if (messages.length === 0) mode = 'new';
 
+  // A talk on the voice has its bar at the top: the switch gives it the place.
+  const voiceOn = voiceNow !== null;
   return (
     <div className="hx-gpt">
       <div className="hx-gpt__bar">
@@ -420,16 +424,19 @@ const ChatScreen = ({ machine, id, onOpenSettings, onOpenDrawer }: IChatScreenPr
         </div>
         <div className="hx-dock" data-screen data-kind="talk">
           {/* Back to a task: a new agent chat on the start page, with the words not sent yet. */}
-          <KindSwitch
-            top
-            value={CHAT_KIND.talk}
-            onChange={(kind) => {
-              if (kind !== CHAT_KIND.task) return;
-              setChatKind(CHAT_KIND.task);
-              if (text.trim()) setDraftText(NEW_CHAT, text);
-              goTo(HOME);
-            }}
-          />
+          {/* As ChatGPT's «Chat | Work»: over an empty talk only; a talk under way has its title and its voice bar there. */}
+          {messages.length === 0 && !running && !voiceOn && (
+            <KindSwitch
+              top
+              value={CHAT_KIND.talk}
+              onChange={(kind) => {
+                if (kind !== CHAT_KIND.task) return;
+                setChatKind(CHAT_KIND.task);
+                if (text.trim()) setDraftText(NEW_CHAT, text);
+                goTo(HOME);
+              }}
+            />
+          )}
           {signedIn === false && (
             <div className="hx-gpt__signin">
               <span>{t('next.chatgpt.signInFirst')}</span>

@@ -42,6 +42,12 @@ type MeItem struct {
 	Off        bool   `json:"off"`
 	CanToggle  bool   `json:"canToggle"`
 	GroupID    string `json:"groupId"` // the group the item is in ("" for none); a group switched off makes Off true
+	// Own: the person's own item (layer "user"): they change and remove it at /api/me/env/own/{itemId}.
+	Own bool `json:"own,omitempty"`
+	// Shadowed: an own item the organization gives one of the same kind and name of: it is not on the machines.
+	Shadowed bool `json:"shadowed,omitempty"`
+	// Source is an own item's source (what it runs), for the person to change it; empty for anything else.
+	Source json.RawMessage `json:"source,omitempty"`
 }
 
 // MeResponse is GET /api/me/env.
@@ -56,6 +62,9 @@ type MeResponse struct {
 	// Outdated: some machine of the person in the tenant does not hold the current list or has a setup item that failed.
 	Outdated bool        `json:"outdated"`
 	Machines []MeMachine `json:"machines"`
+	// Own: the organization has a person's own layer: the person may add their own skills and MCP servers
+	// (/api/me/env/own), and what they switch off leaves their machines.
+	Own bool `json:"own"`
 }
 
 // MeMachine is a machine of the person with what its setup looks like.
@@ -88,6 +97,8 @@ func (w *world) layerTitle(layer, scopeID string) string {
 		return "Организация " + w.org.Name
 	case store.EnvLayerTenant:
 		return "Тенант " + w.tenantBy[scopeID].Name
+	case store.EnvLayerUser:
+		return "Своё"
 	}
 	return "Команда " + w.teamByID[scopeID].Name
 }
@@ -95,8 +106,12 @@ func (w *world) layerTitle(layer, scopeID string) string {
 // openMe finds the tenant (?space= or the body's space: an id or a slug; the only one the person is in when none is
 // named), checks the person is in it and that the environment is on for its organization.
 func (s *Service) openMe(r *http.Request, st store.Store, p *auth.Principal, ref string) (*me, error) {
-	ctx := r.Context()
-	mine, err := st.SpacesByUser(ctx, p.User.ID)
+	return s.openMeFor(r.Context(), st, p.User.ID, ref)
+}
+
+// openMeFor is openMe for a person by id (their machine's change of their own layer has no session).
+func (s *Service) openMeFor(ctx context.Context, st store.Store, userID, ref string) (*me, error) {
+	mine, err := st.SpacesByUser(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +142,7 @@ func (s *Service) openMe(r *http.Request, st store.Store, p *auth.Principal, ref
 	if err != nil {
 		return nil, err
 	}
-	tms, err := st.TeamsOfUser(ctx, p.User.ID)
+	tms, err := st.TeamsOfUser(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -138,12 +153,15 @@ func (s *Service) openMe(r *http.Request, st store.Store, p *auth.Principal, ref
 		}
 	}
 	slices.Sort(teams)
-	off, err := st.EnvPersonOffs(ctx, p.User.ID, sp.ID)
+	off, err := st.EnvPersonOffs(ctx, userID, sp.ID)
 	if err != nil {
 		return nil, err
 	}
-	return &me{ctx: ctx, st: st, space: sp, org: o, w: w, person: Person{OrgID: o.ID, SpaceID: sp.ID, Teams: teams, Off: off,
-		Groups: w.resolverGroups(), GroupOn: w.choicesOf(sp.ID, p.User.ID)}}, nil
+	person := Person{OrgID: o.ID, SpaceID: sp.ID, Teams: teams, Off: off, Groups: w.resolverGroups(), GroupOn: w.choicesOf(sp.ID, userID)}
+	if w.own {
+		person.UserID = userID
+	}
+	return &me{ctx: ctx, st: st, space: sp, org: o, w: w, person: person}, nil
 }
 
 func (m *me) effective() []Effective {
@@ -166,6 +184,7 @@ func (s *Service) meEnv(w http.ResponseWriter, r *http.Request, p *auth.Principa
 		}
 	}
 	eff := m.effective()
+	out.Own = m.w.own
 	out.Groups = m.meGroups(eff)
 	out.Presets = m.mePresets(out.Groups)
 	for _, e := range eff {
@@ -175,9 +194,30 @@ func (s *Service) meEnv(w http.ResponseWriter, r *http.Request, p *auth.Principa
 			scope = m.space.ID
 		case store.EnvLayerTeam:
 			scope = m.entryScope(e.EntryID)
+		case store.EnvLayerUser:
+			scope = p.User.ID
 		}
 		out.Items = append(out.Items, MeItem{ItemID: e.ID, EntryID: e.EntryID, Kind: e.Kind, Name: e.Name, Hint: e.Hint, Layer: e.Layer, ScopeID: scope,
-			LayerTitle: m.w.layerTitle(e.Layer, scope), Pinned: e.Pinned, Off: e.Off, CanToggle: !e.Pinned && !hubproto.IsBuiltInEnvItem(e.ID), GroupID: e.GroupID})
+			LayerTitle: m.w.layerTitle(e.Layer, scope), Pinned: e.Pinned, Off: e.Off, CanToggle: !e.Pinned && !hubproto.IsBuiltInEnvItem(e.ID), GroupID: e.GroupID,
+			Own: e.Layer == store.EnvLayerUser})
+		if e.Layer == store.EnvLayerUser {
+			out.Items[len(out.Items)-1].Source = e.Source
+		}
+	}
+	if m.w.own {
+		// One's own item that what the organization gives of the same name left out: still theirs to change or remove.
+		in := map[string]bool{}
+		for _, e := range eff {
+			in[e.ID] = true
+		}
+		o := &own{w: m.w, userID: p.User.ID}
+		for _, c := range o.items() {
+			if !in[c.ID] {
+				it := meOwnItem(m, c)
+				it.Shadowed = true
+				out.Items = append(out.Items, it)
+			}
+		}
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
 	return nil
@@ -199,7 +239,7 @@ type offIn struct {
 }
 
 // putMeEnv switches an item off or back on for the person in a tenant. It is theirs alone: no change of the
-// organization, no machine list; only the audit trail remembers it.
+// organization; only the audit trail remembers it. With a person's own layer (FeatureOwn) their machines' lists follow.
 func (s *Service) putMeEnv(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
 	var in offIn
 	if err := httpx.Decode(r, &in); err != nil {
@@ -219,54 +259,63 @@ func (s *Service) putMeEnv(w http.ResponseWriter, r *http.Request, p *auth.Princ
 		if err != nil {
 			return err
 		}
-		var eff *Effective
-		for _, e := range m.effective() {
-			if e.ID == itemID {
-				eff = &e
-				break
-			}
-		}
-		if eff == nil {
-			return httpx.ErrNotFound
-		}
-		if eff.Pinned {
-			return httpx.Conflict("locked", "Закреплено: выключить нельзя")
-		}
-		if hubproto.IsBuiltInEnvItem(itemID) {
-			// The platform's items are not rows of the catalog, and this switch is kept by catalog item. A person turns
-			// a platform's app off on their machine («Приложения»), a platform's group with the group's switch.
-			return httpx.Conflict("built_in", "Встроенное выключают на своей машине, в «Приложениях»")
-		}
-		was := m.person.Off[itemID]
-		if was != *in.Off {
-			if err := st.SetEnvPersonOff(r.Context(), p.User.ID, m.space.ID, itemID, *in.Off, s.now()); err != nil {
-				return err
-			}
-			chain, err := orgs.Chain(r.Context(), st, m.org, authz.Scope{Kind: store.ScopeTenant, ID: m.space.ID})
-			if err != nil {
-				return err
-			}
-			if err := st.AddAudit(r.Context(), orgs.Journal(chain, p.User.ID, "env.person.off", "catalog_item", itemID,
-				map[string]any{"off": was}, map[string]any{"off": *in.Off, "spaceId": m.space.ID}, s.now())); err != nil {
-				return err
-			}
-		}
-		out = MeItem{ItemID: eff.ID, EntryID: eff.EntryID, Kind: eff.Kind, Name: eff.Name, Hint: eff.Hint, Layer: eff.Layer, Off: *in.Off, CanToggle: true}
-		scope := m.org.ID
-		switch eff.Layer {
-		case store.EnvLayerTenant:
-			scope = m.space.ID
-		case store.EnvLayerTeam:
-			scope = m.entryScope(eff.EntryID)
-		}
-		out.ScopeID, out.LayerTitle = scope, m.w.layerTitle(eff.Layer, scope)
-		return nil
+		out, err = s.switchMe(m, p.User.ID, itemID, *in.Off)
+		return err
 	})
 	if err != nil {
 		return err
 	}
+	s.kick() // with the own layer the switch is on the person's machines' lists
 	httpx.WriteJSON(w, http.StatusOK, out)
 	return nil
+}
+
+// switchMe switches an item of the person's environment off or back on for them in the tenant m is opened for.
+func (s *Service) switchMe(m *me, userID, itemID string, off bool) (MeItem, error) {
+	var eff *Effective
+	for _, e := range m.effective() {
+		if e.ID == itemID {
+			eff = &e
+			break
+		}
+	}
+	if eff == nil {
+		return MeItem{}, httpx.ErrNotFound
+	}
+	if eff.Pinned {
+		return MeItem{}, httpx.Conflict("locked", "Закреплено: выключить нельзя")
+	}
+	if hubproto.IsBuiltInEnvItem(itemID) {
+		// The platform's items are not rows of the catalog, and this switch is kept by catalog item. A person turns
+		// a platform's app off on their machine («Приложения»), a platform's group with the group's switch.
+		return MeItem{}, httpx.Conflict("built_in", "Встроенное выключают на своей машине, в «Приложениях»")
+	}
+	was := m.person.Off[itemID]
+	if was != off {
+		if err := m.st.SetEnvPersonOff(m.ctx, userID, m.space.ID, itemID, off, s.now()); err != nil {
+			return MeItem{}, err
+		}
+		chain, err := orgs.Chain(m.ctx, m.st, m.org, authz.Scope{Kind: store.ScopeTenant, ID: m.space.ID})
+		if err != nil {
+			return MeItem{}, err
+		}
+		if err := m.st.AddAudit(m.ctx, orgs.Journal(chain, userID, "env.person.off", "catalog_item", itemID,
+			map[string]any{"off": was}, map[string]any{"off": off, "spaceId": m.space.ID}, s.now())); err != nil {
+			return MeItem{}, err
+		}
+	}
+	out := MeItem{ItemID: eff.ID, EntryID: eff.EntryID, Kind: eff.Kind, Name: eff.Name, Hint: eff.Hint, Layer: eff.Layer, Off: off, CanToggle: true}
+	scope := m.org.ID
+	switch eff.Layer {
+	case store.EnvLayerTenant:
+		scope = m.space.ID
+	case store.EnvLayerTeam:
+		scope = m.entryScope(eff.EntryID)
+	case store.EnvLayerUser:
+		scope = userID
+	}
+	out.ScopeID, out.LayerTitle, out.Own = scope, m.w.layerTitle(eff.Layer, scope), eff.Layer == store.EnvLayerUser
+	return out, nil
 }
 
 // meMachineList are the person's machines in the tenant: the working ones, with what their setup looks like.

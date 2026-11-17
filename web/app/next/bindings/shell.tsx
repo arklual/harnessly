@@ -114,7 +114,12 @@ import { useShellTabs, wantsNewTab } from '@/next/bindings/tabs';
 import { useShellKeys } from '@/next/bindings/shell-keys';
 import { keepScreensOnPhone, TabScopeContext, useTabs, useTopTabs } from '@/next/stores/tabs';
 import { deviceKeptScreensMax, keptScreens } from '@/next/features/shell/kept-screens';
-import { screenChatOf, screenMachine } from '@/next/features/shell/screen-machine';
+import {
+  CHAT_RECORD_WAIT_MS,
+  screenChatOf,
+  screenMachine,
+  screenWaits,
+} from '@/next/features/shell/screen-machine';
 import { keptBudget } from '@/next/features/shell/kept-budget';
 import { usePhone } from '@/next/ui/use-media';
 import Sidebar from '@/next/features/sidebar/sidebar';
@@ -189,6 +194,7 @@ import { useFeed } from '@/next/stores/conversation';
 import {
   newChatMachineStore,
   newChatProjectStore,
+  resetHome,
   useNewChatMachine,
   useNewChatProject,
 } from '@/next/stores/new-chat';
@@ -405,10 +411,21 @@ const KeptPage = ({
 const KeptScreen = memo(
   ({ tabId, active, machine, path, terminal, onTermSlot, toolPane, shell }: IKeptScreenProps) => {
     const tabRoute = parseRoute(path);
-    // The screen is drawn where its chat is, not on the machine active in the shell: a chat is one entity.
+    // The screen is drawn where its chat is, not on the machine active in the shell: a chat is one entity. While nothing
+    // says where the chat is (its record and feed are still coming) the screen waits, it does not fall back to the
+    // active machine, whose list has not got the chat (a new chat would be offered for an existing one).
     const chatId = screenChatOf(tabRoute);
     const chatRecord = useConversation(chatId && isConvId(chatId) ? chatId : null);
-    const screenOn = screenMachine(tabRoute, chatRecord?.machineId ?? null, machine) as MachineId;
+    const chatFeed = useFeed(chatId && isConvId(chatId) ? chatId : null);
+    const chatOn = chatRecord?.machineId ?? chatFeed?.machineId ?? null;
+    const waits = screenWaits(tabRoute, chatOn);
+    const [patient, setPatient] = useState(true);
+    useEffect(() => {
+      if (!waits) return;
+      const timer = setTimeout(() => setPatient(false), CHAT_RECORD_WAIT_MS);
+      return () => clearTimeout(timer);
+    }, [waits]);
+    const screenOn = screenMachine(tabRoute, chatOn, machine) as MachineId;
     const scope = useMemo(() => ({ tabId, active }), [tabId, active]);
     // The pane's openers, the same object for the screen's life: each one calls the shell's current one.
     const open = useMemo<NonNullable<IKeptScreensProps['open']>>(
@@ -420,20 +437,25 @@ const KeptScreen = memo(
       [shell],
     );
     if (keptScreenOf(tabRoute) === null) return null;
+    const loading = waits && patient;
     return (
       <div className="hx-kept-screen" data-on={active} inert={!active}>
         <Activity mode={active ? 'visible' : 'hidden'}>
           <TabScopeContext.Provider value={scope}>
             <ChatTerminalContext.Provider value={terminal}>
               <ChatTerminalSlotContext.Provider value={onTermSlot}>
-                <KeptPage
-                  route={tabRoute}
-                  active={active}
-                  machine={screenOn}
-                  toolPane={toolPane}
-                  open={open}
-                  shell={shell}
-                />
+                {loading ? (
+                  <SiteWait />
+                ) : (
+                  <KeptPage
+                    route={tabRoute}
+                    active={active}
+                    machine={screenOn}
+                    toolPane={toolPane}
+                    open={open}
+                    shell={shell}
+                  />
+                )}
               </ChatTerminalSlotContext.Provider>
             </ChatTerminalContext.Provider>
           </TabScopeContext.Provider>
@@ -1405,6 +1427,7 @@ const Shell = ({ owner }: IShellProps) => {
       onNewChat={() => {
         newChatProjectStore.set(null);
         newChatMachineStore.set(null);
+        resetHome();
         // From Designly the field flies back down to the start page's.
         if (!tabs.enabled && route.kind === ROUTE.designly && !wantsNewTab())
           flyComposer(FLY_FIELD.designly, FLY_FIELD.home, () => goTo(HOME));
@@ -1598,6 +1621,7 @@ const Shell = ({ owner }: IShellProps) => {
                 else {
                   newChatProjectStore.set(null);
                   newChatMachineStore.set(null);
+                  resetHome();
                   openScreen(HOME);
                 }
               } else if (row.id.startsWith(APP_ROW.command)) {
@@ -1762,7 +1786,10 @@ const Shell = ({ owner }: IShellProps) => {
             machine={headerMachine}
             drawerOpen={drawerOpen}
             onOpenDrawer={() => setDrawerOpen(true)}
-            onNewChat={() => navigate(HOME)}
+            onNewChat={() => {
+              resetHome();
+              navigate(HOME);
+            }}
             pane={pane.header ?? homePane.header}
             terminal={term.header}
             background={bg.header}

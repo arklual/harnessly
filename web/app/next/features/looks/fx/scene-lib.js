@@ -75,14 +75,12 @@ const SceneLib = (() => {
         }
       }
     found.sort(() => Math.random() - 0.5);
-    return found
-      .slice(0, max)
-      .map(([x, y]) => ({
-        u: (x + 0.5) / W,
-        v: (y + 0.5) / H,
-        ph: Math.random() * 6.28,
-        sp: 0.6 + Math.random() * 1.6,
-      }));
+    return found.slice(0, max).map(([x, y]) => ({
+      u: (x + 0.5) / W,
+      v: (y + 0.5) / H,
+      ph: Math.random() * 6.28,
+      sp: 0.6 + Math.random() * 1.6,
+    }));
   };
 
   /** A soft additive glow. */

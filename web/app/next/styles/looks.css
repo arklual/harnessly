@@ -527,7 +527,8 @@ html[data-look-density='cozy'] .hx-msg {
   height: 100%;
   border: 0;
   background: transparent;
-  color-scheme: normal;
+  /* The frame's document is light too (wire.lookFxFrameHTML); differing schemes make Chrome paint the frame opaque. */
+  color-scheme: light;
   pointer-events: none;
   z-index: 30;
 }

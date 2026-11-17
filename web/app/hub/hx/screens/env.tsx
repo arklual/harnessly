@@ -26,6 +26,7 @@ import { AgentProposals } from './env/proposals';
 import { TestBody } from './env/sandbox';
 import { blocksOf, chainOf, firstTarget, keyOf, metaOf, same, type Target } from './env/scope';
 import { Sheet } from './env/sheet';
+import { OwnAdd } from './env/own';
 import { useCatalog, useEnvData } from './env/state';
 import { Toast, useToast } from './env/toast';
 
@@ -206,6 +207,9 @@ const Screen = () => {
       onRemove: actions.removePreset,
       onMine: member ? (p) => actions.minePreset(p, space) : null,
     },
+    own: member
+      ? { info: data.own, onRemove: (row) => void actions.ownRemove(row.itemId, row.name, space) }
+      : null,
   });
 
   const text = introText(role);
@@ -283,6 +287,7 @@ const Screen = () => {
           <LayerCard key={keyOf(vm.layer)} vm={vm} rows={blocks} q={q} a={actionsOf(vm)} fresh={fresh} />
         ))}
       </div>
+      {member && data.own.can && <OwnAdd onAdd={(req) => actions.ownAdd(req, space)} />}
       {shownLayers.length === 0 && (
         <div className="ev-empty">Ничего не нашлось. Попробуйте другое слово или добавьте ссылкой</div>
       )}

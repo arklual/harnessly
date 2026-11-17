@@ -286,6 +286,7 @@ func settingsItems(d deps) []settingsctl.Item {
 				s.Delegation = &del
 			})
 		}})
+	items = append(items, telemetryItem())
 	items = append(items, providersItem(providers))
 	if strings.TrimSpace(os.Getenv("RUNTIME_HUB_URL")) != "" {
 		// A machine of a hub: its person's agent may propose a provider for the whole organization.

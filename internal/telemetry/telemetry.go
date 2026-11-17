@@ -24,9 +24,11 @@ type Config struct {
 	Common *jsvalue.Object
 	// DistinctID names who the events are about, read at each send.
 	DistinctID func() string
-	Delay      time.Duration
-	Client     *http.Client
-	Log        func(level, msg string, kv ...any)
+	// Allow, when set, is asked at every push and every send: false drops the events (the person turned it off).
+	Allow  func() bool
+	Delay  time.Duration
+	Client *http.Client
+	Log    func(level, msg string, kv ...any)
 }
 
 // Event is one event: its name, when it happened and its own properties.
@@ -57,12 +59,14 @@ func New(cfg Config) *Queue {
 	return &Queue{cfg: cfg}
 }
 
+func (q *Queue) allowed() bool { return q.cfg.Allow == nil || q.cfg.Allow() }
+
 // Enabled says whether events are sent anywhere.
 func (q *Queue) Enabled() bool { return q != nil && q.cfg.URL != "" }
 
 // Push queues an event.
 func (q *Queue) Push(e Event) {
-	if !q.Enabled() {
+	if !q.Enabled() || !q.allowed() {
 		return
 	}
 	q.mu.Lock()
@@ -111,6 +115,9 @@ func Body(key, distinctID string, common *jsvalue.Object, events []Event) []byte
 }
 
 func (q *Queue) send(events []Event) {
+	if !q.allowed() {
+		return
+	}
 	id := ""
 	if q.cfg.DistinctID != nil {
 		id = q.cfg.DistinctID()

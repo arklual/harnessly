@@ -129,5 +129,6 @@
       "groupIds": ["grp-back"],
       "active": true
     }
-  ]
+  ],
+  "own": false
 }

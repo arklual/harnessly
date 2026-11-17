@@ -25,7 +25,8 @@ Everything here ships dark. Nothing changes for an organization until the flag i
   tenant beats team); it is pinned when any layer pinned it. An entry that is `enabled: false` in a lower layer switches
   an item off for that layer's people unless a higher layer pinned it (then the switch is refused with `locked`).
 - **Personal switch** — a person switches an unpinned item off for themselves in a tenant (`PUT /api/me/env/{itemId}`).
-  It is theirs alone; see [What is not done](#what-is-not-done) for the limits.
+  It is theirs alone. With the own layer on, it also takes the item off their machines' lists
+  ([Own layer](#own-layer)).
 
 ### `source` by kind
 
@@ -144,12 +145,48 @@ Fixture: `fixtures/env/catalog.json`.
 
 The person's own environment in a tenant (`space` optional when they have one): `{space: {id, slug, name}, org:
 {id, name} | null, items: MeItem[]}` with `MeItem = {itemId, entryId, kind, name, hint, layer, scopeId, layerTitle,
-pinned, off, canToggle}`. `canToggle` is false for a pinned item. Fixture: `fixtures/env/me.json`.
+pinned, off, canToggle, own?, shadowed?, source?}` and `own` (the own layer is on). `canToggle` is false for a pinned
+item; `source` comes with the person's own items only. Fixture: `fixtures/env/me.json`.
 
 ### `PUT /api/me/env/{itemId}?space=…`
 
 `{off: boolean}` (`space` may also be in the body) → 200 `MeItem`. 409 `locked` for a pinned item, 404 for an item the
 person does not have. Recorded in the audit trail only; it changes nothing of the organization.
+
+## Own layer
+
+HRN-768, behind the organization flag `env.own` (off by default; `HUB_FEATURES_FORCE`, or the organization's choice). The
+contract was agreed in HRN-667.
+
+- **What a person adds.** Their own skill or MCP server, nothing else (repositories, documents, scripts and access stay
+  the organization's). The item is a catalog item owned by the person (`owner_layer = user`, `owner_scope` = their id)
+  with one entry in the layer `user` of the tenant. Up to 30 live items per person.
+- **Where it goes.** Only to the lists of the person's own machines in that tenant (a machine is the person's when they
+  created it). Another person's machines, the organization's catalog, the layers' screens and the entries' endpoints do not
+  see it: the organization's catalog answers 404 for it and does not take it into a layer.
+- **What it never does.** It never replaces what the organization gives. An own item of the same kind whose name matches
+  an organization's or a platform's item (case, spaces and punctuation aside) is refused with 409 `given`; when the
+  organization gives such a name later, the person's own item leaves their machines' lists and `GET /api/me/env` shows it
+  with `shadowed: true`. A pinned item still cannot be switched off.
+- **Personal switches reach the machines.** With the flag on, an item a person switched off leaves their machines' lists;
+  without it the switch is recorded only (as before).
+- **From the machine.** The runtime's settings page (Settings → Skills and MCP, «От организации», `RUNTIME_HUB_ENV_UI=on`
+  and `RUNTIME_HUB_ENV_OWN=on`) adds, removes and switches through the machine agent: the agent sends the event `env.own`
+  (`hubproto.EnvOwnRequest`) over the machine's link and the hub answers with `env.owned` (`EnvOwnResult`, an HTTP-like
+  status and its words). The hub changes the own layer of the machine's owner only, so the link proves the machine and
+  not the person: whoever works on a person's machine changes that person's own layer, and nothing else.
+- **Audit.** `env.own.add`, `env.own.change`, `env.own.remove` and `env.person.off` go to the tenant's audit trail.
+
+### `POST /api/me/env/own?space=…` → 201
+
+`{kind: "skill" | "mcp", name, hint?, source}` → `MeItem` with `own: true` and its `source`. 400 for another kind or a bad
+source, 409 `name_taken` (their own item has the name) or `given` (the organization's), 429 `too_many`, 404
+`not_enabled` without the flag.
+
+### `PATCH /api/me/env/own/{itemId}?space=…` → 200, `DELETE …` → 204
+
+`{name?, hint?, source?}`: the kind never changes. Only the person's own live item; another's answers 404. A removed item
+is archived and leaves their machines.
 
 ## Groups
 
@@ -676,8 +713,11 @@ the flag is for the whole hub. `HUB_USAGE_INGEST=on` is needed for the numbers.
 
 ## What is not done
 
-- A member's own additions from the catalog (not only switching off) have no storage.
-- Personal switches are not applied to a machine's list; machines get the team's list.
+- Without `env.own` personal switches are not applied to a machine's list; machines get the team's list.
+- A person's own layer is per tenant: an own item added in one tenant does not reach their machines in another.
+- An own item's secret is the machine's: the hub sends `secretRefs` and the person puts the value into the machine's safe.
+- Own items are added and removed in the hub's «Моё окружение» (a member's view) and on the runtime's page; changing an
+  own item's name or text is only the endpoint (`PATCH`) for now.
 - The hub's personal switch does not take a platform's item (409 `built_in`): its storage is by catalog item, and the
   platform's items are not in the catalog. A person turns a platform's app off on their machine.
 - The hub compares an organization's own app with a platform's by the package's place, not by the app id (it does not

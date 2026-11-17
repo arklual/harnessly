@@ -7,7 +7,10 @@ import { GPT_VOICE_EVENT, gptPickOf, tellGptScreen } from '@/next/features/chatg
 import { gptChatsChanged, useGptChats } from '@/next/features/chatgpt/store';
 import { VOICE_MODE } from '@/next/features/voice-live/api';
 import { spokenResult, spokenTask } from '@/next/features/voice-live/spoken';
-import VoiceLive from '@/next/features/voice-live/voice-live';
+import VoiceLive, { type IVoiceLiveControls } from '@/next/features/voice-live/voice-live';
+import type { IVoiceTask } from '@/next/features/voice-live/use-voice-call';
+import { useVoiceHands } from '@/next/bindings/voice-hands';
+import { isNoiseText } from '@/next/features/voice-live/noise';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 
 interface IVoiceLiveGptProps {
@@ -23,49 +26,69 @@ const VoiceLiveGpt = ({ machine, conv, id }: IVoiceLiveGptProps) => {
   const unfollow = useRef<(() => void) | null>(null);
   useEffect(() => () => unfollow.current?.(), []);
   const title = useGptChats(machine)?.find((c) => c.id === id)?.title ?? '';
+  const controls = useRef<IVoiceLiveControls | null>(null);
+  // The same hands as in an agent's chat (voice-hands.tsx): the whole page, every chat; «agent» is this talk writing.
+  const hands = useVoiceHands({ machine, conv: null, chatHere: title || 'ChatGPT', controls });
+
+  /** The talk writes it on screen and the voice tells the answer (the router's «agent», or when it is not there). */
+  const writeHere = (task: IVoiceTask, say: IVoiceLiveControls['say'], text?: string) => {
+    const words = text?.trim() || spokenTask(task);
+    if (!words) return;
+    if (unfollow.current) {
+      void say('The chat is still writing its previous answer; ask again in a moment.', task.id);
+      return;
+    }
+    const pick = gptPickOf(id);
+    sendMessage(machine, id, { text: words, model: pick.model, effort: pick.effort, files: [] }).then(
+      () => {
+        gptChatsChanged();
+        tellGptScreen(id, GPT_VOICE_EVENT.sent);
+        unfollow.current = followAnswer(machine, id, {
+          onDelta: () => undefined,
+          onDone: () => {
+            unfollow.current = null;
+            loadChat(machine, id).then(
+              (answer) => {
+                const last = answer.chat.messages?.findLast((m) => m.role === 'assistant');
+                const said = last?.text ? spokenResult(last.text) : '';
+                void say(
+                  said ? `The chat wrote this on screen: ${said}` : 'The chat finished without an answer.',
+                  task.id,
+                );
+              },
+              () => void say('The chat finished, but its answer could not be read.', task.id),
+            );
+          },
+        });
+      },
+      () => void say('The chat refused to take it; nothing was written.', task.id),
+    );
+  };
 
   return (
     <VoiceLive
       machine={machine}
       conv={conv}
       mode={VOICE_MODE.chat}
+      controlsRef={controls}
       onTask={(task, { say }) => {
-        const words = spokenTask(task);
-        if (!words) return;
-        if (unfollow.current) {
-          void say('The chat is still writing its previous answer; ask again in a moment.', task.id);
+        if (!spokenTask(task)) return;
+        // A noise the recognizer made words of (noise.ts) is not a task.
+        if (isNoiseText(task.said?.trim() || task.text)) {
+          void say('That was background noise, not the person: ignore it and say nothing.', task.id, false);
           return;
         }
-        const pick = gptPickOf(id);
-        sendMessage(machine, id, { text: words, model: pick.model, effort: pick.effort, files: [] }).then(
-          () => {
-            gptChatsChanged();
-            tellGptScreen(id, GPT_VOICE_EVENT.sent);
-            unfollow.current = followAnswer(machine, id, {
-              onDelta: () => undefined,
-              onDone: () => {
-                unfollow.current = null;
-                loadChat(machine, id).then(
-                  (answer) => {
-                    const last = answer.chat.messages?.findLast((m) => m.role === 'assistant');
-                    const said = last?.text ? spokenResult(last.text) : '';
-                    void say(
-                      said
-                        ? `The chat wrote this on screen: ${said}`
-                        : 'The chat finished without an answer.',
-                      task.id,
-                    );
-                  },
-                  () => void say('The chat finished, but its answer could not be read.', task.id),
-                );
-              },
-            });
-          },
-          () => void say('The chat refused to take it; nothing was written.', task.id),
-        );
+        void hands
+          .route(task, say, (text) => writeHere(task, say, text))
+          .then((done) => {
+            if (!done) writeHere(task, say);
+          });
       }}
+      onBegin={hands.onBegin}
+      onEnd={hands.onEnd}
       context={() => (title ? `ChatGPT chat «${title}»` : '')}
       onLine={(line) => {
+        hands.onLine(line);
         // Each line said goes to the feed as it is over, the person's and ChatGPT's.
         if (!line.text.trim()) return;
         void appendSpoken(machine, id, [line]).then(() => {

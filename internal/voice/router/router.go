@@ -23,6 +23,7 @@ const (
 	DoAgent     = "agent"      // text → the current chat's agent (the work the voice cannot do itself)
 	DoSend      = "send"       // chat, text → a message to another chat
 	DoNewChat   = "new_chat"   // text, agent?, model?, effort?, orchestrate? → a new chat started with that prompt
+	DoModel     = "model"      // chat?, model?, effort? → the chat's model or depth (the current chat unless named)
 	DoOpenChat  = "open_chat"  // chat → show that chat
 	DoAnswer    = "answer"     // chat, option? (1-based) | text? → the answer to a chat's pending question
 	DoPermit    = "permit"     // chat, allow → a chat's pending permission
@@ -253,6 +254,19 @@ func Clean(in []Action, req Request) []Action {
 			if a.Do == DoPermit && a.Allow == nil {
 				continue
 			}
+		case DoModel:
+			if a.Chat != "" {
+				id, ok := chatID(a.Chat, req.Chats)
+				if !ok {
+					continue
+				}
+				a.Chat = id
+			} else if !hasCurrent(req.Chats) {
+				continue
+			}
+			if strings.TrimSpace(a.Model) == "" && strings.TrimSpace(a.Effort) == "" {
+				continue
+			}
 		case DoAgent, DoNewChat:
 			if strings.TrimSpace(a.Text) == "" {
 				continue
@@ -312,6 +326,15 @@ func chatID(ref string, chats []Chat) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func hasCurrent(chats []Chat) bool {
+	for _, c := range chats {
+		if c.Current {
+			return true
+		}
+	}
+	return false
 }
 
 func hasChoice(list []Choice, id string) bool {

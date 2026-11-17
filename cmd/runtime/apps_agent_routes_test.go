@@ -36,6 +36,12 @@ func TestAgentTokenIsConfinedToItsList(t *testing.T) {
 		{"POST", "/api/cli/connections/c1/mrs", false},
 		{"POST", "/api/cli/connections/env-tracker/issue", false},
 		{"DELETE", "/api/cli/connections/env-tracker", false},
+		// The person's connectors (mail, calendars): listed and read through the runtime; an act waits for their yes.
+		{"GET", "/api/cli/connectors", true},
+		{"POST", "/api/cli/connectors/read", true},
+		{"POST", "/api/cli/connectors/act", true},
+		{"POST", "/api/cli/connectors", false},
+		{"POST", "/api/cli/connectors/c1/approve", false},
 		// What runs or reads outside the wall.
 		{"POST", "/api/cli/tabs", false},
 		{"POST", "/api/cli/tabs/t1/send", false},

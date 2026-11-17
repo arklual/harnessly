@@ -1201,6 +1201,16 @@ html[data-theme='dark'] .hx-dock,
   .hx-composer__bar .hx-ctx:not([data-wide]) {
     display: none;
   }
+  /* The chip that stays: its card spans the field (a class more than the wide rules below, which come later). */
+  .hx-composer__bar .hx-ctx[data-wide] {
+    position: static;
+  }
+  .hx-composer__bar .hx-ctx[data-wide] .hx-ctx__pop {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    transform-origin: 50% 100%;
+  }
   /* The model keeps its whole name; the limit gives way instead: only the window with the least left («нед 24%»), no icon,
      and it may shrink to nothing before the pill does. It is never hidden for being healthy: a person who sees no chip
      takes the machine for one that reports no limits. */
@@ -1514,6 +1524,14 @@ html[data-theme='dark'] .hx-dock,
   display: flex;
   flex-direction: column;
 }
+/* «К сегодняшнему дню» over the app's rehearsal of a past day: the frame follows it closely. */
+.hx-home-stage__back {
+  display: flex;
+  padding: 0 var(--hx-space-5);
+}
+.hx-home-stage > .hx-home-stage__back + .hx-uislot {
+  margin-top: var(--hx-space-2);
+}
 /* A view with no page to scroll (its own frame, the day while it loads) stands under the dock. */
 .hx-home-stage > :not(:has([data-home-scroll])) {
   margin-top: calc(var(--hx-home-under, calc(var(--hx-home-top) + var(--hx-dock-rest))) + var(--hx-space-3));
@@ -1604,6 +1622,16 @@ html[data-theme='dark'] .hx-dock,
   cursor: default;
   outline: none;
   transition: background 220ms var(--hx-ease-out);
+}
+/* The field's meter of the chat's limits (features/limits/limits-mini.tsx; the rest of it in limits.css): thin bars in the context ring's chip, the
+   five hours over the week; on hover the card of every window (HRN-1552). A bar takes the level's colour as it runs
+   low. On a narrow field it gives way with the ring: the pill's popover keeps the windows. */
+.hx-ctx__chip.hx-limmini {
+  align-content: center;
+  place-items: stretch;
+  gap: 4px;
+  padding: 0 6px;
+  box-sizing: border-box;
 }
 .hx-ctx__chip:hover,
 .hx-ctx__chip:focus-visible,
@@ -1911,7 +1939,7 @@ html[data-theme='dark'] .hx-dock,
   margin-top: 8px;
 }
 /* A chip that stays on a narrow field (the spend's) stands at the field's start: its card opens to the
-   right, and on a phone spans the field. */
+   right, and on a narrow field spans it (the container query above). */
 .hx-ctx[data-wide] {
   flex: 0 1 auto;
   min-width: 0;
@@ -1920,17 +1948,6 @@ html[data-theme='dark'] .hx-dock,
   right: auto;
   left: -4px;
   transform-origin: bottom left;
-}
-@media (max-width: 900px) {
-  .hx-ctx[data-wide] {
-    position: static;
-  }
-  .hx-ctx[data-wide] .hx-ctx__pop {
-    left: 8px;
-    right: 8px;
-    width: auto;
-    transform-origin: 50% 100%;
-  }
 }
 
 /* An uploaded picture fills its square in the field too. */

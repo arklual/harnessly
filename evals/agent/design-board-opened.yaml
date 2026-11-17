@@ -18,6 +18,26 @@ expect:
     file: {glob: 'design:shop/project/*.dc.html', contains: 'Оплатить'}
   - name: opened the design on that board
     pane: {tab: design, target: shop, place: '(?i)оплат'}
+  - name: payment board renders on desktop and phone without browser errors
+    check: |
+      python3 -I - <<'PY'
+      import json, os, pathlib, subprocess
+      project = pathlib.Path(os.environ['TMPDIR']).parent / 'design/shop/project'
+      boards = [p for p in project.glob('*.dc.html') if 'оплат' in p.name.lower()]
+      assert len(boards) == 1, 'expected one payment board'
+      env = dict(os.environ, HARNESSLY_DATA_DIR=str(pathlib.Path(os.environ['TMPDIR']).parent / 'data'))
+      result = subprocess.run(['harnessly', '--json', 'design', 'check', 'shop', '--board', boards[0].name], capture_output=True, text=True, timeout=90, env=env)
+      assert result.returncode == 0, result.stderr
+      report = json.loads(result.stdout)
+      assert report.get('finished') and not report.get('failure'), report
+      checked = report.get('boards') or []
+      assert len(checked) == 1, report
+      shots = checked[0].get('shots') or []
+      assert {s['view'] for s in shots} == {'desktop', 'phone'}, checked
+      for shot in shots:
+          assert shot['status'] == 'ok' and not shot.get('errors') and not shot.get('failedRequests'), shot
+          assert shot.get('screenshot') and pathlib.Path(shot['screenshot']).is_file(), shot
+      PY
 variants:
   - id: v1
     kind: short

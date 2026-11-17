@@ -98,6 +98,9 @@ func (s *Service) listCatalog(w http.ResponseWriter, r *http.Request, p *auth.Pr
 		return err
 	}
 	for _, c := range items {
+		if c.OwnerLayer == store.EnvLayerUser {
+			continue // a person's own item: not the organization's catalog
+		}
 		if kind == "" || c.Kind == kind {
 			out.Items = append(out.Items, catalogView(c, added[c.ID]))
 		}
@@ -210,7 +213,7 @@ func (q *req) checkSource(kind string, src json.RawMessage) error {
 // nameTaken: another live item of the organization (or a built-in one) has the kind and the name.
 func (q *req) nameTaken(kind, name, except string) bool {
 	for _, c := range q.w.items {
-		if c.ID != except && c.ArchivedAt == nil && c.Kind == kind && strings.EqualFold(c.Name, name) {
+		if c.ID != except && c.ArchivedAt == nil && c.OwnerLayer != store.EnvLayerUser && c.Kind == kind && strings.EqualFold(c.Name, name) {
 			return true
 		}
 	}
@@ -302,8 +305,8 @@ func deref(v *string) string {
 // itemOf finds an item of the organization's own; a built-in one is not for the organization to change.
 func (q *req) ownItem(id string) (store.CatalogItem, error) {
 	c, ok := q.w.items[id]
-	if !ok || (c.OrgID != "" && c.OrgID != q.w.org.ID) {
-		return c, httpx.ErrNotFound
+	if !ok || (c.OrgID != "" && c.OrgID != q.w.org.ID) || c.OwnerLayer == store.EnvLayerUser {
+		return c, httpx.ErrNotFound // a person's own item is theirs alone (/api/me/env/own)
 	}
 	if c.OrgID == "" {
 		return c, httpx.Conflict("built_in", "Встроенный элемент каталога не меняют")
