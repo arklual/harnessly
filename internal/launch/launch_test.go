@@ -36,6 +36,8 @@ func TestResolveCwd(t *testing.T) {
 		{inside, filepath.Join(root, "none"), "Корневой каталог проектов недоступен"},
 		{filepath.Join(root, "link"), root, "Каталог запуска вне корневого каталога проектов"},
 		{filepath.Join(root, "file"), root, "Каталог запуска не найден"},
+		// GitHub #108: a removed folder is gone, not outside the root.
+		{filepath.Join(root, "removed"), root, "Каталог запуска не найден"},
 	} {
 		if _, err := ResolveCwd(c.dir, c.root, nil); err == nil || err.Error() != c.want {
 			t.Errorf("%s in %s: %v, want %s", c.dir, c.root, err, c.want)

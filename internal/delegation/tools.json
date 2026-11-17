@@ -15,7 +15,11 @@
         },
         "agent_model": {
           "type": "string",
-          "description": "A model id of that provider on this machine (as its model picker names it, e.g. opus or sonnet for Claude); omit for the machine's default. An unknown id is refused with the list of the ones there are."
+          "description": "A model id of that provider on this machine (as its model picker names it, e.g. opus or sonnet for Claude, or a backend profile's model such as kimi-for-coding); omit for the machine's default. An unknown id is refused with the list of the ones there are."
+        },
+        "profile": {
+          "type": "string",
+          "description": "A backend profile of that provider set up on this machine (e.g. kimi-code, glm) to run the chat on, agent_model then one of its models (omit it for the profile's first). Omit for the CLI's own account; an agent_model that only one profile has picks that profile by itself. An unknown profile or model is refused with the ones there are."
         },
         "model": {
           "type": "string",

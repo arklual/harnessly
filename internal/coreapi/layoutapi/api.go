@@ -125,6 +125,7 @@ type DelegateRequest struct {
 	Session  string
 	Provider string
 	Model    string
+	Profile  string // a backend profile of the provider (GitHub #109)
 	Effort   string
 	Prompt   string
 	Title    string

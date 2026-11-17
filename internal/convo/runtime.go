@@ -1776,6 +1776,10 @@ func (r *Runtime) create(m wire.ConversationCreateCmd, person string) wire.CmdRe
 	if r.d.Launcher == nil {
 		return wire.Refused(wire.RefuseUnsupported)
 	}
+	// A folder kept from an earlier chat may be gone: the launch would fail with the message held in a paused queue.
+	if r.d.FolderGone != nil && cwd != "" && r.d.FolderGone(cwd) {
+		return wire.Refused(wire.RefuseNotFound)
+	}
 	model, code := r.onProfile(m.Provider, m.Model, m.Profile)
 	if code != "" {
 		return wire.Refused(code)

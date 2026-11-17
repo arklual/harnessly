@@ -77,7 +77,7 @@ interface IKindSwitchProps {
   value: ChatKind;
   onChange: (kind: ChatKind) => void;
   /** At the top of the screen, in the middle (as ChatGPT's «Chat | Work»): the segment leaves the field and stands
-   *  over the whole stage — the nearest `.hx-stage` or `.hx-gpt` it is drawn in. Without one it stays in place. */
+   *  in the screen's header over the stage it is drawn in (or over the `.hx-gpt` column). Without one it stays in place. */
   top?: boolean;
 }
 
@@ -111,7 +111,13 @@ const KindSwitch = (props: IKindSwitchProps) => {
   const { top } = props;
   useEffect(() => {
     if (!top) return;
-    setHost(mark.current?.closest<HTMLElement>('.hx-stage, .hx-gpt') ?? null);
+    // The stage's own top is the greeting's («Доброе утро» and the day under it), so on the home screen the segment
+    // goes up into the screen's header, which is empty in the middle; the ChatGPT chat keeps it over its own column.
+    const el = mark.current;
+    const gpt = el?.closest<HTMLElement>('.hx-gpt');
+    const stage = el?.closest<HTMLElement>('.hx-stage');
+    const header = stage?.closest('.hx-main__body')?.querySelector<HTMLElement>(':scope > .hx-header');
+    setHost(gpt ?? header ?? stage ?? null);
   }, [top]);
   if (!top) return <Segment {...props} />;
   return (

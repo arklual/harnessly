@@ -19,6 +19,21 @@
 .hx-backdrop[data-shown] {
   opacity: 1;
 }
+/* The home screen has no title bar: its background goes on up under the header (the header is see-through), not
+   from under it with a band of the page's colour across the top. The stage clips at its edge, so it lets the
+   backdrop out by exactly the header's height (header.css: 64px, the phone's 52px and the notch). */
+.hx-stage[data-phase='home'][data-backdrop] {
+  --hx-head-h: 64px;
+  overflow-clip-margin: var(--hx-head-h);
+}
+.hx-stage[data-phase='home'] > .hx-backdrop {
+  top: calc(-1 * var(--hx-head-h));
+}
+@media (max-width: 900px) {
+  .hx-stage[data-phase='home'][data-backdrop] {
+    --hx-head-h: calc(52px + env(safe-area-inset-top));
+  }
+}
 .hx-backdrop__fill,
 .hx-backdrop__canvas,
 .hx-backdrop__dim,

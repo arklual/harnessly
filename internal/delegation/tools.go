@@ -107,7 +107,7 @@ func (t Tools) call(ctx context.Context, name string, args *jsvalue.Object) (str
 	a := argsOf(args)
 	switch name {
 	case "delegate_task":
-		task := Task{Provider: wire.Provider(a.str("provider")), Model: modelArg(a), Effort: wire.Effort(a.str("effort")),
+		task := Task{Provider: wire.Provider(a.str("provider")), Model: modelArg(a), Profile: a.str("profile"), Effort: wire.Effort(a.str("effort")),
 			Prompt: a.str("prompt"), Cwd: a.str("cwd"), Title: a.str("title"), Notify: a.boolean("notify"), Test: a.boolean("test"),
 			PlanFirst: a.boolean("plan_first"), FullContext: a.boolean("full_context")}
 		if err := a.err(); err != nil {

@@ -31,6 +31,12 @@
 .hx-kind[data-place='top']::before {
   background: color-mix(in srgb, var(--hx-fg-1) 9%, var(--hx-bg-raised));
 }
+/* In the screen's header (the home screen): the middle of the bar, out of the greeting's way (HRN-1600 had it over
+   «Доброе утро» and the day's first line). */
+.hx-header > .hx-kind[data-place='top'] {
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
 .hx-gpt > .hx-kind[data-place='top'] {
   top: 5px;
 }
@@ -105,6 +111,21 @@
 @media (max-width: 640px) {
   .hx-kind {
     margin-bottom: 8px;
+  }
+  /* A phone's header has its buttons at both ends: the segment takes the middle in the row, a step smaller. */
+  .hx-header > .hx-kind[data-place='top'] {
+    position: relative;
+    top: auto;
+    left: auto;
+    flex: none;
+    margin: 0 auto;
+    transform: none;
+  }
+  .hx-header > .hx-kind[data-place='top'] .hx-kind__opt {
+    min-width: 0;
+    height: 36px;
+    padding: 0 14px;
+    font-size: var(--hx-text-sm);
   }
   .hx-kind__opt {
     min-width: 108px;

@@ -1486,7 +1486,9 @@ html[data-theme='dark'] .hx-dock,
   --hx-home-top: 136px;
 }
 .hx-stage[data-phase='home'][data-home='stage']:not([data-docked]) > .hx-dock {
-  top: var(--hx-home-top);
+  /* A greeting with a second line (the way back to a terminal session) is taller: the field goes down under all of it,
+     or «Доброе утро» runs up under the screen's header (greeting.tsx measures --hx-home-hello). */
+  top: max(var(--hx-home-top), calc(var(--hx-home-hello, 0px) + var(--hx-space-8) + var(--hx-space-4)));
   bottom: auto;
   transform: translateY(calc(-1 * var(--hx-home-scroll, 0px)));
   transition: none;

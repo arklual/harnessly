@@ -683,7 +683,7 @@ func (c *cli) tabCreate(args []string) error {
 	}
 	args = rest
 	f, err := parseFlags(args, map[string]string{"n": "name", "name": "name", "t": "type", "type": "type",
-		"prompt": "prompt", "model": "model", "effort": "effort"})
+		"prompt": "prompt", "model": "model", "profile": "profile", "effort": "effort"})
 	if err != nil {
 		return err
 	}
@@ -701,7 +701,7 @@ func (c *cli) tabCreate(args []string) error {
 	if v := f.values["type"]; v != "" {
 		body["panelType"] = canonicalPanelType(v)
 	}
-	for _, k := range []string{"prompt", "model", "effort"} {
+	for _, k := range []string{"prompt", "model", "profile", "effort"} {
 		if _, ok := f.values[k]; ok {
 			body[k] = f.values[k]
 		}

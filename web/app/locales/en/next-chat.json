@@ -262,6 +262,7 @@
   "next.turnEnd.continueText": "Continue",
   "next.newChat.noFolder": "Open any chat on this machine first: a new one starts in its folder",
   "next.newChat.failed": "Could not start the conversation",
+  "next.newChat.folderGone": "The folder {folder} is gone. The message is still in the field: send it again and the chat starts in the machine's default folder",
   "next.newChat.creating": "Starting the agent…",
   "next.newChat.connecting": "Connecting to the machine, one moment",
   "next.queuedChat.waiting": "Waiting for “{machine}”: the chat starts by itself once it answers",

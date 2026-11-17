@@ -201,9 +201,13 @@ func ResolveCwd(requested, workspaceRoot string, extraRoots []string) (string, e
 		return "", errors.New(msgRootUnavailable.String())
 	}
 	resolved := realpath(requested)
+	if resolved == "" {
+		// A folder that is gone is said as such, not as one outside the roots (GitHub #108).
+		return "", errors.New(msgCwdNotFound.String())
+	}
 	inside := false
 	for _, r := range roots {
-		inside = inside || resolved != "" && isInside(resolved, r)
+		inside = inside || isInside(resolved, r)
 	}
 	if !inside {
 		return "", errors.New(msgCwdOutsideRoot.String())

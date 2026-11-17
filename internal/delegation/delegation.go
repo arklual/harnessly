@@ -11,6 +11,7 @@ package delegation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -103,6 +104,9 @@ type Service struct {
 	// ProfileModels are the ids of the models of a backend profile (Kimi, GLM, Grok); nil, or none for an unknown profile,
 	// leaves a delegated chat on the CLI's own account.
 	ProfileModels func(profile string) []string
+	// Profiles are the backend profiles of an agent CLI set up on this machine (a key saved), with their models; nil
+	// knows none, and a task then names no profile (GitHub #109).
+	Profiles func(p wire.Provider) []Profile
 	// Self is this machine and its owner, as the envelopes of the messages between the agents name them.
 	Self peers.Sender
 	Book *Book
@@ -252,9 +256,12 @@ func (s *Service) children(ctx context.Context, caller string) ([]wire.Conversat
 type Task struct {
 	Provider wire.Provider
 	// Model is a model id of the provider; "" is the machine's default. Effort is "" for the model's own.
-	Model  string
-	Effort wire.Effort
-	Prompt string
+	Model string
+	// Profile is a backend profile of the provider (Kimi, GLM, …) the chat runs on, Model being one of its models (""
+	// is its first); "" is the CLI's own account, or the profile the only one of whose models Model is (GitHub #109).
+	Profile string
+	Effort  wire.Effort
+	Prompt  string
 	// Cwd is the folder the agent starts in; "" is the caller's.
 	Cwd   string
 	Title string
@@ -396,6 +403,9 @@ func (s *Service) model(t Task, caller wire.Conversation) (*wire.Model, string, 
 	if t.Effort != "" && !slices.Contains(wire.Efforts, t.Effort) {
 		return nil, "", refuse("bad-request", "effort is one of %s", joinEfforts(wire.Efforts))
 	}
+	if t.Profile != "" {
+		return s.profileModel(t)
+	}
 	if cur := caller.Model; cur != nil && cur.Profile != "" && caller.Provider == t.Provider && s.ProfileModels != nil {
 		id := t.Model
 		if id == "" {
@@ -409,7 +419,88 @@ func (s *Service) model(t Task, caller wire.Conversation) (*wire.Model, string, 
 		}
 	}
 	m, err := s.plainModel(t)
-	return m, "", err
+	if err == nil || t.Model == "" {
+		return m, "", err
+	}
+	// Not a model of the CLI's own account: a model of exactly one of its profiles is that profile's (GitHub #109).
+	var owners []string
+	for _, p := range s.profilesOf(t.Provider) {
+		if slices.Contains(p.Models, t.Model) {
+			owners = append(owners, p.ID)
+		}
+	}
+	switch {
+	case len(owners) == 1:
+		t.Profile = owners[0]
+		return s.profileModel(t)
+	case len(owners) > 1:
+		pairs := make([]string, len(owners))
+		for i, o := range owners {
+			pairs[i] = o + "/" + t.Model
+		}
+		return nil, "", refuse("bad-request", "%q is a model of several profiles; name one with profile: %s", t.Model,
+			strings.Join(pairs, ", "))
+	}
+	if pairs := s.profilePairs(t.Provider); len(pairs) > 0 {
+		var r *Refusal
+		if errors.As(err, &r) {
+			return nil, "", refuse(r.Code, "%s; on a profile (profile/model): %s", r.Msg, strings.Join(pairs, ", "))
+		}
+	}
+	return nil, "", err
+}
+
+// Profile is a backend profile of an agent CLI and the ids of its models.
+type Profile struct {
+	ID     string
+	Models []string
+}
+
+func (s *Service) profilesOf(p wire.Provider) []Profile {
+	if s.Profiles == nil {
+		return nil
+	}
+	return s.Profiles(p)
+}
+
+// profilePairs names every model of the CLI's profiles as profile/model.
+func (s *Service) profilePairs(p wire.Provider) []string {
+	var out []string
+	for _, pr := range s.profilesOf(p) {
+		for _, m := range pr.Models {
+			out = append(out, pr.ID+"/"+m)
+		}
+	}
+	return out
+}
+
+// profileModel is the task's model on the profile it names.
+func (s *Service) profileModel(t Task) (*wire.Model, string, error) {
+	profiles := s.profilesOf(t.Provider)
+	i := slices.IndexFunc(profiles, func(p Profile) bool { return p.ID == t.Profile })
+	if i < 0 {
+		ids := make([]string, len(profiles))
+		for j, p := range profiles {
+			ids[j] = p.ID
+		}
+		have := "none"
+		if len(ids) > 0 {
+			have = strings.Join(ids, ", ")
+		}
+		return nil, "", refuse("bad-request", "%s has no profile %q set up here; it has: %s", t.Provider, t.Profile, have)
+	}
+	p := profiles[i]
+	id := t.Model
+	if id == "" && len(p.Models) > 0 {
+		id = p.Models[0]
+	}
+	if !slices.Contains(p.Models, id) {
+		return nil, "", refuse("bad-request", "profile %s has no model %q; it has: %s", p.ID, id, strings.Join(p.Models, ", "))
+	}
+	if t.Effort != "" {
+		return nil, "", refuse("bad-request", "%s takes no effort", id)
+	}
+	return &wire.Model{ID: id}, p.ID, nil
 }
 
 // plainModel is the task's model on the CLI's own account.

@@ -325,6 +325,9 @@ type Deps struct {
 	SessionAccount func(p wire.Provider, agentSessionID, profile string)
 	// AgentSession finds a session the agent CLI kept; nil knows none, and a conversation cannot then be opened on one.
 	AgentSession func(p wire.Provider, sessionID string) (AgentSession, bool)
+	// FolderGone tells a folder that is no more (removed, or not a folder): a conversation asked to start in one is
+	// refused{not-found} at once, and its first message stays with the person (GitHub #108). nil checks none.
+	FolderGone func(dir string) bool
 	// DefaultCwd is the folder a new conversation starts in when the person names none: it goes to the page with the
 	// projects. Empty offers none.
 	DefaultCwd string

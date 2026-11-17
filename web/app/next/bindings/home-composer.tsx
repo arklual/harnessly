@@ -10,6 +10,7 @@ import { launchModel, type IModelChoice } from '@/next/features/composer/agents'
 import { choiceKey, launchPrompt, toggleChoice } from '@/next/features/composer/multi-model';
 import { createConversation, setConversationApps, type NewConversation } from '@/next/commands';
 import { failureText } from '@/next/bindings/outcome';
+import type { OpFailure } from '@/next/stores/ops';
 import { useAgentLimits } from '@/next/bindings/use-limits';
 import { limitsOwnerOf } from '@/next/features/limits/model';
 import { useUploads } from '@/next/bindings/use-uploads';
@@ -152,7 +153,24 @@ const HomeComposer = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const defaultCwd = useDefaultCwd(machine);
-  const cwd = machine ? startFolder(conversations, machine, defaultCwd ?? null) : null;
+  // GitHub #108: the folder of the latest chat may be gone; the machine refuses a chat there, and the next one starts
+  // in the machine's default folder.
+  const [goneFolder, setGoneFolder] = useState<string | null>(null);
+  const kept = machine ? startFolder(conversations, machine, defaultCwd ?? null) : null;
+  const cwd =
+    kept !== null && kept === goneFolder
+      ? defaultCwd && defaultCwd !== goneFolder
+        ? defaultCwd
+        : null
+      : kept;
+  const createFailed = (f: OpFailure, place: NewConversation['where']) => {
+    if (f.r === 'refused' && f.code === 'not-found' && 'cwd' in place) {
+      setGoneFolder(place.cwd);
+      toast(t('next.newChat.folderGone', { folder: place.cwd }), { tone: 'warning' });
+      return;
+    }
+    toast(t('next.newChat.failed'), { tone: 'error', description: failureText(f) });
+  };
   const { choice, agents, onPick, signIn } = useStartChoice(machine);
   // Several models for one prompt (a beta function): the pill's choice and its companions.
   const { multiModel } = useBeta();
@@ -336,8 +354,7 @@ const HomeComposer = ({
         void Promise.all(
           started.map(async (one) => {
             const [st, id] = await Promise.all([one.done, one.conversation]);
-            if (st.k === 'failed')
-              toast(t('next.newChat.failed'), { tone: 'error', description: failureText(st.failure) });
+            if (st.k === 'failed') createFailed(st.failure, place);
             return id;
           }),
         ).then((ids) => {
@@ -371,10 +388,7 @@ const HomeComposer = ({
       void created.done.then((st) => {
         if (st.k === 'failed') {
           setCreating(false);
-          toast(t('next.newChat.failed'), {
-            tone: 'error',
-            description: failureText(st.failure),
-          });
+          createFailed(st.failure, place);
         }
       });
       void created.conversation.then((id) => {

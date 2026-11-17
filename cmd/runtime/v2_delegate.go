@@ -59,6 +59,20 @@ func newDelegation(v *v2Live, settings wire.RuntimeSettingsStore) *delegation.Se
 			_, _, models, _ := providers.Launcher{Store: v.profiles}.Lookup(profile)
 			return models
 		},
+		Profiles: func(p wire.Provider) []delegation.Profile {
+			var out []delegation.Profile
+			for _, pr := range providers.Presets() {
+				if pr.Via != p || v.profiles == nil || !v.profiles.Ready(pr.ID) {
+					continue
+				}
+				ids := make([]string, len(pr.Models))
+				for i, m := range pr.Models {
+					ids[i] = m.ID
+				}
+				out = append(out, delegation.Profile{ID: pr.ID, Models: ids})
+			}
+			return out
+		},
 		Self:  peerSelf(os.Getenv),
 		Roles: roleMarker(v),
 		Permission: func(conv string) wire.PermissionMode {
@@ -148,7 +162,7 @@ func (c *core) cliDelegate(ctx context.Context, req layoutapi.DelegateRequest) (
 	if parent == "" {
 		return layoutapi.DelegateResult{}, &layoutapi.ErrNoParent{Reason: "this terminal is not the agent of a chat (a plain terminal tab), so there is no chat to nest the new one under"}
 	}
-	rec, err := v.delegation.Delegate(ctx, parent, delegation.Task{Provider: wire.Provider(req.Provider), Model: req.Model,
+	rec, err := v.delegation.Delegate(ctx, parent, delegation.Task{Provider: wire.Provider(req.Provider), Model: req.Model, Profile: req.Profile,
 		Effort: wire.Effort(req.Effort), Prompt: req.Prompt, Title: req.Title, Notify: req.Notify, Test: req.Test})
 	if err != nil {
 		var refusal *delegation.Refusal

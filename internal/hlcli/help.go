@@ -33,7 +33,7 @@ SHOW THINGS TO THE PERSON
 TABS OF THIS WORKSPACE
   harnessly workspaces              list workspaces (id, name, folders)
   harnessly tab list                list the tabs of your workspace
-  harnessly tab create [-t TYPE] [-n NAME] [--prompt TEXT] [--model M] [--effort E] [--notify] [--test]
+  harnessly tab create [-t TYPE] [-n NAME] [--prompt TEXT] [--model M] [--profile P] [--effort E] [--notify] [--test]
                                     create a tab. TYPE: terminal (default), claude-code, codex-cli, agent-sessions,
                                     web-browser, diff. With --prompt, a claude-code or codex-cli agent gets that task
                                     as a chat nested under YOUR chat (like the MCP tool delegate_task): the person sees
@@ -477,7 +477,8 @@ as a chat nested under that chat, exactly as the MCP tool delegate_task does. Th
 agent has the platform's hooks and workspace prompt, and you get its answer back: with --notify the runtime wakes your
 chat with it when the agent finishes a turn; without it, read it with "tab result <id>" (the screen) or, over MCP,
 read_conversation / wait_conversation with the same id. --model and --effort pick the model (the machine's default
-otherwise), --name titles the chat. The prompt is the whole briefing: the agent does not see your conversation.
+otherwise); --profile P runs it on a backend profile of the machine (Kimi, GLM, …), --model then one of its models,
+and a --model of exactly one profile picks that profile by itself. --name titles the chat. The prompt is the whole briefing: the agent does not see your conversation.
 A delegated chat cannot delegate further, and the person's limit on the number of delegated chats applies; a refusal
 says so. Run outside a chat (a plain terminal tab) the command cannot nest the agent, starts a separate tab as before and
 prints the reason.
