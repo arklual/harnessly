@@ -218,6 +218,11 @@ var Flags = []Flag{
 	{Name: "HUB_STORE_S3_PREFIX", Owner: "store"},
 	{Name: "HUB_STORE_S3_REGION", Owner: "store"},
 	{Name: "HUB_STORE_S3_SECRET_KEY", Owner: "store"},
+	{Name: "HUB_TBOT_JOIN", Owner: "tbot"},
+	{Name: "HUB_TBOT_JOIN_KUBE_CA_FILE", Owner: "tbot"},
+	{Name: "HUB_TBOT_JOIN_KUBE_TOKEN_FILE", Owner: "tbot"},
+	{Name: "HUB_TBOT_JOIN_KUBE_URL", Owner: "tbot"},
+	{Name: "HUB_TBOT_JOIN_NAMESPACE", Owner: "tbot"},
 	{Name: "HUB_VOICE_TAKES", Owner: "voice", Temporary: true, RemoveAfter: "2027-03-01"},
 }
 

@@ -301,7 +301,7 @@
   "next.settings.general.paneAuto.artifacts": "Documents and boards",
   "next.settings.general.paneAuto.artifacts.hint": "What the agent publishes; published again, the open tab reloads",
   "next.settings.general.paneAuto.browser": "The agent's browser",
-  "next.settings.general.paneAuto.browser.hint": "When the agent works in a site",
+  "next.settings.general.paneAuto.browser.hint": "When the agent works in a site or shows a stand. Off by default: a stand opens on a click on its card",
   "next.settings.general.paneAuto.files": "Files it hands over",
   "next.settings.general.paneAuto.files.hint": "A file the agent gives you opens beside the chat as well as downloading",
   "next.settings.links": "Links from the chat",

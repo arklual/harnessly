@@ -411,6 +411,7 @@ func (h *hub) linkUp(l *link) {
 		h.emit(hubproto.EventEnvState, "state", h.environment.State()) // how the held list went, for a hub that lost it
 	}
 	h.goBG(func() { h.shipRuns(true) }) // the runs of the last day, for a hub that lost them
+	go h.tbotJoinLoop(l)                // ends with the link
 }
 
 func (h *hub) linkDown(l *link) {

@@ -71,7 +71,7 @@ func Reconcile(tasks []Task, counts *Counts) []Task {
 		}
 	}
 	for _, t := range tasks {
-		if t.Kind == Agent || t.Kind == Wakeup || t.Kind == Workflow {
+		if t.Kind == Agent || t.Kind == Wakeup || t.Kind == Workflow || t.Kind == Cron {
 			out = append(out, t)
 		}
 	}

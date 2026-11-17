@@ -339,6 +339,18 @@ func (s *Service) dispatch(ctx context.Context, l *link.Link, m store.Machine, e
 				}
 			})
 		}
+	case hubproto.EventTbotJoin:
+		if s.tbotJoin != nil {
+			raw := ev.Raw
+			safego.Go("machines tbot.join", func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+				defer cancel()
+				res := s.tbotJoin.Requested(ctx, m, raw)
+				if _, err := l.Call(ctx, hubproto.OpTbotJoined, res); err != nil {
+					s.log.Warn("tbot.joined not delivered", "machine", m.ID, "error", err)
+				}
+			})
+		}
 	case hubproto.EventEnvOwn:
 		if s.proposals != nil {
 			raw := ev.Raw

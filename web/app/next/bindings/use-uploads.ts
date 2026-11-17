@@ -171,7 +171,7 @@ export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles:
       // there when the message leaves the outbox.
       const offline = appConfig().centralUploads && connectionStore.get(machine)?.k !== 'live';
       const road = offline
-        ? keepInHub(machine, file, (sent) => progressOf(id, sent, mark))
+        ? keepInHub(machine, file, (sent) => progressOf(id, sent, mark), abort.signal)
         : uploadFile(machine, file, (sent) => progressOf(id, sent, mark), abort.signal, session);
       void road.then((outcome) => {
         controllers.current.delete(id);

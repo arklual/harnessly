@@ -1,6 +1,6 @@
-// «Ваша машина» of a member: the environment on a machine is current, out of date, or waits for a token; one button brings
-// it up to date («Обновить») or looks («Проверить»). One machine is a single line, several are a row each. A run is followed
-// until it ends.
+// «Ваша машина» of a member: the environment on a machine is current, out of date, fell, or waits for a token; one button
+// brings it up to date («Обновить») or looks («Проверить»). One machine is a single line, several are a row each. A run is
+// followed until it ends; a run that could not be followed gives the button back.
 import { useState } from 'react';
 
 import type { MeMachine } from '../../../../hub-api/env';
@@ -9,14 +9,18 @@ import { useOrg } from '../../../org/context';
 import { Btn, Icon } from '../../ui';
 import { useRunPoll } from './runs';
 
-type State = 'ok' | 'stale' | 'token' | 'busy' | 'off' | 'none';
+type State = 'ok' | 'stale' | 'failed' | 'token' | 'busy' | 'off' | 'none';
 
-/** The state of a machine: a machine without the setup feature is not «устарело», it is just not set up by the hub. */
+/**
+ * The state of a machine: a machine without the setup feature is not «устарело», it is just not set up by the hub. A
+ * machine that holds the list but has items in error is «failed»: an update tries them again, a check would change nothing.
+ */
 export const stateOfMachine = (m: MeMachine, busy: boolean): State => {
   if (busy) return 'busy';
   if (!m.setup) return 'none';
   if (!m.online) return 'off';
   if (!m.current) return 'stale';
+  if ((m.errors ?? 0) > 0) return 'failed';
   if (m.failed > 0) return 'token';
   return 'ok';
 };
@@ -24,6 +28,7 @@ export const stateOfMachine = (m: MeMachine, busy: boolean): State => {
 const WORD: Record<State, string> = {
   ok: 'Готова',
   stale: 'Устарела',
+  failed: 'Не всё встало',
   token: 'Ждёт токен',
   busy: 'Обновляется…',
   off: 'Не в сети',
@@ -33,6 +38,7 @@ const WORD: Record<State, string> = {
 const ICON: Record<State, string> = {
   ok: 'circle-check',
   stale: 'triangle-alert',
+  failed: 'triangle-alert',
   token: 'key-round',
   busy: 'loader-circle',
   off: 'server',
@@ -74,12 +80,26 @@ export const MachineStrip = ({
         else fail(`${run.machine.name}: не всё встало. Подробности — в «Логах»`);
       });
     },
+    // The run could not be followed: the machine is not left «обновляется» for good, the button comes back.
+    () => {
+      setActive(null);
+      void refresh();
+      fail('Не удалось узнать, чем кончился запуск. Обновите страницу или запустите ещё раз');
+    },
   );
   if (machines.length === 0) return null;
   const go = (m: MeMachine, mode: 'update' | 'check') => {
     setActive({ runId: null, machineId: m.id, mode });
     api.meRun({ mode, machineId: m.id }, space).then(
-      (res) => setActive({ runId: res.runs[0]?.runId ?? null, machineId: m.id, mode }),
+      (res) => {
+        const runId = res.runs.find((r) => r.machineId === m.id)?.runId ?? res.runs[0]?.runId;
+        if (runId) {
+          setActive({ runId, machineId: m.id, mode });
+          return;
+        }
+        setActive(null);
+        fail(`${m.name}: машина не приняла запуск, попробуйте ещё раз`);
+      },
       (e: unknown) => {
         setActive(null);
         fail(orgErrorText(e));
@@ -100,6 +120,10 @@ export const MachineStrip = ({
           ? `Не встало: ${m.failed}. Обновите — машина попробует ещё раз`
           : 'Список поменялся, машина ещё не подтянула его';
     }
+    if (st === 'failed') {
+      title = `На ${m.name} не всё встало`;
+      sub = `Не встало: ${m.errors}. Обновите — машина попробует ещё раз. Подробности — в «Логах»`;
+    }
     if (st === 'token') {
       title = `${m.name} ждёт токен`;
       sub = 'Часть окружения встанет, когда админ организации положит токен в сейф';
@@ -116,8 +140,8 @@ export const MachineStrip = ({
       title = m.name;
       sub = 'Окружение на этой машине хаб не настраивает';
     }
-    const can = st === 'ok' || st === 'stale' || st === 'token';
-    const update = st === 'stale';
+    const can = st === 'ok' || st === 'stale' || st === 'failed' || st === 'token';
+    const update = st === 'stale' || st === 'failed';
     const block = (
       <>
         <span className="hb-ic">

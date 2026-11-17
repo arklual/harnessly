@@ -630,9 +630,10 @@ func (s *Service) Remove(id string) error {
 		return err
 	}
 	out, found := list[:0], false
+	var gone Conn
 	for _, c := range list {
 		if c.ID == id {
-			found = true
+			found, gone = true, c
 			continue
 		}
 		out = append(out, c)
@@ -645,6 +646,13 @@ func (s *Service) Remove(id string) error {
 	s.mu.Unlock()
 	if err != nil {
 		return err
+	}
+	if c, ok := Lookup(gone.Connector); ok {
+		if f, ok := c.(Forgetter); ok {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			f.Forget(ctx, s.instance(gone, nil))
+			cancel()
+		}
 	}
 	_ = s.secrets.Remove(SecretName(id))
 	_ = os.Remove(s.runner.stateFile(id))

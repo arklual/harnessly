@@ -252,6 +252,7 @@ export const meMachine = obj({
   setup: bool,
   current: bool,
   failed: num,
+  errors: opt(num),
   lastRun: nullable(envRunRow),
 });
 export const meMachinesResponse = obj({ machines: arr(meMachine) });

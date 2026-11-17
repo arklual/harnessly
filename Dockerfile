@@ -172,11 +172,14 @@ RUN --mount=type=cache,id=harnessly-go-build,target=/root/.cache/go-build \
     set -e; \
     mkdir -p web/dist web/dist-hub; touch web/dist/index.html web/dist-hub/index.html; \
     # Two packages to a `go build` compile and link nothing: the links are build-hub's, with the real page.
+    # The four systems compile one after another, beside the hub: the runtime's Telegram client (gotd/td's tg, one
+    # generated package) takes some 6 GB to compile, and four of it at once were more than the builder has. With the
+    # cache warm each takes seconds, and the web stage runs meanwhile.
     GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -tags "hubui webui" ./cmd/hub ./web & pids="$!"; \
-    for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do \
-      ( GOOS=${target%/*} GOARCH=${target#*/} go build -trimpath -tags webui ./cmd/runtime ./web \
-        && GOOS=${target%/*} GOARCH=${target#*/} go build -trimpath ./cmd/agent ./cmd/harnessly ) & pids="$pids $!"; \
-    done; \
+    ( for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do \
+        GOOS=${target%/*} GOARCH=${target#*/} go build -trimpath -tags webui ./cmd/runtime ./web \
+        && GOOS=${target%/*} GOARCH=${target#*/} go build -trimpath ./cmd/agent ./cmd/harnessly || exit 1; \
+      done ) & pids="$pids $!"; \
     for p in $pids; do wait "$p"; done; \
     touch /warm
 
@@ -194,7 +197,7 @@ COPY --from=build-warm /warm /tmp/warm
 # The hub and the four systems a machine can be build side by side: one after another they took four minutes.
 RUN --mount=type=cache,id=harnessly-go-build,target=/root/.cache/go-build \
     set -e; \
-    hubflags="-s -w -X github.com/ly-solutions/harnessly/internal/hub/buildinfo.Version=${VERSION}"; \
+    hubflags="-s -w -X github.com/ly-solutions/harnessly/internal/hub/buildinfo.Version=${VERSION} -X 'github.com/ly-solutions/harnessly/internal/telemetry.DefaultURL=${HARNESSLY_TELEMETRY_URL}' -X 'github.com/ly-solutions/harnessly/internal/telemetry.DefaultKey=${HARNESSLY_TELEMETRY_KEY}'"; \
     ldflags="-s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=${VERSION} -X github.com/ly-solutions/harnessly/internal/hlcli.Version=${VERSION} -X 'github.com/ly-solutions/harnessly/internal/telemetry.DefaultURL=${HARNESSLY_TELEMETRY_URL}' -X 'github.com/ly-solutions/harnessly/internal/telemetry.DefaultKey=${HARNESSLY_TELEMETRY_KEY}'"; \
     mkdir -p /out/dist; \
     GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -tags "hubui webui" -ldflags "$hubflags" -o /out/hub ./cmd/hub & pids="$!"; \

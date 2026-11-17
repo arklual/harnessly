@@ -297,7 +297,8 @@ func delegationPromptText(agentName string) string {
 		"With several delegated chats, `wait_conversation` with id `all` waits for all of them in one call; " +
 		"`broadcast_children` with `deliver: \"now\"` stops all of them at once (their running commands are interrupted). " +
 		"A delegated chat writes to you and to the chats beside it mid-turn (`send_to_conversation`, id `parent`). " +
-		"When the person asks this chat only to " +
+		"When the person drops a link to another chat of theirs, read it with `read_conversation` (its id or the link), " +
+		"not with the browser. When the person asks this chat only to " +
 		"coordinate (or not to do the work itself), call `coordinate_mode` with `on: true`.\n\n"
 }
 

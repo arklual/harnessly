@@ -817,11 +817,13 @@ func TestMeMachineTeamFailedAndOutdated(t *testing.T) {
 	hash := func() string { s, _ := a.s.DB.S().EnvStateByMachine(ctx, box.MachineID); return s.Hash }
 	box.Emit(map[string]any{"event": "env.state", "state": hubproto.EnvState{Rev: 1, Hash: hash(), Applied: []hubproto.EnvApplied{
 		{ItemID: script, Status: "pending", Message: "положите токен npm-token в сейф"},
+		{ItemID: script, Status: "pending", Message: "положите gitlab-token, youtrack-token в сейф"},
 		{ItemID: "x", Status: "pending", Message: "ждёт, пока починят Установка"},
 		{ItemID: script, Status: "pending", Message: "машина ещё настраивается"},
 		{ItemID: script, Status: "error", Message: "exit 1"},
 	}}})
-	a.s.Eventually("failed counted", func() bool { return read().Failed == 2 })
+	// The errors are told apart: they are what an update tries again, a token only the person can put.
+	a.s.Eventually("failed counted", func() bool { m := read(); return m.Failed == 3 && m.Errors == 1 })
 
 	// A machine that cannot do the setup is not behind on it, whatever it holds.
 	old := a.s.NewAgent(nil)

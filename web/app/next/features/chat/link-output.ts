@@ -56,6 +56,8 @@ export interface ILinkOutput {
   port: number | null;
   /** Whether a new tab of the person's browser can show it: a server of the machine cannot. */
   newTab: boolean;
+  /** A stand's other pages the same turn named (outputs.tsx mergeStands): shown under its address. */
+  more?: string[];
 }
 
 type TLinkConfig = Pick<IAppConfig, 'artifactsUrl' | 'boardsUrl' | 'readerUrl' | 'githubHost'>;

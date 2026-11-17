@@ -3,6 +3,7 @@
 // between the paragraphs (parts.tsx) and the answers the person can give with one press.
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { openConversation } from '@/next/features/app-views/agents';
+import { openAsChat } from '@/next/stores/chat-screen';
 import { leadsTo, type IItemChat } from '@/next/features/day/chat-link';
 import { CHIP, webUrl, type IDayCard, type IDayChip, type IDayPriority } from '@/next/features/day/feed';
 import { feedIcon } from '@/next/features/day/icons';
@@ -205,7 +206,10 @@ const ItemChat = ({
             machine={chat.machine}
             lead={widget}
             onRetryLoad={() => hub.client(chat.machine)?.reconnectNow()}
-            onShowBackground={() => openConversation(chat.conv)}
+            onShowBackground={() => {
+              openAsChat(chat.conv);
+              openConversation(chat.conv);
+            }}
           />
         </Suspense>
       </div>

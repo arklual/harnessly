@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/peers"
@@ -279,6 +280,15 @@ func wakeText(r Result) string {
 		b.WriteString("finished its turn but background work of its own is still running.")
 	case r.Outcome == Done:
 		b.WriteString("finished its turn.")
+	case r.Outcome == NeedsPerson:
+		b.WriteString("stands still waiting for an answer (" + string(r.Conv.State.K) + "): a question, a permission or a paused queue in its chat. " +
+			"Answer it with send_to_conversation if you know the answer; otherwise tell the person it waits for them.")
+	case r.Outcome == Limited:
+		b.WriteString("hit its plan's usage limit and stands still until it resets")
+		if l := r.Conv.Limited; l != nil && l.ResetsAt != nil {
+			b.WriteString(" (" + time.UnixMilli(int64(*l.ResetsAt)).UTC().Format("2006-01-02 15:04 UTC") + ")")
+		}
+		b.WriteString(". Give the work to another chat (another model or profile) if it cannot wait.")
 	default:
 		b.WriteString("stopped running (" + string(r.Conv.State.K) + ").")
 	}
@@ -334,15 +344,21 @@ func queuedWhy(r wire.QueueReason) string {
 }
 
 // ConversationRef is the chat id in a reference to it: the id itself (tab-…) or the link to the chat a person drops into
-// another chat (https://<hub>/agents/c/<id>), so an agent reads that chat without the person's page session.
+// another chat, so an agent reads that chat without the person's page session. A link is the hub's stable one
+// (https://<hub>/agents/c/<id>), the chat's address in the interface — on the machine (https://<host>/c/<id>) or through
+// the hub (https://<hub>/m/<machine>/c/<id>) — or a page opened with the chat beside it (…?chat=<id>).
 func ConversationRef(ref string) (string, error) {
 	ref = strings.TrimSpace(ref)
 	if u, err := url.Parse(ref); err == nil && u.Scheme != "" && u.Host != "" {
 		p := strings.Split(strings.Trim(u.Path, "/"), "/")
-		if len(p) != 3 || p[0] != "agents" || p[1] != "c" {
-			return "", fmt.Errorf("not a hub conversation URL")
+		switch n := len(p); {
+		case n >= 2 && p[n-2] == "c":
+			ref = p[n-1]
+		case u.Query().Get("chat") != "":
+			ref = u.Query().Get("chat")
+		default:
+			return "", fmt.Errorf("not a link to a chat")
 		}
-		ref = p[2]
 	}
 	if !strings.HasPrefix(ref, "tab-") || len(ref) > 200 || strings.ContainsAny(ref, "/?# ") {
 		return "", fmt.Errorf("not a conversation id or hub conversation URL")

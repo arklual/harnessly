@@ -109,6 +109,18 @@ describe('planIntents', () => {
     expect(plan?.settled).toEqual(['d', 'a', 'r']);
   });
 
+  it('the browser kind off holds even the agent’s own open of a stand: its card opens it on a click (HRN-1623)', () => {
+    const list = [
+      intent('ab', open('agent-browser', undefined, { auto: true })),
+      intent('st', open('browser', 'https://s1.preview.example.com/admin')),
+      intent('tk', open('task', 'PROJ-1')),
+    ];
+    const off = { design: true, artifacts: true, browser: false, files: true };
+    expect(planIntents(list, [], NOW, { auto: true, kinds: off })?.apply.map((x) => x.id)).toEqual(['tk']);
+    const on = { ...off, browser: true };
+    expect(planIntents(list, [], NOW, { auto: true, kinds: on })?.apply.map((x) => x.id)).toEqual(['ab', 'st', 'tk']);
+  });
+
   it('the runtime opens three tabs in ten minutes at most, one look or many; the agent’s own open is not counted', () => {
     const doc = (n: number) => open('artifacts', `/agents/docs/d${n}`, { auto: true });
     const earlier = [1, 2].map((n) => intent(`d${n}`, doc(n), NOW + n, NOW + n));

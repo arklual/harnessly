@@ -442,4 +442,37 @@ Bot API only (nothing reads the person's chats through their account). The Bot A
   as the card (by default who, where and the subject; the whole text only when «Sends to confirm in Telegram» = «The
   whole text»), a one-time button code dropped before the answer runs, the proposal's 30 minutes, the bound chat and
   person only. An answer anywhere closes the message in Telegram.
-- Not here: reading the person's own chats (forbidden by Telegram's terms), Telegram Business.
+- Not here: reading the person's own chats (a bot cannot: that is the Telegram account below), Telegram Business.
+
+## Telegram account (`telegram-account`)
+
+`internal/connectors/tgaccount`: the person's own Telegram account through MTProto (`github.com/gotd/td`, pure Go),
+so that the agent reads their chats and writes as them. The bot above stays the channel between harnessly and the
+person; this is their account itself.
+
+- **Connect**: `api_id` and `api_hash` of the person's own app (my.telegram.org → API development tools), the hash in
+  the safe; the check asks Telegram for a sign-in code, which fails at once on a wrong pair. An optional «Cloud
+  password» (in the safe) is for an account with two-step verification. The page then shows a QR code (`Step.Image`,
+  a PNG data URL; the page draws only `data:image/png`): the person scans it in Telegram on the phone, Settings →
+  Devices → Link Desktop Device. The sign-in runs while the page asks for the step (it stops 2 minutes after the page
+  is closed, and starts again when it is opened); once signed in, the connection is checked again (`SetRecheck`) and
+  its account becomes «Name (@username)».
+- **On the machine**: the session (`session.json`, 0600), the updates' state (`updates.json`) and the book of peers
+  with their access hashes (`peers.json`) in the connection's folder, gone with it. Removing the connection also
+  signs this device out of Telegram (`Forgetter`). A session ended from the phone is forgotten by the source, and the
+  page shows a new code.
+- **Source**: gotd's updates manager over the account's updates; its state is kept, so a restart catches up with
+  `getDifference`. The source waits without an error until the sign-in. Events, `chat.message` without text,
+  `thread` = `tg:<marked chat id>`, `ref` = `message chat=<id> id=<message>`, facts `chat=private|group`, `mentioned`,
+  `reply`, `forwarded`, `media`, `bot`: by «Events of new messages», private chats and mentions in groups (the
+  default), every chat but channels, or none. Channel posts and the person's own Saved Messages are never events.
+  Inbox kind `telegram`.
+- **Reads**: `chats [limit=] [unread=true]`, `messages chat= [limit=] [before=]`, `message chat= id=`,
+  `search q= [chat=] [limit=]`, `me`. A chat is `@username`, a `t.me` link, `+phone`, `me` (Saved Messages), the
+  marked id from `chats` (users as they are, groups `-id`, supergroups and channels `-100…`) or a known chat's exact
+  title. Reading leaves messages unread. What is read comes as `<untrusted-data>`.
+- **Actions**: `send chat= text= [reply=]` writes as the person after their yes on the card (and the bot's «Send /
+  Don't send» when a bot is bound): what the agent reads in chats is other people's words, and a message cannot be
+  taken back. `note text=` is Direct: the person's own Saved Messages, at once, at most 20 an hour.
+- Telegram may limit a new app's account for unusual activity: the connector sends only what the person confirmed,
+  and Telegram's «wait N seconds» comes back to the agent as words.

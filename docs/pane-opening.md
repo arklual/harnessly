@@ -23,7 +23,8 @@ it. An address the agent writes in its answer is a chip in the text, not an open
 | A design file the agent writes | `internal/paneauto` `Detect` (auto) | Its tab behind with a dot; the pane does not come out |
 | A document or board the agent publishes (`artifact publish`, `board create`) | `internal/paneauto` `Detect` (auto) | Its tab behind with a dot; the pane does not come out |
 | The same document published again | `internal/paneauto` (auto, reload) | The tab that shows it reloads; nothing opens |
-| The agent's browser tool (`chrome_*`) | `internal/paneauto` `Detect` (auto) | The agent's browser tab behind with a dot |
+| The agent's browser tool (`chrome_*`) | `internal/paneauto` `Detect` (auto) | Nothing by default; with «Браузер агента» on, the agent's browser tab behind with a dot |
+| The agent's `open` of a stand or a dev server (the `browser` tab) | `planIntents` in `web/app/next/features/pane/intents.ts` | Nothing by default: its card in the chat opens it on a click; with «Браузер агента» on, as any `open` |
 | A file the agent hands over (`deliver`, `deliver_file`) | `paneauto.OpenOnce` (auto) | Its tab behind with a dot; a card in the chat opens it |
 | An address in the agent's answer (document, board, stand, dev server, MR, task) | `web/app/next/features/chat` chips and cards | A chip or a card; the pane opens on its click |
 | A dev server the agent starts, a stand it deploys | — | Nothing by itself: the agent runs `open` or names it as a chip |
@@ -35,7 +36,7 @@ things asks the agent to `open` one of them, or none: tasks, merge requests and 
 
 The person can turn off even the quiet tabs, or some kinds of them: Settings → General → «Open what the agent works on»
 and, under it, the design it draws, documents and boards, the agent's browser, files it hands over (one synced key,
-`hl:pane-auto-open`: `0` off, absent all on, a JSON record of the kinds otherwise).
+`hl:pane-auto-open`: `0` off, absent the defaults (all on but the agent's browser), a JSON record of the kinds otherwise).
 
 ## Kinds of addresses
 

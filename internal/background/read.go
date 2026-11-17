@@ -291,7 +291,7 @@ func (r *Reader) OutputFile(transcript string, t Task) string {
 func (r *Reader) aliveOnly(tasks []Task, transcript string) []Task {
 	out := []Task{}
 	for _, t := range tasks {
-		if t.Kind == Wakeup || t.Kind == Agent || t.Kind == Workflow {
+		if t.Kind == Wakeup || t.Kind == Agent || t.Kind == Workflow || t.Kind == Cron {
 			out = append(out, t)
 			continue
 		}

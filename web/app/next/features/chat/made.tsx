@@ -335,7 +335,34 @@ const HubRow = ({ made, context, meta: live }: IMadeLinkProps) => {
   );
 };
 
-/** A stand: its page's title, whether it answers, its address to copy. */
+/** One address of a stand, to copy; with several, each opens on the right by itself. */
+const StandAddress = ({ url, onPane }: { url: string; onPane: (() => void) | null }) => (
+  <span className="hx-made__url">
+    <span className="hx-made__url-text">{url.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
+    {onPane && (
+      <button
+        type="button"
+        className="hx-made__url-copy"
+        aria-label={t('next.turnMade.openPage')}
+        title={t('next.turnMade.openPage')}
+        onClick={onPane}
+      >
+        <Icon name="panel-right" size="sm" />
+      </button>
+    )}
+    <button
+      type="button"
+      className="hx-made__url-copy"
+      aria-label={t('next.turnMade.copyUrl')}
+      title={t('next.turnMade.copyUrl')}
+      onClick={() => copyText(url, t('next.turnMade.copied'))}
+    >
+      <Icon name="copy" size="sm" />
+    </button>
+  </span>
+);
+
+/** A stand: its page's title, whether it answers, its addresses to copy (one stand, one card). */
 const StandRow = ({ made, context, meta, look }: IMadeLinkProps) => {
   const { output, link } = made;
   const parts = partsOf(link, meta, look, null);
@@ -343,7 +370,8 @@ const StandRow = ({ made, context, meta, look }: IMadeLinkProps) => {
   const onShare = () => copyLink(link.url);
   const kind = t('next.outputs.link.stand');
   const menu = useLinkMenu({ href: link.url, onPane: onOpen, outside: true, label: kind });
-  const address = link.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const urls = [link.url, ...(link.more ?? [])];
+  const openAt = (url: string) => (context.onOpen ? () => context.onOpen?.({ ...output, ref: url }) : null);
   return (
     <Rich
       preview={<Preview src={null} icon={LINK_ICON.stand} />}
@@ -352,17 +380,11 @@ const StandRow = ({ made, context, meta, look }: IMadeLinkProps) => {
         <Line sub={[kind, <State key="s" text={parts.state} tone={parts.tone} />]} pending={parts.pending} />
       }
       extra={
-        <span className="hx-made__url" onClick={stop}>
-          <span className="hx-made__url-text">{address}</span>
-          <button
-            type="button"
-            className="hx-made__url-copy"
-            aria-label={t('next.turnMade.copyUrl')}
-            title={t('next.turnMade.copyUrl')}
-            onClick={() => copyText(link.url, t('next.turnMade.copied'))}
-          >
-            <Icon name="copy" size="sm" />
-          </button>
+        <span className="hx-made__urls" onClick={stop}>
+          {urls.length > 1 && <span className="hx-made__urls-note">{t('next.turnMade.standPages')}</span>}
+          {urls.map((url) => (
+            <StandAddress key={url} url={url} onPane={urls.length > 1 ? openAt(url) : null} />
+          ))}
         </span>
       }
       href={link.url}

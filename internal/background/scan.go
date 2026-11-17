@@ -23,6 +23,16 @@ const (
 	Wakeup  = "wakeup"
 	// Workflow is a dynamic workflow (Claude Code's Workflow tool): a script that starts subagents in the background.
 	Workflow = "workflow"
+	// Cron is a job of Claude Code's CronCreate (and /loop with an interval): it lives only in the agent's session, so
+	// the chat it fires in must not be stopped for standing idle while it is pending.
+	Cron = "cron"
+)
+
+// cronLife is how long a recurring cron job lives: Claude Code ends one after 7 days. A one-shot job is pending until
+// the next run its answer names, or a day when that cannot be read.
+const (
+	cronLife    = 7 * 24 * 3_600_000.0
+	cronOneShot = 24 * 3_600_000.0
 )
 
 // Task is one piece of background work. Times are epoch milliseconds.
@@ -59,6 +69,8 @@ var (
 	shellID      = regexp.MustCompile(`running in background with ID: ([\w-]+)`)
 	agentID      = regexp.MustCompile(`(?s)Async agent launched.*?agentId: ([\w-]+)`)
 	wakeupIn     = regexp.MustCompile(`(?i)wakeup scheduled for [^(]*\(in (\d+)s\)`)
+	// "Scheduled recurring job 1a2b3c4d (*/5 * * * *)…", "Scheduled one-shot task bcf51e2a (17 4 1 1 *). Next run: …"
+	cronJob      = regexp.MustCompile(`(?i)\bscheduled\s+([\w-]+)\s+(?:job|task)\s+([0-9a-z]{4,})\b`)
 	monitorTask  = regexp.MustCompile(`\(task ([\w-]+)`)
 	monitorToken = regexp.MustCompile(`\b(b[a-z0-9]{7,})\b`)
 	expiresIn    = regexp.MustCompile(`expires in (\d+)(s|m|h)\b`)
@@ -136,7 +148,7 @@ func newScan() *scan {
 // pickInput keeps only what labels need: a Write or Edit input can hold a whole file, and a scan lives with its tab.
 func pickInput(input map[string]any) map[string]any {
 	picked := map[string]any{}
-	for _, k := range []string{"description", "command", "reason", "prompt", "run_in_background", "name", "model"} {
+	for _, k := range []string{"description", "command", "reason", "prompt", "run_in_background", "name", "model", "id", "recurring"} {
 		if v, has := input[k]; has {
 			if s, ok := v.(string); ok {
 				v = jscompat.Slice(s, 200)
@@ -282,6 +294,9 @@ func (s *scan) line(line string, decoded *lineEntry, now float64) {
 			if sid, ok := stopped.(string); ok && (name == "TaskStop" || name == "KillShell" || name == "KillBash") {
 				s.finish(sid, "stopped", at)
 			}
+			if jobID, ok := input["id"].(string); ok && name == "CronDelete" {
+				s.open.del("cron-" + jobID)
+			}
 			if name == "SendMessage" && lead {
 				s.team.poke(teammateTo(input), at)
 			}
@@ -339,6 +354,14 @@ func (s *scan) result(use toolUse, useID, text string) {
 		if l, ok := workflows.ParseLaunch(text); ok {
 			s.open.set(Task{ID: l.TaskID, Kind: Workflow, Label: clip(l.Summary), StartedAt: started, RunID: l.RunID, ToolUseID: useID})
 		}
+	case use.name == "CronCreate" && cronJob.MatchString(text):
+		m := cronJob.FindStringSubmatch(text)
+		life := cronLife
+		if strings.EqualFold(m[1], "one-shot") || use.input["recurring"] == false {
+			life = cronOneShot
+		}
+		until := Ms(use.at + life)
+		s.open.set(Task{ID: "cron-" + m[2], Kind: Cron, Label: clip(use.input["prompt"]), StartedAt: started, Until: &until})
 	case use.name == "ScheduleWakeup" && wakeupIn.MatchString(text):
 		n, _ := strconv.ParseFloat(wakeupIn.FindStringSubmatch(text)[1], 64)
 		until := Ms(use.at + n*1000)

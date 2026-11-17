@@ -4,7 +4,7 @@
 // is put back the same way — only right after the chat opened and before the person did anything in it: a
 // view that comes later never moves a page the person is already in.
 import { useEffect, useRef } from 'react';
-import { forgetScreen, keepScreen, keptScreen, screenOf } from '@/next/stores/chat-screen';
+import { forgetScreen, keepScreen, keptScreen, screenOf, takeAsChat } from '@/next/stores/chat-screen';
 import { onViewApplied } from '@/next/stores/chat-view';
 import { goTo, ROUTE, type TRoute } from '@/next/routes/routes';
 
@@ -53,6 +53,11 @@ export const useChatScreen = (route: TRoute) => {
     if (was !== null && screenOf(was)?.conv === route.id) {
       left.current = route.id;
       forgetScreen(route.id);
+      return;
+    }
+    // Asked for as a chat (Главная): it stays a chat, and a view from another device does not move it either.
+    if (takeAsChat(route.id)) {
+      left.current = route.id;
       return;
     }
     const kept = keptScreen(route.id);

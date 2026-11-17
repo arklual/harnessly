@@ -24,7 +24,8 @@ import (
 // when every one of these holds at every sweep of the window:
 //
 //   - the agent is at its prompt (idle or ready), no turn, no gate, nothing queued, typed or waiting to be applied;
-//   - no background work: no subagent, command, monitor or teammate the agent waits for, no scheduled wakeup;
+//   - no background work: no subagent, command, monitor or teammate the agent waits for, no scheduled wakeup, no
+//     pending cron job (CronCreate, /loop: it lives only in the agent's session);
 //   - nobody has the chat or its terminal open (a page subscribed to it, a terminal attached to the pane);
 //   - the pane's process tree holds the agent, its helpers and shells only — no command the agent runs, nothing the
 //     person started in the pane (treeActivity);
@@ -193,7 +194,7 @@ func (c *conv) notIdle(now time.Time) string {
 		return "queue"
 	case c.rec.PendingModel != nil:
 		return "model change"
-	case c.rec.BgAgents > 0 || c.bgWake > ms(now):
+	case c.rec.BgAgents > 0 || c.bgWake > ms(now) || c.bgCrons > 0:
 		return "background"
 	}
 	for _, t := range c.bg {

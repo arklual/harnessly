@@ -247,6 +247,12 @@ type conv struct {
 	bgAt      time.Time
 	// bgWake is when the agent's scheduled wakeup comes, as the last read saw it; 0 when none is pending.
 	bgWake wire.Ms
+	// bgCrons is how many cron jobs of the agent are pending, as the last read saw it: they die with its session.
+	bgCrons int
+	// bgDeadSeen: a read found the agent not running; bgAliveSince is when a later read found it running again (0 while
+	// the runtime has seen only this process), so cron jobs made before then are not counted.
+	bgDeadSeen   bool
+	bgAliveSince wire.Ms
 	// unread: the conversation came back from a restart at rest, its transcript not read (rest.go).
 	unread bool
 	// bgOpened: a person asked for this chat's snapshot, so its ended subagents are worth reading even when its agent is

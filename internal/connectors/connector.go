@@ -214,6 +214,8 @@ type Actor interface {
 type Step struct {
 	Text Text   `json:"text"`
 	URL  string `json:"url,omitempty"`
+	// Image is a picture to show with the text, as a data: URL of a PNG (a QR code to scan with a phone).
+	Image string `json:"image,omitempty"`
 }
 
 // Stepper is a connector that may need one more step from the person after the check (a chat bound to a bot).
@@ -236,6 +238,12 @@ type Relay interface {
 // shown to the person like Check's.
 type Discoverer interface {
 	Discover(ctx context.Context, in Instance, field string) ([]Choice, error)
+}
+
+// Forgetter is a connector that undoes something outside the machine when its connection is removed (signs a linked
+// device out). Forget is best effort: the connection goes either way.
+type Forgetter interface {
+	Forget(ctx context.Context, in Instance)
 }
 
 // ActGate refuses an action of a connection before a card is shown, when this connection cannot do it at all (a

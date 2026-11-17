@@ -46,6 +46,8 @@ it stays with the previous runtime.
 | `AGENT_ENV_DIR` | `$AGENT_DATA_DIR/agent-env` | the env files agent launches source: keys, delivered secrets, the proxy (the runtime reads the same variable) |
 | `AGENT_RUNTIME_PEERS` | `<runtime base>/api/peers` | the runtime's inbox and directory of messages between machines ([hub/peers.md](hub/peers.md)) |
 | `AGENT_HUB_PEERS` | — | `on` lets an observe link (`AGENT_HUB_OBSERVE_FILE`) carry messages between machines; a hub's own machine follows the policy's `peers` |
+| `AGENT_HUB_TBOT_JOIN` | — | `on` lets an observe link carry the machine's request for a tbot join token ([hub/tbot-join.md](hub/tbot-join.md)); a hub's own machine always sends it |
+| `AGENT_TBOT_JOIN_FILE` | `~/.tbot/join.json` | the request the operator's setup wrote (`{bot, token, machine, publicKey}`); the agent writes `join-approved` beside it once the person approved |
 | `AGENT_HUB_DESIGN` | — | `on` lets an observe link keep the access to the machine's designs: the snapshot, the guest tokens and tunnels to the guest read of a shared design only ([hub/design-access.md](hub/design-access.md)) |
 | `AGENT_HUB_HISTORY` | — | `on` lets an observe link hand the machine's chats to the hub as well, beside the cluster's own copy ([hub/history.md](hub/history.md)) |
 | `AGENT_WORK_DIR` | `$RUNTIME_WORKSPACE_DIR`, else the home | the folder the agent's sign-in and status commands run in |

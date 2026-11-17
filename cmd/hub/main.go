@@ -139,6 +139,9 @@ func serve(ctx context.Context, cfg *config.Config, ready chan<- string, logOut 
 		return &diag.Problem{Code: diag.DataDirError, What: "data folder " + cfg.DataDir, Err: err,
 			Fix: "HUB_DATA_DIR must exist or be makeable, and be writable by the user the hub runs as"}
 	}
+	// The hub's own errors go to harnessly's makers like a runtime's, unless turned off (docs/self-host/telemetry.md).
+	log = withHubTelemetry(ctx, cfg, log, osGetenv)
+	slog.SetDefault(log)
 	// Connect first and migrate second, so the two failures get their own codes; StartupError stays reachable
 	// through Problem.Err for the exit code.
 	db, err := connectDB(ctx, cfg, log)
@@ -195,7 +198,7 @@ func serve(ctx context.Context, cfg *config.Config, ready chan<- string, logOut 
 	log.Info("hub started", "version", buildinfo.Version, "listen", ln.Addr().String(), "publicUrl", cfg.PublicURL,
 		"edition", cfg.Edition, "database", dbKind(cfg), "mail", mailer.Mode(), "runtime", runtimeMode(cfg))
 	for _, w := range cfg.Warnings {
-		log.Error(w)
+		log.Error(w, notReported)
 	}
 	if !cfg.SubdomainMode() {
 		log.Warn("no HUB_RUNTIME_DOMAIN: a machine's page runs on the hub's own origin, with the signed-in person's session, so connect only machines you trust as much as the hub (docs/hub/deploy.md)")

@@ -7313,6 +7313,106 @@
         }
       ]
     },
+    "tbot_joins": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "machine_name",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "host",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "bot",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "token",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "public_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "fingerprint",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "owner_email",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "state",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "decided_at",
+          "type": "BIGINT"
+        },
+        {
+          "name": "decided_by",
+          "type": "TEXT"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "tbot_joins_key",
+          "unique": true,
+          "columns": [
+            "machine_id",
+            "token",
+            "fingerprint"
+          ]
+        },
+        {
+          "name": "tbot_joins_owner",
+          "columns": [
+            "owner_email",
+            "state"
+          ]
+        },
+        {
+          "name": "tbot_joins_token",
+          "columns": [
+            "token",
+            "state"
+          ]
+        }
+      ]
+    },
     "team_members": {
       "columns": [
         {

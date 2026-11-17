@@ -436,6 +436,7 @@ export type MeMachine = {
   setup: boolean; // has the feature environment.setup; false: not «устарело», the machine cannot be set up
   current: boolean; // holds the list the hub computes for it now
   failed: number; // setup items in error or waiting for the person
+  errors?: number; // of them, the items in error: an update tries them again; absent from a hub before it
   lastRun: EnvRunRow | null;
 };
 // GET /api/me/env/machines?space=

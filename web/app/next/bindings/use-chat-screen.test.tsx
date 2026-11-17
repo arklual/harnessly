@@ -9,6 +9,7 @@ import type { TRoute } from '@/next/routes/routes';
 const goTo = vi.fn();
 let applied: (() => void) | null = null;
 let kept: TRoute | null = null;
+let asChat = false;
 vi.mock('@/next/routes/routes', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/next/routes/routes')>()),
   goTo: (...args: unknown[]) => goTo(...args),
@@ -26,6 +27,11 @@ vi.mock('@/next/stores/chat-screen', () => ({
   keepScreen: () => undefined,
   forgetScreen: () => undefined,
   keptScreen: () => kept,
+  takeAsChat: () => {
+    const was = asChat;
+    asChat = false;
+    return was;
+  },
 }));
 
 import { LATE_VIEW_MS, useChatScreen } from '@/next/bindings/use-chat-screen';
@@ -38,6 +44,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   goTo.mockClear();
   kept = null;
+  asChat = false;
 });
 afterEach(() => {
   cleanup();
@@ -71,5 +78,22 @@ describe('a chat is not moved by a view that comes late (HRN-1446)', () => {
     vi.advanceTimersByTime(100);
     viewArrives();
     expect(goTo).not.toHaveBeenCalled();
+  });
+});
+
+describe('a chat opened from Главная stays a chat', () => {
+  it('its kept screen is not put back, nor by a view that comes right after', () => {
+    kept = SCREEN;
+    asChat = true;
+    renderHook(() => useChatScreen(CHAT));
+    vi.advanceTimersByTime(200);
+    viewArrives();
+    expect(goTo).not.toHaveBeenCalled();
+  });
+
+  it('opened otherwise, it goes back to its kept screen', () => {
+    kept = SCREEN;
+    renderHook(() => useChatScreen(CHAT));
+    expect(goTo).toHaveBeenCalledWith(SCREEN, { replace: true });
   });
 });

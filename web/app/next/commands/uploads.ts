@@ -91,19 +91,28 @@ export async function keepInHub(
   m: MachineId,
   file: Blob & { name?: string },
   onProgress: (done: number, total: number) => void,
+  signal?: AbortSignal,
 ): Promise<UploadOutcome> {
+  const stop = signal ?? new AbortController().signal;
+  if (stop.aborted) return { ok: false, code: UPLOAD_FAILURE.aborted };
   if (file.size > MIRROR_MAX_BYTES) return { ok: false, code: UPLOAD_FAILURE.tooLarge };
   if (typeof crypto === 'undefined' || !crypto.subtle) return { ok: false, code: UPLOAD_FAILURE.network };
   const name = file.name || `paste-${Date.now()}.${file.type.split('/')[1] || 'bin'}`;
   const mime = file.type || 'application/octet-stream';
   try {
     const sha = hex(await crypto.subtle.digest('SHA-256', await file.arrayBuffer()));
-    const put = await fetch(`${gatewayPath(`/uploads/blobs/${sha}`)}?machine=${encodeURIComponent(m)}`, {
-      method: 'PUT',
-      body: file,
-      credentials: 'same-origin',
-    });
-    if (!put.ok) return { ok: false, code: UPLOAD_FAILURE.http };
+    const put = await exchangeAt(
+      `${gatewayPath(`/uploads/blobs/${sha}`)}?machine=${encodeURIComponent(m)}`,
+      'PUT',
+      {
+        body: file,
+        signal: stop,
+        onSent: (done) => onProgress(done, file.size),
+      },
+    );
+    if (put === 'aborted') return { ok: false, code: UPLOAD_FAILURE.aborted };
+    if (put === null) return { ok: false, code: UPLOAD_FAILURE.network };
+    if (put.status < 200 || put.status >= 300) return { ok: false, code: UPLOAD_FAILURE.http };
     onProgress(file.size, file.size);
     return {
       ok: true,
@@ -201,18 +210,19 @@ const record = (v: unknown): Record<string, unknown> =>
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
+interface UploadRequest {
+  headers?: Record<string, string>;
+  json?: unknown;
+  body?: Blob;
+  signal: AbortSignal;
+  onSent?: (n: number) => void;
+}
+
 /** One request; null when there was no answer (a break, or silence for IDLE_MS) and `aborted` when the signal ended it. */
-const exchange = (
-  m: MachineId,
-  method: 'POST' | 'PATCH' | 'HEAD',
-  path: `/${string}`,
-  init: {
-    headers?: Record<string, string>;
-    json?: unknown;
-    body?: Blob;
-    signal: AbortSignal;
-    onSent?: (n: number) => void;
-  },
+const exchangeAt = (
+  url: string,
+  method: 'POST' | 'PATCH' | 'HEAD' | 'PUT',
+  init: UploadRequest,
 ): Promise<IAnswer | null | 'aborted'> =>
   new Promise((resolve) => {
     if (init.signal.aborted) {
@@ -220,7 +230,7 @@ const exchange = (
       return;
     }
     const xhr = new XMLHttpRequest();
-    xhr.open(method, machineApi(m).http(path));
+    xhr.open(method, url);
     xhr.setRequestHeader(DEVICE_HEADER, deviceId());
     if (init.json !== undefined) xhr.setRequestHeader('Content-Type', 'application/json');
     for (const [name, value] of Object.entries(init.headers ?? {})) xhr.setRequestHeader(name, value);
@@ -259,6 +269,9 @@ const exchange = (
     arm();
     xhr.send(init.json === undefined ? (init.body ?? null) : JSON.stringify(init.json));
   });
+
+const exchange = (m: MachineId, method: 'POST' | 'PATCH' | 'HEAD', path: `/${string}`, init: UploadRequest) =>
+  exchangeAt(machineApi(m).http(path), method, init);
 
 const pause = (ms: number, signal: AbortSignal) =>
   new Promise<void>((resolve) => {

@@ -303,7 +303,7 @@
   "next.settings.general.paneAuto.artifacts": "Документы и доски",
   "next.settings.general.paneAuto.artifacts.hint": "То, что агент публикует; при новой версии открытая вкладка обновится",
   "next.settings.general.paneAuto.browser": "Браузер агента",
-  "next.settings.general.paneAuto.browser.hint": "Когда агент работает на сайте",
+  "next.settings.general.paneAuto.browser.hint": "Когда агент работает на сайте или показывает стенд. По умолчанию выключено: стенд открывается по клику на карточку",
   "next.settings.general.paneAuto.files": "Файлы, которые он отдаёт",
   "next.settings.general.paneAuto.files.hint": "Файл, который агент вам отдал, кроме скачивания открывается рядом с чатом",
   "next.settings.links": "Ссылки из чата",

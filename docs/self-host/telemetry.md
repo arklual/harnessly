@@ -9,10 +9,12 @@ sends nothing: the address is linked into release builds only.
 | Event | When | Properties |
 | --- | --- | --- |
 | `$exception` | an error of harnessly itself: its page (`web`), the runtime (`runtime`), Sinopia (`sinopia`) | where it was seen and what happened (`web.exception`, `runtime.http`, …), the message with every address, e-mail, home folder, IP address, id, token and long number masked and cut to 300 characters, the HTTP status |
-| `harnessly_heartbeat` | at start and once a day | hours since start, whether `claude` and `codex` are installed |
+| `$exception` | an error of the hub (`hub`): a line of its log at the error level, a handler's panic | what happened (`hub.http`, `hub.panic`, `hub.log`), the message and its error masked the same way, the route template (`/api/v2/chats/{id}`) and the method; never the person, the organization or the address of the hub |
+| `harnessly_heartbeat` | at start and once a day | hours since start; on a runtime, whether `claude` and `codex` are installed |
 
-Every event also carries the version, the operating system, the architecture, the mode (`standalone` or `cluster`) and
-a random install id kept in `<data dir>/telemetry.json`. No person profile is made. An error with the same message goes
+Every event also carries the version, the operating system, the architecture, the mode (`standalone`, `cluster` or
+`hub`; a hub adds its edition and database kind, `sqlite` or `postgres`) and a random install id kept in
+`<data dir>/telemetry.json` (`HUB_DATA_DIR` for a hub). No person profile is made. An error with the same message goes
 once an hour; at most 60 different errors an hour go.
 
 Never sent: your chats, prompts, files, terminal output, the names of your projects, folders or machines, e-mail
@@ -28,8 +30,9 @@ Any of these, the first that says off wins:
 | the environment | `HARNESSLY_TELEMETRY=off` or `RUNTIME_TELEMETRY=off` (also `0`, `false`, `no`), or [`DO_NOT_TRACK=1`](https://consoledonottrack.com) |
 | the page | Settings → Privacy → «Send anonymous error reports» (kept in `<data dir>/telemetry.json`) |
 
-Turning it off on the page also forgets the install id: turned on again, the machine is a new one. The runtime logs on
-start whether telemetry is on and how to turn it off. Off also stops the deployment's own reports
+Turning it off on the page also forgets the install id: turned on again, the machine is a new one. The runtime and the
+hub log on start whether telemetry is on and how to turn it off. A hub has no page switch: set
+`HARNESSLY_TELEMETRY=off` or `DO_NOT_TRACK=1` in its environment (the Helm chart's `env`). Off also stops the deployment's own reports
 (`RUNTIME_TELEMETRY_URL`, `RUNTIME_JOURNAL_EXPORT=telemetry`).
 
 Official builds send to `https://t.harnessly.ru/batch/` and nowhere else, so a firewall rule on that host is a

@@ -138,6 +138,26 @@ describe('ConnectorsSection', () => {
     expect(link.getAttribute('href')).toBe('https://t.me/my_bot?start=abc');
   });
 
+  it('shows the QR code of a step, and only a PNG of its own', () => {
+    const png = 'data:image/png;base64,iVBORw0KGgo=';
+    const step = (image: string) =>
+      readConnectorConn({
+        id: 'cx3',
+        connector: 'telegram-account',
+        kind: 'chat',
+        name: 'Telegram',
+        account: 'Telegram',
+        state: 'ok',
+        next: { text: { en: 'Scan the code in Telegram' }, image },
+      });
+    const { container, unmount } = render(<ConnectorsSection {...props({ connections: [step(png)] })} />);
+    expect(screen.getByText('Scan the code in Telegram')).toBeTruthy();
+    expect(container.querySelector('img.hx-cx-row__qr')?.getAttribute('src')).toBe(png);
+    unmount();
+    const other = render(<ConnectorsSection {...props({ connections: [step('https://example.com/x.png')] })} />);
+    expect(other.container.querySelector('img.hx-cx-row__qr')).toBeNull();
+  });
+
   it('shows the fields of the chosen way only, finds the calendars and connects the picked ones', async () => {
     const calendar = readSpec({
       id: 'caldav',

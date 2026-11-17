@@ -174,6 +174,14 @@ type Waker interface {
 	Wakeup(c wire.Conversation) wire.Ms
 }
 
+// CronKeeper is a Background that also knows the agent's pending cron jobs (Claude Code's CronCreate, /loop with an
+// interval). They live only in the agent's session: a chat that holds one is not stopped for standing idle.
+type CronKeeper interface {
+	// Crons is how many of the agent's cron jobs made since since (epoch ms; 0: any) are still pending. A job made
+	// before the agent's process last started died with the process before it.
+	Crons(c wire.Conversation, since wire.Ms) int
+}
+
 // Closer ends a conversation's pane and its tab: what a deleted conversation leaves behind.
 type Closer interface {
 	// Close kills the tmux session of the conversation and removes its tab from the layout; it returns once both are done.

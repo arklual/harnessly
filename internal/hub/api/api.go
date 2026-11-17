@@ -63,6 +63,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hub/storehub"
 	"github.com/ly-solutions/harnessly/internal/hub/switches"
+	"github.com/ly-solutions/harnessly/internal/hub/tbotjoin"
 	"github.com/ly-solutions/harnessly/internal/hub/tenant"
 	"github.com/ly-solutions/harnessly/internal/hub/ticket"
 	"github.com/ly-solutions/harnessly/internal/hub/usage"
@@ -165,7 +166,9 @@ type Hub struct {
 	// Design is who may see and change a machine's designs, and the guest links to them.
 	Design *designaccess.Service
 	// Notices keeps the person's notices in the hub's database, behind the switch hub-notices.
-	Notices  *noticehub.Service
+	Notices *noticehub.Service
+	// TbotJoin gives the machines the join tokens of their Teleport identities once the person approved.
+	TbotJoin *tbotjoin.Service
 	Dist     *dist.Handler
 	SSH      *sshinstall.Service
 	Dialer   *link.Dialer
@@ -459,10 +462,31 @@ func New(o Options) (*Hub, error) {
 			h.historySweep = history.NewSweeper(history.SweepDeps{DB: db, Log: log, Now: o.Now, Keep: cfg.HistoryDeletedKeep})
 		}
 	}
+	h.TbotJoin = tbotjoin.New(tbotjoin.Deps{
+		DB: db, On: cfg.TbotJoin.On, Gate: tbotjoin.GateFunc(func(ctx context.Context, feature, person, machine string) bool {
+			return h.Switches != nil && h.Switches.On(ctx, feature, person, machine)
+		}),
+		Reg: h.Registry, Require: h.Auth.Require, Log: log, Now: o.Now,
+		Cluster: &tbotjoin.Kube{URL: cfg.TbotJoin.KubeURL, Namespace: cfg.TbotJoin.Namespace, TokenFile: cfg.TbotJoin.TokenFile, CAFile: cfg.TbotJoin.CAFile},
+		MayOpen: func(ctx context.Context, userID, machineID string) error {
+			m, err := h.Machines.Authorize(ctx, userID, machineID, false)
+			if err != nil {
+				return err
+			}
+			if !h.Machines.Visible(ctx, userID, m) {
+				return httpx.ErrNotFound
+			}
+			return nil
+		},
+		Bell: func(ctx context.Context, machineID, email, key, title, text, link string) {
+			h.Notices.Ring(ctx, machineID, email, key, title, text, link)
+		},
+		Link: strings.TrimRight(cfg.PublicURL, "/") + "/",
+	})
 	h.Machines = machines.New(machines.Deps{
 		Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Limiter: o.Limiter, Log: log, Now: o.Now,
 		OnRevoked: func(machineID string) { px.Forget(machineID) }, Usage: usageSink, Budget: budgetSink, Env: envSink,
-		Provider: prov, Features: machineFeatures, Publisher: o.Publisher, Design: h.Design, Projects: &projreg.Service{DB: db, Log: log, Now: o.Now}, Docs: h.Docs, Proposals: h.Env, Automations: h.Automations,
+		Provider: prov, Features: machineFeatures, Publisher: o.Publisher, Design: h.Design, Projects: &projreg.Service{DB: db, Log: log, Now: o.Now}, Docs: h.Docs, Proposals: h.Env, TbotJoin: h.TbotJoin, Automations: h.Automations,
 		History: historySink, Switches: h.Switches, Notice: noticeOf(o.Mailer),
 	})
 	h.Analytics.UseMachines(h.Machines)
@@ -594,6 +618,7 @@ func New(o Options) (*Hub, error) {
 	h.Analytics.Mount(mux)
 	h.Env.Mount(mux)
 	h.Machines.Mount(mux)
+	h.TbotJoin.Mount(mux)
 	h.Docs.Mount(mux)
 	h.Efficiency.Mount(mux)
 	h.Automations.Mount(mux)

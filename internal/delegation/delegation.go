@@ -139,6 +139,12 @@ func refuse(code, format string, a ...any) error {
 	return &Refusal{Code: code, Msg: fmt.Sprintf(format, a...)}
 }
 
+// isRefusal says err is a refusal with the code.
+func isRefusal(err error, code string) bool {
+	var r *Refusal
+	return errors.As(err, &r) && r.Code == code
+}
+
 func (s *Service) now() time.Time {
 	if s.Now != nil {
 		return s.Now()
@@ -232,6 +238,26 @@ func (s *Service) target(caller wire.Conversation, id string) (wire.Conversation
 	}
 	if !s.descends(id, caller.ID) && !s.settings().AnyChat {
 		return wire.Conversation{}, refuse("not-allowed", "chat %s was not delegated by this agent, nor is it this chat's parent or a chat delegated beside it; the person has not let agents write to other chats", id)
+	}
+	return rec, nil
+}
+
+// readable is a chat the caller may read: any chat of this machine but its own (GitHub #86). Reading needs
+// no delegation: the person sees every chat of the machine in the sidebar, and the agent runs as the same user as the
+// transcripts on its disk, so a read gives the agent nothing the person has not. Writing and waiting stay with target.
+func (s *Service) readable(caller wire.Conversation, id string) (wire.Conversation, error) {
+	if id == ParentAlias {
+		if caller.ParentID == nil {
+			return wire.Conversation{}, refuse("not-allowed", "this chat was not delegated, so it has no parent")
+		}
+		id = *caller.ParentID
+	}
+	if id == caller.ID {
+		return wire.Conversation{}, refuse("not-allowed", "that is this agent's own chat")
+	}
+	rec, ok := s.Convs.Record(id)
+	if !ok {
+		return wire.Conversation{}, refuse("not-found", "no chat %s on this machine", id)
 	}
 	return rec, nil
 }
@@ -564,15 +590,19 @@ func (s *Service) Read(ctx context.Context, callerID, id, since string, limit in
 	return s.ReadPage(ctx, callerID, id, since, "", limit)
 }
 
-// ReadPage also accepts the hub's older-page cursor. Since remains the local runtime's entry cursor.
+// ReadPage also accepts the hub's older-page cursor. Since remains the local runtime's entry cursor. callerID is "" for
+// `harnessly chat read` run in a plain terminal of the machine, which is no chat's.
 func (s *Service) ReadPage(ctx context.Context, callerID, id, since, before string, limit int) (string, error) {
-	caller, err := s.caller(callerID)
-	if err != nil {
-		return "", err
+	var caller wire.Conversation
+	if callerID != "" {
+		var err error
+		if caller, err = s.caller(callerID); err != nil {
+			return "", err
+		}
 	}
-	rec, err := s.target(caller, id)
+	rec, err := s.readable(caller, id)
 	if err != nil {
-		if s.CentralRead != nil {
+		if s.CentralRead != nil && isRefusal(err, "not-found") {
 			if since != "" {
 				return "", refuse("bad-request", "since only reads a local chat; use before for a hub history page")
 			}
@@ -580,7 +610,7 @@ func (s *Service) ReadPage(ctx context.Context, callerID, id, since, before stri
 			if centralErr == nil {
 				return text, nil
 			}
-			return "", refuse("hub-unavailable", "%v", centralErr)
+			return "", refuse("hub-unavailable", "no chat %s on this machine, and the hub's history did not give it: %v", id, centralErr)
 		}
 		return "", err
 	}
@@ -589,9 +619,9 @@ func (s *Service) ReadPage(ctx context.Context, callerID, id, since, before stri
 	}
 	var snap wire.ConvSnapshot
 	if since == "" {
-		snap, err = s.Convs.Conversation(ctx, id)
+		snap, err = s.Convs.Conversation(ctx, rec.ID)
 	} else {
-		snap, err = s.Convs.ConversationAfter(ctx, id, since)
+		snap, err = s.Convs.ConversationAfter(ctx, rec.ID, since)
 	}
 	if err != nil {
 		return "", refuse("unavailable", "the chat did not answer: %v", err)
@@ -702,6 +732,8 @@ const (
 	Ended Outcome = "ended"
 	// Timeout: the agent still works.
 	Timeout Outcome = "timeout"
+	// Limited: the agent stands on its plan's usage limit until it resets (only a wake-up says it).
+	Limited Outcome = "limited"
 )
 
 // outcome is where the chat stands for the one waiting on it: "" while it works on what it was given at asked.
@@ -843,6 +875,12 @@ func (s *Service) Observe(rec wire.Conversation) {
 	}
 	s.deliverHeld(rec, page)
 	o := outcome(rec, page.AskedAt)
+	// A chat held on its usage limit stands still until the reset, days for a weekly one: its parent hears it once, so
+	// it can give the work to another chat instead of waiting in silence.
+	if rec.Limited != nil && page.Notify {
+		at := rec.Limited.At
+		s.wake(rec, page, fmt.Sprintf("limit:%d", int64(at)), Result{Conv: rec, Outcome: Limited})
+	}
 	var held bool
 	if o == Done && rec.LastTurn != nil {
 		var proceed bool
@@ -868,24 +906,45 @@ func (s *Service) Observe(rec wire.Conversation) {
 	switch o {
 	case Done:
 		key = "turn:" + rec.LastTurn.ID
+	case NeedsPerson:
+		if rec.Limited != nil {
+			return // the queue waits for the limit's reset, which the parent was told of above
+		}
+		// A question, a permission or a paused queue: the chat stands still until someone answers, and its parent may
+		// know the answer or tell the person.
+		key = "need:" + string(rec.State.K)
+		if rec.Gate != nil {
+			key += ":" + rec.Gate.ID
+		} else if rec.Queue.Paused != nil {
+			key += ":paused"
+		}
+		if rec.LastTurn != nil {
+			key += ":" + rec.LastTurn.ID
+		}
 	case Ended:
-		// A terminal stopped (by the person, or for standing idle) is no news; an agent that died or never started is,
-		// unless its last turn was already reported.
-		if rec.State.K == wire.StateStopped || rec.LastTurn != nil && page.Woken == "turn:"+rec.LastTurn.ID {
+		// A terminal stopped on purpose (by the person, or for standing idle) is no news; an agent that died, never
+		// started or stopped on its own (its terminal fell off) is, unless its last turn was already reported.
+		if rec.State.K == wire.StateStopped && rec.TerminalStop != nil || rec.LastTurn != nil && page.Woken == "turn:"+rec.LastTurn.ID {
 			return
 		}
 		key = "end:" + string(rec.State.K)
 	default:
 		return
 	}
-	parent, ok := s.Convs.Record(*rec.ParentID)
-	if !ok || !s.Book.claim(rec.ID, key, MaxWakes) {
-		return
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	r := s.result(ctx, rec, o)
 	r.GaveUp, r.Held = page.GaveUp, held
+	s.wake(rec, page, key, r)
+}
+
+// wake tells the parent of a delegated chat what r says, once for key and at most MaxWakes times. A message the parent
+// did not take gives the claim back, so the next sweep tries again instead of losing the news.
+func (s *Service) wake(rec wire.Conversation, page Page, key string, r Result) {
+	parent, ok := s.Convs.Record(*rec.ParentID)
+	if !ok || !s.Book.claim(rec.ID, key, MaxWakes) {
+		return
+	}
 	text := wakeText(r)
 	if p, _ := s.Book.Get(rec.ID); p.Wakes >= MaxWakes {
 		text += fmt.Sprintf("\n\nThis chat has woken you %d times, the most it may: it will not wake you again. Use wait_conversation from now on.", MaxWakes)
@@ -894,11 +953,16 @@ func (s *Service) Observe(rec wire.Conversation) {
 	// of an hour of work reads it at its next step, not when that hour ends. A question goes there whatever was chosen:
 	// the child stands still until it is answered.
 	how := DeliverDefault
-	if r.Marker == MarkQuestion {
+	if r.Marker == MarkQuestion || r.Outcome == NeedsPerson {
 		how = deliverStep
 	}
-	if _, res := s.deliver(ctx, rec, parent.ID, text, how); res.R == wire.ResultRefused && s.Log != nil {
-		s.Log("delegation: the parent was not woken", "parent", parent.ID, "child", rec.ID, "code", string(res.Code))
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if _, res := s.deliver(ctx, rec, parent.ID, text, how); res.R == wire.ResultRefused {
+		s.Book.unclaim(rec.ID, key, page.Woken)
+		if s.Log != nil {
+			s.Log("delegation: the parent was not woken", "parent", parent.ID, "child", rec.ID, "code", string(res.Code))
+		}
 	}
 }
 

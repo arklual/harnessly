@@ -725,6 +725,8 @@
   "next.turnMade.share": "Поделиться",
   "next.turnMade.copyUrl": "Скопировать адрес",
   "next.turnMade.copied": "Адрес скопирован",
+  "next.turnMade.standPages": "Один стенд, разные страницы",
+  "next.turnMade.openPage": "Открыть справа",
   "next.turnMade.copyId": "Скопировать ID",
   "next.turnMade.copyIds": "Скопировать список ID",
   "next.turnMade.idCopied": "ID скопирован",

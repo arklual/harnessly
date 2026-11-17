@@ -28,6 +28,7 @@ type fakeConvs struct {
 	sent     map[string][]string // the texts DeliverPeer queued, by conversation
 	told     map[string][]string // the texts the platform sent a chat with Do (reminders), by conversation
 	queued   bool                // DeliverPeer answers queued: the agent is starting
+	refuse   bool                // DeliverPeer refuses every message
 	stopped  []string            // the chats whose running turn was interrupted (Escape)
 	steers   map[string][]bool   // whether each of them was steered into the running turn, by conversation
 	atOnce   map[string][]bool   // whether each of them was marked urgent (DeliverPeerAtOnce), by conversation
@@ -161,7 +162,7 @@ func (f *fakeConvs) deliver(conv, clientID, text string, steer, atOnce bool) wir
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	rec, ok := f.recs[conv]
-	if !ok || !strings.HasPrefix(clientID, "peer-") {
+	if !ok || !strings.HasPrefix(clientID, "peer-") || f.refuse {
 		return wire.Refused(wire.RefuseNotFound)
 	}
 	if f.steers == nil {
@@ -363,7 +364,7 @@ func TestDelegationLimits(t *testing.T) {
 	if text, isErr := delegate(grandchild); !isErr || !strings.Contains(text, "too-deep") {
 		t.Fatalf("third level: %s", text)
 	}
-	// The root reads its grandchild; the grandchild cannot read the root, nor a sibling's chat.
+	// The root reads its grandchild; the grandchild cannot write to the root, nor to a stranger's chat.
 	if text, isErr := r.call("tab-root", "read_conversation", map[string]any{"id": grandchild}); isErr {
 		t.Fatalf("grandchild: %s", text)
 	}
@@ -375,6 +376,29 @@ func TestDelegationLimits(t *testing.T) {
 		t.Fatalf("not a chat link: %s", text)
 	}
 	r.convs.add(wire.Conversation{ID: "tab-other", Title: "The person's own", Provider: wire.ProviderClaude})
+	// reading needs no delegation — any chat of the machine reads, under the person's rights, by id, by its
+	// link, as "parent", and from a terminal that is no chat's; only the agent's own chat does not.
+	if text, isErr := r.call(child, "read_conversation", map[string]any{"id": "tab-other"}); isErr || !strings.HasPrefix(text, "tab-other «") {
+		t.Fatalf("a delegated chat reads a stranger: %s", text)
+	}
+	if text, isErr := r.call(grandchild, "read_conversation", map[string]any{"id": "https://ai.example.com/c/tab-root"}); isErr || !strings.HasPrefix(text, "tab-root «") {
+		t.Fatalf("grandchild reads the root by its link: %s", text)
+	}
+	if text, err := r.svc.ReadPage(context.Background(), "", "tab-other", "", "", 0); err != nil || !strings.HasPrefix(text, "tab-other «") {
+		t.Fatalf("a plain terminal reads: %v %s", err, text)
+	}
+	if text, isErr := r.call(grandchild, "read_conversation", map[string]any{"id": "parent"}); isErr {
+		t.Fatalf("grandchild reads its parent: %s", text)
+	}
+	if text, isErr := r.call("tab-root", "read_conversation", map[string]any{"id": "parent"}); !isErr || !strings.Contains(text, "no parent") {
+		t.Fatalf("parent of a chat the person started: %s", text)
+	}
+	if text, isErr := r.call(child, "read_conversation", map[string]any{"id": child}); !isErr || !strings.Contains(text, "own chat") {
+		t.Fatalf("reads itself: %s", text)
+	}
+	if text, isErr := r.call(child, "read_conversation", map[string]any{"id": "tab-nowhere"}); !isErr || !strings.Contains(text, "not-found") {
+		t.Fatalf("a chat that is nowhere: %s", text)
+	}
 	if text, isErr := r.call(grandchild, "send_to_conversation", map[string]any{"id": "tab-root", "text": "hi"}); !isErr || !strings.Contains(text, "not-allowed") {
 		t.Fatalf("grandchild to root: %s", text)
 	}
@@ -596,14 +620,69 @@ func TestAChatHeldOnItsLimitIsNotReminded(t *testing.T) {
 	if told := r.convs.told[child]; len(told) != 0 {
 		t.Fatalf("a held chat was reminded: %v", told)
 	}
-	if len(r.convs.sent["tab-root"]) != 0 {
-		t.Fatalf("a held chat woke the parent: %v", r.convs.sent["tab-root"])
+	// The parent hears of the hold once, not in silence for days.
+	if woken := r.convs.sent["tab-root"]; len(woken) != 1 || !strings.Contains(woken[0], "usage limit") {
+		t.Fatalf("the parent of a held chat: %v", woken)
 	}
 	r.convs.finish(child, "Done after the reset.\n\n"+MarkDone)
 	r.svc.Observe(mustRecord(t, r.convs, child))
 	r.svc.Observe(mustRecord(t, r.convs, child))
-	if len(r.convs.sent["tab-root"]) != 1 {
+	if len(r.convs.sent["tab-root"]) != 2 {
 		t.Fatalf("wake-ups after the reset: %v", r.convs.sent["tab-root"])
+	}
+}
+
+// A chat that stands waiting for an answer (a question, a permission) wakes its parent once.
+func TestAChatWaitingForAnAnswerWakesTheParent(t *testing.T) {
+	r := newTestRig(t)
+	child := r.delegated(map[string]any{"notify": true})
+	rec := r.convs.finish(child, "Which database?")
+	rec.State.K = wire.StateWaitingQuestion
+	rec.Gate = &wire.GateRef{Kind: wire.GateQuestion, ID: "g1"}
+	r.convs.add(rec)
+	r.svc.Observe(rec)
+	r.svc.Observe(rec)
+	if woken := r.convs.sent["tab-root"]; len(woken) != 1 || !strings.Contains(woken[0], "waiting for an answer") {
+		t.Fatalf("wake-ups: %v", woken)
+	}
+}
+
+// An agent that stopped by itself (its terminal fell off) is news; one stopped on purpose is not.
+func TestAnAgentThatStoppedByItselfWakesTheParent(t *testing.T) {
+	for _, onPurpose := range []bool{false, true} {
+		r := newTestRig(t)
+		child := r.delegated(map[string]any{"notify": true})
+		rec := mustRecord(t, r.convs, child)
+		rec.State.K = wire.StateStopped
+		if onPurpose {
+			rec.TerminalStop = &wire.TerminalStop{By: wire.TerminalStopBy("idle")}
+		}
+		r.convs.add(rec)
+		r.svc.Observe(rec)
+		if got, want := len(r.convs.sent["tab-root"]), map[bool]int{false: 1, true: 0}[onPurpose]; got != want {
+			t.Fatalf("on purpose %v: %d wake-ups, want %d: %v", onPurpose, got, want, r.convs.sent["tab-root"])
+		}
+	}
+}
+
+// A wake-up the parent did not take is tried again at the next look, not lost.
+func TestARefusedWakeUpIsTriedAgain(t *testing.T) {
+	r := newTestRig(t)
+	child := r.delegated(map[string]any{"notify": true})
+	r.convs.finish(child, "All done.\n\n"+MarkDone)
+	r.convs.mu.Lock()
+	r.convs.refuse = true
+	r.convs.mu.Unlock()
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	if len(r.convs.sent["tab-root"]) != 0 {
+		t.Fatal("a refused message was counted as sent")
+	}
+	r.convs.mu.Lock()
+	r.convs.refuse = false
+	r.convs.mu.Unlock()
+	r.svc.Observe(mustRecord(t, r.convs, child))
+	if woken := r.convs.sent["tab-root"]; len(woken) != 1 || !strings.Contains(woken[0], "finished its turn") {
+		t.Fatalf("after the refusal: %v", woken)
 	}
 }
 
@@ -852,14 +931,19 @@ func TestConversationRef(t *testing.T) {
 	for ref, want := range map[string]string{
 		"tab-abc":    "tab-abc",
 		" tab-abc\n": "tab-abc",
-		"https://hub.example.com/agents/c/tab-abc":  "tab-abc",
-		"https://hub.example.com/agents/c/tab-abc/": "tab-abc",
+		"https://hub.example.com/agents/c/tab-abc":                  "tab-abc",
+		"https://hub.example.com/agents/c/tab-abc/":                 "tab-abc",
+		"https://ai.example.com/c/tab-abc":                          "tab-abc",
+		"https://hub.example.com/m/mach-1/c/tab-abc":                "tab-abc",
+		"https://hub.example.com/designly/d1?chat=tab-abc":          "tab-abc",
+		"https://hub.example.com/apps/inbox?chat=tab-abc&o=item-12": "tab-abc",
 	} {
 		if got, err := ConversationRef(ref); err != nil || got != want {
 			t.Errorf("%q: %q, %v", ref, got, err)
 		}
 	}
-	for _, ref := range []string{"", "abc", "https://hub.example.com/agents/tab-abc", "https://hub.example.com/agents/c/x", "tab-a b"} {
+	for _, ref := range []string{"", "abc", "https://hub.example.com/agents/tab-abc", "https://hub.example.com/agents/c/x", "tab-a b",
+		"https://hub.example.com/designly/d1", "https://hub.example.com/apps/x?chat=../etc", "https://hub.example.com/c/tab-a%2Fb"} {
 		if got, err := ConversationRef(ref); err == nil {
 			t.Errorf("%q accepted as %q", ref, got)
 		}

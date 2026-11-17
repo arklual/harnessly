@@ -4,6 +4,7 @@
 // window of its own; the page asks for the day again when that window closes.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { openConversation } from '@/next/features/app-views/agents';
+import { openAsChat } from '@/next/stores/chat-screen';
 import { cardChatOf, chatOf, itemChatOf, runChatOf } from '@/next/features/day/chat-link';
 import { conversationsStore } from '@/next/stores/conversations';
 import { useHomeReset } from '@/next/stores/new-chat';
@@ -332,6 +333,7 @@ const DayStage = ({ app, feed, onGreet, clockNow = Date.now, machine = null, onT
     const conv = runChatOf(named);
     if (conv === null) return false;
     if (conversationsStore.has(conv)) {
+      openAsChat(conv);
       openConversation(conv);
       return true;
     }
@@ -473,6 +475,7 @@ const DayStage = ({ app, feed, onGreet, clockNow = Date.now, machine = null, onT
   const openChat = (named: IActResult & { chat?: string }) => {
     const chat = chatOf(named);
     if (chat !== null) {
+      openAsChat(chat);
       openConversation(chat);
       return;
     }

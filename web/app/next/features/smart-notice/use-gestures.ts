@@ -49,7 +49,12 @@ export interface IGestureEnd {
 /** A move shorter than this is a press, not a gesture. */
 export const SLOP_PX = 8;
 const HIDE_SHARE = 0.35;
-const OPEN_PX = 36;
+/** A pull this far away from the edge opens the plate: twice the fold's, so a scroll of the chat that
+ *  passes over the plate does not open it by chance. */
+const OPEN_PX = 80;
+/** A flick opens only this fast and this far: a scroll's short throw does not. */
+const OPEN_FLICK = 0.9;
+const OPEN_FLICK_PX = 32;
 const FOLD_PX = 40;
 const PAGE_PX = 28;
 const FLICK = 0.45;
@@ -82,7 +87,7 @@ export const settleGesture = (g: IGestureEnd): TGesture => {
     if (-away > PAGE_PX || (-speed > FLICK && -away > SLOP_PX)) return GESTURE.prev;
     return GESTURE.back;
   }
-  if (!g.open && (away > OPEN_PX || (speed > FLICK && away > SLOP_PX * 1.5))) return GESTURE.open;
+  if (!g.open && (away > OPEN_PX || (speed > OPEN_FLICK && away > OPEN_FLICK_PX))) return GESTURE.open;
   if (-away > FOLD_PX || (-speed > FLICK && -away > SLOP_PX * 2)) return GESTURE.fold;
   return GESTURE.back;
 };

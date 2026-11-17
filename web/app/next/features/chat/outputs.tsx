@@ -8,7 +8,7 @@ import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
 import DeliveryCard from '@/next/features/chat/delivery-card';
 import { PictureCards } from '@/next/features/chat/pictures';
-import { LINK_ICON, linkOf, viewOf, type ILinkOutput } from '@/next/features/chat/link-output';
+import { LINK, LINK_ICON, linkOf, viewOf, type ILinkOutput } from '@/next/features/chat/link-output';
 import { usePortUp } from '@/next/features/chat/port-up';
 import OutputRow from '@/next/features/chat/output-row';
 import Made from '@/next/features/chat/made';
@@ -125,11 +125,35 @@ const linksAmong = (
   outputs: readonly TurnOutput[],
   context: IOutputsContext,
 ): { output: TurnOutput; link: ILinkOutput }[] =>
-  outputs.flatMap((output) => {
-    if (!context.shown[output.kind] || output.kind === 'delivery') return [];
-    const link = linkOf(output, appConfig());
-    return link ? [{ output, link }] : [];
+  mergeStands(
+    outputs.flatMap((output) => {
+      if (!context.shown[output.kind] || output.kind === 'delivery') return [];
+      const link = linkOf(output, appConfig());
+      return link ? [{ output, link }] : [];
+    }),
+  );
+
+/**
+ * One stand, one card: the pages of the same stand the turn named (its root and /adminpanel/analytics) are the
+ * addresses of the first card, one under the other, not cards of their own.
+ */
+export const mergeStands = (
+  links: { output: TurnOutput; link: ILinkOutput }[],
+): { output: TurnOutput; link: ILinkOutput }[] => {
+  const byHost = new Map<string, ILinkOutput>();
+  return links.flatMap((made) => {
+    if (made.link.kind !== LINK.stand) return [made];
+    const first = byHost.get(made.link.key);
+    if (!first) {
+      const link = { ...made.link, more: [] };
+      byHost.set(link.key, link);
+      return [{ output: made.output, link }];
+    }
+    const more = first.more ?? [];
+    if (first.url !== made.link.url && !more.includes(made.link.url)) first.more = [...more, made.link.url];
+    return [];
   });
+};
 
 /** The cards of a turn that are no links: its outputs of the kinds shown, then its plain files when they are. */
 export const cardsOf = (item: TurnItem, context: IOutputsContext): ICard[] =>

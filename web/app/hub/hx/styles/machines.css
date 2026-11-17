@@ -84,7 +84,8 @@
   animation-delay: 0.36s;
 }
 /* a failed load: one row with the retry */
-.hb .mx-err {
+.hb .mx-err,
+.hb .mx-join {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -95,7 +96,8 @@
   color: var(--hx-fg-2);
   font-size: var(--hx-text-sm);
 }
-.hb .mx-err span {
+.hb .mx-err span,
+.hb .mx-join span {
   flex: 1;
   min-width: 0;
 }

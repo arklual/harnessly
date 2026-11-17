@@ -296,7 +296,10 @@ Exit codes: 0 done, 1 refused or failed (the reason is printed), 2 wrong usage.
 
 var commandHelp = map[string]string{
 	"chat": `harnessly chat read ID|URL [--before TURN] [-n N]
-    Read the owner's synchronised central history by id or hub URL. --before reads the older page.
+    Read another chat of the person's as a transcript, by its id (tab-…) or the link they dropped into this chat
+    (https://<hub>/agents/c/tab-…, …/c/tab-…, …?chat=tab-…): any chat of this machine, without the page's sign-in; a
+    chat of another machine from the hub's history. -n is how many entries (1–100, 40 by default); --before reads
+    the older page of a hub history. MCP: read_conversation with the same id or link.
 
 harnessly chat test ID|current [--off]
 harnessly chat delete ID

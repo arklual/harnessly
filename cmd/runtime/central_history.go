@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
@@ -17,25 +15,8 @@ import (
 
 const centralHistoryTimeout = 20 * time.Second
 
-// centralConversationID accepts the stable hub URL as well as the raw conversation id.
-func centralConversationID(ref string) (string, error) {
-	ref = strings.TrimSpace(ref)
-	if u, err := url.Parse(ref); err == nil && u.Scheme != "" && u.Host != "" {
-		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
-		if len(parts) == 3 && parts[0] == "agents" && parts[1] == "c" {
-			ref = parts[2]
-		} else {
-			return "", fmt.Errorf("not a hub conversation URL")
-		}
-	}
-	if !strings.HasPrefix(ref, "tab-") || len(ref) > 200 || strings.ContainsAny(ref, "/?# ") {
-		return "", fmt.Errorf("not a conversation id or hub conversation URL")
-	}
-	return ref, nil
-}
-
 func (v *v2Live) centralHistoryRead(ctx context.Context, ref, before string, limit int) (string, error) {
-	id, err := centralConversationID(ref)
+	id, err := delegation.ConversationRef(ref)
 	if err != nil {
 		return "", err
 	}

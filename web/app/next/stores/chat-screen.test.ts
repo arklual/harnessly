@@ -5,8 +5,10 @@ import {
   keepScreen,
   keptScreen,
   MAX_SCREENS,
+  openAsChat,
   parseScreens,
   screenOf,
+  takeAsChat,
 } from '@/next/stores/chat-screen';
 import { parseRoute, ROUTE } from '@/next/routes/routes';
 
@@ -36,5 +38,15 @@ describe('the full screen a chat was left on', () => {
     for (let i = 0; i <= MAX_SCREENS; i++) keepScreen(`tab-${i}`, `/designly/d?chat=tab-${i}`);
     expect(keptScreen('tab-0')).toBeNull();
     expect(keptScreen(`tab-${MAX_SCREENS}`)).not.toBeNull();
+  });
+});
+
+describe('a chat asked for as a chat', () => {
+  it('forgets its screen and is taken once', () => {
+    keepScreen('tab-day', '/apps/example.inbox?chat=tab-day');
+    openAsChat('tab-day');
+    expect(keptScreen('tab-day')).toBeNull();
+    expect(takeAsChat('tab-day')).toBe(true);
+    expect(takeAsChat('tab-day')).toBe(false);
   });
 });

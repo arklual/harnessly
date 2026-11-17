@@ -1,0 +1,23 @@
+id: orch-long-child-notify
+title: Долгая работа в подчате — главный чат узнаёт итог сам, без вопроса человека (HRN-1625)
+tags: [orchestration, delegation]
+agents: [claude, codex]
+timeout_s: 1500
+settle_s: 90
+setup:
+  workspace: [fixtures/orch-long]
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/delegation/**'
+  - 'internal/mcpserver/**'
+prompt: |-
+  Поручи другому агенту в отдельном чате запустить `sh scripts/crunch.sh` в этой папке и дождаться конца: скрипт идёт минуты четыре и в конце печатает RESULT=<число>. Сам его не запускай. Я отойду — когда помощник закончит, напиши мне здесь, какое число получилось.
+expect:
+  - name: delegated to a chat
+    any_of:
+      - called: harnessly\.delegate_task
+      - called: Bash
+        args: {command: 'harnessly tab create\b.*--prompt'}
+  - name: brought the number back once the helper finished
+    text: '\b4817\b'

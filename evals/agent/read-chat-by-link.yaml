@@ -1,0 +1,37 @@
+id: read-chat-by-link
+title: «Прочитай, что мы решили в том чате» — ссылка на другой чат читается тулом, не браузером
+tags: [delegation, chats]
+agents: [claude]
+timeout_s: 300
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'internal/delegation/**'
+  - 'internal/hlcli/chat.go'
+# GitHub #86, HRN-1583: the person drops a link to another chat of theirs. The page behind it needs the person's sign-in,
+# so the agent reads the chat with read_conversation (or `harnessly chat read`), never with the browser or curl. The
+# chat is not on the stand, so the read answers that it is not found: the agent says so instead of making a decision up.
+prompt: Прочитай, что мы решили вот в этом чате, https://hub.example.com/agents/c/tab-dbchoice1, и коротко перескажи.
+variants:
+  - id: v1
+    kind: short
+    text: "что там решили? https://hub.example.com/agents/c/tab-dbchoice1"
+  - id: v2
+    kind: long
+    text: "мы вчера в соседнем чате долго спорили, какую базу брать, вот он: https://hub.example.com/c/tab-dbchoice1 — глянь, к чему пришли, и расскажи в двух словах"
+expect:
+  - name: read the chat by its link
+    any_of:
+      - called: harnessly\.read_conversation
+        even_failed: true
+      - called: Bash
+        args: {command: 'harnessly chat read\b'}
+        even_failed: true
+  - name: did not open the chat in a browser
+    not_called: '.*browser_(navigate|snapshot|read).*'
+  - name: did not fetch the page
+    not_called: WebFetch
+  - name: did not curl the page
+    not_called: Bash
+    args: {command: '(?s:.*)(curl|wget)(?s:.*)tab-dbchoice1(?s:.*)'}
+  - name: did not make a decision up
+    text_not: '(?i)\b(postgres|mysql|sqlite|mongo)\w*\s+(выбрали|решили)'

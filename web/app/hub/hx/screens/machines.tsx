@@ -13,6 +13,7 @@ import { MemberSkeleton, MemberView } from './machines/member-view';
 import { OrgView } from './machines/org-view';
 import { ErrorRow, ListSkeleton } from './machines/parts';
 import { TenantView } from './machines/tenant-view';
+import { TbotJoins } from './machines/tbot-joins';
 import { useDrawerUrl } from './machines/url';
 import { useMachineList } from './machines/use-machines';
 
@@ -89,6 +90,7 @@ const Screen = () => {
             : {})}
         />
       )}
+      <TbotJoins />
       <OpenCtx.Provider value={ws}>{content()}</OpenCtx.Provider>
       {canAdd && (
         <AddMachineSheet

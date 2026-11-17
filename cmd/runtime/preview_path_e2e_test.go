@@ -97,6 +97,11 @@ func TestPreviewByPathEndToEnd(t *testing.T) {
 	if site.code != 200 || !so.ByPath || !strings.HasPrefix(so.Origin, base+"/agents/__pv/7-") || so.EnterURL != so.Origin+"/adminpanel" {
 		t.Fatalf("a site by path: %d %s", site.code, site.body)
 	}
+	// Its page is the slot's to answer, not the mount's «not found» for a slot above the ports.
+	stand := do("GET", so.EnterURL, "", http.Header{"Sec-Fetch-Dest": {"iframe"}, "Sec-Fetch-Mode": {"navigate"}})
+	if stand.code == 404 && (strings.Contains(stand.body, "Not found") || strings.Contains(stand.body, "Не найдено")) {
+		t.Fatalf("a site slot by path is refused by the mount: %d %s", stand.code, stand.body)
+	}
 	for _, wrong := range []string{`{"target":{"kind":"url","origin":"https://example.com"},"slot":1}`,
 		`{"target":{"kind":"port","port":` + strconv.Itoa(devPort) + `},"slot":7}`} {
 		if a := do("POST", base+"/api/preview/open", wrong, page); a.code != 400 {

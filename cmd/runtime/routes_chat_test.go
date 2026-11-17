@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ly-solutions/harnessly/internal/delegation"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -123,5 +124,51 @@ func TestChatDeleteRoute(t *testing.T) {
 	}
 	if len(deleted) != 1 {
 		t.Fatalf("deleted %v", deleted)
+	}
+}
+
+// GitHub #86, HRN-1583: `chat read` takes a chat's id or link and reads it as read_conversation does, the caller being
+// the chat of the calling tab ("" from a plain terminal).
+func TestChatReadRoute(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "cli-token"), []byte("tok"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d := deps{DataDir: dir, CLI: &gate.CLIToken{DataDir: dir, Headers: []string{"x-cli-token"}}}
+	var gotCaller, gotID string
+	chats := appChats{
+		ofSession: func(s string) string {
+			if s == "hs-agent" {
+				return "tab-1"
+			}
+			return ""
+		},
+		read: func(_ context.Context, caller, id, _ string, _ int) (string, error) {
+			gotCaller, gotID = caller, id
+			if id == "tab-gone" {
+				return "", &delegation.Refusal{Code: "not-found", Msg: "no chat tab-gone on this machine"}
+			}
+			return "chat " + id + "\n[person] what did we decide\n", nil
+		},
+	}
+	route := chatRoutes(d, chats)[2]
+	call := func(body string) (int, string) {
+		req := httptest.NewRequest(http.MethodPost, "/api/cli/chat/read", bytes.NewBufferString(body))
+		req.Header.Set("x-cli-token", "tok")
+		w := httptest.NewRecorder()
+		route.Handler.ServeHTTP(w, req)
+		return w.Code, w.Body.String()
+	}
+	if code, body := call(`{"session":"hs-agent","id":"https://ai.example.com/c/tab-2"}`); code != http.StatusOK || gotCaller != "tab-1" || gotID != "tab-2" || !strings.Contains(body, "what did we decide") {
+		t.Fatalf("by link from a chat: %d %s caller=%q id=%q", code, body, gotCaller, gotID)
+	}
+	if code, _ := call(`{"id":"tab-2"}`); code != http.StatusOK || gotCaller != "" {
+		t.Fatalf("from a plain terminal: %d caller=%q", code, gotCaller)
+	}
+	if code, body := call(`{"id":"tab-gone"}`); code != http.StatusNotFound || !strings.Contains(body, "no chat tab-gone") {
+		t.Fatalf("a chat that is nowhere: %d %s", code, body)
+	}
+	if code, _ := call(`{"id":"https://ai.example.com/boards/x"}`); code != http.StatusBadRequest {
+		t.Fatalf("not a chat link: %d", code)
 	}
 }

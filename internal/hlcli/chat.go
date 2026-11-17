@@ -2,14 +2,10 @@ package hlcli
 
 import (
 	"encoding/json"
-	"os"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/delegation"
-	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
 // chat is `harnessly chat test ID|current [--off]`: the mark of a test chat, which the sidebar leaves out.
@@ -76,7 +72,8 @@ func (c *cli) chat(args []string) error {
 	return nil
 }
 
-// chatRead reads the owner's synchronised copy through their local agent; it never needs a browser session.
+// chatRead is a chat's transcript by its id or link (GitHub #86), as read_conversation gives it: any chat of
+// this machine from the runtime, another of the person's from the hub's history. It never needs a browser session.
 func (c *cli) chatRead(args []string) error {
 	f, err := parseFlags(args, map[string]string{"before": "before", "n": "limit", "limit": "limit"})
 	if err != nil || len(f.pos) != 1 {
@@ -84,7 +81,7 @@ func (c *cli) chatRead(args []string) error {
 	}
 	id, err := delegation.ConversationRef(f.pos[0])
 	if err != nil {
-		return err
+		return usageErr("chat read: %v", err)
 	}
 	limit := 40
 	if s := f.values["limit"]; s != "" {
@@ -93,28 +90,31 @@ func (c *cli) chatRead(args []string) error {
 			return usageErr("chat read: -n is 1 to 100")
 		}
 	}
-	status, raw, err := agent.CallLocal(c.env.Client, c.dataDir(), os.Getenv("RUNTIME_AGENT_TOKEN_HEADER"), "/history/read", hubproto.HistoryRead{Conversation: id, Before: f.values["before"], Limit: limit}, 20*time.Second)
+	body := map[string]any{"session": c.session(), "id": id, "before": f.values["before"], "limit": limit}
+	status, raw, err := c.call("POST", "/api/cli/chat/read", nil, body)
 	if err != nil {
-		return fail("central history: %v", err)
+		return err
 	}
-	if status != 200 {
+	if status >= 300 {
+		var e struct {
+			Detail string `json:"detail"`
+		}
+		if json.Unmarshal(raw, &e) == nil && e.Detail != "" {
+			return fail("%s", e.Detail)
+		}
 		return apiError(status, raw)
 	}
 	if c.json {
 		c.printRaw(raw)
 		return nil
 	}
-	var page hubproto.HistoryPage
-	if json.Unmarshal(raw, &page) != nil {
-		return fail("central history returned invalid JSON")
+	var r struct {
+		Text string `json:"text"`
 	}
-	c.out("%s\n", string(page.Conversation))
-	for _, entry := range page.Entries {
-		c.out("%s\n", string(entry))
+	if json.Unmarshal(raw, &r) != nil {
+		return fail("the machine returned invalid JSON")
 	}
-	if page.BeforeTurnID != nil {
-		c.out("previous: %s (pass --before to read the older page)\n", *page.BeforeTurnID)
-	}
+	c.out("%s\n", strings.TrimRight(r.Text, "\n"))
 	return nil
 }
 

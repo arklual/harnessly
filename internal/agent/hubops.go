@@ -293,6 +293,8 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 			return nil, nil, h.allow(op, false, "changes of the organization's environment")
 		}
 		return h.opEnvProposed(req)
+	case hubproto.OpTbotJoined:
+		return h.opTbotJoined(req)
 	case hubproto.OpEnvOwned:
 		if h.observe {
 			return nil, nil, h.allow(op, false, "changes of the person's own environment")

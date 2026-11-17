@@ -48,7 +48,7 @@ func (c *conv) notAtRest(now time.Time) string {
 		return "timer"
 	case c.deletedAt == 0 && !c.titleDueAt.IsZero():
 		return "title due"
-	case c.rec.BgAgents > 0 || c.bgWake > ms(now):
+	case c.rec.BgAgents > 0 || c.bgWake > ms(now) || c.bgCrons > 0:
 		return "background"
 	case c.fd != nil && !c.fd.Released():
 		return "feed read"

@@ -97,13 +97,14 @@ export const moveBefore = (layer: EnvLayer, itemId: string, beforeItemId: string
 const POLL_MS = 900;
 
 /**
- * Follows a run: asks for it again until it ends. `runId` null: nothing to follow. A failed ask is kept in `error` and the
- * poll stops; starting another run starts over.
+ * Follows a run: asks for it again until it ends. `runId` null: nothing to follow. A failed ask is kept in `error`, told to
+ * `onLost`, and the poll stops; starting another run starts over.
  */
 export const useRunPoll = (
   runId: string | null,
   fetchRun: (id: string) => Promise<EnvRunRow>,
   onEnd?: (run: EnvRunRow) => void,
+  onLost?: (error: unknown) => void,
 ): { run: EnvRunRow | null; error: unknown } => {
   const [state, setState] = useState<{ id: string | null; run: EnvRunRow | null; error: unknown }>({
     id: null,
@@ -112,9 +113,11 @@ export const useRunPoll = (
   });
   const fetchRef = useRef(fetchRun);
   const endRef = useRef(onEnd);
+  const lostRef = useRef(onLost);
   useEffect(() => {
     fetchRef.current = fetchRun;
     endRef.current = onEnd;
+    lostRef.current = onLost;
   });
   useEffect(() => {
     if (runId === null) return;
@@ -129,7 +132,9 @@ export const useRunPoll = (
           else endRef.current?.(run);
         },
         (error: unknown) => {
-          if (live) setState({ id: runId, run: null, error });
+          if (!live) return;
+          setState({ id: runId, run: null, error });
+          lostRef.current?.(error);
         },
       );
     };

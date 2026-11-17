@@ -75,13 +75,13 @@
   },
   {
     "name": "read_conversation",
-    "description": "Read a chat you delegated, or another chat of the person's by its id or link (the hub's history, under the person's access): the person's and the agent's messages, tool calls in a line each (failed ones with their output), oldest first. Ends with a cursor: pass it as since to read only what came after.",
+    "description": "Read any chat of the person's by its id or the link they dropped into this chat — one you delegated, another chat of this machine, or one of another machine from the hub's history (under the person's access): the person's and the agent's messages, tool calls in a line each (failed ones with their output), oldest first. Ends with a cursor: pass it as since to read only what came after.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
-          "description": "The chat's id (tab-…) or its link (https://<hub>/agents/c/tab-…)."
+          "description": "The chat's id (tab-…) or its link (https://<hub>/agents/c/tab-…, …/c/tab-…, …?chat=tab-…)."
         },
         "since": {
           "type": "string",

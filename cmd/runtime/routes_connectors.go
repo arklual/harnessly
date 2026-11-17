@@ -48,6 +48,7 @@ import (
 	_ "github.com/ly-solutions/harnessly/internal/connectors/rss"
 	"github.com/ly-solutions/harnessly/internal/connectors/rules"
 	"github.com/ly-solutions/harnessly/internal/connectors/telegram"
+	"github.com/ly-solutions/harnessly/internal/connectors/tgaccount"
 	"github.com/ly-solutions/harnessly/internal/connectors/webhook"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/locale"
@@ -163,6 +164,12 @@ func connectorRoutes(d deps, c *core) []gate.Route {
 	rulesCore.Store(c)
 	ruleEngine := rulesFor(d, svc)
 	telegram.SetHooks(telegramHooks(d, c))
+	// A Telegram account signed in by its QR code: checked again, so that its label becomes the person's name.
+	tgaccount.SetRecheck(func(id string) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		_, _ = svc.Check(ctx, id)
+	})
 	callers := &callerCache{panes: c.cfg.Tmux, convOf: func(session string) string {
 		id, _ := convOf(c, session)
 		return id

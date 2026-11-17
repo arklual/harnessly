@@ -12,6 +12,9 @@ All notable changes to this project are documented here. The format follows
   as `$exception`, scrubbed of addresses, e-mails, paths, ids and tokens, and a daily heartbeat with the version, to the
   PostHog linked in at release time. Off with `install.sh --disable-telemetry`, `HARNESSLY_TELEMETRY=off`,
   `DO_NOT_TRACK=1` or Settings → Privacy; a build from a checkout sends nothing.
+- The hub reports its own errors the same way: its error-level log lines and handler panics as `$exception`
+  with the route template and method, and a daily heartbeat with the version, edition and database kind. Off with
+  `HARNESSLY_TELEMETRY=off` or `DO_NOT_TRACK=1` in the hub's environment.
 - Logs and metrics for your own stack (docs/self-host/observability.md): the journal as OTLP/HTTP logs (the standard
   `OTEL_EXPORTER_OTLP_*` variables) and Prometheus metrics on `RUNTIME_METRICS_LISTEN`.
 - A person's own layer of the hub's environment (docs/hub/environment.md «Own layer»), behind the organization

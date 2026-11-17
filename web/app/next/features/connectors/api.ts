@@ -91,6 +91,8 @@ export interface IConnectorConn {
 export interface IConnectorStep {
   text: string;
   url: string;
+  /** A picture to show with the text: a PNG data URL (a QR code to scan with a phone); '' when none. */
+  image: string;
 }
 
 export interface IConnectorShown {
@@ -229,7 +231,13 @@ export const readConnectorConn = (v: unknown): IConnectorConn => {
 const readStep = (v: unknown): IConnectorStep | null => {
   if (v === undefined || v === null) return null;
   const o = obj(v, 'next');
-  return { text: word(o.text, 'next.text'), url: optStr(o.url, 'next.url') };
+  const image = optStr(o.image, 'next.image');
+  return {
+    text: word(o.text, 'next.text'),
+    url: optStr(o.url, 'next.url'),
+    // Only a PNG of our own runtime is drawn: never an address a page would fetch.
+    image: image.startsWith('data:image/png;base64,') ? image : '',
+  };
 };
 
 export const readProposal = (v: unknown): IConnectorProposal => {

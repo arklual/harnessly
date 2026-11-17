@@ -695,6 +695,8 @@
   "next.turnMade.share": "Share",
   "next.turnMade.copyUrl": "Copy address",
   "next.turnMade.copied": "Address copied",
+  "next.turnMade.standPages": "One stand, several pages",
+  "next.turnMade.openPage": "Open on the right",
   "next.turnMade.copyId": "Copy ID",
   "next.turnMade.copyIds": "Copy the IDs",
   "next.turnMade.idCopied": "ID copied",

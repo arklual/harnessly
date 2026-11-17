@@ -290,6 +290,9 @@ const ConnectorRow = ({ conn, title, leaving, onCheck, onRemove, onReissue, rule
               {conn.next !== null && problem === null && (
                 <span className="hx-cx-row__next">
                   {conn.next.text}
+                  {conn.next.image !== '' && (
+                    <img className="hx-cx-row__qr" src={conn.next.image} alt="" width={168} height={168} />
+                  )}
                   {conn.next.url !== '' && (
                     <a className="hx-cx-row__link" href={conn.next.url} target="_blank" rel="noreferrer">
                       {t('next.connectors.openLink')}

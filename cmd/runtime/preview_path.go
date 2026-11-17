@@ -123,7 +123,7 @@ func (s *previewSlots) mount(next http.Handler) http.Handler {
 			guarded.ServeHTTP(w, r)
 			return
 		}
-		if slot < 0 || slot > previewPortSlots {
+		if slot < 0 || slot > previewSlotCount {
 			previewDeny(w, 404, locale.Pick("Not found", "Не найдено"))
 			return
 		}

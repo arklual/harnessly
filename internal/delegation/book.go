@@ -157,6 +157,20 @@ func (b *Book) claim(id, key string, max int) bool {
 	return true
 }
 
+// unclaim gives back a wake-up claimed for key whose message did not reach the parent: Woken goes back to was.
+func (b *Book) unclaim(id, key, was string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.load()
+	p, ok := b.chats[id]
+	if !ok || p.Woken != key {
+		return
+	}
+	p.Woken, p.Wakes = was, max(0, p.Wakes-1)
+	b.chats[id] = p
+	b.save()
+}
+
 // nudge claims a reminder for key unless one went for it already or they ran out: true when this caller is the one to
 // send it. Nudges is then the number sent including this one.
 func (b *Book) nudge(id, key string, max int) (int, bool) {

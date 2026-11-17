@@ -110,6 +110,14 @@ export const PANE_AUTO_KINDS = ['design', 'artifacts', 'browser', 'files'] as co
 export type TPaneAutoKind = (typeof PANE_AUTO_KINDS)[number];
 export type TPaneAutoKinds = Readonly<Record<TPaneAutoKind, boolean>>;
 
+/**
+ * A web page in the pane's browser: the agent's own browser, or a stand or a dev server it asked to show. Its card in
+ * the chat opens it on a click, so even the agent's explicit `open` of it waits for the person's «Браузер агента»
+ * switch, off by default: the person is not thrown two browser tabs for one stand.
+ */
+const isBrowser = (intent: IPaneIntent): boolean =>
+  intent.command.kind === 'open' && (intent.command.tab === 'agent-browser' || intent.command.tab === 'browser');
+
 /** The tab an auto intent opens, as the switch that lets it: the design, a document or board, the agent's browser, the rest. */
 export const autoKindOf = (command: TIntentCommand): TPaneAutoKind => {
   if (command.kind !== 'open') return 'files';
@@ -153,7 +161,9 @@ export const planIntents = (
     .filter((intent) => options.auto || !isAuto(intent))
     .filter(
       (intent) =>
-        !isAuto(intent) || isReload(intent) || (options.kinds?.[autoKindOf(intent.command)] ?? true),
+        isReload(intent) ||
+        ((!isAuto(intent) || (options.kinds?.[autoKindOf(intent.command)] ?? true)) &&
+          (!isBrowser(intent) || (options.kinds?.browser ?? true))),
     )
     .sort((a, b) => a.createdAt - b.createdAt);
   // The window's budget: what the runtime opened by itself lately (applied on some page) counts against the new.

@@ -59,6 +59,8 @@ type Deps struct {
 	Docs DocsSink
 	// Proposals answers the machines' env.propose and env.own; nil: nobody answers.
 	Proposals EnvProposals
+	// TbotJoin answers the machines' tbot.join (internal/hub/tbotjoin); nil: nobody answers.
+	TbotJoin TbotJoinSink
 	// Automations takes the reports of automation conversations (internal/hub/automations); nil: nobody does.
 	Automations AutomationsSink
 	// History keeps the machines' chats (internal/hub/history); nil: the hub takes none.
@@ -103,6 +105,11 @@ type DocsSink interface {
 }
 
 // EnvProposals answers a change of the environment a machine's agent proposes for its person (internal/hub/env).
+// TbotJoinSink keeps a machine's request for a tbot join token and says where it stands (internal/hub/tbotjoin).
+type TbotJoinSink interface {
+	Requested(ctx context.Context, m store.Machine, raw json.RawMessage) hubproto.TbotJoinState
+}
+
 type EnvProposals interface {
 	Proposed(ctx context.Context, m store.Machine, raw json.RawMessage) hubproto.EnvProposalResult
 	// Own changes the own layer of the machine's owner.
@@ -152,6 +159,7 @@ type Service struct {
 	projects  ProjectsSink
 	docs      DocsSink
 	proposals EnvProposals
+	tbotJoin  TbotJoinSink
 	// automations takes the report of a conversation an automation run started (nil: automations are off).
 	automations AutomationsSink
 	history     HistorySink
@@ -177,7 +185,7 @@ type Service struct {
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget, env: d.Env, design: d.Design, projects: d.Projects, docs: d.Docs, proposals: d.Proposals, automations: d.Automations, history: d.History, prov: d.Provider, pub: d.Publisher, gate: d.Features, notice: d.Notice}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget, env: d.Env, design: d.Design, projects: d.Projects, docs: d.Docs, proposals: d.Proposals, tbotJoin: d.TbotJoin, automations: d.Automations, history: d.History, prov: d.Provider, pub: d.Publisher, gate: d.Features, notice: d.Notice}
 	s.res.init()
 	if s.now == nil {
 		s.now = time.Now

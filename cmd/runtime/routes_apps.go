@@ -273,6 +273,13 @@ func appRoutes(d deps, c *core) []gate.Route {
 			}
 			return rt.Do(ctx, "cli", cmd)
 		},
+		read: func(ctx context.Context, caller, ref, before string, limit int) (string, error) {
+			v := c.v2.Load()
+			if v == nil || v.delegation == nil {
+				return "", errNoCore
+			}
+			return v.delegation.ReadPage(ctx, caller, ref, "", before, limit)
+		},
 	}
 	installLock(d, reg)
 	installShareGate(d, reg)
@@ -283,11 +290,13 @@ func appRoutes(d deps, c *core) []gate.Route {
 // decisionRate is how many decisions a launch may journal in a minute.
 const decisionRate = 30
 
-// appChats is what the routes need of the conversations: the one a tmux session runs, a record, the command entry.
+// appChats is what the routes need of the conversations: the one a tmux session runs, a record, the command entry, and
+// a chat's transcript as read_conversation reads it (caller "" for a terminal that is no chat's).
 type appChats struct {
 	ofSession func(session string) string
 	record    func(id string) (wire.Conversation, bool)
 	do        func(ctx context.Context, cmd wire.Command) wire.CmdResult
+	read      func(ctx context.Context, caller, ref, before string, limit int) (string, error)
 }
 
 // appRouteList is appRoutes with its parts given: the registry, the host version and the conversations.

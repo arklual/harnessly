@@ -75,6 +75,7 @@ type MeMachine struct {
 	Setup   bool       `json:"setup"`   // has environment.setup
 	Current bool       `json:"current"` // holds the list the hub computes for it now
 	Failed  int        `json:"failed"`  // setup items in error or waiting for the person
+	Errors  int        `json:"errors"`  // of them, the items in error: an update makes the machine try them again
 	LastRun *EnvRunRow `json:"lastRun"`
 	// Team is the team whose list the machine holds; null for a machine of no team.
 	Team *NameRef `json:"team"`
@@ -349,7 +350,7 @@ func (s *Service) meMachineList(m *me, userID string) ([]MeMachine, error) {
 		}
 		mm.Current = want.empty() || (reported && want.holds(st.Hash))
 		if reported && mm.Setup {
-			mm.Failed = m.failedSetup(st.Applied)
+			mm.Failed, mm.Errors = m.failedSetup(st.Applied)
 		}
 		runs, err := m.st.EnvRunsOf(m.ctx, store.EnvRunQuery{OrgID: m.org.ID, MachineIDs: []string{mc.ID}, Since: s.runsSince(), Limit: 1})
 		if err != nil {
@@ -367,24 +368,31 @@ func (s *Service) meMachineList(m *me, userID string) ([]MeMachine, error) {
 	return out, nil
 }
 
-// tokenAsk starts the message of a setup item that waits for a token of the person's safe («положите токен <name> в
-// сейф»); any other pending is the machine still working.
-const tokenAsk = "положите токен"
+// tokenAsk is in the message of a setup item that waits for a token of the person's safe: «положите токен <name> в сейф»,
+// «положите <a>, <b> в сейф», «<pack>: положите в сейф <a>», «ждёт вашего разрешения в сейфе»; any other pending is the
+// machine still working, or a script waiting for another one to be mended.
+const tokenAsk = "в сейф"
 
-// failedSetup counts the setup items a machine reported in error, or waiting for a token the person has to put in the safe.
-func (m *me) failedSetup(applied string) int {
+// failedSetup counts the setup items a machine reported in error, or waiting for a token the person has to put in the
+// safe; errors are those in error alone.
+func (m *me) failedSetup(applied string) (failed, errors int) {
 	var items []hubproto.EnvApplied
 	if json.Unmarshal([]byte(applied), &items) != nil {
-		return 0
+		return 0, 0
 	}
-	n := 0
 	for _, a := range items {
+		if !hubproto.IsSetupKind(m.w.items[a.ItemID].Kind) {
+			continue
+		}
 		waits := a.Status == hubproto.EnvPending && strings.Contains(a.Message, tokenAsk)
-		if (a.Status == hubproto.EnvError || waits) && hubproto.IsSetupKind(m.w.items[a.ItemID].Kind) {
-			n++
+		if a.Status == hubproto.EnvError {
+			errors++
+		}
+		if a.Status == hubproto.EnvError || waits {
+			failed++
 		}
 	}
-	return n
+	return failed, errors
 }
 
 func (s *Service) meMachines(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {

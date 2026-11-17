@@ -12,7 +12,8 @@ const KEY = 'hl:pane-auto-open';
 export const ALL_PANE_AUTO_KINDS: TPaneAutoKinds = {
   design: true,
   artifacts: true,
-  browser: true,
+  // The agent's browser and the stands it shows open only on the person's click unless they switch it on.
+  browser: false,
   files: true,
 };
 
@@ -21,6 +22,7 @@ export interface IPaneAuto {
   kinds: TPaneAutoKinds;
 }
 
+/** What a browser that never touched the switches has: on, with the browser kind off. */
 const ALL_ON: IPaneAuto = { on: true, kinds: ALL_PANE_AUTO_KINDS };
 
 /** The stored value as the switches; a broken record is everything on. */
@@ -44,7 +46,7 @@ export const parsePaneAuto = (raw: string | null): IPaneAuto => {
 /** What to store: null (remove) for everything on. */
 export const formatPaneAuto = (value: IPaneAuto): string | null => {
   if (!value.on) return '0';
-  if (PANE_AUTO_KINDS.every((kind) => value.kinds[kind])) return null;
+  if (PANE_AUTO_KINDS.every((kind) => value.kinds[kind] === ALL_PANE_AUTO_KINDS[kind])) return null;
   return JSON.stringify(value.kinds);
 };
 

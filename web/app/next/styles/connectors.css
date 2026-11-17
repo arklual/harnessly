@@ -37,6 +37,16 @@
   line-height: 1.4;
   white-space: normal;
 }
+/* A QR code to scan with a phone (a Telegram account's sign-in): dark on white whatever the theme, or phones miss it. */
+.hx-cx-row__qr {
+  flex-basis: 100%;
+  max-width: 168px;
+  height: auto;
+  padding: 8px;
+  border-radius: var(--hx-radius-sm);
+  background: #fff;
+  image-rendering: crisp-edges;
+}
 .hx-cx-row__link {
   display: inline-flex;
   align-items: center;

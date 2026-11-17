@@ -200,6 +200,11 @@ describe('machine state', () => {
     expect(stateOfMachine({ ...m, current: false }, false)).toBe('stale');
     expect(stateOfMachine({ ...m, failed: 1 }, false)).toBe('token');
   });
+  it('offers an update again after a setup item fell, not only a check', () => {
+    expect(stateOfMachine({ ...m, failed: 2, errors: 1 }, false)).toBe('failed');
+    expect(stateOfMachine({ ...m, current: false, failed: 1, errors: 1 }, false)).toBe('stale');
+    expect(stateOfMachine({ ...m, failed: 1, errors: 0 }, false)).toBe('token');
+  });
   it('is not stale without the setup feature', () => {
     expect(stateOfMachine({ ...m, setup: false, current: false }, false)).toBe('none');
   });

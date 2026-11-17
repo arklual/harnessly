@@ -8,6 +8,7 @@
       "setup": true,
       "current": false,
       "failed": 1,
+      "errors": 1,
       "lastRun": {
         "id": "run-3f9a1c2e",
         "machine": {

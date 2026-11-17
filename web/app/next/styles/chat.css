@@ -3100,6 +3100,18 @@ html[data-theme='dark'] .hx-ref[data-type='link'] {
   outline: 2px solid var(--hx-focus);
   outline-offset: 1px;
 }
+/* A stand's addresses, one under the other, with what they are when there are several. */
+.hx-made__urls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+.hx-made__urls-note {
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+}
 /* A stand's address with its copy button. */
 .hx-made__url {
   display: inline-flex;

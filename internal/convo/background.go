@@ -27,15 +27,22 @@ func (c *conv) watchBackground(now time.Time) {
 	case wire.StateStarting, wire.StateUnknown:
 		return
 	}
+	if dead {
+		c.bgDeadSeen = true
+	}
 	switch {
 	case dead && !c.bgOpened:
-		c.bgWake = 0
+		c.bgWake, c.bgCrons = 0, 0
 		c.bgApply(nil, now)
 		return
 	case dead && c.bgDeadRead:
 		return
 	case !dead:
 		c.bgDeadRead = false
+		if c.bgDeadSeen {
+			// The agent is up again on a new process: its cron jobs did not come back with it.
+			c.bgDeadSeen, c.bgAliveSince = false, wire.Ms(now.UnixMilli())
+		}
 	}
 	if c.bgReading || now.Sub(c.bgAt) < bgEvery {
 		return
@@ -45,11 +52,14 @@ func (c *conv) watchBackground(now time.Time) {
 	if c.look != nil {
 		pane = c.look.Plain
 	}
-	rec, bg := c.rec, c.d.Background
+	rec, bg, since := c.rec, c.d.Background, c.bgAliveSince
 	c.spawn(func() any {
 		got := bgRead{tasks: bg.Tasks(rec, pane)}
 		if w, ok := bg.(Waker); ok {
 			got.wakeup = w.Wakeup(rec)
+		}
+		if k, ok := bg.(CronKeeper); ok {
+			got.crons = k.Crons(rec, since)
 		}
 		return got
 	}, func(r any) {
@@ -59,9 +69,9 @@ func (c *conv) watchBackground(now time.Time) {
 		if dead { // what ran with the agent is over, its wakeup too; the subagents that ended stay
 			got.tasks = slices.DeleteFunc(got.tasks, func(t wire.BackgroundTask) bool { return !t.Teammate && t.Status == wire.BgStatusRunning })
 			got.tasks = teammatesOver(got.tasks)
-			got.wakeup = 0
+			got.wakeup, got.crons = 0, 0
 		}
-		c.bgWake = got.wakeup
+		c.bgWake, c.bgCrons = got.wakeup, got.crons
 		c.bgApply(got.tasks, c.d.Clock.Now())
 	})
 }
@@ -81,6 +91,7 @@ func teammatesOver(tasks []wire.BackgroundTask) []wire.BackgroundTask {
 type bgRead struct {
 	tasks  []wire.BackgroundTask
 	wakeup wire.Ms
+	crons  int
 }
 
 // bgApply makes the page's list the agent's: a task new or changed goes out whole, one gone is removed. A task we

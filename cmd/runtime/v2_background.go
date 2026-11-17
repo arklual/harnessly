@@ -149,6 +149,22 @@ func (b v2Background) Wakeup(c wire.Conversation) wire.Ms {
 	return 0
 }
 
+// Crons is how many of the agent's cron jobs (CronCreate, /loop with an interval) are still pending: the chat keeps
+// its session for them.
+func (b v2Background) Crons(c wire.Conversation, since wire.Ms) int {
+	if c.Provider != wire.ProviderClaude || c.TranscriptPath == "" || b.reader == nil {
+		return 0
+	}
+	running, _ := b.reader.ReadAll(c.TranscriptPath)
+	n := 0
+	for _, t := range running {
+		if t.Kind == background.Cron && wire.Ms(t.StartedAt) >= since {
+			n++
+		}
+	}
+	return n
+}
+
 // endedTasks are the subagents that ended lately, the latest first, as the page draws them: done, failed or stopped.
 func (b v2Background) endedTasks(c wire.Conversation, ended []background.Ended) []wire.BackgroundTask {
 	clock := b.now

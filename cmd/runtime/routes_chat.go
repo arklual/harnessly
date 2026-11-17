@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/delegation"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -90,8 +92,59 @@ func chatRoutes(d deps, chats appChats) []gate.Route {
 		}
 		secretJSON(w, http.StatusOK, map[string]any{"conversation": b.ID, "deleted": true})
 	}
+	// `chat read ID|URL` (GitHub #86) reads any chat of the machine the way read_conversation does — the
+	// person's rights, no page session — and a chat that is not here from the hub's history of the person.
+	read := func(w http.ResponseWriter, r *http.Request) {
+		if d.CLI == nil || !d.CLI.OK(r) {
+			secretJSON(w, http.StatusForbidden, map[string]string{"error": "Forbidden"})
+			return
+		}
+		if r.Method != http.MethodPost {
+			secretJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+			return
+		}
+		var b struct {
+			Session string `json:"session"`
+			ID      string `json:"id"`
+			Before  string `json:"before"`
+			Limit   int    `json:"limit"`
+		}
+		if !readSecretBody(r, &b) || b.ID == "" || chats.read == nil {
+			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
+			return
+		}
+		id, err := delegation.ConversationRef(b.ID)
+		if err != nil {
+			secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request", "detail": err.Error()})
+			return
+		}
+		caller := ""
+		if b.Session != "" {
+			caller = chats.ofSession(b.Session)
+		}
+		text, err := chats.read(r.Context(), caller, id, b.Before, b.Limit)
+		if err != nil {
+			status, code := http.StatusServiceUnavailable, "unavailable"
+			var refusal *delegation.Refusal
+			if errors.As(err, &refusal) {
+				code = refusal.Code
+				switch refusal.Code {
+				case "not-found", "hub-unavailable":
+					status = http.StatusNotFound
+				case "not-allowed", "unknown-caller":
+					status = http.StatusForbidden
+				case "bad-request":
+					status = http.StatusBadRequest
+				}
+			}
+			secretJSON(w, status, map[string]string{"error": code, "detail": err.Error()})
+			return
+		}
+		secretJSON(w, http.StatusOK, map[string]any{"conversation": id, "text": text})
+	}
 	return []gate.Route{
 		{Match: func(r *http.Request) bool { return pathIs(r, "/api/cli/chat/test") }, Handler: http.HandlerFunc(test)},
 		{Match: func(r *http.Request) bool { return pathIs(r, "/api/cli/chat/delete") }, Handler: http.HandlerFunc(del)},
+		{Match: func(r *http.Request) bool { return pathIs(r, "/api/cli/chat/read") }, Handler: http.HandlerFunc(read)},
 	}
 }

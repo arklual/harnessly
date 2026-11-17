@@ -76,3 +76,15 @@ export const forgetScreen = (conv: string) => {
   const screens = read();
   if (screens.delete(conv)) write(screens);
 };
+
+/** Chats asked for as a chat: a card of Главная opens the item's chat, the item is all there (the app's screen is not). */
+const askedAsChat = new Set<string>();
+
+/** The chat opens as a chat, not on the screen it was left on (another device's too): that screen is forgotten. */
+export const openAsChat = (conv: string) => {
+  forgetScreen(conv);
+  askedAsChat.add(conv);
+};
+
+/** True once for a chat asked for as a chat: it is opening now. */
+export const takeAsChat = (conv: string): boolean => askedAsChat.delete(conv);

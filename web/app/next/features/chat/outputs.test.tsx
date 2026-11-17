@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import Outputs, { OutputsContext, SHOWN_BY_DEFAULT, type TShownKinds } from '@/next/features/chat/outputs';
+import Outputs, { mergeStands, OutputsContext, SHOWN_BY_DEFAULT, type TShownKinds } from '@/next/features/chat/outputs';
+import { linkOf } from '@/next/features/chat/link-output';
+import { appConfig } from '@/platform/config';
 import type { TurnItem, TurnOutput } from '@/next/features/chat/types';
 
 afterEach(cleanup);
@@ -266,5 +268,21 @@ describe('what a turn made', () => {
     );
     const srcs = [...container.querySelectorAll('.hx-pic img')].map((img) => img.getAttribute('src'));
     expect(srcs).toEqual(['/view?path=/d/images/j1-1.png', '/view?path=/d/images/j1-2.png']);
+  });
+});
+
+describe('mergeStands (HRN-1623)', () => {
+  it('pages of one stand are the addresses of its first card', () => {
+    const made = (ref: string) => {
+      const output: TurnOutput = { kind: 'stand', op: 'created', title: ref, ref };
+      return { output, link: linkOf(output, appConfig())! };
+    };
+    const root = 'https://s1.preview.example.com/';
+    const page = 'https://s1.preview.example.com/adminpanel/analytics';
+    const other = 'https://s2.preview.example.com/';
+    const merged = mergeStands([made(root), made(page), made(page), made(other)]);
+    expect(merged.map((m) => m.output.ref)).toEqual([root, other]);
+    expect(merged[0]!.link.more).toEqual([page]);
+    expect(merged[1]!.link.more).toEqual([]);
   });
 });

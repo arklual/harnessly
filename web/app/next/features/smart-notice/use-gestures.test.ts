@@ -27,8 +27,9 @@ describe('settleGesture', () => {
   });
 
   it('opens a plate pulled away from its edge, and folds it pushed back', () => {
-    expect(settleGesture(end({ dy: -50 }))).toBe(GESTURE.open);
-    expect(settleGesture(end({ edge: 'top', dy: 50 }))).toBe(GESTURE.open);
+    expect(settleGesture(end({ dy: -90 }))).toBe(GESTURE.open);
+    expect(settleGesture(end({ edge: 'top', dy: 90 }))).toBe(GESTURE.open);
+    expect(settleGesture(end({ dy: -50 }))).toBe(GESTURE.back);
     expect(settleGesture(end({ dy: 20 }))).toBe(GESTURE.back);
     expect(settleGesture(end({ open: true, dy: 80 }))).toBe(GESTURE.fold);
     expect(settleGesture(end({ open: true, edge: 'top', dy: -80 }))).toBe(GESTURE.fold);
@@ -36,7 +37,10 @@ describe('settleGesture', () => {
   });
 
   it('takes a quick short flick for the whole gesture', () => {
-    expect(settleGesture(end({ dy: -14, vy: -0.8 }))).toBe(GESTURE.open);
+    expect(settleGesture(end({ dy: -40, vy: -1.1 }))).toBe(GESTURE.open);
+    // A scroll's short throw over the plate does not open it.
+    expect(settleGesture(end({ dy: -14, vy: -0.8 }))).toBe(GESTURE.back);
+    expect(settleGesture(end({ dy: -40, vy: -0.6 }))).toBe(GESTURE.back);
     expect(settleGesture(end({ open: true, dy: 20, vy: 0.9 }))).toBe(GESTURE.fold);
   });
 });
