@@ -21,6 +21,7 @@ import type { ConvId } from '@/next/protocol/v2';
 import { RoundButton } from '@/next/ui/button';
 import Icon from '@/next/ui/icon';
 import { PRESENCE, usePresence } from '@/next/ui/presence';
+import VoiceActs from '@/next/features/voice-live/voice-acts-list';
 import '@/next/styles/voice-layer.css';
 
 /** The bar leaves in this long (hx-voice-bar-out). */
@@ -112,6 +113,9 @@ const VoiceBarBody = ({
           <b>«{title}»</b>
         </span>
         <MiniWave look={look} />
+        <span className="hx-voice-bar__wide">
+          <VoiceActs last />
+        </span>
         <span className="hx-voice-bar__sep hx-voice-bar__wide" />
         <button type="button" className="hx-voice-bar__b hx-voice-bar__wide" onClick={() => onBack(conv)}>
           {t('next.chatgpt.voice.bar.back')}

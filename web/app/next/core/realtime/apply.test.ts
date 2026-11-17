@@ -429,6 +429,54 @@ describe('GitHub #33: chats cached under a machine id the fleet no longer has', 
     expect(messagesStore.get(unsent)?.state.k).toBe('submitting');
   });
 
+  it('GitHub #104: replaces a stale cached feed after the central record already names the current machine', async () => {
+    const { rt, m, unsent, draft } = await strayChat();
+    conversationsStore.patch(CONV, (c) => c && { ...c, machineId: m });
+    feedStore.patch(CONV, (f) => f && { ...f, source: 'cached' });
+    const record = conversationsStore.get(CONV);
+    const sends = rt.commands.length;
+    storeSink.snapshot(m, convsSnap(rt));
+    expect(conversationsStore.get(CONV)?.machineId).toBe(m);
+    expect(feedStore.get(CONV)?.machineId ?? m).toBe(m);
+    const conv = fixture<{ ch: ConvChannel; data: ConvSnapshot }>('snapshot.conv');
+    storeSink.snapshot(m, { ch: CH, mode: 'replace', data: conv.data } as never);
+    expect(feedStore.get(CONV)).toMatchObject({ machineId: m, source: 'live', loaded: true });
+    expect(feedStore.get(CONV)?.rows.length).toBeGreaterThan(0);
+    expect(conversationsStore.get(CONV)?.createdAt).toBe(record?.createdAt);
+    // The unconfirmed one moves along and waits for Повторить; the draft stays a draft.
+    expect(messagesStore.get(unsent)).toMatchObject({
+      machineId: m,
+      held: true,
+      state: { k: 'failed', code: 'unconfirmed' },
+    });
+    expect(messagesStore.get(draft)).toMatchObject({ machineId: m, state: { k: 'draft' } });
+    await settle();
+    expect(rt.commands.slice(sends).filter((c) => c.op === 'send')).toEqual([]);
+  });
+
+  it('keeps a mismatched feed while its machine is still in the fleet', async () => {
+    const { rt, m } = await strayChat();
+    conversationsStore.patch(CONV, (c) => c && { ...c, machineId: m });
+    feedStore.patch(CONV, (f) => f && { ...f, source: 'cached' });
+    putMachines([rt.machine, { ...rt.machine, id: OLD as never, name: 'old' }]);
+    const feed = feedStore.get(CONV);
+    storeSink.snapshot(m, convsSnap(rt));
+    expect(feedStore.get(CONV)).toBe(feed);
+  });
+
+  it('does not discard a live foreign feed or use a different chat as evidence', async () => {
+    const { rt, m } = await strayChat();
+    conversationsStore.patch(CONV, (c) => c && { ...c, machineId: m });
+    const feed = feedStore.get(CONV);
+    storeSink.snapshot(m, convsSnap(rt));
+    expect(feedStore.get(CONV)).toBe(feed);
+    feedStore.patch(CONV, (f) => f && { ...f, source: 'cached' });
+    conversationsStore.patch(CONV, (c) => c && { ...c, cwd: '/different-chat' });
+    const cached = feedStore.get(CONV);
+    storeSink.snapshot(m, convsSnap(rt));
+    expect(feedStore.get(CONV)).toBe(cached);
+  });
+
   it('does not take over a different chat behind a colliding id', async () => {
     const { rt, m, unsent } = await strayChat();
     for (const other of [{ createdAt: 1700000000000 }, { cwd: '/somewhere/else' }]) {

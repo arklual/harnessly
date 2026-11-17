@@ -2,14 +2,13 @@ package hlcli
 
 import (
 	"encoding/json"
-	"fmt"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/delegation"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
@@ -77,28 +76,13 @@ func (c *cli) chat(args []string) error {
 	return nil
 }
 
-func cliConversationID(ref string) (string, error) {
-	ref = strings.TrimSpace(ref)
-	if u, err := url.Parse(ref); err == nil && u.Scheme != "" && u.Host != "" {
-		p := strings.Split(strings.Trim(u.Path, "/"), "/")
-		if len(p) != 3 || p[0] != "agents" || p[1] != "c" {
-			return "", fmt.Errorf("not a hub conversation URL")
-		}
-		ref = p[2]
-	}
-	if !strings.HasPrefix(ref, "tab-") || len(ref) > 200 || strings.ContainsAny(ref, "/?# ") {
-		return "", fmt.Errorf("not a conversation id or hub conversation URL")
-	}
-	return ref, nil
-}
-
 // chatRead reads the owner's synchronised copy through their local agent; it never needs a browser session.
 func (c *cli) chatRead(args []string) error {
 	f, err := parseFlags(args, map[string]string{"before": "before", "n": "limit", "limit": "limit"})
 	if err != nil || len(f.pos) != 1 {
 		return usageErr("chat read ID|URL [--before TURN] [-n N]")
 	}
-	id, err := cliConversationID(f.pos[0])
+	id, err := delegation.ConversationRef(f.pos[0])
 	if err != nil {
 		return err
 	}

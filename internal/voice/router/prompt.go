@@ -57,6 +57,11 @@ Rules:
   сайт», «новый проект») is a "new_chat", not "agent": the current chat keeps its own work.
 - When the screen says a ChatGPT talk is current, "agent" is that talk writing (texts, answers, plans); anything that
   needs a machine — a board, a design, a file, code, running something — is a "new_chat" for an agent.
+- The text for an agent ("agent", "send", "new_chat") is the person's request, whole and in their words, so the
+  agent can do it without the talk. Never tell an agent to ask the person for a key, a token or a password: the
+  machine has its own access.
+- «Синопия», «Sinopia», «макет», «прототип», «дизайн экрана» is Sinopia Design (the harnessly design app): its
+  "new_chat" text says to make it in Sinopia Design.
 - Small talk, an opinion, a joke: just "say", no actions.`
 
 // Prompt is the message for one task: the task, the screen, the chats, the catalog, and what was recalled.

@@ -20,6 +20,8 @@ import { conversationsByActivity } from '@/next/stores/conversations';
 import { gatesStore, openGates } from '@/next/stores/conversation';
 import { meStore, patchSettings } from '@/next/stores/me';
 import { sendModeNow } from '@/next/stores/chat-state';
+import { ACT, addAct, updateAct } from '@/next/features/voice-live/voice-acts';
+import { t } from '@/next/i18n';
 
 export interface IRouteAction {
   do: string;
@@ -262,6 +264,8 @@ export interface IPlanHands {
   show: (what: string, action: IRouteAction) => void;
   readAloud: (action: IRouteAction) => void;
   stop: () => void;
+  /** A chat the voice gave work to (a message, a new chat): its answer is told when its agent is done. */
+  follow?: (chat: ConvId, act: number) => void;
 }
 
 const MOODS = new Set(['neutral', 'joy', 'sad', 'thinking', 'surprised']);
@@ -282,12 +286,19 @@ export const runPlan = async (plan: IRoutePlan, hands: IPlanHands): Promise<bool
 
 const chatOf = (id: string | undefined) => conversationsByActivity().find((c) => c.id === id) ?? null;
 
+const titleOf = (c: Conversation | null) => c?.title || t('next.voice.cards.untitled');
+const short = (text: string, n = 48) => (text.length > n ? `${text.slice(0, n - 1).trimEnd()}…` : text);
+const PAGE_NAME = (page: string | undefined) =>
+  PAGES.find(([id]) => id === page)?.[1].split(' / ')[0] ?? page ?? '';
+
 const runAction = async (a: IRouteAction, h: IPlanHands): Promise<boolean> => {
   switch (a.do) {
     case 'agent':
       if (!a.text) return false;
       if (!h.conv && !h.chatHere) return newChat({ ...a, do: 'new_chat' }, h);
       h.toAgent(a.text);
+      if (h.conv)
+        h.follow?.(h.conv, addAct(t('next.voice.acts.agent', { text: short(a.text) }), ACT.waiting, h.conv));
       return true;
     case 'send': {
       const c = chatOf(a.chat);
@@ -298,12 +309,14 @@ const runAction = async (a: IRouteAction, h: IPlanHands): Promise<boolean> => {
         attachments: [],
         mode: sendModeNow(c.id),
       });
+      h.follow?.(c.id, addAct(t('next.voice.acts.send', { title: titleOf(c) }), ACT.waiting, c.id));
       return true;
     }
     case 'open_chat': {
       const c = chatOf(a.chat);
       if (!c) return false;
       goTo({ kind: ROUTE.chat, id: c.id });
+      addAct(t('next.voice.acts.openChat', { title: titleOf(c) }), ACT.done, c.id);
       return true;
     }
     case 'answer': {
@@ -315,6 +328,15 @@ const runAction = async (a: IRouteAction, h: IPlanHands): Promise<boolean> => {
       const answers = valid ? [{ i: 0, choices: [n] }] : [{ i: 0, choices: [], text: a.text ?? '' }];
       if (!valid && !a.text) return false;
       await settled(answerQuestion(c.machineId, c.id, q.id, answers));
+      const said = valid ? (q.items[0]?.options[n]?.label ?? '') : (a.text ?? '');
+      h.follow?.(
+        c.id,
+        addAct(
+          t('next.voice.acts.answer', { title: titleOf(c), answer: short(said, 32) }),
+          ACT.waiting,
+          c.id,
+        ),
+      );
       return true;
     }
     case 'permit': {
@@ -324,6 +346,8 @@ const runAction = async (a: IRouteAction, h: IPlanHands): Promise<boolean> => {
       const option = permissionOption(p, a.allow === true);
       if (!option) return false;
       await settled(decidePermission(c.machineId, c.id, p.id, option));
+      const key = a.allow === true ? 'next.voice.acts.allowed' : 'next.voice.acts.denied';
+      h.follow?.(c.id, addAct(t(key, { title: titleOf(c) }), ACT.waiting, c.id));
       return true;
     }
     case 'new_chat':
@@ -339,6 +363,11 @@ const runAction = async (a: IRouteAction, h: IPlanHands): Promise<boolean> => {
         EFFORTS.includes(a.effort ?? '') ? a.effort : (c.model?.effort ?? null)
       ) as Effort | null;
       await settled(setModel(c.machineId, c.id, model, effort, false));
+      addAct(
+        t('next.voice.acts.model', { title: titleOf(c), model: [model, effort].filter(Boolean).join(' · ') }),
+        ACT.done,
+        c.id,
+      );
       return true;
     }
     case 'open': {
@@ -351,15 +380,25 @@ const runAction = async (a: IRouteAction, h: IPlanHands): Promise<boolean> => {
         if (!kind) return false;
         goTo({ kind } as Parameters<typeof goTo>[0]);
       }
+      addAct(
+        t('next.voice.acts.open', {
+          name:
+            a.page === 'settings' && a.section
+              ? `${PAGE_NAME('settings')} · ${SECTION_LABEL[a.section as SettingsSection] ?? a.section}`
+              : PAGE_NAME(a.page),
+        }),
+      );
       return true;
     }
     case 'theme':
       if (!a.value) return false;
       h.setTheme(a.value);
+      addAct(t(`next.voice.acts.theme.${a.value === 'dark' || a.value === 'light' ? a.value : 'system'}`));
       return true;
     case 'sidebar': {
       const wantFolded = a.open === false;
       if (wantFolded !== h.sidebarFolded) toggleRail();
+      addAct(t(wantFolded ? 'next.voice.acts.sidebarFolded' : 'next.voice.acts.sidebarOpen'));
       return true;
     }
     case 'pane': {
@@ -375,16 +414,15 @@ const runAction = async (a: IRouteAction, h: IPlanHands): Promise<boolean> => {
         // A queued tab is taken when the chat is shown: show it again.
         goTo({ kind: ROUTE.chat, id: conv }, { replace: true });
       }
+      addAct(
+        t(a.open === false ? 'next.voice.acts.paneClosed' : 'next.voice.acts.paneOpen', { tab: a.tab ?? '' }),
+      );
       return true;
     }
     case 'setting': {
-      if (a.key === 'enterSends')
-        return (await patchSettings({ enterSends: a.value === 'on' })).r === 'accepted';
-      if (a.key === 'voiceMascot' && (a.value === 'h' || a.value === 'face'))
-        return (await patchSettings({ voiceMascot: a.value })).r === 'accepted';
-      if (a.key === 'textSize' && (a.value === 's' || a.value === 'm' || a.value === 'l'))
-        return (await patchSettings({ textSize: a.value })).r === 'accepted';
-      return false;
+      const ok = await changeSetting(a);
+      if (ok) addAct(t('next.voice.acts.setting', { key: a.key ?? '', value: a.value ?? '' }));
+      return ok;
     }
     case 'show':
       h.show(a.what ?? 'text', a);
@@ -398,6 +436,15 @@ const runAction = async (a: IRouteAction, h: IPlanHands): Promise<boolean> => {
     default:
       return false;
   }
+};
+
+const changeSetting = async (a: IRouteAction): Promise<boolean> => {
+  if (a.key === 'enterSends') return (await patchSettings({ enterSends: a.value === 'on' })).r === 'accepted';
+  if (a.key === 'voiceMascot' && (a.value === 'h' || a.value === 'face'))
+    return (await patchSettings({ voiceMascot: a.value })).r === 'accepted';
+  if (a.key === 'textSize' && (a.value === 's' || a.value === 'm' || a.value === 'l'))
+    return (await patchSettings({ textSize: a.value })).r === 'accepted';
+  return false;
 };
 
 const newChat = async (a: IRouteAction, h: IPlanHands): Promise<boolean> => {
@@ -420,8 +467,18 @@ const newChat = async (a: IRouteAction, h: IPlanHands): Promise<boolean> => {
     model: id ? launchModel({ provider, model: id, effort, ultracode: false }) : null,
     first: { text, attachments: [] },
   });
+  const act = addAct(
+    t('next.voice.acts.newChat', { text: short(a.text, 40), model: id ?? provider }),
+    ACT.doing,
+  );
   const conv = await handle.conversation;
-  if (!conv) return false;
+  if (!conv) {
+    updateAct(act, { state: ACT.failed });
+    return false;
+  }
+  updateAct(act, { state: ACT.waiting, chat: conv });
+  // The new chat is opened; the voice goes on with the person there (its chat follows the screen, voice-hands.tsx).
   goTo({ kind: ROUTE.chat, id: conv });
+  h.follow?.(conv, act);
   return true;
 };

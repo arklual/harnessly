@@ -96,16 +96,38 @@ func ChildrenFromTable(parent int) []int {
 }
 
 // Descendants is every process below root (root itself excluded), level by level: the children, then their children.
+// It reads the process table once (one stat per process) instead of the children of every thread of the tree: a
+// tree of many-threaded programs (Go and Node servers run dozens of threads each) costs a read per thread that way,
+// and where a read of /proc is a slow system call (a sandboxed kernel) the walk took seconds per tree.
 func Descendants(root int) []int {
+	return descendantsIn(childrenTable(), root)
+}
+
+// childrenTable is every process's children, read from the parents in the process table, each list in pid order.
+func childrenTable() map[int][]int {
+	table := map[int][]int{}
+	for _, pid := range All() {
+		if st, ok := readStat(pid); ok {
+			table[st.ppid] = append(table[st.ppid], pid)
+		}
+	}
+	return table
+}
+
+// descendantsIn walks table below root level by level; a pid met twice (a reused one) is walked once.
+func descendantsIn(table map[int][]int, root int) []int {
 	all := []int{}
+	seen := map[int]bool{root: true}
 	frontier := []int{root}
 	for len(frontier) > 0 {
 		var next []int
 		for _, p := range frontier {
-			next = append(next, ChildPIDs(p)...)
-		}
-		if len(next) == 0 {
-			break
+			for _, c := range table[p] {
+				if !seen[c] {
+					seen[c] = true
+					next = append(next, c)
+				}
+			}
 		}
 		all = append(all, next...)
 		frontier = next

@@ -27,7 +27,14 @@ import type { IVoiceLiveControls } from '@/next/features/voice-live/voice-live';
 import type { IVoiceLine, IVoiceTask } from '@/next/features/voice-live/use-voice-call';
 import { useThemeMaybe } from '@/platform/theme';
 import { useRail } from '@/next/bindings/rail';
-import { goTo, ROUTE } from '@/next/routes/routes';
+import { goTo, parseRoute, ROUTE } from '@/next/routes/routes';
+import Router from '@/platform/router';
+import { quickPlan } from '@/next/bindings/voice-quick';
+import { ACT, addAct, clearActs, updateAct } from '@/next/features/voice-live/voice-acts';
+import { hub } from '@/next/core/realtime/hub';
+import { sendMessage } from '@/next/commands';
+import { sendModeNow } from '@/next/stores/chat-state';
+import { spokenResult } from '@/next/features/voice-live/spoken';
 import { conversationsByActivity, conversationsStore } from '@/next/stores/conversations';
 import { gatesStore, openGates } from '@/next/stores/conversation';
 import { startFolder } from '@/next/bindings/home-composer';
@@ -40,10 +47,35 @@ interface IVoiceHandsArgs {
   conv: ConvId | null;
   /** A ChatGPT talk: its title (the router's «agent» is that talk writing). */
   chatHere?: string | null;
+  /** A board or a file is open for quick edits («тёмная тема» may be the board's). */
+  overBoard?: boolean;
   controls: { current: IVoiceLiveControls | null };
 }
 
-export const useVoiceHands = ({ machine, conv, chatHere = null, controls }: IVoiceHandsArgs) => {
+/** A chat the voice gave work to, followed until its agent is done. */
+interface IFollowed {
+  act: number;
+  /** Its agent was seen working since. */
+  started: boolean;
+  /** Stopped since (the answer lands a moment after the state). */
+  quietAt: number | null;
+  since: number;
+  /** Its answer is told (the voice's own chat tells its answers itself, voice-live-agent.tsx). */
+  speak: boolean;
+}
+
+/** How long a followed chat stays stopped before its turn counts as over. */
+const SETTLE_MS = 2500;
+/** A chat that never started working in this long is not waited for any more. */
+const NEVER_MS = 90_000;
+
+export const useVoiceHands = ({
+  machine,
+  conv,
+  chatHere = null,
+  overBoard = false,
+  controls,
+}: IVoiceHandsArgs) => {
   const theme = useThemeMaybe();
   const resolvedTheme = theme?.resolvedTheme ?? 'dark';
   const setTheme = (next: string) => theme?.setTheme(next as Parameters<typeof theme.setTheme>[0]);
@@ -95,6 +127,94 @@ export const useVoiceHands = ({ machine, conv, chatHere = null, controls }: IVoi
     };
   }, [live, conv, controls]);
 
+  // The chats the voice gave work to are followed: when an agent is done, the voice tells its answer («голос
+  // один на всё приложение» — a new chat made by voice, a message to another chat, an answered question).
+  const followed = useRef(new Map<ConvId, IFollowed>());
+  const [followTick, setFollowTick] = useState(0);
+  const follow = useCallback(
+    (chat: ConvId, act: number) => {
+      followed.current.set(chat, {
+        act,
+        started: false,
+        quietAt: null,
+        since: Date.now(),
+        speak: chat !== conv,
+      });
+      setFollowTick((n) => n + 1);
+    },
+    [conv],
+  );
+  useEffect(() => {
+    if (!live || followed.current.size === 0) return;
+    const channels = new Map<ConvId, () => void>();
+    const check = () => {
+      const now = Date.now();
+      for (const [id, f] of followed.current) {
+        const c = conversationsStore.get(id);
+        if (!c) continue;
+        if (!channels.has(id)) channels.set(id, hub.openConversation(c.machineId, id));
+        const k = c.state.k;
+        // A question or a permission is told by the waiting watch above: the work is not over.
+        if (k === 'working' || k === 'starting' || k === 'waiting-question' || k === 'waiting-permission') {
+          f.started = true;
+          f.quietAt = null;
+          continue;
+        }
+        if (!f.started) {
+          if (now - f.since > NEVER_MS) {
+            followed.current.delete(id);
+            updateAct(f.act, { state: ACT.done });
+          }
+          continue;
+        }
+        f.quietAt ??= now;
+        if (now - f.quietAt < SETTLE_MS) continue;
+        followed.current.delete(id);
+        const failed = c.lastTurn?.status === 'failed' || k === 'launch-failed';
+        updateAct(f.act, { state: failed ? ACT.failed : ACT.done });
+        if (!f.speak) continue;
+        const last = chatLines(new ItemsBuilder(id, c.machineId).snapshot(), 1)[0];
+        const answer = last?.role === 'assistant' ? spokenResult(last.text).slice(0, 1200) : '';
+        void controls.current?.say(
+          answer
+            ? `The chat «${c.title || 'untitled'}» is done. Its answer: «${answer}». Tell the person its gist in one or ` +
+                'two short sentences, as news from that chat.'
+            : `The chat «${c.title || 'untitled'}» ${failed ? 'failed' : 'is done, without an answer'}. Tell the ` +
+                'person in a few words.',
+        );
+      }
+    };
+    const timer = window.setInterval(check, 1000);
+    check();
+    return () => {
+      window.clearInterval(timer);
+      for (const release of channels.values()) release();
+    };
+  }, [live, followTick, controls]);
+
+  /** The agent chat on screen, if one is: the talk follows the person there; else the talk's own chat. */
+  const focusChat = (): ConvId | null => {
+    const r = parseRoute(Router.asPath);
+    if (r.kind !== ROUTE.chat) return conv;
+    const c = conversationsStore.get(r.id as ConvId);
+    return c && !c.test ? c.id : conv;
+  };
+
+  /** Work for a chat that is not the talk's own: a message to it, followed. */
+  const toChat = (id: ConvId, text: string) => {
+    const c = conversationsStore.get(id);
+    if (!c || !text.trim()) return;
+    sendMessage(c.machineId, { conversationId: id, text, attachments: [], mode: sendModeNow(id) });
+    follow(
+      id,
+      addAct(
+        t('next.voice.acts.send', { title: c.title || t('next.voice.cards.untitled') }),
+        ACT.waiting,
+        id,
+      ),
+    );
+  };
+
   /** Says the next part of a long reading, or ends it. */
   const readOn = useCallback((say: IVoiceLiveControls['say']) => {
     const r = reading();
@@ -128,36 +248,54 @@ export const useVoiceHands = ({ machine, conv, chatHere = null, controls }: IVoi
     say: IVoiceLiveControls['say'],
     toAgent: (text?: string) => void,
   ): Promise<boolean> => {
+    // The chat on screen is the current one: the voice works where the person is, not where the talk began.
+    const focus = focusChat();
+    const away = focus !== null && focus !== conv;
+    const here = away ? null : chatHere;
     const ctx = {
       machine,
-      conv,
-      screen: chatHere
-        ? `route: ChatGPT talk «${chatHere}» (a plain talk: it answers and writes texts; it has no machine)`
+      conv: focus,
+      screen: here
+        ? `route: ChatGPT talk «${here}» (a plain talk: it answers and writes texts; it has no machine)`
         : '',
       history: history.current,
       theme: resolvedTheme,
       sidebarFolded: railFolded,
     };
-    let plan;
-    try {
-      plan = await routeVoice(machine, routeRequest(task.text, task.said, ctx));
-    } catch {
-      return false;
+    // A simple command (the theme, a page, a chat by name) is done at once, without the model (voice-quick.ts).
+    const quickCtx = {
+      chats: conversationsByActivity()
+        .filter((c) => !c.test)
+        .map((c) => ({ id: c.id, title: c.title || '' })),
+      readingPaused: reading()?.paused === true,
+      overBoard,
+    };
+    let plan =
+      quickPlan(task.said?.trim() || task.text, quickCtx) ??
+      (task.said ? quickPlan(task.text, quickCtx) : null);
+    if (!plan) {
+      try {
+        plan = await routeVoice(machine, routeRequest(task.text, task.said, ctx));
+      } catch {
+        return false;
+      }
     }
+    const toWork = (text: string) => (away ? toChat(focus, text) : toAgent(text));
     const onlyAgent = plan.actions.length > 0 && plan.actions.every((a) => a.do === 'agent');
     if (onlyAgent) {
-      toAgent(plan.actions.map((a) => a.text).join('\n'));
+      toWork(plan.actions.map((a) => a.text).join('\n'));
       return true;
     }
-    const cur = conv ? conversationsStore.get(conv) : undefined;
+    const cur = focus ? conversationsStore.get(focus) : undefined;
     const ok = await runPlan(plan, {
       machine,
-      conv,
-      chatHere,
+      conv: focus,
+      chatHere: here,
+      follow,
       folder: cur?.cwd ?? startFolder([...conversationsByActivity()], machine),
       setTheme,
       sidebarFolded: railFolded,
-      toAgent: (text) => toAgent(text),
+      toAgent: toWork,
       show: (what, a) => {
         if (what === 'chats') {
           showOnVoiceStage(
@@ -183,6 +321,7 @@ export const useVoiceHands = ({ machine, conv, chatHere = null, controls }: IVoi
         }
         const text = readSource(a);
         if (!text.trim() || !startReading(t('next.voice.cards.reading'), text)) return;
+        addAct(t('next.voice.acts.reading'));
         readingSent.current = false;
         showOnVoiceStage(
           <ReadingCard
@@ -226,6 +365,8 @@ export const useVoiceHands = ({ machine, conv, chatHere = null, controls }: IVoi
   const onEnd = () => {
     setLive(false);
     stopReading();
+    clearActs();
+    followed.current.clear();
     showOnVoiceStage(null);
     history.current = [];
   };

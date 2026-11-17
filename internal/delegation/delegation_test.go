@@ -367,6 +367,13 @@ func TestDelegationLimits(t *testing.T) {
 	if text, isErr := r.call("tab-root", "read_conversation", map[string]any{"id": grandchild}); isErr {
 		t.Fatalf("grandchild: %s", text)
 	}
+	// GitHub #86: the link a person drops into the chat reads the same chat.
+	if text, isErr := r.call("tab-root", "read_conversation", map[string]any{"id": "https://hub.example.com/agents/c/" + grandchild}); isErr {
+		t.Fatalf("grandchild by link: %s", text)
+	}
+	if text, isErr := r.call("tab-root", "read_conversation", map[string]any{"id": "https://hub.example.com/boards/" + grandchild}); !isErr || !strings.Contains(text, "bad-request") {
+		t.Fatalf("not a chat link: %s", text)
+	}
 	r.convs.add(wire.Conversation{ID: "tab-other", Title: "The person's own", Provider: wire.ProviderClaude})
 	if text, isErr := r.call(grandchild, "send_to_conversation", map[string]any{"id": "tab-root", "text": "hi"}); !isErr || !strings.Contains(text, "not-allowed") {
 		t.Fatalf("grandchild to root: %s", text)
@@ -837,6 +844,24 @@ func TestTheWakeUpGoesIntoTheParentsRunningTurn(t *testing.T) {
 		}
 		if env, ok := peers.Parse(woken[0]); !ok || env.Chat != "Parser tests" || env.Via != "agent" || env.Ref != "dev-box/"+child {
 			t.Fatalf("the wake-up is not the chat's envelope: %q", woken[0])
+		}
+	}
+}
+
+func TestConversationRef(t *testing.T) {
+	for ref, want := range map[string]string{
+		"tab-abc":    "tab-abc",
+		" tab-abc\n": "tab-abc",
+		"https://hub.example.com/agents/c/tab-abc":  "tab-abc",
+		"https://hub.example.com/agents/c/tab-abc/": "tab-abc",
+	} {
+		if got, err := ConversationRef(ref); err != nil || got != want {
+			t.Errorf("%q: %q, %v", ref, got, err)
+		}
+	}
+	for _, ref := range []string{"", "abc", "https://hub.example.com/agents/tab-abc", "https://hub.example.com/agents/c/x", "tab-a b"} {
+		if got, err := ConversationRef(ref); err == nil {
+			t.Errorf("%q accepted as %q", ref, got)
 		}
 	}
 }

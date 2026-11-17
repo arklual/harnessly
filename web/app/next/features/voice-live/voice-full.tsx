@@ -30,6 +30,7 @@ import type { ConvId } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
 import { PRESENCE, usePresence, usePresentFlag } from '@/next/ui/presence';
 import { showOnVoiceStage, useVoiceStage } from '@/next/features/voice-live/voice-stage';
+import VoiceActs from '@/next/features/voice-live/voice-acts-list';
 import '@/next/styles/voice-full.css';
 
 /** The layer leaves in this long (hx-voice-full-out). */
@@ -261,6 +262,7 @@ export const VoiceFullBody = ({
         >
           {subs ? tailOf(line) : ''}
         </p>
+        {view !== 'text' && <VoiceActs />}
       </main>
       {fieldOn.mounted && (
         <VoiceTextField onSend={voice.typed} closing={fieldOn.state === PRESENCE.closing} />

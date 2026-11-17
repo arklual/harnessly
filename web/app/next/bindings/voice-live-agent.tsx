@@ -104,7 +104,7 @@ const VoiceLiveAgent = ({ machine, conv, extra = null }: IVoiceLiveAgentProps) =
       }
     : null;
   const voiceEdit = extra?.voiceEdit ?? paneEdit;
-  const hands = useVoiceHands({ machine, conv, controls });
+  const hands = useVoiceHands({ machine, conv, overBoard: Boolean(voiceEdit), controls });
   const started = useRef(false);
   // A task that waits for «да» (confirm.ts): the next words decide.
   const held = useRef<IVoiceTask | null>(null);

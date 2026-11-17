@@ -297,3 +297,23 @@ func TestSocketOwner(t *testing.T) {
 		}
 	}
 }
+
+// process-proc: the walk goes level by level and survives a pid that appears twice in the table.
+func TestDescendantsInWalksLevelsOnce(t *testing.T) {
+	table := map[int][]int{1: {2, 3}, 2: {4}, 3: {5}, 4: {2}, 5: {}}
+	if got := descendantsIn(table, 1); !slices.Equal(got, []int{2, 3, 4, 5}) {
+		t.Fatalf("descendants %v", got)
+	}
+	if got := descendantsIn(table, 9); len(got) != 0 {
+		t.Fatalf("a pid with no children: %v", got)
+	}
+}
+
+// process-proc: grandchildren are found too.
+func TestDescendantsFindsGrandchildren(t *testing.T) {
+	sh := start(t, "sh", "-c", "sh -c 'sleep 30 & wait' & wait")
+	got := waitFor(t, func() []int { return Descendants(sh.Process.Pid) }, func(p []int) bool { return len(p) == 2 })
+	if kids := ChildPIDs(sh.Process.Pid); len(kids) != 1 || got[0] != kids[0] || !slices.Equal(got[1:], ChildPIDs(kids[0])) {
+		t.Fatalf("descendants %v, children %v", got, kids)
+	}
+}

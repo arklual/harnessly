@@ -87,3 +87,82 @@
 .hx-vread__text p[data-past] {
   opacity: 0.6;
 }
+
+/* The voice's actions under the mascot (features/voice-live/voice-acts-list.tsx). */
+.hx-vacts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: min(520px, 100%);
+  margin: 12px auto 0;
+  padding: 0 16px;
+  list-style: none;
+}
+.hx-vacts > li {
+  display: contents;
+}
+.hx-vacts__row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 5px 12px;
+  border: 1px solid var(--hx-border);
+  border-radius: 999px;
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  animation: hx-vacts-in 220ms ease-out;
+}
+button.hx-vacts__row {
+  cursor: pointer;
+}
+button.hx-vacts__row:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-vacts__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-vacts__state {
+  flex: none;
+  color: var(--hx-fg-3);
+}
+.hx-vacts__row[data-state='waiting'] {
+  border-color: color-mix(in srgb, var(--hx-accent) 40%, var(--hx-border));
+}
+.hx-vacts__row[data-state='waiting'] svg,
+.hx-vacts__row[data-state='doing'] svg {
+  color: var(--hx-accent);
+}
+.hx-vacts__row[data-state='done'] svg {
+  color: var(--hx-success, #3fb37f);
+}
+.hx-vacts__row[data-state='failed'] svg {
+  color: var(--hx-danger, #e5534b);
+}
+.hx-vacts[data-last] {
+  width: auto;
+  margin: 0;
+  padding: 0;
+}
+.hx-vacts[data-last] .hx-vacts__row {
+  padding: 2px 8px;
+  border: 0;
+  background: transparent;
+}
+@keyframes hx-vacts-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-vacts__row {
+    animation: none;
+  }
+}

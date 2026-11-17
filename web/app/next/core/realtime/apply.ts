@@ -118,6 +118,16 @@ const goneFromFleet = (machine: MachineId): boolean => {
 function adoptStray(machine: MachineId, c: Conversation): void {
   const record = conversationsStore.get(c.id);
   const feed = feedStore.get(c.id);
+  // GitHub #104. The central history list may already name the new owner while IndexedDB still holds the old
+  // machine's drawing: owns() would refuse the new owner's snapshot forever. Only a cached drawing of this same chat
+  // from a machine gone from the fleet gives way; a live feed or a machine still listed keeps its ownership.
+  if (record?.machineId === machine && feed && feed.machineId !== machine) {
+    if (feed.source !== 'cached' || !goneFromFleet(feed.machineId)) return;
+    if (record.createdAt !== c.createdAt || record.cwd !== c.cwd) return;
+    moveMessages(c.id, feed.machineId, machine);
+    dropConversationData(c.id);
+    return;
+  }
   const was = record?.machineId ?? feed?.machineId;
   if (!was || was === machine || !goneFromFleet(was)) return;
   if (feed && feed.machineId !== was) return;
@@ -127,17 +137,22 @@ function adoptStray(machine: MachineId, c: Conversation): void {
     return;
   }
   if (record.createdAt !== c.createdAt || record.cwd !== c.cwd) return;
+  moveMessages(c.id, was, machine);
+  dropConversationData(c.id);
+  removeConversation(c.id);
+}
+
+/** The chat's messages kept under the old machine move to the new one; none of them is sent again by itself. */
+function moveMessages(conv: ConvId, was: MachineId, machine: MachineId): void {
   const at = machineNow(machine);
-  for (const id of convMessagesStore.get(c.id) ?? []) {
+  for (const id of convMessagesStore.get(conv) ?? []) {
     const m = messagesStore.get(id);
-    if (!m || m.machineId !== was || m.conversationId !== c.id) continue;
+    if (!m || m.machineId !== was || m.conversationId !== conv) continue;
     messagesStore.set(id, { ...m, machineId: machine });
     // A draft stays a draft and a failure keeps its reason; one on its way (or waiting to go) stops and waits.
     if (m.rev === 0 && !isTerminal(m.state) && m.state.k !== 'failed' && m.state.k !== 'draft')
       returnToQueue(id, at);
   }
-  dropConversationData(c.id);
-  removeConversation(c.id);
 }
 
 const ownRecord = (machine: MachineId, id: ConvId): boolean =>

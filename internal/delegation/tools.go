@@ -131,6 +131,13 @@ func (t Tools) call(ctx context.Context, name string, args *jsvalue.Object) (str
 		if err := a.need("id", id); err != nil {
 			return "", err
 		}
+		if id != ParentAlias {
+			ref, err := ConversationRef(id)
+			if err != nil {
+				return "", refuse("bad-request", "id: %v", err)
+			}
+			id = ref
+		}
 		return t.S.ReadPage(ctx, t.Caller, id, since, before, limit)
 	case "send_to_conversation":
 		id, text, how := a.str("id"), a.text(), a.str("deliver")
