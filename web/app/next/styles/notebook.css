@@ -1,24 +1,25 @@
 /* Native notebook cells use the file pane's sizing, type and light/dark tokens. */
-.hx-nb {
+.hx-jnb {
   min-width: 0;
 }
-.hx-nb__body {
+.hx-jnb__body {
+  display: block;
   flex: 1;
   min-height: 0;
   overflow: auto;
   padding: 16px;
 }
-.hx-nb__kernel {
+.hx-jnb__kernel {
   color: var(--hx-fg-3);
   font-size: var(--hx-text-xs);
   white-space: nowrap;
 }
-.hx-nb .hx-fed__bar {
+.hx-jnb .hx-fed__bar {
   gap: 8px;
   flex-wrap: wrap;
 }
-.hx-nb__trust,
-.hx-nb__warning {
+.hx-jnb__trust,
+.hx-jnb__warning {
   margin: 0 0 16px;
   padding: 12px;
   border: 1px solid var(--hx-border);
@@ -27,19 +28,19 @@
   font-size: var(--hx-text-sm);
   line-height: 1.6;
 }
-.hx-nb__trust p {
+.hx-jnb__trust p {
   margin: 0 0 8px;
 }
-.hx-nb__cell {
+.hx-jnb__cell {
   margin-bottom: 16px;
   border: 1px solid var(--hx-border);
   border-radius: 10px;
   overflow: hidden;
 }
-.hx-nb__cell[data-running] {
+.hx-jnb__cell[data-running] {
   border-color: var(--hx-accent);
 }
-.hx-nb__cell-head {
+.hx-jnb__cell-head {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -48,45 +49,45 @@
   border-bottom: 1px solid var(--hx-border);
   background: var(--hx-bg-rail);
 }
-.hx-nb__cell-head > span {
+.hx-jnb__cell-head > span {
   flex: 1;
   color: var(--hx-fg-3);
   font: 12px var(--hx-font-mono);
 }
-.hx-nb__source {
+.hx-jnb__source {
   display: block;
   box-sizing: border-box;
   width: 100%;
   min-height: 64px;
   background: var(--hx-bg-app);
 }
-.hx-nb__source:focus-within {
+.hx-jnb__source:focus-within {
   outline: 2px solid var(--hx-accent);
   outline-offset: -2px;
 }
-.hx-nb__cell > .hx-fed__doc {
+.hx-jnb__cell > .hx-fed__doc {
   padding: 12px 16px;
 }
-.hx-nb__outputs {
+.hx-jnb__outputs {
   padding: 12px;
   border-top: 1px solid var(--hx-border);
   overflow: auto;
 }
-.hx-nb__outputs pre {
+.hx-jnb__outputs pre {
   margin: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font: 13px/1.6 var(--hx-font-mono);
 }
-.hx-nb__outputs pre[data-stderr] {
+.hx-jnb__outputs pre[data-stderr] {
   color: var(--hx-danger);
 }
-.hx-nb__outputs img {
+.hx-jnb__outputs img {
   display: block;
   max-width: 100%;
   height: auto;
 }
-.hx-nb__outputs iframe {
+.hx-jnb__outputs iframe {
   display: block;
   box-sizing: border-box;
   width: 100%;
@@ -96,7 +97,7 @@
   border: 0;
   background: white;
 }
-.hx-nb__muted {
+.hx-jnb__muted {
   color: var(--hx-fg-3);
   font-size: var(--hx-text-sm);
 }

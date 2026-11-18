@@ -1,0 +1,25 @@
+.hx-notebook-gallery {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding: 16px;
+  gap: 12px;
+  background: var(--hx-bg-app);
+  color: var(--hx-fg-1);
+}
+.hx-notebook-gallery__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  font: 13px var(--hx-font-ui);
+}
+.hx-notebook-gallery__pane {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--hx-border);
+  border-radius: 12px;
+  overflow: hidden;
+}

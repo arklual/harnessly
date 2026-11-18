@@ -14,7 +14,13 @@ import {
   type KernelState,
   type NotebookRuntime,
 } from './notebook-api';
-import { notebookText, parseNotebook, writeNotebook, type Notebook } from './notebook-model';
+import {
+  isPythonNotebook,
+  notebookText,
+  parseNotebook,
+  writeNotebook,
+  type Notebook,
+} from './notebook-model';
 import '@/next/styles/notebook.css';
 
 export interface NotebookViewProps extends IFileEditorProps {
@@ -123,7 +129,7 @@ const NotebookEditor = ({
       !(event.ctrlKey || event.metaKey) ||
       event.altKey ||
       event.key.toLowerCase() !== 's' ||
-      !target?.closest('.hx-nb')
+      !target?.closest('.hx-jnb')
     )
       return;
     event.preventDefault();
@@ -228,17 +234,12 @@ const NotebookEditor = ({
   };
   const busy = running !== null || kernel === 'busy';
   const codeCells = book.cells.flatMap((cell, i) => (cell.cell_type === 'code' ? [i] : []));
-  const kernelName = book.metadata.kernelspec;
-  const declaredKernel =
-    typeof kernelName === 'object' && kernelName !== null && 'name' in kernelName
-      ? kernelName.name
-      : undefined;
-  const compatible = declaredKernel === undefined || declaredKernel === 'python3';
+  const compatible = isPythonNotebook(book);
 
   return (
-    <div className="hx-fed hx-nb" data-kind="notebook">
+    <div className="hx-fed hx-jnb" data-kind="notebook">
       <HeadTools bar="hx-fed__bar">
-        <span className="hx-nb__kernel" role="status">
+        <span className="hx-jnb__kernel" role="status">
           {t(`next.notebook.state.${kernel}`)}
         </span>
         <RoundButton
@@ -292,29 +293,29 @@ const NotebookEditor = ({
           </Button>
         </div>
       )}
-      <div className="hx-nb__body">
+      <div className="hx-jnb__body">
         {!compatible && (
-          <p className="hx-nb__warning" role="status">
+          <p className="hx-jnb__warning" role="status">
             {t('next.notebook.pythonOnly')}
           </p>
         )}
         {!allowed && runtime && compatible && (
-          <div className="hx-nb__trust">
+          <div className="hx-jnb__trust">
             <p>{t('next.notebook.trustNotice')}</p>
             <Button size="sm" variant="ghost" onClick={() => setAllowed(true)}>
               {t('next.notebook.allow')}
             </Button>
           </div>
         )}
-        {book.cells.length === 0 && <p className="hx-nb__muted">{t('next.notebook.empty')}</p>}
+        {book.cells.length === 0 && <p className="hx-jnb__muted">{t('next.notebook.empty')}</p>}
         {book.cells.map((cell, index) => (
           <section
             key={index}
-            className="hx-nb__cell"
+            className="hx-jnb__cell"
             data-running={running === index || undefined}
             aria-label={t('next.notebook.cell', { n: index + 1 })}
           >
-            <div className="hx-nb__cell-head">
+            <div className="hx-jnb__cell-head">
               <span>
                 {cell.cell_type === 'code'
                   ? `[${running === index ? '*' : (cell.execution_count ?? ' ')}]`
@@ -357,7 +358,7 @@ const NotebookEditor = ({
               />
             )}
             {cell.cell_type === 'code' && cell.outputs && cell.outputs.length > 0 && (
-              <div className="hx-nb__outputs">
+              <div className="hx-jnb__outputs">
                 {cell.outputs.slice(0, 200).map((output, i) => (
                   <NotebookOutputView key={i} output={output} />
                 ))}
@@ -367,9 +368,11 @@ const NotebookEditor = ({
           </section>
         ))}
       </div>
-      <div className="hx-fed__status">
-        <span>{t('next.notebook.label')}</span>
-        <span>{t(saving ? 'next.editor.saving' : dirty ? 'next.editor.dirty' : 'next.editor.saved')}</span>
+      <div className="hx-fed__foot">
+        <span className="hx-fed__lang">{t('next.notebook.label')}</span>
+        <span className="hx-fed__state" data-state={saving ? 'saving' : dirty ? 'dirty' : 'saved'}>
+          {t(saving ? 'next.editor.saving' : dirty ? 'next.editor.dirty' : 'next.editor.saved')}
+        </span>
       </div>
     </div>
   );

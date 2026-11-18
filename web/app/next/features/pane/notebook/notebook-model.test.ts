@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { isNotebook, notebookHtml, notebookText, parseNotebook, writeNotebook } from './notebook-model';
+import {
+  isNotebook,
+  isPythonNotebook,
+  notebookHtml,
+  notebookText,
+  parseNotebook,
+  writeNotebook,
+} from './notebook-model';
 
 const fixture = () => ({
   nbformat: 4,
@@ -55,6 +62,24 @@ describe('notebook files', () => {
       { ...fixture(), cells: [{ cell_type: 'code', metadata: {}, source: '', outputs: [null] }] },
     ])
       expect(() => parseNotebook(JSON.stringify(value))).toThrow();
+  });
+  it('recognizes Python by language even when the kernelspec names a project environment', () => {
+    for (const metadata of [
+      { kernelspec: { name: 'project-python', language: 'python', argv: ['never-run-metadata'] } },
+      { kernelspec: { name: 'custom-env' }, language_info: { name: 'python' } },
+      { kernelspec: { name: 'python3' } },
+      {},
+    ])
+      expect(isPythonNotebook(parseNotebook(JSON.stringify({ ...fixture(), metadata })))).toBe(true);
+  });
+  it('does not mistake another language for Python, even with misleading kernel names', () => {
+    for (const metadata of [
+      { kernelspec: { name: 'julia', language: 'julia' } },
+      { kernelspec: { name: 'julia' } },
+      { kernelspec: { name: 'python3', language: 'R' } },
+      { language_info: { name: 'javascript' } },
+    ])
+      expect(isPythonNotebook(parseNotebook(JSON.stringify({ ...fixture(), metadata })))).toBe(false);
   });
   it('recognizes only notebook extensions', () => {
     expect(isNotebook('/work/EXAMPLE.IPYNB')).toBe(true);

@@ -51,7 +51,7 @@ const NotebookOutputView = ({ output }: { output: NotebookOutput }) => {
   if (text) return <pre>{plain(text)}</pre>;
   if (data['application/json'] !== undefined)
     return <pre>{JSON.stringify(data['application/json'], null, 2)}</pre>;
-  return <p className="hx-nb__muted">{t('next.notebook.unsupportedOutput')}</p>;
+  return <p className="hx-jnb__muted">{t('next.notebook.unsupportedOutput')}</p>;
 };
 
 export default NotebookOutputView;
