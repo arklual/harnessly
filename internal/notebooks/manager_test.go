@@ -144,7 +144,11 @@ func TestNotebookBusyRejectsButInterruptAndShutdownWork(t *testing.T) {
 	<-f.started
 	m.Shutdown(key)
 	select {
-	case <-done:
+	case err := <-done:
+		var ne *Error
+		if !errors.As(err, &ne) || ne.Code != "closed" {
+			t.Fatalf("shutdown did not cancel execution: %v", err)
+		}
 	case <-time.After(time.Second):
 		t.Fatal("shutdown left execution running")
 	}

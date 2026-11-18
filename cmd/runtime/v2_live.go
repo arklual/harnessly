@@ -74,7 +74,7 @@ type v2Live struct {
 	starter    *v2Launcher
 	terms      *v2Terminals // nil when the core has no terminal server
 	notebooks  *notebooks.Manager
-	designly   *v2Designly  // nil when the core cannot start agents
+	designly   *v2Designly // nil when the core cannot start agents
 	// delegation is the agents' delegation of chats to other agents (v2_delegate.go).
 	delegation *delegation.Service
 	// resume is the move service when the chats' resume snapshots are on (chat_resume.go), else nil.
