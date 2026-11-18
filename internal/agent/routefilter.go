@@ -49,6 +49,13 @@ func isOwnTerminals(p string) bool {
 }
 
 func isTerminalRoute(p string) bool {
+	// A native notebook executes arbitrary local Python just like a shell;
+	// turning terminals off must not leave this alternate execution path open.
+	if rest, ok := strings.CutPrefix(p, "/api/v2/conversations/"); ok {
+		if _, tail, found := strings.Cut(rest, "/"); found && tail == "notebook" {
+			return true
+		}
+	}
 	if isOwnTerminals(p) {
 		return true
 	}

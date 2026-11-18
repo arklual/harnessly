@@ -33,6 +33,8 @@ func guarded(p string, r *http.Request) bool {
 		return true
 	case strings.HasPrefix(p, "conversations/") && (strings.HasSuffix(p, "/file-op") || strings.HasSuffix(p, "/find")):
 		return true
+	case strings.HasPrefix(p, "conversations/") && strings.HasSuffix(p, "/notebook"):
+		return true
 	case strings.HasPrefix(p, "conversations/") && strings.HasSuffix(p, "/file"):
 		return r.Method != http.MethodGet && r.Method != http.MethodHead
 	case strings.HasPrefix(p, "conversations/") && strings.Contains(p, "/terminals"):
