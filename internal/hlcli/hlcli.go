@@ -690,6 +690,23 @@ func (c *cli) tabCreate(args []string) error {
 	if len(f.pos) > 0 {
 		return usageErr("tab create takes options only, got %q", f.pos[0])
 	}
+	if p, ok := f.values["prompt"]; ok {
+		// "-" reads the task from stdin (a heredoc): a long task with quotes and new lines never breaks the shell's
+		// quoting. An empty task is refused: a $(cat missing-file) that came out empty would otherwise start a plain
+		// tab, with no nested chat and nobody woken by its answer.
+		if p == "-" {
+			raw, err := io.ReadAll(io.LimitReader(c.env.Stdin, 1<<20))
+			if err != nil {
+				return fail("--prompt -: %v", err)
+			}
+			p = string(raw)
+		}
+		if strings.TrimSpace(p) == "" {
+			return usageErr("--prompt is empty: give the whole task, or --prompt - with the task on stdin " +
+				"(harnessly tab create -t codex-cli --notify --prompt - <<'EOF' … EOF)")
+		}
+		f.values["prompt"] = p
+	}
 	ws, err := c.ownWorkspace()
 	if err != nil {
 		return err

@@ -26,6 +26,7 @@ import { openOutside } from '@/next/features/chat/pane-sites';
 import { isOutsideClick } from '@/next/features/chat/ref-chip';
 import type { TTracker } from '@/next/features/chat/tracker-mark';
 import type { IOutputsContext } from '@/next/features/chat/outputs';
+import { viaOf } from '@/next/features/chat/delegation';
 
 const TrackerMark = lazy(() => import('@/next/features/chat/tracker-mark'));
 // The share window (Sinopia's access dialog) is loaded on «Поделиться» only, as link-card.tsx does.
@@ -62,6 +63,22 @@ const BATCH_MIN = 4;
 const BATCH_SHOWN = 3;
 
 const stop = (event: MouseEvent) => event.stopPropagation();
+
+/** The mark of a thing a subchat or a subagent made, lifted into this turn; null for the turn's own. */
+export const viaText = (output: TurnOutput): string | null => {
+  const via = viaOf(output);
+  if (!via) return null;
+  const title = via.title.trim();
+  if (via.kind === 'subagent')
+    return title ? t('next.turnMade.fromSubagent', { title }) : t('next.turnMade.fromSubagentUntitled');
+  return title ? t('next.turnMade.fromSubchat', { title }) : t('next.turnMade.fromSubchatUntitled');
+};
+
+/** What a row is, with the mark of the helper that made it. */
+const withVia = (kind: string, output: TurnOutput): string => {
+  const via = viaText(output);
+  return via ? `${kind} · ${via}` : kind;
+};
 
 // ── the parts of a row ──
 
@@ -314,7 +331,7 @@ const HubRow = ({ made, context, meta: live }: IMadeLinkProps) => {
       <Rich
         preview={<Preview src={src} page={!meta?.preview && meta?.page} icon={LINK_ICON[link.kind]} />}
         title={title}
-        kind={kind}
+        kind={withVia(kind, output)}
         href={link.url}
         onOpen={onOpen}
         onShare={onShare}
@@ -377,7 +394,10 @@ const StandRow = ({ made, context, meta, look }: IMadeLinkProps) => {
       preview={<Preview src={null} icon={LINK_ICON.stand} />}
       title={parts.title ?? output.title}
       kind={
-        <Line sub={[kind, <State key="s" text={parts.state} tone={parts.tone} />]} pending={parts.pending} />
+        <Line
+          sub={[kind, viaText(output), <State key="s" text={parts.state} tone={parts.tone} />]}
+          pending={parts.pending}
+        />
       }
       extra={
         <span className="hx-made__urls" onClick={stop}>
@@ -405,7 +425,7 @@ const PageRow = ({ made, context, meta, look }: IMadeLinkProps) => {
     <Rich
       preview={<Preview src={null} icon={LINK_ICON.page} />}
       title={parts.title ?? output.title}
-      kind={t('next.outputs.link.page')}
+      kind={withVia(t('next.outputs.link.page'), output)}
       href={link.url}
       onOpen={onOpen}
       onShare={() => copyLink(link.url)}
@@ -445,7 +465,8 @@ const LineRow = ({
     extra,
     label: t(`next.outputs.link.${link.kind}`),
   });
-  const sub = note ? [note] : parts.sub;
+  const via = viaText(output);
+  const sub = [...(note ? [note] : parts.sub), ...(via ? [via] : [])];
   const title = parts.title ?? output.title;
   return (
     <Row
@@ -666,7 +687,7 @@ const DocRow = ({ output, context }: { output: TurnOutput; context: IOutputsCont
     <Rich
       preview={<Preview src={null} icon={KIND_ICON.doc} />}
       title={output.title}
-      kind={output.op === 'changed' ? `${kind} · ${t('next.outputs.changed')}` : kind}
+      kind={withVia(output.op === 'changed' ? `${kind} · ${t('next.outputs.changed')}` : kind, output)}
       onOpen={onOpen}
       onShare={onShare}
       menu={menu}
@@ -689,7 +710,7 @@ const DesignRow = ({ output, context }: { output: TurnOutput; context: IOutputsC
     <Rich
       preview={<Preview src={src} icon={KIND_ICON.design} />}
       title={output.title}
-      kind={output.op === 'changed' ? `${kind} · ${t('next.outputs.changed')}` : kind}
+      kind={withVia(output.op === 'changed' ? `${kind} · ${t('next.outputs.changed')}` : kind, output)}
       openLabel={t('next.turnMade.openDesign')}
       openIcon="palette"
       onOpen={onOpen}
@@ -703,7 +724,7 @@ const OtherRow = ({ output, context }: { output: TurnOutput; context: IOutputsCo
   <Row
     tile={<Tile icon={KIND_ICON[output.kind]} />}
     title={output.title}
-    line={<Line sub={[t(`next.outputs.kind.${output.kind}`)]} />}
+    line={<Line sub={[t(`next.outputs.kind.${output.kind}`), viaText(output)]} />}
     onOpen={context.onOpen ? () => context.onOpen?.(output) : null}
   />
 );

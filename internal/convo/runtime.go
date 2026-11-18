@@ -1785,6 +1785,16 @@ func (r *Runtime) create(m wire.ConversationCreateCmd, person string) wire.CmdRe
 		return wire.Refused(code)
 	}
 	m.Model = model
+	// GitHub #112: the first message's files must be on the machine, else its send is refused after the chat is made
+	// and the message is lost behind a chat that says it started. The chat is refused instead and the page keeps it.
+	if m.First != nil && len(m.First.AttachmentIDs) > 0 {
+		if r.d.Uploads == nil {
+			return wire.Refused(wire.RefuseAttachmentMissing)
+		}
+		if _, _, code := r.d.Uploads.Resolve(m.First.AttachmentIDs); code != "" {
+			return wire.Refused(code)
+		}
+	}
 	id := "tab-" + newID()
 	if m.Worktree {
 		// One of several chats started by a prompt works in a tree of its own, so they do not step on each other.

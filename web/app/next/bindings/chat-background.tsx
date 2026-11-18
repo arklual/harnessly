@@ -14,7 +14,7 @@ import CodeAsks, { CODE_EXIT_MS, CODE_SENT, type TCodeSent } from '@/next/featur
 import { useRailRoom } from '@/next/features/background/rail-room';
 import type { IHeaderBackground } from '@/next/features/header/chat-header';
 import { machineApi } from '@/next/core/net/machine';
-import type { BackgroundTask, ConvId, Conversation, MachineId, Shot } from '@/next/protocol/v2';
+import type { BackgroundTask, ConvId, Conversation, MachineId, Shot, TurnOutput } from '@/next/protocol/v2';
 import { useBackground, useShots } from '@/next/stores/conversation';
 import { useConversation } from '@/next/stores/conversations';
 import { usePresentFlag } from '@/next/ui/presence';
@@ -26,6 +26,7 @@ import { SMART_KIND } from '@/next/features/smart-notice/smart-notice';
 import { NOTIFICATION_KIND } from '@/next/features/notifications/kinds';
 import MachineDrop from '@/next/bindings/machine-drop';
 import SideWidgetsBinding from '@/next/bindings/side-widgets';
+import ChatDocs from '@/next/bindings/chat-docs';
 import { WaitBinding } from '@/next/bindings/notification-center';
 import { askDropBack, dismissDrops, useDrops, type IDrop } from '@/next/stores/smart-drops';
 import { useConversationList } from '@/next/stores/conversations';
@@ -43,6 +44,8 @@ export const useChatBackground = (
   machine: MachineId | null,
   now: number,
   onOpenChat: (id: string) => void,
+  /** Opens a thing of the chat in the pane: a row of «Документы». */
+  onOpenOutput?: (output: TurnOutput) => void,
 ): { header: IHeaderBackground | null; panel: React.ReactNode; show: () => void } => {
   const tasks = useBackground(conv);
   const recap = useConversation(conv)?.recap ?? null;
@@ -225,6 +228,7 @@ export const useChatBackground = (
               )}
               {widgetsMounted && machine && (
                 <div className="hx-wgs-wrap" data-shown={widgetsShown} data-pop={widgetsPop || undefined}>
+                  {conv && onOpenOutput && <ChatDocs machine={machine} conv={conv} onOpen={onOpenOutput} />}
                   <SideWidgetsBinding machine={machine} onOpenChat={onOpenChat} />
                 </div>
               )}

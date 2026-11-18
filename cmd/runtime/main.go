@@ -125,6 +125,8 @@ func pathIs(r *http.Request, p string) bool {
 
 // runtimeGate is the assembled gate and what main must stop with it.
 type runtimeGate struct {
+	// agentCLIs runs the background loop of the agent CLIs and the model lists (agent_clis.go).
+	agentCLIs func(ctx context.Context)
 	*gate.Gate
 	terms        *terminal.Server
 	browser      *browser.Service
@@ -543,6 +545,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	self := newSelfUpdater(cfg.DataDir)
 	f.Add(updateRoutes(d, checker, checkOn, self)...)
 	f.Add(machineCheckRoutes(d, self)...)
+	f.Add(agentCLIRoutes(d)...)
 	if launchEnvUndeclared(os.Getenv, os.LookupEnv) {
 		agent.Log("warn", "the reserved launch variables of this deployment are not set: a provider's launch is checked against harnessly's own only",
 			agent.F{K: "variable", V: extproviders.ReservedPrefixesEnv})
@@ -598,6 +601,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		revisions: func(r design.Revisions) { designAPI(d).L.UseRevisions(r) },
 		pusher:    func(p design.StorePusher) { designAPI(d).L.UseStorePusher(p) },
 		records:   func() []filestore.Record { return libraryRecords(d) }, watch: watchLibrary(d), covers: pushCovers(d)}
+	rg.agentCLIs = func(ctx context.Context) { runAgentCLIs(ctx, d) }
 	if checkOn {
 		rg.update = checker
 	}
@@ -698,6 +702,10 @@ func run(ctx context.Context, cfg gate.Config) error {
 	go watchAppsConsent(ctx, apps.Open(cfg.DataDir), appsPolicyEvery)
 	defer f.startStore(ctx, cfg)()
 	go watchBasepkg(ctx, cfg.DataDir)
+	// The agent CLIs and the model lists keep themselves up to date.
+	if f.agentCLIs != nil {
+		go f.agentCLIs(ctx)
+	}
 	// A GPT switch left on brings its proxy up again.
 	if a := f.core.c.agents; a != nil && a.gpt != nil {
 		a.gpt.Resume()

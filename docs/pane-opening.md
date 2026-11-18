@@ -53,5 +53,12 @@ person clicks and for the runtime's own opening. The chat's cards for documents 
 | Merge request, commit | `https://<GitLab host>/<project>/-/merge_requests/<n>`, `/-/commit/<sha>`; GitHub pull requests, commits and issues | the GitLab tab |
 | Task | a tracker key (`PROJ-12`) or `https://<tracker host>/issue/<key>` | the task tab |
 
+In the web pane a document and a board have one place: the tab of the «Документы» app
+(`harnessly.docs`) and of the «Доски» app (`harnessly.boards`), one tab per app, which comes forward with the object
+when it is open already. Every way of opening goes through `objectPlaceOf` (`web/app/next/features/pane/doc-link.ts`):
+the agent's `open`, a chip, a card of the turn, «Документы» of the right column, the old documents list (its tab is
+handed over, `web/app/next/legacy/handed.ts`). The old documents tab is left only for what the apps do not show: a
+version or a thread of the reader, a document of another service (`x-…`), and an installation without the apps.
+
 A document is never the browser: a page of the portal or the platform that is no `/a/<slug>`, `/b/<slug>` or reader
 path is a plain site, and a «stand» card is made only for a stand or a port of this machine.

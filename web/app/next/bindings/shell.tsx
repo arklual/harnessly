@@ -180,7 +180,13 @@ import { deleteChat as deleteGptChat, renameChat as renameGptChat } from '@/next
 import LearnWelcome from '@/next/features/learn/learn-welcome';
 import TourOverlay from '@/next/features/tour/tour-overlay';
 import WhatsNew from '@/next/features/whats-new/whats-new';
-import { REFS_MAX, type Conversation, type ConvId, type MachineId } from '@/next/protocol/v2';
+import {
+  REFS_MAX,
+  type Conversation,
+  type ConvId,
+  type MachineId,
+  type TurnOutput,
+} from '@/next/protocol/v2';
 import { chatRef } from '@/next/features/composer/chat-sources';
 import { addDraftRef } from '@/next/stores/drafts';
 import { conversationsStore, useConversation, useConvsAnswered } from '@/next/stores/conversations';
@@ -956,7 +962,15 @@ const Shell = ({ owner }: IShellProps) => {
   // A design's chat keeps its terminal in its own column, under its field: the design's view gives the slot.
   const [termSlot, setTermSlot] = useState<HTMLElement | null>(null);
   const term = useAgentTerminal(route.kind === ROUTE.chat ? (record ?? null) : (designRecord ?? null));
-  const bg = useChatBackground(stageId && isConvId(stageId) ? stageId : null, chatMachine, now, openChat);
+  // The pane is made further down; the column's «Документы» opens through it once it is there.
+  const openOutputRef = useRef<((output: TurnOutput) => void) | null>(null);
+  const bg = useChatBackground(
+    stageId && isConvId(stageId) ? stageId : null,
+    chatMachine,
+    now,
+    openChat,
+    (output) => openOutputRef.current?.(output),
+  );
   const present = stageId !== null && chatMachine !== null;
   // The last chats opened stay mounted, hidden (<Activity>): back to one of them, its feed and field are already drawn
   // and only show again.
@@ -1267,6 +1281,9 @@ const Shell = ({ owner }: IShellProps) => {
     };
   });
   // A full-screen design has no chat page around it: its chat opens links, files and cards in the pane beside it.
+  useEffect(() => {
+    openOutputRef.current = pane.openOutput;
+  }, [pane.openOutput]);
   const designOpeners = {
     onOpenRef: pane.openRef,
     onOpenFile: pane.openFile,

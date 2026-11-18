@@ -90,11 +90,17 @@ func (s *deckShooter) videoNewTab() (*deckTab, error) {
 	}
 	session, _ := a["sessionId"].(string)
 	tab := &deckTab{s: s, target: target, session: session}
-	for _, d := range []string{"Page", "Runtime"} {
+	for _, d := range []string{"Page", "Runtime", "Network"} {
 		if _, err := s.br.cdp.sendLong(d+".enable", nil, session, videoReadyWait); err != nil {
 			tab.close()
 			return nil, err
 		}
+	}
+	// The render draws the recordings at their full size; a view gets their light copies (serveFileAs).
+	headers := map[string]any{"headers": map[string]any{FullClipsHeader: "1"}}
+	if _, err := s.br.cdp.sendLong("Network.setExtraHTTPHeaders", headers, session, videoReadyWait); err != nil {
+		tab.close()
+		return nil, err
 	}
 	return tab, nil
 }

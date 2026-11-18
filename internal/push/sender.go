@@ -17,6 +17,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 	"github.com/ly-solutions/harnessly/internal/status"
 )
@@ -201,6 +202,41 @@ func (s *Sender) Push(tabID string, e status.Entry, kind string) {
 		}
 	}
 	s.deliver(subs, msg)
+}
+
+// As is the chat a delegated chat's notification speaks for: the root of its delegation, where the person sits
+// The tap leads there; the words say which subchat it is.
+type As struct {
+	TabID, WorkspaceID, Title string
+	AgentSessionID            *string
+	// From is the title of the subchat the notification is about.
+	From string
+}
+
+// PushAs sends a delegated chat's notification as the root's: the tap opens the root, its title is the root's, and the
+// words start with the subchat's name. The tag stays the subchat's, so it does not take the place of the root's own.
+func (s *Sender) PushAs(tabID string, e status.Entry, kind string, as As) {
+	subs := s.Store.Subscriptions()
+	if len(subs) == 0 {
+		return
+	}
+	s.deliver(subs, AsRoot(BuildMessage(tabID, e, kind, s.cfg.TagPrefix, s.cfg.Now()), as))
+}
+
+// AsRoot is msg told from the root chat as says.
+func AsRoot(msg Message, as As) Message {
+	from := as.From
+	if from == "" {
+		from = msg.Title
+	}
+	prefix := locale.Pick("Subchat «", "Подчат «") + Clip(from, titleMax) + "»: "
+	msg.Body = Clip(prefix+msg.Body, detailMax)
+	msg.Detail = Clip(prefix+msg.Detail, detailMax)
+	if as.Title != "" {
+		msg.Title, msg.ConversationTitle = Clip(as.Title, titleMax), Clip(as.Title, titleMax)
+	}
+	msg.TabID, msg.WorkspaceID, msg.AgentSessionID = as.TabID, as.WorkspaceID, as.AgentSessionID
+	return msg
 }
 
 // Wait returns when every notification that waited for a summary went.

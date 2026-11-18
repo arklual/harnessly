@@ -881,6 +881,13 @@ func (s *Service) Observe(rec wire.Conversation) {
 		at := rec.Limited.At
 		s.wake(rec, page, fmt.Sprintf("limit:%d", int64(at)), Result{Conv: rec, Outcome: Limited})
 	}
+	// A chat two levels down that waits for the person reaches the root too: the person sits there, and the chat in
+	// between can neither grant a permission nor reach the person itself.
+	if rec.Limited != nil {
+		s.tellRoot(rec, page, fmt.Sprintf("limit:%d", int64(rec.Limited.At)), Limited)
+	} else if o == NeedsPerson {
+		s.tellRoot(rec, page, needKey(rec), NeedsPerson)
+	}
 	var held bool
 	if o == Done && rec.LastTurn != nil {
 		var proceed bool
@@ -912,15 +919,7 @@ func (s *Service) Observe(rec wire.Conversation) {
 		}
 		// A question, a permission or a paused queue: the chat stands still until someone answers, and its parent may
 		// know the answer or tell the person.
-		key = "need:" + string(rec.State.K)
-		if rec.Gate != nil {
-			key += ":" + rec.Gate.ID
-		} else if rec.Queue.Paused != nil {
-			key += ":paused"
-		}
-		if rec.LastTurn != nil {
-			key += ":" + rec.LastTurn.ID
-		}
+		key = needKey(rec)
 	case Ended:
 		// A terminal stopped on purpose (by the person, or for standing idle) is no news; an agent that died, never
 		// started or stopped on its own (its terminal fell off) is, unless its last turn was already reported.
@@ -936,6 +935,66 @@ func (s *Service) Observe(rec wire.Conversation) {
 	r := s.result(ctx, rec, o)
 	r.GaveUp, r.Held = page.GaveUp, held
 	s.wake(rec, page, key, r)
+}
+
+// needKey names what a chat that needs the person waits for: its state, the gate (or the paused queue) and the turn.
+func needKey(rec wire.Conversation) string {
+	key := "need:" + string(rec.State.K)
+	if rec.Gate != nil {
+		key += ":" + rec.Gate.ID
+	} else if rec.Queue.Paused != nil {
+		key += ":paused"
+	}
+	if rec.LastTurn != nil {
+		key += ":" + rec.LastTurn.ID
+	}
+	return key
+}
+
+// rootOf is the chat at the top of rec's delegation and the chat right below it that rec came through; ok is false
+// for a chat whose parent is the root itself (its parent hears it already) or whose chain cannot be read.
+func (s *Service) rootOf(rec wire.Conversation) (root, via wire.Conversation, ok bool) {
+	if rec.ParentID == nil {
+		return root, via, false
+	}
+	at, ok := s.Convs.Record(*rec.ParentID)
+	if !ok || at.ParentID == nil {
+		return root, via, false
+	}
+	seen := map[string]bool{rec.ID: true}
+	for range MaxDepth + 8 {
+		seen[at.ID] = true
+		up, ok := s.Convs.Record(*at.ParentID)
+		if !ok || seen[up.ID] {
+			return root, via, false
+		}
+		if up.ParentID == nil {
+			return up, at, true
+		}
+		at = up
+	}
+	return root, via, false
+}
+
+// tellRoot tells the root chat above a chat two or more levels down that it waits for the person (a question, a
+// permission, a paused queue) or stands on its usage limit, once for key and at most MaxWakes times.
+func (s *Service) tellRoot(rec wire.Conversation, page Page, key string, o Outcome) {
+	root, via, ok := s.rootOf(rec)
+	if !ok || !s.Book.claimRoot(rec.ID, key, MaxWakes) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	r := Result{Conv: rec, Outcome: o}
+	if o == NeedsPerson {
+		r = s.result(ctx, rec, o)
+	}
+	if _, res := s.deliver(ctx, rec, root.ID, rootText(r, via), deliverStep); res.R == wire.ResultRefused {
+		s.Book.unclaimRoot(rec.ID, key, page.RootTold)
+		if s.Log != nil {
+			s.Log("delegation: the root was not told", "root", root.ID, "chat", rec.ID, "code", string(res.Code))
+		}
+	}
 }
 
 // wake tells the parent of a delegated chat what r says, once for key and at most MaxWakes times. A message the parent

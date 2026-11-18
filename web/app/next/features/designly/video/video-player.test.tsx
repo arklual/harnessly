@@ -132,7 +132,10 @@ describe('VideoPlayer', () => {
     const toB = vi.spyOn(b.contentWindow as Window, 'postMessage');
     say(b.contentWindow, { type: 'tk:video-ready', moments: [] });
     expect(toB).toHaveBeenCalledWith({ type: 'tk:video-seek', t: 3000 }, ORIGIN);
-    expect(toA).not.toHaveBeenCalled();
+    // the hidden frame is only told it does not follow its files live: no command of the video yet
+    const videoCalls = (spy: typeof toA) =>
+      spy.mock.calls.filter(([m]) => String((m as { type?: string })?.type).startsWith('tk:video-'));
+    expect(videoCalls(toA)).toHaveLength(0);
     // the frame with the next scene waits at its start
     say(a.contentWindow, { type: 'tk:video-ready', moments: [] });
     expect(toA).toHaveBeenCalledWith({ type: 'tk:video-pause' }, ORIGIN);

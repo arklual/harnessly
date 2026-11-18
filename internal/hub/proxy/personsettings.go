@@ -78,7 +78,9 @@ func lookOf(p string) (hash string, ok bool) {
 }
 
 // lookBlobs is where the hub keeps the pictures of its people's looks: the hub's bucket under looks/ when
-// it keeps its files in S3, else <data>/looks. Made once; nil when it cannot be, and the paths answer 404.
+// it keeps its files in S3; else the file store's bucket under <its prefix>/looks/ when the store has one, since every
+// replica sees it and <data> may be a pod's emptyDir; else <data>/looks. Made once; nil when it cannot be,
+// and the paths answer 404.
 func (s *Service) lookBlobs() wire.LookBlobs {
 	s.looksOnce.Do(func() {
 		if s.cfg.StorageS3() && s.cfg.S3.Endpoint != "" {
@@ -89,11 +91,27 @@ func (s *Service) lookBlobs() wire.LookBlobs {
 			}
 			return
 		}
+		if st := s.cfg.Store; !st.Off && st.S3.Endpoint != "" {
+			if b, err := sites.NewS3Blobs(sites.S3Config{Endpoint: st.S3.Endpoint, Region: st.S3.Region, Bucket: st.S3.Bucket,
+				Prefix: storeLooksPrefix(st.S3.Prefix), AccessKey: st.S3.AccessKey, SecretKey: st.S3.SecretKey}); err == nil {
+				s.looks = b
+				return
+			}
+		}
 		if b, err := sites.NewFolderBlobs(filepath.Join(s.cfg.DataDir, "looks")); err == nil {
 			s.looks = b
 		}
 	})
 	return s.looks
+}
+
+// storeLooksPrefix is where the looks live in the file store's bucket: <prefix>/looks/, beside the store's own
+// <prefix>/rooms/ that its collection lists and cleans, so the store never takes them for its garbage.
+func storeLooksPrefix(storePrefix string) string {
+	if p := strings.Trim(storePrefix, "/"); p != "" {
+		return p + "/looks/"
+	}
+	return "looks/"
 }
 
 // hubMe is the wire.MeStore of one hub user, for one request.

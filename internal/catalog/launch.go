@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 
@@ -74,6 +75,71 @@ func claudeModels() []Model {
 		{ID: "sonnet", Label: "Sonnet", Hint: locale.Pick("alias: the latest Sonnet model", "псевдоним: последняя модель Sonnet"), Efforts: all()},
 		{ID: "haiku", Label: "Haiku", Hint: locale.Pick("no reasoning depth to choose", "без выбора глубины"), Efforts: []string{}},
 	}
+}
+
+// claudeStateFile is Claude Code's own state file for a config folder: <dir>/.claude.json when the folder is
+// CLAUDE_CONFIG_DIR, else ~/.claude.json beside ~/.claude.
+func claudeStateFile(claudeDir string) string {
+	if p := filepath.Join(claudeDir, ".claude.json"); fileExists(p) {
+		return p
+	}
+	return filepath.Join(filepath.Dir(claudeDir), ".claude.json")
+}
+
+func fileExists(p string) bool { st, err := os.Stat(p); return err == nil && st.Mode().IsRegular() }
+
+// parseClaudeOffered reads the models Claude Code's /model offers beyond its aliases, as its account told it
+// (additionalModelOptionsCache of .claude.json: a full id like «claude-fable-5-2[1m]», a label, a description). They
+// follow the account and the CLI's version by themselves.
+func parseClaudeOffered(raw string) ([]Model, error) {
+	var doc struct {
+		Options []struct {
+			Value       string `json:"value"`
+			Label       string `json:"label"`
+			Description string `json:"description"`
+		} `json:"additionalModelOptionsCache"`
+	}
+	if err := json.Unmarshal([]byte(raw), &doc); err != nil {
+		return nil, err
+	}
+	var out []Model
+	for _, o := range doc.Options {
+		id := trim(o.Value)
+		if !modelID.MatchString(id) || slices.ContainsFunc(out, func(m Model) bool { return m.ID == id }) {
+			continue
+		}
+		label, hint := trim(o.Label), ""
+		if name, rest, ok := strings.Cut(trim(o.Description), " · "); ok && name != "" {
+			label, hint = name, trim(rest)
+		} else if d := trim(o.Description); d != "" {
+			hint = d
+		}
+		if label == "" {
+			label = id
+		}
+		if strings.HasSuffix(id, "[1m]") {
+			label += " · 1M"
+		}
+		out = append(out, Model{ID: id, Label: label, Hint: hint, Efforts: append([]string{}, claudeEfforts...)})
+	}
+	return out, nil
+}
+
+// withClaudeOffered is the aliases with the models the account offers after them.
+func withClaudeOffered(models []Model, claudeDir string) []Model {
+	if claudeDir == "" {
+		return models
+	}
+	extra, state := readParsed(claudeStateFile(claudeDir), parseClaudeOffered)
+	if state != fileOK {
+		return models
+	}
+	for _, m := range extra {
+		if !slices.ContainsFunc(models, func(x Model) bool { return x.ID == m.ID }) {
+			models = append(models, m)
+		}
+	}
+	return models
 }
 
 // stringOrEmpty: a string, trimmed, "" otherwise.
@@ -222,7 +288,7 @@ func (c LaunchConfig) Launch(provider string) LaunchOptions {
 		if s, ok := settings.(map[string]any); ok && state == fileOK {
 			def = Choice{Model: stringOrNil(s["model"]), Effort: knownEffortOrNil(s["effortLevel"])}
 		}
-		out = LaunchOptions{Provider: "claude", Source: "static", Models: claudeModels(), CliDefault: def}
+		out = LaunchOptions{Provider: "claude", Source: "static", Models: withClaudeOffered(claudeModels(), c.ClaudeDir), CliDefault: def}
 	} else {
 		models, state := readParsed(filepath.Join(c.CodexDir, "models_cache.json"), parseCodexModels)
 		switch {

@@ -460,3 +460,62 @@
     transition-duration: 1ms;
   }
 }
+
+/* «Документы» above the widgets: what this chat and its subchats wrote, a row opens it in the pane. */
+.hx-chat-docs {
+  margin-bottom: var(--hx-space-3);
+  padding: var(--hx-space-2);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-lg);
+  background: var(--hx-bg-raised);
+}
+.hx-chat-docs__title {
+  margin: 0 0 var(--hx-space-1);
+  padding: 0 var(--hx-space-1);
+  font-size: var(--hx-text-xs);
+  font-weight: 600;
+  color: var(--hx-fg-3);
+}
+.hx-chat-docs__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hx-chat-docs__row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--hx-space-2);
+  width: 100%;
+  padding: 6px var(--hx-space-1);
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--hx-fg-1);
+  text-align: left;
+  cursor: pointer;
+}
+.hx-chat-docs__row:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-chat-docs__row:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: -2px;
+}
+.hx-chat-docs__ic {
+  grid-row: span 2;
+  margin-top: 2px;
+  color: var(--hx-fg-3);
+}
+.hx-chat-docs__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--hx-text-sm);
+}
+.hx-chat-docs__meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+}

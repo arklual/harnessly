@@ -236,7 +236,10 @@ const aurora = (w: number, h: number, c: ISceneColors, speed: number, detail: nu
             Math.sin(s / (w * 0.035) - ts * 0.23 * cu.sp + ph * 2) * w * 0.012;
           if (fx < -4 || fx > w + 4) continue;
           // Where along its length the curtain is lit: ribbons with gaps between them, slowly shifting.
-          const e = 0.5 + 0.5 * Math.sin(s / (w * 0.21) + ph * 1.3 + ts * 0.03) * 0.8 + 0.5 * 0.2 * Math.sin(s / (w * 0.08) + ph);
+          const e =
+            0.5 +
+            0.5 * Math.sin(s / (w * 0.21) + ph * 1.3 + ts * 0.03) * 0.8 +
+            0.5 * 0.2 * Math.sin(s / (w * 0.08) + ph);
           const env = e * e * (3 - 2 * e);
           if (env < 0.04) continue;
           const y =
@@ -252,7 +255,11 @@ const aurora = (w: number, h: number, c: ISceneColors, speed: number, detail: nu
           const fl = 0.75 + 0.25 * Math.sin(ts * (1.3 + vary[i]) + flick[i]);
           const a = cu.a * env * pulse * fl * vary[i] * (dark ? 0.6 : 0.34);
           if (a <= 0.01) continue;
-          const len = cu.len * (0.6 + 0.4 * Math.sin(s / (w * 0.13) + ph * 3 + ts * 0.05)) * (0.8 + 0.2 * vary[i]) * (0.55 + 0.45 * env);
+          const len =
+            cu.len *
+            (0.6 + 0.4 * Math.sin(s / (w * 0.13) + ph * 3 + ts * 0.05)) *
+            (0.8 + 0.2 * vary[i]) *
+            (0.55 + 0.45 * env);
           ctx.globalAlpha = Math.min(1, a);
           ctx.drawImage(cu.ray, fx, y - len, step * 1.25, len);
         }

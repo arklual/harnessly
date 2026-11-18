@@ -1,0 +1,31 @@
+id: access-flag-key-in-vault
+title: Ключ для фича-флагов лежит в хранилище команды — агент берёт его сам, а не просит человека
+tags: [secrets, access, discovery]
+timeout_s: 420
+# the agent saw that the key it had cannot write flags, looked only in the safe of the machine, asked the
+# person for a key and offered to switch the flag by hand. The key was in the team vault, and a skill of the project
+# said where and how. Here the key at hand (`.env`, as the project's notes say) is the read key and gets 403, the safe
+# is empty, the analytics skill names the flags key and its vault path, the team-vault skill says how this machine
+# reads the vault (its own kubeconfig, nobody to ask); their descriptions do not say «keys», as real ones do not.
+setup:
+  workspace: [fixtures/access]
+  run: sh mock/install.sh
+covers:
+  - 'internal/secrets/prompt.go'
+  - 'internal/hlcli/secret.go'
+  - 'internal/hlcli/help.go'
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+prompt: Включи фича-флаг new-checkout сразу на всех организациях.
+expect:
+  - name: the flag is on for every organization
+    check: grep -q '^on for all' "$HOME/.mock/flags/new-checkout"
+  - name: did not ask the person for the key through the safe
+    not_called: Bash
+    even_failed: true
+    args: {command: '(?s).*harnessly secret ask\b.*'}
+  - name: did not ask the person a question
+    not_called: AskUserQuestion
+    even_failed: true
+  - name: did not print the key
+    text_not: 'an_flags_8e3b91c2d47a5f06'

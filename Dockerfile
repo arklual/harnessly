@@ -194,19 +194,20 @@ ARG HARNESSLY_TELEMETRY_KEY=
 COPY --from=web /src/web/dist ./web/dist
 COPY --from=web /src/web/dist-hub ./web/dist-hub
 COPY --from=build-warm /warm /tmp/warm
-# The hub and the four systems a machine can be build side by side: one after another they took four minutes.
+# The hub builds beside the four systems a machine can be, and the systems one after another, as in build-warm: five
+# links of the runtime at once went over the builder's 10 GB and were killed by memory (HRN-1622, 18.11).
 RUN --mount=type=cache,id=harnessly-go-build,target=/root/.cache/go-build \
     set -e; \
     hubflags="-s -w -X github.com/ly-solutions/harnessly/internal/hub/buildinfo.Version=${VERSION} -X 'github.com/ly-solutions/harnessly/internal/telemetry.DefaultURL=${HARNESSLY_TELEMETRY_URL}' -X 'github.com/ly-solutions/harnessly/internal/telemetry.DefaultKey=${HARNESSLY_TELEMETRY_KEY}'"; \
     ldflags="-s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=${VERSION} -X github.com/ly-solutions/harnessly/internal/hlcli.Version=${VERSION} -X 'github.com/ly-solutions/harnessly/internal/telemetry.DefaultURL=${HARNESSLY_TELEMETRY_URL}' -X 'github.com/ly-solutions/harnessly/internal/telemetry.DefaultKey=${HARNESSLY_TELEMETRY_KEY}'"; \
     mkdir -p /out/dist; \
     GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -tags "hubui webui" -ldflags "$hubflags" -o /out/hub ./cmd/hub & pids="$!"; \
-    for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do \
-      os=${target%/*}; arch=${target#*/}; \
-      ( GOOS=$os GOARCH=$arch go build -trimpath -tags webui -ldflags "$ldflags" -o /out/dist/runtime-$os-$arch ./cmd/runtime \
+    ( for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do \
+        os=${target%/*}; arch=${target#*/}; \
+        GOOS=$os GOARCH=$arch go build -trimpath -tags webui -ldflags "$ldflags" -o /out/dist/runtime-$os-$arch ./cmd/runtime \
         && GOOS=$os GOARCH=$arch go build -trimpath -ldflags "$ldflags" -o /out/dist/agent-$os-$arch ./cmd/agent \
-        && GOOS=$os GOARCH=$arch go build -trimpath -ldflags "$ldflags" -o /out/dist/harnessly-$os-$arch ./cmd/harnessly ) & pids="$pids $!"; \
-    done; \
+        && GOOS=$os GOARCH=$arch go build -trimpath -ldflags "$ldflags" -o /out/dist/harnessly-$os-$arch ./cmd/harnessly || exit 1; \
+      done ) & pids="$pids $!"; \
     for p in $pids; do wait "$p"; done; \
     install -m 0755 deploy/install/install.sh /out/dist/install.sh
 

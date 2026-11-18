@@ -32,6 +32,28 @@ type Description struct {
 	Summary string
 	// Images is set when the script draws pictures.
 	Images *ImageCall
+	// Commands are the shell commands the script runs, whole, in order: what a delivery or a page it opened is read
+	// from, past the summary's first line.
+	Commands []string
+}
+
+// commands are the whole shell commands among calls.
+func commands(calls []Call) []string {
+	var out []string
+	for _, c := range calls {
+		switch c.Name {
+		case "exec_command", "shell", "bash":
+			obj, _ := c.Arg.(*Object)
+			cmd := obj.str("cmd")
+			if cmd == "" {
+				cmd = obj.str("command")
+			}
+			if cmd = strings.TrimSpace(cmd); cmd != "" {
+				out = append(out, cmd)
+			}
+		}
+	}
+	return out
 }
 
 // ImageCall is the picture drawing a script asks for: Count pictures, the first brief as Prompt.
@@ -81,14 +103,14 @@ func Describe(js string) Description {
 		tools[i], texts[i] = describeCall(c)
 		same = same && tools[i] == tools[0]
 	}
-	images := imageCalls(calls)
+	images, cmds := imageCalls(calls), commands(calls)
 	if len(calls) == 1 {
-		return Description{Tool: tools[0], Summary: texts[0], Images: images}
+		return Description{Tool: tools[0], Summary: texts[0], Images: images, Commands: cmds}
 	}
 	if !same {
-		return Description{Tool: "exec", Summary: join(texts, false), Images: images}
+		return Description{Tool: "exec", Summary: join(texts, false), Images: images, Commands: cmds}
 	}
-	return Description{Tool: tools[0], Summary: join(texts, tools[0] == "exec_command"), Images: images}
+	return Description{Tool: tools[0], Summary: join(texts, tools[0] == "exec_command"), Images: images, Commands: cmds}
 }
 
 // join puts the first parts that fit side by side; shell parts drop the repeated "$ ".

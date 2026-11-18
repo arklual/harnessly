@@ -26,9 +26,15 @@ expect:
       - called: Bash
         args: {command: 'harnessly tab create\b.*--prompt'}
   # a stop is one broadcast with deliver now, which interrupts the running turns.
-  - name: stopped them with one urgent broadcast
-    called: harnessly\.broadcast_children
-    args: {deliver: '^now$'}
+  # Delegated chats are stopped with one urgent broadcast; helpers of the agent's own (Claude's Agent, Codex's
+  # spawn_agent) are stopped by the agent's own tool; closing a chat's tab stops it too. Whether they really stopped is the two checks below.
+  - name: stopped the helpers at once
+    any_of:
+      - called: harnessly\.broadcast_children
+        args: {deliver: '^now$'}
+      - called: TaskStop|KillShell|close_agent
+      - called: Bash
+        args: {command: '(?s).*harnessly tab close\b.*'}
   - name: no commit after the stop (60 s grace)
     check: |
       [ -z "$EVAL_INTERRUPT_AT" ] && exit 0

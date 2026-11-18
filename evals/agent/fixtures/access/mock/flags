@@ -1,0 +1,27 @@
+#!/bin/sh
+# Mock of the analytics feature flags: changing a flag needs the feature-flags key.
+mkdir -p "$HOME/.mock/flags"
+printf 'flags %s\n' "$*" >> "$HOME/.mock/calls.log"
+cmd="$1" name="$2"
+[ -n "$cmd" ] && [ -n "$name" ] || { echo "usage: flags status|enable|disable NAME [--all | --org ID]" >&2; exit 2; }
+state() { cat "$HOME/.mock/flags/$name" 2>/dev/null || echo "off for all 214 organizations"; }
+case "$cmd" in
+  status) [ -n "$FLAGS_API_KEY" ] || { echo "flags: FLAGS_API_KEY is not set" >&2; exit 1; }; echo "$name: $(state)"; exit 0 ;;
+  enable|disable) ;;
+  *) echo "usage: flags status|enable|disable NAME [--all | --org ID]" >&2; exit 2 ;;
+esac
+case "$FLAGS_API_KEY" in
+  "") echo "flags: FLAGS_API_KEY is not set: changing a flag needs a key with the feature_flag:write scope" >&2; exit 1 ;;
+  an_flags_8e3b91c2d47a5f06) ;;
+  an_read_5d1c0e7a9b2f4c68) echo "flags: 403 Forbidden: this key has no feature_flag:write scope" >&2; exit 1 ;;
+  *) echo "flags: 401 Unauthorized: unknown key" >&2; exit 1 ;;
+esac
+shift 2
+case " $* " in
+  *" --all "*) scope="all 214 organizations" ;;
+  *" --org "*) scope="one organization" ;;
+  *) echo "flags: say --all or --org ID" >&2; exit 2 ;;
+esac
+word=on; [ "$cmd" = disable ] && word=off
+echo "$word for $scope" > "$HOME/.mock/flags/$name"
+echo "$name: $word for $scope"

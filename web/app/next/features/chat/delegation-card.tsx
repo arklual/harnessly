@@ -4,8 +4,10 @@
 import { memo, useContext, useMemo, useState } from 'react';
 import { subchatOutputs } from '@/next/bindings/inherited-made';
 import {
+  CHILD_STATE,
   DelegatedChats,
   SubchatsMade,
+  WaitingBelow,
   childState,
   startedIn,
   type TChildState,
@@ -36,13 +38,17 @@ const modelOf = (c: Conversation): string => {
 };
 
 const DelegationHead = memo(({ chat }: { chat: Conversation }) => {
-  const state = childState(chat);
+  // A chat further down that waits for the person makes the card wait too, and the click leads there.
+  const below = useContext(WaitingBelow).get(chat.id);
+  const own = childState(chat);
+  const state = below && own !== CHILD_STATE.waiting ? CHILD_STATE.waiting : own;
+  const go = below && own !== CHILD_STATE.waiting ? below.id : chat.id;
   return (
     <button
       type="button"
       className="hx-deleg"
       data-tone={STATE_TONE[state]}
-      onClick={() => goTo({ kind: ROUTE.chat, id: chat.id })}
+      onClick={() => goTo({ kind: ROUTE.chat, id: go })}
     >
       <Icon name="workflow" size="sm" className="hx-deleg__ic" />
       <span className="hx-deleg__text">
@@ -52,7 +58,11 @@ const DelegationHead = memo(({ chat }: { chat: Conversation }) => {
       </span>
       <span className="hx-deleg__state" role="status">
         <span className="hx-deleg__dot" aria-hidden="true" />
-        {t(`next.delegation.state.${state}`)}
+        <span className="hx-deleg__state-text">
+          {go !== chat.id && below
+            ? t('next.delegation.waitingBelow', { title: below.title || t('next.delegation.untitled') })
+            : t(`next.delegation.state.${state}`)}
+        </span>
       </span>
       <Icon name="chevron-right" size="sm" className="hx-deleg__go" />
     </button>

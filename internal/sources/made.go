@@ -149,8 +149,19 @@ func (m *Made) call(e *jsvalue.Object, at wire.Ms) {
 	if v, ok := e.Get("publish"); ok {
 		c.Publish, _ = v.(*jsvalue.Object)
 	}
-	if tool == "Bash" {
-		c.Command = strings.TrimPrefix(e.String("summary"), "$ ")
+	if tool == "Bash" || tool == "exec_command" {
+		// Codex's code mode runs a shell command as exec_command: the same as a Bash call.
+		c.Tool = "Bash"
+		// The whole command, not the summary's first line: a delivery or a publish after a heredoc that wrote the file
+		// is on a later line.
+		if d, ok := e.Get("call"); ok {
+			if o, ok := d.(*jsvalue.Object); ok {
+				c.Command = o.String("command")
+			}
+		}
+		if c.Command == "" {
+			c.Command = strings.TrimPrefix(e.String("summary"), "$ ")
+		}
 	}
 	c.Deliver = outputs.IsDeliverTool(tool)
 	if c.Publish == nil && c.Command == "" && !c.Deliver {

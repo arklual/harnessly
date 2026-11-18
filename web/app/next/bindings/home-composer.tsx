@@ -1,7 +1,7 @@
 // The start page's field: the first message creates a conversation on the active machine and opens it (spec §3,
 // conversation.create with `first`). The field is busy-free and the words stay in it until the machine has created
 // the chat; if it refuses, they are still there and the reason is on screen.
-import { uploadSrc } from '@/next/commands/uploads';
+import { anyKept, takeKept, uploadSrc } from '@/next/commands/uploads';
 import { AttachmentSrc } from '@/next/ui/attachment-thumb';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { uuidv7 } from '@/next/core/ids';
@@ -29,7 +29,7 @@ import KindSwitch, {
 } from '@/next/features/composer/kind-switch';
 import type { IModelPickerProps } from '@/next/features/composer/model-picker';
 import { useGptExtra } from '@/next/bindings/use-gpt-extra';
-import type { Conversation, ConvId, MachineId } from '@/next/protocol/v2';
+import type { AttachmentRef, Conversation, ConvId, MachineId } from '@/next/protocol/v2';
 import { clearDraft, NEW_CHAT } from '@/next/stores/drafts';
 import { queueChat } from '@/next/commands/queued-chats';
 import { useDraftField } from '@/next/bindings/use-draft';
@@ -333,11 +333,29 @@ const HomeComposer = ({
       });
     }
 
+    // GitHub #112: a file attached while the machine was away is kept in the hub (hub:<sha>); the machine takes its copy
+    // before the first message goes, as a message of an open chat does. When it cannot, the draft stays and says so.
     function send(target: MachineId, place: NewConversation['where']) {
+      const ready = uploads.ready;
+      if (!anyKept(ready)) {
+        sendWith(target, place, ready);
+        return;
+      }
+      void takeKept(target, ready).then((got) => {
+        if (!got) {
+          setCreating(false);
+          toast(t('next.newChat.attachmentLost'), { tone: 'error' });
+          return;
+        }
+        sendWith(target, place, got);
+      });
+    }
+
+    function sendWith(target: MachineId, place: NewConversation['where'], ready: readonly AttachmentRef[]) {
       if (choice && companions.length > 0 && !talk) {
         // One chat on each model, each in a worktree of its own, grouped under the prompt.
         const launch = { id: uuidv7(), prompt: launchPrompt(text) };
-        const first = { text: withMentions(mentions, text.trim()), attachments: uploads.ready, refs };
+        const first = { text: withMentions(mentions, text.trim()), attachments: [...ready], refs };
         const started = [choice, ...companions].map((pick) =>
           createConversation(target, {
             where: place,
@@ -382,7 +400,7 @@ const HomeComposer = ({
         ...(choice?.profile ? { profile: choice.profile } : {}),
         model: choice?.model ? launchModel({ ...choice, model: choice.model }) : null,
         ...(firstOf(talk)
-          ? { first: { text: withMentions(mentions, text.trim()), attachments: uploads.ready, refs } }
+          ? { first: { text: withMentions(mentions, text.trim()), attachments: [...ready], refs } }
           : {}),
       });
       void created.done.then((st) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHILD_STATE, childState, startedIn } from '@/next/features/chat/delegation';
+import { CHILD_STATE, childState, startedIn, waitingBelow } from '@/next/features/chat/delegation';
 import type { Conversation } from '@/next/protocol/v2';
 
 const chat = (id: string, createdAt: number, state: Conversation['state'], bgAgents = 0): Conversation =>
@@ -28,5 +28,31 @@ describe('childState', () => {
     expect(childState(chat('a', 0, { k: 'waiting-question' } as Conversation['state']))).toBe(
       CHILD_STATE.waiting,
     );
+  });
+});
+
+describe('waitingBelow (HRN-1634)', () => {
+  const sub = (id: string, parentId: string | undefined, k: string): Conversation =>
+    ({ id, parentId, createdAt: 0, state: { k, since: 0 } }) as unknown as Conversation;
+  it('finds the grandchild that waits for the person under its subchat', () => {
+    const all = [
+      sub('root', undefined, 'working'),
+      sub('mid', 'root', 'working'),
+      sub('kid', 'mid', 'waiting-permission'),
+      sub('quiet', 'root', 'working'),
+      sub('done', 'quiet', 'ready'),
+    ];
+    const below = waitingBelow(all, 'root');
+    expect(below.get('mid')?.id).toBe('kid');
+    expect(below.has('quiet')).toBe(false);
+  });
+  it('leaves out the subchat itself and survives a loop of parents', () => {
+    const all = [
+      sub('mid', 'root', 'waiting-question'),
+      sub('a', 'mid', 'working'),
+      sub('b', 'a', 'working'),
+      sub('a', 'b', 'working'),
+    ];
+    expect(waitingBelow(all, 'root').has('mid')).toBe(false);
   });
 });

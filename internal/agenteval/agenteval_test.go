@@ -348,4 +348,45 @@ func TestCalledEvenFailed(t *testing.T) {
 	if ok, why := lenient.holds(f); !ok {
 		t.Fatalf("a failed call must count with even_failed: %s", why)
 	}
+	// not_called: a question that timed out still asked the person.
+	if ok, _ := (Expect{NotCalled: ".*notice_ask.*"}).holds(f); !ok {
+		t.Fatal("a failed call must not count against not_called without even_failed")
+	}
+	if ok, _ := (Expect{NotCalled: ".*notice_ask.*", EvenFailed: true}).holds(f); ok {
+		t.Fatal("a failed call must count against not_called with even_failed")
+	}
+}
+
+// a document a delegated chat made is listed by the person's chat; a file is not a document.
+func TestJudgeMade(t *testing.T) {
+	s, err := ParseScenario("s", []byte(`id: made
+prompt: поручи
+expect:
+  - made: {kind: doc|board, ref: 'eval-lab', from: subchat}
+  - made: {kind: doc|board|design, ref: 'report\.md', absent: true}
+  - made: {kind: file, from: subchat}
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := Facts{Made: []MadeFact{
+		{Kind: "doc", Ref: "https://docs.example.test/a/eval-lab-uuwhtz", Op: "changed", From: "subchat"},
+		{Kind: "file", Ref: "/work/report.md", Op: "created", From: "subchat"},
+	}}
+	for _, v := range s.Check(f) {
+		if !v.OK {
+			t.Fatalf("%s: %s", v.Name, v.Why)
+		}
+	}
+	// The chat's own document is not the subchat's.
+	f.Made[0].From = ""
+	if v := s.Check(f); v[0].OK {
+		t.Fatal("the chat's own document counted as a subchat's")
+	}
+	if v := s.Check(Facts{MadeError: "GET …/made: 404"}); v[0].OK || !strings.Contains(v[0].Why, "not read") {
+		t.Fatalf("an unread list passed: %+v", v[0])
+	}
+	if _, err := ParseScenario("s", []byte("id: bad\nprompt: x\nexpect:\n  - made: {ref: x}\n")); err == nil {
+		t.Fatal("made without a kind was accepted")
+	}
 }

@@ -171,3 +171,41 @@ func TestViewCopyReadsOnlyTheProjectsOwnRecords(t *testing.T) {
 		t.Error("a records folder that is a link out is not read")
 	}
 }
+
+// the editor plays a recording from its light copy too, and only the final render gets the clip itself.
+func TestEditorPlaysTheLightCopyAndTheRenderTheClip(t *testing.T) {
+	root := t.TempDir()
+	l := testLibrary(t, root)
+	l.srv = &server{}
+	heavy, light := strings.Repeat("H", 5000), strings.Repeat("l", 700)
+	writeFile(t, filepath.Join(root, "clip", ArtifactFile), `{"title":"clip"}`)
+	writeFile(t, filepath.Join(root, "clip", ProjectDirname, RecordsDir, "chat.mp4"), heavy)
+	writeFile(t, filepath.Join(root, "clip", ProjectDirname, RecordsDir, "chat.view.mp4"), light)
+	writeFile(t, filepath.Join(root, "clip", ProjectDirname, RecordsDir, "solo.mp4"), heavy)
+	get := func(path string, header http.Header) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", path, nil)
+		r.Host = "127.0.0.1:18470"
+		for k, v := range header {
+			r.Header[k] = v
+		}
+		l.serveLibrary(w, r, 18470)
+		return w
+	}
+	if w := get("/a/clip/p/records/chat.mp4", nil); w.Body.String() != light {
+		t.Errorf("the editor got %d bytes (%d), not the light copy", w.Body.Len(), w.Code)
+	}
+	if w := get("/a/clip/p/records/chat.mp4", http.Header{FullClipsHeader: {"1"}}); w.Body.String() != heavy {
+		t.Errorf("the render got %d bytes, not the clip", w.Body.Len())
+	}
+	if w := get("/a/clip/p/records/solo.mp4", nil); w.Body.String() != heavy {
+		t.Errorf("a clip with no copy got %d bytes", w.Body.Len())
+	}
+	if w := get("/a/clip/p/records/chat.view.mp4", nil); w.Body.String() != light {
+		t.Errorf("the copy itself got %d bytes", w.Body.Len())
+	}
+	ranged := get("/a/clip/p/records/chat.mp4", http.Header{"Range": {"bytes=100-199"}})
+	if ranged.Code != 206 || ranged.Body.String() != light[100:200] {
+		t.Errorf("range: %d %d bytes", ranged.Code, ranged.Body.Len())
+	}
+}

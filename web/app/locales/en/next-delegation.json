@@ -20,5 +20,6 @@
   "next.settings.delegation.deliveryHint": "When a working agent reads another agent's message: at its next step or after the turn. Questions arrive at once.",
   "next.settings.delegation.delivery.step": "At once",
   "next.settings.delegation.delivery.turn": "After the turn",
-  "next.delegation.made": "Made: {count}"
+  "next.delegation.made": "Made: {count}",
+  "next.delegation.waitingBelow": "Waits for you in «{title}»"
 }

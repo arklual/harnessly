@@ -541,10 +541,10 @@
    "status": 400,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"T2VCEkI8AaJPK2mhSywzPlPnZuU\"",
-    "content-length": "101"
+    "etag": "\"C6LuNe1m7cccZrZ5blJCiqCRqdY\"",
+    "content-length": "59"
    },
-   "answer": "{\"error\":\"Каталог запуска вне корневого каталога проектов\"}",
+   "answer": "{\"error\":\"Каталог запуска не найден\"}",
    "scrubbed": false,
    "calls": []
   },

@@ -692,6 +692,16 @@ func (l *Library) serveFile(w http.ResponseWriter, r *http.Request, q url.Values
 // follows the live project nor edits it) and, with kitVersion, on that version of the project's kit.
 func (l *Library) serveFileAs(w http.ResponseWriter, r *http.Request, q url.Values, id string, segments []string, head, readOnly bool, kitVersion string) {
 	file := l.ResolveProjectFile(id, segments)
+	// A recording in a scene is seen in the editor through the platform's proxy: the light copy (viewcopy.go) is about
+	// a tenth of the clip, and a 30 MB clip held the page's connections for a minute. Only the final render
+	// asks for the clip itself (FullClipsHeader).
+	if file != "" && isRecordClip(segments) && r.Header.Get(FullClipsHeader) == "" {
+		if light := l.ResolveProjectFile(id, viewCopySegments(segments)); light != "" {
+			if _, err := os.Stat(light); err == nil {
+				file = light
+			}
+		}
+	}
 	if kitVersion != "" {
 		if kf := l.kitFileAt(id, kitVersion, segments); kf != "" {
 			file = kf

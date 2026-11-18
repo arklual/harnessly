@@ -56,6 +56,8 @@ func voiceLiveService(d deps) *realtime.Service {
 		Primed:    voicePrimed,
 		Relayed:   voiceRelayed,
 		Live:      voiceLiveFlag(d),
+		// The subscription route's model is the newest «gpt-live» the machine's Codex knows.
+		LiveModels: func() []string { return codexLiveModels(d) },
 		// The team's deployment turns the subscription route on for everyone who never turned it (15.11, the owner's
 		// decision); any other installation keeps it off until its person turns it.
 		SubscriptionOn: os.Getenv("RUNTIME_VOICE_SUBSCRIPTION") == "on",

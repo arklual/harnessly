@@ -1,0 +1,35 @@
+id: orch-grandchild-question
+title: Подчат подчата спрашивает человека — вопрос поднимается в главный чат, ответ спускается вниз (HRN-1634)
+tags: [orchestration, delegation, hard]
+agents: [claude, codex]
+timeout_s: 1500
+settle_s: 90
+setup:
+  workspace: [fixtures/orch-ask]
+  run: git init -q && git add -A && git -c user.name=eval -c user.email=eval@example.test commit -qm init
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'cmd/runtime/v2_notice*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/delegation/**'
+  - 'internal/mcpserver/**'
+  - 'internal/push/**'
+prompt: |-
+  Поручи помощнику в отдельном чате, а он пусть поручит ещё одному агенту в отдельном чате: создать в этой папке файл greeting.txt с одной строкой приветствия гостям на языке, который выберу я. Язык у меня спросит тот, кто будет писать файл, — ни ты, ни помощник его не выбирайте и не угадывайте. Я сижу в этом чате; отвечу здесь, когда меня спросят.
+interrupt:
+  after_s: 300
+  text: Язык — испанский.
+expect:
+  - name: delegated to a chat
+    any_of:
+      - called: harnessly\.delegate_task
+      - called: Bash
+        args: {command: '(?s).*harnessly tab create\b.*--prompt.*'}
+  # The writer asked the person (its question waits in its own chat, the root is told) or its parent, never guessed.
+  - name: the writer asked for the language
+    any_of:
+      - called: AskUserQuestion|request_user_input
+        even_failed: true
+      - called: harnessly\.send_to_conversation
+  - name: the answer came down to the file
+    check: grep -qiE 'hola|bienvenid|saludos' greeting.txt

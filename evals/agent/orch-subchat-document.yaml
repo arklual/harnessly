@@ -1,0 +1,31 @@
+id: orch-subchat-document
+title: Подчат работает с документом — главный чат человека видит его в «Сделано за ход» и в «Документах» (HRN-1631)
+tags: [orchestration, docs]
+agents: [claude, codex]
+timeout_s: 900
+settle_s: 90
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/delegation/**'
+  - 'cmd/runtime/v2_made.go'
+  - 'internal/sources/made*.go'
+  - 'internal/outputs/**'
+prompt: |-
+  Поручи это помощнику в отдельном чате, сам ничего не делай: пусть он покажет мне справа проектную доку https://docs.example.test/a/eval-laboratoriya-uuwhtz и скинет мне файлом notes.md, где одной строкой записан её адрес. Читать доку не нужно. Когда он закончит, скажи мне здесь.
+expect:
+  - name: delegated to a chat
+    any_of:
+      - called: harnessly\.delegate_task
+      - called: Bash
+        args: {command: '(?s).*harnessly tab create\b.*--prompt.*'}
+  # A stand has no hub, so a document cannot be published in it; the subchat showing the catalogue's page is the
+  # same thing for the person's chat: a page of the catalogue the helper touched. The person's chat lists it, marked
+  # — what its «Сделано за ход» and «Документы» on the right are drawn from. Either the chat's or the subchat's: the
+  # chat reading the subchat's answer (`tab result`) touches the same page first, and the block shows it either way.
+  - name: the person's chat lists the subchat's document
+    made: {kind: doc, ref: 'eval-laboratoriya-uuwhtz'}
+  # The file only the subchat makes: it shows the subchat's things come up to the person's chat. «Документы» leaves
+  # files out (web/app/next/bindings/chat-docs.test.ts).
+  - name: the person's chat lists the subchat's file
+    made: {kind: file, ref: 'notes\.md', from: subchat}

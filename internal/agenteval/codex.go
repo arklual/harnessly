@@ -147,6 +147,11 @@ func codexTool(name, args string) (string, json.RawMessage) {
 		}
 		_ = json.Unmarshal(a, &x)
 		cmd := x.Cmd
+		if cmd == "" && x.Command == nil {
+			// Code mode writes the command as JavaScript, often a template literal (cmd:`harnessly tab create
+			// --prompt ${p}`), which is no JSON: the command is read off the script as written.
+			cmd = scriptCmd(args)
+		}
 		switch c := x.Command.(type) {
 		case string:
 			cmd = c
@@ -165,6 +170,9 @@ func codexTool(name, args string) (string, json.RawMessage) {
 		return "Bash", b
 	case "apply_patch":
 		return "Edit", a
+	case "spawn_agent":
+		// Codex's own helper agent is what Claude's Agent tool is: scenarios that accept a subagent accept it.
+		return "Agent", a
 	}
 	if strings.HasPrefix(name, "mcp__") {
 		return apps.ToolName(name), a
@@ -196,6 +204,18 @@ func codeModeCalls(script string) []codeCall {
 		out = append(out, codeCall{name: name, args: js})
 	}
 	return out
+}
+
+// scriptCmdRe finds the cmd of an exec_command call as JavaScript writes it: `…`, "…" or '…'.
+var scriptCmdRe = regexp.MustCompile("(?s)\\bcmd\"?\\s*:\\s*(`(?:[^`\\\\]|\\\\.)*`|\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*')")
+
+// scriptCmd is the command of a code-mode exec_command argument, without its quotes; "" when there is none.
+func scriptCmd(arg string) string {
+	m := scriptCmdRe.FindStringSubmatch(arg)
+	if m == nil {
+		return ""
+	}
+	return m[1][1 : len(m[1])-1]
 }
 
 // balancedArg is the first argument of a call whose "(" was just read: up to its "," or ")" at depth zero, outside

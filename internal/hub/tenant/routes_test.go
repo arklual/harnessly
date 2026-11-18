@@ -36,6 +36,9 @@ func registered(t *testing.T) map[string]bool {
 				return err
 			}
 			ast.Inspect(f, func(n ast.Node) bool {
+				if fd, ok := n.(*ast.FuncDecl); ok && isSlogHandle(fd) {
+					return false // a log handler passing a record on registers no route
+				}
 				call, ok := n.(*ast.CallExpr)
 				if !ok || len(call.Args) != 2 {
 					return true
@@ -56,6 +59,20 @@ func registered(t *testing.T) map[string]bool {
 		}
 	}
 	return found
+}
+
+// isSlogHandle says whether a declaration is a slog.Handler's Handle(ctx, slog.Record) method, whose
+// next.Handle(ctx, r) reads like a route registration to the walk above.
+func isSlogHandle(fd *ast.FuncDecl) bool {
+	if fd.Recv == nil || fd.Name.Name != "Handle" || fd.Type.Params == nil || len(fd.Type.Params.List) != 2 {
+		return false
+	}
+	sel, ok := fd.Type.Params.List[1].Type.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	pkg, ok := sel.X.(*ast.Ident)
+	return ok && pkg.Name == "slog" && sel.Sel.Name == "Record"
 }
 
 // pattern is a route's pattern as the source writes it: string literals as they are, a name as <name>.

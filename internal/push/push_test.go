@@ -474,3 +474,18 @@ func TestAddReplacesTheDeviceAndKeepsEveryWrite(t *testing.T) {
 		t.Fatalf("%+v", subs[0])
 	}
 }
+
+// A subchat's notification told as the root's: the root's tab, title and session, the subchat named in the words, the
+// subchat's own tag.
+func TestAsRoot(t *testing.T) {
+	sid := "sid-root"
+	msg := AsRoot(Message{Kind: "question", Title: "Board", Body: "May I write?", Detail: "May I write?", TabID: "tab-sub", Tag: "p:tab-sub"},
+		As{TabID: "tab-root", WorkspaceID: "ws", Title: "Plan the release", AgentSessionID: &sid, From: "Board"})
+	if msg.TabID != "tab-root" || msg.WorkspaceID != "ws" || msg.Title != "Plan the release" || msg.ConversationTitle != "Plan the release" ||
+		msg.Tag != "p:tab-sub" || msg.AgentSessionID != &sid {
+		t.Fatalf("%+v", msg)
+	}
+	if !strings.Contains(msg.Body, "«Board»: May I write?") || !strings.Contains(msg.Detail, "«Board»") {
+		t.Fatalf("words: %q %q", msg.Body, msg.Detail)
+	}
+}

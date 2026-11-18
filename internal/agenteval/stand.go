@@ -21,6 +21,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agentnet"
 	"go.yaml.in/yaml/v3"
 )
@@ -40,6 +41,8 @@ type StandConfig struct {
 	RealImages bool
 	// AgentEnv are variables every agent of the stand gets (a provider's base URL, a model's name).
 	AgentEnv map[string]string
+	// LogsDir is where a stand that fails to start leaves its logs before its folder goes; "" keeps none.
+	LogsDir string
 	// RuntimeEnv are the runtime's settings (RUNTIME_GITLAB_HOSTS, RUNTIME_TASK_KEY_RE…): the setup under test.
 	RuntimeEnv map[string]string
 	// ClaudeConfig are keys merged into the agents' ~/.claude.json: a consent given once, as a person would
@@ -137,6 +140,10 @@ func Up(cfg StandConfig, name string, port int) (*Stand, error) {
 		return nil, infra("home: %v", err)
 	}
 	if err := s.start(cfg); err != nil {
+		if cfg.LogsDir != "" {
+			s.keepLogs(cfg.LogsDir)
+			err = fmt.Errorf("%w; its logs are kept in %s", err, cfg.LogsDir)
+		}
 		s.Down()
 		return nil, err
 	}
@@ -178,6 +185,12 @@ func (s *Stand) writeHome(cfg StandConfig) error {
 	if err := os.WriteFile(filepath.Join(s.Home, ".claude", "settings.json"), []byte(`{"permissions":{"defaultMode":"bypassPermissions"}}`+"\n"), 0o600); err != nil {
 		return err
 	}
+	// A clean Codex: the plugins of the person's ChatGPT account (openai-curated-remote: Superpowers and the like) are
+	// not the environment under test, and Superpowers alone rewrote how the agent works. harnessly's own
+	// skills are skills, not plugins, and stay.
+	if err := os.WriteFile(filepath.Join(s.Home, ".codex", "config.toml"), []byte("[features]\nplugins = false\n"), 0o600); err != nil {
+		return err
+	}
 	if b, err := os.ReadFile(filepath.Join(cfg.Login, "codex-auth.json")); err == nil {
 		if b, err = codexStandAuth(b, time.Now()); err != nil {
 			return fmt.Errorf("codex-auth.json: %v", err)
@@ -210,7 +223,9 @@ func (s *Stand) writeHome(cfg StandConfig) error {
 	tmp := filepath.Join(s.Dir, "tmp")
 	env := map[string]string{"ENABLE_CLAUDEAI_MCP_SERVERS": "false", "TMPDIR": tmp, "CLAUDE_CODE_TMPDIR": tmp}
 	for k, v := range cfg.AgentEnv {
-		env[k] = v
+		// ${NAME} takes a value from the eval's own environment: a provider's key comes from the safe
+		// (harnessly secret run --env NAME=…) and is never written into the setup file.
+		env[k] = os.Expand(v, func(name string) string { return os.Getenv(name) })
 	}
 	keys := make([]string, 0, len(env))
 	for k := range env {
@@ -337,6 +352,11 @@ func (s *Stand) sandboxArgs(cfg StandConfig) []string {
 func shellQuote(v string) string { return "'" + strings.ReplaceAll(v, "'", `'\''`) + "'" }
 
 func (s *Stand) api(method, path string, body, out any) error {
+	return s.request(method, path, body, out, nil)
+}
+
+// request is api with a page session's cookie in place of the cli-token when cookie is set.
+func (s *Stand) request(method, path string, body, out any, cookie *http.Cookie) error {
 	var rd io.Reader
 	if body != nil {
 		b, _ := json.Marshal(body)
@@ -348,7 +368,11 @@ func (s *Stand) api(method, path string, body, out any) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Set("x-cli-token", s.token)
+	if cookie != nil {
+		req.AddCookie(cookie)
+	} else {
+		req.Header.Set("x-cli-token", s.token)
+	}
 	req.Header.Set("content-type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -499,9 +523,48 @@ func (s *Stand) Collect(agent, tab, keep string) (Facts, error) {
 		_ = copyFile(t, keep)
 	}
 	f.Pane = ReadPaneIntents(filepath.Join(s.Data, "pane-intents.json"), tab)
+	f.Made, f.MadeError = s.made(tab)
 	f.Images = ReadImageJobs(filepath.Join(s.Data, "images"), tab)
 	f.Files = append(ReadFiles(s.Work, ""), ReadFiles(s.Library, "design:")...)
 	return f, nil
+}
+
+// made is what the runtime lists as made by the person's chat (its conversation is its tab), the way the chat's page
+// asks for it; the second answer says why it could not be read.
+func (s *Stand) made(tab string) ([]MadeFact, string) {
+	var out struct {
+		Items []struct {
+			Kind  string `json:"kind"`
+			Ref   string `json:"ref"`
+			Title string `json:"title"`
+			Op    string `json:"op"`
+			From  *struct {
+				Kind string `json:"kind"`
+			} `json:"from"`
+		} `json:"items"`
+	}
+	// /api/v2 lets in only a page session, never the cli-token: the stand signs one with its own runtime's secret, as
+	// the person's page has.
+	secret, err := agent.Config{ConfigFile: filepath.Join(s.Data, "config.json")}.LoadSecret()
+	if err != nil {
+		return nil, "the stand's secret: " + err.Error()
+	}
+	cookie := &http.Cookie{Name: "session-token", Value: agent.SignHS256(secret, "eval", "", 5*time.Minute)}
+	if n := s.cfg.RuntimeEnv["RUNTIME_SESSION_COOKIE"]; n != "" {
+		cookie.Name = n
+	}
+	if err := s.request(http.MethodGet, "/api/v2/conversations/"+tab+"/made", nil, &out, cookie); err != nil {
+		return nil, err.Error()
+	}
+	facts := make([]MadeFact, 0, len(out.Items))
+	for _, it := range out.Items {
+		f := MadeFact{Kind: it.Kind, Ref: it.Ref, Title: it.Title, Op: it.Op}
+		if it.From != nil {
+			f.From = it.From.Kind
+		}
+		facts = append(facts, f)
+	}
+	return facts, ""
 }
 
 // sessionFiles are every Claude Code transcript of the stand, of any folder: the person's chat, its subagents, the
@@ -652,12 +715,20 @@ func (s *Stand) Exec(ctx context.Context, script string, extra []string, timeout
 }
 
 func (s *Stand) codexRollout() string {
-	files, _ := filepath.Glob(filepath.Join(s.Home, ".codex", "sessions", "*", "*", "*", "*.jsonl"))
+	return firstRollout(filepath.Join(s.Home, ".codex", "sessions"))
+}
+
+// firstRollout is the Codex session that started first under dir: the person's chat. The chats it delegated to run
+// Codex in the same home and write later, so the newest file is a helper's, not the person's. A rollout's
+// name starts with the time it began (rollout-2026-11-17T20-42-05-<id>.jsonl), so the order of names is the order of
+// starts.
+func firstRollout(dir string) string {
+	files, _ := filepath.Glob(filepath.Join(dir, "*", "*", "*", "*.jsonl"))
 	sort.Strings(files)
 	if len(files) == 0 {
 		return ""
 	}
-	return files[len(files)-1]
+	return files[0]
 }
 
 func copyFile(src, dst string) error {
@@ -672,6 +743,19 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return os.WriteFile(dst, b, 0o600)
+}
+
+// keepLogs copies what tells why a stand failed (the runtime's log, the stand's own logs) to dir before Down removes
+// the stand's folder.
+func (s *Stand) keepLogs(dir string) {
+	if s == nil || s.Dir == "" {
+		return
+	}
+	files, _ := filepath.Glob(filepath.Join(s.Dir, "*.log"))
+	more, _ := filepath.Glob(filepath.Join(s.Data, "*.log"))
+	for _, f := range append(files, more...) {
+		_ = copyFile(f, filepath.Join(dir, filepath.Base(f)))
+	}
 }
 
 // Down stops the stand's runtime and agents and removes its folder.

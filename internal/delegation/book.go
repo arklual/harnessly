@@ -30,6 +30,10 @@ type Page struct {
 	// Woken is the turn (or the end) the parent was last woken for, Wakes how many wake-ups went to it.
 	Woken string `json:"woken,omitempty"`
 	Wakes int    `json:"wakes,omitempty"`
+	// RootTold is what the root chat above the parent was last told this chat waits for (a question, a permission, a
+	// limit), RootWakes how many times it was: the person sits in the root.
+	RootTold  string `json:"rootTold,omitempty"`
+	RootWakes int    `json:"rootWakes,omitempty"`
 	// Contract: the chat was started with the rules of a delegated chat (see Rules): its final answer ends with a
 	// marker, and a turn that ends without one is a pause the platform answers with a reminder. Chats that
 	// were delegated before the rules existed are not held to them.
@@ -155,6 +159,36 @@ func (b *Book) claim(id, key string, max int) bool {
 	b.chats[id] = p
 	b.save()
 	return true
+}
+
+// claimRoot claims telling the root chat what key says of the chat, once for key and at most max times; unlike claim
+// it does not need the parent to have asked to be woken: the root did not delegate this chat, the person sits there.
+func (b *Book) claimRoot(id, key string, max int) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.load()
+	p, ok := b.chats[id]
+	if !ok || p.RootTold == key || p.RootWakes >= max {
+		return false
+	}
+	p.RootTold, p.RootWakes = key, p.RootWakes+1
+	b.chats[id] = p
+	b.save()
+	return true
+}
+
+// unclaimRoot gives back a claimRoot whose message did not reach the root.
+func (b *Book) unclaimRoot(id, key, was string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.load()
+	p, ok := b.chats[id]
+	if !ok || p.RootTold != key {
+		return
+	}
+	p.RootTold, p.RootWakes = was, max(0, p.RootWakes-1)
+	b.chats[id] = p
+	b.save()
 }
 
 // unclaim gives back a wake-up claimed for key whose message did not reach the parent: Woken goes back to was.

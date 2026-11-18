@@ -261,6 +261,7 @@
   "next.feed.stepsFailed": "Could not load the turn's steps",
   "next.turnEnd.continueText": "Continue",
   "next.newChat.noFolder": "Open any chat on this machine first: a new one starts in its folder",
+  "next.newChat.attachmentLost": "The attachment could not reach the machine. The draft is kept: send it again.",
   "next.newChat.failed": "Could not start the conversation",
   "next.newChat.folderGone": "The folder {folder} is gone. The message is still in the field: send it again and the chat starts in the machine's default folder",
   "next.newChat.creating": "Starting the agent…",
@@ -716,6 +717,10 @@
   "next.turnMade.epic": "Epic",
   "next.turnMade.epicDone": "{done} of {n} done",
   "next.turnMade.new": "new · agent",
+  "next.turnMade.fromSubchat": "from subchat “{title}”",
+  "next.turnMade.fromSubchatUntitled": "from a subchat",
+  "next.turnMade.fromSubagent": "from subagent “{title}”",
+  "next.turnMade.fromSubagentUntitled": "from a subagent",
   "next.turnMade.more": "{n} more",
   "next.turnMade.shots": "Screenshots · {n}",
   "next.turnMade.design": "Sinopia design"

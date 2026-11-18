@@ -27,9 +27,35 @@ func TestMetricsOf(t *testing.T) {
 		call(2, "Write", `{"file_path":"/w/b.py","content":"z2"}`),
 	}}}
 	m := MetricsOf(r)
-	want := Metrics{Tokens: 135, Sessions: 3, Subagents: 1, Teammates: 2, Messages: 2, Delegations: 2, Asks: 2, Repl: 1, LeadEdits: 1, Conflicts: 1, Duplicates: 1}
+	want := Metrics{Tokens: 135, Sessions: 3, Subagents: 1, Teammates: 2, Messages: 2, Delegations: 2, Asks: 2, BlindAsks: 1,
+		Steps: 9, Repl: 1, LeadEdits: 1, Conflicts: 1, Duplicates: 1}
 	if m != want {
 		t.Fatalf("got %+v\nwant %+v", m, want)
+	}
+}
+
+// a card of the safe is the person needed too, and an ask after a skill was opened is not blind.
+func TestMetricsAsksThroughTheSafe(t *testing.T) {
+	blind := MetricsOf(Result{Facts: &Facts{Calls: []Call{
+		call(0, "Bash", `{"command":"harnessly secret list"}`),
+		call(0, "Bash", `{"command":"harnessly secret ask flags-key --why \"switch a flag\""}`),
+		call(0, "Skill", `{"skill":"analytics"}`),
+	}}})
+	if blind.Asks != 1 || blind.BlindAsks != 1 || blind.Steps != 3 {
+		t.Fatalf("blind ask: %+v", blind)
+	}
+	for _, opened := range []Call{
+		call(0, "Skill", `{"skill":"team-vault"}`),
+		call(0, "Read", `{"file_path":"/w/.claude/skills/team-vault/SKILL.md"}`),
+		call(0, "Bash", `{"command":"cat .agents/skills/team-vault/SKILL.md"}`),
+	} {
+		m := MetricsOf(Result{Facts: &Facts{Calls: []Call{opened, call(0, "Bash", `{"command":"harnessly secret ask paybox-key --why x"}`)}}})
+		if m.Asks != 1 || m.BlindAsks != 0 {
+			t.Fatalf("ask after %s: %+v", opened.Name, m)
+		}
+	}
+	if m := MetricsOf(Result{Facts: &Facts{Calls: []Call{call(0, "Skill", `{"skill":"servers"}`), call(0, "Bash", `{"command":"tsh ls"}`)}}}); m.Asks != 0 || m.BlindAsks != 0 {
+		t.Fatalf("no ask: %+v", m)
 	}
 }
 

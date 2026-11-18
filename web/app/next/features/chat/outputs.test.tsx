@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import Outputs, { mergeStands, OutputsContext, SHOWN_BY_DEFAULT, type TShownKinds } from '@/next/features/chat/outputs';
+import Outputs, {
+  mergeStands,
+  OutputsContext,
+  SHOWN_BY_DEFAULT,
+  type TShownKinds,
+} from '@/next/features/chat/outputs';
 import { linkOf } from '@/next/features/chat/link-output';
 import { appConfig } from '@/platform/config';
 import type { TurnItem, TurnOutput } from '@/next/features/chat/types';

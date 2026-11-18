@@ -6,6 +6,7 @@ import { startPrefsSync } from '@/next/stores/synced-prefs';
 import { useSyncExternalStore } from 'react';
 import { pageClock } from '@/next/core/clock';
 import { getPage } from '@/next/core/net/http';
+import { pokeAgentCLIs } from '@/next/core/net/agent-clis';
 import { clusterApi, machineApi } from '@/next/core/net/machine';
 import { startDraftSync } from '@/next/core/drafts-cloud';
 import { watchFleet, type FleetSource, type FleetWatch } from '@/next/core/fleet-watch';
@@ -313,7 +314,8 @@ export function bootNext(o: BootOptions = {}): Promise<BootState> {
       // A machine the list already calls unreachable is not asked: its socket says when it is back.
       if (m.reach === 'unreachable') continue;
       void checkRuntime(m.id).then((v2) => {
-        if (v2 || gone()) return;
+        if (v2) return pokeAgentCLIs(m.id);
+        if (gone()) return;
         dropOutdated(m.id, preferred);
       });
     }

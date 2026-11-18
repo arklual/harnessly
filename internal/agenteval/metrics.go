@@ -22,8 +22,14 @@ type Metrics struct {
 	// Conflicts are files edited from more than one session; Duplicates are the same edit made in more than one.
 	Conflicts  int `json:"conflicts"`
 	Duplicates int `json:"duplicates"`
-	// Asks are the times the person was needed: a question tool, a turn that ended waiting for input.
+	// Asks are the times the person was needed: a question tool, a card of the safe asking for a secret, a turn that
+	// ended waiting for input.
 	Asks int `json:"asks"`
+	// BlindAsks is 1 when the person was first asked (a question tool or the safe's card) before any skill was opened:
+	// the access the agent wanted may well have been described there.
+	BlindAsks int `json:"blindAsks"`
+	// Steps are the tool calls of the person's chat: how long the way to the result was.
+	Steps int `json:"steps"`
 	// Messages are what agents told each other mid-work (SendMessage, send_to_conversation).
 	Messages int `json:"messages"`
 	// Repl are the calls of Code Mode's REPL tool.
@@ -36,6 +42,9 @@ var (
 	delegateCall = regexp.MustCompile(`(^|\.)delegate_task$`)
 	sendCall     = regexp.MustCompile(`(^|\.)send_to_conversation$`)
 	tabCreate    = regexp.MustCompile(`harnessly tab create\b.*--prompt`)
+	secretAsk    = regexp.MustCompile(`harnessly secret ask\b`)
+	// skillOpen is a skill's file read by a tool other than Skill: Codex reads SKILL.md with its shell.
+	skillOpen = regexp.MustCompile(`(?i)skill\.md`)
 )
 
 // MetricsOf reads the metrics of a run.
@@ -52,9 +61,24 @@ func MetricsOf(r Result) Metrics {
 	}
 	byFile := map[string]map[int]bool{}
 	byEdit := map[string]map[int]bool{}
+	skillSeen, asked := false, false
 	for _, c := range f.Calls {
 		var a map[string]any
 		_ = json.Unmarshal(c.Args, &a)
+		if c.Session == 0 {
+			m.Steps++
+		}
+		cmd, _ := a["command"].(string)
+		path, _ := a["file_path"].(string)
+		if c.Name == "Skill" || skillOpen.MatchString(cmd) || skillOpen.MatchString(path) {
+			skillSeen = true
+		}
+		if c.Name == "AskUserQuestion" || (c.Name == "Bash" && secretAsk.MatchString(cmd)) {
+			if !asked && !skillSeen {
+				m.BlindAsks = 1
+			}
+			asked = true
+		}
 		switch {
 		case subagentTool.MatchString(c.Name):
 			// A teammate of an agent team is an Agent call with a name (and a team).
@@ -67,8 +91,11 @@ func MetricsOf(r Result) Metrics {
 		case delegateCall.MatchString(c.Name):
 			m.Delegations++
 		case c.Name == "Bash":
-			if cmd, _ := a["command"].(string); tabCreate.MatchString(cmd) {
+			if tabCreate.MatchString(cmd) {
 				m.Delegations++
+			}
+			if secretAsk.MatchString(cmd) {
+				m.Asks++
 			}
 		case c.Name == "SendMessage" || sendCall.MatchString(c.Name):
 			m.Messages++

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/convo"
+	"github.com/ly-solutions/harnessly/internal/push"
 	"github.com/ly-solutions/harnessly/internal/status"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -151,5 +152,51 @@ func TestChatNoticeMirrorCoalesces(t *testing.T) {
 	queued[0]()
 	if strings.Join(got, ",") != "ready-for-review" {
 		t.Fatalf("mirrored: %v", got)
+	}
+}
+
+// rootNotePusher also tells a subchat's notification as its root's.
+type rootNotePusher struct {
+	notePusher
+	as []push.As
+}
+
+func (p *rootNotePusher) PushAs(tabID string, e status.Entry, kind string, as push.As) {
+	p.Push(tabID, e, kind)
+	p.as = append(p.as, as)
+}
+
+// A subchat's question (two levels down) is pushed as the root's: the tap opens the root chat, the subchat's
+// transcript gives the question.
+func TestChatNoticeOfASubchatLeadsToTheRoot(t *testing.T) {
+	r := newNoticeRig()
+	p := &rootNotePusher{}
+	r.n.push = func() status.Pusher { return p }
+	mid, root := "c-mid", "c-root"
+	recs := map[string]wire.Conversation{
+		"c1": {ID: "c1", Title: "Board", Session: "s1", ParentID: &mid, State: wire.AgentState{K: wire.StateWaitingPermission, Since: 20}, TranscriptPath: "/t/c1.jsonl"},
+		mid:  {ID: mid, Title: "Middle", Session: "s-mid", ParentID: &root},
+		root: {ID: root, Title: "Plan the release", Session: "s-root", AgentSessionID: "sid-root"},
+	}
+	r.rec = recs["c1"]
+	r.n.record = func(id string) (wire.Conversation, bool) { c, ok := recs[id]; return c, ok }
+	r.n.entry = func(s string) (string, status.Entry, bool) {
+		return "tab-of-" + s, status.Entry{WorkspaceID: "ws1"}, true
+	}
+	r.tell(convo.NoticeQuestion)
+	if len(p.sent) != 1 || p.sent[0].tab != "tab-of-s1" || p.sent[0].transcript != "/t/c1.jsonl" {
+		t.Fatalf("pushes: %+v", p.sent)
+	}
+	if len(p.as) != 1 || p.as[0].TabID != "tab-of-s-root" || p.as[0].Title != "Plan the release" || p.as[0].From != "Board" ||
+		p.as[0].AgentSessionID == nil || *p.as[0].AgentSessionID != "sid-root" {
+		t.Fatalf("as: %+v", p.as)
+	}
+	// The root's own question stays its own.
+	r.rec = recs[root]
+	r.rec.Session, r.rec.State = "s1", wire.AgentState{K: wire.StateWaitingQuestion, Since: 30}
+	recs[root] = r.rec
+	r.tell(convo.NoticeQuestion)
+	if len(p.sent) != 2 || len(p.as) != 1 {
+		t.Fatalf("the root's own: %+v %+v", p.sent, p.as)
 	}
 }

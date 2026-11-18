@@ -95,6 +95,10 @@ func all() []Preset {
 	extraMu.RLock()
 	defer extraMu.RUnlock()
 	out := append([]Preset(nil), presets...)
+	if i := slices.IndexFunc(out, func(p Preset) bool { return p.ID == "gpt" }); i >= 0 {
+		out[i] = withCodexModels(out[i], codexGPTModels())
+	}
+	withVendorLists(out)
 	// A vendor's profile whose key is an account of the person's providers: the key and the name are that account's.
 	// A profile of the file that stands in its place below is the file's own and keeps what the file says.
 	for i := range out {

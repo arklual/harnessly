@@ -25,7 +25,7 @@ var secretReasons = map[string]string{
 	"bad-origin":   "a site must be an HTTPS origin, or HTTP on localhost, 127.0.0.1 or [::1]",
 	"bad-project":  "project identifiers must be nonempty and have no surrounding spaces",
 	"bad-name":     "a name is letters, digits, '.', '_' and '-' (64 at most), e.g. github-token; a reference is local:NAME or vault:PATH#KEY",
-	"not-found":    "the safe has no secret by that name: ask the person for it with harnessly secret ask NAME --why \"...\"",
+	"not-found":    "the safe has no secret by that name: if no skill of the service or of the team's vault says where it is, ask the person for it with harnessly secret ask NAME --why \"...\"",
 	"key-lost":     "the safe's key is gone, its values cannot be read: ask for the secret again with --replace",
 	"rate-limited": "too many asks from this conversation in the last 10 minutes, wait a little",
 	"too-many":     "too many asks wait for the person already",
@@ -134,7 +134,7 @@ func (c *cli) secretList() error {
 		c.out("%s\tput %s\tused %s%s\n", s.Name, stamp(s.UpdatedAt), stamp(s.LastUsedAt), where)
 	}
 	if len(out.Secrets) == 0 {
-		c.out("the safe is empty: ask the person for a secret with harnessly secret ask NAME --why \"...\"\n")
+		c.out("the safe is empty: a team may keep its keys elsewhere (look for a skill of the service or of the team's vault); if none says where, ask the person with harnessly secret ask NAME --why \"...\"\n")
 	}
 	return nil
 }

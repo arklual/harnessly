@@ -309,6 +309,11 @@ const VideoView = (props: IVideoViewProps) => {
   const shareFormats = shareFormatsOf(video.settings.formats);
   const onShare = access ? () => (access.manage ? togglePop(POP.share) : access.onOpen()) : undefined;
 
+  // «Чат на весь экран»: the video over the whole window goes back to the chat with the video beside it.
+  const chatFull =
+    stage && !embed && stage.mode !== 'chat'
+      ? () => stage.onMode('chat', { width: window.innerWidth, height: window.innerHeight })
+      : undefined;
   const stageBody = (): ReactNode => {
     if (scenes.length === 0) return <Empty>{t('next.video.shell.noScenes')}</Empty>;
     if (slotError !== null) {
@@ -385,6 +390,7 @@ const VideoView = (props: IVideoViewProps) => {
         badge={renderBadge(info)}
         onShare={onShare}
         shareOn={pop === POP.share}
+        onChatFull={chatFull}
         downloads={[
           {
             id: 'mp4',
@@ -422,6 +428,7 @@ const VideoView = (props: IVideoViewProps) => {
           }
           context={chatContextOf(video, time, sent)}
           site={stage}
+          onChatFull={chatFull}
         />
       )}
 

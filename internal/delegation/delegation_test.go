@@ -949,3 +949,53 @@ func TestConversationRef(t *testing.T) {
 		}
 	}
 }
+
+// A chat two levels down that waits for the person reaches the root as well as its parent, once: the person sits in
+// the root, and the chat in between cannot grant a permission.
+func TestAGrandchildWaitingForThePersonReachesTheRoot(t *testing.T) {
+	r := newTestRig(t)
+	child := r.delegated(map[string]any{"notify": true, "title": "Middle"})
+	text, isErr := r.call(child, "delegate_task", map[string]any{"provider": "claude", "prompt": "Draw the board", "title": "Board", "notify": true})
+	if isErr {
+		t.Fatal(text)
+	}
+	grandchild := idOf(t, text)
+	rec := r.convs.finish(grandchild, "May I write to /etc?")
+	rec.State.K = wire.StateWaitingPermission
+	rec.Gate = &wire.GateRef{Kind: wire.GatePermission, ID: "g1"}
+	r.convs.add(rec)
+	r.svc.Observe(rec)
+	r.svc.Observe(rec)
+	if woken := r.convs.sent[child]; len(woken) != 1 || !strings.Contains(woken[0], "waiting for an answer") {
+		t.Fatalf("the parent: %v", woken)
+	}
+	told := r.convs.sent["tab-root"]
+	if len(told) != 1 || !strings.Contains(told[0], grandchild) || !strings.Contains(told[0], "«Middle»") ||
+		!strings.Contains(told[0], "only the person can grant") {
+		t.Fatalf("the root: %v", told)
+	}
+	// Its usage limit reaches the root once too.
+	reset := wire.Ms(1_800_000_000_000)
+	rec.State.K, rec.Gate = wire.StateReady, nil
+	rec.Limited = &wire.LimitHold{Provider: wire.ProviderClaude, At: 5, ResetsAt: &reset}
+	r.convs.add(rec)
+	r.svc.Observe(rec)
+	r.svc.Observe(rec)
+	if told := r.convs.sent["tab-root"]; len(told) != 2 || !strings.Contains(told[1], "usage limit") {
+		t.Fatalf("the root after the limit: %v", told)
+	}
+}
+
+// A direct child of the root wakes only its parent, which is the root: no second message.
+func TestAChildOfTheRootTellsItOnce(t *testing.T) {
+	r := newTestRig(t)
+	child := r.delegated(map[string]any{"notify": true})
+	rec := r.convs.finish(child, "Which database?")
+	rec.State.K = wire.StateWaitingQuestion
+	rec.Gate = &wire.GateRef{Kind: wire.GateQuestion, ID: "g1"}
+	r.convs.add(rec)
+	r.svc.Observe(rec)
+	if woken := r.convs.sent["tab-root"]; len(woken) != 1 || strings.Contains(woken[0], "further down") {
+		t.Fatalf("the root: %v", woken)
+	}
+}

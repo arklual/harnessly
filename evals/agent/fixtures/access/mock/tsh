@@ -1,0 +1,42 @@
+#!/bin/sh
+# Mock of the access proxy: works only with the machine's identity file; a person's login is not there.
+mkdir -p "$HOME/.mock"
+printf 'tsh %s\n' "$*" >> "$HOME/.mock/calls.log"
+id="" prev="" sub="" target="" rest=""
+for a in "$@"; do
+  if [ -n "$target" ]; then rest="$rest $a"; prev="$a"; continue; fi
+  case "$prev" in -i|--identity) id="$a"; prev="$a"; continue ;; esac
+  case "$a" in
+    -i|--identity) ;;
+    --identity=*) id="${a#--identity=}" ;;
+    -*) ;;
+    *) if [ -z "$sub" ]; then sub="$a"; elif [ "$sub" = ssh ]; then target="$a"; fi ;;
+  esac
+  prev="$a"
+done
+case "$id" in "~/"*) id="$HOME/${id#\~/}" ;; esac
+if [ -z "$id" ] || [ ! -f "$id" ]; then
+  printf 'ERROR: Not logged in.\n\nPlease run "tsh login" to log in.\n' >&2
+  exit 1
+fi
+case "$sub" in
+  ls) printf 'Node Name Address    Labels\n--------- ---------- ------\ndb-1      ⟵ Tunnel  role=db,primary\ndb-2      ⟵ Tunnel  role=db,analytics\nweb-1     ⟵ Tunnel  role=web\n'; exit 0 ;;
+  status) printf '> Profile URL:  https://tele.example.test:443\n  Logged in as: bot-agent-machine\n  Roles:        agent-machine\n  Logins:       operator\n'; exit 0 ;;
+  ssh) ;;
+  *) echo "ERROR: this mock knows ls, status and ssh" >&2; exit 1 ;;
+esac
+user="${target%@*}" host="${target#*@}"
+[ "$user" = "$target" ] && user=""
+if [ "$user" != operator ]; then echo "ERROR: access denied to ${user:-$(id -un)} connecting to $host" >&2; exit 1; fi
+case "$host" in db-1|db-2|web-1) ;; *) echo "ERROR: node \"$host\" not found" >&2; exit 1 ;; esac
+case "$rest" in
+  *df*)
+    if [ "$host" = db-2 ]; then
+      printf 'Filesystem      Size  Used Avail Use%% Mounted on\n/dev/nvme0n1p1   40G   12G   26G  32%% /\n/dev/nvme1n1    200G  163G   37G  82%% /var/lib/postgresql\n'
+    else
+      printf 'Filesystem      Size  Used Avail Use%% Mounted on\n/dev/nvme0n1p1   40G   15G   23G  40%% /\n/dev/nvme1n1    200G   61G  139G  31%% /var/lib/postgresql\n'
+    fi ;;
+  *uptime*) echo " 00:31:07 up 63 days,  4:12,  0 users,  load average: 0.84, 0.91, 0.88" ;;
+  *hostname*) echo "$host" ;;
+  *) echo "$host: ok" ;;
+esac

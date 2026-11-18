@@ -11,7 +11,8 @@ import { PictureCards } from '@/next/features/chat/pictures';
 import { LINK, LINK_ICON, linkOf, viewOf, type ILinkOutput } from '@/next/features/chat/link-output';
 import { usePortUp } from '@/next/features/chat/port-up';
 import OutputRow from '@/next/features/chat/output-row';
-import Made from '@/next/features/chat/made';
+import Made, { viaText } from '@/next/features/chat/made';
+import { LiftedMade } from '@/next/features/chat/delegation';
 import { useArtifactMetas } from '@/next/features/artifacts/meta-store';
 import type { IArtifactItem } from '@/next/features/artifacts/model';
 import type { MachineId } from '@/next/protocol/v2';
@@ -96,7 +97,9 @@ const outputCard = (output: TurnOutput, context: IOutputsContext): ICard => {
     icon: KIND_ICON[output.kind],
     accent: output.op === 'created',
     title: output.title,
-    meta: output.op === 'changed' ? `${kind} · ${t('next.outputs.changed')}` : kind,
+    meta: [output.op === 'changed' ? `${kind} · ${t('next.outputs.changed')}` : kind, viaText(output)]
+      .filter(Boolean)
+      .join(' · '),
     open: onOpen ? () => onOpen(output) : null,
   };
 };
@@ -253,7 +256,7 @@ const LinkOutputCard = ({
       meta={
         <>
           {view.tone && <span className="hx-file__dot" data-tone={view.tone} aria-hidden="true" />}
-          {view.meta}
+          {[view.meta, viaText(output)].filter(Boolean).join(' · ')}
         </>
       }
       pending={view.pending}
@@ -292,8 +295,19 @@ export const deliveriesOf = (item: TurnItem, context: IOutputsContext): TurnOutp
 export const drawnOf = (item: TurnItem): readonly string[] =>
   item.turn.status === 'live' ? [] : (item.turn.pictures ?? []);
 
-const Outputs = ({ item }: { item: TurnItem }) => {
+/** The turn's own outputs with what the chat's helpers made during it, each thing once. */
+export const withLifted = (item: TurnItem, lifted: readonly TurnOutput[] | undefined): TurnItem => {
+  if (!lifted || lifted.length === 0) return item;
+  const own = item.turn.outputs ?? [];
+  const seen = new Set(own.map((o) => `${o.kind}:${o.ref}`));
+  const more = lifted.filter((o) => !seen.has(`${o.kind}:${o.ref}`));
+  return more.length === 0 ? item : { ...item, turn: { ...item.turn, outputs: [...own, ...more] } };
+};
+
+const Outputs = ({ item: own }: { item: TurnItem }) => {
   const context = useContext(OutputsContext);
+  const lifted = useContext(LiftedMade).get(own.key);
+  const item = useMemo(() => withLifted(own, lifted), [own, lifted]);
   const outputs = item.turn.outputs ?? [];
   const files = context.shown.file ? item.turn.files.filter((f) => f.op !== 'read') : [];
   return (

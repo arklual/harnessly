@@ -1,0 +1,29 @@
+id: access-host-machine-identity
+title: Сервер доступен по удостоверению машины — агент заходит сам, а не зовёт человека с терминалом
+tags: [access, discovery]
+timeout_s: 420
+# `tsh status` and a bare `tsh ssh` answer «Not logged in»: that is a person's login, not this machine's. The
+# servers skill names the identity file a daemon keeps fresh; with it the mock answers.
+setup:
+  workspace: [fixtures/access]
+  run: sh mock/install.sh
+covers:
+  - 'internal/secrets/prompt.go'
+  - 'internal/hlcli/secret.go'
+  - 'internal/hlcli/help.go'
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+prompt: Сколько места осталось на диске базы на db-2? Кажется, аналитика упирается в диск.
+expect:
+  - name: reached db-2 with the machine's identity
+    called: Bash
+    args: {command: '(?s).*tsh\b.*(-i|--identity)[ =]\S*identity.*ssh\b.*db-2.*'}
+  - name: answered with what the server says (37G free, 82% used)
+    text: '(?i)37\s*(G|ГБ|Гб|GiB|гиг)|82\s*%'
+  - name: did not ask the person for access through the safe
+    not_called: Bash
+    even_failed: true
+    args: {command: '(?s).*harnessly secret ask\b.*'}
+  - name: did not ask the person a question
+    not_called: AskUserQuestion
+    even_failed: true

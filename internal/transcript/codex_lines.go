@@ -495,6 +495,10 @@ func (s *codexState) responseItem(p *jsvalue.Object, ts float64) []*jsvalue.Obje
 		if text != "" && cardResult(text) == "" {
 			setResultText(result, text)
 		}
+		// The addresses the output names, as Claude's results keep them: a delivered file, a page shown or read.
+		if links := resultLinks(codexPrinted(text), false); len(links) > 0 {
+			result.Set("links", links)
+		}
 		if rep, ok := codexPictureReport(text); ok {
 			// The answer of generate_images / wait_images, straight or printed by a script: the card's job and files.
 			paths := make([]any, len(rep.Paths))
@@ -522,13 +526,18 @@ func (s *codexState) responseItem(p *jsvalue.Object, ts float64) []*jsvalue.Obje
 		}
 		summary := summarizeCodexCall(name, prop(p, "input"))
 		var images *codemode.ImageCall
+		var commands []string
 		if input, ok := prop(p, "input").(string); ok && name == "exec" {
 			// Code mode: the script calls the real tools, so the entry says which ones.
 			d := codemode.Describe(input)
-			name, summary, images = d.Tool, d.Summary, d.Images
+			name, summary, images, commands = d.Tool, d.Summary, d.Images, d.Commands
 		}
 		call := codexEntry("tool-call", ts, "toolUseId", callID, "toolName", name,
 			"summary", summary, "status", status)
+		if len(commands) > 0 {
+			// The shell commands whole, as Claude's Bash call keeps them: what they made is read from them.
+			call.Set("call", jsvalue.NewObject("command", strings.Join(commands, "\n")))
+		}
 		if images != nil {
 			call.Set("imageGen", jsvalue.NewObject("count", float64(images.Count), "prompt", images.Prompt, "shape", images.Shape))
 			s.imageCall = callID // Codex logs the call «completed» while it still runs; its output line ends it
@@ -1086,6 +1095,28 @@ func codexOutputText(out any) string {
 		}
 	}
 	return b.String()
+}
+
+// codexPrinted is an output with what a code-mode script printed of exec_command's answers ({"exit_code":0,"output":
+// "…"} on a line) put back as the command's own text: an address in a JSON string ends in an escaped «\n», not a
+// newline.
+func codexPrinted(text string) string {
+	if !strings.Contains(text, `"output"`) {
+		return text
+	}
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		if !strings.HasPrefix(line, "{") {
+			continue
+		}
+		var answer struct {
+			Output *string `json:"output"`
+		}
+		if json.Unmarshal([]byte(line), &answer) == nil && answer.Output != nil {
+			lines[i] = *answer.Output
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // codexPictureReport finds the report of harnessly's picture tool in an output: at its start (a direct call) or on a

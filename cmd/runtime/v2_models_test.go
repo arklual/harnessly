@@ -106,16 +106,16 @@ func TestCodexModelsOfTheMachine(t *testing.T) {
 // still offers the models Codex ships with.
 func TestCodexModelsWithoutCacheAndUltra(t *testing.T) {
 	ms := machineModels(t, `{}`, "").v2Models(wire.ProviderCodex)
-	if len(ms) != 7 || ms[0].ID != "gpt-5.6-sol" {
+	if len(ms) != 5 || ms[0].ID != "gpt-6.2-sol" {
 		t.Fatalf("built-in models: %+v", ms)
 	}
-	for _, id := range []string{"gpt-5.6-sol", "gpt-5.6-terra"} {
+	for _, id := range []string{"gpt-6.2-sol", "gpt-6.1-terra"} {
 		m := byID(ms, id)
 		if len(m.Efforts) != 6 || m.Efforts[5] != wire.EffortUltra || m.DefaultEffort == nil {
 			t.Errorf("%s: %+v", id, m)
 		}
 	}
-	if m := byID(ms, "gpt-5.6-luna"); len(m.Efforts) != 5 || m.Efforts[4] != wire.EffortMax {
+	if m := byID(ms, "gpt-6-luna"); len(m.Efforts) != 5 || m.Efforts[4] != wire.EffortMax {
 		t.Errorf("luna: %+v", m)
 	}
 	for _, m := range ms {

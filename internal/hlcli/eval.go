@@ -201,8 +201,8 @@ func (c *cli) evalRun(args []string) error {
 		toolDirs = filepath.SplitList(*tools)
 	} else {
 		for _, n := range []string{"claude", "codex"} {
-			if p, err := exec.LookPath(n); err == nil {
-				toolDirs = append(toolDirs, filepath.Dir(p))
+			if d := standTool(n, c.env.Home); d != "" {
+				toolDirs = append(toolDirs, d)
 			}
 		}
 	}
@@ -230,10 +230,14 @@ func (c *cli) evalRun(args []string) error {
 	loginDir := *login
 	if loginDir == "" {
 		loginDir = filepath.Join(base, "login")
+		// No copies yet: they are made from this account's own logins, without refresh tokens.
+		if err := copyLogins(c.env.Home, loginDir); err != nil {
+			fmt.Fprintf(c.env.Stderr, "eval run: no login copies in %s (%v): pass --login\n", loginDir, err)
+		}
 	}
 	o := agenteval.Options{Scenarios: scenarios, Models: ms, Variants: *variants, Repeats: *repeats, Parallel: *parallel,
 		MaxRuns: *maxRuns, MaxUSD: *maxUSD, Retries: *retries, Setup: *setup, Out: out, PortBase: *portBase, Log: c.env.Stderr,
-		Stand: agenteval.StandConfig{Root: filepath.Join(out, "stands"), Runtime: rt, Harnessly: self, Tools: toolDirs, Login: loginDir,
+		Stand: agenteval.StandConfig{Root: standRoot(out, stamp), Runtime: rt, Harnessly: self, Tools: toolDirs, Login: loginDir,
 			RealImages: *realImages, RuntimeEnv: su.RuntimeEnv, AgentEnv: su.AgentEnv, ClaudeConfig: su.ClaudeConfig, PromptSuffix: su.PromptSuffix}}
 	if *reuse {
 		o.Reuse = map[string]agenteval.Result{}
@@ -446,4 +450,95 @@ func reorder(args []string) []string {
 		pos = append(pos, a)
 	}
 	return append(flags, pos...)
+}
+
+// standSockets is how much of a unix socket's path a stand adds below its folder: /w<n>/tmp/harnessly-voice-<uid>/asr.sock
+// and tmux's /tmp/tmux-<uid>/default. A socket's whole path holds 107 bytes.
+const standSockets = 48
+
+// standRoot is where the run's stands live: beside its results while the sockets fit, else in a short folder of its own
+// under /tmp (a deep home made tmux fail to start every stand).
+func standRoot(out, stamp string) string {
+	root := filepath.Join(out, "stands")
+	if len(root)+standSockets <= 107 {
+		return root
+	}
+	return filepath.Join(os.TempDir(), fmt.Sprintf("hev-%d", os.Getuid()), stamp)
+}
+
+// standTool is the folder a stand takes an agent's CLI from: the one on PATH when the sandbox can read it, else the
+// same CLI the machine keeps outside the home (a stand reads no home but its own). "" when there is none.
+func standTool(name, home string) string {
+	inHome := func(p string) bool { return home != "" && strings.HasPrefix(p, strings.TrimRight(home, "/")+"/") }
+	// The stand reaches the CLI through its folder: both it and what a link there points to must be readable.
+	outside := func(p string) bool {
+		real, err := filepath.EvalSymlinks(p)
+		return err == nil && !inHome(p) && !inHome(real)
+	}
+	if p, err := exec.LookPath(name); err == nil && outside(p) {
+		return filepath.Dir(p)
+	}
+	dirs, _ := filepath.Glob("/opt/*/bin")
+	for _, d := range append(dirs, "/usr/local/bin", "/usr/bin") {
+		if p := filepath.Join(d, name); fileExists(p) && outside(p) {
+			return d
+		}
+	}
+	return ""
+}
+
+// copyLogins makes the stands' login copies in dir from the account's own, once: Claude's credentials without the
+// refresh token (a stand never renews them for the account), its account record, and Codex's auth.json (the stand
+// clears its refresh token itself).
+func copyLogins(home, dir string) error {
+	own := filepath.Join(home, ".claude", ".credentials.json")
+	// Copies made from an older login of the account (a token since revoked) are made again from the current one.
+	if copied, err := os.Stat(filepath.Join(dir, "claude-credentials.json")); err == nil {
+		if login, err := os.Stat(own); err != nil || !login.ModTime().After(copied.ModTime()) {
+			return nil
+		}
+	}
+	raw, err := os.ReadFile(own)
+	if err != nil {
+		return err
+	}
+	var cred map[string]any
+	if err := json.Unmarshal(raw, &cred); err != nil {
+		return err
+	}
+	dropRefresh(cred)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	b, _ := json.Marshal(cred)
+	if err := os.WriteFile(filepath.Join(dir, "claude-credentials.json"), b, 0o600); err != nil {
+		return err
+	}
+	if raw, err := os.ReadFile(filepath.Join(home, ".claude.json")); err == nil {
+		var conf struct {
+			OAuthAccount json.RawMessage `json:"oauthAccount"`
+		}
+		if json.Unmarshal(raw, &conf) == nil && len(conf.OAuthAccount) > 0 {
+			b, _ := json.Marshal(map[string]json.RawMessage{"oauthAccount": conf.OAuthAccount})
+			_ = os.WriteFile(filepath.Join(dir, "claude-account.json"), b, 0o600)
+		}
+	}
+	if raw, err := os.ReadFile(filepath.Join(home, ".codex", "auth.json")); err == nil {
+		_ = os.WriteFile(filepath.Join(dir, "codex-auth.json"), raw, 0o600)
+	}
+	return nil
+}
+
+// dropRefresh takes every refresh token out of a login record.
+func dropRefresh(m map[string]any) {
+	for k, v := range m {
+		switch strings.ToLower(k) {
+		case "refreshtoken", "refresh_token":
+			delete(m, k)
+			continue
+		}
+		if sub, ok := v.(map[string]any); ok {
+			dropRefresh(sub)
+		}
+	}
 }

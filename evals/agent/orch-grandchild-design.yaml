@@ -1,0 +1,29 @@
+id: orch-grandchild-design
+title: Подчат подчата делает доску — главный чат человека её показывает и называет (HRN-1634)
+tags: [orchestration, design, pane]
+agents: [claude, codex]
+timeout_s: 1500
+settle_s: 60
+setup:
+  design: [fixtures/shop]
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/delegation/**'
+  - 'internal/paneintents/**'
+  - 'internal/design/**'
+prompt: |-
+  Поручи это помощнику в отдельном чате, а он пусть сам поручит рисование ещё одному агенту в отдельном чате: в проекте Sinopia Design «shop» нужна новая доска «Возврат» — форма возврата заказа с причиной и кнопкой «Оформить возврат». Сам ничего не рисуй. Когда доска будет готова, скажи мне здесь, как она называется.
+expect:
+  - name: delegated to a chat
+    any_of:
+      - called: harnessly\.delegate_task
+      - called: Bash
+        args: {command: '(?s).*harnessly tab create\b.*--prompt.*'}
+  - name: the board exists
+    file: {glob: 'design:shop/project/*.dc.html', contains: 'Оформить возврат'}
+  # The design a helper's helper drew comes up to the person's chat: its pane opens it (lifted), quietly.
+  - name: the person's pane got the design
+    pane: {tab: design, target: shop}
+  - name: told the person the board
+    text: '(?i)возврат'

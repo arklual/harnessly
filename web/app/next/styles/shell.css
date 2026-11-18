@@ -1948,6 +1948,11 @@ html:has(.hx-app) body {
   .hx-sidebar__list {
     touch-action: pan-y pinch-zoom;
   }
+  /* Pinched in, the finger moves over the zoomed page both ways; the drawer does not take the drag then
+     (use-drawer-swipe.ts sets data-zoomed). */
+  .hx-app[data-zoomed] :is(.hx-main, .hx-scrim, .hx-feed, .hx-sidebar, .hx-sidebar__list) {
+    touch-action: pan-x pan-y pinch-zoom;
+  }
 }
 
 /* ── The sidebar and the window on the compositor ──

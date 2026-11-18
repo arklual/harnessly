@@ -116,7 +116,8 @@ export type TPaneAutoKinds = Readonly<Record<TPaneAutoKind, boolean>>;
  * switch, off by default: the person is not thrown two browser tabs for one stand.
  */
 const isBrowser = (intent: IPaneIntent): boolean =>
-  intent.command.kind === 'open' && (intent.command.tab === 'agent-browser' || intent.command.tab === 'browser');
+  intent.command.kind === 'open' &&
+  (intent.command.tab === 'agent-browser' || intent.command.tab === 'browser');
 
 /** The tab an auto intent opens, as the switch that lets it: the design, a document or board, the agent's browser, the rest. */
 export const autoKindOf = (command: TIntentCommand): TPaneAutoKind => {

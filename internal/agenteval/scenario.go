@@ -84,15 +84,19 @@ type Expect struct {
 	// Called: a call that did not fail, of a tool whose name matches (whole), with arguments matching Args.
 	Called string `yaml:"called" json:"called,omitempty"`
 	// EvenFailed makes Called count a call that failed too: a question to the person times out in a run nobody
-	// answers, and what is judged is that the agent asked.
+	// answers, and what is judged is that the agent asked. With NotCalled it forbids the attempt: a question that timed
+	// out still asked the person.
 	EvenFailed bool `yaml:"even_failed" json:"evenFailed,omitempty"`
-	// NotCalled: no call of a matching tool with matching Args ran (a refused call does not count).
+	// NotCalled: no call of a matching tool with matching Args ran (a refused or failed call does not count, unless
+	// EvenFailed).
 	NotCalled string `yaml:"not_called" json:"notCalled,omitempty"`
 	// Args are regexps over the call's arguments: argument name → regexp over its value (a string as it is, other JSON
 	// as its text).
 	Args map[string]string `yaml:"args" json:"args,omitempty"`
 	// Pane: the agent asked the right pane to open a tab of a kind matching Tab, at a target matching Target.
 	Pane *PaneExpect `yaml:"pane" json:"pane,omitempty"`
+	// Made: the runtime lists a matching thing as made by the person's chat (or, with Absent, none).
+	Made *MadeExpect `yaml:"made" json:"made,omitempty"`
 	// Images: at least this many pictures were drawn for the chat.
 	Images int `yaml:"images" json:"images,omitempty"`
 	// File: a file of the workspace or the design library.
@@ -115,6 +119,16 @@ type PaneExpect struct {
 	Target string `yaml:"target" json:"target,omitempty"`
 	// Place is a regexp over where in the target (a design's board); its target must match too.
 	Place string `yaml:"place" json:"place,omitempty"`
+}
+
+// MadeExpect is a thing the person's chat must (or must not) list as made, by regexps: Kind over its kind (doc, board,
+// design, task, mr, stand, commit, file; whole), Ref over its address or id, From over who made it ("" the chat
+// itself, subagent, subchat; whole).
+type MadeExpect struct {
+	Kind   string `yaml:"kind" json:"kind"`
+	Ref    string `yaml:"ref" json:"ref,omitempty"`
+	From   string `yaml:"from" json:"from,omitempty"`
+	Absent bool   `yaml:"absent" json:"absent,omitempty"`
 }
 
 // FileExpect is a file that must (or must not) be there.
@@ -241,7 +255,7 @@ func ParseScenario(name string, raw []byte) (*Scenario, error) {
 
 func (e Expect) kinds() int {
 	n := 0
-	for _, set := range []bool{e.Called != "", e.NotCalled != "", e.Pane != nil, e.Images > 0, e.File != nil, e.Text != "",
+	for _, set := range []bool{e.Called != "", e.NotCalled != "", e.Pane != nil, e.Made != nil, e.Images > 0, e.File != nil, e.Text != "",
 		e.TextNot != "", len(e.AnyOf) > 0, e.MaxCalls > 0, e.Check != ""} {
 		if set {
 			n++
@@ -252,7 +266,7 @@ func (e Expect) kinds() int {
 
 func (e Expect) validate() error {
 	if e.kinds() != 1 {
-		return errors.New("one kind per expectation: called, not_called, pane, images, file, text, text_not, any_of, max_calls or check")
+		return errors.New("one kind per expectation: called, not_called, pane, made, images, file, text, text_not, any_of, max_calls or check")
 	}
 	if len(e.Args) > 0 && e.Called == "" && e.NotCalled == "" {
 		return errors.New("args go with called or not_called")
@@ -266,6 +280,12 @@ func (e Expect) validate() error {
 			return errors.New("pane names a tab")
 		}
 		res = append(res, e.Pane.Tab, e.Pane.Target, e.Pane.Place)
+	}
+	if e.Made != nil {
+		if e.Made.Kind == "" {
+			return errors.New("made names a kind")
+		}
+		res = append(res, e.Made.Kind, e.Made.Ref, e.Made.From)
 	}
 	if e.File != nil {
 		if e.File.Glob == "" {

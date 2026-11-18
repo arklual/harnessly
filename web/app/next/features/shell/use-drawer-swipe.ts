@@ -10,6 +10,8 @@ import {
 
 /** The flick carries on for this long after the finger leaves: a short quick swipe still opens or closes. */
 const PROJECTION_MS = 200;
+/** Above this scale of the visual viewport the person has pinched in. */
+const ZOOMED_SCALE = 1.01;
 
 interface IDrag extends ITrack {
   pointerId: number;
@@ -42,6 +44,16 @@ const useDrawerSwipe = ({ app, scrim }: IDrawerRefs, open: boolean, setOpen: (op
     if (!appEl || !sidebarEl || !scrimEl) return;
     const phone = window.matchMedia(PHONE_QUERY);
     let drag: IDrag | null = null;
+    // Pinched in, a sideways drag moves the person over the zoomed page: the drawer stays put and the chat lets the
+    // finger pan both ways (data-zoomed, shell.css).
+    const viewport = window.visualViewport;
+    const zoomed = () => (viewport?.scale ?? 1) > ZOOMED_SCALE;
+    const onZoom = () => {
+      if (zoomed()) appEl.setAttribute('data-zoomed', '');
+      else appEl.removeAttribute('data-zoomed');
+    };
+    onZoom();
+    viewport?.addEventListener('resize', onZoom);
 
     const paint = () => {
       if (!drag) return;
@@ -59,7 +71,7 @@ const useDrawerSwipe = ({ app, scrim }: IDrawerRefs, open: boolean, setOpen: (op
     };
 
     const onDown = (event: PointerEvent) => {
-      if (!phone.matches || event.pointerType === 'mouse' || drag || !event.isPrimary) return;
+      if (!phone.matches || event.pointerType === 'mouse' || drag || !event.isPrimary || zoomed()) return;
       const target = event.target as Element;
       let kind: IDrag['kind'] | null = null;
       if (open && target.closest('.hx-sidebar, .hx-scrim')) kind = 'close';
@@ -120,6 +132,8 @@ const useDrawerSwipe = ({ app, scrim }: IDrawerRefs, open: boolean, setOpen: (op
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
       document.removeEventListener('pointercancel', onUp);
+      viewport?.removeEventListener('resize', onZoom);
+      appEl.removeAttribute('data-zoomed');
       release();
     };
   }, [app, scrim, open, setOpen]);

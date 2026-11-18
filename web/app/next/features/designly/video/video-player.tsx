@@ -11,6 +11,7 @@ import { videoFileHref } from '@/next/features/designly/video/api';
 import { frameOrigin, fromFrame } from '@/next/features/designly/bridge-origin';
 import { useBoardErrors } from '@/next/features/designly/use-board-errors';
 import { postVideo, readVideoMessage, type TVideoBoardMessage } from '@/next/features/designly/video/bridge';
+import { postDeck } from '@/next/features/designly/deck/bridge';
 import {
   clampTime,
   clockAt,
@@ -296,6 +297,32 @@ const VideoPlayer = ({
   useEffect(() => {
     syncNow();
   }, [index, format, live, ready]);
+
+  // Only the frame in front follows its files live. The next scene's frame waits hidden: its event stream and polling
+  // would hold one of the six connections the browser has to the platform (HTTP/1.1), as a deck's kept slides did
+  // and the page's own calls queued behind them. Once in front, the board catches up.
+  const src0 = slots[0].src;
+  const src1 = slots[1].src;
+  const ready0 = ready[0] === src0;
+  const ready1 = ready[1] === src1;
+  const liveFrames = useRef<{ frame: HTMLIFrameElement | null; src: string | null }[]>([]);
+  useEffect(() => {
+    liveFrames.current = SLOTS.map((slot) => ({ frame: frameRefs[slot].current, src: slots[slot].src }));
+    SLOTS.forEach((slot) => {
+      const f = liveFrames.current[slot];
+      postDeck(f.frame, f.src, { type: 'tk:deck-live', on: slot === front });
+    });
+    // The frames of these addresses, told again once each says it is ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [front, src0, src1, ready0, ready1]);
+  // The player hidden behind another tab (its effects taken down) or gone: no frame follows. Shown again, the effect
+  // above tells the front one.
+  useEffect(
+    () => () => {
+      for (const f of liveFrames.current) postDeck(f.frame, f.src, { type: 'tk:deck-live', on: false });
+    },
+    [],
+  );
 
   // ---- the transport
 

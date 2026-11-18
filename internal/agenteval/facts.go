@@ -22,6 +22,10 @@ type Facts struct {
 	Final string   `json:"final"`
 	// Pane are the right pane's intents the chat left.
 	Pane []PaneIntent `json:"pane"`
+	// Made is what the runtime lists as made by the person's chat with its subagents and delegated chats (GET
+	// …/made): what the chat's «Сделано за ход» and «Документы» are drawn from. MadeError says why it was not read.
+	Made      []MadeFact `json:"made,omitempty"`
+	MadeError string     `json:"madeError,omitempty"`
 	// Images are the picture jobs of the chat.
 	Images []ImageJob `json:"images"`
 	// Files are the workspace's files ("design:" before the design library's), with the text of the small ones.
@@ -79,6 +83,16 @@ type PaneIntent struct {
 	Target string `json:"target,omitempty"`
 	// Place is where in the target: a design's board.
 	Place string `json:"place,omitempty"`
+}
+
+// MadeFact is one thing the runtime lists as made by the person's chat. From is who made it: "" for the chat itself,
+// "subagent" or "subchat" (a delegated chat, at any depth).
+type MadeFact struct {
+	Kind  string `json:"kind"`
+	Ref   string `json:"ref"`
+	Title string `json:"title,omitempty"`
+	Op    string `json:"op,omitempty"`
+	From  string `json:"from,omitempty"`
 }
 
 // ImageJob is a picture job of the chat.

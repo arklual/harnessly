@@ -138,13 +138,15 @@ var presets = []Preset{
 		KeyEnv: "XAI_API_KEY", Relayed: true,
 	},
 	{
-		// The models of a ChatGPT subscription as `codex debug models` lists them (10.2026). The windows are the 95% of
+		// The models of a ChatGPT subscription as `codex debug models` lists them (11.2026), the fallback of Codex's own cache (gptmodels.go). The windows are the 95% of
 		// the context Codex itself fills; the default efforts are the backend's own.
 		ID: "gpt", Label: "GPT · подписка ChatGPT", Vendor: wire.VendorGPT, Via: wire.ProviderClaude,
 		BaseURL: "https://chatgpt.com/backend-api/codex", Host: "chatgpt.com", Hint: "Через Claude Code: вход Codex CLI по подписке ChatGPT",
 		Models: []Model{
-			{ID: "gpt-6.1-sol", Label: "GPT-6.1 Sol", Hint: "Основная модель для кода", Window: 475_000, Efforts: gptEfforts, DefaultEffort: wire.EffortLow},
-			{ID: "gpt-6-astra", Label: "GPT-6 Astra", Hint: "Для самых сложных задач", Window: 258_400, Efforts: gptEfforts, DefaultEffort: wire.EffortMedium},
+			{ID: "gpt-6.2-sol", Label: "GPT-6.2 Sol", Hint: "Основная модель для кода", Window: 475_000, Efforts: gptEfforts, DefaultEffort: wire.EffortLow},
+			{ID: "gpt-6.2-astra", Label: "GPT-6.2 Astra", Hint: "Для самых сложных задач", Window: 258_400, Efforts: gptEfforts, DefaultEffort: wire.EffortLow},
+			{ID: "gpt-6.1-sol", Label: "GPT-6.1 Sol", Window: 475_000, Efforts: gptEfforts, DefaultEffort: wire.EffortLow},
+			{ID: "gpt-6-astra", Label: "GPT-6 Astra", Window: 258_400, Efforts: gptEfforts, DefaultEffort: wire.EffortMedium},
 			{ID: "gpt-6.1-terra", Label: "GPT-6.1 Terra", Window: 475_000, Efforts: gptEfforts, DefaultEffort: wire.EffortLow},
 			{ID: "gpt-6-luna", Label: "GPT-6 Luna", Hint: "Быстрая и дешёвая", Window: 258_400, Efforts: gptEfforts, DefaultEffort: wire.EffortMedium},
 		},

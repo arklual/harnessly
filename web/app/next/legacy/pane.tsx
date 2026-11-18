@@ -30,6 +30,7 @@ import {
   type TPaneTabKind,
 } from '@/lib/hl-pane-tabs';
 import type { ITab } from '@/types/terminal';
+import { handedTabs, type TLegacyClaims } from '@/next/legacy/handed';
 import { Guarded } from '@/next/ui/lazy-view';
 import { Skeleton } from '@/next/ui/skeleton';
 import { t } from '@/next/i18n';
@@ -57,9 +58,6 @@ const TOOLS = [
 /** Legacy's tabs the design has no place for: one left open in Legacy does not come over. «Диск» is the pane's «Файлы»
  *  on the machine now. */
 const GONE: ReadonlySet<TPaneTabKind> = new Set(['overview', 'design', 'app', 'disk']);
-
-/** Legacy's tabs the new pane has tools of its own for: what Legacy's pane gets for them is handed over. */
-const HANDED: ReadonlySet<TPaneTabKind> = new Set(['browser', 'plan', 'side-chat']);
 
 const ICONS: Record<TPaneTabKind, string> = {
   overview: 'layers',
@@ -111,7 +109,13 @@ export interface ILegacyTool {
 }
 
 /** What Legacy's pane got for one of the new pane's own tools. */
-export type TLegacyHandoff = { kind: 'browser'; target: string | null } | { kind: 'plan' } | { kind: 'side' };
+export type TLegacyHandoff =
+  | { kind: 'browser'; target: string | null }
+  | { kind: 'plan' }
+  | { kind: 'side' }
+  | { kind: 'object'; target: string };
+
+export type { TLegacyClaims };
 
 /** The kinds of Legacy's tabs the new pane opens by request (a link of the feed, the agent's open command). */
 export type TLegacyShown =
@@ -225,6 +229,8 @@ export interface ILegacyPaneOptions {
    *  only the front of the conversation just come to, which the new pane may have kept its own front for. */
   onForward: (id: string, switched: boolean) => void;
   onHandoff: (asked: TLegacyHandoff[]) => void;
+  /** A document or a board an app's tab shows: its old tab is handed over. */
+  claims?: TLegacyClaims;
 }
 
 export const useLegacyPane = (conv: Conversation | null, options: ILegacyPaneOptions): ILegacyPane => {
@@ -244,14 +250,16 @@ export const useLegacyPane = (conv: Conversation | null, options: ILegacyPaneOpt
   const seen = useRef<{ key: string | null; active: string | null }>({ key: null, active: null });
   const forward = useEffectEvent((id: string, switched: boolean) => options.onForward(id, switched));
   const handoff = useEffectEvent((asked: TLegacyHandoff[]) => options.onHandoff(asked));
+  const claim = options.claims ?? null;
   useEffect(() => {
     if (!key) return;
-    const handed = all.filter((x) => HANDED.has(x.kind));
+    const handed = handedTabs(all, claim);
     if (handed.length > 0) {
       updatePane(key, (state) => handed.reduce((acc, x) => closeTab(acc, x.id), state));
       handoff(
         handed.map((x): TLegacyHandoff => {
           if (x.kind === 'browser') return { kind: 'browser', target: x.target };
+          if (x.kind === 'artifacts' && x.target) return { kind: 'object', target: x.target };
           return x.kind === 'plan' ? { kind: 'plan' } : { kind: 'side' };
         }),
       );
@@ -262,14 +270,15 @@ export const useLegacyPane = (conv: Conversation | null, options: ILegacyPaneOpt
     seen.current = { key, active: activeId };
     if (moved && activeId !== OVERVIEW_TAB_ID && all.some((x) => x.id === activeId))
       forward(`${PREFIX}${activeId}`, switched);
-  }, [key, all, activeId]);
+  }, [key, all, activeId, claim]);
 
   const artifacts = useMemo(() => contents.data.links.map(artifactItemOf), [contents.data.links]);
   const { complete, failed, reload, loaded, jsonlPath } = contents.data;
   // A conversation whose agent has written nothing yet has no transcript to read: its links are the timeline's.
   const noTranscript = loaded && jsonlPath === null && !tab?.agentState?.jsonlPath;
 
-  const shown = tab ? all.filter((x) => x.kind !== 'tools' && !GONE.has(x.kind) && !HANDED.has(x.kind)) : [];
+  const handedIds = new Set(handedTabs(all, claim).map((x) => x.id));
+  const shown = tab ? all.filter((x) => x.kind !== 'tools' && !GONE.has(x.kind) && !handedIds.has(x.id)) : [];
   const find = (id: string) => shown.find((x) => idOf(x) === id);
   return {
     on: tab !== null,

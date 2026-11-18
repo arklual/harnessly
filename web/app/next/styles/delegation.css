@@ -135,14 +135,23 @@
   content: '· ';
 }
 .hx-deleg__state {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 50%;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: var(--hx-text-xs);
   color: var(--hx-fg-3);
 }
+.hx-deleg__state-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .hx-deleg__dot {
+  flex: none;
   width: 6px;
   height: 6px;
   border-radius: 50%;

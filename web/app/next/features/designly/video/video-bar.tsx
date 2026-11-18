@@ -39,6 +39,9 @@ export interface IVideoBarProps {
   shareOn: boolean;
   /** «Скачать»: the MP4, the scene on screen and every scene, the project as a ZIP. */
   downloads?: readonly IDownloadItem[];
+  /** «Чат на весь экран»: back from the video over the whole window to the chat with the video beside it. Absent where
+   *  the video is no chat's stage. */
+  onChatFull?: () => void;
 }
 
 interface IBarButtonProps {
@@ -208,6 +211,9 @@ const VideoBar = (p: IVideoBarProps) => (
       disabled={!p.onShare}
       onClick={p.onShare}
     />
+    {p.onChatFull && (
+      <BarButton k="chat-full" icon="message-square" label={t('next.site.chatFull')} onClick={p.onChatFull} />
+    )}
   </header>
 );
 

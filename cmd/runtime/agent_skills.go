@@ -119,6 +119,7 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 		"harnessly design export <project> \"<page>\"   # a Sinopia Design page as one HTML file, handed to the person (--zip: the project)\n" +
 		"harnessly tab list                # the tabs of this workspace\n" +
 		"harnessly tab create -t codex-cli --prompt \"<the whole task>\" [--notify]   # hand a task to another agent: a chat nested under yours\n" +
+		"harnessly tab create -t codex-cli --notify --prompt - <<'EOF'   # the same with a long task read from stdin: no quoting to break\n" +
 		"harnessly tab status <id>         # is it working or waiting\n" +
 		"harnessly tab result <id>         # what its screen shows: read its answer\n" +
 		"harnessly docs search <words>     # the documentation of harnessly and of this team: read it before guessing\n" +

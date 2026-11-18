@@ -34,6 +34,8 @@ type CellStat struct {
 	Conflicts   float64 `json:"conflicts,omitempty"`
 	Duplicates  float64 `json:"duplicates,omitempty"`
 	Asks        float64 `json:"asks,omitempty"`
+	BlindAsks   float64 `json:"blindAsks,omitempty"`
+	Steps       float64 `json:"steps,omitempty"`
 	LeadEdits   float64 `json:"leadEdits,omitempty"`
 	Repl        float64 `json:"repl,omitempty"`
 	Messages    float64 `json:"messages,omitempty"`
@@ -61,7 +63,7 @@ type Report struct {
 func Summarize(results, against []Result, noise float64) Report {
 	type k struct{ s, m string }
 	cells := map[k]*CellStat{}
-	type series struct{ active, tokens, usd, sess, sub, del, team, conf, dup, asks, lead, repl, msg []float64 }
+	type series struct{ active, tokens, usd, sess, sub, del, team, conf, dup, asks, blind, steps, lead, repl, msg []float64 }
 	ser := map[k]*series{}
 	models := map[string]bool{}
 	var rep Report
@@ -113,6 +115,8 @@ func Summarize(results, against []Result, noise float64) Report {
 		sr.conf = append(sr.conf, float64(m.Conflicts))
 		sr.dup = append(sr.dup, float64(m.Duplicates))
 		sr.asks = append(sr.asks, float64(m.Asks))
+		sr.blind = append(sr.blind, float64(m.BlindAsks))
+		sr.steps = append(sr.steps, float64(m.Steps))
 		sr.lead = append(sr.lead, float64(m.LeadEdits))
 		sr.repl = append(sr.repl, float64(m.Repl))
 		sr.msg = append(sr.msg, float64(m.Messages))
@@ -140,6 +144,7 @@ func Summarize(results, against []Result, noise float64) Report {
 			c.Sessions, c.Subagents, c.Delegations, c.Teammates = mean(sr.sess), mean(sr.sub), mean(sr.del), mean(sr.team)
 			c.Conflicts, c.Duplicates, c.Asks, c.LeadEdits, c.Repl = mean(sr.conf), mean(sr.dup), mean(sr.asks), mean(sr.lead), mean(sr.repl)
 			c.Messages = mean(sr.msg)
+			c.BlindAsks, c.Steps = mean(sr.blind), median(sr.steps)
 		}
 		c.Lo, c.Hi = Wilson(c.Pass, c.Runs)
 		if c.Runs >= 3 {
@@ -248,10 +253,11 @@ func (rep Report) Markdown(title string) string {
 	b.WriteString("\n")
 	b.WriteString("\n## Cost and teamwork\n\n")
 	b.WriteString("Medians of the judged runs (spread = (max − min) / median), means of the counts per run: helpers started " +
-		"(subagents / delegated chats / teammates), files edited from more than one session, identical edits, the person needed, " +
+		"(subagents / delegated chats / teammates), files edited from more than one session, identical edits, the person needed " +
+		"(blind: asked before opening any skill; the share of runs), tool calls of the person's chat (median), " +
 		"edits of the lead chat itself, messages between agents mid-work, REPL calls; timeouts.\n\n")
-	b.WriteString("| Scenario | Model | Time, s | Tokens, k | $ | Sub/Del/Team | Conflicts | Dups | Asks | Lead edits | Msgs | REPL | Timeouts |\n")
-	b.WriteString("|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
+	b.WriteString("| Scenario | Model | Time, s | Tokens, k | $ | Sub/Del/Team | Conflicts | Dups | Asks (blind) | Steps | Lead edits | Msgs | REPL | Timeouts |\n")
+	b.WriteString("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
 	for _, c := range rep.Cells {
 		if c.Runs == 0 {
 			continue
@@ -260,9 +266,9 @@ func (rep Report) Markdown(title string) string {
 		if c.CostUnknown {
 			price = "unknown"
 		}
-		fmt.Fprintf(&b, "| %s | %s | %.0f (±%s%%) | %.0f (±%s%%) | %s | %.1f/%.1f/%.1f | %.1f | %.1f | %.1f | %.1f | %.1f | %.1f | %d |\n",
+		fmt.Fprintf(&b, "| %s | %s | %.0f (±%s%%) | %.0f (±%s%%) | %s | %.1f/%.1f/%.1f | %.1f | %.1f | %.1f (%.1f) | %.0f | %.1f | %.1f | %.1f | %d |\n",
 			c.Scenario, c.Model, c.ActiveS, pct(c.ActiveSpread/2), c.Tokens/1000, pct(c.TokenSpread/2), price,
-			c.Subagents, c.Delegations, c.Teammates, c.Conflicts, c.Duplicates, c.Asks, c.LeadEdits, c.Messages, c.Repl, c.Timeouts)
+			c.Subagents, c.Delegations, c.Teammates, c.Conflicts, c.Duplicates, c.Asks, c.BlindAsks, c.Steps, c.LeadEdits, c.Messages, c.Repl, c.Timeouts)
 	}
 	if len(rep.Failures) > 0 {
 		b.WriteString("\n## Failures\n\n")

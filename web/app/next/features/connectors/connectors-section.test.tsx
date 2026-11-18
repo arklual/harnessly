@@ -154,7 +154,9 @@ describe('ConnectorsSection', () => {
     expect(screen.getByText('Scan the code in Telegram')).toBeTruthy();
     expect(container.querySelector('img.hx-cx-row__qr')?.getAttribute('src')).toBe(png);
     unmount();
-    const other = render(<ConnectorsSection {...props({ connections: [step('https://example.com/x.png')] })} />);
+    const other = render(
+      <ConnectorsSection {...props({ connections: [step('https://example.com/x.png')] })} />,
+    );
     expect(other.container.querySelector('img.hx-cx-row__qr')).toBeNull();
   });
 

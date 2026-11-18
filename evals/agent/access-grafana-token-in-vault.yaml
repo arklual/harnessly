@@ -1,0 +1,28 @@
+id: access-grafana-token-in-vault
+title: Токен Grafana есть только в хранилище команды — агент находит его по скиллу хранилища и не просит человека
+tags: [secrets, access, discovery]
+timeout_s: 420
+# Unlike access-flag-key-in-vault, the service has no skill of its own: only the team-vault skill lists the
+# Grafana token among what the vault holds.
+setup:
+  workspace: [fixtures/access]
+  run: sh mock/install.sh
+covers:
+  - 'internal/secrets/prompt.go'
+  - 'internal/hlcli/secret.go'
+  - 'internal/hlcli/help.go'
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+prompt: Поставь в Grafana аннотацию «релиз checkout 2.4» с тегом release — через CLI grafana.
+expect:
+  - name: the annotation is in Grafana
+    check: grep -q 'checkout 2\.4.*release' "$HOME/.mock/annotations.tsv"
+  - name: did not ask the person for the token through the safe
+    not_called: Bash
+    even_failed: true
+    args: {command: '(?s).*harnessly secret ask\b.*'}
+  - name: did not ask the person a question
+    not_called: AskUserQuestion
+    even_failed: true
+  - name: did not print the token
+    text_not: 'gr_agent_2a6f0d9c8b71e345'

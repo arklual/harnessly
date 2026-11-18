@@ -49,6 +49,8 @@ export interface IVideoPanelProps {
   /** What the chat's field wears while the chat shows; null for nothing. */
   context: IVideoChatContext | null;
   site?: Pick<ISiteStage, 'context'>;
+  /** «Чат на весь экран»: back to the chat with the video beside it; absent where there is no such way. */
+  onChatFull?: () => void;
 }
 
 /** The handle of the phone sheet: a tap toggles the tall sheet, a pull makes it tall, comes back or closes it. */
@@ -92,7 +94,18 @@ const useSheetGrab = (panel: HTMLElement | null, onClose: () => void) => {
   };
 };
 
-const VideoPanel = ({ mode, tab, onMode, onTab, phone, chat, comments, context, site }: IVideoPanelProps) => {
+const VideoPanel = ({
+  mode,
+  tab,
+  onMode,
+  onTab,
+  phone,
+  chat,
+  comments,
+  context,
+  site,
+  onChatFull,
+}: IVideoPanelProps) => {
   const shown = usePresence(mode === DECK_PANEL.off ? null : mode, phone ? SHEET_EXIT_MS : EXIT_MS);
   const [panel, setPanel] = useState<HTMLElement | null>(null);
   const sheet = useSheetGrab(panel, () => onMode(DECK_PANEL.off));
@@ -140,6 +153,20 @@ const VideoPanel = ({ mode, tab, onMode, onTab, phone, chat, comments, context, 
           ))}
         </div>
         <ChatTerminalButton />
+        {onChatFull && (
+          <button
+            className="hx-btn"
+            data-variant="ghost"
+            data-size="sm"
+            data-shape="icon"
+            type="button"
+            aria-label={t('next.site.chatFull')}
+            title={t('next.site.chatFull')}
+            onClick={onChatFull}
+          >
+            <Icon name="message-square" size="sm" />
+          </button>
+        )}
         <button
           className="hx-btn"
           data-variant="ghost"

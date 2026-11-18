@@ -20,7 +20,7 @@ func TestChatForwardsExplicitEffort(t *testing.T) {
 					t.Error(err)
 				}
 				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte(`{"tabId":"test-chat","launched":true}`))
+				_, _ = w.Write([]byte(`{"tabId":"test-chat","launched":true}`))
 			}))
 			defer srv.Close()
 			stand := &Stand{Port: srv.Listener.Addr().(*net.TCPAddr).Port, Workspace: "test-workspace"}

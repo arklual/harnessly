@@ -1,0 +1,17 @@
+# Claude Code on Kimi Code (Anthropic-compatible API). The key comes from the eval's environment:
+#   harnessly secret run --env KIMI_API_KEY=kimi-code-key -- harnessly eval run --setup-file evals/agent/setups/kimi.yaml --models haiku (every Claude alias goes to Kimi) …
+name: kimi
+runtime_env:
+  RUNTIME_GITLAB_HOSTS: gitlab.example.test
+  RUNTIME_TRACKER_HOSTS: tracker.example.test
+  RUNTIME_TASK_KEY_RE: '\b(?:PRJ|OPS)-\d+\b'
+  RUNTIME_TASK_EXAMPLES: PRJ-128
+  RUNTIME_STAND_DOMAIN: .preview.example.test
+  RUNTIME_DOCS_HOST: docs.example.test
+agent_env:
+  ANTHROPIC_BASE_URL: https://api.kimi.com/coding
+  ANTHROPIC_AUTH_TOKEN: ${KIMI_API_KEY}
+  ANTHROPIC_DEFAULT_HAIKU_MODEL: kimi-for-coding
+  ANTHROPIC_DEFAULT_SONNET_MODEL: kimi-for-coding
+  ANTHROPIC_DEFAULT_OPUS_MODEL: kimi-for-coding
+  ANTHROPIC_SMALL_FAST_MODEL: kimi-for-coding

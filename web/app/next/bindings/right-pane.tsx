@@ -97,9 +97,8 @@ import {
   type IPaneTabs,
   type TTab,
 } from '@/next/features/pane/pane-tabs';
-import { boardPlaceOf } from '@/next/features/pane/board-link';
 import { claimedBySpace } from '@/next/features/pane/space-claim';
-import { docPlaceOf } from '@/next/features/pane/doc-link';
+import { objectPlaceOf } from '@/next/features/pane/doc-link';
 import {
   liftedTitle,
   requestOf,
@@ -1228,6 +1227,8 @@ export const useRightPane = (
   const machineId = conv?.machineId ?? null;
   // The machine's apps: a board link opens in the boards app when it is there.
   const apps = useInstalledApps(machineId ?? ('' as MachineId), 0, machineId !== null);
+  // Where a document or a board opens: its app's tab of the pane, by one rule for every way it is opened.
+  const placeOf = (target: string) => objectPlaceOf(target, apps.list?.apps, window.location.origin);
   // The chat's pane is read as the chat is: the first frame of another chat already draws its own pane.
   const paneKey = paneKeyOf(convId, view);
   const state = useChatPane(paneKey);
@@ -1438,12 +1439,29 @@ export const useRightPane = (
 
   // What Legacy's pane got for the tools this pane has of its own comes here: an address to a browser tab, the plan
   // and the side chat to theirs.
+  const appList = apps.list?.apps;
+  const claims = useMemo(
+    () =>
+      appList ? (target: string) => objectPlaceOf(target, appList, window.location.origin) !== null : null,
+    [appList],
+  );
   const handoff = (asked: TLegacyHandoff[]) => {
     setOpen(true);
     setState((s) => {
       // An address already open in a tab, the plan and the side chat that are there come forward instead of a second one.
       let tabs: IPaneTabs = s;
       for (const x of asked) {
+        // A document or a board the old pane was asked for goes to its app's one tab.
+        const object = x.kind === 'object' ? placeOf(x.target) : null;
+        if (x.kind === 'object') {
+          if (object)
+            tabs = placeAppObject(tabs, object.app, object.view, object.slug, {
+              busy: false,
+              cwd: conv?.cwd ?? '',
+              nextId,
+            }).next;
+          continue;
+        }
         const have = x.kind === 'side' ? tabs.tabs.find((y) => y.kind === 'side') : undefined;
         if (have) tabs = { ...tabs, active: have.id, unread: tabs.unread.filter((y) => y !== have.id) };
         else if (x.kind === 'side') {
@@ -1462,6 +1480,9 @@ export const useRightPane = (
   };
   const legacy = useLegacyPane(conv, {
     open,
+    // The old documents tab never shows what an app's tab shows: such a tab is handed over, also one opened
+    // before the list of apps came.
+    claims,
     // Coming to a chat, its kept front stays; Legacy's front comes only where nothing was kept.
     onForward: (id, switched) => {
       if (!switched || state.active === '') setActive(id);
@@ -1491,7 +1512,7 @@ export const useRightPane = (
       // A document of the hub opens in the documents app's view, as on the whole screen.
       const doc =
         (request.k === 'legacy' && request.kind === 'artifacts') || request.k === 'browser'
-          ? request.target && docPlaceOf(request.target, apps.list?.apps, window.location.origin)
+          ? request.target && placeOf(request.target)
           : null;
       const placed = doc
         ? placeAppObject(tabs, doc.app, doc.view, doc.slug, { busy: busy || still, cwd: conv.cwd, nextId })
@@ -1658,7 +1679,18 @@ export const useRightPane = (
   const openTarget = (place: OpenTarget) =>
     openPlace(place, {
       browser: (target) => handoff([{ kind: 'browser', target }]),
-      show: (tab, target) => legacy.show(tab, target),
+      show: (tab, target) => {
+        // The runtime names a document by the reader's path and a board by its framed address: both are an app's.
+        const object = tab === 'artifacts' ? placeOf(target) : null;
+        if (!object) return legacy.show(tab, target);
+        const placed = placeAppObject(state, object.app, object.view, object.slug, {
+          busy: false,
+          cwd: conv?.cwd ?? '',
+          nextId,
+        });
+        setState((s) => ({ ...s, ...placed.next }));
+        return placed.next.active;
+      },
       design: (design, board) => {
         if (board !== null) askBoard({ design, board });
         openDesign(design);
@@ -1694,8 +1726,7 @@ export const useRightPane = (
     if (!conv) return;
     // A board opens in the boards app's view of the pane, on the board; a document of the hub in the
     // documents app's.
-    const board =
-      boardPlaceOf(ref, apps.list?.apps) ?? docPlaceOf(ref, apps.list?.apps, window.location.origin);
+    const board = placeOf(ref);
     if (board) {
       setOpen(true);
       setState((s) => {
@@ -1799,7 +1830,7 @@ export const useRightPane = (
       <PaneBody
         conv={conv}
         onAppAddress={(text) => {
-          const doc = docPlaceOf(text, apps.list?.apps, window.location.origin);
+          const doc = placeOf(text);
           if (!doc) return false;
           setState((s) => ({
             ...s,

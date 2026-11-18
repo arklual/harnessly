@@ -118,7 +118,11 @@ describe('planIntents', () => {
     const off = { design: true, artifacts: true, browser: false, files: true };
     expect(planIntents(list, [], NOW, { auto: true, kinds: off })?.apply.map((x) => x.id)).toEqual(['tk']);
     const on = { ...off, browser: true };
-    expect(planIntents(list, [], NOW, { auto: true, kinds: on })?.apply.map((x) => x.id)).toEqual(['ab', 'st', 'tk']);
+    expect(planIntents(list, [], NOW, { auto: true, kinds: on })?.apply.map((x) => x.id)).toEqual([
+      'ab',
+      'st',
+      'tk',
+    ]);
   });
 
   it('the runtime opens three tabs in ten minutes at most, one look or many; the agent’s own open is not counted', () => {

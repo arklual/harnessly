@@ -4,7 +4,8 @@
 import { useEffect, useState } from 'react';
 import { loadMade } from '@/next/commands/pages';
 import type { TurnOutput } from '@/next/features/chat/types';
-import type { ConvId, MachineId, MadeItem, MadeKind, OutputKind } from '@/next/protocol/v2';
+import type { ILiftedOutput } from '@/next/features/chat/delegation';
+import type { ConvId, MachineId, MadeFrom, MadeItem, MadeKind, OutputKind } from '@/next/protocol/v2';
 import { hasFeature } from '@/next/stores/machines';
 
 const NONE: readonly MadeItem[] = [];
@@ -44,6 +45,56 @@ export const subchatOutputs = (items: readonly MadeItem[], subchat: string): Tur
         ? { ...output, name: item.ref.slice(item.ref.lastIndexOf('/') + 1) }
         : output;
     });
+
+/** A turn of the chat as the lifting needs it: its key in the feed and when it ran (endedAt null: still running). */
+export interface ITurnSpan {
+  key: string;
+  startedAt: number;
+  endedAt: number | null;
+}
+
+/** The made thing as a card of the feed, with who made it for the mark «из подчата …». */
+const outputOf = (item: MadeItem & { from: MadeFrom }): ILiftedOutput => {
+  const output: ILiftedOutput = {
+    kind: OUTPUT_OF[item.kind],
+    op: item.op,
+    ref: item.ref,
+    title: item.title,
+    via: item.from,
+  };
+  return item.kind === 'file' ? { ...output, name: item.ref.slice(item.ref.lastIndexOf('/') + 1) } : output;
+};
+
+/**
+ * What the chat's subchats (and theirs, and its subagents) made, by the turn of this chat it belongs to:
+ * the person works in the root chat, so a thing a helper made shows in «Сделано за ход» of the turn that was running
+ * or had just ended when it was made: the first turn that ended at or after it, the running one, or — made after the
+ * last turn — the last one. Each thing once, by its latest change.
+ */
+export const liftedByTurn = (
+  items: readonly MadeItem[],
+  turns: readonly ITurnSpan[],
+): Map<string, ILiftedOutput[]> => {
+  const out = new Map<string, ILiftedOutput[]>();
+  if (turns.length === 0) return out;
+  const ordered = [...turns].sort((a, b) => a.startedAt - b.startedAt);
+  const latest = new Map<string, MadeItem & { from: MadeFrom }>();
+  for (const item of items) {
+    if (!item.from) continue;
+    const key = `${item.kind}:${item.ref}`;
+    const seen = latest.get(key);
+    if (!seen || item.at > seen.at) latest.set(key, { ...item, from: item.from });
+  }
+  for (const item of latest.values()) {
+    const turn =
+      ordered.find((t) => t.endedAt === null || t.endedAt >= item.at) ?? ordered[ordered.length - 1];
+    if (!turn) continue;
+    const list = out.get(turn.key) ?? [];
+    list.push(outputOf(item));
+    out.set(turn.key, list);
+  }
+  return out;
+};
 
 /**
  * The things the chat inherits. `on`: there is a reason to ask (the agent is done, or the chat delegated); `moved`

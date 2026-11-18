@@ -549,3 +549,22 @@ func TestEndpointAgentTokenFile(t *testing.T) {
 		t.Fatalf("a missing token file gave %q", token)
 	}
 }
+
+// A task read from stdin (--prompt -) reaches the runtime whole; an empty task is refused, never a plain tab.
+func TestTabCreatePromptFromStdinAndEmptyRefused(t *testing.T) {
+	f := newFake(t)
+	r := f.run(t, "hs-me", "tab", "create", "-t", "codex-cli", "--notify", "--prompt", "-")
+	if got := f.last(); r.code != 0 || got.Body["prompt"] != "piped text" || got.Body["notify"] != true {
+		t.Fatalf("stdin prompt: %+v sent %+v", r, got)
+	}
+	before := len(f.calls)
+	for _, empty := range []string{"", "  \n"} {
+		r = f.run(t, "hs-me", "tab", "create", "-t", "codex-cli", "--notify", "--prompt", empty)
+		if r.code != 2 || !strings.Contains(r.errs, "--prompt is empty") {
+			t.Errorf("empty prompt %q: %+v", empty, r)
+		}
+	}
+	if len(f.calls) != before {
+		t.Errorf("an empty prompt reached the runtime")
+	}
+}

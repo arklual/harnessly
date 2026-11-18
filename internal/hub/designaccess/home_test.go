@@ -24,7 +24,7 @@ func TestHomeFromTheMachineOrTheStore(t *testing.T) {
 	}
 	r.svc.UseView(&fakeLibrary{items: []LibraryItem{{ID: "shared", Title: "Сайт команды", UpdatedAt: 2000, Kind: "site", Rev: 7}}})
 
-	serve := func(ask func(ctx context.Context, w http.ResponseWriter)) *httptest.ResponseRecorder {
+	serveOn := func(r *spaceRig, ask func(ctx context.Context, w http.ResponseWriter)) *httptest.ResponseRecorder {
 		t.Helper()
 		req := httptest.NewRequest(http.MethodGet, "/m/"+r.owner.ID+"/api/platform/design/home?machine="+r.owner.ID, nil)
 		w := httptest.NewRecorder()
@@ -32,6 +32,10 @@ func TestHomeFromTheMachineOrTheStore(t *testing.T) {
 			t.Fatal("the hub did not take the home")
 		}
 		return w
+	}
+	serve := func(ask func(ctx context.Context, w http.ResponseWriter)) *httptest.ResponseRecorder {
+		t.Helper()
+		return serveOn(r, ask)
 	}
 	machine := func(delay time.Duration, code int, body string) func(ctx context.Context, w http.ResponseWriter) {
 		return func(ctx context.Context, w http.ResponseWriter) {
@@ -83,8 +87,14 @@ func TestHomeFromTheMachineOrTheStore(t *testing.T) {
 	// A machine that answers no home (an old runtime's 404, an error): the store's copy at once.
 	storeCopy(serve(machine(0, http.StatusNotFound, `not found`)), "no home on the machine")
 
-	// No store: the machine's answer, however late.
-	r.svc.UseView(nil)
+	// No store: the machine's answer, however late. A hub of its own: the view is set once before the hub serves, and
+	// switching it here raced with the store reads the asks above left running.
+	bare := newSpaceRig(t, true)
+	bare.svc.homeOn = r.svc.homeOn
+	serve = func(ask func(ctx context.Context, w http.ResponseWriter)) *httptest.ResponseRecorder {
+		t.Helper()
+		return serveOn(bare, ask)
+	}
 	w = serve(machine(150*time.Millisecond, http.StatusOK, `{"parts":{},"failed":[],"tookMs":150}`))
 	if w.Code != http.StatusOK || w.Header().Get(HomeFromHeader) != "machine" {
 		t.Fatalf("no store, late machine: %d %s", w.Code, w.Body.String())

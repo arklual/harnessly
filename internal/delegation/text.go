@@ -299,6 +299,28 @@ func wakeText(r Result) string {
 	return b.String()
 }
 
+// rootText is what the root chat hears of a chat further down its delegation that needs the person: the
+// person reads the root, the chat in between was told too but cannot grant a permission or reach the person itself.
+func rootText(r Result, via wire.Conversation) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "A chat further down your delegation, %s «%s» (delegated by your subchat %s «%s»), ", r.Conv.ID, r.Conv.Title, via.ID, via.Title)
+	if r.Outcome == Limited {
+		b.WriteString("hit its plan's usage limit and stands still until it resets")
+		if l := r.Conv.Limited; l != nil && l.ResetsAt != nil {
+			b.WriteString(" (" + time.UnixMilli(int64(*l.ResetsAt)).UTC().Format("2006-01-02 15:04 UTC") + ")")
+		}
+		b.WriteString(". Its parent was told and may give the work to another chat.")
+	} else {
+		b.WriteString("stands still waiting for the person (" + string(r.Conv.State.K) + "): a question, a permission or a paused queue in its chat. " +
+			"Its parent was told too, but only the person can grant a permission. Tell the person in your answer that this chat waits for them " +
+			"(they answer it in that chat), or answer it with send_to_conversation if it is a question you know the answer to.")
+	}
+	if r.Answer != "" {
+		b.WriteString("\n\nIts last words:\n" + r.Answer)
+	}
+	return b.String()
+}
+
 // SentText is the answer of send_to_conversation: where the message went, in words the sender can act on.
 func SentText(s Sent) string {
 	var line string

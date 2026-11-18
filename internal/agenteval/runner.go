@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"sort"
@@ -176,15 +177,19 @@ func Run(ctx context.Context, o Options) ([]Result, error) {
 		started atomic.Int64
 		spent   float64
 		stop    bool
+		// unknownSaid: the log said once that a model's cost is not known.
+		unknownSaid bool
 	)
 	record := func(r Result) {
 		mu.Lock()
 		defer mu.Unlock()
 		results = append(results, r)
 		spent += r.USD
-		if o.MaxUSD > 0 && r.CostUnknown && !stop {
-			stop = true
-			logf("budget: model cost is unknown, no new runs")
+		if o.MaxUSD > 0 && r.CostUnknown && !unknownSaid {
+			// A model without a known price (Codex, Kimi, GLM through a profile) does not stop the matrix: the $ budget
+			// counts what is known and --max-runs bounds the rest.
+			unknownSaid = true
+			logf("budget: the cost of %s is unknown: the $ budget counts only known costs, --max-runs bounds the rest", r.Model)
 		}
 		if o.MaxUSD > 0 && spent >= o.MaxUSD && !stop {
 			stop = true
@@ -304,11 +309,18 @@ func runOne(ctx context.Context, o Options, c Cell, key, worker string, port int
 	}
 	cfg := o.Stand
 	cfg.RuntimeEnv = merged(cfg.RuntimeEnv, c.Scenario.Setup.RuntimeEnv)
-	stand, err := Up(cfg, worker, port)
+	cfg.LogsDir = filepath.Join(o.Out, "stand-logs", key)
+	stand, err := Up(cfg, worker, freePort(port, max(1, o.Parallel)))
 	if err != nil {
 		return finish(Infra, err)
 	}
-	defer stand.Down()
+	defer func() {
+		// A run that did not pass keeps its stand's logs: the stand's folder goes with it.
+		if r.State != Pass {
+			stand.keepLogs(filepath.Join(o.Out, "stand-logs", key))
+		}
+		stand.Down()
+	}()
 	if err := prepare(stand, c.Scenario); err != nil {
 		return finish(Infra, err)
 	}
@@ -526,4 +538,16 @@ func ReadResults(path string) ([]Result, error) {
 		}
 	}
 	return out, sc.Err()
+}
+
+// freePort is the first port from start, stepping by step (each worker keeps its own residue), that nothing listens
+// on: another person's runs on the machine take ports of their own. start when none of the next is free.
+func freePort(start, step int) int {
+	for p, i := start, 0; i < 64 && p < 65536; p, i = p+step, i+1 {
+		if l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", p)); err == nil {
+			_ = l.Close()
+			return p
+		}
+	}
+	return start
 }

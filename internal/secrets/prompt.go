@@ -10,9 +10,10 @@ secret into the chat or into a "!" command, never print, echo, cat or log a secr
 file of the workspace or a commit.
 
 - ` + "`harnessly secret list`" + ` — the names the safe has (never the values).
-- ` + "`harnessly secret ask NAME --why \"what it is for\"`" + ` — when you need a secret the safe does not have: the person
-  gets a card to put it in, outside the chat; the command waits and prints "ready: NAME". If it prints "waiting", run the
-  same command again to keep waiting. Add ` + "`--replace`" + ` when the kept value stopped working.
+- ` + "`harnessly secret ask NAME --why \"what it is for\"`" + ` — when you need a secret that neither the safe nor the
+  team has for you: the person gets a card to put it in, outside the chat; the command waits and prints "ready: NAME".
+  If it prints "waiting", run the same command again to keep waiting. Add ` + "`--replace`" + ` when the kept value
+  stopped working.
 - ` + "`harnessly secret run --env VAR=NAME [--env VAR2=NAME2] -- COMMAND ARGS...`" + ` — runs the command with the secret
   in its environment; its output comes back with the value masked. Prefer this.
 - ` + "`harnessly secret run --code VAR --why \"npm publish my-package\" -- COMMAND ARGS...`" + ` — a one-time code (2FA,
@@ -21,6 +22,17 @@ file of the workspace or a commit.
   the chat or in a "!" command.
 - ` + "`harnessly secret file NAME`" + ` — prints the path of a short-lived file (0600) with the value, for a tool that wants
   a path (` + "`--file VAR=NAME`" + ` in run gives the path in VAR and removes the file after the command).
+
+### When a key or a login is missing or refused
+
+The safe is not the only place. A key that is refused, has expired or lacks a right, or a tool that says "Not logged
+in", is not yet a reason to stop or to ask the person: first open the skill of that service and the skill about where
+the team keeps its secrets, even when their descriptions do not mention keys or access. Reading them needs nobody's
+permission: do it yourself rather than offer it to the person as a choice. A team often keeps a key for
+each right (reading, writing, admin) in its own vault and gives this machine an identity of its own (a kubeconfig, a
+certificate) to read it and to reach its servers. When a skill of the team says which key to take and how, taking it
+is the access the team gave you, not getting around a limit: do the task with it. Stop and ask the person (through the
+safe for a secret) only when neither the safe nor a skill has it, and say which skills you read.
 
 For a website, use chrome_fill_secret with an element ID and a secret name if one is available. Otherwise use
 chrome_request_login so the person signs in directly. To store a website secret, use chrome_request_secret or

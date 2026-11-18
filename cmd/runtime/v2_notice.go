@@ -9,6 +9,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/limits"
 	"github.com/ly-solutions/harnessly/internal/machine"
+	"github.com/ly-solutions/harnessly/internal/push"
 	"github.com/ly-solutions/harnessly/internal/status"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -135,7 +136,48 @@ func (n *chatNotices) pushNow(x convo.Notice) {
 	if x.Kind == convo.NoticeQuestion {
 		kind = "question"
 	}
+	// A delegated chat's notification speaks for the root of its delegation and leads there: the person works in the
+	// root, a subchat is where they look in only when something is wrong.
+	if rp, ok := p.(rootPusher); ok {
+		if as, ok := n.rootAs(now); ok {
+			rp.PushAs(tabID, e, kind, as)
+			return
+		}
+	}
 	p.Push(tabID, e, kind)
+}
+
+// rootPusher is a Pusher that can tell a delegated chat's notification as its root's.
+type rootPusher interface {
+	PushAs(tabID string, e status.Entry, kind string, as push.As)
+}
+
+// rootAs is the root chat a delegated chat's notification speaks for; false for a chat that was not delegated or
+// whose root cannot be read.
+func (n *chatNotices) rootAs(rec wire.Conversation) (push.As, bool) {
+	if rec.ParentID == nil {
+		return push.As{}, false
+	}
+	root, seen := rec, map[string]bool{rec.ID: true}
+	for root.ParentID != nil {
+		up, ok := n.record(*root.ParentID)
+		if !ok || seen[up.ID] {
+			return push.As{}, false
+		}
+		seen[up.ID] = true
+		root = up
+	}
+	tabID, e := n.pushEntry(root, convo.NoticeDone)
+	title := root.Title
+	if title == "" {
+		title = e.TabName
+	}
+	var sid *string
+	if e.AgentSessionID.Has() {
+		v := e.AgentSessionID.Value()
+		sid = &v
+	}
+	return push.As{TabID: tabID, WorkspaceID: e.WorkspaceID, Title: title, AgentSessionID: sid, From: rec.Title}, true
 }
 
 // pushEntry is what the push is built from: the keeper's tab of the chat when it has one (its workspace and names),

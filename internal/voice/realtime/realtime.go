@@ -91,6 +91,8 @@ type Config struct {
 	// WakeModelURL and WakeModelSHA256 replace WakeModel's (tests).
 	WakeModelURL    string
 	WakeModelSHA256 string
+	// LiveModels are the «gpt-live-…» models the machine's Codex knows (models.go); nil knows none.
+	LiveModels func() []string
 }
 
 // Mode says what the voice does with a request.
@@ -218,6 +220,8 @@ type Service struct {
 	calls map[string]*Call
 	// wakeMu lets one request fetch the wake model while the others wait for it.
 	wakeMu sync.Mutex
+	// models keeps the key route's list as the vendor gave it (models.go).
+	models modelsCache
 }
 
 // New makes a Service.
@@ -322,10 +326,11 @@ func (s *Service) State() State {
 	if view == "" {
 		view = RouteSubscription
 	}
+	models := s.modelsOf(view)
 	return State{
 		Subscription: st.Subscription, SignedIn: signed, HasKey: hasKey, Route: r, Ready: r != "",
 		Voice: pick("", st.Voice, Voices[view]), Voices: Voices[view],
-		Model: pick("", st.Model, Models[view]), Models: Models[view],
+		Model: pick("", st.Model, models), Models: models,
 		Talk: pick("", st.Talk, []string{TalkText, TalkVoice}),
 		Head: pick("", st.Head, []string{HeadH, HeadFace}), Barge: !st.NoBarge,
 		About: st.About, Notes: st.notesOn(),
@@ -408,7 +413,7 @@ func (s *Service) Start(ctx context.Context, in CallInput) (*Started, error) {
 		return nil, &Error{Code: CodeBadRequest, Status: http.StatusBadRequest, Detail: "bad offer"}
 	}
 	voice := pick(in.Voice, st.Voice, Voices[r])
-	model := pick(in.Model, st.Model, Models[r])
+	model := pick(in.Model, st.Model, s.modelsOf(r))
 	mode := in.Mode
 	if mode != ModeChat && mode != ModeDigest {
 		mode = ModeAgent

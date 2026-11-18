@@ -258,7 +258,7 @@ func TestFilesAreOwnerOnlyAndGoAway(t *testing.T) {
 
 func TestPromptBlockTellsNotToUseTheChat(t *testing.T) {
 	b := PromptBlock()
-	for _, want := range []string{"harnessly secret ask", "harnessly secret run --env", "Never ask the person to paste"} {
+	for _, want := range []string{"harnessly secret ask", "harnessly secret run --env", "Never ask the person to paste", "first open the skill of that service", "not getting around a limit", "only when neither"} {
 		if !strings.Contains(b, want) {
 			t.Fatalf("prompt block lacks %q", want)
 		}

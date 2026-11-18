@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ly-solutions/harnessly/internal/agents/cliupdate"
 	"io"
 	"net/http"
 	"os"
@@ -95,6 +96,9 @@ type machineProbe struct {
 	PreviewOrigins func() []string
 	// PreviewDNS resolves the slots' names (preview.CheckOrigins).
 	PreviewDNS func(ctx context.Context, origins []string) []preview.OriginCheck
+	// CLIs is what the updater of the agent CLIs saw (agent_clis.go); nil shows nothing. UpdateCLIs runs it now.
+	CLIs       func() []cliupdate.Status
+	UpdateCLIs func(ctx context.Context)
 	// LaunchEnvUndeclared: the machine is a hub's and its deployment has not said which variables of its own a
 	// provider's launch may not set (extproviders.ReservedPrefixesEnv; set and empty says "none").
 	LaunchEnvUndeclared func() bool
@@ -247,6 +251,11 @@ func (p machineProbe) run(ctx context.Context) []machineCheck {
 		agentCLI.Detail = "npm install -g @openai/codex"
 	}
 	add(agentCLI)
+	if p.CLIs != nil {
+		for _, c := range cliChecks(p.CLIs()) {
+			add(c)
+		}
+	}
 	if gitOK {
 		identity := machineCheck{ID: "git_identity", OK: email != "", Title: "git user.email"}
 		if !identity.OK {
@@ -448,6 +457,10 @@ func (p machineProbe) fix(ctx context.Context, id string) error {
 		}
 		return err
 	}
+	if strings.HasPrefix(id, "agent_cli_version_") && p.UpdateCLIs != nil {
+		p.UpdateCLIs(ctx)
+		return nil
+	}
 	return errNoFix
 }
 
@@ -618,6 +631,14 @@ func newMachineProbe(d deps, self *selfupdate.Updater) machineProbe {
 		SetGitIdentity: func(name, email string) error { return setGitIdentity(tools.ShellPath())(name, email) },
 		LookPath:       exec.LookPath, Exists: pathExists, Invalidate: tools.Invalidate, ReadFile: os.ReadFile,
 		LaunchEnvUndeclared: func() bool { return launchEnvUndeclared(os.Getenv, os.LookupEnv) },
+		CLIs: func() []cliupdate.Status {
+			u := agentCLIs(d)
+			if cliAutoUpdate() {
+				u.Poke(context.Background())
+			}
+			return u.Status()
+		},
+		UpdateCLIs: func(ctx context.Context) { agentCLIs(d).Run(ctx) },
 		AppsBoundary: func() (bool, error) {
 			root := apps.Open(d.DataDir).Root
 			if _, err := os.Stat(root); err != nil {

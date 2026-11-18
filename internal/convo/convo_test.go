@@ -1835,3 +1835,17 @@ func TestCreateInAGoneFolderIsRefused(t *testing.T) {
 		t.Fatalf("create in a folder that is there: %+v", res)
 	}
 }
+
+// GitHub #112: a first message whose file is not on the machine (a hub:<sha> id the page did not hand over) refuses the
+// chat, instead of a chat that says it started while its first message is dropped.
+func TestCreateRefusesAFirstMessageWhoseFileIsNotHere(t *testing.T) {
+	r := newRig(t)
+	res := r.do(wire.ConversationCreateCmd{OpID: "c1", Cwd: "/w", Provider: wire.ProviderClaude,
+		First: &wire.FirstMessage{ClientID: "first", Text: "see the file", AttachmentIDs: []string{"hub:abc"}}})
+	if res.R != wire.ResultRefused || res.Code != wire.RefuseAttachmentMissing {
+		t.Fatalf("create: %+v", res)
+	}
+	if len(r.launcher.launched) != 0 {
+		t.Fatalf("launched %+v", r.launcher.launched)
+	}
+}

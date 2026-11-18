@@ -32,15 +32,19 @@ describe('the quiet limits card (HRN-1496)', () => {
   });
 
   it('names no weekday for today, and says nothing when the end is at or after the reset', () => {
-    const at = (exhaustAt: number, resetsIn: number) => [
-      {
-        kind: 'seven_day' as const,
-        window: win(93, resetsIn, forecast({ status: 'exhausts_before_reset', exhaustAt })),
-      },
-    ];
     const noon = new Date();
     noon.setHours(12, 0, 0, 0);
     const n = noon.getTime() / 1000;
+    // The reset counts from the same noon as the end; from the real clock it moved past the end after 12:00.
+    const at = (exhaustAt: number, resetsIn: number) => [
+      {
+        kind: 'seven_day' as const,
+        window: {
+          ...win(93, resetsIn, forecast({ status: 'exhausts_before_reset', exhaustAt })),
+          resetsAt: n + resetsIn,
+        },
+      },
+    ];
     expect(runsOutLine(at(n + 3600, 5 * 86400), n)).toMatch(/^Lasts until \d\d:\d\d$/);
     expect(runsOutLine(at(n + 6 * 86400, 5 * 86400), n)).toBeNull();
     expect(runsOutLine(at(n + 5 * 86400, 5 * 86400), n)).toBeNull();

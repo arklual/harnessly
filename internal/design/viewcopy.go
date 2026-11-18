@@ -15,6 +15,9 @@ import (
 // beside it, records/<name>.view.mp4, 1440 lines high, no sound, about five times smaller. The copy is a project file,
 // so it syncs to the hub with the rest of the snapshot; the public route answers a request for the clip from it.
 
+// FullClipsHeader marks a request of the final render: it gets a recording itself, not its light copy.
+const FullClipsHeader = "X-Tk-Full-Clips"
+
 const (
 	viewCopySuffix = ".view.mp4"
 	viewCopyHeight = 1440

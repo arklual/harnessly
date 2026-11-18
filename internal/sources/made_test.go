@@ -187,3 +187,68 @@ func TestMadeKeepsFilesStandsAndPushedCommits(t *testing.T) {
 		t.Errorf("a refused push made a commit:\n%s", got)
 	}
 }
+
+// A file written by a heredoc and handed over on the command's last line is made: the whole command counts, not the
+// first line the feed shows.
+func TestMadeSeesADeliveryAfterAHeredoc(t *testing.T) {
+	file := delivery.Link(delivery.Info{Path: "/w/notes.md", Name: "notes.md", Mime: "text/markdown", Size: 9, SHA256: "cd"})
+	cmd := "cat > notes.md <<'EOF'\n# notes\nEOF\nharnessly deliver notes.md"
+	rt, path := madeRoute(t, madePair(t, 1, "Bash", map[string]any{"command": cmd}, "Delivered notes.md\n"+file, false))
+	res, found, failed := rt.Read(path, "")
+	if !found || failed {
+		t.Fatalf("found=%v failed=%v", found, failed)
+	}
+	if got := madeLines(res); !strings.Contains(got, `file created "notes.md" /w/notes.md`) {
+		t.Errorf("the delivery after a heredoc is not made:\n%s", got)
+	}
+}
+
+// Codex's code mode runs the shell through one exec script: the page it shows and the file it hands over are made
+// as by Claude's Bash.
+func TestMadeReadsCodexCodeMode(t *testing.T) {
+	file := delivery.Link(delivery.Info{Path: "/w/notes.md", Name: "notes.md", Mime: "text/markdown", Size: 9, SHA256: "cd"})
+	script := `text(await tools.exec_command({cmd:"harnessly open https://docs.example.com/a/spec\nprintf '%s\\n' spec > notes.md && harnessly deliver notes.md"}))` + "\n"
+	call, _ := json.Marshal(map[string]any{"type": "response_item", "timestamp": "2026-10-12T10:00:01.000Z",
+		"payload": map[string]any{"type": "custom_tool_call", "name": "exec", "call_id": "call_1", "status": "completed", "input": script}})
+	// The script prints exec_command's answer as JSON, the way Codex writes it: the address ends in an escaped «\n».
+	answer, _ := json.Marshal(map[string]any{"exit_code": 0, "output": "Tab recorded\nDelivered notes.md\n" + file + "\n"})
+	out, _ := json.Marshal(map[string]any{"type": "response_item", "timestamp": "2026-10-12T10:00:01.500Z",
+		"payload": map[string]any{"type": "custom_tool_call_output", "call_id": "call_1", "output": []any{
+			map[string]any{"type": "input_text", "text": "Script completed\nWall time 0.1 seconds\nOutput:\n"},
+			map[string]any{"type": "input_text", "text": string(answer)},
+		}}})
+	home := t.TempDir()
+	dir := filepath.Join(home, ".codex", "sessions", "2026", "10", "12")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "rollout-2026-10-12T10-00-00-x.jsonl")
+	meta := `{"type":"session_meta","timestamp":"2026-10-12T10:00:00.000Z","payload":{"id":"x","cwd":"/w"}}`
+	if err := os.WriteFile(path, []byte(meta+"\n"+string(call)+"\n"+string(out)+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, found, failed := (&Route{Links: madeLinks(), Home: home}).Read(path, "")
+	if !found || failed {
+		t.Fatalf("found=%v failed=%v", found, failed)
+	}
+	got := madeLines(res)
+	for _, want := range []string{`file created "notes.md" /w/notes.md`, `doc changed "" https://docs.example.com/a/spec`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("made has no %q:\n%s", want, got)
+		}
+	}
+}
+
+// One command that shows a page and hands a file over makes both: the delivery does not hide the page.
+func TestMadeKeepsThePageOfACommandThatAlsoDelivers(t *testing.T) {
+	file := delivery.Link(delivery.Info{Path: "/w/notes.md", Name: "notes.md", Mime: "text/markdown", Size: 9, SHA256: "cd"})
+	cmd := "harnessly open https://docs.example.com/a/spec; echo spec > notes.md && harnessly deliver notes.md"
+	rt, path := madeRoute(t, madePair(t, 1, "Bash", map[string]any{"command": cmd}, "opened\nDelivered notes.md\n"+file, false))
+	res, _, _ := rt.Read(path, "")
+	got := madeLines(res)
+	for _, want := range []string{`file created "notes.md" /w/notes.md`, `doc changed "" https://docs.example.com/a/spec`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("made has no %q:\n%s", want, got)
+		}
+	}
+}

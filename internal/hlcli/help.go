@@ -33,7 +33,7 @@ SHOW THINGS TO THE PERSON
 TABS OF THIS WORKSPACE
   harnessly workspaces              list workspaces (id, name, folders)
   harnessly tab list                list the tabs of your workspace
-  harnessly tab create [-t TYPE] [-n NAME] [--prompt TEXT] [--model M] [--profile P] [--effort E] [--notify] [--test]
+  harnessly tab create [-t TYPE] [-n NAME] [--prompt TEXT|-] [--model M] [--profile P] [--effort E] [--notify] [--test]
                                     create a tab. TYPE: terminal (default), claude-code, codex-cli, agent-sessions,
                                     web-browser, diff. With --prompt, a claude-code or codex-cli agent gets that task
                                     as a chat nested under YOUR chat (like the MCP tool delegate_task): the person sees
@@ -155,6 +155,8 @@ SECRETS (the safe of this machine: tokens and keys the person put in, outside th
   harnessly secret ask NAME --why "what it is for" [--replace]
                                     ask the person for a secret: they get a card to put it in the safe; waits and
                                     prints "ready: NAME" ("waiting": run it again). Never ask for a secret in the chat.
+                                    First open the skills of the service and of the team's vault: a key the team keeps
+                                    elsewhere is read the way they say, without the person.
   harnessly secret run --env VAR=NAME [--file VAR=NAME]... -- COMMAND ARGS...
                                     run a command with secrets in its environment (--file: VAR is the path of a
                                     temporary file with the value); the values are masked in its output
@@ -392,6 +394,10 @@ Versions are immutable and live on channels. An eval scenario is a file evals/<n
 
 The safe keeps the tokens, passwords and keys the person gave the agents of this machine, encrypted, and hands them to
 commands by name. The person puts a secret in Settings → Safe, or on the card your ask puts on their screen.
+
+The safe is not the only place: a team often keeps its keys in its own vault and gives this machine an identity to read
+it (a kubeconfig, a certificate). Before ask, open the skills of the service and of the team's vault and do what they
+say; ask only when neither the safe nor a skill has the secret.
 
   harnessly secret list
   harnessly secret ask github-token --why "push the release branch to GitHub"

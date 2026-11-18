@@ -80,7 +80,7 @@ var (
 	// The name of one feature stand under the stands' domain.
 	standNameRe = regexp.MustCompile(`^[\w-]+$`)
 	// A dev server the agent shows: `harnessly open http://localhost:5173` (or the deployment's name of the command).
-	openCmdRe = regexp.MustCompile(`(?:^|[\s;&|(/])([\w-]+)\s+open\s+['"]?(https?://[^\s'"]+)`)
+	openCmdRe = regexp.MustCompile(`(?:^|[\s;&|(/])([\w-]+)\s+open\s+['"]?(https?://[^\s'";&|)]+)`)
 	// A task the agent shows by its key: `harnessly open HRN-1426`.
 	openKeyRe = regexp.MustCompile(`(?:^|[\s;&|(/])([\w-]+)\s+open\s+['"]?([A-Z][A-Z0-9]{1,15}-\d{1,7})(?:['"\s;&|)]|$)`)
 	// A task of the tracker by its address: /issue/<KEY>.
@@ -122,6 +122,7 @@ func Of(cfg Config, c Call, links []string) []wire.TurnOutput {
 		return artifactOf(cfg, c.Publish, links)
 	}
 	cmd := c.Command
+	var out []wire.TurnOutput
 	if c.Deliver || deliverCmdRe.MatchString(cmd) {
 		// Only the record the tool wrote counts: a file the call merely names is not one the person was given.
 		if info, ok := delivery.LinkIn(links); ok {
@@ -129,23 +130,25 @@ func Of(cfg Config, c Call, links []string) []wire.TurnOutput {
 			if title == "" {
 				title = info.Name
 			}
-			return []wire.TurnOutput{{Kind: wire.OutputDelivery, Op: wire.OutputCreated, Ref: info.Path, Title: title,
-				Name: info.Name, Mime: info.Mime, Size: info.Size, SHA256: info.SHA256}}
+			out = append(out, wire.TurnOutput{Kind: wire.OutputDelivery, Op: wire.OutputCreated, Ref: info.Path, Title: title,
+				Name: info.Name, Mime: info.Mime, Size: info.Size, SHA256: info.SHA256})
 		}
-		return nil
+		if c.Deliver {
+			return out
+		}
+		// One command may also open a page or push (`harnessly open …; … && harnessly deliver notes.md`): read on.
 	}
 	switch {
 	case artifactCmdRe.MatchString(cmd):
 		if link := first(links, func(l string) bool { return ArtifactLink(cfg, l) }); link != "" {
-			return []wire.TurnOutput{{Kind: wire.OutputArtifact, Op: wire.OutputCreated, Ref: link, Title: titleOr(cmd, link)}}
+			return append(out, wire.TurnOutput{Kind: wire.OutputArtifact, Op: wire.OutputCreated, Ref: link, Title: titleOr(cmd, link)})
 		}
 	case strings.Contains(cmd, "glab mr create") || strings.Contains(cmd, "gh pr create") ||
 		(strings.Contains(cmd, "git push") && strings.Contains(cmd, "merge_request.create")):
 		if link := first(links, mrLinkRe.MatchString); link != "" {
-			return []wire.TurnOutput{{Kind: wire.OutputMR, Op: wire.OutputCreated, Ref: link, Title: titleOr(cmd, mrName(link))}}
+			return append(out, wire.TurnOutput{Kind: wire.OutputMR, Op: wire.OutputCreated, Ref: link, Title: titleOr(cmd, mrName(link))})
 		}
 	}
-	var out []wire.TurnOutput
 	// A push names the commits it put on the server (gitpush, in the result's links): each is a commit of the chat.
 	if gitPushRe.MatchString(cmd) {
 		for _, link := range links {

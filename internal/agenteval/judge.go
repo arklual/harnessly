@@ -46,6 +46,15 @@ func (e Expect) label() string {
 		return "did not call " + e.NotCalled + argsLabel(e.Args)
 	case e.Pane != nil:
 		return strings.TrimSpace("opened " + e.Pane.Tab + " " + e.Pane.Target + " " + e.Pane.Place)
+	case e.Made != nil:
+		what := strings.TrimSpace(e.Made.Kind + " " + e.Made.Ref)
+		if e.Made.From != "" {
+			what += " from " + e.Made.From
+		}
+		if e.Made.Absent {
+			return "not made: " + what
+		}
+		return "made " + what
 	case e.Images > 0:
 		return fmt.Sprintf("drew %d picture(s)", e.Images)
 	case e.File != nil:
@@ -129,7 +138,7 @@ func (e Expect) holds(f Facts) (bool, string) {
 	case e.NotCalled != "":
 		name := whole(e.NotCalled)
 		for _, c := range f.Calls {
-			if name.MatchString(c.Name) && !c.Error && argsMatch(c.Args, e.Args) {
+			if name.MatchString(c.Name) && (!c.Error || e.EvenFailed) && argsMatch(c.Args, e.Args) {
 				return false, "called " + c.Name + " " + clip(string(c.Args), 200)
 			}
 		}
@@ -158,6 +167,8 @@ func (e Expect) holds(f Facts) (bool, string) {
 			return false, "nothing was opened in the pane"
 		}
 		return false, "opened instead: " + strings.Join(seen, "; ")
+	case e.Made != nil:
+		return e.Made.holds(f)
 	case e.Images > 0:
 		n := 0
 		var errs []string
@@ -273,4 +284,38 @@ func (s *Scenario) Checks() []string {
 	}
 	walk(s.Expect)
 	return out
+}
+
+// holds says whether the runtime listed a matching thing as made by the person's chat (none, when Absent).
+func (m MadeExpect) holds(f Facts) (bool, string) {
+	if f.MadeError != "" {
+		return false, "what the chat made was not read: " + clip(f.MadeError, 200)
+	}
+	kind := whole(m.Kind)
+	from := whole(m.From)
+	var ref *regexp.Regexp
+	if m.Ref != "" {
+		ref = regexp.MustCompile(m.Ref)
+	}
+	var seen []string
+	for _, it := range f.Made {
+		if kind.MatchString(it.Kind) && (ref == nil || ref.MatchString(it.Ref)) && (m.From == "" || from.MatchString(it.From)) {
+			if m.Absent {
+				return false, "made " + it.Kind + " " + it.Ref
+			}
+			return true, ""
+		}
+		who := it.From
+		if who == "" {
+			who = "the chat"
+		}
+		seen = append(seen, it.Kind+" "+it.Ref+" by "+who)
+	}
+	if m.Absent {
+		return true, ""
+	}
+	if len(seen) == 0 {
+		return false, "the chat lists nothing as made"
+	}
+	return false, "made instead: " + clip(strings.Join(seen, "; "), 400)
 }
