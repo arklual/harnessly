@@ -34,6 +34,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/machine"
 	"github.com/ly-solutions/harnessly/internal/msgindex"
+	"github.com/ly-solutions/harnessly/internal/notebooks"
 	"github.com/ly-solutions/harnessly/internal/outbox"
 	"github.com/ly-solutions/harnessly/internal/paneauto"
 	"github.com/ly-solutions/harnessly/internal/preflight"
@@ -72,6 +73,7 @@ type v2Live struct {
 	tm         *v2Tmux
 	starter    *v2Launcher
 	terms      *v2Terminals // nil when the core has no terminal server
+	notebooks  *notebooks.Manager
 	designly   *v2Designly  // nil when the core cannot start agents
 	// delegation is the agents' delegation of chats to other agents (v2_delegate.go).
 	delegation *delegation.Service
@@ -282,6 +284,8 @@ func newV2Live(d deps, c *core) *v2Live {
 		}
 	}
 	v.srv.Files = v2f
+	v.notebooks = notebooks.New()
+	v.srv.Notebook = (&v2Notebooks{files: v2f, kernels: v.notebooks}).Serve
 	v.srv.Download = v2f.ServeDownload
 	v.srv.GitSide = v2f.ServeGitSide
 	v.srv.FindText = v2f.ServeSearch
@@ -521,6 +525,9 @@ func (v *v2Live) start(ctx context.Context) {
 
 func (v *v2Live) stop() {
 	v.ready.Store(false)
+	if v.notebooks != nil {
+		v.notebooks.Close()
+	}
 	if v.cancel != nil {
 		v.cancel()
 	}
@@ -1069,6 +1076,9 @@ type v2Closer struct{ v *v2Live }
 var _ convo.Closer = v2Closer{}
 
 func (cl v2Closer) Close(conv wire.Conversation) error {
+	if cl.v.notebooks != nil {
+		cl.v.notebooks.CloseConversation(conv.ID)
+	}
 	core := cl.v.c
 	ws, pane, tab, ok := core.cfg.Tmux.ParseSessionName(conv.Session)
 	if !ok {

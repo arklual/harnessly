@@ -1317,7 +1317,7 @@ export interface DirListing {
   /** The place of the workspace an absolute folder lies in: the crumbs go up to it. */
   root?: string;
 }
-/** GET /api/v2/conversations/{id}/file?path=: a UTF-8 text file of at most 1 MB, with the revision a save names. */
+/** GET /api/v2/conversations/{id}/file?path=: UTF-8 text up to 1 MB (16 MiB for notebooks), with its save revision. */
 export interface FileContent {
   path: string;
   content: string;

@@ -69,8 +69,8 @@ type DirListing struct {
 
 func (d DirListing) Validate() error { return each("entries", d.Entries) }
 
-// FileContent is the answer of GET /api/v2/conversations/{id}/file?path=<file>: a UTF-8 text file of at most 1 MB, with
-// the revision a save must name; a save answers with the file as it is now.
+// FileContent is the answer of GET /api/v2/conversations/{id}/file?path=<file>: a UTF-8 text file of at most 1 MB
+// (16 MiB for .ipynb notebooks), with the revision a save must name; a save answers with the file as it is now.
 type FileContent struct {
 	Path     string `json:"path"`
 	Content  string `json:"content"`
@@ -104,6 +104,9 @@ func (f FileSave) Validate() error {
 
 // FileSaveBodyMax is the largest body a save may send: a text of 1 MB whose every byte is escaped, and the envelope.
 const FileSaveBodyMax = 6<<20 + 4096
+
+// NotebookSaveBodyMax bounds the JSON envelope of a 16 MiB notebook, including worst-case JSON escaping.
+const NotebookSaveBodyMax = 6*(16<<20) + 4096
 
 // FileRefusal is the answer of a files page that refuses: the code of the protocol and a message worded for the person.
 type FileRefusal struct {
@@ -149,7 +152,11 @@ func (s *Server) files(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	switch {
 	case one && r.Method == http.MethodPut:
 		var body FileSave
-		raw, rerr := io.ReadAll(http.MaxBytesReader(w, r.Body, FileSaveBodyMax))
+		bodyMax := int64(FileSaveBodyMax)
+		if strings.HasSuffix(strings.ToLower(path), ".ipynb") {
+			bodyMax = NotebookSaveBodyMax
+		}
+		raw, rerr := io.ReadAll(http.MaxBytesReader(w, r.Body, bodyMax))
 		if rerr == nil {
 			rerr = decodeStrict(raw, &body)
 		}

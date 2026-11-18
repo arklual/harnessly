@@ -7,7 +7,7 @@ it stays with the previous runtime.
 
 - [Machine agent](#machine-agent)
 - [Runtime](#runtime): [gate and process](#gate-and-process), [tmux, tabs and agents](#tmux-tabs-and-agents),
-  [prompt delivery](#prompt-delivery), [folders and files](#folders-and-files),
+  [prompt delivery](#prompt-delivery), [folders and files](#folders-and-files), [notebook execution](#notebook-execution),
   [links and external services](#links-and-external-services), [usage and statistics](#usage-and-statistics),
   [conversation snapshots](#conversation-snapshots), [machine and web push](#machine-and-web-push),
   [design library](#design-library), [preview proxy](#preview-proxy), [voice](#voice)
@@ -144,6 +144,60 @@ and the kill switch are in [hub/machine.md](hub/machine.md).
 | `RUNTIME_DATA_DIR_LABEL` | how messages name the data folder (default `~/` and its path under the home) |
 | `RUNTIME_CHECKPOINT_NAMESPACE`, `RUNTIME_CHECKPOINT_TMP_TAG` | the turn checkpoints' git refs (`refs/<ns>/checkpoints/`, `refs/<ns>/saved/`) and author (`<ns>@localhost`), default `harnessly`; and the tag of the files a rewind stages (`<file>.<tag>-<hex>.tmp`, default `hs`) |
 | `RUNTIME_CHECKPOINT_POOL` | `on` keeps one object store per working folder (`checkpoints/pool-<folder>`), which the checkpoint repositories of its tabs borrow from through git alternates and hand their packed objects to once an hour; the repositories that exist are swept once after a start. Default `off`: a repository per tab with loose objects. A runtime without the setting still reads the repositories made with it |
+
+### Notebook execution
+
+See [Jupyter notebooks in the file pane](notebooks.md) for opening, editing, running and saving notebooks.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `RUNTIME_NOTEBOOK_PYTHON` | first executable `python3` in `/usr/local/bin`, `/usr/bin`, `/bin` | absolute path of the Python interpreter used for native `.ipynb` execution; one executable path, not a shell command. It must have `jupyter_client` and `ipykernel` installed. A virtualenv's `bin/python` is supported |
+
+These Python packages are optional. Opening a notebook or asking for its kernel state does not start Python or
+probe dependencies. An explicit execute/restart reports an actionable error if they are unavailable. For example:
+
+```sh
+python3 -m venv /path/to/notebook-env
+/path/to/notebook-env/bin/python -m pip install jupyter_client ipykernel
+# Set this in the runtime's service environment:
+RUNTIME_NOTEBOOK_PYTHON=/path/to/notebook-env/bin/python
+```
+
+Only the fixed Python 3 kernel is supported initially. Notebook kernelspec metadata and installed kernelspec launch
+commands are never executed. Both the embedded helper and the kernel start with Python's `-I` flag; Jupyter and
+IPython use private temporary configuration directories. The child environment is an allowlist (a fixed machine
+`PATH`, locale, `HOME`, `TZ`, and the private configuration directories), not the runtime's environment: runtime,
+connector, proxy-auth and agent tokens are not inherited.
+
+`GET /api/v2/conversations/{id}/notebook?path=…` returns `{state:"stopped"|"idle"|"busy", kernel?:"python3"}`.
+`POST` to the same route accepts `{action:"execute", code:"…"}` or `{action:"interrupt"|"restart"|"shutdown"}`.
+Execute returns nbformat outputs, `execution_count` and `status:"ok"|"error"`; Python exceptions are cell outputs,
+not HTTP failures. Other actions return state. Busy execution/restart and kernel-count limits return HTTP 409;
+code/output limits return 413; missing dependencies and execution timeouts return 503, with the ordinary file-route
+`{r:"refused", code, message}` envelope. Restart explicitly creates a fresh kernel, even when stopped; interrupt
+and shutdown of a stopped notebook are no-ops. The page adds `timeout=150` to execute requests so the hub proxy uses
+its existing long-request header budget instead of cutting off a running cell after 60 seconds; this hint does not
+raise the runtime's own startup/execution limits.
+
+A session is private to the authenticated identity, conversation and canonical notebook path. Variables survive
+cells. Execution is allowed only for an existing, readable nbformat 4 `.ipynb` file inside the canonical conversation
+folder, with a writable file and directory, and outside the existing credential-path denylist. Absolute paths inside
+that folder are accepted; viewer-accessible handovers or files in another workspace place are not execution access.
+The kernel's initial working directory is the notebook's directory. Execution does not persist notebook outputs or
+source: the page uses the existing revision-aware file save route.
+
+There are at most 16 kernels per runtime and 4 per identity, at most 256 KiB of UTF-8 code per execution, and at most
+4 MiB/1000 accumulated output objects. Kernel startup has a 30-second budget and each execution a 120-second budget.
+A concurrent execute/restart is refused rather than queued; interrupt and shutdown remain available during execution.
+Timeouts, disconnected executing requests and helper failures discard the kernel. Idle kernels expire after 30 minutes
+(with a minute's sweep interval); reading state does not keep them alive. Shutdown, conversation deletion and runtime
+stop tear down helpers and kernels, and no session is restored after a runtime restart.
+
+**Execution is not a security sandbox.** Explicitly run code has the runtime Unix account's filesystem and network
+access, can change its own working directory, and may read credentials from disk just as a local terminal can. The
+path checks and clean environment prevent unintended launch locations/token inheritance, not hostile Python code.
+Run only trusted cells. The machine agent treats notebook routes as terminal access: a hub connection with
+`terminal = false` cannot reach them.
 
 ### Links and external services
 

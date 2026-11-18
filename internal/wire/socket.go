@@ -99,6 +99,9 @@ type Server struct {
 	// Files reads the folders of the conversations: .../files lists a folder, .../file reads a text file. nil: both are
 	// 404s.
 	Files FilesSource
+	// Notebook explicitly executes cells of a conversation's notebook; nil: a 404.
+	// It owns its execution timeout, which can exceed the ordinary page budget.
+	Notebook func(w http.ResponseWriter, r *http.Request, conv string)
 	// PaneSelection hears what is selected in a file open in a chat's pane: POST /api/v2/pane-selection. nil: a 404.
 	PaneSelection http.Handler
 	// PaneAct is the agent's hand on the page in a chat's pane: GET /api/v2/pane-act?conversation= is the page's long poll

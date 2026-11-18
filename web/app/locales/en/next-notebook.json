@@ -1,0 +1,22 @@
+{
+  "next.notebook.label": "Jupyter Notebook",
+  "next.notebook.run": "Run",
+  "next.notebook.runAll": "Run all",
+  "next.notebook.interrupt": "Interrupt",
+  "next.notebook.restart": "Restart kernel",
+  "next.notebook.shutdown": "Shut down kernel",
+  "next.notebook.state.stopped": "Kernel stopped",
+  "next.notebook.state.idle": "Python · ready",
+  "next.notebook.state.busy": "Python · running",
+  "next.notebook.trustNotice": "Opening a file does not run code. Execution uses Python on this machine with access to files, just like a terminal. Only allow execution for notebooks you trust. Save results with the usual Save button.",
+  "next.notebook.allow": "Allow execution",
+  "next.notebook.pythonOnly": "Only the Python 3 kernel is supported for now. This notebook uses another kernel; its saved cells and outputs can still be viewed and edited.",
+  "next.notebook.empty": "This notebook has no cells yet.",
+  "next.notebook.cell": "Cell {n}",
+  "next.notebook.source": "Cell {n} source",
+  "next.notebook.raw": "Raw text",
+  "next.notebook.outputImage": "Cell output",
+  "next.notebook.outputHtml": "Cell HTML output",
+  "next.notebook.unsupportedOutput": "This output format is not supported. It is preserved in the file.",
+  "next.notebook.outputTruncated": "Showing the first 200 outputs. The rest are preserved in the file."
+}

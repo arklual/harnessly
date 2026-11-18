@@ -498,6 +498,7 @@ export const FilesTab = ({
       <LazyFileEditor
         key={key}
         onHandle={edits.attach}
+        runtime={{ machine: conv.machineId, conv: conv.id }}
         path={now.file.path}
         initial={now.initial}
         onSave={save}

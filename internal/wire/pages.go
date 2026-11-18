@@ -261,6 +261,22 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request, parts []string) {
 		s.EntryOp(w, r, parts[0])
 		return
 	}
+	if len(parts) == 2 && parts[1] == "notebook" {
+		if !ValidConvID(parts[0]) {
+			refuse(w, RefuseBadRequest)
+			return
+		}
+		if r.Method != http.MethodGet && r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if s.Notebook == nil {
+			refuse(w, RefuseNotFound)
+			return
+		}
+		s.Notebook(w, r, parts[0])
+		return
+	}
 	saving := len(parts) == 2 && parts[1] == "file" && r.Method == http.MethodPut
 	if r.Method != http.MethodGet && !saving {
 		w.WriteHeader(http.StatusMethodNotAllowed)

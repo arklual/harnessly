@@ -56,7 +56,23 @@ func within(root, target string) bool {
 const (
 	editorMaxBytes   = 1_000_000
 	editorMaxEntries = 2_000
+	// NotebookMaxBytes allows embedded cell output without raising the limit for ordinary text files.
+	NotebookMaxBytes = 16 << 20
 )
+
+func editorLimit(name string) int {
+	if strings.EqualFold(filepath.Ext(name), ".ipynb") {
+		return NotebookMaxBytes
+	}
+	return editorMaxBytes
+}
+
+func textTooLarge(limit int) *EditorError {
+	if limit == NotebookMaxBytes {
+		return &EditorError{415, locale.Pick("The notebook viewer supports files up to 16 MiB.", "Просмотрщик ноутбуков поддерживает файлы до 16 МиБ.")}
+	}
+	return errTooLarge()
+}
 
 // EditorError is a refusal of the editor routes: a status and the text shown to the person.
 type EditorError struct {
@@ -264,7 +280,7 @@ func openNoFollow(target string, mode int) (*os.File, error) {
 	return os.NewFile(uintptr(fd), target), nil
 }
 
-// readBounded is an open file's text: a regular file of at most 1 MB, without NUL bytes, in UTF-8.
+// readBounded is an open file's UTF-8 text without NUL bytes: at most 1 MB (16 MiB for notebooks).
 func readBounded(f *os.File) ([]byte, *EditorError) {
 	st, err := f.Stat()
 	if err != nil {
@@ -273,32 +289,24 @@ func readBounded(f *os.File) ([]byte, *EditorError) {
 	if !st.Mode().IsRegular() {
 		return nil, errNotRegular()
 	}
-	if st.Size() > editorMaxBytes {
-		return nil, errTooLarge()
+	limit := editorLimit(f.Name())
+	if st.Size() > int64(limit) {
+		return nil, textTooLarge(limit)
 	}
-	buf := make([]byte, editorMaxBytes+1)
-	n := 0
-	for n < len(buf) {
-		k, err := f.ReadAt(buf[n:], int64(n))
-		n += k
-		if err == io.EOF || k == 0 && err == nil {
-			break
-		}
-		if err != nil {
-			return nil, editorFail(err)
-		}
+	data, err := io.ReadAll(io.NewSectionReader(f, 0, int64(limit)+1))
+	if err != nil {
+		return nil, editorFail(err)
 	}
-	data := buf[:n]
-	if ee := checkText(data); ee != nil {
+	if ee := checkText(data, limit); ee != nil {
 		return nil, ee
 	}
 	return data, nil
 }
 
-func checkText(data []byte) *EditorError {
+func checkText(data []byte, limit int) *EditorError {
 	switch {
-	case len(data) > editorMaxBytes:
-		return errTooLarge()
+	case len(data) > limit:
+		return textTooLarge(limit)
 	case bytes.IndexByte(data, 0) >= 0:
 		return errNotText()
 	case !utf8.Valid(data):
@@ -368,7 +376,7 @@ func WriteProjectFile(root, relative, content, revision string, loneSurrogate bo
 		return nil, editorFail(err)
 	}
 	data := []byte(content)
-	if ee := checkText(data); ee != nil {
+	if ee := checkText(data, editorLimit(target)); ee != nil {
 		return nil, ee
 	}
 	if loneSurrogate {
@@ -408,7 +416,7 @@ func SaveProjectFile(root, relative, content, revision string) (Object, *EditorE
 		return nil, editorFail(err)
 	}
 	data := []byte(content)
-	if ee := checkText(data); ee != nil {
+	if ee := checkText(data, editorLimit(target)); ee != nil {
 		return nil, ee
 	}
 	defer writeLocks.lock(target)()
