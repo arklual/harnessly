@@ -51,11 +51,13 @@ const NotebookSource = ({ text, label, kind, readOnly, onChange, onRun }: Source
           }),
           editable.of(EditorState.readOnly.of(false)),
           Prec.high(EditorView.contentAttributes.of({ 'aria-label': start.current.label })),
-          EditorView.theme({
-            '&': { height: 'auto' },
-            '.cm-content': { padding: '8px 0' },
-            '.cm-scroller': { maxHeight: '440px' },
-          }),
+          Prec.high(
+            EditorView.theme({
+              '&': { height: 'auto' },
+              '.cm-content': { padding: '8px 0' },
+              '.cm-scroller': { maxHeight: '440px' },
+            }),
+          ),
         ],
       }),
     });
@@ -87,7 +89,7 @@ const NotebookSource = ({ text, label, kind, readOnly, onChange, onRun }: Source
     if (view && view.state.doc.toString() !== text)
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
   }, [text]);
-  return <div className="hx-nb__source" ref={host} />;
+  return <div className="hx-jnb__source" ref={host} />;
 };
 
 export default NotebookSource;

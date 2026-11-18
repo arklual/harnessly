@@ -149,6 +149,20 @@ describe('native notebook editor', () => {
     expect((screen.getByRole('button', { name: 'Run all' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('allows an explicitly trusted custom-named Python environment without trusting its executable metadata', async () => {
+    const doc = {
+      ...notebook(),
+      metadata: { kernelspec: { name: 'project-python', language: 'python', argv: ['never-run-metadata'] } },
+    };
+    const text = JSON.stringify(doc);
+    show({ initial: { text, base: text, revision: 'rev1' } });
+    expect(screen.queryByText(/This notebook uses another kernel/)).toBeNull();
+    allow();
+    fireEvent.click(screen.getAllByRole('button', { name: /^Run$/ })[0]);
+    await screen.findByText('executed');
+    expect(request.mock.calls.find((c) => c[2] === 'execute')?.[3]).toBe('x = 4');
+  });
+
   it('leaves malformed notebooks available in the text editor', () => {
     show({ initial: { text: '{', base: '{', revision: 'rev1' } });
     expect(screen.getByText('JSON editor fallback')).toBeTruthy();

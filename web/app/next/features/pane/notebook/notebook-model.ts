@@ -62,6 +62,19 @@ export const parseNotebook = (text: string): Notebook => {
   return value as unknown as Notebook;
 };
 
+// Kernelspec names identify environments (e.g. a project's venv), not languages or launch commands.
+// Language metadata recognizes custom Python names without ever trusting kernelspec argv/executable fields.
+export const isPythonNotebook = (notebook: Notebook): boolean => {
+  const spec = record(notebook.metadata.kernelspec) ? notebook.metadata.kernelspec : {};
+  const info = record(notebook.metadata.language_info) ? notebook.metadata.language_info : {};
+  const language = notebookText(spec.language || info.name)
+    .trim()
+    .toLowerCase();
+  if (language) return language === 'python' || language === 'python3' || language === 'ipython';
+  const name = notebookText(spec.name).trim().toLowerCase();
+  return name === '' || name === 'python' || name === 'python3';
+};
+
 export const writeNotebook = (notebook: Notebook): string => `${JSON.stringify(notebook, null, 1)}\n`;
 export const isNotebook = (path: string): boolean => /\.ipynb$/i.test(path);
 

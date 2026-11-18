@@ -18,8 +18,10 @@ output; the usual **1 MB** limit for other text files is unchanged.
 
 ## Execution
 
-Only Python 3 is supported initially. The notebook's kernelspec is not an instruction to execute a program: notebooks
-that declare another kernel remain viewable and editable, but the UI does not run them with Python by mistake.
+Only Python 3 is supported initially. Compatibility is determined by the kernel's language, not its environment
+name: a custom project kernelspec declaring `language: "python"` is recognized as Python. Notebooks declaring another
+language remain viewable and editable, but are not run with Python by mistake. Execution still uses the configured
+runtime interpreter; accepting a custom name does not select that project's virtualenv or execute metadata commands.
 
 Before the first run in an open file, choose **Allow execution**. This is a trust decision, not a sandbox: code runs
 on the machine and has the same filesystem access as a terminal process under the runtime's OS account. Only run
