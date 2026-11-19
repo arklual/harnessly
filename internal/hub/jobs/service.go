@@ -54,6 +54,9 @@ type Service struct {
 	misses   map[string]int       // job id → polls that did not know the job
 	firstBad map[string]time.Time // machine id → when its polls began to fail
 	sweptAt  time.Time
+	// lastAt is the creation time of the last job submitted here: the queue goes by it, so two jobs of one
+	// millisecond keep the order they came in.
+	lastAt time.Time
 }
 
 const (
@@ -243,16 +246,21 @@ func (s *Service) SetRole(ctx context.Context, m store.Machine, role string, cap
 		if len(caps) == 0 && len(prev.Caps) > 0 {
 			b.Caps = prev.Caps
 		}
-		if b.Slots == 0 {
+		// Slots the person changed in this request are theirs. Otherwise, while the agent has never told its labels,
+		// the slots kept are the stand-in 1 of a role set before the agent could be asked (offline, or its hello with
+		// the job feature not in yet), and the agent's count replaces them together with the labels.
+		personSlots := slots > 0 && slots != prev.Slots
+		if !personSlots {
 			b.Slots = prev.Slots
 		}
+		detect := !personSlots && len(prev.Caps) == 0
 		if (len(b.Caps) == 0 || b.Slots == 0) && s.link.Online(m.ID) && s.offers != nil && s.offers(m.ID, hubproto.FeatureJobRun) {
 			var got hubproto.JobCaps
 			if raw, err := s.link.Do(ctx, m.ID, hubproto.OpJobCaps, struct{}{}, callTimeout); err == nil && json.Unmarshal(raw, &got) == nil {
 				if len(b.Caps) == 0 {
 					b.Caps, _ = CleanCaps(got.Caps)
 				}
-				if b.Slots == 0 {
+				if got.Slots > 0 && (b.Slots == 0 || detect) {
 					b.Slots = got.Slots
 				}
 			}
@@ -447,7 +455,7 @@ func (s *Service) Submit(ctx context.Context, a Actor, req Request) (store.Heavy
 	}
 	j := store.HeavyJob{SpaceID: a.SpaceID, UserID: a.UserID, FromMachine: a.MachineID, Title: req.Title, Kind: req.Need.Kind, Caps: req.Need.Caps,
 		WantMachine: want, Argv: req.Argv, Env: req.Env, Outputs: req.Outputs, TimeoutSec: req.TimeoutSec, HasInput: req.HasInput,
-		Status: hubproto.HeavyQueued, CreatedAt: s.now().UTC()}
+		Status: hubproto.HeavyQueued, CreatedAt: s.createdAt()}
 	pl := Place(Need{Kind: j.Kind, Caps: j.Caps, Machine: j.WantMachine}, cands)
 	switch {
 	case pl.Local && a.MachineID != "":
@@ -741,4 +749,16 @@ func (s *Service) sweep(ctx context.Context) {
 		}
 		return hubproto.HeavyActive(j.Status) || j.FinishedAt == nil || s.now().Sub(*j.FinishedAt) < FilesKeep
 	})
+}
+
+// createdAt is now, but always after the last job submitted here (the store keeps milliseconds).
+func (s *Service) createdAt() time.Time {
+	at := s.now().UTC().Truncate(time.Millisecond)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !at.After(s.lastAt) {
+		at = s.lastAt.Add(time.Millisecond)
+	}
+	s.lastAt = at
+	return at
 }

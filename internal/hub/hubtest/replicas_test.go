@@ -152,9 +152,11 @@ func TestKilledReplicaMachinesReconnectToTheLiveOne(t *testing.T) {
 	// The agent dials the replica that is alive.
 	ag.S = b
 	ag.Connect()
-	b.Eventually("the live replica owns the machine", func() bool {
+	// The owner's row is written before the link is put in the registry: wait for both.
+	b.Eventually("the live replica owns the machine and holds its link", func() bool {
 		row, ok := ownerOf(t, b, ag.MachineID)
-		return ok && row.Owner == b.Hub.Registry.Cluster().ID
+		l := b.Hub.Registry.Get(ag.MachineID)
+		return ok && row.Owner == b.Hub.Registry.Cluster().ID && l != nil && !l.Remote()
 	})
 	second, _ := ownerOf(t, b, ag.MachineID)
 	if second.Fence <= first.Fence {

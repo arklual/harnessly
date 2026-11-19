@@ -328,3 +328,29 @@ func TestFiles(t *testing.T) {
 		t.Fatal("not removed")
 	}
 }
+
+// A role set before the agent could be asked keeps the stand-in of one slot; set again with the agent there, the
+// labels and the slots both come from it. Slots the person changes stay theirs.
+func TestRoleSetBeforeTheAgentAnswersTakesItsSlotsLater(t *testing.T) {
+	ctx := context.Background()
+	r := newRig(t)
+	r.link.online[r.b1.ID] = false
+	b, err := r.s.SetRole(ctx, r.b1, "builder", nil, 0, r.user)
+	if err != nil || b.Slots != 1 || len(b.Caps) != 0 {
+		t.Fatalf("offline: %+v %v", b, err)
+	}
+	r.link.online[r.b1.ID] = true
+	// the card sends back what it shows: no labels, one slot
+	b, err = r.s.SetRole(ctx, r.b1, "builder", nil, 1, r.user)
+	if err != nil || b.Slots != 2 || strings.Join(b.Caps, ",") != "blender,ffmpeg" {
+		t.Fatalf("online again: %+v %v", b, err)
+	}
+	b, err = r.s.SetRole(ctx, r.b1, "builder", nil, 5, r.user)
+	if err != nil || b.Slots != 5 {
+		t.Fatalf("the person's slots: %+v %v", b, err)
+	}
+	b, err = r.s.SetRole(ctx, r.b1, "builder", nil, 0, r.user)
+	if err != nil || b.Slots != 5 {
+		t.Fatalf("set again, the person's slots stay: %+v %v", b, err)
+	}
+}
