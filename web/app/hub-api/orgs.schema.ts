@@ -15,6 +15,7 @@ export const org = obj({
   currency: lit('RUB', 'USD'),
   createdAt: time,
   appsConsent: opt(lit('ask', 'auto')),
+  memberMachines: opt(bool),
   links: opt(
     obj({
       standDomain: opt(str),

@@ -26,6 +26,8 @@ type OrgView struct {
 	CreatedAt string `json:"createdAt"`
 	// AppsConsent is the rule for apps on the organization's machines: "ask" (the default) or "auto".
 	AppsConsent string `json:"appsConsent"`
+	// MemberMachines: a member connects a machine of their own.
+	MemberMachines bool `json:"memberMachines"`
 	// Links are the integrations for the chat's links; every field is empty when not named.
 	Links hubproto.LinkSettings `json:"links"`
 }
@@ -81,7 +83,7 @@ type View struct {
 }
 
 func orgView(o store.Org) OrgView {
-	return OrgView{ID: o.ID, Slug: o.Slug, Name: o.Name, Timezone: o.Timezone, Currency: o.Currency, CreatedAt: httpx.Time(o.CreatedAt), AppsConsent: o.AppsConsent, Links: o.Links}
+	return OrgView{ID: o.ID, Slug: o.Slug, Name: o.Name, Timezone: o.Timezone, Currency: o.Currency, CreatedAt: httpx.Time(o.CreatedAt), AppsConsent: o.AppsConsent, MemberMachines: !o.NoMemberMachines, Links: o.Links}
 }
 
 func grantView(g store.RoleGrant) GrantView {

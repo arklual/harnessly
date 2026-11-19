@@ -26,7 +26,7 @@ export const MemberSkeleton = () => (
   </div>
 );
 
-export const MemberView = ({ list }: { list: MachinesList }) => {
+export const MemberView = ({ list, onAdd }: { list: MachinesList; onAdd?: () => void }) => {
   const { busyId, error, open } = useOpenMachine();
   const all = list.groups.flatMap((g) => g.machines);
   const mine = all.filter((m) => m.mine !== false);
@@ -74,7 +74,20 @@ export const MemberView = ({ list }: { list: MachinesList }) => {
       {group('Мои', mine)}
       {group(`Общие в тенанте ${shared[0]?.tenantName ?? ''}`.trim(), shared)}
       {all.length === 0 && (
-        <div className="mo-empty">Машин пока нет. Попросите админа тенанта добавить вам машину.</div>
+        <div className="mo-empty">
+          У вас пока нет машины.
+          {onAdd ? (
+            <div style={{ marginTop: 10 }}>
+              <Btn variant="primary" icon="plus" onClick={onAdd}>
+                Подключить машину
+              </Btn>
+            </div>
+          ) : (
+            <div className="mut sm" style={{ marginTop: 6 }}>
+              Машины в организации подключает администратор.
+            </div>
+          )}
+        </div>
       )}
     </>
   );

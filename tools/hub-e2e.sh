@@ -224,7 +224,7 @@ expect "a wrong code is refused" "$(j .error)" invalid_code
 call "$OWNER" POST /api/auth/email/verify "{\"email\":\"anna@example.com\",\"code\":\"$(code_for anna@example.com)\"}"
 expect "the right code signs in" "$CODE" 200
 expect "a new account is told so" "$(j .isNew)" true
-expect "the first account has nowhere to go but a new space" "$(j .next)" /new
+expect "the first account is led to the hub's landing, which makes the first organization" "$(j .next)" /
 call "$OWNER" PATCH /api/me '{"name":"Анна"}'
 call "$OWNER" GET /api/me
 expect "the first account is the instance admin" "$(j .user.isAdmin)" true
@@ -268,7 +268,7 @@ machine_env() {
 	env HOME="$MHOME" TMUX_TMPDIR="$T/tmux" AGENT_DATA_DIR="$MHOME/.harnessly" AGENT_POLICY_FILE="$MHOME/policy.toml" \
 		AGENT_WORK_DIR="$MHOME/work" "$@"
 }
-machine_env "$T/bin/harnessly-agent" register --hub "$HUB" --token "$REG_CODE" --profile full --via command --name e2e-box >"$T/register.out" 2>&1 \
+machine_env "$T/bin/harnessly-agent" register --no-start --hub "$HUB" --token "$REG_CODE" --profile full --via command --name e2e-box >"$T/register.out" 2>&1 \
 	|| die "register failed: $(cat "$T/register.out")"
 MF="$MHOME/.harnessly/machine.json"
 check "machine.json is private (0600)" test "$(stat -c %a "$MF")" = 600
@@ -278,7 +278,7 @@ expect "the base path is /m/<id>" "$BASE" "/m/$MID"
 expect "the dial address is the hub's, as ws" "$(jq -r .dialUrl "$MF")" "ws://127.0.0.1:$HUB_PORT/agent/v1"
 check "the machine has an Ed25519 key (a 32-byte seed)" bash -c "test \"\$(jq -r .ed25519 '$MF' | base64 -d | wc -c)\" = 32"
 check "the registration code is not left on the machine" bash -c "! grep -rq '$REG_CODE' '$MHOME'"
-if machine_env "$T/bin/harnessly-agent" register --hub "$HUB" --token "$REG_CODE" --profile full --via command --force >"$T/register2.out" 2>&1; then
+if machine_env "$T/bin/harnessly-agent" register --no-start --hub "$HUB" --token "$REG_CODE" --profile full --via command --force >"$T/register2.out" 2>&1; then
 	bad "the same code registered a second machine"
 else
 	ok "a used code does not register again"

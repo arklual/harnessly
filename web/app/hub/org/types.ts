@@ -35,6 +35,8 @@ export interface OrgRef {
   id: string;
   slug: string;
   name: string;
+  /** A member connects a machine of their own; false when the organization's admin turned it off. */
+  memberMachines?: boolean;
 }
 
 export interface TenantRef {

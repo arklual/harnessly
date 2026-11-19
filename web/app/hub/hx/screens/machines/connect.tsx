@@ -137,7 +137,9 @@ export const ConnectPage = ({
   const expired = issued !== null && new Date(issued.expiresAt).getTime() <= now;
   const { copied, copy } = useCopy();
   // The hub lists the teams of the tenant the person is in now; for another tenant there is nothing to pick from.
-  const teams = scope.kind === 'tenant' && scope.tenant.id === tenantId ? shell.teams : [];
+  // A member connects only a machine of their own: a shared one, and trusting it, are for those who manage.
+  const manages = shell.viewer.role !== 'member';
+  const teams = manages && scope.kind === 'tenant' && scope.tenant.id === tenantId ? shell.teams : [];
   const team = teams.find((t) => t.id === teamId) ?? teams[0] ?? null;
   const canOwn = owner === 'me' || team !== null;
   const canNext = tenantId !== '' && (where === 'local' || profile !== 'full' || sure);
@@ -372,7 +374,7 @@ export const ConnectPage = ({
         <Radio
           on={owner === 'me'}
           title="Моя"
-          sub={`Владелец — ${me?.user.name || me?.user.email || 'вы'}. Чаты на ней открываете вы, подтверждаете её тоже вы.`}
+          sub={`Владелец — ${me?.user.name || me?.user.email || 'вы'}. Чаты на ней открываете вы, ${manages ? 'подтверждаете её тоже вы' : 'подтверждает администратор организации'}.`}
           onPick={() => setOwner('me')}
         />
         {teams.length > 0 && (
@@ -491,7 +493,13 @@ export const ConnectPage = ({
           {live && setup && (
             <Check s={setup.runtime === 'ready' ? 'ok' : 'err'}>
               {setup.runtime === 'ready' ? 'Машина подтверждена' : 'Машина ждёт подтверждения'}
-              {setup.runtime === 'needs_trust' && (
+              {setup.runtime === 'needs_trust' && !manages && (
+                <div className="mut sm" style={{ marginTop: 4 }}>
+                  Подтверждает администратор организации: пока этого нет, чаты на ней не откроются. Машина уже
+                  видна ему в разделе «Машины».
+                </div>
+              )}
+              {setup.runtime === 'needs_trust' && manages && (
                 <>
                   <div className="mut sm" style={{ margin: '4px 0 8px' }}>
                     Подтвердите, что это ваша машина: пока этого нет, чаты на ней не откроются.

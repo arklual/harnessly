@@ -18,6 +18,8 @@ export type Org = {
   createdAt: string;
   /** The rule for apps on the organization's machines; absent on an older hub, which means `ask`. */
   appsConsent?: AppsConsent;
+  /** May a member connect a machine of their own; absent on an older hub, which means yes. */
+  memberMachines?: boolean;
   /** The integrations for the chat's links; a field that is not named is absent. */
   links?: OrgLinks;
 };

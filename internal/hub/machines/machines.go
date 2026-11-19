@@ -236,7 +236,7 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	sub := s.spaces.Sub()
 	g := s.guard()
 	sub.Handle("GET /api/spaces/{spaceId}/machines", g.Space(tenant.Member, s.list))
-	sub.Handle("POST /api/spaces/{spaceId}/machines/codes", g.Space(tenant.Owner, s.createCode))
+	sub.Handle("POST /api/spaces/{spaceId}/machines/codes", g.Space(tenant.Member, s.createCode))
 	sub.Handle("POST /api/spaces/{spaceId}/machines/local", g.Space(tenant.Owner, s.claimLocal))
 
 	mux.Handle("GET /api/machines/{machineId}", g.Machine(tenant.Viewer, s.get))
@@ -557,9 +557,12 @@ func (s *Service) rename(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) 
 	}
 	ctx := r.Context()
 	m := *t.Machine
-	// The route lets every member in (the team and the access list have rights of their own); the name is the owners'.
-	if err := s.spaces.Owner(ctx, p.User.ID, m.SpaceID); err != nil {
-		return err
+	// The route lets every member in (the team and the access list have rights of their own); the name is the owners',
+	// and a member's own machine is theirs to name too.
+	if m.CreatedBy != p.User.ID {
+		if err := s.spaces.Owner(ctx, p.User.ID, m.SpaceID); err != nil {
+			return err
+		}
 	}
 	if err := s.db.S().RenameMachine(ctx, m.ID, name); err != nil {
 		return err

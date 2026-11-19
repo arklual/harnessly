@@ -187,6 +187,8 @@ export class FakeHub {
       profiles: { dir: true, container: true, full: true },
       runtimeMode: 'path',
       termsUrl: 'https://example.com/terms',
+      // Organizations are on by default, as on the hub.
+      orgs: 'on',
       ...scenario.config,
     } as Config;
     this.user = scenario.signedIn ? this.newUser('anna@example.com') : null;

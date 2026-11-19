@@ -43,6 +43,9 @@ const Screen = () => {
   const role = shell.viewer.role;
   const org = scope.kind === 'org';
   const member = role === 'member';
+  // A member connects a machine of their own unless the organization's admin turned it off.
+  const canAdd = !member || shell.org.memberMachines !== false;
+  const adding = add.adding && canAdd;
   const data = list.data;
   const all = data ? data.groups.flatMap((g) => g.machines) : [];
   const title = 'Машины';
@@ -52,9 +55,9 @@ const Screen = () => {
       ? orgLead(shell.org.name, data?.summary.total ?? all.length, all)
       : tenantLead(scope.tenant.name, all);
   const addable = org ? shell.tenants : [scope.tenant];
-  const canAdd = role === 'admin';
   const hint = card.shown ? (all.find((m) => m.id === card.shown) ?? null) : null;
 
+  // A member's machine is their own and waits for an administrator's confirmation.
   const end = canAdd ? (
     <div className="hb-tools">
       <Btn variant="outline" size="sm" icon="plus" onClick={() => add.open()}>
@@ -64,7 +67,7 @@ const Screen = () => {
   ) : null;
 
   const content = () => {
-    if (add.adding && canAdd) {
+    if (adding) {
       return (
         <ConnectPage
           tenants={addable}
@@ -84,8 +87,8 @@ const Screen = () => {
       );
     }
     if (!data) return member ? <MemberSkeleton /> : <ListSkeleton />;
-    if (member) return <MemberView list={data} />;
-    const onAdd = canAdd ? () => add.open() : undefined;
+    const onAdd = () => add.open();
+    if (member) return <MemberView list={data} onAdd={canAdd ? onAdd : undefined} />;
     return org ? (
       <OrgView list={data} onOpen={url.open} onAdd={onAdd} />
     ) : (
@@ -93,7 +96,7 @@ const Screen = () => {
     );
   };
 
-  if (add.adding && canAdd) {
+  if (adding) {
     return (
       <>
         <span className="hx-part-mark" data-hx-part="machines" aria-hidden="true" />

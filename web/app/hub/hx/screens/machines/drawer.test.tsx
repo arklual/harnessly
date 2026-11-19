@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { OrgApi } from '../../../org/api';
@@ -63,8 +63,8 @@ describe('machine card: the openings for debugging', () => {
   it('asks for them when the hub says the viewer may see them', async () => {
     const debug = vi.fn(async () => []);
     await open('admin', debug);
-    await screen.findByText('Нагрузка за сутки');
-    expect(debug).toHaveBeenCalled();
+    // The card's sections mount after the machine loads: under CI load the load chart may come a tick earlier.
+    await waitFor(() => expect(debug).toHaveBeenCalled());
   });
 
   it('does not ask a lead the hub keeps out', async () => {

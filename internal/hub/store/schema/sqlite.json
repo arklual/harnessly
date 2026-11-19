@@ -6007,6 +6007,10 @@
         {
           "name": "links",
           "type": "TEXT"
+        },
+        {
+          "name": "member_machines",
+          "type": "TEXT"
         }
       ],
       "primaryKey": [

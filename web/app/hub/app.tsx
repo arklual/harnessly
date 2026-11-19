@@ -15,6 +15,7 @@ import { NetworkScreen } from './pages/network';
 import { SwitchesScreen } from './pages/switches';
 import { SitesPage } from './pages/sites';
 import { http } from './org/api/live/http';
+import { dataMode } from './org/mode';
 import { orgTargetFor } from './org/redirect';
 import { orgLanding, orgStepOn } from './org/step';
 import { ALL_SCOPE, type Section } from './org/types';
@@ -94,6 +95,8 @@ const SessionFailed = ({ error, retry }: { error: ApiError; retry: () => void })
 
 /** The organizations of the person, asked again twice when the hub does not answer: a slow hub is not «no organization». */
 const orgsWithRetry = async (alive: () => boolean): Promise<OrgList | null> => {
+  // The dev server's mocks (org/mode.ts) have one organization; the org screens never ask the hub for the list.
+  if (import.meta.env.DEV && dataMode() === 'mock') return MOCK_ORG_LIST;
   for (let attempt = 0; ; attempt++) {
     try {
       return await http.get<OrgList>('/api/orgs');
@@ -102,6 +105,21 @@ const orgsWithRetry = async (alive: () => boolean): Promise<OrgList | null> => {
       await new Promise((done) => setTimeout(done, 1000 * (attempt + 1)));
     }
   }
+};
+
+const MOCK_ORG_LIST: OrgList = {
+  orgs: [
+    {
+      id: 'o-acme',
+      slug: 'acme',
+      name: 'Акме',
+      timezone: 'Europe/Moscow',
+      currency: 'RUB',
+      createdAt: '2026-10-01T09:00:00Z',
+      role: 'admin',
+    },
+  ],
+  looseSpaces: [],
 };
 
 /**

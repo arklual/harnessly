@@ -34,6 +34,9 @@ type Org struct {
 	AppsConsent string
 	// Links are the organization's integrations for the chat's links; empty names nothing.
 	Links hubproto.LinkSettings
+	// NoMemberMachines is the admin's «участники не подключают свои машины»: by default a member connects a
+	// machine of their own, and it waits for trust.
+	NoMemberMachines bool
 }
 
 // The organization's rules for apps: what the machines of the organization do with the rights an app asks for.
@@ -42,16 +45,17 @@ const (
 	AppsConsentAuto = "auto"
 )
 
-const orgCols = `id, slug, name, timezone, currency, created_by, created_at, apps_consent, links`
+const orgCols = `id, slug, name, timezone, currency, created_by, created_at, apps_consent, links, member_machines`
 
 func scanOrg(row interface{ Scan(...any) error }) (Org, error) {
 	var o Org
-	var by, consent, links sql.NullString
+	var by, consent, links, memberMachines sql.NullString
 	var created int64
-	if err := row.Scan(&o.ID, &o.Slug, &o.Name, &o.Timezone, &o.Currency, &by, &created, &consent, &links); err != nil {
+	if err := row.Scan(&o.ID, &o.Slug, &o.Name, &o.Timezone, &o.Currency, &by, &created, &consent, &links, &memberMachines); err != nil {
 		return Org{}, err
 	}
 	o.CreatedBy, o.CreatedAt = by.String, fromMs(created)
+	o.NoMemberMachines = memberMachines.String == "off"
 	o.AppsConsent = AppsConsentAsk
 	if consent.String == AppsConsentAuto {
 		o.AppsConsent = AppsConsentAuto
@@ -61,6 +65,14 @@ func scanOrg(row interface{ Scan(...any) error }) (Org, error) {
 		_ = json.Unmarshal([]byte(links.String), &o.Links)
 	}
 	return o, nil
+}
+
+// memberMachinesCol is the column's value: NULL for the default, 'off' when members do not connect machines.
+func memberMachinesCol(o Org) any {
+	if o.NoMemberMachines {
+		return "off"
+	}
+	return nil
 }
 
 // linksJSON is the column's value: NULL when nothing is named.
@@ -89,8 +101,8 @@ func (s Store) CreateOrg(ctx context.Context, o *Org) error {
 	if o.AppsConsent != AppsConsentAuto {
 		o.AppsConsent = AppsConsentAsk
 	}
-	_, err := s.q.Exec(ctx, `INSERT INTO orgs (`+orgCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		o.ID, o.Slug, o.Name, o.Timezone, o.Currency, nullStr(o.CreatedBy), Ms(o.CreatedAt), o.AppsConsent, linksJSON(o.Links))
+	_, err := s.q.Exec(ctx, `INSERT INTO orgs (`+orgCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		o.ID, o.Slug, o.Name, o.Timezone, o.Currency, nullStr(o.CreatedBy), Ms(o.CreatedAt), o.AppsConsent, linksJSON(o.Links), memberMachinesCol(*o))
 	return err
 }
 
@@ -107,7 +119,7 @@ func (s Store) UpdateOrg(ctx context.Context, o Org) error {
 	if o.AppsConsent == AppsConsentAuto {
 		consent = AppsConsentAuto
 	}
-	_, err := s.q.Exec(ctx, `UPDATE orgs SET name = ?, timezone = ?, currency = ?, apps_consent = ?, links = ? WHERE id = ?`, o.Name, o.Timezone, o.Currency, consent, linksJSON(o.Links), o.ID)
+	_, err := s.q.Exec(ctx, `UPDATE orgs SET name = ?, timezone = ?, currency = ?, apps_consent = ?, links = ?, member_machines = ? WHERE id = ?`, o.Name, o.Timezone, o.Currency, consent, linksJSON(o.Links), memberMachinesCol(o), o.ID)
 	return err
 }
 

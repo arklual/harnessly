@@ -28,6 +28,8 @@ const (
 	CodeTTL = 30 * time.Minute
 	// maxActiveCodes bounds the unused codes of a space.
 	maxActiveCodes = 20
+	// maxMemberCodes is how many codes a member who does not manage the space may ask for within CodeTTL.
+	maxMemberCodes = 3
 	// registrationsPerHour is the limit on registration attempts per address.
 	registrationsPerHour = 30
 	// localRenewBelow is when the local code is replaced by a fresher one.
@@ -64,6 +66,21 @@ func (s *Service) createCode(w http.ResponseWriter, r *http.Request, t *tenant.C
 	if err := s.CheckProfile(req.Profile, req.ConfirmFull); err != nil {
 		return err
 	}
+	// A member connects a machine of their own: it is theirs (CreatedBy), it waits for trust like any machine an
+	// administrator did not connect (auth.RequireTrustedOnHub), and they hold a few codes at a time, so the space's
+	// limit stays for its owners.
+	if t.Role != store.RoleOwner {
+		if err := s.spaces.Owner(ctx, p.User.ID, spaceID); err != nil {
+			if off, ferr := s.memberMachinesOff(ctx, spaceID); ferr != nil {
+				return ferr
+			} else if off {
+				return err
+			}
+			if ok, retry := s.lim.Allow("code-member:"+spaceID+":"+p.User.ID, maxMemberCodes, CodeTTL); !ok {
+				return httpx.RateLimited(ratelimit.RetrySeconds(retry))
+			}
+		}
+	}
 	rc, code, err := s.IssueCode(ctx, spaceID, p.User.ID, req.Profile)
 	if err != nil {
 		return err
@@ -73,6 +90,20 @@ func (s *Service) createCode(w http.ResponseWriter, r *http.Request, t *tenant.C
 		"code": code, "expiresAt": httpx.Time(rc.ExpiresAt), "profile": req.Profile, "command": s.InstallCommand(code, req.Profile),
 	})
 	return nil
+}
+
+// memberMachinesOff is the organization's «участники не подключают свои машины» for the space.
+func (s *Service) memberMachinesOff(ctx context.Context, spaceID string) (bool, error) {
+	st := s.db.S()
+	sp, err := st.SpaceByID(ctx, spaceID)
+	if err != nil || sp.OrgID == "" {
+		return false, err
+	}
+	o, err := st.OrgByID(ctx, sp.OrgID)
+	if errors.Is(err, store.ErrNotFound) {
+		return false, nil
+	}
+	return o.NoMemberMachines, err
 }
 
 // IssueCode makes a registration code for a space, under the limits on codes per person and per space. The caller has

@@ -181,9 +181,10 @@ describe('a send leaves an empty field', () => {
           types: ['Files'],
         },
       });
+      // The file's content key is a crypto.subtle digest: it ends on its own clock, past the fake timers.
+      await vi.waitFor(() => expect(uploads).toHaveLength(1));
       await settle();
     });
-    expect(uploads).toHaveLength(1);
     fireEvent.keyDown(field(), { key: 'Enter' });
     await settle();
     expect(sent()).toHaveLength(0);

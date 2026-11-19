@@ -108,21 +108,56 @@ func TestCreateCodeProfiles(t *testing.T) {
 	}
 }
 
-func TestCreateCodeIsForOwners(t *testing.T) {
+func TestMembersConnectTheirOwnMachines(t *testing.T) {
 	f := setup(t)
 	member := f.s.SignIn("member@example.com")
 	f.owner.Join(f.spaceID, member)
 	stranger := f.s.SignIn("stranger@example.com")
 	path := "/api/spaces/" + f.spaceID + "/machines/codes"
 	body := map[string]any{"profile": "dir"}
-	if r := member.Do("POST", path, body); r.Code != 403 {
-		t.Errorf("member: %s", r)
-	}
 	if r := stranger.Do("POST", path, body); r.Code != 403 {
 		t.Errorf("stranger: %s", r)
 	}
 	if r := f.s.Browser().Do("POST", path, body); r.Code != 401 {
 		t.Errorf("anonymous: %s", r)
+	}
+
+	// A member's code makes a machine of their own, which they may name and which waits for trust.
+	var issued struct{ Code string }
+	if r := member.Do("POST", path, body); r.Code != 201 {
+		t.Fatalf("member: %s", r)
+	} else {
+		r.JSON(&issued)
+	}
+	a := f.s.NewAgent(nil)
+	r := a.Register(issued.Code, hubproto.ProfileDir, hubproto.ViaCommand)
+	if r.Code != http.StatusCreated {
+		t.Fatal(r)
+	}
+	var res hubproto.RegisterResponse
+	r.JSON(&res)
+	m := f.view(t, res.MachineID)
+	if m["ownerId"] != member.ID {
+		t.Errorf("ownerId = %v, want the member", m["ownerId"])
+	}
+	if r := member.Do("PATCH", "/api/machines/"+res.MachineID, map[string]any{"name": "Мой ноутбук"}); r.Code != 200 {
+		t.Errorf("the member names their machine: %s", r)
+	}
+	if r := member.Do("GET", "/api/machines/"+res.MachineID+"/open", nil); r.Code != http.StatusForbidden || r.Err() != "machine_untrusted" {
+		t.Errorf("the member's machine opens before it is trusted: %s", r)
+	}
+
+	// A member holds a few codes at a time; the owner's are not taken by them.
+	for i := 1; i < 3; i++ {
+		if r := member.Do("POST", path, body); r.Code != 201 {
+			t.Fatalf("member code %d: %s", i+1, r)
+		}
+	}
+	if r := member.Do("POST", path, body); r.Code != http.StatusTooManyRequests {
+		t.Errorf("a fourth member code: %s", r)
+	}
+	if r := f.codes(body); r.Code != 201 {
+		t.Errorf("owner after the member: %s", r)
 	}
 }
 
@@ -1182,5 +1217,42 @@ func TestRegisteringAgainWithoutTheMachinesKeyMakesANewMachine(t *testing.T) {
 	r, res = f.again(t, f.owner, f.spaceID, back, a.MachineID, a.Priv)
 	if r.Code != http.StatusCreated || res.MachineID == a.MachineID {
 		t.Fatalf("a removed machine's claim: %s %+v", r, res)
+	}
+}
+
+func TestOrganizationTurnsOffMembersMachines(t *testing.T) {
+	f := setup(t, hubtest.Env("HUB_ORGS", "on"))
+	member := f.s.SignIn("member@example.com")
+	f.owner.Join(f.spaceID, member)
+	var org struct {
+		Org struct {
+			ID             string
+			MemberMachines bool
+		}
+	}
+	if r := f.owner.Do("POST", "/api/orgs", map[string]any{"name": "Acme", "spaceIds": []string{f.spaceID}}); r.Code != 201 {
+		t.Fatalf("org: %s", r)
+	} else {
+		r.JSON(&org)
+	}
+	if !org.Org.MemberMachines {
+		t.Error("a new organization lets members connect their machines")
+	}
+	path := "/api/spaces/" + f.spaceID + "/machines/codes"
+	body := map[string]any{"profile": "dir"}
+	if r := member.Do("POST", path, body); r.Code != 201 {
+		t.Fatalf("member, by default: %s", r)
+	}
+	if r := member.Do("PATCH", "/api/orgs/"+org.Org.ID, map[string]any{"memberMachines": false}); r.Code != 403 {
+		t.Errorf("a member changes the rule: %s", r)
+	}
+	if r := f.owner.Do("PATCH", "/api/orgs/"+org.Org.ID, map[string]any{"memberMachines": false}); r.Code != 200 || !strings.Contains(string(r.Body), `"memberMachines":false`) {
+		t.Fatalf("turning it off: %s", r)
+	}
+	if r := member.Do("POST", path, body); r.Code != 403 {
+		t.Errorf("member, turned off: %s", r)
+	}
+	if r := f.codes(body); r.Code != 201 {
+		t.Errorf("owner, turned off: %s", r)
 	}
 }

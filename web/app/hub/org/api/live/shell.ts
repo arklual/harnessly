@@ -79,7 +79,12 @@ export const liveShell = (remember: (view: OrgView, scope: ApiScope) => void): S
     };
     return {
       viewer,
-      org: { id: view.org.id, slug: view.org.slug, name: view.org.name },
+      org: {
+        id: view.org.id,
+        slug: view.org.slug,
+        name: view.org.name,
+        memberMachines: view.org.memberMachines ?? true,
+      },
       tenants: view.tenants.map((t) => ({ id: t.id, slug: t.slug, name: t.name })),
       teams,
       orgs: list.orgs.map((o) => ({ slug: o.slug, name: o.name, roleLabel: ROLE_WORD[o.role] })),
@@ -93,6 +98,10 @@ export const liveShell = (remember: (view: OrgView, scope: ApiScope) => void): S
   setAppsConsent: async (org, value: AppsConsent) => {
     const out = await http.patch<{ org: Org }>(orgPath(org), { appsConsent: value });
     return out.org.appsConsent ?? 'ask';
+  },
+  setMemberMachines: async (org, on) => {
+    const out = await http.patch<{ org: Org }>(orgPath(org), { memberMachines: on });
+    return out.org.memberMachines ?? true;
   },
   links: async (org) => {
     const view = await http.get<OrgView>(orgPath(org));

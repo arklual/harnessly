@@ -5,6 +5,7 @@ import { orgErrorText } from '../../../org/api/errors';
 import type { MyChat, MyLimit, MyOverview } from '../../../org/api/member';
 import type { OverviewPeriod } from '../../../org/api/overview';
 import { navigate } from '../../../lib/router';
+import { useOrg } from '../../../org/context';
 import { useAction } from '../../../org/hooks';
 import { monthWord } from '../../../org/dates';
 import { resetText } from '../../../org/format/overview';
@@ -35,6 +36,7 @@ const Tiles = ({ data, period, base }: { data: MyOverview; period: OverviewPerio
   const { limit, tiles } = data;
   const when = forPeriod(period);
   const m = tiles.machine;
+  const canAdd = useOrg().shell.org.memberMachines !== false;
   return (
     <div className="sx-wrap">
       <div className="sx-grid">
@@ -86,11 +88,19 @@ const Tiles = ({ data, period, base }: { data: MyOverview; period: OverviewPerio
           label="Моя машина"
           value={m ? machineLine(m) : 'пока нет'}
           chart={<Bars values={m?.bars ?? []} />}
-          hint="Машина, на которой шёл ваш последний чат. Нажмите, чтобы открыть её в разделе «Машины»."
-          onClick={
+          hint={
             m
-              ? () => navigate(m.id ? `${base}/machines?m=${encodeURIComponent(m.id)}` : `${base}/machines`)
-              : undefined
+              ? 'Машина, на которой шёл ваш последний чат. Нажмите, чтобы открыть её в разделе «Машины».'
+              : canAdd
+                ? 'Машины пока нет. Нажмите, чтобы подключить свою: одна команда, дальше хаб доводит её сам.'
+                : 'Машины пока нет. В организации их подключает администратор.'
+          }
+          onClick={() =>
+            navigate(
+              m?.id
+                ? `${base}/machines?m=${encodeURIComponent(m.id)}`
+                : `${base}/machines${canAdd ? '?add=machine' : ''}`,
+            )
           }
         />
       </div>

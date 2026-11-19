@@ -32,7 +32,7 @@ func TestSpaceRoutesRefuseOtherSpaces(t *testing.T) {
 	}
 	routes := []route{
 		{"GET", base, nil, false},
-		{"POST", base + "/codes", map[string]any{"profile": "container"}, true},
+		{"POST", base + "/codes", map[string]any{"profile": "dir"}, false},
 		{"POST", base + "/local", map[string]any{}, true},
 		{"POST", base + "/provision", map[string]any{"name": "box"}, true},
 		{"GET", base + "/provision/" + made.Op, nil, true},
@@ -42,7 +42,7 @@ func TestSpaceRoutesRefuseOtherSpaces(t *testing.T) {
 			t.Errorf("another space %s %s: %s", rt.method, rt.path, r)
 		}
 		if !rt.ownersOnly {
-			if r := mate.Do(rt.method, rt.path, rt.body); r.Code != 200 {
+			if r := mate.Do(rt.method, rt.path, rt.body); r.Code/100 != 2 {
 				t.Errorf("member %s %s: %s", rt.method, rt.path, r)
 			}
 			continue

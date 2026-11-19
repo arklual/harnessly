@@ -44,6 +44,7 @@ export const MOCK_FEATURES = [
 
 let mockAppsConsent: AppsConsent = 'ask';
 let mockLinks: OrgLinks = {};
+let mockMemberMachines = true;
 
 export const shellMock = (ctx: MockCtx): ShellApi => ({
   appsConsent: async () => later(mockAppsConsent),
@@ -51,6 +52,11 @@ export const shellMock = (ctx: MockCtx): ShellApi => ({
     if (ctx.role !== 'admin') throw new OrgApiError('forbidden', '');
     mockAppsConsent = value;
     return later(mockAppsConsent);
+  },
+  setMemberMachines: async (_org, on) => {
+    if (ctx.role !== 'admin') throw new OrgApiError('forbidden', '');
+    mockMemberMachines = on;
+    return later(mockMemberMachines);
   },
   links: async () => later(mockLinks),
   setLinks: async (_org, value) => {
@@ -68,7 +74,12 @@ export const shellMock = (ctx: MockCtx): ShellApi => ({
     const viewer = VIEWERS[ctx.role];
     return later({
       viewer,
-      org: { id: `org-${known.slug}`, slug: known.slug, name: known.name },
+      org: {
+        id: `org-${known.slug}`,
+        slug: known.slug,
+        name: known.name,
+        memberMachines: mockMemberMachines,
+      },
       tenants: (ctx.role === 'admin' ? TENANTS : TENANTS.slice(0, 1)).map((t) => ({
         ...t,
         name: renamedTenants.get(t.id) ?? t.name,

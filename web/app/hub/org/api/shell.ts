@@ -8,6 +8,8 @@ export interface ShellApi {
   appsConsent(org: string): Promise<AppsConsent>;
   /** Sets the rule; only the organization's admin may. Resolves with the rule the hub kept. */
   setAppsConsent(org: string, value: AppsConsent): Promise<AppsConsent>;
+  /** Turns members' own machines on or off; only the organization's admin may. Resolves with what the hub kept. */
+  setMemberMachines(org: string, on: boolean): Promise<boolean>;
   /** The organization's integrations for the chat's links. */
   links(org: string): Promise<OrgLinks>;
   /** Replaces them (an empty object clears); only the organization's admin may. Resolves with what the hub kept. */

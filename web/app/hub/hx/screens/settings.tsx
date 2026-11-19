@@ -1,5 +1,5 @@
 // The «Настройки организации» screen of the new hub (admin): the organization's own settings. The rule for apps on
-// its machines and the links for the chat. The switch changes after the hub answered, and the machines get the rule with their list.
+// its machines, members' own machines and the links for the chat. The switch changes after the hub answered, and the machines get the rule with their list.
 // Its own chunk: it loads when the person opens the section.
 import { useEffect, useState } from 'react';
 
@@ -10,6 +10,60 @@ import { Titles } from '../shell';
 import { LinksSection } from './links-section';
 
 type Loaded = { value: AppsConsent } | { error: string };
+
+// MemberMachines is «Участники подключают свои машины»: on, a member connects a machine of their own and it waits for
+// an administrator's trust; off, only those who manage a tenant connect machines.
+const MemberMachines = () => {
+  const { api, shell, refreshShell } = useOrg();
+  const [on, setOn] = useState(shell.org.memberMachines !== false);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  const toggle = () => {
+    if (busy) return;
+    setBusy(true);
+    setFailed(null);
+    api.setMemberMachines(shell.org.slug, !on).then(
+      (next) => {
+        setOn(next);
+        setBusy(false);
+        refreshShell();
+      },
+      (e: unknown) => {
+        setFailed(orgErrorText(e));
+        setBusy(false);
+      },
+    );
+  };
+  return (
+    <>
+      <div className="set" data-busy={busy ? 'true' : undefined}>
+        <div>
+          <div className="hd-t" id="member-machines-label">
+            Участники подключают свои машины
+          </div>
+          <div className="hd-d">
+            Участник сам подключает свою машину, а работать на ней можно после подтверждения администратора.
+            Выключите, чтобы машины подключали только администраторы. Уже подключённые машины остаются.
+          </div>
+        </div>
+        <div>
+          <button
+            type="button"
+            className="hx-switch"
+            role="switch"
+            aria-checked={on ? 'true' : 'false'}
+            aria-labelledby="member-machines-label"
+            disabled={busy}
+            onClick={toggle}
+          >
+            <i />
+          </button>
+        </div>
+      </div>
+      {failed && <p className="mut sm">{failed}</p>}
+    </>
+  );
+};
 
 const Screen = () => {
   const { api, shell } = useOrg();
@@ -59,7 +113,7 @@ const Screen = () => {
       <div style={{ maxWidth: 1100 }}>
         <h2 className="hd-sech is-first" data-sec="chats">
           Машины и чаты
-          <span className="mut2 sm">Что можно приложениям на машинах организации.</span>
+          <span className="mut2 sm">Кто подключает машины и что можно приложениям на них.</span>
         </h2>
         <div className="t-card viz-card dash-tile hd-card flat">
           <div className="set" data-busy={busy ? 'true' : undefined}>
@@ -90,6 +144,7 @@ const Screen = () => {
               )}
             </div>
           </div>
+          <MemberMachines />
         </div>
         {loaded && 'error' in loaded && (
           <p className="mut sm" style={{ marginTop: 8 }}>

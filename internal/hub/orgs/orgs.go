@@ -391,6 +391,8 @@ func (s *Service) patch(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) 
 		// Links are the integrations for the chat's links: the whole object replaces the held one, an empty
 		// one clears it.
 		Links *hubproto.LinkSettings
+		// MemberMachines: may a member connect a machine of their own; on by default.
+		MemberMachines *bool
 	}
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
@@ -429,6 +431,9 @@ func (s *Service) patch(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) 
 		}
 		next.AppsConsent = *req.AppsConsent
 	}
+	if req.MemberMachines != nil {
+		next.NoMemberMachines = !*req.MemberMachines
+	}
 	if req.Links != nil {
 		links, err := cleanLinks(*req.Links)
 		if err != nil {
@@ -443,6 +448,9 @@ func (s *Service) patch(w http.ResponseWriter, r *http.Request, tc *tenant.Ctx) 
 		if f.was != f.now {
 			before[f.key], after[f.key] = f.was, f.now
 		}
+	}
+	if o.NoMemberMachines != next.NoMemberMachines {
+		before["memberMachines"], after["memberMachines"] = !o.NoMemberMachines, !next.NoMemberMachines
 	}
 	linksChanged := !sameLinks(o.Links, next.Links)
 	if linksChanged {
