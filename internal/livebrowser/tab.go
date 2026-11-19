@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"strings"
 	"sync"
 	"time"
 )
@@ -29,6 +30,10 @@ type Frame struct {
 
 // Tab is one page of the browser, shown in one browser tab of the pane.
 type Tab struct {
+	// castMu keeps one screencast start or stop on the wire at a time: a restart is a stop and a start, and two of them
+	// at once (a navigation to another process and a resize) interleave into "Screencast is already active".
+	castMu sync.Mutex
+
 	ID        string
 	conn      *conn
 	targetID  string
@@ -669,6 +674,8 @@ func (t *Tab) Resize(width, height int, scale float64) error {
 
 // StartScreencast asks for the page's pictures as they change; one that runs is started over (a new size).
 func (t *Tab) StartScreencast() error {
+	t.castMu.Lock()
+	defer t.castMu.Unlock()
 	t.mu.Lock()
 	was := t.casting
 	t.casting = true
@@ -678,14 +685,25 @@ func (t *Tab) StartScreencast() error {
 		_ = t.call("Page.stopScreencast", nil, nil)
 	}
 	t.Touched()
-	return t.call("Page.startScreencast", map[string]any{
+	params := map[string]any{
 		"format": "jpeg", "quality": jpegQuality,
 		"maxWidth": int(float64(w) * s), "maxHeight": int(float64(h) * s), "everyNthFrame": 1,
-	}, nil)
+	}
+	err := t.call("Page.startScreencast", params, nil)
+	var ce *cdpError
+	if errors.As(err, &ce) && strings.Contains(ce.Message, "already active") {
+		// Right after a navigation the browser may still hold the old cast that the stop above did not reach: stop it
+		// and start once more.
+		_ = t.call("Page.stopScreencast", nil, nil)
+		err = t.call("Page.startScreencast", params, nil)
+	}
+	return err
 }
 
 // StopScreencast ends the pictures while nobody looks.
 func (t *Tab) StopScreencast() error {
+	t.castMu.Lock()
+	defer t.castMu.Unlock()
 	t.mu.Lock()
 	t.casting = false
 	if t.still != nil {
