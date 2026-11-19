@@ -26,6 +26,7 @@ export const PROVIDER_LABELS: Record<string, string> = {
   chat: t('agents.providerIcon.chat'),
   claude: 'Claude',
   codex: 'Codex',
+  antigravity: 'Antigravity',
   grok: 'Grok',
   terminal: t('agents.providerIcon.terminal'),
 };

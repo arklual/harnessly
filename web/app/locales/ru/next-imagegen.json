@@ -1,4 +1,9 @@
 {
+  "next.agents.noSteering": "Antigravity не поддерживает сообщения внутри текущего ответа. Отправьте сообщение в очередь.",
+  "next.agents.experimental": "экспериментально",
+  "next.agents.noNativeAttachments": "Antigravity пока не поддерживает вложения файлов. Отправьте текст.",
+  "next.imagegen.provider": "Генератор изображений",
+  "next.imageEdit.noTransparency": "Antigravity не поддерживает прозрачный фон и удаление фона. Для этих функций выберите Codex.",
   "next.imageEdit.brush.medium": "Средняя",
   "next.imageEdit.brush.thin": "Тонкая",
   "next.imageEdit.brush.wide": "Широкая",

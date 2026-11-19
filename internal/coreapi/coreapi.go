@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents/antigravity"
 	"github.com/ly-solutions/harnessly/internal/agents/claude"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/gate"
@@ -108,7 +109,13 @@ func (t Timings) withDefaults() Timings {
 
 // Config is what the routes use.
 type Config struct {
-	Keeper Keeper
+	Keeper          Keeper
+	AntigravityHome string
+	// AntigravityAuthorize MUST atomically verify the tab is antigravity-cli, its
+	// provider and conversation marker, the active launch generation, and any
+	// previously bound native UUID. Never authorize a different UUID to rebind it.
+	// Nil fails closed, even for an otherwise authenticated CLI request.
+	AntigravityAuthorize func(session, conversation, generation string, payload antigravity.HookPayload) bool
 	// PermissionRequest holds Claude's PermissionRequest hook for the conversation of a tmux session until the person
 	// decided, and answers with what the hook prints; false, or nil, leaves it to Claude's own dialog.
 	PermissionRequest func(ctx context.Context, session string, request map[string]any) (any, bool)
@@ -231,10 +238,72 @@ func (c *Config) hook(r *http.Request, body any) (int, any, http.Header) {
 	}
 	if p, ok := queryString(r, "provider"); ok && p == "codex" {
 		return c.codexHook(r, body)
+	} else if ok && p == antigravity.ProviderID {
+		return c.antigravityHook(r, body)
 	} else if ok && p == "claude-permission" {
 		return c.permissionHook(r, body)
 	}
 	return c.claudeHook(r, body)
+}
+
+// antigravityHook accepts only an authenticated, explicitly authorized launch.
+func (c *Config) antigravityHook(r *http.Request, body any) (int, any, http.Header) {
+	session, _ := queryString(r, "tmuxSession")
+	if c.AntigravityAuthorize == nil || c.AntigravityHome == "" || session == "" {
+		return http.StatusNoContent, nil, nil
+	}
+	raw, err := json.Marshal(body)
+	if err != nil || len(raw) > 70<<10 {
+		return http.StatusNoContent, nil, nil
+	}
+	var report struct {
+		Event        string          `json:"event"`
+		Conversation string          `json:"conversation"`
+		Generation   string          `json:"generation"`
+		ExpectedUUID string          `json:"expectedUUID"`
+		Payload      json.RawMessage `json:"payload"`
+	}
+	if json.Unmarshal(raw, &report) != nil || report.Conversation == "" || report.Generation == "" || len(report.Conversation) > 128 || len(report.Generation) > 128 {
+		return http.StatusNoContent, nil, nil
+	}
+	switch report.Event {
+	case "SessionStart", "PreInvocation", "PostInvocation", "Stop":
+	default:
+		return http.StatusNoContent, nil, nil
+	}
+	payload, err := antigravity.ParseHookPayload(c.AntigravityHome, report.Payload)
+	if err != nil || payload.TranscriptPath == "" || report.ExpectedUUID != "" && (!agents.IsUUID(report.ExpectedUUID) || report.ExpectedUUID != payload.SessionID) {
+		return http.StatusNoContent, nil, nil
+	}
+	if !c.AntigravityAuthorize(session, report.Conversation, report.Generation, payload) {
+		return http.StatusNoContent, nil, nil
+	}
+	meta := status.HookMeta{SessionID: optPtr(&payload.SessionID), JSONLPath: optPtr(&payload.TranscriptPath)}
+	if report.Event == "PreInvocation" && payload.LastUserInput != "" {
+		meta.LastUserMessage = optPtr(&payload.LastUserInput)
+	}
+	if _, _, ok := c.Keeper.ApplyHookMeta(antigravity.ProviderID, session, meta); !ok {
+		return http.StatusNoContent, nil, nil
+	}
+	ev := agents.Event{AgentSession: payload.SessionID}
+	switch report.Event {
+	case "SessionStart":
+		ev.Kind = agents.SessionStart
+	case "PreInvocation":
+		// A native invocation is one model step, not necessarily a new user prompt.
+		// Binding/preview metadata above is useful; USER_INPUT in the transcript is
+		// the authoritative submission acknowledgement.
+		return http.StatusNoContent, nil, nil
+	case "Stop":
+		if !payload.FullyIdle {
+			return http.StatusNoContent, nil, nil
+		}
+		ev.Kind = agents.Stop
+	default:
+		return http.StatusNoContent, nil, nil
+	}
+	c.Keeper.HandleProviderEvent(antigravity.ProviderID, session, ev, nil)
+	return http.StatusNoContent, nil, nil
 }
 
 // permissionHook holds Claude's PermissionRequest until the person decided; no content leaves it to Claude's dialog.

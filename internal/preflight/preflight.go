@@ -71,10 +71,11 @@ type Codex struct {
 
 // Result is the runtime's preflight answer.
 type Result struct {
-	Tmux   Tmux   `json:"tmux"`
-	Git    Tool   `json:"git"`
-	Claude Claude `json:"claude"`
-	Codex  Codex  `json:"codex"`
+	Tmux        Tmux        `json:"tmux"`
+	Git         Tool        `json:"git"`
+	Claude      Claude      `json:"claude"`
+	Codex       Codex       `json:"codex"`
+	Antigravity Antigravity `json:"antigravity"`
 }
 
 // Checker runs the checks and keeps the answer for half a minute.
@@ -97,6 +98,10 @@ type Checker struct {
 	codex      *Codex
 	codexAt    time.Time
 	codexStamp string
+
+	antigravityMu sync.Mutex
+	antigravity   *Antigravity
+	antigravityAt time.Time
 
 	claudeMu    sync.Mutex
 	claude      *Claude
@@ -189,6 +194,9 @@ func (c *Checker) Invalidate() {
 	c.codexMu.Lock()
 	c.codex = nil
 	c.codexMu.Unlock()
+	c.antigravityMu.Lock()
+	c.antigravity = nil
+	c.antigravityMu.Unlock()
 	c.claudeMu.Lock()
 	c.claude = nil
 	c.claudeMu.Unlock()
@@ -198,7 +206,7 @@ func (c *Checker) check() Result {
 	path := c.shellPath()
 	var wg sync.WaitGroup
 	var r Result
-	wg.Add(4)
+	wg.Add(5)
 	go func() {
 		defer wg.Done()
 		t := c.tool(path, "tmux", "-V")
@@ -207,6 +215,7 @@ func (c *Checker) check() Result {
 	go func() { defer wg.Done(); r.Git = c.tool(path, "git", "--version") }()
 	go func() { defer wg.Done(); r.Claude = c.claudeStatus(path) }()
 	go func() { defer wg.Done(); r.Codex = c.codexStatus(path) }()
+	go func() { defer wg.Done(); r.Antigravity = c.antigravityStatus(path) }()
 	wg.Wait()
 	return r
 }

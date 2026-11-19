@@ -50,6 +50,11 @@ describe('chainVersions', () => {
     });
   });
 
+  it('keeps the reported image provider in the version chain', () => {
+    const jobs = [job({ startedAt: 1, source: '/a.png', paths: ['/b.png'], provider: 'antigravity' })];
+    expect(chainVersions(original, jobs, src)[1].provider).toBe('antigravity');
+  });
+
   it('a version already in the chain is not added twice', () => {
     const jobs = [job({ startedAt: 1, source: '/a.png', paths: ['/a.png'] })];
     expect(chainVersions(original, jobs, src)).toEqual([original]);

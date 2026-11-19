@@ -1754,6 +1754,11 @@ func (r *Runtime) worktree(cwd, name string) (string, error) {
 }
 
 func (r *Runtime) create(m wire.ConversationCreateCmd, person string) wire.CmdResult {
+	if m.Provider == wire.ProviderAntigravity {
+		if m.Profile != "" || (m.Model != nil && (m.Model.Profile != "" || m.Model.Fast || m.Model.Ultracode || (m.Model.Permission != "" && m.Model.Permission != wire.PermissionAsk && m.Model.Permission != wire.PermissionPlan))) || (m.First != nil && len(m.First.AttachmentIDs) > 0) {
+			return wire.Refused(wire.RefuseUnsupported)
+		}
+	}
 	cwd := m.Cwd
 	var projectID *string
 	if m.ProjectID != "" {
@@ -1817,7 +1822,7 @@ func (r *Runtime) create(m wire.ConversationCreateCmd, person string) wire.CmdRe
 		Provider: m.Provider, Model: m.Model, TitleSource: wire.TitleFromFirstMessage, CreatedAt: ms(now),
 		LastActivityAt: ms(now), LastPromptAt: ms(now), SeenAt: ms(now), State: wire.AgentState{K: wire.StateUnknown, Since: ms(now)},
 		ParentID: parentID, Test: m.Test, Rev: 1, Person: person}
-	if r.d.AlwaysApps != nil {
+	if r.d.AlwaysApps != nil && m.Provider != wire.ProviderAntigravity {
 		if ids := r.d.AlwaysApps(); len(ids) > 0 && (r.d.AppsOK == nil || r.d.AppsOK(ids) == "") {
 			rec.Apps = append([]string(nil), ids...)
 		}

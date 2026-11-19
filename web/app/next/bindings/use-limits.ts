@@ -90,7 +90,7 @@ export const useAgentLimits = (machine: MachineId | null, owner: LimitsOwner | n
   const dayStartHour = useDayStartHour();
   useLimitsAsked(machine);
 
-  if (!entry || !owner || !machine) return null;
+  if (!entry || !owner || !machine || owner.provider === 'antigravity') return null;
   const { provider } = owner;
   if (owner.profile !== null) {
     // A vendor's profile has a chip only once the machine has its limits: one it cannot ask says nothing, not zero.

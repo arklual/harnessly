@@ -12,6 +12,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents/antigravity"
 	"github.com/ly-solutions/harnessly/internal/agents/claude"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/coreapi"
@@ -190,6 +191,11 @@ func (c *core) resumeAgents() map[string]coreapi.Agent {
 		Running: func(pid int) bool { return c.claude.IsRunning(proc.ChildPIDs(pid)) }}
 	out[agents.Codex] = coreapi.Agent{ReadSessionID: codex.Tabs{}.ReadSessionID, ResumeCommand: line(agents.Codex),
 		Running: func(pid int) bool { return codexDet.IsRunning(proc.ChildPIDs(pid)) }}
+	if nativeAntigravityEnabled() {
+		det := antigravity.NewDetector(c.cfg.Home)
+		det.Binary = nativeAntigravityBinary(c.cfg.Home)
+		out[agents.Antigravity] = coreapi.Agent{ReadSessionID: antigravityProvider{}.ReadSessionID, ResumeCommand: line(agents.Antigravity), Running: func(pid int) bool { return det.IsRunning(proc.ChildPIDs(pid)) }}
+	}
 	return out
 }
 
@@ -239,8 +245,10 @@ func (c *core) runHookSpool(ctx context.Context) {
 
 func (c *core) hookAPI() *coreapi.Config {
 	return &coreapi.Config{
-		Keeper: keeperRef{c},
-		Access: c.access,
+		Keeper:               keeperRef{c},
+		Access:               c.access,
+		AntigravityHome:      c.cfg.Home,
+		AntigravityAuthorize: c.authorizeAntigravityHook,
 		PermissionRequest: func(ctx context.Context, session string, request map[string]any) (any, bool) {
 			v := c.v2.Load()
 			if v == nil {

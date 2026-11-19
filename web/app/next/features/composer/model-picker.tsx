@@ -524,7 +524,7 @@ const ModelPicker = ({
                       aria-checked={mode === permissionShown}
                       data-mode={mode}
                       title={t(`next.picker.permissionHint.${mode}`)}
-                      disabled={frozen}
+                      disabled={frozen || (value.provider === 'antigravity' && mode !== 'ask' && mode !== 'plan')}
                       onClick={() => {
                         if (mode !== permissionShown) onChange({ ...value, ...keep, permission: mode });
                       }}

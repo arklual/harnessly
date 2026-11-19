@@ -3,6 +3,7 @@
 // agent has returned, a two-line plain summary of what it said; a click opens the whole report by height.
 import { memo, useState } from 'react';
 import Md from '@/next/features/chat/md';
+import type { Provider } from '@/next/protocol/v2';
 import type { SubagentEntry } from '@/next/features/chat/types';
 import { summaryOf } from '@/next/features/subagents/excerpt';
 import { openSubagent } from '@/next/features/subagents/open';
@@ -38,11 +39,13 @@ export const subagentTitle = (entry: SubagentEntry): string =>
 export const subagentMeta = (entry: SubagentEntry): string =>
   [entry.model, entry.durationMs === null ? '' : duration(entry.durationMs)].filter(Boolean).join(' · ');
 
-/** The glyph of the provider the agent runs on: Codex's models are the only others the feed knows. */
-export const providerOf = (...hints: (string | null)[]): 'claude' | 'codex' =>
-  /codex|gpt/i.test(hints.join(' ')) ? 'codex' : 'claude';
+/** Explicit native agent names take precedence over a model-family hint. */
+export const providerOf = (...hints: (string | null)[]): Provider =>
+  /antigravity|\bagy\b/i.test(hints.join(' '))
+    ? 'antigravity'
+    : /codex|gpt/i.test(hints.join(' ')) ? 'codex' : 'claude';
 
-export const subagentProvider = (entry: SubagentEntry): 'claude' | 'codex' =>
+export const subagentProvider = (entry: SubagentEntry): Provider =>
   providerOf(entry.model, entry.agentType);
 
 const Report = ({ entry, open }: { entry: SubagentEntry; open: boolean }) => {

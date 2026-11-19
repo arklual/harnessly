@@ -48,7 +48,7 @@ export const useSlashSource = ({
 }: IOptions): ISlashSource | null => {
   const [woken, setWoken] = useState(false);
   const wake = useCallback(() => setWoken(true), []);
-  const on = woken && machine !== null && provider !== null;
+  const on = woken && machine !== null && provider !== null && provider !== 'antigravity';
   const catalog = useCatalog(machine ?? '', provider ?? 'claude', on, cwd);
   const settings = useAgentSettings(machine ?? '', provider ?? 'claude', on);
 
@@ -90,7 +90,7 @@ export const useSlashSource = ({
 
   return useMemo(
     () =>
-      machine !== null && provider !== null
+      machine !== null && provider !== null && provider !== 'antigravity'
         ? {
             provider,
             wake,

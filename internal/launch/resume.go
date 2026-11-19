@@ -2,11 +2,14 @@ package launch
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents/antigravity"
 	"github.com/ly-solutions/harnessly/internal/agents/claude"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
@@ -185,11 +188,19 @@ func tabLaunch(o *jsvalue.Object) *agents.Launch {
 
 // processProvider is the agent CLI a pane's foreground command is, "" for none.
 func processProvider(command string, args []string) string {
+	if binary := os.Getenv("RUNTIME_ANTIGRAVITY_BIN"); filepath.IsAbs(binary) {
+		name := filepath.Base(binary)
+		if command == binary || command == name || len(args) > 0 && args[0] == binary {
+			return agents.Antigravity
+		}
+	}
 	switch {
 	case claude.MatchesProcess(command, args):
 		return agents.Claude
 	case codex.MatchesProcess(command, args):
 		return agents.Codex
+	case antigravity.MatchesProcess(command, args):
+		return agents.Antigravity
 	}
 	return ""
 }

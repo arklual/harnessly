@@ -5,7 +5,14 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { CardReply } from '@/next/bindings/reply-field';
 import useKeyboardInset from '@/next/features/composer/use-keyboard-inset';
-import { EDIT_FORMATS, type IImageVersion, type TEditFormat } from '@/next/features/image-edit/host';
+import {
+  EDIT_FORMATS,
+  IMAGE_PROVIDERS,
+  imageProviderName,
+  type ImageProvider,
+  type IImageVersion,
+  type TEditFormat,
+} from '@/next/features/image-edit/host';
 import { BRUSH_IDS, MARK_COLORS, type TBrushId } from '@/next/features/image-edit/marks';
 import { TOOL, TOOLS, type TTool } from '@/next/features/image-edit/tool-rules';
 import { t } from '@/next/i18n';
@@ -20,6 +27,7 @@ export const hintKey = (tool: TTool | null, running: boolean): string => {
 };
 
 export interface IFailure {
+  provider?: ImageProvider;
   why: string | null;
   onRetry: () => void;
 }
@@ -27,6 +35,8 @@ export interface IFailure {
 interface IEditDockProps {
   /** Over the tools: the switch to the person's own marks, where the picture has them. */
   switcher?: ReactNode;
+  provider: ImageProvider;
+  onProvider: (provider: ImageProvider) => void;
   tool: TTool | null;
   onTool: (tool: TTool) => void;
   running: boolean;
@@ -62,6 +72,20 @@ export const EditDock = (props: IEditDockProps) => {
   return (
     <div ref={root} className="hx-ie">
       {props.switcher}
+      <label>
+        {t('next.imagegen.provider')}
+        <select
+          aria-label={t('next.imagegen.provider')}
+          value={props.provider}
+          disabled={running}
+          onChange={(event) => props.onProvider(event.target.value === 'antigravity' ? 'antigravity' : 'codex')}
+        >
+          {IMAGE_PROVIDERS.map((provider) => (
+            <option key={provider} value={provider}>{imageProviderName(provider)}</option>
+          ))}
+        </select>
+      </label>
+      {props.provider === 'antigravity' && <p role="note">{t('next.imageEdit.noTransparency')}</p>}
       {hasOptions && (
         <div className="hx-ie__opts" key={tool}>
           {tool === TOOL.mark &&
@@ -122,7 +146,8 @@ export const EditDock = (props: IEditDockProps) => {
             className="hx-ie__tool"
             aria-pressed={id === TOOL.cut ? undefined : tool === id}
             aria-label={t(`next.imageEdit.tool.${id}`)}
-            disabled={running}
+            disabled={running || (id === TOOL.cut && props.provider === 'antigravity')}
+            title={id === TOOL.cut && props.provider === 'antigravity' ? t('next.imageEdit.noTransparency') : undefined}
             onClick={() => props.onTool(id)}
           >
             <Icon name={icon} />
@@ -141,7 +166,7 @@ export const EditDock = (props: IEditDockProps) => {
               : t('next.imageEdit.failed', { why: props.failure.why })}
           </span>
           <button type="button" className="hx-ie__retry" onClick={props.failure.onRetry}>
-            {t('next.imageEdit.retry')}
+            {t('next.imageEdit.retry')}{props.failure.provider ? ` · ${imageProviderName(props.failure.provider)}` : ''}
           </button>
         </p>
       )}
@@ -180,6 +205,7 @@ export const VersionStrip = ({ versions, at, disabled, onPick }: IVersionsProps)
           className="hx-ie__thumb"
           data-clear={version.clear || undefined}
           aria-pressed={version.id === at}
+          title={version.provider ? imageProviderName(version.provider) : undefined}
           aria-label={i === 0 ? t('next.imageEdit.original') : t('next.imageEdit.version', { n: i + 1 })}
           disabled={disabled}
           onClick={() => onPick(version)}

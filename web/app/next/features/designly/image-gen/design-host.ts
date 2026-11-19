@@ -90,8 +90,11 @@ export const designImageHost = (p: IDesignPicture): IImageEditHost => {
 
   return {
     start: async (edit) => {
+      if (edit.provider === 'antigravity' && edit.mode === EDIT_MODE.cut)
+        throw new Error(t('next.imageEdit.noTransparency'));
       const started = await startDesignEdit(p.machine, {
         artifact: p.artifact,
+        provider: edit.provider ?? 'codex',
         source: edit.from.id,
         mode: edit.mode,
         prompt: edit.prompt,
@@ -116,7 +119,7 @@ export const designImageHost = (p: IDesignPicture): IImageEditHost => {
       if (pic === undefined) return { state: 'failed', versions: [], error: t('next.imageEdit.noPicture') };
       const known = runs.get(run);
       if (known) made.set(pic.src, known);
-      return { state: 'done', versions: [versionOf(p, pic.src)] };
+      return { state: 'done', versions: [{ ...versionOf(p, pic.src), provider: job.provider }] };
     },
 
     versions: async (original, signal) => {

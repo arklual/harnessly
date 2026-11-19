@@ -153,7 +153,7 @@ export const foldTasks = (entries: readonly ITimelineEntry[]): ITaskItem[] => {
 interface IUseTimelineOptions {
   sessionName: string;
   agentSessionId?: string | null;
-  panelType: 'claude-code' | 'codex-cli';
+  panelType: 'claude-code' | 'codex-cli' | 'antigravity-cli';
   machineId?: string | null;
   enabled?: boolean;
 }

@@ -6,7 +6,7 @@
 
 // ---- closed lists, in the schema's order
 
-export const PROVIDERS = ['claude', 'codex'] as const;
+export const PROVIDERS = ['claude', 'codex', 'antigravity'] as const;
 export type Provider = (typeof PROVIDERS)[number];
 export const FEATURES = [
   'queue',

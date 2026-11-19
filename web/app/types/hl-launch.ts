@@ -3,7 +3,7 @@
  * Isomorphic: imported by API routes, launch builders and the welcome composer.
  */
 
-export const AGENT_PROVIDERS = ['claude', 'codex'] as const;
+export const AGENT_PROVIDERS = ['claude', 'codex', 'antigravity'] as const;
 export type TAgentProvider = (typeof AGENT_PROVIDERS)[number];
 
 export const isAgentProvider = (value: unknown): value is TAgentProvider =>

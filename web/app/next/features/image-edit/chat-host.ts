@@ -4,11 +4,13 @@ import { useMemo } from 'react';
 import { platformPath, runtimePath } from '@/next/core/net/machine';
 import { listJobs } from '@/next/features/chat/image-jobs';
 import { chainVersions, CUT_MODE } from '@/next/features/image-edit/chain';
-import type {
-  IEditProgress,
-  IImageEdit,
-  IImageEditHost,
-  IImageVersion,
+import {
+  EDIT_MODE,
+  type ImageProvider,
+  type IEditProgress,
+  type IImageEdit,
+  type IImageEditHost,
+  type IImageVersion,
 } from '@/next/features/image-edit/host';
 import type { IImageEditing } from '@/next/features/image-edit/image-editor';
 import { previewUrl } from '@/next/features/pane/delivered';
@@ -45,7 +47,7 @@ const errorOf = async (res: Response): Promise<string> => {
 
 const decodeSnapshot = (
   doc: unknown,
-): { id: string; state: string; paths: string[]; mode: string; error: string } => {
+): { id: string; state: string; paths: string[]; mode: string; provider?: ImageProvider; error: string } => {
   if (!isRecord(doc) || typeof doc.id !== 'string' || typeof doc.state !== 'string')
     throw new Error('bad answer');
   const images = Array.isArray(doc.images) ? doc.images : [];
@@ -53,6 +55,7 @@ const decodeSnapshot = (
     .map((image) => (isRecord(image) && typeof image.path === 'string' ? image.path : ''))
     .filter((path) => path !== '');
   return {
+    provider: doc.provider === 'antigravity' || doc.provider === 'codex' ? doc.provider : undefined,
     id: doc.id,
     state: doc.state,
     paths,
@@ -65,7 +68,10 @@ export const chatImageHost = (chat: IChatImages): IImageEditHost => ({
   opensLatest: true,
 
   start: async (edit: IImageEdit) => {
+    if (edit.provider === 'antigravity' && edit.mode === EDIT_MODE.cut)
+      throw new Error(t('next.imageEdit.noTransparency'));
     const body = {
+      provider: edit.provider ?? 'codex',
       source: edit.from.id,
       mode: edit.mode,
       prompt: edit.prompt,
@@ -95,7 +101,7 @@ export const chatImageHost = (chat: IChatImages): IImageEditHost => ({
     if (job.state === 'done') {
       const path = job.paths[job.paths.length - 1];
       if (path === undefined) return { state: 'failed', versions: [], error: t('next.imageEdit.noPicture') };
-      const version = versionOfPath(chat, path);
+      const version = { ...versionOfPath(chat, path), provider: job.provider };
       return { state: 'done', versions: [job.mode === CUT_MODE ? { ...version, clear: true } : version] };
     }
     return { state: 'failed', versions: [], error: job.error === '' ? undefined : job.error };
@@ -126,8 +132,9 @@ export const useChatEditing = (
   }, [custom, machine, conv, srcOf]);
   const id = original?.id;
   const src = original?.src;
+  const provider = original?.provider;
   return useMemo(
-    () => (host && id !== undefined && src !== undefined ? { original: { id, src }, host } : null),
-    [host, id, src],
+    () => (host && id !== undefined && src !== undefined ? { original: { id, src, provider }, host } : null),
+    [host, id, src, provider],
   );
 };

@@ -16,7 +16,7 @@ export interface IContextBlock {
   /** The chat it came from (a handoff, a fork) or the fork that sends it (a result). */
   fromId: string;
   title: string;
-  agent: 'claude' | 'codex' | null;
+  agent: Provider | null;
   model: string | null;
   /** How a handoff carries the context; null for a result. */
   mode: TBlockMode | null;
@@ -37,7 +37,7 @@ const attrs = (raw: string): Record<string, string> => {
 };
 
 const agentOf = (value: string | undefined): IContextBlock['agent'] =>
-  value === 'claude' || value === 'codex' ? value : null;
+  value === 'claude' || value === 'codex' || value === 'antigravity' ? value : null;
 
 const modeOf = (value: string | undefined): TBlockMode | null =>
   value === BLOCK_MODE.excerpt || value === BLOCK_MODE.note || value === BLOCK_MODE.history ? value : null;

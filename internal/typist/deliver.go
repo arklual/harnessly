@@ -134,6 +134,9 @@ func (p Plan) Own() bool { return p.Landed > 0 || p.OwnText }
 // Decide reads a look for a message, as Type does before any key: the outbox asks it first so a try the screen would
 // refuse is not started at all.
 func Decide(m Message, s Screen, provider wire.Provider) Plan {
+	if provider == wire.ProviderAntigravity {
+		return nativePlan(m, s)
+	}
 	// Claude still reads a paste of pictures: the box is not final, its references land later — nothing goes in now.
 	if provider != wire.ProviderCodex && s.Readable && Pasting(s.Plain) {
 		return Plan{Decision: DecideWait}
@@ -195,6 +198,9 @@ func Decide(m Message, s Screen, provider wire.Provider) Plan {
 // the person's answer in words, decides whether it may type now, and types what the box does not hold yet. The caller
 // holds the pane's lock.
 func Type(m Message, provider wire.Provider, p Pane, c Clock) Result {
+	if provider == wire.ProviderAntigravity {
+		return typeAntigravity(m, p, c)
+	}
 	if pr, ok := p.(Prober); ok {
 		if err := pr.Responsive(); err != nil {
 			// The terminal answers too slowly for the waits between the keys to mean anything: nothing is typed, and

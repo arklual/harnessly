@@ -149,7 +149,7 @@ const asTab = (conv: Conversation, legacy: LegacyTab): ITab => ({
   name: conv.title,
   order: 0,
   cwd: legacy.cwd || conv.cwd,
-  panelType: conv.provider === 'codex' ? 'codex-cli' : 'claude-code',
+  panelType: conv.provider === 'antigravity' ? 'antigravity-cli' : conv.provider === 'codex' ? 'codex-cli' : 'claude-code',
   agentState: legacy.agentSessionId
     ? {
         providerId: conv.provider,
