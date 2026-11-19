@@ -9,6 +9,7 @@ import {
   cardView,
   columnsOf,
   followsJob,
+  isAudio,
   isClip,
   jobOf,
   listJobs,
@@ -91,11 +92,13 @@ interface ITileProps {
   onOpen: () => void;
   /** A clip plays in place (controls), a picture opens in the viewer. */
   clip: boolean;
+  /** Music, speech or a sound: a player across the tile. */
+  audio?: boolean;
 }
 
 const TONES = 4;
 
-const Tile = ({ src, name, shape, tone, onOpen, clip }: ITileProps) => {
+const Tile = ({ src, name, shape, tone, onOpen, clip, audio = false }: ITileProps) => {
   const [loaded, setLoaded] = useState(false);
   const [natural, setNatural] = useState<Shape | null>(null);
   const [broken, setBroken] = useState(false);
@@ -103,7 +106,19 @@ const Tile = ({ src, name, shape, tone, onOpen, clip }: ITileProps) => {
   const frame = shape ?? natural ?? 'square';
   const media =
     src !== null && !broken ? (
-      clip ? (
+      audio ? (
+        <audio
+          className="hx-img__pic hx-img__audio"
+          src={src}
+          controls
+          preload="metadata"
+          onLoadedMetadata={() => {
+            setNatural('landscape');
+            setLoaded(true);
+          }}
+          onError={() => setBroken(true)}
+        />
+      ) : clip ? (
         <video
           className="hx-img__pic"
           src={src}
@@ -143,6 +158,7 @@ const Tile = ({ src, name, shape, tone, onOpen, clip }: ITileProps) => {
         data-ready={ready}
         data-broken={broken || undefined}
         data-clip
+        data-audio={audio || undefined}
       >
         {placeholder}
         {media}
@@ -200,6 +216,7 @@ const Card = ({ host, entry }: { host: IImageHost; entry: ImageEntry }) => {
               shape={shape}
               tone={i}
               clip={path !== null && isClip(path)}
+              audio={path !== null && isAudio(path)}
               onOpen={() => {
                 // A clip plays where it is; the viewer is for pictures.
                 if (path !== null && !isClip(path)) setViewing(files.indexOf(path));

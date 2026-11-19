@@ -19,6 +19,14 @@ const stamped = new Set<ConvId>();
 /** The chat's agent state; null while the list does not hold the chat. */
 export const agentStateOf = (conv: ConvId): AgentState | null => conversationsStore.get(conv)?.state ?? null;
 
+const askingStates: ReadonlySet<AgentState['k']> = new Set(['waiting-question', 'waiting-permission']);
+
+/** The agent waits for the person (a question, a permission, a plan, a dialog of its own): it works at nothing meanwhile. */
+export const agentAsks = (conv: ConvId): boolean => {
+  const state = agentStateOf(conv);
+  return state !== null && askingStates.has(state.k);
+};
+
 /**
  * How a message the person sends right now goes: into the turn of an agent that works (steer, read at its
  * next step, Claude Code and Codex alike), else the next thing it gets. Waiting for the turn to end is asked for apart.

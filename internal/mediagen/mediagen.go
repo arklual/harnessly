@@ -80,6 +80,13 @@ type Request struct {
 	Resolution string   `json:"resolution,omitempty"`
 	// Audio asks for the sound of a clip; nil: without (it costs more and a clip from a scene is silent anyway).
 	Audio *bool `json:"audio,omitempty"`
+	// Voice is the voice of speech (a preset voice id of Higgsfield's MCP); "" for the model's default.
+	Voice string `json:"voice,omitempty"`
+	// Params are the model's own further settings, sent as they are (Higgsfield's MCP only: models_explore lists them).
+	Params map[string]any `json:"params,omitempty"`
+	// Allowance says what pays on Higgsfield's MCP: "trial" (the free-trial unlimited generations), "credits", or ""
+	// when the person has not said (a job that needs the choice stops and asks).
+	Allowance string `json:"allowance,omitempty"`
 	// MaxUSD is the most the job may cost by the provider's price; 0 is DefaultMaxUSD.
 	MaxUSD float64 `json:"maxUsd,omitempty"`
 	// Conv is the chat that asked ("" for none); Owner says who else did (e.g. "design:<id>").
@@ -118,6 +125,7 @@ type Origin struct {
 	Sources   []string               `json:"sources,omitempty"`
 	RequestID string                 `json:"requestId,omitempty"`
 	CostUSD   float64                `json:"costUsd,omitempty"`
+	Credits   float64                `json:"credits,omitempty"`
 	Seconds   int                    `json:"seconds,omitempty"`
 	Ratio     string                 `json:"ratio,omitempty"`
 	CreatedAt string                 `json:"createdAt"`
@@ -141,10 +149,12 @@ type Snapshot struct {
 	Status string `json:"status,omitempty"`
 	// EstimateUSD is the provider's price of the request (0 until it is asked); MaxUSD is the cap the job runs under.
 	EstimateUSD float64 `json:"estimateUsd"`
-	MaxUSD      float64 `json:"maxUsd"`
-	RequestID   string  `json:"requestId,omitempty"`
-	Files       []File  `json:"files"`
-	Error       string  `json:"error,omitempty"`
+	// Credits is the price in the provider's credits, when it counts in them (Higgsfield's MCP).
+	Credits   float64 `json:"credits,omitempty"`
+	MaxUSD    float64 `json:"maxUsd"`
+	RequestID string  `json:"requestId,omitempty"`
+	Files     []File  `json:"files"`
+	Error     string  `json:"error,omitempty"`
 	// Meta is the line the card shows under the clip: the model and the price.
 	Meta      string         `json:"meta,omitempty"`
 	Origin    map[string]any `json:"origin,omitempty"`
@@ -177,6 +187,8 @@ type Service struct {
 	Download *http.Client
 	// AllowHTTP lets a result or a status address be http (a test's server); a provider's address is the registry's.
 	AllowHTTP bool
+	// MCP is the person's Higgsfield MCP connection (nil: none): it serves when no key does, and alone makes audio.
+	MCP MCPConn
 	// Changed is told a job's new state; nil for nothing.
 	Changed func(Snapshot)
 	// DailyUSD is what the jobs of a day may cost together (0: DefaultDailyUSD).
@@ -195,6 +207,7 @@ type Service struct {
 type job struct {
 	snap   Snapshot
 	req    Request
+	tg     target
 	done   chan struct{}
 	cancel context.CancelFunc
 }
@@ -205,12 +218,20 @@ var (
 	ErrBadRequest = errors.New("bad request")
 	// ErrNoKey: no media provider holds a key.
 	ErrNoKey = errors.New("no key")
+	// ErrNoMCP: audio, or a request that names the MCP connection, without it.
+	ErrNoMCP = errors.New("no Higgsfield MCP connection")
 	// ErrOverCap: the price is over the cap.
 	ErrOverCap = errors.New("over the cap")
 )
 
+// NoMCPMessage is what a caller is told when the Higgsfield MCP connection is missing.
+const NoMCPMessage = "Higgsfield's MCP is not connected (it makes music, speech and sound, and pictures and clips without an API key). " +
+	"The person connects «Higgsfield (MCP)» in Settings → Connections and signs in with their Higgsfield account; " +
+	"generation needs a Higgsfield plan or its free trial (https://higgsfield.ai/mcp)."
+
 // NoKeyMessage is what a caller is told when there is no key: how to connect Higgsfield, and the safe's way to give the key.
-const NoKeyMessage = "Higgsfield is not connected: no API key. The person adds it in Settings → Providers → Higgsfield " +
+const NoKeyMessage = "Higgsfield is not connected: no API key and no «Higgsfield (MCP)» connection. The simplest way: the person connects " +
+	"«Higgsfield (MCP)» in Settings → Connections (a Higgsfield plan or its free trial pays, no key). Or the person adds a key in Settings → Providers → Higgsfield " +
 	"(key ID and secret as «id:secret», from console.higgsfield.ai), or you ask for it through the safe, outside the chat: " +
 	"`harnessly secret ask " + SecretName + " --why \"Higgsfield API: video generation in harnessly\"` (the value is «id:secret»). " +
 	"Never ask the person to paste the key into the chat."
@@ -262,11 +283,30 @@ func safeName(s string) string {
 // target is the provider a request goes to: its address, key and the name it is called.
 type target struct {
 	base, key, name string
+	// mcp: the person's Higgsfield MCP connection, not the REST API.
+	mcp bool
 }
 
 // resolve finds the provider of a request: the account named, else the default Higgsfield account that holds a key,
 // else the key under SecretName in the safe.
-func (s *Service) resolve(id string) (target, error) {
+func (s *Service) resolve(id string, kind extproviders.MediaKind) (target, error) {
+	mcp := target{name: "Higgsfield (MCP)", mcp: true}
+	mcpOK := s.MCP != nil && s.MCP.Connected()
+	if kind == extproviders.KindAudio || strings.EqualFold(id, MCPConnID) || strings.EqualFold(id, "mcp") {
+		if !mcpOK {
+			return target{}, ErrNoMCP
+		}
+		return mcp, nil
+	}
+	tg, err := s.resolveKey(id)
+	if errors.Is(err, ErrNoKey) && (id == "" || strings.EqualFold(id, "higgsfield")) && mcpOK {
+		return mcp, nil
+	}
+	return tg, err
+}
+
+// resolveKey finds a provider that holds a REST API key.
+func (s *Service) resolveKey(id string) (target, error) {
 	if s.Registry != nil {
 		views, err := s.Registry.List()
 		if err != nil {
@@ -323,8 +363,13 @@ func Normalize(r Request) (Request, error) {
 	if r.Kind == "" {
 		r.Kind = extproviders.KindVideo
 	}
-	if r.Kind != extproviders.KindVideo && r.Kind != extproviders.KindImage {
-		return r, fmt.Errorf("%w: kind is video or image", ErrBadRequest)
+	if r.Kind != extproviders.KindVideo && r.Kind != extproviders.KindImage && r.Kind != extproviders.KindAudio {
+		return r, fmt.Errorf("%w: kind is video, image or audio", ErrBadRequest)
+	}
+	switch r.Allowance {
+	case "", "trial", "credits":
+	default:
+		return r, fmt.Errorf("%w: allowance is trial or credits", ErrBadRequest)
 	}
 	if len(r.Prompt) > maxPrompt {
 		return r, fmt.Errorf("%w: the prompt is longer than %d characters", ErrBadRequest, maxPrompt)
@@ -332,8 +377,8 @@ func Normalize(r Request) (Request, error) {
 	if len(r.Frames) > maxFrames {
 		return r, fmt.Errorf("%w: at most %d frames (the first and the last)", ErrBadRequest, maxFrames)
 	}
-	if r.Seconds < 0 || r.Seconds > 60 {
-		return r, fmt.Errorf("%w: seconds is 1–60", ErrBadRequest)
+	if r.Seconds < 0 || r.Seconds > 360 || (r.Seconds > 60 && r.Kind != extproviders.KindAudio) {
+		return r, fmt.Errorf("%w: seconds is 1–60 (1–360 for audio)", ErrBadRequest)
 	}
 	if r.MaxUSD < 0 {
 		return r, fmt.Errorf("%w: max_usd is not negative", ErrBadRequest)
@@ -465,7 +510,11 @@ func (s *Service) Start(r Request) (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
-	pl, err := makePlan(r)
+	tg, err := s.resolve(r.Provider, r.Kind)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	pl, err := planFor(r, tg)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -494,13 +543,9 @@ func (s *Service) Start(r Request) (Snapshot, error) {
 			return Snapshot{}, fmt.Errorf("%w: the frame %s is over %d MB", ErrBadRequest, f, maxFrameBytes>>20)
 		}
 	}
-	tg, err := s.resolve(pl.req.Provider)
-	if err != nil {
-		return Snapshot{}, err
-	}
 	id := newID()
 	ctx, cancel := context.WithTimeout(context.Background(), RunTimeout)
-	j := &job{done: make(chan struct{}), cancel: cancel, req: pl.req, snap: Snapshot{
+	j := &job{done: make(chan struct{}), cancel: cancel, req: pl.req, tg: tg, snap: Snapshot{
 		ID: id, Kind: pl.req.Kind, Provider: tg.name, Model: pl.model.Label, Endpoint: pl.endpoint, Prompt: pl.req.Prompt,
 		Frames: slices.Clone(pl.req.Frames), Seconds: pl.req.Seconds, Conv: pl.req.Conv, Owner: pl.req.Owner, State: Queued,
 		MaxUSD: pl.req.MaxUSD, Files: []File{}, Origin: pl.req.Origin, StartedAt: s.now().UnixMilli(),
@@ -520,24 +565,47 @@ func (s *Service) Start(r Request) (Snapshot, error) {
 	return snap, nil
 }
 
-// Estimate asks the provider the price of a request, in USD. It sends nothing to be made.
-func (s *Service) Estimate(ctx context.Context, r Request) (float64, string, error) {
+// Estimate asks the provider the price of a request: in USD, and in credits when the provider counts in them (0
+// otherwise). It sends nothing to be made.
+func (s *Service) Estimate(ctx context.Context, r Request) (Price, error) {
 	r, err := Normalize(r)
 	if err != nil {
-		return 0, "", err
+		return Price{}, err
 	}
-	pl, err := makePlan(r)
+	tg, err := s.resolve(r.Provider, r.Kind)
 	if err != nil {
-		return 0, "", err
+		return Price{}, err
 	}
-	tg, err := s.resolve(pl.req.Provider)
+	pl, err := planFor(r, tg)
 	if err != nil {
-		return 0, "", err
+		return Price{}, err
 	}
-	c := &hf{base: tg.base, key: tg.key, http: s.client(), allowHTTP: s.AllowHTTP}
-	// The estimate takes the same fields; a frame file has no address yet, a stand-in does for a price.
-	usd, err := c.estimate(ctx, pl.endpoint, fillFrames(pl.body, func(int) string { return "https://example.com/frame.jpg" }))
-	return usd, pl.model.Label, err
+	b, err := s.backendFor(tg)
+	if err != nil {
+		return Price{}, err
+	}
+	usd, credits, err := b.estimate(ctx, pl)
+	return Price{USD: usd, Credits: credits, Model: pl.model.Label, Via: tg.name}, err
+}
+
+// Price is what a request would cost.
+type Price struct {
+	USD, Credits float64
+	Model, Via   string
+}
+
+// planFor checks a request for the way it goes by.
+func planFor(r Request, tg target) (plan, error) {
+	if tg.mcp {
+		return makeMCPPlan(r)
+	}
+	if r.Kind == extproviders.KindAudio {
+		return plan{}, fmt.Errorf("%w: audio is made by the Higgsfield MCP connection only", ErrBadRequest)
+	}
+	if len(r.Params) > 0 || r.Voice != "" || r.Allowance != "" {
+		return plan{}, fmt.Errorf("%w: params, voice and allowance are of the Higgsfield MCP connection, not of an API key", ErrBadRequest)
+	}
+	return makePlan(r)
 }
 
 func fillFrames(body map[string]any, addr func(i int) string) map[string]any {
@@ -610,12 +678,18 @@ func (s *Service) Cancel(ctx context.Context, id string) (Snapshot, error) {
 		return snap, nil
 	}
 	if snap.RequestID != "" {
-		tg, err := s.resolve(j.req.Provider)
+		tg := j.tg
+		if tg == (target{}) {
+			var err error
+			if tg, err = s.resolve(j.req.Provider, j.req.Kind); err != nil {
+				return snap, err
+			}
+		}
+		b, err := s.backendFor(tg)
 		if err != nil {
 			return snap, err
 		}
-		c := &hf{base: tg.base, key: tg.key, http: s.client(), allowHTTP: s.AllowHTTP}
-		if err := c.cancel(ctx, snap.RequestID); err != nil {
+		if err := b.cancel(ctx, snap.RequestID); err != nil {
 			return snap, err
 		}
 	}
@@ -682,6 +756,9 @@ func metaOf(s Snapshot) string {
 	if s.Seconds > 0 {
 		parts = append(parts, fmt.Sprintf("%d s", s.Seconds))
 	}
+	if s.Credits > 0 {
+		parts = append(parts, fmt.Sprintf("%g credits", s.Credits))
+	}
 	if s.EstimateUSD > 0 {
 		parts = append(parts, fmt.Sprintf("≈ $%.2f", s.EstimateUSD))
 	}
@@ -713,14 +790,18 @@ func (s *Service) fail(j *job, err error) {
 func (s *Service) run(ctx context.Context, j *job, pl plan, tg target) {
 	defer close(j.done)
 	defer j.cancel()
-	c := &hf{base: tg.base, key: tg.key, http: s.client(), allowHTTP: s.AllowHTTP}
-	// The price comes first and costs nothing; a job over its cap is not sent.
-	usd, err := c.estimate(ctx, pl.endpoint, fillFrames(pl.body, func(int) string { return "https://example.com/frame.jpg" }))
+	c, err := s.backendFor(tg)
 	if err != nil {
 		s.fail(j, err)
 		return
 	}
-	s.settle(j, func(sn *Snapshot) { sn.EstimateUSD = usd })
+	// The price comes first and costs nothing; a job over its cap is not sent.
+	usd, credits, err := c.estimate(ctx, pl)
+	if err != nil {
+		s.fail(j, err)
+		return
+	}
+	s.settle(j, func(sn *Snapshot) { sn.EstimateUSD, sn.Credits = usd, credits })
 	if usd > pl.req.MaxUSD {
 		s.fail(j, fmt.Errorf("%w: the provider's price is ≈ $%.2f, over the cap of $%.2f for this job. Nothing was sent. Tell the person the price and ask; run it again with a higher max_usd only if they agree", ErrOverCap, usd, pl.req.MaxUSD))
 		return
@@ -740,19 +821,15 @@ func (s *Service) run(ctx context.Context, j *job, pl plan, tg target) {
 		s.settle(j, func(sn *Snapshot) { sn.State, sn.Error = Canceled, "canceled" })
 		return
 	}
-	// Frames that are files go up to the provider's storage and are named by their public address.
+	// Frames go up to the provider's storage and are named as the provider reads them.
 	addrs := make([]string, len(pl.req.Frames))
 	for i, f := range pl.req.Frames {
-		if isURL(f) {
-			addrs[i] = f
-			continue
-		}
-		if addrs[i], err = c.upload(ctx, f); err != nil {
+		if addrs[i], err = c.ref(ctx, f); err != nil {
 			s.fail(j, fmt.Errorf("uploading the frame %s: %w", filepath.Base(f), err))
 			return
 		}
 	}
-	rid, err := c.submit(ctx, pl.endpoint, fillFrames(pl.body, func(i int) string { return addrs[i] }), j.snap.ID)
+	rid, err := c.submit(ctx, pl, addrs, j.snap.ID)
 	if err != nil {
 		s.fail(j, err)
 		return
@@ -785,7 +862,7 @@ func (s *Service) run(ctx context.Context, j *job, pl plan, tg target) {
 }
 
 // poll asks the provider for the request's status until it ends: after 2 s, then slower up to 10 s.
-func (s *Service) poll(ctx context.Context, j *job, c *hf, rid string) (hfStatus, error) {
+func (s *Service) poll(ctx context.Context, j *job, c backend, rid string) (hfStatus, error) {
 	delay, max := s.PollFirst, s.PollMax
 	if delay <= 0 {
 		delay = 2 * time.Second
@@ -842,7 +919,7 @@ func (s *Service) collect(ctx context.Context, j *job, pl plan, tg target, st hf
 		}
 		f := File{N: i + 1, Path: path}
 		var err error
-		org := Origin{Provider: "higgsfield", Account: tg.name, Model: pl.model.Label, Endpoint: pl.endpoint, Kind: pl.req.Kind,
+		org := Origin{Provider: "higgsfield", Account: tg.name, Credits: j.snap.Credits, Model: pl.model.Label, Endpoint: pl.endpoint, Kind: pl.req.Kind,
 			Prompt: pl.req.Prompt, Sources: pl.req.Frames, RequestID: j.snap.RequestID, CostUSD: j.snap.EstimateUSD, Seconds: pl.req.Seconds,
 			Ratio: pl.req.Ratio, CreatedAt: s.now().UTC().Format(time.RFC3339), Extra: pl.req.Origin}
 		if f.OriginFile, err = writeOrigin(path, org); err != nil {
@@ -877,6 +954,9 @@ func extOf(raw string, kind extproviders.MediaKind) string {
 	}
 	if kind == extproviders.KindImage {
 		return ".png"
+	}
+	if kind == extproviders.KindAudio {
+		return ".mp3"
 	}
 	return ".mp4"
 }

@@ -1,6 +1,7 @@
 // The Settings screen's frame (the design's .hx-set): the sections on the left in three groups (the app, the agents,
 // the machine), the open one on the right. On a phone the list is the screen and the open section slides over it from
-// the right, with a way back; the sidebar opens from the list's head with the same glyph as the sidebar's own toggle.
+// the right, with a way back to the list; the list's own head has a way out of Settings, to the chats (the sidebar
+// drawer), as the ChatGPT screen has. A wide window keeps the sidebar beside the screen, so it has no such button.
 import '@/next/styles/settings.css';
 import '@/next/styles/settings-changes.css';
 
@@ -52,7 +53,10 @@ interface ISettingsShellProps {
   /** Sections where an agent has just changed a setting: their entries carry a dot until the person opens them. */
   changed?: readonly SettingsSection[];
   onPick: (section: SettingsSection) => void;
+  /** The open section's way back to the list (a phone). */
   onBack: () => void;
+  /** The list's way out of Settings (a phone): the button before its title; none without it. */
+  onLeave?: () => void;
   /** The agent's field, kept at the bottom of the page over what scrolls. */
   island?: ReactNode;
   children: ReactNode;
@@ -66,6 +70,7 @@ const SettingsShell = ({
   changed = [],
   onPick,
   onBack,
+  onLeave,
   island,
   children,
 }: ISettingsShellProps) => {
@@ -97,6 +102,16 @@ const SettingsShell = ({
     <section className="hx-set" data-page={pageOpen} ref={root}>
       <nav className="hx-set__nav" aria-label={t('next.settings.nav')}>
         <div className="hx-set__nav-head">
+          {onLeave && (
+            <button
+              type="button"
+              className="hx-head-btn hx-set__leave"
+              aria-label={t('next.settings.leave')}
+              onClick={onLeave}
+            >
+              <Icon name="chevron-left" />
+            </button>
+          )}
           <span className="hx-set__h1">{t('next.settings.title')}</span>
         </div>
         {NAV_GROUPS.map((group) => (

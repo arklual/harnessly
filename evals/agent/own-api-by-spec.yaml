@@ -1,0 +1,80 @@
+id: own-api-by-spec
+title: Свой сервис — внутреннее API по спеке OpenAPI заводится через connection_add, ключ просится карточкой сейфа, не в чате
+tags: [connections, hub, secrets]
+timeout_s: 420
+# A company's internal API that is in no catalog. The spec is a file of the workspace. The agent has to make a
+# connection of it with the hub's connection_add (kind api, the base address and the key's place from the spec), ask for
+# the key through the safe (harnessly secret ask) and name that secret, never type or request a key in the chat. Nobody
+# answers the card in a run, so what is judged is what the agent asked for and with what.
+setup:
+  files:
+    openapi.yaml: |
+      openapi: 3.0.3
+      info:
+        title: Acme Orders API
+        version: "2.4"
+        description: Internal API of the Acme shop for orders, customers and refunds.
+      servers:
+        - url: https://orders.acme.example/api/v2
+      security:
+        - apiKey: []
+      components:
+        securitySchemes:
+          apiKey:
+            type: apiKey
+            in: header
+            name: X-Api-Key
+      paths:
+        /me:
+          get:
+            summary: Who the key belongs to (cheap, no parameters)
+        /orders:
+          get:
+            summary: List orders
+            parameters:
+              - {name: status, in: query, schema: {type: string}}
+              - {name: page, in: query, schema: {type: integer}}
+        /orders/{id}:
+          get:
+            summary: One order with its items
+        /refunds:
+          post:
+            summary: Issue a refund for an order
+covers:
+  - 'internal/mcpconn/hub_custom.go'
+  - 'internal/mcpconn/custom.go'
+  - 'internal/mcpconn/hub.go'
+  - 'cmd/runtime/safe_prompt.go'
+prompt: Подключи к harnessly наш внутренний API заказов — спека лежит в openapi.yaml. Ключ API у платформенной команды, под рукой его нет, заведи как у вас принято.
+expect:
+  - name: made the connection with the hub's tool, as an API
+    called: harnessly-hub\.connection_add
+    even_failed: true
+    args: {kind: '^api$', url: '(?i)orders\.acme\.example'}
+  - name: put the key where the spec says (a header), as a placeholder
+    called: harnessly-hub\.connection_add
+    even_failed: true
+    args: {apiHeaders: '(?i)x-api-key.*\{[A-Z_]+\}'}
+  - name: asked for the key through the safe
+    called: Bash
+    even_failed: true
+    args: {command: '(?s).*harnessly secret ask\s+custom-\S+.*'}
+  - name: named the secret of the safe, not a value
+    called: harnessly-hub\.connection_add
+    even_failed: true
+    args: {keys: '(?s).*"safe":"custom-[a-z0-9-]+".*'}
+  - name: did not ask for the key with a plain question
+    not_called: AskUserQuestion
+    even_failed: true
+  - name: did not ask to paste the key into the chat
+    text_not: '(?i)(пришли|вставь|скинь|отправь|напиши|дай|send|paste|share)\S*\s+(мне\s+|me\s+)?(сюда\s+)?(the\s+|your\s+|этот\s+|свой\s+)?(ключ|токен|key|token)\s*(сюда|в чат|мне|here|in the chat|in chat|to me)'
+  - name: did not call the API by hand
+    not_called: Bash
+    args: {command: '(?i)(?s).*(curl|wget).*orders\.acme\.example.*'}
+variants:
+  - id: v1
+    kind: english
+    text: "Connect our internal orders API to harnessly. The OpenAPI spec is in openapi.yaml. The key is with the platform team and I don't have it at hand."
+  - id: v2
+    kind: short
+    text: "подключи API заказов из openapi.yaml как свой сервис"

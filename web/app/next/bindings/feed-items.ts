@@ -41,7 +41,7 @@ import {
   turnStore,
   type TurnView,
 } from '@/next/stores/conversation';
-import { agentStateOf, turnRuns } from '@/next/stores/chat-state';
+import { agentAsks, agentStateOf, turnRuns } from '@/next/stores/chat-state';
 import { conversationsStore } from '@/next/stores/conversations';
 import {
   convMessagesStore,
@@ -62,6 +62,7 @@ interface ICachedTurn {
   now: Now | null;
   wait: TurnItem['wait'];
   settled: boolean;
+  asks: boolean;
   auto: AutoMark | undefined;
   cleared: TerminalAside | undefined;
   item: TurnItem;
@@ -530,6 +531,8 @@ export class ItemsBuilder {
     const nowOfTurn = now && now.turnId === id ? now : null;
     const wait = stalled ? 'machine' : null;
     const settled = turn.status === 'live' && !turnRuns(this.conv, turn);
+    // The agent waits for the person: its live line («working», the clock) is not drawn, it is not at work.
+    const asks = turn.status === 'live' && !settled && agentAsks(this.conv);
     const promptId = prompt?.clientId ?? null;
     const promptMessage = promptId === null ? undefined : messagesStore.get(promptId);
     const auto = autoMarkOf(promptId, promptMessage, goes);
@@ -547,6 +550,7 @@ export class ItemsBuilder {
       have.now === nowOfTurn &&
       have.wait === wait &&
       have.settled === settled &&
+      have.asks === asks &&
       have.auto === auto &&
       have.cleared === cleared &&
       sameList(have.steps, steps)
@@ -567,6 +571,7 @@ export class ItemsBuilder {
       wait,
       endNote: null,
       ...(settled && { settled }),
+      ...(asks && { asks }),
       ...(partial && { partial }),
       ...(auto && { auto }),
       ...(cleared && { cleared }),
@@ -582,6 +587,7 @@ export class ItemsBuilder {
       now: nowOfTurn,
       wait,
       settled,
+      asks,
       auto,
       cleared,
       item,

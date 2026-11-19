@@ -128,6 +128,13 @@ func TestCatalogIntegrity(t *testing.T) {
 		// /v2/mcp: no client registration and no personal token, only an OAuth app made in Asana's console
 		// beforehand; back with our own OAuth client (wave 2 of HRN-1533).
 		"asana": "needs an OAuth app registered beforehand",
+		// Looked at for HRN-1706 and left out: the agent has its own browser (browser_* and chrome_* tools), so these
+		// would start a second, empty one; Puppeteer's reference package is archived.
+		"playwright": "duplicates the agent's own browser", "chrome-devtools": "duplicates the agent's own browser",
+		"puppeteer": "archived, and duplicates the agent's own browser",
+		// HubSpot's and Box's hosted servers let no client register (no registration endpoint, only an app made in
+		// their consoles beforehand): HubSpot is the local server with a private app token, Box has no working package.
+		"hubspot-remote": "has no client registration", "box": "has no client registration, and the local package fails to import",
 	} {
 		if remoteIDs[gone] || ids[gone] && !strings.HasPrefix(why, "admits") && !strings.HasPrefix(why, "has no") {
 			t.Errorf("%s is back in the catalog: it %s", gone, why)
@@ -168,4 +175,79 @@ func hasCyrillic(s string) bool {
 		}
 	}
 	return false
+}
+
+// A service's own page (service_pages.go) is written by hand: each guide belongs to an entry, says what an agent can
+// do in three to five phrases in both languages, and links only to official https pages, no address twice.
+func TestCatalogGuides(t *testing.T) {
+	kinds := []string{LinkDocs, LinkSetup, LinkToken, LinkPricing, LinkHome}
+	for id, g := range catalogGuides {
+		e, ok := catalogEntry(id)
+		if !ok {
+			t.Errorf("%s: a guide for an entry the catalog does not have", id)
+			continue
+		}
+		if g.About == "" || g.AboutRu == "" {
+			t.Errorf("%s: the description is in both languages", id)
+		}
+		if len(g.Can) < 3 || len(g.Can) > 5 || len(g.Can) != len(g.CanRu) {
+			t.Errorf("%s: three to five things the agent can do, in both languages (%d/%d)", id, len(g.Can), len(g.CanRu))
+		}
+		if len(g.Steps) != len(g.StepsRu) {
+			t.Errorf("%s: the steps are in both languages (%d/%d)", id, len(g.Steps), len(g.StepsRu))
+		}
+		if len(e.Can) != len(g.Can) {
+			t.Errorf("%s: the guide did not reach the entry", id)
+		}
+		seen := map[string]bool{}
+		for _, l := range g.Links {
+			u, err := url.Parse(l.URL)
+			if err != nil || u.Scheme != "https" || u.Host == "" {
+				t.Errorf("%s: link %q is not an https address", id, l.URL)
+			}
+			if !slices.Contains(kinds, l.Kind) {
+				t.Errorf("%s: link kind %q", id, l.Kind)
+			}
+			if seen[l.URL] {
+				t.Errorf("%s: link %q twice", id, l.URL)
+			}
+			seen[l.URL] = true
+		}
+		// A token form that the page links to is the entry's own.
+		if e.TokenURL != "" && !seen[e.TokenURL] {
+			t.Logf("%s: the token link of the entry is not among the guide's links", id)
+		}
+		for _, line := range slices.Concat(g.Can, g.CanRu, g.Steps, g.StepsRu) {
+			if strings.TrimSpace(line) == "" || strings.Contains(line, "  ") {
+				t.Errorf("%s: a blank or doubled-space line %q", id, line)
+			}
+		}
+	}
+	// Every entry has a page: written by hand, in both languages, with steps and official links.
+	for _, e := range catalog {
+		g, ok := catalogGuides[e.ID]
+		if !ok {
+			t.Errorf("%s: the entry has no page: add it to a service_pages_*.go file", e.ID)
+			continue
+		}
+		if len(g.Steps) < 2 {
+			t.Errorf("%s: the page needs the steps to connect (at least two)", e.ID)
+		}
+		if len(g.Links) < 2 {
+			t.Errorf("%s: the page needs at least two official links", e.ID)
+		}
+		if !slices.ContainsFunc(g.Links, func(l Link) bool { return l.Kind == LinkDocs || l.Kind == LinkHome }) {
+			t.Errorf("%s: the page links neither to the docs nor to the product", e.ID)
+		}
+		if !hasCyrillic(g.AboutRu) || slices.ContainsFunc(g.CanRu, func(s string) bool { return !hasCyrillic(s) }) ||
+			slices.ContainsFunc(g.StepsRu, func(s string) bool { return !hasCyrillic(s) }) {
+			t.Errorf("%s: the Russian text is not Russian", e.ID)
+		}
+		if hasCyrillic(g.About) || slices.ContainsFunc(slices.Concat(g.Can, g.Steps), hasCyrillic) {
+			t.Errorf("%s: the English text holds Russian", e.ID)
+		}
+		if len(g.About) < 60 || len(g.AboutRu) < 60 {
+			t.Errorf("%s: the description is too short to say anything", e.ID)
+		}
+	}
 }

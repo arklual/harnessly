@@ -36,6 +36,11 @@
   margin-bottom: 10px;
   padding-left: 8px;
 }
+/* The way out of Settings, before the list's title: a phone only (a wide window has the sidebar beside it). Two classes:
+   header.css comes after this file and its .hx-head-btn would show the button and size it 34px. */
+.hx-head-btn.hx-set__leave {
+  display: none;
+}
 .hx-set__h1 {
   font-size: var(--hx-text-xl);
   font-weight: var(--hx-weight-semibold);
@@ -108,7 +113,7 @@
   gap: 8px;
   margin-bottom: 8px;
 }
-.hx-set__back {
+.hx-head-btn.hx-set__back {
   display: none;
 }
 .hx-set__titles {
@@ -1092,6 +1097,50 @@
   font-weight: var(--hx-weight-medium);
   animation: hx-set-in 240ms var(--hx-ease-out) backwards;
 }
+/* A phone: the name takes the line (one line, an ellipsis), the address and the state stand under it, the badge is at
+   the row's end, the button on its own line under the text; nothing is laid over anything. */
+.hx-mrow__nm {
+  min-width: 0;
+}
+@media (max-width: 600px) {
+  .hx-mrow {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 8px 12px;
+    min-height: 0;
+    padding: 12px 16px;
+  }
+  .hx-mrow__text {
+    grid-column: 2;
+  }
+  .hx-mrow__name {
+    display: block;
+  }
+  .hx-mrow__nm,
+  .hx-mrow__host {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hx-mrow__host {
+    margin-top: 1px;
+  }
+  .hx-mrow__sub {
+    margin-top: 2px;
+    white-space: normal;
+  }
+  .hx-mrow__main {
+    grid-column: 3;
+    grid-row: 1;
+    margin-top: 1px;
+  }
+  .hx-mrow > .hx-set__btn {
+    grid-column: 2 / -1;
+    justify-self: start;
+  }
+}
 .hx-madd {
   display: grid;
   gap: 12px;
@@ -1225,17 +1274,31 @@
     grid-template-columns: minmax(0, 1fr);
     overflow: clip;
   }
+  /* One line on the left for the way out, the group captions and the icons: --hx-set-edge from the window's edge
+     (the row's own padding plus the list's, the safe areas included). The title stands after the way out, on the
+     labels' line. */
   .hx-set__nav {
-    padding: calc(8px + env(safe-area-inset-top)) 8px calc(24px + env(safe-area-inset-bottom));
+    --hx-set-edge: 16px;
+    padding: calc(8px + env(safe-area-inset-top)) calc(var(--hx-set-edge) - 8px + env(safe-area-inset-right))
+      calc(24px + env(safe-area-inset-bottom)) calc(var(--hx-set-edge) - 8px + env(safe-area-inset-left));
   }
   .hx-set__nav-head {
     padding-left: 0;
     margin-bottom: 8px;
     height: 48px;
+    gap: 0;
+  }
+  /* The glyph (the icon's size in a 40px button) stands on the icons' line; the title on the labels' line. */
+  .hx-head-btn.hx-set__leave {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    flex: none;
+    margin-left: -2px;
   }
   .hx-set__nav-item {
-    height: 52px;
-    padding: 0 12px;
+    height: 46px;
+    padding: 0 8px;
     font-size: var(--hx-text-md);
   }
   .hx-set__nav-chev {
@@ -1261,9 +1324,10 @@
       visibility 0s;
   }
   .hx-set__page-in {
-    padding: calc(8px + env(safe-area-inset-top)) 16px calc(48px + env(safe-area-inset-bottom));
+    padding: calc(8px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
+      calc(48px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
   }
-  .hx-set__back {
+  .hx-head-btn.hx-set__back {
     display: grid;
     width: 40px;
     height: 40px;
@@ -1917,11 +1981,14 @@
   font-weight: var(--hx-weight-medium);
 }
 @media (max-width: 900px) {
+  .hx-set__nav-group {
+    gap: 0;
+  }
   .hx-set__nav-group + .hx-set__nav-group {
-    margin-top: 22px;
+    margin-top: 20px;
   }
   .hx-set__nav-caption {
-    padding: 0 12px 4px;
+    padding: 0 8px 6px;
   }
 }
 

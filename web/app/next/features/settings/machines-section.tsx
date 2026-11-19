@@ -32,7 +32,7 @@ const MachinesSection = ({ rows, failed = null, busy, onMakeMain, below }: IMach
           </span>
           <div className="hx-mrow__text">
             <div className="hx-mrow__name">
-              {row.name}
+              <span className="hx-mrow__nm">{row.name}</span>
               {row.host !== row.name && <span className="hx-mrow__host">{row.host}</span>}
             </div>
             <div className="hx-mrow__sub">{[row.state, row.agents].filter(Boolean).join(' · ')}</div>

@@ -62,10 +62,9 @@ const mcpStaleAfter = time.Hour
 // "" when there is no enabled server or that config is unreadable.
 func mcpClaudeConfig(enabled func() []mcpconn.Server, runtimeMCP, dir string) func() (string, []string) {
 	return func() (string, []string) {
+		// The hub goes to every launch, with nothing connected too: the person's first own service is made through it
+		// (connection_add).
 		list := enabled()
-		if len(list) == 0 {
-			return "", nil
-		}
 		base, headers, ok := runtimeMCPEndpoint(runtimeMCP)
 		if !ok {
 			return "", nil
@@ -164,9 +163,6 @@ func mcpCodexServers(enabled func() []mcpconn.Server, own codex.MCP, port int) f
 			return nil
 		}
 		list := enabled()
-		if len(list) == 0 {
-			return nil
-		}
 		out := []codex.MCP{{Server: mcpHubName, URL: codex.MCPURL(port, mcpHubPath), TokenHeader: own.TokenHeader, TokenEnv: own.TokenEnv}}
 		for _, srv := range mcpDirect(list) {
 			out = append(out, codex.MCP{Server: mcpAgentServerName(srv), URL: codex.MCPURL(port, mcpProxyPath+url.PathEscape(srv.ID)),

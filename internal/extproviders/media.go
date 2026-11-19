@@ -25,6 +25,8 @@ type MediaKind string
 const (
 	KindVideo MediaKind = "video"
 	KindImage MediaKind = "image"
+	// KindAudio is music, speech or a sound effect: only Higgsfield's MCP server makes it.
+	KindAudio MediaKind = "audio"
 )
 
 // MediaModel is one model of a media provider: its endpoint (the model's ID), what it makes, from what, and which

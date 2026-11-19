@@ -21,6 +21,7 @@ import {
   callRun,
   callTerminalRead,
   callAgentsRun,
+  callConnections,
   callAI,
   callSecretsPut,
   callBrowser,
@@ -83,6 +84,7 @@ import {
 } from '@/next/features/app-views/frame-health';
 import { pageOffer } from '@/next/features/app-views/page-tools';
 import { askConfirm } from '@/next/features/app-views/confirm';
+import { confirmText, consentText, runConnection } from '@/next/features/app-views/connections';
 import { hostKeys } from '@/next/features/app-views/host-keys';
 import { isBlankDocument, watchLoads } from '@/next/features/app-views/frame-loads';
 import { isSpaceApp } from '@/next/features/app-views/service-health';
@@ -120,6 +122,8 @@ const elevationAction = (method: string): string => {
   if (method === 'harnessly/ai.complete') return t('next.appview.elevate.ai');
   if (method === 'harnessly/agents.run') return t('next.appview.elevate.agentsRun');
   if (method === 'harnessly/secrets.put') return t('next.appview.elevate.secretsPut');
+  if (method === 'harnessly/connections.call' || method === 'harnessly/connections.api')
+    return t('next.appview.elevate.connections');
   return t('next.appview.elevate.other');
 };
 export const APP_FRAME_SANDBOX = 'allow-scripts allow-forms allow-popups';
@@ -827,6 +831,14 @@ const AppFrame = ({
         const sid = await need();
         return callAgentsRun(machine, sid, params);
       },
+      connections: async (op, params) => {
+        const sid = await need();
+        return runConnection(op, params, {
+          call: (body) => callConnections(machine, sid, { ...body, session: sid }),
+          ask: (q) =>
+            askConfirm(app.name, q.kind === 'consent' ? consentText(q.card, t) : confirmText(q.change, t)),
+        });
+      },
       terminalRead: async (params) => {
         const sid = await need();
         return callTerminalRead(machine, sid, params);
@@ -1138,7 +1150,10 @@ const AppFrame = ({
     if (!ready) return;
     return subscribeStorageChanges(machine, (change) => {
       if (!reaches(change, { app, chat, document: doc })) return;
-      bridge.current?.notify('harnessly/notifications/storage', { scope: change.scope, key: change.key });
+      // The person's connections changed: the view lists them again (hl.on('connections')).
+      if (change.scope === 'connections') bridge.current?.notify('harnessly/notifications/connections', {});
+      else
+        bridge.current?.notify('harnessly/notifications/storage', { scope: change.scope, key: change.key });
     });
   }, [ready, machine, app, chat, doc]);
 

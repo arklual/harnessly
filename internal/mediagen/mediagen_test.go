@@ -285,12 +285,12 @@ func toolText(o *jsvalue.Object) string {
 func TestKeyFromTheSafeWithoutAProvider(t *testing.T) {
 	f := newFake(t)
 	s := &Service{Dir: t.TempDir(), Secrets: fakeSecrets{SecretName: f.key}, AllowHTTP: true}
-	tg, err := s.resolve("")
+	tg, err := s.resolve("", extproviders.KindVideo)
 	if err != nil || tg.key != f.key || tg.base != extproviders.HiggsfieldBase {
 		t.Fatalf("%+v %v", tg, err)
 	}
 	s.Secrets = fakeSecrets{SecretName: "not-a-pair"}
-	if _, err := s.resolve(""); !errors.Is(err, ErrNoKey) {
+	if _, err := s.resolve("", extproviders.KindVideo); !errors.Is(err, ErrNoKey) {
 		t.Errorf("a key that is no id:secret was taken: %v", err)
 	}
 }

@@ -197,5 +197,12 @@
   "next.appdown.homeText": "Всё на месте. Попробуйте ещё раз через минуту.",
   "next.appmain.back": "Назад",
   "next.appmain.home": "Главная",
-  "next.appmain.collapse": "Свернуть"
+  "next.appmain.collapse": "Свернуть",
+  "next.appview.elevate.connections": "обратиться к одному из ваших подключённых сервисов",
+  "next.appview.connectConfirm": "Приложение хочет сделать это через ваш сервис «{name}»:\n{what}\n{detail}\nЭто будет сделано от вашего имени. Разрешить один раз?",
+  "next.appview.connectConsentRead": "Приложение хочет читать данные из вашего сервиса «{name}». {reason}\nОно сможет только читать: ничего не отправит и не изменит. Согласие можно забрать в настройках приложения.",
+  "next.appview.connectConsentAll": "Приложение хочет читать данные из вашего сервиса «{name}» и действовать через него. {reason}\nКаждое изменение всё равно ждёт вашего «ОК». Согласие можно забрать в настройках приложения.",
+  "next.inspector.connectionGroup": "Приложение может использовать любой ваш сервис «{category}»; пока ни одного не подключено",
+  "next.inspector.connectionReads": "Приложение читает «{name}» от вашего имени; ничего не меняет",
+  "next.inspector.connectionAllowRead": "Разрешить чтение"
 }

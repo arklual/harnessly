@@ -45,9 +45,10 @@ install points at your folder and is never deleted by `remove`.
 | `trust` | yes | `declarative` (no outbound `network` for views), `sandboxed` (adds `network` and a framed `https://` view), `trusted` (adds local processes; installed by hand). A view's scripts run on every tier |
 | `targets` | yes | `chat`, `pane`, `app`, `sinopia.<kind>`, `sinopia.*` |
 | `activation` | no | `on`: `document` turns the app on in the documents of its kinds; `always` turns it on in every new Claude chat of the machine (an app the person installed, not a team's); `command:/x` turns it on in a Claude chat when a message starts with `/x` (one app per command, the agent's own commands such as `/clear` are refused). `manual` is checked and turns nothing on; `view` and `template` are refused: not supported yet. `openView`: the view `harnessly open app:<id>` shows |
-| `permissions` | yes | `chat.prompt`, `chat.read`, `chat.card`, `agents.read`, `pane.open`, `storage`, `storage.space.write`, `files.read:<mask>`, `files.write:<mask>`, `secrets:<name>`, `sinopia.read\|write\|comment\|kind`, `notify`, `tools.page`, `context.publish`. `ai`, `users.read` and `sinopia.export` are refused: not supported yet. Every right and the methods it opens: [reference](apps/reference.md) |
+| `permissions` | yes | `chat.prompt`, `chat.read`, `chat.card`, `agents.read`, `pane.open`, `storage`, `storage.space.write`, `files.read:<mask>`, `files.write:<mask>`, `secrets:<name>`, `sinopia.read\|write\|comment\|kind`, `notify`, `tools.page`, `context.publish`, `connections.read`, `connections.act`. `ai`, `users.read` and `sinopia.export` are refused: not supported yet. Every right and the methods it opens: [reference](apps/reference.md) |
 | `network` | no | `connect`, `resources`, `frames`: host names; `*` needs `reason` |
 | `secrets` | no | `{name, description, optional}`; each needs the permission `secrets:<name>`. The person puts the value into the machine's safe from «О приложении», off the chat, under `app/<id>/<name>`. It reaches nobody but the app's MCP servers: the runtime's MCP proxy writes it in place of `${secret:<name>}` in a remote server's `headers` on each call (no file holds it), and a launch writes it in `env` of a local server of a `trusted` app (a folder only that chat's wall opens, removed when the agent is gone). A view, the agent, the host tools and the safe's list never get it. A new value is read at the next launch: no reinstall. An app with a required secret that has no value is «ждёт секрет» (shown in «О приложении»); its chat starts, without the servers that need it |
+| `connections` | no | The person's connections (Settings → Connections) the views read with `hl.connections`: `[{id \| category, access, reason}]`, up to 16. `id` is a catalog entry (`yandex-tracker`), `category` a group of the catalog (`mail`, `tasks`, `calendar`, `docs`, `code`, …) and stands for each connection of the person's in it. `access` is `read` (the default: tools the server marks read-only, GET requests) or `all` (also changes, each after the person's yes; needs `connections.act`). `reason` is one line of up to 200 characters for the person's card. Needs `connections.read`. See [The person's connections](#the-persons-connections-hlconnections) |
 | `settings` | no | JSON Schema of an object (`properties` of `string`, `number`, `integer`, `boolean`, with `title`, `description`, `enum`, `default`, `minimum`, `maximum`, `required`). The host draws a form from it in «О приложении» and checks the values against it. They are kept in the `install` storage under `_settings` (a view cannot write that key); a view reads them with `hl.settings.get()`, the agent with the host tool `settings_get` |
 | `kind` | no | `ui`, `runtime` or `tool`: what the package is (see Extensions). Worked out from the contents when absent; when written it must agree with them |
 | `data` | no | `{version, migrations}`: the version of the app's own data and a JSON Patch file for each earlier version (`"1": "migrations/1-to-2.json"`) |
@@ -135,13 +136,18 @@ One dependency-free file the runtime serves to every view at `/__hl/app-sdk.js` 
 
 | Call | Permission | What it does |
 | --- | --- | --- |
-| `hl.on(event, fn)` | none | `context`, `theme`, `selection`, `data` (a chat widget's), `storage` (`{scope, key}`, no value: a key of the app's storage was written or deleted by the agent, another view or this one, told within a second from the runtime's stream `GET <platform>/apps/events`; only to views of that app that hold `storage`, and an area of a chat or document only to the views of that chat or document) and `visibility` (`{visible}`: the view was hidden or shown). `tool-result`, `tool-input` are not sent by the page yet |
+| `hl.on(event, fn)` | none | `context`, `theme`, `selection`, `data` (a chat widget's), `storage` (`{scope, key}`, no value: a key of the app's storage was written or deleted by the agent, another view or this one, told within a second from the runtime's stream `GET <platform>/apps/events`; only to views of that app that hold `storage`, and an area of a chat or document only to the views of that chat or document) and `visibility` (`{visible}`: the view was hidden or shown) and `connections` (the person's connections changed: an agreement given or taken back, a sign-in, a turn on or off; only to views that hold `connections.read`). `tool-result`, `tool-input` are not sent by the page yet |
 | `hl.chat.send(text)` | `chat.prompt` | A message to the agent of this chat; the chat always shows the app's real name before it, on one line |
 | `hl.chat.read({last})` | `chat.read` | The latest messages of the chat |
 | `hl.chat.card(view, data)` | `chat.card` | A card of the app in the feed |
 | `hl.pane.open(target)` | `pane.open` | Opens `app:<id>[/<view>]`, or `chat:<id>` of a conversation the page holds — this machine's or another machine's of the person (also needs `agents.read`); where the app is the main thing also `object:<slug>` and `share:<slug>` (the share dialog of a board or a document); anything else is `invalid_params` |
 | `hl.agents.list()` | `agents.read` | Conversations of the person on this machine: `{id, title, status: working\|waiting\|free, provider, machine}`, no text; the page answers from the list it already holds, and tells the `agents` event when it changes |
 | `hl.tools.call('server.tool', args)` | none | A tool of the app's own remote MCP server (`.mcp.json`), called by the machine: `https://` on a public address, or an internal host the deployment lists (`RUNTIME_APPS_INTERNAL_HOSTS`, `RUNTIME_APPS_CA_FILE`), 30 s, 4 MB. A `command` server is `policy_blocked`, a header with `${` is not sent. Answers the raw MCP result, `isError` included |
+| `hl.connections.list()` | `connections.read` | What the manifest's `connections` names, each as the person has it: `{id, slug, name, kind: mcp\|local\|api, category, status, declared, access, reason}`; `status` is `ready`, `needs_consent`, `not_connected`, `needs_signin`, `off` or `unavailable`. Never a key, an address or a header |
+| `hl.connections.tools(conn)` | `connections.read` | The tools of an MCP connection: `{name, description, inputSchema, readOnly}` |
+| `hl.connections.call(conn, tool, args)` | `connections.read` | Calls a tool with the person's own sign-in; the raw MCP result. A read-only tool runs at once; any other asks the person first |
+| `hl.connections.api(conn, {method, path, query, body})` | `connections.read` | A request to an API connection with the person's keys: `{status, ok, contentType, body}`, a JSON answer parsed. GET reads; the rest asks the person first |
+| `hl.connections.request(conn, {access})` | `connections.read` | Asks the person to agree to a connection for this app (the host's card): `{granted, access}` |
 | `hl.storage.<scope>.get/getVersioned/set/delete/keys` | `storage` | Scopes `install`, `user`, `chat`, `space`, `doc`; writing `space` needs `storage.space.write`. Every key has a version (a counter that goes up with each write or delete; 0 for a key never written or kept before versions). `getVersioned` answers `{value, version}`; `set(key, value, {ifVersion})` writes only if the key is at that version, else rejects with `conflict` (`error.version` is the current one) and writes nothing; a write past the area's limit is `quota_exceeded` |
 | `hl.flow.*`, `hl.data.*` | none | Removed (they were never connected): a call rejects with `invalid_params` |
 | `hl.ui.toast/confirm`, `hl.notify(text)` | `notify` for the last | A notice, a question, a message to the person |
@@ -289,6 +295,77 @@ per app (the page's lines, the files the view server refused, the failed calls o
 read with `harnessly app logs <id> [--follow] [--since 10m] [--json]`. `harnessly app check <id> --open [--view v]` opens the
 view in a headless browser of the machine, waits for the handshake and prints how it loaded (exit 1 on a failure). A dev
 install (`harnessly app dev`) shows its debug section without the switch. See [Debugging](build-apps/06-debugging.md#where-to-look).
+
+### The person's connections (`hl.connections`)
+
+An app's views read the services the person connected in **Settings → Connections** (mail, trackers, calendars, any MCP
+server, local server or API) through `hl.connections`: the same connections the agents reach through `harnessly-hub`
+(`docs/mcp-connections.md`), signed in as the person. A sidebar widget shows the unread mail from Yandex Mail or the
+open issues of Yandex Tracker; the app holds no key. Example: [`apps/tracker-side`](apps/tracker-side).
+
+```json
+{
+  "permissions": ["connections.read"],
+  "connections": [
+    { "id": "yandex-tracker", "access": "read", "reason": "Shows your open issues" },
+    { "category": "mail", "reason": "Counts unread mail" }
+  ]
+}
+```
+
+```js
+const hl = await harnessly.connect({ protocol: 2 });
+const [tracker] = (await hl.connections.list()).filter((c) => c.id === 'yandex-tracker');
+if (tracker.status === 'needs_consent') await hl.connections.request('yandex-tracker'); // from a click
+const found = await hl.connections.api('yandex-tracker', { method: 'POST', path: '/issues/_search', body: { query: 'Assignee: me()' } });
+const unread = await hl.connections.call('yandex-mail', 'search_messages', { unread: true }); // an MCP connection
+hl.on('connections', refresh); // an agreement, a sign-in, a turn on or off
+```
+
+**What a view reaches.** Only what is both named in the manifest (`connections`, by catalog id or by group) and agreed
+to by the person for this app, at the level both allow. Every call is checked three times: by the page's bridge (the
+right `connections.read`, the arguments), by the runtime (`POST <platform>/apps/connections`: the manifest again, the
+agreement, what the call does) and by the connection's own sign-in at the service. A connection the manifest does not
+name is `permission_denied` whether the person has it or not.
+
+**The person's agreement, per connection and per app.** The first time, the view calls `hl.connections.request(conn)`
+(from a click, not on load): the host shows a card titled with the app's real name, the connection's name, the app's
+`reason` and the level (reading only, or acting too), and the answer is `{granted}`. The same agreement is given or taken
+back in the app's «О приложении» → «Настройка» (`POST <platform>/apps/setup/connection {id, name, access?, remove?}`) and by
+`harnessly app connect <app> <connection> [--off]`. It is kept on the machine (`connection-grants.json`, per app, with
+its level), is the person's alone (an agent's token is refused on these routes, a view has no route of its own), and ends
+with the app. An update never widens it: a connection the new version names for the first time waits for its own
+agreement, one it dropped or narrowed from `all` to `read` loses what it had. A group (`category`) covers every
+connection of the person's in it, each agreed to apart; a person with none leaves the group's line at `not_connected`.
+Two connections made from one catalog entry share the agreement. A service of the person's own (a pasted address, an API or a local server added by hand or by an agent, `custom-<slug>`) is named in the manifest like a catalog entry.
+
+**Read and write.** `access: read` (the default) lets a view call only the tools the server marks `readOnlyHint` and
+make GET and HEAD requests (and the searches the catalog lists as reads of an API, such as Yandex Tracker's
+`POST /issues/_search`). A tool that carries no mark is taken as one that may change something. Anything else needs the
+right `connections.act`, `access: "all"` in the manifest, the person's agreement at that level, and **their yes to that
+very call**: the runtime answers it `needsConfirm` and sends nothing; the page shows the host's dialog with the connection,
+the tool or `METHOD path`, and the arguments, and repeats the call with `confirmed` only after «ОК» (the same shape as
+`harnessly connector act`: a change in the person's name leaves only after their yes to exactly what it does). A «no» is
+`permission_denied`. While the chat's agent drives the view, a call is also asked about as the other high-class rights
+are, before it starts.
+
+**Secrets never reach the view.** The sign-in, the keys, the server's address and its headers stay in the connections'
+service. `list` carries no address, header or key; a call's answer and error pass through a scrub that takes the
+connection's keys (typed keys, a header, OAuth tokens) out of the text as `[key]`; a refusal does not repeat the server's
+own words. An API's path never leaves its base address. What a service returns is data for the app, never instructions: do
+not pass it to the agent as if it were the person's words.
+
+**Limits.** 20 calls in 10 seconds per app and connection (`rate_limited`), 512 KiB of answer (`quota_exceeded`: ask for
+less), 256 KiB of arguments or body, 30 seconds a call. The journal of the app records each call (the connection, the
+tool or the method and path, never the arguments), as a `high` call, a change as `critical`.
+
+**Where it stands.** Without the connection, the call is `auth_required` with `error.signIn.connection` (the host shows
+«Войти»; a view never signs in), the same for a connection turned off or waiting for a sign-in (`auth_expired` for a
+sign-in that ran out); `permission_denied` says the person has not agreed. `list` says it before any call, so a view
+draws «нет подключения» and «нет согласия» itself. A failed service is `upstream_error`; the others are the codes of the
+bridge. The runtime's route takes the view's session and these ops: `list`, `tools`, `call`, `api`, `request`, and `grant`
+(the page's own word after the person's yes in the card). It is the person's page session only; a builtin or a
+slot view uses it through the same bridge.
 
 ### Host calls beyond storage and tools
 
@@ -843,6 +920,7 @@ The following is under `HARNESSLY_UI_SLOTS=on`; without it nothing here is offer
 - [`apps/cashback`](apps/cashback): a pane and full-screen view with the month's picks in the chat's storage; the agent reads and writes them with `app.data.*`, shows the view with `app.open` and confirms changes with `app.ask`. In a site it adds a card template whose elements carry `data-hl-field`, and an inspector view that opens on a click on one of them and writes the value back with `hl.sinopia.setFields`.
 - [`apps/moodboard`](apps/moodboard): a Sinopia document type of its own (`acme.moodboard`) built from the SDK alone: its editor view, a JSON Schema and a migration between two versions of the format.
 - [`apps/standup`](apps/standup): a `trusted` app with a local stdio server, the workspace's files as the shared store, a pane and full-screen view, a card from a tool's result, and the worked example of [the guide](build-apps/08-worked-example.md).
+- [`apps/tracker-side`](apps/tracker-side): a sidebar widget (`side`) that shows the person's open Yandex Tracker issues through `hl.connections`: no key in the app, a read agreement, and a word for each state (not connected, no agreement, waiting for a sign-in, off, empty, a list).
 - [`apps/deck-lint`](apps/deck-lint): «Валидатор презентаций», on in presentations only (`sinopia.slides`): word and font-size rules that mark the slides' blocks and stop a share while one is an error, a panel with the longest texts, a selection item that asks the agent to shorten the text.
 
 ## State

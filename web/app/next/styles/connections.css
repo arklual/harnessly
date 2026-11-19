@@ -463,29 +463,6 @@ html[data-theme='dark'] .hx-conn-glyph[data-mcp='posthog'] {
   font-size: var(--hx-text-xs);
   line-height: 1.5;
 }
-
-/* A connected server */
-.hx-mcp-row .hx-conn-glyph,
-.hx-mcp-row .hx-conn-row__name,
-.hx-mcp-row .hx-conn-row__sub {
-  transition: opacity var(--hx-dur-xs) ease;
-}
-.hx-mcp-row[data-off] .hx-conn-glyph,
-.hx-mcp-row[data-off] .hx-conn-row__name,
-.hx-mcp-row[data-off] .hx-conn-row__sub {
-  opacity: 0.5;
-}
-.hx-mcp-row__flow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-  margin-top: 2px;
-  color: var(--hx-fg-2);
-  font-size: var(--hx-text-xs);
-  line-height: 1.4;
-  animation: hx-conn-in 240ms var(--hx-ease-out) backwards;
-}
 .hx-mcp-row__link {
   padding: 0;
   border: 0;
@@ -553,103 +530,6 @@ html[data-theme='dark'] .hx-conn-glyph[data-mcp='posthog'] {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
-
-/* The catalog: a press on a card puts its service in the form above */
-.hx-mcp-cat {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-.hx-mcp-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  min-height: 56px;
-  padding: 10px 12px;
-  border: 1px solid var(--hx-border);
-  border-radius: 14px;
-  background: var(--hx-bg-window);
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  animation: hx-conn-in 320ms var(--hx-ease-out) backwards;
-  transition:
-    background-color var(--hx-dur-xs) ease,
-    border-color var(--hx-dur-xs) ease;
-}
-.hx-mcp-card:hover {
-  background: var(--hx-bg-hover);
-}
-.hx-mcp-card:focus-visible {
-  outline: 2px solid var(--hx-accent);
-  outline-offset: 2px;
-}
-.hx-mcp-card[aria-pressed='true'] {
-  border-color: var(--hx-fg-3);
-}
-.hx-mcp-card[data-leaving] {
-  animation: hx-conn-out 200ms cubic-bezier(0.4, 0, 1, 1) both;
-  pointer-events: none;
-}
-.hx-mcp-card__go {
-  flex-shrink: 0;
-  color: var(--hx-fg-3);
-  opacity: 0;
-  transition: opacity var(--hx-dur-xs) ease;
-}
-.hx-mcp-card:hover .hx-mcp-card__go,
-.hx-mcp-card[aria-pressed='true'] .hx-mcp-card__go {
-  opacity: 1;
-}
-.hx-mcp-more {
-  display: inline-flex;
-  align-items: center;
-  justify-self: start;
-  gap: 4px;
-  padding: 4px;
-  border: 0;
-  background: none;
-  color: var(--hx-fg-2);
-  font: inherit;
-  font-size: var(--hx-text-sm);
-  cursor: pointer;
-}
-.hx-mcp-more:hover {
-  color: var(--hx-fg-1);
-}
-/* The whole catalog: a search, then the services by what they reach */
-.hx-mcp-all {
-  display: grid;
-  gap: 16px;
-}
-.hx-mcp-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.hx-mcp-search__icon {
-  position: absolute;
-  left: 12px;
-  color: var(--hx-fg-3);
-  pointer-events: none;
-}
-.hx-mcp-search__input {
-  width: 100%;
-  padding-left: 34px;
-}
-.hx-mcp-group {
-  display: grid;
-  gap: 8px;
-  animation: hx-conn-in 320ms var(--hx-ease-out) backwards;
-}
-.hx-mcp-group__title {
-  margin: 0;
-  color: var(--hx-fg-3);
-  font-size: var(--hx-text-xs);
-  font-weight: 500;
-}
 .hx-mcp-none {
   margin: 0;
   color: var(--hx-fg-3);
@@ -657,28 +537,6 @@ html[data-theme='dark'] .hx-conn-glyph[data-mcp='posthog'] {
 }
 .hx-mcp__foot {
   margin: 0;
-}
-.hx-mcp-card__text {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.hx-mcp-card__name {
-  overflow: hidden;
-  color: var(--hx-fg-1);
-  font-size: var(--hx-text-sm);
-  font-weight: var(--hx-weight-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hx-mcp-card__blurb {
-  overflow: hidden;
-  color: var(--hx-fg-3);
-  font-size: var(--hx-text-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* The keys of a local server or an API: one field each, a hint under it, links to where they are made */
@@ -704,24 +562,12 @@ html[data-theme='dark'] .hx-conn-glyph[data-mcp='posthog'] {
 }
 
 @media (max-width: 600px) {
-  .hx-mcp-cat,
   .hx-mcp-head {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .hx-mcp-row .hx-conn-row__head {
-    flex-wrap: wrap;
-  }
-  .hx-mcp-row .hx-conn-row__head .hx-set__btn {
-    order: 3;
-    margin-left: 48px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hx-mcp-row__flow,
-  .hx-mcp-card,
-  .hx-mcp-card[data-leaving],
-  .hx-mcp-card__go,
   .hx-mcp-tools__chev {
     animation: none;
     transition: none;

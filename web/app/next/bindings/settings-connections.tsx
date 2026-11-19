@@ -1,7 +1,7 @@
 // Settings → Connections on the machine the person has open: the list read when the page opens, every change taken
 // only from the machine's answer (a refused one leaves the list as it was). Its MCP servers are a part of their own
 // under it, read on their own: a machine without them still shows its trackers and wikis.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { pageText } from '@/next/bindings/outcome';
 import {
   checkConnection,
@@ -34,6 +34,8 @@ import {
 import ConnectorsSection from '@/next/features/connectors/connectors-section';
 import {
   addMcp,
+  addOwnService,
+  describeOwnService,
   checkMcp,
   enableMcp,
   loadMcp,
@@ -50,6 +52,7 @@ import { mcpReasonText, needsPerson, withServer } from '@/next/features/connecti
 import McpSection, { type TSignInStart } from '@/next/features/connections/mcp-section';
 import { reasonText, withConn, withPrimary } from '@/next/features/connections/model';
 import type { MachineId } from '@/next/protocol/v2';
+import { goTo, ROUTE } from '@/next/routes/routes';
 
 type TLoad = { k: 'loading' } | { k: 'failed'; text: string } | { k: 'ready'; conns: readonly IConn[] };
 
@@ -75,7 +78,7 @@ const mcpOutcome = <T,>(res: TConnOutcome<T>): { value: T } | { error: string } 
 };
 
 /** The part of the page under trackers and wikis: the machine's MCP servers and the catalog. */
-const McpPart = ({ machine }: { machine: MachineId }) => {
+const McpPart = ({ machine, item }: { machine: MachineId; item: string | null }) => {
   const [state, setState] = useState<TMcpLoad>({ k: 'loading' });
   const [attempt, setAttempt] = useState(0);
 
@@ -151,6 +154,14 @@ const McpPart = ({ machine }: { machine: MachineId }) => {
     <McpSection
       mcp={state.k === 'ready' ? state.mcp : null}
       failed={state.k === 'failed' ? { reason: state.text, onRetry: retry } : null}
+      item={item}
+      onOpen={(next) =>
+        goTo(
+          next === null
+            ? { kind: ROUTE.settings, section: 'connections' }
+            : { kind: ROUTE.settings, section: 'connections', item: next },
+        )
+      }
       onProbe={async (url) => {
         const got = mcpOutcome(await probeMcp(machine, url));
         return 'error' in got ? { error: got.error } : { probe: got.value };
@@ -161,8 +172,15 @@ const McpPart = ({ machine }: { machine: MachineId }) => {
         change((all) => withServer(all, got.value.server));
         return got.value;
       }}
+      onAddOwn={async (input, values) => {
+        const got = mcpOutcome(await addOwnService(machine, input, values));
+        if ('error' in got) return { error: got.error };
+        change((all) => withServer(all, got.value.server));
+        return got.value;
+      }}
       onSignIn={signIn}
       onRefresh={refresh}
+      onDescribe={(id, description) => replaced(describeOwnService(machine, id, description))}
       onHeader={(id, header) => replaced(setMcpHeader(machine, id, header))}
       onEnv={(id, env) => replaced(setMcpEnv(machine, id, env))}
       onCheck={(id) => replaced(checkMcp(machine, id))}
@@ -299,7 +317,38 @@ const ConnectorsPart = ({ machine }: { machine: MachineId }) => {
   );
 };
 
-export const ConnectionsPage = ({ machine, start }: { machine: MachineId; start?: string }) => {
+/**
+ * A service's page opens from the top, and the list it came from is found where it was left: the page keeps the scroll
+ * position of the list while a service is open (the list stays mounted, only hidden) and puts it back on return.
+ */
+const useListScroll = (item: string | null) => {
+  const root = useRef<HTMLDivElement>(null);
+  const left = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const scroller = root.current?.closest('.hx-set__page');
+    if (!(scroller instanceof HTMLElement)) return;
+    if (item !== null) {
+      left.current ??= scroller.scrollTop;
+      scroller.scrollTo({ top: 0 });
+    } else if (left.current !== null) {
+      scroller.scrollTo({ top: left.current });
+      left.current = null;
+    }
+  }, [item]);
+  return root;
+};
+
+export const ConnectionsPage = ({
+  machine,
+  start,
+  item = null,
+}: {
+  machine: MachineId;
+  start?: string;
+  /** The service whose page is open (the address's `item`); null: the list. */
+  item?: string | null;
+}) => {
+  const root = useListScroll(item);
   const [state, setState] = useState<TLoad>({ k: 'loading' });
   const [attempt, setAttempt] = useState(0);
 
@@ -334,33 +383,35 @@ export const ConnectionsPage = ({ machine, start }: { machine: MachineId; start?
   };
 
   return (
-    <>
-      <ConnectionsSection
-        connections={state.k === 'ready' ? state.conns : null}
-        failed={state.k === 'failed' ? { reason: state.text, onRetry: retry } : null}
-        start={start}
-        onDetect={async (url) => {
-          const got = outcome(await detectLink(machine, url));
-          return 'error' in got ? { error: got.error } : { detection: got.value };
-        }}
-        onConnect={(input) => replaced(connectLink(machine, input))}
-        onCheck={(id) => replaced(checkConnection(machine, id))}
-        onRename={(id, name) => replaced(renameConnection(machine, id, name))}
-        onPrimary={async (id) => {
-          const got = outcome(await makePrimary(machine, id));
-          if ('error' in got) return got.error;
-          change((conns) => withPrimary(conns, got.value));
-          return null;
-        }}
-        onRemove={async (id) => {
-          const got = outcome(await removeConnection(machine, id));
-          if ('error' in got) return got.error;
-          change((conns) => conns.filter((conn) => conn.id !== id));
-          return null;
-        }}
-      />
-      <ConnectorsPart machine={machine} />
-      <McpPart machine={machine} />
-    </>
+    <div className="hx-cn" ref={root} data-service={item !== null || undefined}>
+      <div className="hx-cn__lists" hidden={item !== null}>
+        <ConnectionsSection
+          connections={state.k === 'ready' ? state.conns : null}
+          failed={state.k === 'failed' ? { reason: state.text, onRetry: retry } : null}
+          start={start}
+          onDetect={async (url) => {
+            const got = outcome(await detectLink(machine, url));
+            return 'error' in got ? { error: got.error } : { detection: got.value };
+          }}
+          onConnect={(input) => replaced(connectLink(machine, input))}
+          onCheck={(id) => replaced(checkConnection(machine, id))}
+          onRename={(id, name) => replaced(renameConnection(machine, id, name))}
+          onPrimary={async (id) => {
+            const got = outcome(await makePrimary(machine, id));
+            if ('error' in got) return got.error;
+            change((conns) => withPrimary(conns, got.value));
+            return null;
+          }}
+          onRemove={async (id) => {
+            const got = outcome(await removeConnection(machine, id));
+            if ('error' in got) return got.error;
+            change((conns) => conns.filter((conn) => conn.id !== id));
+            return null;
+          }}
+        />
+        <ConnectorsPart machine={machine} />
+      </div>
+      <McpPart machine={machine} item={item} />
+    </div>
   );
 };

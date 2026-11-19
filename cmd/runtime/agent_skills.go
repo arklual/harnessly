@@ -158,10 +158,13 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 	b.WriteString("## Video\n\n")
 	b.WriteString("When the person asks for a video clip made from pictures or from a text (\"сделай видео из кадра\", \"оживи картинку\", " +
 		"\"animate this frame\"), call the MCP tool `generate_video` (`mcp__harnessly__generate_video` in Claude Code): frames are the pictures it starts " +
-		"from, the model is kling, seedance or ltx. It spends the person's Higgsfield balance: call it only when they asked for a clip " +
-		"(or the task you work on says to), mind the price it answers with (a job over `max_usd` is refused: tell the person the price and ask, " +
-		"never raise the cap yourself), and when it says there is no key, follow its words (the key is asked through the safe, never in the chat). " +
-		"The clip appears in the chat as it is made; its origin is written beside it (`<clip>.origin.json`).\n\n")
+		"from, the model is seedance, kling or minimax (ltx through an API key only). Music, a song, a voice-over or a sound effect: `generate_audio` " +
+		"(model speech, music or sfx). Both spend the person's Higgsfield credits or balance: call them only when they asked " +
+		"(or the task you work on says to), mind the price they answer with (a job over `max_usd` is refused: tell the person the price and ask, " +
+		"never raise the cap yourself), and when they say Higgsfield is not connected or asks what pays (trial or credits), follow their words " +
+		"(a key is asked through the safe, never in the chat). The result appears in the chat as it is made; its origin is written beside it " +
+		"(`<file>.origin.json`). Higgsfield's other tools (presets, Marketing Studio, 3D, its models' catalog) are on the harnessly-hub " +
+		"connection higgsfield-mcp.\n\n")
 	b.WriteString("## Handing files over\n\n")
 	b.WriteString("When the person asks you to download, send or give them a file (\"скачай\", \"скинь\", \"put it in a zip\", \"give me the docx\"), " +
 		"make it and hand it over with the `deliver_file` tool (or `harnessly deliver <path>`); never answer with the path in text. " +

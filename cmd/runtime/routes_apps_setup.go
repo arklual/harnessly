@@ -9,7 +9,6 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/gate"
-	"github.com/ly-solutions/harnessly/internal/mcpconn"
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
 	"github.com/ly-solutions/harnessly/internal/secrets"
 )
@@ -22,7 +21,7 @@ import (
 //	POST <platform>/apps/setup           {id}                 the form, the values and what the app waits for
 //	POST <platform>/apps/setup/settings  {id, values}         saves the values once they pass the schema (else problems)
 //	POST <platform>/apps/setup/secret    {id, name, value}    puts a secret's value ({remove: true} forgets it)
-//	POST <platform>/apps/setup/connection {id, name}          allows the app the person's connection ({remove: true} takes it back)
+//	POST <platform>/apps/setup/connection {id, name, access?}  allows the app the person's connection, as far as access (read, all; default as far as the app asks) ({remove: true} takes it back)
 
 type setupBody struct {
 	ID     string         `json:"id"`
@@ -30,6 +29,8 @@ type setupBody struct {
 	Name   string         `json:"name"`
 	Value  string         `json:"value"`
 	Remove bool           `json:"remove"`
+	// Access is how far the person allows a connection: read or all; empty is as far as the app asks (connection).
+	Access string `json:"access"`
 }
 
 // setupAnswer is the whole of «Настройка» of an app as the page draws it.
@@ -52,6 +53,15 @@ type setupConnection struct {
 	Name      string `json:"name"`
 	Granted   bool   `json:"granted"`
 	Connected bool   `json:"connected"`
+	// Declared is how far the app asks to go with it (read or all), Access how far the person allowed ("" not at all),
+	// Status where it stands as a view sees it (appConnInfo); Kind and Category say what it is. A group the app names
+	// with none of the person's connections in it is a line with no id.
+	Declared string `json:"declared,omitempty"`
+	Access   string `json:"access,omitempty"`
+	Status   string `json:"status,omitempty"`
+	Kind     string `json:"kind,omitempty"`
+	Category string `json:"category,omitempty"`
+	Reason   string `json:"reason,omitempty"`
 }
 
 func appSetupRoutes(d deps, reg *apps.Registry, storage *apps.Storage) []gate.Route {
@@ -70,11 +80,12 @@ func appSetupRoutes(d deps, reg *apps.Registry, storage *apps.Storage) []gate.Ro
 			out.Waiting = []string{}
 		}
 		out.Connections = []setupConnection{}
-		if pkg, _ := apps.CachedPackage(app.Dir); pkg != nil {
-			for _, id := range pkg.Connections() {
-				_, connected := mcpFor(d).ByCatalog(id)
-				out.Connections = append(out.Connections, setupConnection{ID: id, Name: mcpconn.CatalogName(id),
-					Granted: reg.ConnectionGranted(app.ID, id), Connected: connected})
+		conns := &appConns{ms: mcpFor(d), reg: reg}
+		if list, err := conns.list(app.ID); err == nil {
+			for _, c := range list {
+				out.Connections = append(out.Connections, setupConnection{ID: c.ID, Name: c.Name, Granted: c.Access != "",
+					Connected: c.Status != connNotConnected && c.Status != connOff && c.Status != connNeedsSignIn,
+					Declared:  c.Declared, Access: c.Access, Status: c.Status, Kind: c.Kind, Category: c.Category, Reason: c.Reason})
 			}
 		}
 		return out, nil
@@ -159,11 +170,12 @@ func appSetupRoutes(d deps, reg *apps.Registry, storage *apps.Storage) []gate.Ro
 		if b.Remove {
 			err = reg.RevokeConnection(app.ID, b.Name)
 		} else {
-			err = reg.GrantConnection(app.ID, b.Name)
+			err = reg.GrantConnectionAccess(app.ID, b.Name, b.Access)
 		}
 		if err != nil {
 			return http.StatusNotFound, map[string]string{"error": "not-found"}
 		}
+		storage.NotifyConnections(app.ID)
 		return read(app, b)
 	}
 	is := func(p string) func(*http.Request) bool { return func(r *http.Request) bool { return pathIs(r, p) } }

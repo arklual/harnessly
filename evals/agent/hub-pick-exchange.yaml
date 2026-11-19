@@ -1,0 +1,34 @@
+id: hub-pick-exchange
+title: Четыре биржи подключены — агент берёт ту, что названа в задаче, и не путает похожие
+tags: [connections, hub, finance]
+timeout_s: 300
+# OKX, Binance, Kraken and Coinbase are all connected and all answer «price of a pair». The person names OKX:
+# the agent finds that connection through the hub and asks it, not one of the three look-alikes.
+setup:
+  connections: [okx, binance, kraken, coinbase]
+covers:
+  - 'internal/mcpconn/hub.go'
+  - 'internal/mcpconn/catalog_api.go'
+  - 'internal/mcpconn/catalog.go'
+prompt: какая сейчас цена BTC-USDT на бирже OKX?
+expect:
+  - name: looked the connection up through the hub
+    called: harnessly-hub\.(search_tools|connections|api_request)
+  - name: asked OKX
+    called: harnessly-hub\.api_request
+    args: {connection: '(?i).*okx.*'}
+  - name: did not ask the look-alike exchanges
+    not_called: harnessly-hub\.api_request
+    args: {connection: '(?i).*(binance|kraken|coinbase).*'}
+  - name: did not go around the hub
+    not_called: Bash
+    args: {command: '(?i)(?s).*(curl|wget|python|requests).*(okx|binance|kraken|coinbase).*'}
+  - name: answered with a price
+    text: '(?i)\d[\d\s.,]{3,}'
+variants:
+  - id: v1
+    kind: english
+    text: "What's the current BTC-USDT price on OKX?"
+  - id: v2
+    kind: short
+    text: "okx btc usdt цена"

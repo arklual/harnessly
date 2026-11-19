@@ -50,6 +50,11 @@ type Service struct {
 
 	lockMu sync.Mutex
 	locks  map[string]*lockT
+
+	// subs hear that the servers were written (OnChange, appaccess.go).
+	subMu   sync.Mutex
+	subs    map[int]func()
+	nextSub int
 }
 
 // New keeps servers in dir/mcp-connections.json and their credentials in secrets. h nil is connections.NewHTTP(nil):
@@ -58,7 +63,7 @@ func New(dir string, secrets Secrets, h *connections.HTTP) *Service {
 	if h == nil {
 		h = connections.NewHTTP(nil)
 	}
-	return &Service{
+	s := &Service{
 		file:    filepath.Join(dir, "mcp-connections.json"),
 		secrets: secrets,
 		http:    h,
@@ -66,6 +71,8 @@ func New(dir string, secrets Secrets, h *connections.HTTP) *Service {
 		flows:   map[string]flow{},
 		locks:   map[string]*lockT{},
 	}
+	s.adoptOwn()
+	return s
 }
 
 type stored struct {
@@ -86,6 +93,7 @@ func (s *Service) readAll() (stored, error) {
 	if err := json.Unmarshal(raw, &f); err != nil {
 		return stored{}, fmt.Errorf("mcp-connections.json: %w", err)
 	}
+	rememberCustomKinds(f.Servers)
 	return f, nil
 }
 
@@ -121,7 +129,11 @@ func (s *Service) writeAll(f stored) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), s.file)
+	if err := os.Rename(tmp.Name(), s.file); err != nil {
+		return err
+	}
+	s.notifyChange()
+	return nil
 }
 
 // List is every server, in the order they were added.
@@ -211,7 +223,7 @@ func authStart(srv Server) *AuthStart {
 		return nil
 	}
 	a := &AuthStart{Auth: srv.Auth, HeaderName: srv.HeaderName, OAuthUnavailable: srv.OAuthUnavailable}
-	if e, ok := catalogEntry(srv.CatalogID); ok {
+	if e, ok := entryOf(srv); ok {
 		a.TokenURL = e.TokenURL
 	}
 	return a
@@ -293,6 +305,10 @@ func (s *Service) Add(ctx context.Context, in AddInput) (Server, *AuthStart, err
 	if srv.Auth == AuthHeader && fromCatalog && entry.HeaderName != "" {
 		srv.HeaderName = entry.HeaderName
 	}
+	if !fromCatalog && in.Owner == "" {
+		// A pasted address is a service of the person's own like any: an id an app's manifest can name.
+		s.ownIdentity(&srv)
+	}
 
 	if in.Header != nil && strings.TrimSpace(in.Header.Value) != "" {
 		hname, value, err := headerOf(in.Header.Name, in.Header.Value)
@@ -318,6 +334,9 @@ func (s *Service) Add(ctx context.Context, in AddInput) (Server, *AuthStart, err
 	f, err := s.readAll()
 	if err != nil {
 		return Server{}, nil, err
+	}
+	if srv.Custom != nil {
+		srv.CatalogID = uniqueCustomID(srv.CatalogID, f.Servers, srv.ID)
 	}
 	srv.Slug = uniqueSlug(slugBase(srv), f.Servers, srv.ID)
 	f.Servers = append(f.Servers, srv)

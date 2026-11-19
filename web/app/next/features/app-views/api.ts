@@ -646,6 +646,23 @@ export const callAI = async (
   }
 };
 
+/** The person's connections for a view (hl.connections): the runtime judges the manifest, the agreement and the reading. */
+export const callConnections = async (
+  m: MachineId,
+  session: string,
+  params: Record<string, unknown>,
+): Promise<Record<string, unknown>> => {
+  try {
+    return await runtimeJson<Record<string, unknown>>(
+      m,
+      platformPath('/apps/connections'),
+      postJson({ ...params, session }),
+    );
+  } catch (e) {
+    throw asBridgeError(e);
+  }
+};
+
 /** A value into the safe, never read back (secrets.write): {created}. */
 export const callSecretsPut = async (
   m: MachineId,
@@ -912,6 +929,12 @@ export interface IAppConnection {
   granted: boolean;
   /** The person is signed in to it. */
   connected: boolean;
+  /** hl.connections: how far the app asks (read or all), how far the person allowed ('' not at all). */
+  declared?: 'read' | 'all';
+  access?: 'read' | 'all' | '';
+  /** The group of the catalog (mail, tasks…); a line with no `id` is a group the app names with none of the person's connections in it. */
+  category?: string;
+  reason?: string;
 }
 
 export interface IAppSetup {
@@ -939,8 +962,18 @@ export const putAppSecret = (m: MachineId, id: string, name: string, value: stri
   runtimeJson<IAppSetup>(m, platformPath('/apps/setup/secret'), postJson({ id, name, value }));
 
 /** Allows the app the person's connection (on) or takes it back. */
-export const setAppConnection = (m: MachineId, id: string, name: string, on: boolean): Promise<IAppSetup> =>
-  runtimeJson<IAppSetup>(m, platformPath('/apps/setup/connection'), postJson({ id, name, remove: !on }));
+export const setAppConnection = (
+  m: MachineId,
+  id: string,
+  name: string,
+  on: boolean,
+  access?: 'read' | 'all',
+): Promise<IAppSetup> =>
+  runtimeJson<IAppSetup>(
+    m,
+    platformPath('/apps/setup/connection'),
+    postJson({ id, name, remove: !on, ...(access ? { access } : {}) }),
+  );
 
 export const removeAppSecret = (m: MachineId, id: string, name: string): Promise<IAppSetup> =>
   runtimeJson<IAppSetup>(m, platformPath('/apps/setup/secret'), postJson({ id, name, remove: true }));

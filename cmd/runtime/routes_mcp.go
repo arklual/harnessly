@@ -80,7 +80,9 @@ func mcpFor(d deps) *mcpconn.Service {
 	return s
 }
 
-func mcpRoutes(d deps) []gate.Route { return mcpRoutesOf(d, mcpFor(d), nil) }
+func mcpRoutes(d deps, c *core) []gate.Route {
+	return mcpRoutesOf(d, mcpFor(d), nil, ownServiceConfirmer(d, c))
+}
 
 // mcpStatus is the status of a reason: never 401 or 403, which the page reads as its own session.
 func mcpStatus(reason string) int {
@@ -190,7 +192,8 @@ func mcpReturnTo(r *http.Request, sent string) string {
 	return "/"
 }
 
-func mcpRoutesOf(d deps, ms *mcpconn.Service, transport http.RoundTripper) []gate.Route {
+// mcpRoutesOf: confirm makes the hub's connection_add ask the person on a card (nil: the tool is not offered).
+func mcpRoutesOf(d deps, ms *mcpconn.Service, transport http.RoundTripper, confirm mcpconn.Confirmer) []gate.Route {
 	base, cliBase, proxyBase := platformAPI+"/mcp", "/api/cli/mcp", strings.TrimSuffix(mcpProxyPath, "/")
 	under := func(r *http.Request, p string) (string, bool) {
 		for _, prefix := range []string{p + "/", "/agents" + p + "/"} {
@@ -270,6 +273,9 @@ func mcpRoutesOf(d deps, ms *mcpconn.Service, transport http.RoundTripper) []gat
 				notAllowed(w)
 			}
 			return
+		case rest == "custom":
+			mcpCustomRoute(w, r, ms, ctxOf)
+			return
 		case rest == "probe":
 			if r.Method != http.MethodPost {
 				notAllowed(w)
@@ -306,13 +312,18 @@ func mcpRoutesOf(d deps, ms *mcpconn.Service, transport http.RoundTripper) []gat
 				var b struct {
 					Name    *string `json:"name"`
 					Enabled *bool   `json:"enabled"`
+					// Custom is a new description of a service of the person's own; Guide an API's.
+					Custom *mcpconn.CustomMeta `json:"custom"`
+					Guide  *string             `json:"guide"`
 				}
 				if !readSecretBody(r, &b) {
 					badBody(w)
 					return
 				}
 				srv, err := ms.Get(id)
-				if err == nil && b.Name != nil {
+				if err == nil && b.Custom != nil {
+					srv, err = ms.DescribeCustom(id, b.Name, b.Guide, *b.Custom)
+				} else if err == nil && b.Name != nil {
 					srv, err = ms.Rename(id, *b.Name)
 				}
 				if err == nil && b.Enabled != nil {
@@ -450,7 +461,7 @@ func mcpRoutesOf(d deps, ms *mcpconn.Service, transport http.RoundTripper) []gat
 	}
 
 	px := &mcpProxy{d: d, ms: ms, client: mcpProxyClient(transport)}
-	hub := &mcpconn.Hub{S: ms, Results: filepath.Join(os.TempDir(), "harnessly-mcp-results")}
+	hub := &mcpconn.Hub{S: ms, Results: filepath.Join(os.TempDir(), "harnessly-mcp-results"), Confirm: confirm}
 	return []gate.Route{
 		{Match: func(r *http.Request) bool { return pathIs(r, mcpHubPath) || pathIs(r, "/agents"+mcpHubPath) },
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -460,7 +471,7 @@ func mcpRoutesOf(d deps, ms *mcpconn.Service, transport http.RoundTripper) []gat
 				}
 				ctx, cancel := context.WithTimeout(r.Context(), mcpCallMax)
 				defer cancel()
-				hub.ServeHTTP(w, r.WithContext(ctx))
+				hub.ServeHTTP(w, r.WithContext(withHubCaller(ctx, r)))
 			})},
 		{Match: func(r *http.Request) bool { _, ok := under(r, base); return pathIs(r, base) || ok }, Handler: http.HandlerFunc(page)},
 		{Match: func(r *http.Request) bool { return pathIs(r, cliBase) }, Handler: http.HandlerFunc(cli)},

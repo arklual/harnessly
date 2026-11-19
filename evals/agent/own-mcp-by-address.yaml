@@ -1,0 +1,38 @@
+id: own-mcp-by-address
+title: Свой сервис — MCP-сервер по адресу заводится через connection_add, токен для заголовка просится карточкой сейфа
+tags: [connections, hub, secrets]
+timeout_s: 420
+# A company's own MCP server by its address and a token in a header. The agent makes the connection with the hub's
+# connection_add (kind mcp, the address, the header), asks for the token through the safe and names that secret, and does not
+# add the server by other ways or ask the token in the chat. The address does not answer on a stand: what is judged is what the
+# agent asked for.
+covers:
+  - 'internal/mcpconn/hub_custom.go'
+  - 'internal/mcpconn/custom.go'
+  - 'cmd/runtime/safe_prompt.go'
+prompt: Подключи наш внутренний MCP-сервер по адресу https://mcp.acme.example/mcp — он пускает по токену в заголовке X-Team-Key. Токена под рукой нет.
+expect:
+  - name: made the connection with the hub's tool, as an MCP server
+    called: harnessly-hub\.connection_add
+    even_failed: true
+    args: {kind: '^mcp$', url: '(?i)mcp\.acme\.example/mcp'}
+  - name: said where the token goes
+    called: harnessly-hub\.connection_add
+    even_failed: true
+    args: {headerName: '(?i)^x-team-key$'}
+  - name: asked for the token through the safe
+    called: Bash
+    even_failed: true
+    args: {command: '(?s).*harnessly secret ask\s+custom-\S+.*'}
+  - name: did not ask for the token with a plain question
+    not_called: AskUserQuestion
+    even_failed: true
+  - name: did not ask to paste the token into the chat
+    text_not: '(?i)(пришли|вставь|скинь|отправь|напиши|дай|send|paste|share)\S*\s+(мне\s+|me\s+)?(сюда\s+)?(the\s+|your\s+|этот\s+|свой\s+)?(ключ|токен|key|token)\s*(сюда|в чат|мне|here|in the chat|in chat|to me)'
+variants:
+  - id: v1
+    kind: english
+    text: "Connect our internal MCP server at https://mcp.acme.example/mcp to harnessly. It takes a token in the X-Team-Key header; I don't have the token with me."
+  - id: v2
+    kind: short
+    text: "добавь наш mcp https://mcp.acme.example/mcp (заголовок X-Team-Key)"

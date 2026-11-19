@@ -96,6 +96,7 @@ flowchart TD
 11. [An existing site](11-existing-site.md): the agent drives your admin panel — the loader line, state, action, screen, the answer and its issues.
 12. [Notices](12-notices.md): ask the person in the smart notice — choice, confirm, field, code, a view of your own; never secrets.
 13. [Quick edit](13-quick-edit.md): let the person change your object by voice in seconds — read, apply, undo.
+14. [The person's connections](14-connections.md): show data from their mail, tracker or any connected service in a view, with their agreement and no key in your app.
 
 The [reference](../apps.md) has every field and every call.
 

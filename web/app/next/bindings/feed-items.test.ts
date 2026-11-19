@@ -32,11 +32,14 @@ import {
   type MessageView,
 } from '@/next/stores/messages';
 import { conversationsStore } from '@/next/stores/conversations';
+import { noteSnapshotStamp } from '@/next/stores/chat-state';
+import type { AgentStamp, ConvId } from '@/next/protocol/v2';
 import type { Conversation, Entry, Message, Permission, RewindMark, Turn } from '@/next/protocol/v2';
 
 const CONV = 'tab-1';
 
 afterEach(() => {
+  noteSnapshotStamp(CONV as ConvId, undefined, false);
   conversationsStore.delete(CONV);
   dropConversationData(CONV);
   convMessagesStore.delete(CONV);
@@ -439,6 +442,47 @@ describe('feed items', () => {
     const after = builder.snapshot();
     const item = after?.[0];
     expect(item && item.kind === 'turn' ? item.steps?.map((e) => e.t) : null).toEqual(['gate']);
+  });
+});
+
+describe('a live turn while the agent waits for the person', () => {
+  const live = (k: string): TurnItem => {
+    applyConvSnapshot(
+      CONV,
+      'local',
+      'replace',
+      {
+        turns: [turn],
+        entries: [],
+        beforeTurnId: null,
+        now: null,
+        queue: { conversationId: CONV, items: [], paused: null, rev: 1 },
+        questions: [],
+        permissions: [],
+        background: [],
+        messages: [],
+      },
+      1,
+    );
+    applyTurn(CONV, turn);
+    conversationsStore.set(CONV, { id: CONV, state: { k, since: 1 } } as unknown as Conversation);
+    noteSnapshotStamp(
+      CONV as ConvId,
+      { state: { k, since: 1 }, rev: 1, epoch: 'e' } as unknown as AgentStamp,
+      true,
+    );
+    const item = new ItemsBuilder(CONV, 'local').snapshot()?.[0];
+    if (!item || item.kind !== 'turn') throw new Error('no turn');
+    return item;
+  };
+
+  it('draws no «working» line: a question, a permission or a dialog stands open, nothing is at work', () => {
+    expect(live('waiting-permission').asks).toBe(true);
+    expect(live('waiting-question').asks).toBe(true);
+  });
+
+  it('draws it while the agent works', () => {
+    expect(live('working').asks).toBeUndefined();
   });
 });
 

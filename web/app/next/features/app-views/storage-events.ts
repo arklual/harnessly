@@ -39,6 +39,8 @@ export interface IStorageViewer {
  * area per chat or document only that of the chat or document the view is in. Another chat's key is not told.
  */
 export const reaches = (c: IStorageChange, v: IStorageViewer): boolean => {
+  // The person's connections of the app changed: told to a view that may read them, whatever its storage.
+  if (c.scope === 'connections') return c.app === v.app.id && v.app.permissions.includes('connections.read');
   if (c.app !== v.app.id || !v.app.permissions.includes('storage')) return false;
   switch (c.scope) {
     case 'install':

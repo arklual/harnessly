@@ -59,6 +59,8 @@ type Proposal struct {
 type pending struct {
 	p    Proposal
 	args map[string]string
+	// run is what a yes does, for a proposal that is not an action of a connection (ProposeRun).
+	run  func(ctx context.Context) (string, error)
 	done chan struct{}
 }
 
@@ -130,6 +132,25 @@ func (s *Service) Propose(id, action string, args map[string]string, why string,
 	return p, nil
 }
 
+// ProposeRun keeps a thing that is not an action of a connection for the person's yes and shows it on the same card:
+// a service of their own to connect. name is the line under the title, args the lines of the card, run what
+// a yes does, once. The agent waits on the proposal like on any other (Wait); a no or time out never runs it. Nothing
+// secret may be in args: they are shown and written to the journal.
+func (s *Service) ProposeRun(name string, title Text, args []Pair, why string, by By, run func(ctx context.Context) (string, error)) Proposal {
+	p := Proposal{ID: newID("ca"), Connection: OwnService, Connector: OwnService, Name: name, Action: "connect", Title: title,
+		Args: args, Why: oneLine(why), Conv: by.Conv, State: Waiting, CreatedAt: s.now().UTC()}
+	s.mu.Lock()
+	s.expireLocked()
+	s.pending[p.ID] = &pending{p: p, run: run, done: make(chan struct{})}
+	s.mu.Unlock()
+	s.changed()
+	return p
+}
+
+// OwnService is the Connector of a ProposeRun made for a service of the person's own. It is shown on the page's card
+// only: a chat bot's one-tap «Send» does not show what is connected or what code would run.
+const OwnService = "own-service"
+
 // direct runs an Action.Direct at once (it reaches only the person themselves) and writes the journal of sends.
 func (s *Service) direct(p Proposal, args map[string]string) Proposal {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -150,6 +171,9 @@ func (s *Service) direct(p Proposal, args map[string]string) Proposal {
 
 // relay shows a new proposal (settle: closes an answered one) in every working connection of a Relay connector.
 func (s *Service) relay(p Proposal, settle bool) {
+	if p.Connector == OwnService {
+		return
+	}
 	list, err := s.List()
 	if err != nil {
 		return
@@ -262,7 +286,13 @@ func (s *Service) answer(ctx context.Context, id string, approve bool, by string
 	p, args := w.p, w.args
 	s.mu.Unlock()
 
-	res, err := s.act(ctx, p, args)
+	var res string
+	var err error
+	if w.run != nil {
+		res, err = w.run(ctx)
+	} else {
+		res, err = s.act(ctx, p, args)
+	}
 	s.mu.Lock()
 	if err != nil {
 		w.p.State, w.p.Result = Failed, sayOf(err)

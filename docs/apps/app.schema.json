@@ -9,6 +9,7 @@
     "branding": {},
     "budget": {},
     "chat": {},
+    "connections": {},
     "data": {},
     "description": {},
     "harnessly": {},
@@ -167,6 +168,14 @@
           {
             "const": "ai",
             "description": "Call a model on the person's behalf, within the app's budget of the day (manifest `budget.usdPerDay`, $0.50 by default, $5 at most)."
+          },
+          {
+            "const": "connections.read",
+            "description": "Read data from the person's connected services (Settings → Connections: mail, tasks, calendars, APIs) through hl.connections: tools the service marks read-only and GET requests, for each connection the manifest's `connections` names and the person agreed to for this app."
+          },
+          {
+            "const": "connections.act",
+            "description": "Act through the person's connected services: send, create, change, delete (hl.connections.call and api that change something). Only for a connection the manifest names with `access: all` and the person agreed to that far; every action waits for the person's yes in the page."
           },
           {
             "const": "agents.run",

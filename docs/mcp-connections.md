@@ -100,7 +100,7 @@ next.
 
 ## Local servers, APIs and the hub
 
-The catalog has three kinds of entries (`internal/mcpconn/catalog*.go`, about 320 in all):
+The catalog has three kinds of entries (`internal/mcpconn/catalog*.go`, 336 in all, in 23 groups):
 
 - **Remote MCP servers** (`transport: http|sse`): the vendor's own hosted server, signed in with OAuth (dynamic client
   registration), a typed header or nothing. `TestRealRemoteServers` (`HARNESSLY_E2E_REMOTE=1`) probes every one as the
@@ -122,6 +122,36 @@ The catalog has three kinds of entries (`internal/mcpconn/catalog*.go`, about 32
   for basic auth), a `checkPath` asked when the keys are typed, and a `guide` of the main paths for the agent. A path
   never leaves the base; an answer never carries a key back.
 
+A local server that takes a setting as a command-line argument, not an environment variable (SQLite's file path), puts
+`{FIELD}` into its `Command`; the person's value for that field goes in its place, and an empty field drops the argument.
+Not here, and why: Playwright, Chrome DevTools and Puppeteer (the agent has its own browser, `browser_*` and `chrome_*`;
+a second, empty one would duplicate it, and Puppeteer's reference package is archived); Atlassian's server already
+covers Jira and Confluence; HubSpot's and Box's hosted servers admit no client registration (HubSpot is here as the
+local server with a private app token, Box's local package does not import); Zendesk has no vendor server, only
+community packages with a few hundred weekly downloads.
+
+### A service's page and how to add an entry
+
+Each entry has its own page, `/settings/connections/<id>`, written by hand: a description, three to
+five things an agent can do with the service, the numbered steps to connect and official links, in Russian and in
+English. It is text for the person; an agent is never given it. The pages are in `internal/mcpconn/service_pages*.go`:
+`service_pages.go` holds the type and the first pages, the others one map per group of the catalog.
+
+To add a service:
+
+1. Put the entry in `catalog_new.go` (or the file of its kind): the pinned package or the vendor's address, the
+   sign-in, `Blurb` and `BlurbRu` (one sentence each). For a local server start it with made-up keys first:
+   `HARNESSLY_E2E_MCP=<id> go test ./internal/mcpconn -run TestRealLocalServers -v`, for a remote one
+   `HARNESSLY_E2E_REMOTE=1 … -run TestRealRemoteServers`. An entry that does not start does not go in.
+2. Write its page in the `guides…` map of a `service_pages_<group>.go` file under the same id: facts about the service
+   and the server's real tools (read the package's tool list, not its marketing), steps that match the entry's fields
+   or sign-in, and only official links, each one opened with `curl` (200, or a real page behind a bot check; a link
+   you are not sure of stays out).
+3. `TestCatalogGuides` fails an entry without a page, a page without steps or links, English text with Russian in it and
+   a Russian text that is not Russian. `go test ./internal/mcpconn` runs it.
+4. The catalog is part of the agent's surface (`evals/agent/surface.txt`): a new group of services or a change of how
+   the hub finds them comes with a scenario in `evals/agent/hub-*.yaml`.
+
 ### The hub
 
 Agents get one MCP server for all of it, `harnessly-hub` (`/api/cli/mcp-hub`, `internal/mcpconn/hub.go`), so a
@@ -139,3 +169,69 @@ hundred connections do not put thousands of tool descriptions into every chat:
 When the turned-on servers have at most 40 tools together, agents also get them as servers of their own
 (`mcp__mcp-<slug>__<tool>`), as before; past that, only the hub. The scenarios `evals/agent/hub-*.yaml` check that an
 agent finds and uses connections through the hub (`setup.connections` connects keyless catalog entries on the stand).
+
+## For apps
+
+The same connections reach an app's views through `hl.connections` of `@harnessly/app-sdk` (docs/apps.md, «The person's
+connections»; the guide `harnessly app docs connections`): `list`, `tools`, `call`, `api` and `request`, over
+`POST <platform>/apps/connections` (`cmd/runtime/routes_apps_connections.go`). An app names the catalog entries (or groups,
+the catalog's `kind`) it needs in its manifest, the person agrees to each for each app, and what it reads is only what the
+server marks `readOnlyHint` and GET requests (`mcpconn.APIReads` also lists the searches of an API that are POSTs, such as
+Yandex Tracker's `/issues/_search`); a change goes out only after the person's yes to that call, in the page. An answer is
+scrubbed of the connection's keys (`Service.Redact`), at most 512 KiB, 20 calls in 10 seconds per app and connection. The
+connections' service tells the apps when it writes (`Service.OnChange`), which is the event `connections`. Connections made
+by a pasted address are services of the person's own and are named in a manifest as `custom-<slug>`, below.
+
+## The person's own services
+
+A service that is in no catalog (the company's internal API, a self-made MCP server, a local server of one's choice) is a
+connection of the same record as the catalog's, with an id of its own, `custom-<slug>` (`Server.catalogId`; the slug is
+made once from the name and made unique, the machine's id of the record stays `m…`). It is kept in `mcp-connections.json`
+and its keys in the safe as `mcp-<id>` like the others, so the hub, the proxy, the apps' `hl.connections` and the page
+treat it as one of them. A server added by a pasted address gets the same id and an empty description (older records are
+given theirs when the file is first read). The description, which the catalog writes by hand in `service_pages.go`, is
+`Server.custom`: the group (`category`: any of the catalog's groups, `utility` when none fits), the one-letter mark,
+`about`/`aboutRu`, `can`, `steps`, `links`; an API's `guide` is the record's own. `entryOf(srv)` reads a catalog entry or
+makes one from the record, which is what the hub's search, the page and the apps' groups use.
+
+| Kind | What it keeps | Check on connecting |
+| --- | --- | --- |
+| `mcp` | the address, `http` or `sse` (the probe decides), a header name and the one key of it, or OAuth, or nothing | `initialize`, then `tools/list` with the key; OAuth waits for the person's sign-in |
+| `api` | the base address (it may hold `{KEY}`), where each key goes (`apiHeaders`, `apiQuery`, `{BASIC:A:B}`), `checkPath`, the guide of the main paths | a GET of `checkPath` with the keys |
+| `local` | `npx -y <package>@<exact version> …` or `uvx <package>==<exact version> …` and its keys as environment variables; a Docker image, a script, `latest` are refused | started once, only after the person's yes |
+
+A key is never a value of the record. `keys[]` names the variables (`API_KEY`), `apiHeaders`/`apiQuery` carry only
+`{API_KEY}` placeholders (a header whose value is a literal secret is refused), and the value is typed by the person on the
+service's page or copied by the runtime from a secret of the safe the key names (`keys[].safe`, which must start with the
+service's id: an agent cannot point a service at another secret of the safe).
+
+### How an agent connects one
+
+The hub's `connection_add` (only on a runtime that can show a card; `connection_add {help: true}` prints the steps):
+
+1. The agent finds out the kind from the address, the docs or the OpenAPI file, and writes the record: for an API the
+   base address (`servers[0].url`), where the key goes (from the security scheme), a cheap `checkPath`, a guide of the main
+   paths; the description in the person's language; the category.
+2. It asks for each key with `harnessly secret ask custom-<slug>-<key> --why …` (a card of the safe) and names the secret in
+   `keys[].safe`. A key is never an argument, a command line or a message.
+3. `dry_run: true` tries it (an MCP address is initialised and its tools listed with the key; an API's check path is asked
+   with the key from the safe; a local server is never started) and says what would be made.
+4. Without `dry_run` the person gets a card in the agent's own chat, the card of `harnessly connector act`
+   (`<platform>/connector-actions`, a proposal of the connectors' service made by `ProposeRun`), listing the kind, the
+   address, where each key goes and from which secret, what was tried, the description and, for a local server, the command
+   and a warning that it runs someone else's code. Only a yes makes the record (`Service.SaveCustom`); the call waits 90
+   seconds and answers "waiting", to be called again with `proposal=<id>`. The same id changes a service made before. The
+   card is shown on the page only, never in a chat bot (a one-tap «Send» would not show the command that runs).
+5. The answer says what was made and how to use it (`api_request(connection, path)`, `call`, or the sign-in the person still
+   has to make). The proposal and its yes are in the journal of sends (`connector-sends`), without any key.
+
+### By hand
+
+Settings → Connections → **Your own service**: «Connect with the agent» opens a new chat with the request written in its
+field; «Add by hand» has an MCP address (the probe finds the sign-in), an API (base address, the header and prefix the key
+goes in, a check path, the key) and a local server (a command, with a checkbox saying that it runs someone else's code).
+The page of a service of one's own is the page of a catalog one with an editor of its name, group and description
+(`PATCH <platform>/mcp/<id> {name?, custom?, guide?}`), the keys form, check, turn off and remove. `POST <platform>/mcp/custom
+{input, values}` makes or changes one (`input` is `mcpconn.CustomInput`, `values` the keys typed).
+
+The scenarios `evals/agent/own-api-by-spec.yaml` and `own-mcp-by-address.yaml` check the agent's way.

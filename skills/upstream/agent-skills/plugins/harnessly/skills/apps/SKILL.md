@@ -16,14 +16,15 @@ harnessly app docs export ./hl-docs # the pages and the example packages in a fo
 ```
 
 Pages: `overview`, `first-plugin`, `views`, `backend`, `sinopia`, `agents`, `debugging`, `sharing`, `worked-example`, `compatibility`,
-`reference`.
+`connections`, `reference`.
 
 ## A widget under the right column
 
 A small card for the chat's right column is an app view of the `side` target with a `widget` block (size, refresh,
 sources, smart request). For one card, do not scaffold an app: `harnessly widget create <name> --title T …` (or the MCP
 tool `widget_create`) writes and installs it (`harnessly widget --help`, docs/side-widgets.md). An app of your own may
-add a `side` view next to its others the same way.
+add a `side` view next to its others the same way. A widget that shows data from the person's connected services (`hl.connections`) is an app,
+not a `widget create` card: a card made that way has no manifest to name the connection in.
 
 ## The loop
 
@@ -69,8 +70,16 @@ you do not use, and a `description` that says why each dangerous one is needed.
 | Stop or add to the agent's tool calls | `hl.hooks.on('tool', fn)` | `hooks.agent`, `hooks.strict` (critical) |
 | Run without the view open | a hidden view in every chat the app is on in | `background` (critical) |
 | A model, an agent | `hl.ai.complete`, `hl.agents.run` | `ai`, `agents.run` (high), within the manifest `budget` of the day |
+| The person's connected services (mail, a tracker, a calendar, any MCP server or API from Settings → Connections) | `hl.connections.list/tools/call/api/request`, `hl.on('connections')` | `connections.read` (high) plus the manifest's `connections` list; `connections.act` (critical) to change anything |
 | The safe, write only | `hl.secrets.put(name, value, {shared})` | `secrets.write` (medium, its own keys); `secrets.write:<name>` (high, the person's secret) |
 | A notice, the person's keys | `hl.ui.toast`, `hl.keys.on/press/hints` | none |
+
+Data of a service the person already connected (their mail, their tracker) is `hl.connections`, never a key typed into the app and never
+a server of your own: name the connection in the manifest (`"connections": [{"id": "yandex-tracker", "access": "read"}]`, or
+`{"category": "mail"}`), hold `connections.read`, and draw the states `hl.connections.list()` reports (`not_connected`,
+`needs_consent`, `needs_signin`, `ready`). The person agrees to each connection for each app (`hl.connections.request`, from a click);
+`read` reaches only read-only tools and GET, and a change needs `access: "all"`, `connections.act` and the person's yes to that call.
+Read the page `connections` before you write it.
 
 Commands and processes run in the agent's sandbox. A mask such as `terminal.run:npm test*` runs only the commands it matches, without
 the shell. `hooks.agent` sees each tool call before it runs. A view that does not answer in 5 s lets the call through, and with

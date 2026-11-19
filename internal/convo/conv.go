@@ -166,6 +166,8 @@ type conv struct {
 	quietSince  time.Time
 	// menuGone counts the looks in a row that found no menu for a question the screen holds open.
 	menuGone int
+	// cardGone counts the looks in a row that found no menu for a card that stands open while the chat is out of its wait.
+	cardGone int
 	// staleLooks counts the looks a Codex chat stood at its prompt with a screen card still open (closeStaleCodexCards).
 	staleLooks int
 	quietSize  int64
@@ -1231,6 +1233,7 @@ func (c *conv) seeing(s seen, now time.Time) {
 		return
 	}
 	c.bootPlain, c.bootAt, c.bootFirst = "", time.Time{}, time.Time{}
+	c.holdWait(look, now)
 	switch look.Menu {
 	case typist.MenuPermission:
 		c.permissionOnScreen(look, now)
@@ -1262,7 +1265,9 @@ func (c *conv) seeing(s seen, now time.Time) {
 		// agent's) leaves the input box behind, with no spinner of the chat's own.
 		// A question only the screen holds open (no hook waits on it) is let go after a second look: one frame of a
 		// redraw is no answer, and the main agent's spinner stands on the screen the whole time a subagent asks.
-		if g := c.openGate(c.rec.State.PermissionID); c.foreignGate(g) && g.reply == nil && g.state().K == wire.GateStateOpen {
+		// A dialog is held open by the screen alone as well: one frame without it (a redraw, the input box drawn for a
+		// moment) must not let it go, or the chat would work on with a card still asking.
+		if g := c.openGate(c.rec.State.PermissionID); (c.foreignGate(g) || c.onDialog()) && g.reply == nil && g.state().K == wire.GateStateOpen {
 			c.menuGone++
 		} else {
 			c.menuGone = menuGoneLooks
@@ -1580,7 +1585,9 @@ func (c *conv) dialogOnScreen(look typist.Screen, now time.Time) {
 		}
 		return
 	}
-	if c.rec.State.K != wire.StateWorking || c.typing || look.Busy || look.InputLine || c.fd.OpenTurn() == "" {
+	// A chat that works with no turn open (the turn ended, its stop never came) and a menu on the screen waits all the
+	// same: nothing else would ever end that work.
+	if c.rec.State.K != wire.StateWorking || c.typing || look.Busy || look.InputLine {
 		c.dialogPlain, c.dialogSince = "", time.Time{}
 		return
 	}
@@ -1605,11 +1612,101 @@ func (c *conv) openDialog(look typist.Screen, now time.Time) {
 	p := wire.Permission{ID: c.screenGateID(), ConversationID: c.rec.ID, Kind: wire.PermDialog, AskedAt: ms(now), PlanMD: &request,
 		Options: permissionOptions(look.Options, false), State: wire.GateState{K: wire.GateStateOpen}}
 	c.placeScreenGate(&p)
+	if g := c.dialogCardOf(p); g != nil {
+		// The card of this very dialog was closed when the agent seemed to move on, and the dialog stands: it opens
+		// again, one dialog is one card.
+		c.setGateState(g, wire.GateState{K: wire.GateStateOpen}, now)
+		g.p.Options = p.Options
+		c.input(agentstate.Input{K: agentstate.PermissionPrompt, GateID: g.id()}, now)
+		c.gateOnScreen(g, look, now)
+		return
+	}
 	g := &gate{p: &p}
 	if c.addGate(g) {
 		c.input(agentstate.Input{K: agentstate.PermissionPrompt, GateID: p.ID}, now)
 		c.gateOnScreen(g, look, now)
 	}
+}
+
+// sameDialog: the card is for the dialog p stands for (what it asks and the options it offers).
+func sameDialog(g *gate, p wire.Permission) bool {
+	if g == nil || g.p == nil || g.p.Kind != wire.PermDialog || (g.p.PlanMD == nil) != (p.PlanMD == nil) ||
+		g.p.PlanMD != nil && *g.p.PlanMD != *p.PlanMD || len(g.p.Options) != len(p.Options) {
+		return false
+	}
+	for i, o := range g.p.Options {
+		if o.Label != p.Options[i].Label {
+			return false
+		}
+	}
+	return true
+}
+
+// dialogCardOf is the card closed without an answer that stood for the dialog p in the same turn, nil for none.
+func (c *conv) dialogCardOf(p wire.Permission) *gate {
+	for i := len(c.order) - 1; i >= 0; i-- {
+		g := c.gates[c.order[i]]
+		if g == nil || g.p == nil || g.p.Kind != wire.PermDialog || !sameDialog(g, p) {
+			continue
+		}
+		st := g.state()
+		if st.K == wire.GateStateClosed && st.Reason == wire.ClosedAgentMovedOn && g.reply == nil && sameTurn(g.p.TurnID, p.TurnID) {
+			return g
+		}
+		return nil
+	}
+	return nil
+}
+
+func sameTurn(a, b *string) bool { return a == nil && b == nil || a != nil && b != nil && *a == *b }
+
+// holdWait keeps the chat's state true to its cards: a card of a dialog or a plan stands open and its menu is on the
+// screen, so the agent waits on a person, whatever took the chat out of its wait (a hook that came late, a look that
+// saw the input box for a frame). A card whose menu has gone from the screen for good is let go.
+func (c *conv) holdWait(look typist.Screen, now time.Time) {
+	st := c.rec.State
+	if st.PermissionID != "" || st.QuestionID != "" || !screenGateFrom[st.K] || c.typing {
+		c.cardGone = 0
+		return
+	}
+	stale := ""
+	for i := len(c.order) - 1; i >= 0; i-- {
+		g := c.openGate(c.order[i])
+		if g == nil || g.p == nil || g.p.Kind == wire.PermTool || g.reply != nil || g.state().K != wire.GateStateOpen {
+			continue
+		}
+		menu, in := typist.MenuOther, agentstate.PermissionPrompt
+		if g.p.Kind == wire.PermPlan {
+			menu, in = typist.MenuPlan, agentstate.PlanProposed
+		}
+		if look.Menu == menu && (g.p.Kind == wire.PermPlan || c.dialogOnLook(g, look)) {
+			c.cardGone = 0
+			c.input(agentstate.Input{K: in, GateID: g.id()}, now)
+			return
+		}
+		if look.Menu == typist.NoMenu && stale == "" {
+			stale = g.id()
+		}
+	}
+	if stale == "" {
+		c.cardGone = 0
+		return
+	}
+	if c.cardGone++; c.cardGone >= menuGoneLooks {
+		c.cardGone = 0
+		c.moveOn(stale, now)
+	}
+}
+
+// dialogOnLook: the dialog on the screen is the one the card stands for.
+func (c *conv) dialogOnLook(g *gate, look typist.Screen) bool {
+	request := look.Request
+	options := permissionOptions(look.Options, false)
+	if look.Cut() || len(g.p.Options) == 0 {
+		// Not all of it is drawn, or the card never had options: what it asks is all that can be compared.
+		options = g.p.Options
+	}
+	return sameDialog(g, wire.Permission{Kind: wire.PermDialog, PlanMD: &request, Options: options})
 }
 
 // promptUnseen: the hook said the agent waits on a person, and after DialogHold no card stands for it and the agent is

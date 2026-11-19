@@ -350,6 +350,37 @@ func TestActionNeedsThePersonsYes(t *testing.T) {
 	}
 }
 
+// A proposal made by ProposeRun (a service of the person's own) runs its function once, only after a yes, and
+// never reaches a chat bot's one-tap card.
+func TestProposeRunWaitsForTheYes(t *testing.T) {
+	reset()
+	s := newSvc(t, t.TempDir(), &memSafe{m: map[string]string{}})
+	runs := 0
+	run := func(context.Context) (string, error) { runs++; return "made", nil }
+	p := s.ProposeRun("Acme", T("Connect a service", "Подключить сервис"), []Pair{{Name: "Address", Value: "https://api.example.com"}}, "asked", By{Conv: "c1"}, run)
+	if p.State != Waiting || p.Connector != OwnService || runs != 0 {
+		t.Fatalf("propose: %+v runs=%d", p, runs)
+	}
+	if got := s.Proposals(); len(got) != 1 || got[0].Conv != "c1" || got[0].Args[0].Value != "https://api.example.com" {
+		t.Fatalf("listed: %+v", got)
+	}
+	done, err := s.Answer(context.Background(), p.ID, true)
+	if err != nil || done.State != Done || done.Result != "made" || runs != 1 {
+		t.Fatalf("answer: %+v %v runs=%d", done, err, runs)
+	}
+	if _, err := s.Answer(context.Background(), p.ID, true); !errors.Is(err, ErrNotWaiting) || runs != 1 {
+		t.Fatalf("a second yes: %v runs=%d", err, runs)
+	}
+	no := s.ProposeRun("Acme", T("Connect a service", ""), nil, "", By{}, run)
+	if got, _ := s.Answer(context.Background(), no.ID, false); got.State != Declined || runs != 1 {
+		t.Fatalf("a no ran it: %+v runs=%d", got, runs)
+	}
+	bad := s.ProposeRun("Acme", T("Connect a service", ""), nil, "", By{}, func(context.Context) (string, error) { return "", errors.New("the server refused") })
+	if got, _ := s.Answer(context.Background(), bad.ID, true); got.State != Failed || got.Result != "the server refused" {
+		t.Fatalf("failed run: %+v", got)
+	}
+}
+
 func TestReadIsMarkedAsData(t *testing.T) {
 	s := newSvc(t, t.TempDir(), &memSafe{m: map[string]string{}})
 	c, err := s.Connect(context.Background(), "test", "", map[string]string{"host": "example.com", "password": "right"})

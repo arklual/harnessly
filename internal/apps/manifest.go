@@ -103,6 +103,9 @@ type Manifest struct {
 	Backend     *Backend        `json:"backend,omitempty"`
 	// Budget is what the app may spend a day through `ai` and `agents.run` (spend.go).
 	Budget *Budget `json:"budget,omitempty"`
+	// Connections are the person's connections (Settings → Connections) the views read through hl.connections, and how far
+	// each goes (connections_manifest.go).
+	Connections []ConnectionNeed `json:"connections,omitempty"`
 	// Workflow is the statuses of the app's documents and the moves between them (workflow.go).
 	Workflow *Workflow `json:"workflow,omitempty"`
 	// Delivery, Points and Aliases are the host's own apps' (builtin.go): an installed app is a package and has none.
@@ -870,6 +873,7 @@ func (m *Manifest) Check() Problems {
 
 	m.checkBranding(targets, add)
 	m.checkBudget(add)
+	m.checkConnections(add)
 
 	// A target with nothing in it is a mistake: the app would show up where it does nothing.
 	for _, t := range sortedKeys(targets) {

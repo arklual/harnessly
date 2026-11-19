@@ -1,122 +1,272 @@
-/* «Переместить в папку?» under the chat's header: one quiet line with two choices. */
+/* «Переместить в папку?» (redone as a notice in HRN-1700): a small card floating under the chat's header. It
+   lies over the feed and shifts nothing; it has the toast's palette and shape (--hx-toast-*, as ui.css's .hx-toast and the
+   smart notice), and it stands at the top as every notice does: at the bottom it would cover the field and the «down»
+   button, and the right column's stack stands at the top right. It keeps out of the right pane like the header. */
 .hx-foldersug {
+  position: absolute;
+  top: calc(var(--hx-header-h) + 6px);
+  left: 0;
+  right: 0;
+  z-index: 22;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  position: relative;
-  z-index: 15;
-  margin: 6px 16px 0;
-  padding: 8px 10px 8px 14px;
-  border: 1px solid var(--hx-border-strong);
-  border-radius: 12px;
-  background: var(--hx-bg-raised);
-  color: var(--hx-fg-2);
-  font-size: var(--hx-text-sm);
+  justify-content: center;
+  padding: 0 16px;
+  pointer-events: none;
 }
-.hx-foldersug__txt {
-  flex: 1;
-  min-width: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+@media (min-width: 901px) {
+  .hx-main__body:has(.hx-stage[data-pane='true']) .hx-foldersug {
+    right: calc(var(--pane-w) + 12px);
+  }
 }
-.hx-foldersug__yes {
-  flex: none;
-  height: 28px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 8px;
-  background: var(--hx-primary);
-  color: var(--hx-primary-fg);
-  font: inherit;
-  cursor: pointer;
+@media (max-width: 900px) {
+  .hx-foldersug {
+    top: calc(52px + env(safe-area-inset-top) + 6px);
+    padding: 0 calc(12px + env(safe-area-inset-right)) 0 calc(12px + env(safe-area-inset-left));
+  }
 }
-.hx-foldersug__yes:disabled {
-  opacity: 0.6;
+
+.hx-foldersug__card {
+  width: min(100%, 440px);
+  padding: 8px 8px 8px 14px;
+  border-radius: 20px;
+  background: var(--hx-toast-bg);
+  box-shadow: var(--hx-toast-shadow);
+  color: var(--hx-toast-fg);
+  font-size: var(--hx-text-md);
+  line-height: 20px;
+  pointer-events: auto;
+  transform-origin: 50% 0;
+  animation: hx-foldersug-in 260ms var(--hx-ease-out) backwards;
 }
-.hx-foldersug__no {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: var(--hx-fg-3);
-  cursor: pointer;
+.hx-foldersug[data-state='closing'] .hx-foldersug__card {
+  animation: hx-foldersug-out 240ms var(--hx-ease-out) forwards;
+  pointer-events: none;
 }
-.hx-foldersug__no:hover {
-  background: var(--hx-bg-hover);
+@keyframes hx-foldersug-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+}
+@keyframes hx-foldersug-out {
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+}
+@keyframes hx-foldersug-swap {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hx-foldersug-fade-out {
+  to {
+    opacity: 0;
+  }
 }
 
 .hx-foldersug__row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-height: 36px;
 }
-/* The text and the arrow are one button: a press unfolds the notice to read it whole and pick another folder. */
+.hx-foldersug__icon {
+  flex: none;
+  color: var(--hx-toast-fg2);
+}
+/* The title and the arrow are one button: a press unfolds the other folders. */
 .hx-foldersug__head {
   display: flex;
   flex: 1;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
   min-width: 0;
   padding: 0;
   border: 0;
+  border-radius: 8px;
   background: none;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
+.hx-foldersug__head:focus-visible,
+.hx-foldersug__yes:focus-visible,
+.hx-foldersug__no:focus-visible,
+.hx-foldersug__chip:focus-visible {
+  outline: 2px solid var(--hx-toast-focus);
+  outline-offset: 2px;
+}
+.hx-foldersug__txt {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
 .hx-foldersug__chev {
   flex: none;
-  color: var(--hx-fg-3);
-  transition: transform 300ms var(--hx-ease-out);
+  color: var(--hx-toast-fg3);
+  transition: transform var(--hx-dur-md) var(--hx-ease-out);
 }
 .hx-foldersug[data-open] .hx-foldersug__chev {
   transform: rotate(180deg);
 }
-.hx-foldersug[data-open] .hx-foldersug__txt {
-  display: block;
-  overflow: visible;
-  -webkit-line-clamp: unset;
+.hx-foldersug__yes {
+  flex: none;
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--hx-toast-fill2);
+  color: var(--hx-toast-fg);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  cursor: pointer;
+  transition: background var(--hx-dur-xs) var(--hx-ease-out);
 }
+.hx-foldersug__yes:hover:not(:disabled) {
+  background: rgb(var(--hx-toast-on) / 0.16);
+}
+.hx-foldersug__yes:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.hx-foldersug__no {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--hx-toast-fg3);
+  cursor: pointer;
+  transition: background var(--hx-dur-xs) var(--hx-ease-out);
+}
+.hx-foldersug__no:hover {
+  background: var(--hx-toast-fill);
+}
+
+/* The other folders: a grid row between 0fr and 1fr, so the card grows and folds smoothly by height. */
 .hx-foldersug__more {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 40vh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 260ms var(--hx-ease-out),
+    opacity var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-foldersug[data-open] .hx-foldersug__more {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.hx-foldersug__clip {
+  min-height: 0;
+  overflow: hidden;
+  /* The row's focus ring and the chips' edge are not cut at the sides. */
+  margin: 0 -8px 0 -14px;
+  padding: 0 8px 0 14px;
 }
 .hx-foldersug__why {
-  margin: 0;
-  color: var(--hx-fg-3);
+  margin: 8px 0 8px;
+  color: var(--hx-toast-fg3);
+  font-size: var(--hx-text-xs);
+  line-height: 16px;
 }
+/* The chips run in one row that scrolls sideways; its ends fade out where it goes on. */
 .hx-foldersug__pick {
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
+  margin: 0 -8px 2px -14px;
+  padding: 0 8px 4px 14px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 20px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 20px), transparent);
+}
+.hx-foldersug__pick::-webkit-scrollbar {
+  display: none;
 }
 .hx-foldersug__chip {
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--hx-border-strong);
+  max-width: 200px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgb(var(--hx-toast-on) / 0.14);
   border-radius: 999px;
   background: none;
-  color: var(--hx-fg-1);
+  color: var(--hx-toast-fg);
   font: inherit;
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
   cursor: pointer;
+  transition: background var(--hx-dur-xs) var(--hx-ease-out);
+}
+.hx-foldersug__chip > .hx-icon {
+  flex: none;
+  color: var(--hx-toast-fg2);
 }
 .hx-foldersug__chip[data-suggested] {
-  border-color: var(--hx-primary);
+  border-color: rgb(var(--hx-toast-on) / 0.5);
 }
-.hx-foldersug__chip:hover {
-  background: var(--hx-bg-hover);
+.hx-foldersug__chip:hover:not(:disabled) {
+  background: var(--hx-toast-fill);
+}
+.hx-foldersug__chip:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* The confirmation after a move: the same card with one line. */
+.hx-foldersug__row--done > * {
+  animation: hx-foldersug-swap var(--hx-dur-sm) var(--hx-ease-out) backwards;
+}
+.hx-foldersug__row--done .hx-foldersug__txt {
+  padding-right: 8px;
+}
+.hx-foldersug__ok {
+  flex: none;
+  color: var(--hx-success);
+}
+
+@media (max-width: 900px) {
+  .hx-foldersug__card {
+    border-radius: 16px;
+    padding: 6px 6px 6px 12px;
+  }
+  .hx-foldersug__yes,
+  .hx-foldersug__no {
+    height: 36px;
+  }
+  .hx-foldersug__no {
+    width: 36px;
+  }
+  .hx-foldersug__chip {
+    height: 36px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-foldersug__card {
+    animation: hx-foldersug-swap var(--hx-dur-xs) linear backwards;
+  }
+  .hx-foldersug[data-state='closing'] .hx-foldersug__card {
+    animation: hx-foldersug-fade-out var(--hx-dur-xs) linear forwards;
+  }
+  .hx-foldersug__row--done > * {
+    animation: none;
+  }
+  .hx-foldersug__more,
+  .hx-foldersug__chev {
+    transition-duration: 1ms;
+  }
 }

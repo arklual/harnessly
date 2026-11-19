@@ -1995,7 +1995,9 @@ const Shell = ({ owner }: IShellProps) => {
           machine={model.active}
           section={route.section}
           connect={route.connect}
+          item={route.item}
           name={name ?? login}
+          onOpenDrawer={() => setDrawerOpen(true)}
         />
       )}
       {!hubFirst && route.kind === ROUTE.manage && <ManageScreen onOpen={navigate} />}

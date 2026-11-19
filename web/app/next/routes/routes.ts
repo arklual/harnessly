@@ -114,8 +114,11 @@ export type TRoute =
   /** Settings: `/settings` (the list of sections; on a wide window the first one is open) and `/settings/:section`. */
   /** «Обучение»: the lessons, each a film and a hands-on tour. */
   | { kind: typeof ROUTE.learn }
-  /** `connect`: Connections opens with this address already found, to sign in to it (`?connect=`). */
-  | { kind: typeof ROUTE.settings; section: SettingsSection | null; connect?: string }
+  /**
+   * `connect`: Connections opens with this address already found, to sign in to it (`?connect=`). `item`: the page of one
+   * service in Connections, `/settings/connections/:item` — a catalog id or the id of a server the person has.
+   */
+  | { kind: typeof ROUTE.settings; section: SettingsSection | null; connect?: string; item?: string }
   /** A conversation with ChatGPT (internal/chatgpt): `/chatgpt/:id`, `?m=` the machine it is kept on. */
   | { kind: typeof ROUTE.chatgpt; id: string; machine?: string };
 
@@ -142,7 +145,7 @@ export { APP_OBJECT_RE };
 const APP_RE = /^\/apps\/([a-z0-9][a-z0-9-]{0,39}\.[a-z0-9][a-z0-9-]{0,39})\/?$/;
 const HELP_RE = /^\/help(?:\/([a-z0-9][a-z0-9-]{0,62})(?:\/([a-z0-9][a-z0-9-]{0,62}))?)?\/?$/;
 const LEARN_RE = /^\/learn\/?$/;
-const SETTINGS_RE = /^\/settings(?:\/([a-z]+))?\/?$/;
+const SETTINGS_RE = /^\/settings(?:\/([a-z]+)(?:\/([a-z0-9][a-z0-9._-]{0,79}))?)?\/?$/;
 
 /** One parameter of an address's query, when it names one. */
 /** A path of this page (`/apps/…`), not an address of another site or a protocol-relative one. */
@@ -252,7 +255,10 @@ export const parseRoute = (path: string): TRoute => {
     );
     if (!settings[1]) return { kind: ROUTE.settings, section: null };
     const connect = section === 'connections' ? queryParam(path, 'connect') : null;
-    return section ? { kind: ROUTE.settings, section, ...(connect ? { connect } : {}) } : HOME;
+    const item = section === 'connections' ? settings[2] : undefined;
+    // A path below a section is home, but for the page of a service in Connections.
+    if (!section || (settings[2] && !item)) return HOME;
+    return { kind: ROUTE.settings, section, ...(connect ? { connect } : {}), ...(item ? { item } : {}) };
   }
   const appDoc = APP_DOC_RE.exec(pathname);
   if (appDoc?.[1]) {
@@ -371,6 +377,7 @@ export const routePath = (route: TRoute): string => {
         ? `/chatgpt/${route.id}?${new URLSearchParams({ m: route.machine })}`
         : `/chatgpt/${route.id}`;
     case ROUTE.settings:
+      if (route.section === 'connections' && route.item) return `/settings/connections/${route.item}`;
       if (route.section && route.connect)
         return `/settings/${route.section}?${new URLSearchParams({ connect: route.connect })}`.replace(
           /%3A/gi,

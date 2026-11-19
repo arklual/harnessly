@@ -23,6 +23,7 @@
   "next.settings.title": "Settings",
   "next.settings.nav": "Settings sections",
   "next.settings.back": "All settings",
+  "next.settings.leave": "Chats",
   "next.settings.section.general": "General",
   "next.settings.section.accounts": "Providers",
   "next.settings.section.smart": "Smart features",

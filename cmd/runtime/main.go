@@ -582,7 +582,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(basepkgRoutes(d)...)
 	f.Add(connectionRoutes(d)...)
 	f.Add(connectorRoutes(d, ref.c)...)
-	f.Add(mcpRoutes(d)...)
+	f.Add(mcpRoutes(d, ref.c)...)
 	f.Add(journalRoutes(d)...)
 	f.Add(uiEventRoutes(d, func() *telemetry.Queue { return ref.c.cfg.Telemetry })...)
 	f.Add(appRoutes(d, ref.c)...)

@@ -51,6 +51,10 @@ The view's manifest (`views[].widget`, the `side` target, docs/apps/reference.md
 | `sources` | The host's data the view gets in `hl.context.data.sources`: `limits`, `machine`, `subagents`. Nothing else of the page reaches it. |
 | `smart` | `{prompt, every}`: a request a model answers over the sources in at most three short lines, every `every` minutes (5 to 1440, default 30) and at once on the card's button; the answer is in `hl.context.data.smart` (`{text, at, asking}`). |
 
+A card of this kind can also show data from the person's connected services (mail, a tracker): that is `hl.connections`, which an app's view
+has and a card made by `widget create` does not (it has no manifest to name the connection in), so such a widget is an app with a `side`
+view. See [`apps/tracker-side`](apps/tracker-side) and `docs/build-apps/14-connections.md`.
+
 ### It shows at once, with no reload
 
 Every write of the installed list (a widget made, changed or removed by `harnessly widget` / the MCP tools, an app

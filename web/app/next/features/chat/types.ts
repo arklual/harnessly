@@ -267,6 +267,8 @@ export interface TurnItem {
    * drawn, the end of the turn is on its way. Absent for any other turn.
    */
   settled?: boolean;
+  /** The turn is live and the agent waits for the person (a question, a permission, a dialog): no «working» line is drawn. */
+  asks?: boolean;
   /** What went with a stop or a failure, e.g. «the question was withdrawn». */
   endNote: string | null;
   /** The prompt is a message the runtime sent to go on by itself; absent for any other turn. */

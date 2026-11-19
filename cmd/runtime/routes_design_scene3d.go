@@ -70,7 +70,8 @@ func (g scene3dGen) req(r design.Scene3DGenRequest) mediagen.Request {
 }
 
 func (g scene3dGen) Estimate(ctx context.Context, r design.Scene3DGenRequest) (float64, string, error) {
-	return mediaJobs(g.d).Estimate(ctx, g.req(r))
+	p, err := mediaJobs(g.d).Estimate(ctx, g.req(r))
+	return p.USD, p.Model, err
 }
 
 func (g scene3dGen) job(s mediagen.Snapshot) design.Scene3DGenJob {

@@ -113,6 +113,7 @@ import '@/next/styles/code-asks.css';
 import '@/next/styles/code-field.css';
 import '@/next/styles/project-access.css';
 import '@/next/styles/connections.css';
+import '@/next/styles/connections-page.css';
 import '@/next/styles/connectors.css';
 import '@/next/styles/smart-notice.css';
 import '@/next/styles/notice-stack.css';

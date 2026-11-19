@@ -65,11 +65,15 @@ export interface ISettingsScreenProps {
   section: SettingsSection | null;
   /** Connections: an address to sign in to at once. */
   connect?: string;
+  /** Connections: the service whose page is open. */
+  item?: string;
   /** The name the sidebar shows for the person. */
   name: string;
+  /** A phone: the list's way out of Settings opens the sidebar, the chats (as the ChatGPT screen's back does). */
+  onOpenDrawer: () => void;
 }
 
-const SettingsScreen = ({ machine, section, connect, name }: ISettingsScreenProps) => {
+const SettingsScreen = ({ machine, section, connect, item, name, onOpenDrawer }: ISettingsScreenProps) => {
   const active = section ?? 'general';
   const view = useMachine(machine);
   const now = useClock();
@@ -152,7 +156,8 @@ const SettingsScreen = ({ machine, section, connect, name }: ISettingsScreenProp
         <PeersPage machine={machine} now={now} pending={pending} />
       </>
     );
-  else if (active === 'connections') body = <ConnectionsPage machine={machine} start={connect} />;
+  else if (active === 'connections')
+    body = <ConnectionsPage machine={machine} start={connect} item={item ?? null} />;
   else if (active === 'design') body = <DesignPage machine={machine} />;
   else if (active === 'extensions') body = <ExtensionsPage machine={machine} />;
   else if (active === 'plugins') body = <PluginsPage />;
@@ -167,7 +172,14 @@ const SettingsScreen = ({ machine, section, connect, name }: ISettingsScreenProp
       hidden={hasExtensions ? [] : ['extensions']}
       changed={changedSections}
       onPick={(next) => goTo({ kind: ROUTE.settings, section: next })}
-      onBack={() => goTo({ kind: ROUTE.settings, section: null })}
+      onBack={() =>
+        goTo(
+          active === 'connections' && item
+            ? { kind: ROUTE.settings, section: 'connections' }
+            : { kind: ROUTE.settings, section: null },
+        )
+      }
+      onLeave={onOpenDrawer}
       island={<SettingsAgent machine={machine} changes={changes} />}
     >
       {body}

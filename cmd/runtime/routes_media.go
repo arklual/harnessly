@@ -13,6 +13,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/mcpconn"
 	"github.com/ly-solutions/harnessly/internal/mediagen"
 )
 
@@ -39,9 +40,36 @@ func mediaJobs(d deps) *mediagen.Service {
 			Dir:      mediaDir(d),
 			Registry: extProvidersFor(d),
 			Secrets:  extSecrets{store: safeFor(d).store},
+			MCP:      higgsfieldConn{ms: mcpFor(d)},
 		}
 	})
 	return mediaJobsSvc
+}
+
+// higgsfieldConn is the person's «Higgsfield (MCP)» connection of Settings → Connections, as the media jobs reach it.
+type higgsfieldConn struct{ ms *mcpconn.Service }
+
+func (h higgsfieldConn) server() (mcpconn.Server, bool) {
+	for _, s := range h.ms.Enabled() {
+		if s.Owner == "" && s.CatalogID == mediagen.MCPConnID {
+			return s, true
+		}
+	}
+	return mcpconn.Server{}, false
+}
+
+func (h higgsfieldConn) Connected() bool { _, ok := h.server(); return ok }
+
+func (h higgsfieldConn) Call(ctx context.Context, tool string, args map[string]any) (json.RawMessage, error) {
+	s, ok := h.server()
+	if !ok {
+		return nil, errors.New(mediagen.NoMCPMessage)
+	}
+	raw, err := json.Marshal(args)
+	if err != nil {
+		return nil, err
+	}
+	return h.ms.CallTool(ctx, s.ID, tool, raw)
 }
 
 func mediaRoutes(d deps) []gate.BodyRoute {
@@ -110,12 +138,12 @@ func serveMedia(s *mediagen.Service, readable func(string) bool, w http.Response
 		req := body.Request
 		req.CopyTo, req.Name, req.SaveOK, req.FrameOK = "", "", nil, readable
 		if q.Get("estimate") != "" {
-			usd, model, err := s.Estimate(ctx, req)
+			p, err := s.Estimate(ctx, req)
 			if err != nil {
 				writeMediaError(w, err)
 				return
 			}
-			writeImagesJSON(w, http.StatusOK, map[string]any{"usd": usd, "model": model})
+			writeImagesJSON(w, http.StatusOK, map[string]any{"usd": p.USD, "credits": p.Credits, "model": p.Model, "via": p.Via})
 			return
 		}
 		snap, err := s.Start(req)
@@ -134,6 +162,9 @@ func writeMediaError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, mediagen.ErrBadRequest):
 		status = http.StatusBadRequest
+	case errors.Is(err, mediagen.ErrNoMCP):
+		status = http.StatusConflict
+		err = errors.New(mediagen.NoMCPMessage)
 	case errors.Is(err, mediagen.ErrNoKey):
 		status = http.StatusFailedDependency
 		err = errors.New(mediagen.NoKeyMessage)

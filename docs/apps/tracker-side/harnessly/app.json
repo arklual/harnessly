@@ -1,0 +1,22 @@
+{
+  "id": "harnessly.tracker-side",
+  "name": "Мои задачи из Трекера",
+  "description": "Виджет в сайдбаре: ваши открытые задачи из Яндекс Трекера. Читает через подключение из «Настройки → Подключения», без ключей в приложении",
+  "version": "0.1.0",
+  "harnessly": ">=0.16.423",
+  "trust": "sandboxed",
+  "targets": ["side"],
+  "permissions": ["connections.read"],
+  "connections": [
+    { "id": "yandex-tracker", "access": "read", "reason": "Показывает ваши открытые задачи. Ничего не создаёт и не меняет." }
+  ],
+  "views": [
+    {
+      "id": "main",
+      "title": "Мои задачи",
+      "entry": "ui/index.html",
+      "targets": ["side"],
+      "widget": { "size": "m" }
+    }
+  ]
+}

@@ -143,7 +143,7 @@ func authProblems(s MCPServer) []string {
 // address and sign-in come from the person's connection, so it brings no address, credentials or process of its own.
 func connectionProblems(s MCPServer) []string {
 	var out []string
-	if !mcpconn.KnownCatalogID(s.Connection) {
+	if !mcpconn.KnownConnectionID(s.Connection) {
 		out = append(out, fmt.Sprintf("connection %q is not in the catalog of connections", s.Connection))
 	}
 	if s.Type != "" && s.Type != "http" && s.Type != "sse" {

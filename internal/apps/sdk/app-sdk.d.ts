@@ -94,6 +94,58 @@ export interface WorkflowState {
   versions: { n: number; hash: string; status: string }[];
 }
 
+/** What a connection of the person's is: a remote MCP server, a local one the machine runs, or an HTTP API. */
+export type ConnectionKind = 'mcp' | 'local' | 'api';
+
+/**
+ * Where a connection stands for this app: `ready` (use it); `needs_consent` (the person has not agreed to it for this
+ * app: `hl.connections.request`); `not_connected` (the person has no such connection: Settings → Connections);
+ * `needs_signin` (it waits for a sign-in or fixed keys); `off` (turned off); `unavailable` (the service does not
+ * answer now).
+ */
+export type ConnectionStatus = 'ready' | 'needs_consent' | 'not_connected' | 'needs_signin' | 'off' | 'unavailable';
+
+/** How far an app goes with a connection: `read` (tools the server marks read-only, GET requests) or `all`. */
+export type ConnectionAccess = 'read' | 'all';
+
+/** A connection the app's manifest names, never with a key, an address or a header. */
+export interface ConnectionInfo {
+  /** The catalog entry's id; empty for a group the manifest names that the person has no connection in. */
+  id: string;
+  /** The connection's own name for `conn` where there are several of one entry; absent when not connected. */
+  slug?: string;
+  name: string;
+  kind?: ConnectionKind;
+  /** The catalog's group: mail, calendar, tasks, docs, code… */
+  category?: string;
+  status: ConnectionStatus;
+  /** How far the manifest asks. */
+  declared: ConnectionAccess;
+  /** How far the person agreed to; null while they have not. */
+  access: ConnectionAccess | null;
+  /** The line the manifest gave for the person's card. */
+  reason?: string;
+  /** For a ready API: the catalog's note of its main paths. */
+  guide?: string;
+}
+
+export interface ConnectionTool {
+  name: string;
+  description?: string;
+  inputSchema?: object;
+  /** The server marks the tool read-only; any other may change something and needs `access: 'all'`. */
+  readOnly: boolean;
+}
+
+export interface ApiAnswer {
+  status: number;
+  /** 2xx. */
+  ok: boolean;
+  contentType: string;
+  /** The parsed JSON of a JSON answer, else the text. */
+  body: unknown;
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant';
   text: string;
@@ -404,12 +456,15 @@ export interface Harnessly {
    * `storage` ({ scope, key }: a key of this app's storage was written or deleted, by the agent, another view or this
    * one; never the value, read the key again; an area of a chat or document only reaches the views of that chat or
    * document), `visibility` ({ visible }: the view was hidden or shown), `agents` ({ agents }: the list of the person's
-   * conversations on this machine, or the status of one, changed; only with `agents.read`). `tool-input` and `tool-result` are declared by
+   * conversations on this machine, or the status of one, changed; only with `agents.read`), `connections` (the person's
+   * connections changed; only with `connections.read`). `tool-input` and `tool-result` are declared by
    * MCP Apps but the host does not send them yet. Returns the unsubscribe.
    */
   on(event: 'storage', fn: (payload: { scope: StorageScope; key: string }) => void): () => void;
   on(event: 'agents', fn: (payload: { agents: AgentInfo[] }) => void): () => void;
   on(event: 'visibility', fn: (payload: { visible: boolean }) => void): () => void;
+  /** The person's connections changed (an agreement, a sign-in, a turn on or off): `hl.connections.list()` again; only with `connections.read`. */
+  on(event: 'connections', fn: (payload: Record<string, never>) => void): () => void;
   on(event: string, fn: (payload: any) => void): () => void;
   chat: {
     /** The chat shows the app's name before the text. */
@@ -444,6 +499,38 @@ export interface Harnessly {
    */
   secrets: {
     put(name: string, value: string, options?: { shared?: boolean }): Promise<{ created: boolean }>;
+  };
+  /**
+   * The person's connections (Settings → Connections: mail, trackers, calendars, any MCP server, local server or API),
+   * the same ones the agents reach through the hub; needs `connections.read` and a `connections` list in the manifest
+   * (`{"id": "yandex-tracker"}` or `{"category": "mail"}`, `access` read by default, all with `connections.act`). A
+   * view reaches a connection only when the manifest names it AND the person agreed to it for this app. Refusals are
+   * HarnesslyErrors: `auth_required` (not connected, off, or waiting for a sign-in; `signIn.connection` names it, the
+   * host shows «Войти»), `permission_denied` (not named, no agreement, or a change with read access only),
+   * `rate_limited` (20 calls in 10 s per connection), `quota_exceeded` (an answer past 512 KiB), `upstream_error`.
+   * Hear changes with `hl.on('connections', fn)`.
+   */
+  connections: {
+    /** What the manifest names, each as the person has it, with `status` for «нет подключения» and «нет согласия». */
+    list(): Promise<ConnectionInfo[]>;
+    /** The tools of an MCP connection (`conn`: the catalog id or the slug from `list`). */
+    tools(conn: string): Promise<ConnectionTool[]>;
+    /**
+     * Call a tool with the person's own sign-in; answers the MCP result (`content`, `isError`). A read-only tool runs
+     * at once; any other needs `connections.act`, access `all`, and the person's OK to this very call in the host's
+     * dialog (a refusal there is `permission_denied`).
+     */
+    call(conn: string, tool: string, args?: Record<string, unknown>): Promise<{ content?: { type: string; text?: string }[]; isError?: boolean; [more: string]: unknown }>;
+    /** A request to an API connection under its base address; GET reads, the rest asks like `call`. */
+    api(
+      conn: string,
+      request: { method?: 'GET' | 'HEAD' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; path: string; query?: Record<string, string | number | boolean>; body?: unknown },
+    ): Promise<ApiAnswer>;
+    /**
+     * Ask the person to agree to a connection for this app (the host's card, titled with the app's name). `access` is
+     * as far as the manifest asks by default. `{granted: false}` when they say no. Call it from a click, not on load.
+     */
+    request(conn: string, options?: { access?: ConnectionAccess }): Promise<{ granted: boolean; access: ConnectionAccess | null }>;
   };
   /** `app:<id>[/<view>]`, or `chat:<id>` to open a conversation from `agents.list` (needs `agents.read` as well). */
   pane: { open(target: string): Promise<void> };

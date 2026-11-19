@@ -20,6 +20,7 @@ const (
 	KindSocial     Kind = "social"
 	KindFiles      Kind = "files"
 	KindCloud      Kind = "cloud"
+	KindDatabase   Kind = "database"
 	KindDesign     Kind = "design"
 	KindMedia      Kind = "media"
 	KindSearch     Kind = "search"
@@ -32,7 +33,7 @@ const (
 
 // Kinds is the order of the catalog's groups on the page.
 var Kinds = []Kind{KindMail, KindCalendar, KindChat, KindSocial, KindMeetings, KindTasks, KindDocs, KindFiles,
-	KindDesign, KindMedia, KindSearch, KindResearch, KindSEO, KindCode, KindCloud, KindMonitoring, KindSupport, KindCRM,
+	KindDesign, KindMedia, KindSearch, KindResearch, KindSEO, KindCode, KindCloud, KindDatabase, KindMonitoring, KindSupport, KindCRM,
 	KindPayments, KindFinance, KindSites, KindUtility}
 
 // EnvField is one key a local server takes: an environment variable of its process the person fills in.
@@ -91,6 +92,34 @@ type CatalogEntry struct {
 	FixedEnv map[string]string `json:"fixedEnv,omitempty"`
 	// Runtime is the program the machine needs for a local server: "npx" or "uvx".
 	Runtime string `json:"runtime,omitempty"`
+	// The service's own page, written by hand for the common ones in service_pages.go: a longer description,
+	// what an agent can do with it, the steps to connect and links worth keeping. All optional: the page shows what is
+	// there and the one-line Blurb otherwise.
+	About   string `json:"about,omitempty"`
+	AboutRu string `json:"aboutRu,omitempty"`
+	// Can is three to five things an agent can do with the service, each a short phrase.
+	Can   []string `json:"can,omitempty"`
+	CanRu []string `json:"canRu,omitempty"`
+	// Steps are the numbered steps to connect, when the generic ones for the sign-in kind do not fit.
+	Steps   []string `json:"steps,omitempty"`
+	StepsRu []string `json:"stepsRu,omitempty"`
+	// Links are the official pages: docs, where to get the key, the product, its prices.
+	Links []Link `json:"links,omitempty"`
+}
+
+// Link kinds on a service's page.
+const (
+	LinkDocs    = "docs"    // documentation of the service or of its MCP server
+	LinkSetup   = "setup"   // how to switch the access on or get a key (a guide, not the token form itself)
+	LinkToken   = "token"   // the page that makes the key
+	LinkPricing = "pricing" // plans and prices
+	LinkHome    = "home"    // the product's own page
+)
+
+// Link is one official page about a service.
+type Link struct {
+	Kind string `json:"kind"`
+	URL  string `json:"url"`
 }
 
 var remoteCatalog = []CatalogEntry{
@@ -227,7 +256,7 @@ var remoteCatalog = []CatalogEntry{
 }
 
 // catalog is the remote servers, the local ones (catalog_local.go) and the APIs (catalog_api.go).
-var catalog = slices.Concat(remoteCatalog, remoteMoreCatalog, localCatalog, localMoreCatalog, apiCatalog)
+var catalog = withGuides(slices.Concat(remoteCatalog, remoteMoreCatalog, localCatalog, localMoreCatalog, apiCatalog, newCatalog))
 
 func catalogEntry(id string) (CatalogEntry, bool) {
 	if id == "" {

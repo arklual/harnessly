@@ -334,6 +334,14 @@ export interface IBridgeHandlers {
   debugLog?: (level: 'error' | 'warn', text: string) => void;
   /** The Document API of Sinopia: the runtime does the work and checks the right once more. */
   sinopia?: (method: TSinopiaMethod, params: Record<string, unknown>) => Promise<unknown>;
+  /**
+   * The person's connections (hl.connections, connections.read): the runtime judges the manifest's list, the person's
+   * agreement and the reading; a change and an agreement are asked about in the host's dialog (connections.ts).
+   */
+  connections?: (
+    op: 'list' | 'tools' | 'call' | 'api' | 'request',
+    params: Record<string, unknown>,
+  ) => Promise<unknown>;
   /** The view's page tools, the whole list each time (tools.page). */
   pageTools?: (tools: readonly IPageTool[]) => void;
   /** The view's answer to a call of its tool. */
@@ -387,6 +395,14 @@ const bytesOf = (v: unknown): Uint8Array | null => {
 const elevationDetail = (method: string, p: Record<string, unknown>): string | null => {
   // The name of the secret, never its value.
   if (method === 'harnessly/secrets.put') return typeof p.name === 'string' ? JSON.stringify(p.name) : null;
+  if (method === 'harnessly/connections.call') {
+    const shown = `${String(p.connection)}: ${String(p.tool)} ${JSON.stringify(isRecord(p.args) ? p.args : {})}`;
+    return shown.length > MAX_ELEVATED_COMMAND ? null : shown;
+  }
+  if (method === 'harnessly/connections.api') {
+    const shown = `${String(p.connection)}: ${String(p.method ?? 'GET')} ${String(p.path)}`;
+    return shown.length > MAX_ELEVATED_COMMAND ? null : shown;
+  }
   if (method === 'harnessly/terminal.write') {
     const bytes = bytesOf(p.data);
     if (bytes === null) return null;
@@ -834,6 +850,9 @@ export class AppBridge {
     if (
       method === 'harnessly/process.list' ||
       method === 'harnessly/process.output' ||
+      method === 'harnessly/connections.list' ||
+      method === 'harnessly/connections.tools' ||
+      method === 'harnessly/connections.request' ||
       method === 'harnessly/terminal.resize' ||
       method === 'harnessly/terminal.close'
     )
@@ -1196,6 +1215,39 @@ export class AppBridge {
           value: str('value', 65_536),
           shared: p.shared === true,
           ...yes,
+        });
+      case 'harnessly/connections.list':
+        return this.need('connections')('list', {});
+      case 'harnessly/connections.tools':
+        return this.need('connections')('tools', { connection: str('connection', 120) });
+      case 'harnessly/connections.call':
+        if (p.args !== undefined && !isRecord(p.args))
+          throw new BridgeError('invalid_params', 'args is an object');
+        return this.need('connections')('call', {
+          connection: str('connection', 120),
+          tool: str('tool', 200),
+          args: isRecord(p.args) ? p.args : {},
+        });
+      case 'harnessly/connections.api': {
+        if (p.query !== undefined && !isRecord(p.query))
+          throw new BridgeError('invalid_params', 'query is an object');
+        const method = p.method === undefined || p.method === '' ? 'GET' : str('method', 10).toUpperCase();
+        if (!['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method))
+          throw new BridgeError('invalid_params', 'method is GET, HEAD, POST, PUT, PATCH or DELETE');
+        return this.need('connections')('api', {
+          connection: str('connection', 120),
+          method,
+          path: str('path', 2048),
+          params: isRecord(p.query) ? p.query : {},
+          ...(p.body === undefined ? {} : { body: p.body }),
+        });
+      }
+      case 'harnessly/connections.request':
+        if (p.access !== undefined && p.access !== 'read' && p.access !== 'all')
+          throw new BridgeError('invalid_params', 'access is read or all');
+        return this.need('connections')('request', {
+          connection: str('connection', 120),
+          ...(p.access === undefined ? {} : { access: p.access }),
         });
       case 'harnessly/agents.run':
         return this.need('agentsRun')({

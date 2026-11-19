@@ -84,6 +84,14 @@ describe('routes', () => {
     });
   });
 
+  it('gives a service of Connections an address of its own, and only Connections', () => {
+    const route = { kind: ROUTE.settings, section: 'connections', item: 'higgsfield-mcp' } as const;
+    expect(routePath(route)).toBe('/settings/connections/higgsfield-mcp');
+    expect(parseRoute('/settings/connections/higgsfield-mcp/')).toEqual(route);
+    expect(parseRoute('/settings/connections')).toEqual({ kind: ROUTE.settings, section: 'connections' });
+    expect(parseRoute('/settings/general/higgsfield-mcp')).toEqual(HOME);
+  });
+
   it('reads the installed apps and an app opened as the main thing with the chat beside it', () => {
     expect(parseRoute('/apps/')).toEqual({ kind: ROUTE.apps });
     expect(routePath({ kind: ROUTE.apps })).toBe('/apps');

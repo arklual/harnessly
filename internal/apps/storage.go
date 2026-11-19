@@ -97,6 +97,14 @@ func (s *Storage) OnChange(fn func(Change)) (cancel func()) {
 	}
 }
 
+// ScopeConnections is the scope of a Change that is no key: the app's connections changed (an agreement given or
+// taken back, a connection signed in, turned on or off). The views that hold connections.read hear it as the event
+// `connections`.
+const ScopeConnections Scope = "connections"
+
+// NotifyConnections tells the views of an app that its connections changed.
+func (s *Storage) NotifyConnections(app string) { s.emit(Change{App: app, Scope: ScopeConnections}) }
+
 func (s *Storage) emit(changes ...Change) {
 	s.subMu.Lock()
 	fns := make([]func(Change), 0, len(s.subs))

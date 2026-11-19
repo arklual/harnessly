@@ -1,0 +1,29 @@
+id: hub-pick-pubmed
+title: Медицинские статьи — PubMed, а не arXiv и не OpenAlex, хотя все три научные и подключены
+tags: [connections, hub, research]
+timeout_s: 360
+# arXiv, OpenAlex, PubMed and Crossref are connected. A clinical question belongs to PubMed; the agent asks it
+# first and does not answer from arXiv, which has no clinical trials.
+setup:
+  connections: [arxiv, openalex, pubmed, crossref]
+covers:
+  - 'internal/mcpconn/hub.go'
+  - 'internal/mcpconn/catalog_api.go'
+  - 'internal/mcpconn/catalog.go'
+  - 'internal/mcpconn/catalog_more.go'
+prompt: найди в PubMed три свежие работы про лечение мигрени и дай ссылки
+expect:
+  - name: looked the connection up through the hub
+    called: harnessly-hub\.(search_tools|connections|api_request)
+  - name: asked PubMed
+    called: harnessly-hub\.api_request
+    args: {connection: '(?i).*pubmed.*'}
+  - name: did not search arXiv
+    not_called: harnessly-hub\.api_request
+    args: {connection: '(?i).*arxiv.*'}
+  - name: gave links to PubMed
+    text: '(?i)(pubmed\.ncbi\.nlm\.nih\.gov|ncbi\.nlm\.nih\.gov/pubmed|doi\.org)'
+variants:
+  - id: v1
+    kind: english
+    text: "Find three recent papers on migraine treatment in PubMed and give me the links."

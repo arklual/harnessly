@@ -167,11 +167,13 @@ type hfStatus struct {
 	Images []struct {
 		URL string `json:"url"`
 	} `json:"images"`
+	// URLs are the files a backend found itself (Higgsfield's MCP).
+	URLs []string `json:"-"`
 }
 
 // urls are the files a finished request gives: the clip, or the pictures.
 func (s hfStatus) urls() []string {
-	var out []string
+	out := append([]string(nil), s.URLs...)
 	if s.Video != nil && s.Video.URL != "" {
 		out = append(out, s.Video.URL)
 	}

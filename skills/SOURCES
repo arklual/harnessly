@@ -1,3 +1,3 @@
 # name  repository  commit  paths…   (paths are copied to upstream/<name>/<path>; skills/sync.sh keeps them equal)
-agent-skills https://github.com/ly-solutions/agent-skills 3ace80a38f1c4d11e5e2c7c4cd4749edf8bf50b9 plugins/harnessly plugins/boards LICENSE
+agent-skills https://github.com/ly-solutions/agent-skills f045a76e4f247cae37c0cb1255bd7cc968966778 plugins/harnessly plugins/boards LICENSE
 artifacts https://github.com/ly-solutions/artifacts 1917bf32d58f04276a71df7677a89c287916ff2a skills/artifacts bin/artifacts.mjs src/cli.mjs LICENSE

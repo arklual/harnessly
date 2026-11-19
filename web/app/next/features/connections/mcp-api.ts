@@ -50,6 +50,7 @@ export const MCP_KINDS = [
   'seo',
   'code',
   'cloud',
+  'database',
   'monitoring',
   'support',
   'crm',
@@ -92,6 +93,20 @@ export interface IMcpEnvField {
   default: string;
 }
 
+/** What the person (or an agent for them) wrote about a service of their own (mcpconn.CustomMeta). */
+export interface IMcpCustom {
+  category: TMcpKind;
+  /** The one character of its mark. */
+  letter: string;
+  about: string;
+  aboutRu: string;
+  can: readonly string[];
+  canRu: readonly string[];
+  steps: readonly string[];
+  stepsRu: readonly string[];
+  links: readonly IMcpLink[];
+}
+
 export interface IMcpServer {
   id: string;
   name: string;
@@ -114,6 +129,8 @@ export interface IMcpServer {
   /** Why a local server does not start, in short English («uvx is not installed on this machine»); empty when fine. */
   problem: string;
   guide: string;
+  /** Set for a service of the person's own (catalogId is custom-<slug>): its description, which the page may change. */
+  custom: IMcpCustom | null;
 }
 
 export interface IMcpCatalogEntry {
@@ -138,6 +155,30 @@ export interface IMcpCatalogEntry {
   runtime: string;
   /** A line on where to get the keys, when the entry has one. */
   guide: string;
+  /** The service's own page (internal/mcpconn/service_pages.go): a longer description, what an agent can do, the
+   * steps to connect and official links. Each is empty when the catalog has nothing for the service. */
+  about: string;
+  aboutRu: string;
+  can: readonly string[];
+  canRu: readonly string[];
+  steps: readonly string[];
+  stepsRu: readonly string[];
+  links: readonly IMcpLink[];
+}
+
+export const MCP_LINK = {
+  docs: 'docs',
+  setup: 'setup',
+  token: 'token',
+  pricing: 'pricing',
+  home: 'home',
+} as const;
+export type TMcpLink = (typeof MCP_LINK)[keyof typeof MCP_LINK];
+
+/** One official page about a service. */
+export interface IMcpLink {
+  kind: TMcpLink;
+  url: string;
 }
 
 export interface IMcpProbe {
@@ -194,6 +235,32 @@ const readTool = (v: unknown): IMcpTool => {
   return { name: str(o.name, 'tool.name'), description: optStr(o.description, 'tool.description') };
 };
 
+const strings = (v: unknown, what: string): readonly string[] =>
+  v === undefined || v === null ? [] : list(v, what, (item) => str(item, what));
+
+const readLink = (v: unknown): IMcpLink => {
+  const o = obj(v, 'mcp link');
+  const kindOf = Object.values(MCP_LINK).find((item) => item === o.kind);
+  if (kindOf === undefined) throw new Error('connections: mcp link kind');
+  return { kind: kindOf, url: str(o.url, 'link.url') };
+};
+
+const readCustom = (v: unknown): IMcpCustom | null => {
+  if (v === undefined || v === null) return null;
+  const o = obj(v, 'mcp custom');
+  return {
+    category: MCP_KINDS.find((item) => item === o.category) ?? 'utility',
+    letter: optStr(o.letter, 'custom.letter'),
+    about: optStr(o.about, 'custom.about'),
+    aboutRu: optStr(o.aboutRu, 'custom.aboutRu'),
+    can: strings(o.can, 'custom.can'),
+    canRu: strings(o.canRu, 'custom.canRu'),
+    steps: strings(o.steps, 'custom.steps'),
+    stepsRu: strings(o.stepsRu, 'custom.stepsRu'),
+    links: o.links === undefined || o.links === null ? [] : list(o.links, 'custom.links', readLink),
+  };
+};
+
 export const readMcpServer = (v: unknown): IMcpServer => {
   const o = obj(v, 'mcp server');
   return {
@@ -213,6 +280,7 @@ export const readMcpServer = (v: unknown): IMcpServer => {
     env: readEnv(o.env),
     problem: optStr(o.problem, 'problem'),
     guide: optStr(o.guide, 'guide'),
+    custom: readCustom(o.custom),
   };
 };
 
@@ -235,6 +303,13 @@ export const readMcpCatalogEntry = (v: unknown): IMcpCatalogEntry => {
     env: readEnv(o.env),
     runtime: optStr(o.runtime, 'runtime'),
     guide: optStr(o.guide, 'guide'),
+    about: optStr(o.about, 'about'),
+    aboutRu: optStr(o.aboutRu, 'aboutRu'),
+    can: strings(o.can, 'can'),
+    canRu: strings(o.canRu, 'canRu'),
+    steps: strings(o.steps, 'steps'),
+    stepsRu: strings(o.stepsRu, 'stepsRu'),
+    links: o.links === undefined || o.links === null ? [] : list(o.links, 'links', readLink),
   };
 };
 
@@ -383,3 +458,46 @@ export const enableMcp = (
 
 export const removeMcp = (machine: MachineId, id: string): Promise<TConnOutcome<true>> =>
   sendPage('DELETE', path(machine, one(id)), readRemoved, TIMEOUT_MS);
+
+/** A service of the person's own, as the form sends it (mcpconn.CustomInput). */
+export interface IOwnServiceInput {
+  kind: 'mcp' | 'api' | 'local';
+  name: string;
+  url?: string;
+  headerName?: string;
+  keys?: readonly { name: string; label?: string; optional?: boolean }[];
+  apiHeaders?: Readonly<Record<string, string>>;
+  checkPath?: string;
+  command?: readonly string[];
+  category?: TMcpKind;
+}
+
+/** Makes a service of the person's own from the form: the keys typed go to the safe and come back nowhere. */
+export const addOwnService = (
+  machine: MachineId,
+  input: IOwnServiceInput,
+  values: Readonly<Record<string, string>>,
+): Promise<TConnOutcome<IMcpAdded>> =>
+  sendBody('POST', path(machine, '/mcp/custom'), { input, values }, readAdded, START_TIMEOUT_MS);
+
+/** What the page may rewrite of a service of its own: the name and the description. */
+export interface IOwnDescription {
+  name: string;
+  category: TMcpKind;
+  about: string;
+  aboutRu: string;
+  can: readonly string[];
+  canRu: readonly string[];
+  steps: readonly string[];
+  stepsRu: readonly string[];
+  letter: string;
+}
+
+export const describeOwnService = (
+  machine: MachineId,
+  id: string,
+  d: IOwnDescription,
+): Promise<TConnOutcome<IMcpServer>> => {
+  const { name, ...custom } = d;
+  return sendJson(path(machine, one(id)), { name, custom }, readOne, TIMEOUT_MS);
+};

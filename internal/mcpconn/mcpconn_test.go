@@ -881,3 +881,39 @@ func TestReadEventsMultiline(t *testing.T) {
 		t.Fatalf("%v %q", err, got)
 	}
 }
+
+func TestAppAccessHelpers(t *testing.T) {
+	if got := CatalogKind("linear"); got != "tasks" {
+		t.Errorf("linear is in %q", got)
+	}
+	if CatalogKind("nope") != "" || !KnownKind("mail") || KnownKind("nope") {
+		t.Error("kinds")
+	}
+	for _, c := range []struct {
+		id, method, path string
+		want             bool
+	}{
+		{"yandex-tracker", "GET", "/issues", true}, {"anything", "", "/x", true}, {"anything", "head", "/x", true},
+		{"yandex-tracker", "POST", "/issues/_search", true}, {"yandex-tracker", "post", "issues/_search?x=1", true},
+		{"yandex-tracker", "POST", "/issues", false}, {"yandex-tracker", "POST", "/issues/_search/x", false},
+		{"yandex-tracker", "DELETE", "/issues/A-1", false}, {"binance", "POST", "/issues/_search", false},
+	} {
+		if got := APIReads(c.id, c.method, c.path); got != c.want {
+			t.Errorf("%+v: %v", c, got)
+		}
+	}
+}
+
+func TestOnChangeHearsWrites(t *testing.T) {
+	s, _ := newService(t)
+	heard := 0
+	stop := s.OnChange(func() { heard++ })
+	if err := s.writeAll(stored{}); err != nil || heard != 1 {
+		t.Fatalf("%v %d", err, heard)
+	}
+	stop()
+	_ = s.writeAll(stored{})
+	if heard != 1 {
+		t.Fatalf("heard after stopping: %d", heard)
+	}
+}

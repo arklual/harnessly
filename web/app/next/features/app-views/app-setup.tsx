@@ -252,22 +252,41 @@ const Connection = ({
 }) => {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
-  const allow = (on: boolean) => {
+  const allow = (on: boolean, access?: 'read' | 'all') => {
     setBusy(true);
     setFailed(false);
-    setAppConnection(machine, app.id, connection.id, on)
+    setAppConnection(machine, app.id, connection.id, on, access)
       .then(onSetup)
       .catch(() => setFailed(true))
       .finally(() => setBusy(false));
   };
+  const signIn = (
+    <Button size="sm" variant="ghost" onClick={() => goTo({ kind: ROUTE.settings, section: 'connections' })}>
+      {t('next.inspector.connectionSignIn')}
+    </Button>
+  );
+  // A group the app names (any of the person's mail services…) with none of theirs in it: there is nothing to allow yet.
+  if (connection.id === '')
+    return (
+      <div className="hx-insp__field">
+        <span className="hx-insp__label">{connection.category}</span>
+        <span className="hx-insp__hint">
+          {t('next.inspector.connectionGroup', { category: connection.category ?? '' })}
+        </span>
+        <div className="hx-insp__row">{signIn}</div>
+      </div>
+    );
+  const level = connection.access ?? '';
+  let hint = t('next.inspector.connectionAsk', { name: connection.name });
+  if (connection.granted)
+    hint = t(level === 'read' ? 'next.inspector.connectionReads' : 'next.inspector.connectionAllowed', {
+      name: connection.name,
+    });
   return (
     <div className="hx-insp__field">
       <span className="hx-insp__label">{connection.name}</span>
-      <span className="hx-insp__hint">
-        {t(connection.granted ? 'next.inspector.connectionAllowed' : 'next.inspector.connectionAsk', {
-          name: connection.name,
-        })}
-      </span>
+      <span className="hx-insp__hint">{hint}</span>
+      {connection.reason && <span className="hx-insp__hint">{connection.reason}</span>}
       <div className="hx-insp__row">
         {connection.granted ? (
           <Button size="sm" variant="ghost" disabled={busy} onClick={() => allow(false)}>
@@ -275,18 +294,19 @@ const Connection = ({
           </Button>
         ) : (
           <Button size="sm" variant="primary" busy={busy} onClick={() => allow(true)}>
-            {t('next.inspector.connectionAllow')}
+            {t(
+              connection.declared === 'read'
+                ? 'next.inspector.connectionAllowRead'
+                : 'next.inspector.connectionAllow',
+            )}
           </Button>
         )}
-        {!connection.connected && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => goTo({ kind: ROUTE.settings, section: 'connections' })}
-          >
-            {t('next.inspector.connectionSignIn')}
+        {!connection.granted && connection.declared === 'all' && (
+          <Button size="sm" variant="ghost" disabled={busy} onClick={() => allow(true, 'read')}>
+            {t('next.inspector.connectionAllowRead')}
           </Button>
         )}
+        {!connection.connected && signIn}
       </div>
       {failed && <span className="hx-insp__problem">{t('next.inspector.saveFailed')}</span>}
     </div>
@@ -334,7 +354,13 @@ const AppSetup = ({ machine, app }: { machine: MachineId; app: IInstalledApp }) 
           <p className="hx-insp__hint">{t('next.inspector.connectionsNote')}</p>
           <div className="hx-insp__form">
             {(setup.connections ?? []).map((c) => (
-              <Connection key={c.id} machine={machine} app={app} connection={c} onSetup={onSetup} />
+              <Connection
+                key={`${c.id}/${c.category ?? ''}`}
+                machine={machine}
+                app={app}
+                connection={c}
+                onSetup={onSetup}
+              />
             ))}
           </div>
         </div>

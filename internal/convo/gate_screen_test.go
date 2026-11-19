@@ -293,6 +293,8 @@ func TestPromptTheScreenCannotReadStillGetsACard(t *testing.T) {
 		}
 	}
 	r.busy()
+	// Two looks without the dialog: one frame of a redraw is no answer.
+	r.tick(time.Second)
 	r.tick(time.Second)
 	if k := r.state().K; k == wire.StateWaitingPermission {
 		t.Fatalf("still waiting: %s", k)

@@ -1,28 +1,19 @@
-// Connecting an MCP server is one form: its address (typed, or put there by a catalog card), what the machine found
-// there and how it signs in, and one explicit step — «Sign in with …» opens the service's page in a popup, a server
-// that takes a token asks for it in the form, an open one just connects. A catalog card only fills the form: nothing
-// is kept and no window opens until the person presses that button.
-import { useEffect, useEffectEvent, useId, useRef, useState, type Ref } from 'react';
+// The pieces of connecting an MCP server, shared by the service page and the form for an address of one's own. That form:
+// its address, what the machine found there and how it signs in, and one explicit step — «Sign in with …» opens the
+// service's page in a popup, a server that takes a token asks for it in the form, an open one just connects. Nothing is
+// kept and no window opens until the person presses that button. A catalog service is connected on its own page
+// (service-page.tsx).
+import { useEffect, useId, useRef, useState } from 'react';
 import { McpGlyph } from '@/next/features/connections/glyphs';
 import {
   DEFAULT_HEADER,
   MCP_AUTH,
-  MCP_TRANSPORT,
   type IMcpAddInput,
-  type IMcpCatalogEntry,
   type IMcpEnvField,
   type IMcpHeader,
   type IMcpProbe,
 } from '@/next/features/connections/mcp-api';
-import {
-  blurbOf,
-  envDefaults,
-  envPayload,
-  envReady,
-  headerValue,
-  isKeyed,
-  probeLine,
-} from '@/next/features/connections/mcp-model';
+import { envDefaults, headerValue, probeLine } from '@/next/features/connections/mcp-model';
 import { hostOf } from '@/next/features/connections/model';
 import { FormError, SetButton } from '@/next/features/settings/rows';
 import { t } from '@/next/i18n';
@@ -235,186 +226,38 @@ export const StartingHint = () => (
   </p>
 );
 
-interface IKeyedCardProps {
-  entry: IMcpCatalogEntry;
-  onConnect: TConnectMcp;
-  /** Kept: the form lets the entry go. */
-  onDone: () => void;
-  onCancel: () => void;
-}
-
-/**
- * A local server or an API from the catalog: nothing to probe, only its keys. The press of «Connect» keeps it with
- * the keys; the first start of a local server can take a couple of minutes.
- */
-const KeyedCard = ({ entry, onConnect, onDone, onCancel }: IKeyedCardProps) => {
-  const env = useEnvValues(entry.env, true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const alive = useAlive();
-  const local = entry.transport === MCP_TRANSPORT.stdio;
-  const ready = envReady(entry.env, env.values);
-
-  const connect = async () => {
-    if (busy || !ready) return;
-    setBusy(true);
-    setError(null);
-    const refused = await onConnect(
-      {
-        url: '',
-        name: '',
-        catalogId: entry.id,
-        transport: null,
-        header: null,
-        env: envPayload(entry.env, env.values),
-      },
-      false,
-    );
-    if (!alive.current) return;
-    setBusy(false);
-    if (refused !== null) {
-      setError(refused);
-      return;
-    }
-    onDone();
-  };
-
-  return (
-    <div className="hx-conn-found">
-      <div className="hx-conn-found__head">
-        <McpGlyph id={entry.id} name={entry.name} />
-        <span className="hx-conn-found__text">
-          <span className="hx-conn-found__name">{entry.name}</span>
-          {blurbOf(entry) !== '' && <span className="hx-conn-found__sub">{blurbOf(entry)}</span>}
-        </span>
-      </div>
-      <p className="hx-conn-found__note">
-        {local ? t('next.connections.mcp.localNote') : t('next.connections.mcp.apiNote')}
-      </p>
-      {entry.guide !== '' && <p className="hx-conn-found__note">{entry.guide}</p>}
-      {entry.env.length > 0 && (
-        <EnvFields
-          fields={entry.env}
-          values={env.values}
-          keep={false}
-          disabled={busy}
-          invalid={error !== null}
-          onChange={(name, value) => {
-            env.set(name, value);
-            setError(null);
-          }}
-          onSubmit={() => void connect()}
-        />
-      )}
-      {(entry.tokenUrl !== '' || entry.docsUrl !== '') && (
-        <div className="hx-mcp-env__links">
-          {entry.tokenUrl !== '' && (
-            <a className="hx-conn-found__token" href={entry.tokenUrl} target="_blank" rel="noreferrer">
-              {t('next.connections.createToken')}
-              <Icon name="external-link" size="sm" />
-            </a>
-          )}
-          {entry.docsUrl !== '' && (
-            <a className="hx-conn-found__token" href={entry.docsUrl} target="_blank" rel="noreferrer">
-              {t('next.connections.mcp.docs')}
-              <Icon name="external-link" size="sm" />
-            </a>
-          )}
-        </div>
-      )}
-      {busy && <StartingHint />}
-      <div className="hx-conn-found__actions">
-        <SetButton tone="primary" busy={busy} disabled={!ready} onClick={() => void connect()}>
-          {t('next.connections.connect')}
-        </SetButton>
-        <SetButton tone="ghost" disabled={busy} onClick={onCancel}>
-          {t('next.connections.cancel')}
-        </SetButton>
-      </div>
-      <ErrorLine error={error} />
-    </div>
-  );
-};
-
-interface ICatalogCardProps {
-  entry: IMcpCatalogEntry;
-  leaving: boolean;
-  /** This card's service is in the form now. */
-  picked: boolean;
-  onPick: (entry: IMcpCatalogEntry) => void;
-}
-
-/** A known service: its mark, its name, one line of what it gives. A press puts it in the form above. */
-export const CatalogCard = ({ entry, leaving, picked, onPick }: ICatalogCardProps) => (
-  <button
-    type="button"
-    className="hx-mcp-card"
-    data-leaving={leaving || undefined}
-    aria-pressed={picked}
-    disabled={leaving}
-    onClick={() => onPick(entry)}
-  >
-    <McpGlyph id={entry.id} name={entry.name} size="sm" />
-    <span className="hx-mcp-card__text">
-      <span className="hx-mcp-card__name">{entry.name}</span>
-      {blurbOf(entry) !== '' && <span className="hx-mcp-card__blurb">{blurbOf(entry)}</span>}
-    </span>
-    <Icon name="chevron-right" size="sm" className="hx-mcp-card__go" />
-  </button>
-);
-
 const BUSY = { probe: 'probe', connect: 'connect' } as const;
 type TBusy = (typeof BUSY)[keyof typeof BUSY];
 
-/** A catalog entry put into the form; `at` tells two presses of the same card apart. */
-export interface IPicked {
-  entry: IMcpCatalogEntry;
-  at: number;
-}
-
-interface IConnectFormProps {
-  picked: IPicked | null;
-  onProbe: (url: string) => Promise<TProbeResult>;
-  onConnect: TConnectMcp;
-  /** The form let its catalog entry go (cancelled, connected, or another address typed). */
-  onUnpick: () => void;
-  ref?: Ref<HTMLDivElement>;
-}
-
-const nameOf = (probe: IMcpProbe, entry: IMcpCatalogEntry | null): string => {
-  if (entry !== null) return entry.name;
-  return probe.name === '' ? hostOf(probe.url) : probe.name;
-};
-
 /** The probed server signs in on its own page (and lets this app register there). */
 const signsInByPage = (probe: IMcpProbe): boolean => probe.auth === MCP_AUTH.oauth && !probe.oauthUnavailable;
-/**
- * The server takes a typed token: the probe says so, or the catalog does for a server that answers initialize without
- * one but refuses its tools (Yandex 360).
- */
-const asksToken = (probe: IMcpProbe, entry: IMcpCatalogEntry | null): boolean =>
-  probe.auth === MCP_AUTH.header || probe.oauthUnavailable || entry?.auth === MCP_AUTH.header;
+/** The server takes a typed token: the probe says so. */
+const asksToken = (probe: IMcpProbe): boolean => probe.auth === MCP_AUTH.header || probe.oauthUnavailable;
 
-/** «MCP server address»: type it or pick a service below, see what it is and how it signs in, then connect. */
-export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConnectFormProps) => {
+const nameOf = (probe: IMcpProbe): string => (probe.name === '' ? hostOf(probe.url) : probe.name);
+
+interface IConnectFormProps {
+  onProbe: (url: string) => Promise<TProbeResult>;
+  onConnect: TConnectMcp;
+}
+
+/** «A server of your own»: the address in one line with its button inside, then what was found there and the step. */
+export const ConnectForm = ({ onProbe, onConnect }: IConnectFormProps) => {
   const [url, setUrl] = useState('');
-  const [entry, setEntry] = useState<IMcpCatalogEntry | null>(null);
   const [probe, setProbe] = useState<IMcpProbe | null>(null);
   const [name, setName] = useState('');
   const [header, setHeader] = useState(DEFAULT_HEADER);
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState<TBusy | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // A local server or an API from the catalog: its keys' form takes the place of the probe's card.
-  const [keyed, setKeyed] = useState<IPicked | null>(null);
   const alive = useAlive();
   const ids = useId();
   const card = usePresence(probe, CARD_EXIT_MS);
   const shown = card.value;
   const closing = card.state === PRESENCE.closing;
-  const token = shown !== null && asksToken(shown, entry);
+  const token = shown !== null && asksToken(shown);
 
-  const find = async (link: string, from: IMcpCatalogEntry | null) => {
+  const find = async (link: string) => {
     const address = link.trim();
     if (address === '' || busy === BUSY.connect) return;
     setBusy(BUSY.probe);
@@ -429,44 +272,18 @@ export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConn
     }
     setProbe(got.probe);
     setName('');
-    const fromCatalog = from === null ? '' : from.headerName;
-    setHeader(got.probe.headerName === '' ? fromCatalog || DEFAULT_HEADER : got.probe.headerName);
+    setHeader(got.probe.headerName === '' ? DEFAULT_HEADER : got.probe.headerName);
     setValue('');
   };
 
-  // A catalog card fills the address and looks at it at once; nothing is kept yet.
-  const lastPick = useRef<number | null>(null);
-  const takePick = useEffectEvent((next: IPicked) => {
-    setEntry(next.entry);
-    if (isKeyed(next.entry)) {
-      // Nothing to probe: only keys to ask for.
-      setUrl('');
-      setProbe(null);
-      setError(null);
-      setKeyed(next);
-      return;
-    }
-    setKeyed(null);
-    setUrl(next.entry.url);
-    void find(next.entry.url, next.entry);
-  });
-  useEffect(() => {
-    if (picked === null || lastPick.current === picked.at) return;
-    lastPick.current = picked.at;
-    takePick(picked);
-  }, [picked]);
-
-  const ready = probe !== null && (!asksToken(probe, entry) || value.trim() !== '');
+  const ready = probe !== null && (!asksToken(probe) || value.trim() !== '');
 
   const reset = () => {
     setProbe(null);
     setUrl('');
-    setEntry(null);
-    setKeyed(null);
     setName('');
     setValue('');
     setError(null);
-    onUnpick();
   };
 
   const connect = async () => {
@@ -475,12 +292,10 @@ export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConn
     const pending = onConnect(
       {
         url: probe.url,
-        name: entry === null ? name.trim() : '',
-        catalogId: entry === null ? '' : entry.id,
+        name: name.trim(),
+        catalogId: '',
         transport: probe.transport,
-        header: asksToken(probe, entry)
-          ? headerOf(header, value, entry === null ? '' : entry.tokenPrefix)
-          : null,
+        header: asksToken(probe) ? headerOf(header, value, '') : null,
       },
       signsInByPage(probe),
     );
@@ -497,58 +312,50 @@ export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConn
     reset();
   };
 
-  const title = shown === null ? '' : nameOf(shown, entry);
-  const tokenUrl = entry === null ? '' : entry.tokenUrl;
+  const title = shown === null ? '' : nameOf(shown);
 
   return (
-    <div ref={ref} className="hx-conn-form">
-      <div className="hx-conn-form__paste">
-        <label className="hx-conn-form__label" htmlFor={`${ids}-url`}>
-          {t('next.connections.mcp.address')}
-        </label>
-        <div className="hx-conn-form__line">
-          <input
-            id={`${ids}-url`}
-            className="hx-set__input"
-            type="text"
-            inputMode="url"
-            value={url}
-            autoComplete="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            placeholder={t('next.connections.mcp.address.placeholder')}
-            aria-invalid={(error !== null && probe === null) || undefined}
-            onChange={(event) => {
-              const next = event.target.value;
-              setUrl(next);
-              setError(null);
-              if (probe !== null) setProbe(null);
-              if (entry !== null && next.trim() !== entry.url) {
-                setEntry(null);
-                setKeyed(null);
-                onUnpick();
-              }
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') void find(url, entry);
-            }}
-          />
-          {probe === null && (
-            <SetButton
-              tone="primary"
-              busy={busy === BUSY.probe}
-              disabled={url.trim() === ''}
-              onClick={() => void find(url, entry)}
-            >
-              {t('next.connections.find')}
-            </SetButton>
-          )}
-        </div>
+    <div className="hx-conn-form">
+      <label className="hx-conn-form__label" htmlFor={`${ids}-url`}>
+        {t('next.connections.mcp.address')}
+      </label>
+      <div className="hx-cn-paste" data-invalid={(error !== null && probe === null) || undefined}>
+        <input
+          id={`${ids}-url`}
+          className="hx-cn-paste__input"
+          type="text"
+          inputMode="url"
+          value={url}
+          autoComplete="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          placeholder={t('next.connections.mcp.address.placeholder')}
+          aria-invalid={(error !== null && probe === null) || undefined}
+          onChange={(event) => {
+            setUrl(event.target.value);
+            setError(null);
+            if (probe !== null) setProbe(null);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') void find(url);
+          }}
+        />
+        {probe === null && (
+          <button
+            type="button"
+            className="hx-cn-paste__go"
+            disabled={url.trim() === '' || busy !== null}
+            data-busy={busy === BUSY.probe || undefined}
+            onClick={() => void find(url)}
+          >
+            {t('next.connections.find')}
+          </button>
+        )}
       </div>
       {shown !== null && (
         <div className="hx-conn-found" data-state={card.state} inert={closing || undefined}>
           <div className="hx-conn-found__head">
-            <McpGlyph id={entry === null ? '' : entry.id} name={title} />
+            <McpGlyph id="" name={title} />
             <span className="hx-conn-found__text">
               <span className="hx-conn-found__name">{title}</span>
               <span className="hx-conn-found__sub">
@@ -563,7 +370,7 @@ export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConn
             <HeaderFields
               name={header}
               value={value}
-              tokenUrl={tokenUrl}
+              tokenUrl=""
               disabled={busy !== null}
               invalid={error !== null}
               onName={setHeader}
@@ -574,26 +381,24 @@ export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConn
               onSubmit={() => void connect()}
             />
           )}
-          {entry === null && (
-            <div className="hx-conn-form__field">
-              <label className="hx-conn-form__label" htmlFor={`${ids}-name`}>
-                {t('next.connections.name')}
-              </label>
-              <input
-                id={`${ids}-name`}
-                className="hx-set__input"
-                value={name}
-                maxLength={80}
-                autoComplete="off"
-                disabled={busy !== null}
-                placeholder={title}
-                onChange={(event) => setName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') void connect();
-                }}
-              />
-            </div>
-          )}
+          <div className="hx-conn-form__field">
+            <label className="hx-conn-form__label" htmlFor={`${ids}-name`}>
+              {t('next.connections.name')}
+            </label>
+            <input
+              id={`${ids}-name`}
+              className="hx-set__input"
+              value={name}
+              maxLength={80}
+              autoComplete="off"
+              disabled={busy !== null}
+              placeholder={title}
+              onChange={(event) => setName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void connect();
+              }}
+            />
+          </div>
           <div className="hx-conn-found__actions">
             <SetButton
               tone="primary"
@@ -611,9 +416,6 @@ export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConn
             </SetButton>
           </div>
         </div>
-      )}
-      {keyed !== null && (
-        <KeyedCard key={keyed.at} entry={keyed.entry} onConnect={onConnect} onDone={reset} onCancel={reset} />
       )}
       <ErrorLine error={error} />
     </div>

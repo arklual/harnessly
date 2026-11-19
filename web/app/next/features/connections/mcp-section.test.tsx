@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ConnectionsPage } from '@/next/bindings/settings-connections';
 import { setFetch } from '@/next/core/net/http';
@@ -11,6 +12,7 @@ import {
 } from '@/next/features/connections/mcp-api';
 import { catalogGroups, headerValue, openCatalog } from '@/next/features/connections/mcp-model';
 import McpSection, { type IMcpSectionProps } from '@/next/features/connections/mcp-section';
+import { canFromTools, findService, linksOf, stepsOf } from '@/next/features/connections/service-model';
 import { pinLocale } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
 
@@ -144,8 +146,43 @@ const props = (over: Partial<IMcpSectionProps> = {}): IMcpSectionProps => ({
 /** A popup as window.open gives it: blank at first, sent to the sign-in later. */
 const fakePopup = () => ({ closed: false, close: vi.fn(), location: { href: 'about:blank' } });
 
-/** A catalog card: a button named by its service. */
+/** A row of the list: a button named by its service. */
 const card = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}`) });
+
+/** The address of a server of one's own is folded like a group; opening it gives the field. */
+const ownField = () => {
+  fireEvent.click(screen.getByRole('button', { name: /^Add by hand/ }));
+  return screen.getByLabelText('MCP server address');
+};
+
+/** The page of the open service: the list behind it stays mounted, hidden, and has the same words. */
+const page = () => within(screen.getByRole('article'));
+
+/** A group of the catalog is folded to its name and count until it is pressed. */
+const openGroup = (name: string) =>
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${name}`) }));
+
+/**
+ * The section as the binding runs it: the address (`item`) is the binding's, and so is the list, which takes in the
+ * server a connect kept.
+ */
+const Host = (p: IMcpSectionProps) => {
+  const [item, setItem] = useState<string | null>(p.item ?? null);
+  const [mcp, setMcp] = useState(p.mcp);
+  return (
+    <McpSection
+      {...p}
+      mcp={mcp}
+      item={item}
+      onOpen={setItem}
+      onAdd={async (input) => {
+        const got = await p.onAdd(input);
+        if (!('error' in got) && mcp !== null) setMcp({ ...mcp, servers: [...mcp.servers, got.server] });
+        return got;
+      }}
+    />
+  );
+};
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -199,64 +236,58 @@ describe('the MCP readers', () => {
 });
 
 describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => {
-  it('starts with the intro line and the catalog when nothing is connected', () => {
-    render(<McpSection {...props()} />);
+  it('starts with the intro line, the groups of the catalog folded, and a field for a server of one’s own', () => {
+    render(<Host {...props()} />);
     expect(screen.getByText('MCP servers')).toBeTruthy();
     expect(screen.getByText('Agents in new chats get the tools of these servers')).toBeTruthy();
-    expect(screen.getByText('Issues, projects and cycles')).toBeTruthy();
-    expect(screen.getByLabelText('MCP server address')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Tasks/ }).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByText('Linear')).toBeNull();
+    expect(ownField()).toBeTruthy();
   });
 
-  it('«Show all» opens the catalog in groups with a search over it', () => {
-    // GitHub is seventh, past the first six the catalog shows until «Show all».
-    const many = [
-      readMcpCatalogEntry(linear),
-      ...['a', 'b', 'c', 'd', 'e'].map((n) =>
-        readMcpCatalogEntry({
-          ...linear,
-          id: `tasks-${n}`,
-          name: `Tasks ${n}`,
-          url: `https://${n}.example.com/mcp`,
-        }),
-      ),
-      readMcpCatalogEntry(github),
-    ];
-    render(<McpSection {...props({ mcp: { servers: [], catalog: many } })} />);
+  it('opens a group on a press, and the search opens the groups that have what it finds', () => {
+    render(<Host {...props()} />);
+    openGroup('Tasks');
+    expect(screen.getByText('Issues, projects and cycles')).toBeTruthy();
     expect(screen.queryByText('GitHub')).toBeNull();
-    fireEvent.click(screen.getByText('Show all'));
-    expect(screen.getByRole('heading', { name: 'Tasks' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Code and infrastructure' })).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Find a service'), { target: { value: 'pull requests' } });
+    fireEvent.change(screen.getByLabelText('Search services'), { target: { value: 'pull requests' } });
     expect(screen.getByText('GitHub')).toBeTruthy();
-    expect(screen.queryByRole('heading', { name: 'Tasks' })).toBeNull();
-    fireEvent.change(screen.getByLabelText('Find a service'), { target: { value: 'zzz' } });
+    expect(screen.queryByRole('button', { name: /^Tasks/ })).toBeNull();
+    fireEvent.change(screen.getByLabelText('Search services'), { target: { value: 'zzz' } });
     expect(screen.getByText('Nothing found')).toBeTruthy();
   });
 
-  it('a catalog card only fills the address: nothing is kept and no window opens', async () => {
+  it('a service of the catalog opens its page: nothing is kept, no window opens, «back» finds the list', async () => {
     const open = vi.spyOn(window, 'open');
     const p = props();
-    render(<McpSection {...p} />);
+    render(<Host {...p} />);
+    openGroup('Tasks');
     fireEvent.click(card('Linear'));
-    expect(await screen.findByText('Sign in with Linear')).toBeTruthy();
-    expect((screen.getByLabelText('MCP server address') as HTMLInputElement).value).toBe(linear.url);
-    expect(p.onProbe).toHaveBeenCalledWith(linear.url);
+    expect(await screen.findByRole('heading', { name: 'Linear' })).toBeTruthy();
+    expect(screen.getByText('How to connect')).toBeTruthy();
+    expect(screen.getByText('Sign in with Linear', { selector: 'button *' })).toBeTruthy();
+    expect(screen.getByText('Documentation').closest('a')?.getAttribute('href')).toBe(linear.docsUrl);
+    expect(p.onProbe).not.toHaveBeenCalled();
     expect(p.onAdd).not.toHaveBeenCalled();
     expect(open).not.toHaveBeenCalled();
-    // Another address typed: the card lets go, and the service is looked at anew.
-    fireEvent.change(screen.getByLabelText('MCP server address'), {
-      target: { value: 'https://linear.acme.dev/mcp' },
-    });
-    expect(screen.queryByText('Sign in with Linear')).toBeNull();
-    expect(card('Linear').getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(screen.getByText('All connections'));
+    expect(screen.queryByRole('heading', { name: 'Linear' })).toBeNull();
+    // The list is as it was left: the group is still open.
+    expect(screen.getByText('Issues, projects and cycles')).toBeTruthy();
+  });
+
+  it('says so for an address that is no service', () => {
+    render(<Host {...props({ item: 'nope' })} />);
+    expect(screen.getByText(/no such service/)).toBeTruthy();
+    fireEvent.click(screen.getByText('All connections'));
+    expect(screen.getByText('MCP servers')).toBeTruthy();
   });
 
   it('opens the popup in the click, then sends it to the sign-in and waits for its word', async () => {
     const popup = fakePopup();
     const open = vi.spyOn(window, 'open').mockReturnValue(popup as unknown as Window);
-    const p = props();
-    render(<McpSection {...p} />);
-    fireEvent.click(card('Linear'));
+    const p = props({ item: 'linear' });
+    render(<Host {...p} />);
     fireEvent.click(await screen.findByText('Sign in with Linear'));
     // Before any answer of the machine: a window opened later would be blocked.
     expect(open).toHaveBeenCalledWith('about:blank', 'harnessly-mcp', 'popup,width=520,height=720');
@@ -292,7 +323,7 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
   it('leaves a link to the sign-in when the browser blocks the popup', async () => {
     vi.spyOn(window, 'open').mockReturnValue(null);
     const signin = readMcpServer(server({ state: 'signin', tools: [], me: '' }));
-    render(<McpSection {...props({ mcp: { servers: [signin], catalog } })} />);
+    render(<Host {...props({ item: 'linear', mcp: { servers: [signin], catalog } })} />);
     expect(screen.getByText('Sign-in not finished')).toBeTruthy();
     fireEvent.click(screen.getByText('Sign in'));
     const link = (await screen.findByText('Open sign-in')).closest('a');
@@ -300,32 +331,35 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
     expect(screen.getByText('The browser blocked the sign-in window')).toBeTruthy();
   });
 
-  it('asks for a token in the form for a service that takes one', async () => {
+  it('asks for a token on the page of a service that takes one, and sends it as Bearer', async () => {
     const open = vi.spyOn(window, 'open');
     const p = props({
-      onProbe: vi.fn(async (url: string) => ({ probe: readMcpProbe({ url, auth: 'header' }) })),
+      item: 'github',
       onAdd: vi.fn(async () => ({
-        server: readMcpServer(server({ id: 'g1', auth: 'header' })),
+        server: readMcpServer(server({ id: 'g1', name: 'GitHub', catalogId: 'github', auth: 'header' })),
         authStart: null,
       })),
     });
-    render(<McpSection {...p} />);
-    fireEvent.click(card('GitHub'));
-    expect(((await screen.findByLabelText('Header')) as HTMLInputElement).value).toBe('Authorization');
+    render(<Host {...p} />);
     expect(screen.getByText('Create a token').closest('a')?.getAttribute('href')).toBe(github.tokenUrl);
     const field = screen.getByLabelText('Token') as HTMLInputElement;
     expect(field.type).toBe('password');
+    const connect = screen.getByText('Connect').closest('button') as HTMLButtonElement;
+    expect(connect.disabled).toBe(true);
     fireEvent.change(field, { target: { value: TOKEN } });
-    fireEvent.click(screen.getByText('Connect'));
+    fireEvent.click(connect);
     await waitFor(() => expect(p.onAdd).toHaveBeenCalled());
     expect(vi.mocked(p.onAdd).mock.calls[0]?.[0].header).toEqual({
       name: 'Authorization',
       value: `Bearer ${TOKEN}`,
     });
     expect(open).not.toHaveBeenCalled();
+    // Kept: the page turns into the state of the server.
+    await waitFor(() => expect(page().getByText('Online')).toBeTruthy());
+    expect(screen.queryByText('How to connect')).toBeNull();
   });
 
-  it('opens the token form of a kept server that asks for one, with no popup', async () => {
+  it('opens the token form on the page of a kept server that asks for one, with no popup', async () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null);
     const kept = readMcpServer(
       server({
@@ -352,50 +386,76 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
         }),
       })),
     });
-    const { rerender } = render(<McpSection {...p} />);
-    fireEvent.change(screen.getByLabelText('MCP server address'), {
+    render(<Host {...p} />);
+    fireEvent.change(ownField(), {
       target: { value: 'https://mcp.acme.dev/mcp' },
     });
     fireEvent.click(screen.getByText('Find'));
     fireEvent.change(await screen.findByLabelText('Token'), { target: { value: 'k1' } });
     fireEvent.click(screen.getByText('Connect'));
     await waitFor(() => expect(p.onAdd).toHaveBeenCalled());
-    // The binding takes the kept server into the list.
-    rerender(<McpSection {...p} mcp={{ servers: [kept], catalog }} />);
-    expect(await screen.findByText(/needs a token here/)).toBeTruthy();
-    // The paste card folds away; the row's form stays.
-    await waitFor(() => expect(screen.getAllByLabelText('Header')).toHaveLength(1));
+    // The kept server is in the list; its page has the token form open.
+    fireEvent.click(await screen.findByRole('button', { name: /^Acme/ }));
+    expect((await screen.findByLabelText('Header')) as HTMLInputElement).toBeTruthy();
     expect((screen.getByLabelText('Header') as HTMLInputElement).value).toBe('X-API-Key');
-    expect(screen.getAllByText('Create a token').at(-1)?.closest('a')?.getAttribute('href')).toBe(
+    expect(screen.getByText('Create a token').closest('a')?.getAttribute('href')).toBe(
       'https://acme.dev/tokens',
     );
     expect(open).not.toHaveBeenCalled();
   });
 
-  it('lists a server by its name and whose it is, and says nothing of its state when fine', () => {
-    render(<McpSection {...props({ mcp: { servers: [readMcpServer(server())], catalog } })} />);
-    expect(screen.getByText('mcp.linear.app/mcp · as anna@acme.com')).toBeTruthy();
-    expect(screen.queryByText(/sign in/i)).toBeNull();
-    // Connected already: no longer in the catalog.
-    expect(screen.queryByText('Issues, projects and cycles')).toBeNull();
-    const toggle = screen.getByText('2 tools').closest('button') as HTMLButtonElement;
-    expect(toggle.getAttribute('aria-expanded')).toBe('false');
-    fireEvent.click(toggle);
-    expect(toggle.getAttribute('aria-expanded')).toBe('true');
-    expect(screen.getByText('list_issues')).toBeTruthy();
+  it('lists a connected server by its name, whose it is and how many tools, and it leaves the catalog', () => {
+    render(<Host {...props({ mcp: { servers: [readMcpServer(server())], catalog } })} />);
+    expect(screen.getByText('mcp.linear.app/mcp · as anna@acme.com · 2 tools')).toBeTruthy();
+    expect(screen.getByText('Online')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Tasks/ })).toBeNull();
+  });
+
+  it('a connected server’s page: its state, what its tools let the agent do, the tools folded', () => {
+    const many = Array.from({ length: 8 }, (_, n) => [
+      { name: `list_page${n}`, description: 'List things' },
+      { name: `create_page${n}`, description: 'Create a thing' },
+    ]).flat();
+    const rich = readMcpServer(
+      server({ tools: [...many, { name: 'search_pages', description: 'Search.' }] }),
+    );
+    const { container } = render(<Host {...props({ item: 'linear', mcp: { servers: [rich], catalog } })} />);
+    expect(screen.getByRole('heading', { name: 'Linear' })).toBeTruthy();
+    expect(page().getByText('Online')).toBeTruthy();
+    expect(screen.getByText('What the agent will be able to do')).toBeTruthy();
+    expect(screen.getByText(/From the server's real tools: 17 in all/)).toBeTruthy();
+    expect((container.querySelector('details.hx-svc-tools') as HTMLDetailsElement).open).toBe(false);
+    for (const name of ['Check', 'Turn off', 'Rename', 'Disconnect'])
+      expect(page().getAllByText(name).length).toBeGreaterThan(0);
+  });
+
+  it('its buttons talk to the machine: check, turn off, and disconnect after «sure?»', async () => {
+    const p = props({ item: 'linear', mcp: { servers: [readMcpServer(server())], catalog } });
+    render(<Host {...p} />);
+    fireEvent.click(screen.getByText('Check'));
+    await waitFor(() => expect(p.onCheck).toHaveBeenCalledWith('m1'));
+    expect(await screen.findByText('Works')).toBeTruthy();
+    fireEvent.click(screen.getByText('Turn off'));
+    await waitFor(() => expect(p.onEnable).toHaveBeenCalledWith('m1', false));
+    fireEvent.click(screen.getAllByText('Disconnect')[0]);
+    expect(screen.getByText(/Disconnect «Linear»/)).toBeTruthy();
+    expect(p.onRemove).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByText('Disconnect').at(-1) as HTMLElement);
+    await waitFor(() => expect(p.onRemove).toHaveBeenCalledWith('m1'));
   });
 
   it('mutes a server turned off for agents', () => {
     const off = readMcpServer(server({ enabled: false }));
-    const { container } = render(<McpSection {...props({ mcp: { servers: [off], catalog } })} />);
-    expect(container.querySelector('.hx-mcp-row[data-off]')).toBeTruthy();
+    const { container } = render(<Host {...props({ mcp: { servers: [off], catalog } })} />);
+    expect(container.querySelector('.hx-cn-row[data-off]')).toBeTruthy();
     expect(screen.getByText(/off for agents/)).toBeTruthy();
+    expect(screen.getByText('Off')).toBeTruthy();
   });
 
   it('says how a pasted server signs in', async () => {
     const p = props();
-    render(<McpSection {...p} />);
-    fireEvent.change(screen.getByLabelText('MCP server address'), {
+    render(<Host {...p} />);
+    fireEvent.change(ownField(), {
       target: { value: 'https://mcp.acme.dev/mcp' },
     });
     fireEvent.click(screen.getByText('Find'));
@@ -411,8 +471,6 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
       const method = init.method ?? 'GET';
       calls.push({ url, method, body: String(init.body ?? '') });
       if (pathOf(url).endsWith('/mcp/m1/signin')) return json(200, { authUrl: AUTH_URL });
-      if (pathOf(url).endsWith('/mcp/probe'))
-        return json(200, { probe: { url: linear.url, transport: 'http', auth: 'oauth' } });
       if (method === 'POST' && pathOf(url).endsWith('/mcp'))
         return json(200, {
           server: server({ state: 'signin', tools: [], me: '' }),
@@ -421,8 +479,7 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
       if (pathOf(url).endsWith('/mcp')) return json(200, { servers: [], catalog: [linear] });
       return json(200, { connections: [] });
     });
-    render(<ConnectionsPage machine={MACHINE} />);
-    fireEvent.click(await screen.findByRole('button', { name: /^Linear/ }));
+    render(<ConnectionsPage machine={MACHINE} item="linear" />);
     fireEvent.click(await screen.findByText('Sign in with Linear'));
     await waitFor(() => expect(popup.location.href).toBe(AUTH_URL));
     const add = calls.find((c) => c.method === 'POST' && pathOf(c.url).endsWith('/mcp'));
@@ -436,22 +493,29 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
     expect(JSON.parse(signin?.body ?? '{}').origin).toBe(window.location.origin);
   });
 
-  it('a local server asks for its keys: no probe, and «Connect» keeps it with the keys', async () => {
+  it('a local server asks for its keys on its page: no probe, and «Connect» keeps it with the keys', async () => {
     const p = props({
+      item: 'exa',
       mcp: { servers: [], catalog: keyedCatalog },
       onAdd: vi.fn(async () => ({
         server: readMcpServer(
-          server({ id: 'e1', name: 'Exa Search', url: 'stdio:exa', transport: 'stdio', auth: 'env' }),
+          server({
+            id: 'e1',
+            name: 'Exa Search',
+            catalogId: 'exa',
+            url: 'stdio:exa',
+            transport: 'stdio',
+            auth: 'env',
+          }),
         ),
         authStart: null,
       })),
     });
-    render(<McpSection {...p} />);
-    fireEvent.click(card('Exa Search'));
-    expect(await screen.findByText(/starts on this machine through npx\/uvx/)).toBeTruthy();
+    render(<Host {...p} />);
+    expect(screen.getByText(/starts on this machine through npx\/uvx/)).toBeTruthy();
     expect(p.onProbe).not.toHaveBeenCalled();
     expect(screen.getByText('From dashboard.exa.ai')).toBeTruthy();
-    expect(screen.getByText('Create a token').closest('a')?.getAttribute('href')).toBe(exa.tokenUrl);
+    expect(screen.getByText('Where to get the key').closest('a')?.getAttribute('href')).toBe(exa.tokenUrl);
     const key = screen.getByLabelText('Exa API key') as HTMLInputElement;
     expect(key.type).toBe('password');
     // The optional field starts with its default and does not hold «Connect» back.
@@ -468,19 +532,19 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
       header: null,
       env: { EXA_API_KEY: 'exa-secret', EXA_REGION: 'us' },
     });
-    // Kept: the form lets the entry go.
+    // Kept: the page turns into the state of the server.
     await waitFor(() => expect(screen.queryByLabelText('Exa API key')).toBeNull());
   });
 
   it('says the server is starting while a local server is added, and shows a refusal', async () => {
     let refuse: (answer: { error: string }) => void = () => {};
     const p = props({
+      item: 'exa',
       mcp: { servers: [], catalog: keyedCatalog },
       onAdd: vi.fn(() => new Promise<{ error: string }>((resolve) => (refuse = resolve))),
     });
-    render(<McpSection {...p} />);
-    fireEvent.click(card('Exa Search'));
-    fireEvent.change(await screen.findByLabelText('Exa API key'), { target: { value: 'bad' } });
+    render(<Host {...p} />);
+    fireEvent.change(screen.getByLabelText('Exa API key'), { target: { value: 'bad' } });
     fireEvent.click(screen.getByText('Connect'));
     expect(await screen.findByText(/first time can take a couple of minutes/)).toBeTruthy();
     act(() => refuse({ error: 'The server refused' }));
@@ -490,12 +554,14 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
 
   it('connects an API without keys in one press', async () => {
     const p = props({
+      item: 'open-meteo',
       mcp: { servers: [], catalog: keyedCatalog },
       onAdd: vi.fn(async () => ({
         server: readMcpServer(
           server({
             id: 'o1',
             name: 'Open-Meteo',
+            catalogId: 'open-meteo',
             url: 'https://api.open-meteo.com',
             transport: 'api',
             auth: 'none',
@@ -504,41 +570,46 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
         authStart: null,
       })),
     });
-    render(<McpSection {...p} />);
-    fireEvent.click(card('Open-Meteo'));
-    expect(await screen.findByText(/agents reach it through the hub/)).toBeTruthy();
+    render(<Host {...p} />);
+    expect(screen.getByText(/agents reach it through the hub/)).toBeTruthy();
     fireEvent.click(screen.getByText('Connect'));
     await waitFor(() => expect(p.onAdd).toHaveBeenCalled());
     expect(vi.mocked(p.onAdd).mock.calls[0]?.[0]).toMatchObject({ catalogId: 'open-meteo', env: {} });
     expect(p.onProbe).not.toHaveBeenCalled();
   });
 
-  it("a local server's row has a keys panel: an empty field keeps the key, and the problem shows", async () => {
+  const localServer = (over: Record<string, unknown> = {}) =>
+    server({
+      id: 'e1',
+      name: 'Exa Search',
+      catalogId: 'exa',
+      url: 'stdio:exa',
+      transport: 'stdio',
+      auth: 'env',
+      env: exa.env,
+      ...over,
+    });
+
+  it("a local server's page has a keys panel: an empty field keeps the key, and the problem shows", async () => {
     const local = readMcpServer(
-      server({
-        id: 'e1',
-        name: 'Exa Search',
-        catalogId: 'exa',
-        url: 'stdio:exa',
-        transport: 'stdio',
-        auth: 'env',
+      localServer({
         state: 'unreachable',
         tools: [],
         me: '',
         problem: 'uvx is not installed on this machine',
-        env: exa.env,
       }),
     );
-    const p = props({ mcp: { servers: [local], catalog: keyedCatalog } });
-    render(<McpSection {...p} />);
-    expect(screen.getByText('Local server on this machine')).toBeTruthy();
+    const p = props({ item: 'exa', mcp: { servers: [local], catalog: keyedCatalog } });
+    render(<Host {...p} />);
+    expect(page().getByText('Local server on this machine')).toBeTruthy();
     expect(screen.getByText('uvx is not installed on this machine')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for «Exa Search»' }));
-    fireEvent.click(await screen.findByText('Keys'));
+    expect(page().getByText('Not answering')).toBeTruthy();
+    fireEvent.click(screen.getAllByText('Keys')[0]);
     const key = (await screen.findByLabelText('Exa API key')) as HTMLInputElement;
     expect(key.value).toBe('');
-    // The rename panel's «Save» is folded away; the keys panel's is the one next to the keys.
-    const save = key.closest('.hx-conn-row__panel')?.querySelector('button.hx-set__btn') as HTMLButtonElement;
+    const save = key
+      .closest('.hx-svc-manage__panel')
+      ?.querySelector('button.hx-set__btn') as HTMLButtonElement;
     expect(save.textContent).toBe('Save');
     expect(save.disabled).toBe(true);
     fireEvent.change(key, { target: { value: 'new-key' } });
@@ -560,28 +631,20 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
         }),
       ),
     ];
-    render(<McpSection {...props({ mcp: { servers: [], catalog: many } })} />);
-    // Searching opens the groups without «Show all».
-    fireEvent.change(screen.getByLabelText('Find a service'), { target: { value: 'web search' } });
+    render(<Host {...props({ mcp: { servers: [], catalog: many } })} />);
+    // Searching opens the groups that have what it finds.
+    fireEvent.change(screen.getByLabelText('Search services'), { target: { value: 'web search' } });
     expect(screen.getByText('Exa Search')).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Search and web' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Search and web/ })).toBeTruthy();
     expect(screen.queryByText('Tasks a')).toBeNull();
-    fireEvent.change(screen.getByLabelText('Find a service'), { target: { value: 'utilities' } });
+    fireEvent.change(screen.getByLabelText('Search services'), { target: { value: 'utilities' } });
     expect(screen.getByText('Open-Meteo')).toBeTruthy();
     expect(screen.queryByText('Exa Search')).toBeNull();
   });
 
   it('talks to the runtime for keys: add with env, then PUT the new ones', async () => {
     const calls: { url: string; method: string; body: string }[] = [];
-    const local = server({
-      id: 'e1',
-      name: 'Exa Search',
-      catalogId: 'exa',
-      url: 'stdio:exa',
-      transport: 'stdio',
-      auth: 'env',
-      env: exa.env,
-    });
+    const local = localServer();
     setFetch(async (url, init) => {
       const method = init.method ?? 'GET';
       calls.push({ url, method, body: String(init.body ?? '') });
@@ -591,22 +654,20 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
       if (pathOf(url).endsWith('/mcp')) return json(200, { servers: [], catalog: [exa] });
       return json(200, { connections: [] });
     });
-    render(<ConnectionsPage machine={MACHINE} />);
-    fireEvent.click(await screen.findByRole('button', { name: /^Exa Search/ }));
+    render(<ConnectionsPage machine={MACHINE} item="exa" />);
     fireEvent.change(await screen.findByLabelText('Exa API key'), { target: { value: 'k1' } });
     fireEvent.click(screen.getByText('Connect'));
-    await screen.findByText(/^Local server on this machine/);
+    await waitFor(() => expect(page().getByText(/^Local server on this machine/)).toBeTruthy());
     const add = calls.find((c) => c.method === 'POST' && pathOf(c.url).endsWith('/mcp'));
     expect(JSON.parse(add?.body ?? '{}')).toEqual({
       catalogId: 'exa',
       env: { EXA_API_KEY: 'k1', EXA_REGION: 'us' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for «Exa Search»' }));
-    fireEvent.click(await screen.findByText('Keys'));
+    fireEvent.click(screen.getAllByText('Keys')[0]);
     const key = (await screen.findByLabelText('Exa API key')) as HTMLInputElement;
     fireEvent.change(key, { target: { value: 'k2' } });
     fireEvent.click(
-      key.closest('.hx-conn-row__panel')?.querySelector('button.hx-set__btn') as HTMLButtonElement,
+      key.closest('.hx-svc-manage__panel')?.querySelector('button.hx-set__btn') as HTMLButtonElement,
     );
     await waitFor(() => expect(calls.some((c) => c.method === 'PUT')).toBe(true));
     const put = calls.find((c) => c.method === 'PUT');
@@ -622,5 +683,62 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
     render(<ConnectionsPage machine={MACHINE} />);
     await screen.findByText(/A link is enough/);
     await waitFor(() => expect(screen.queryByText('MCP servers')).toBeNull());
+  });
+});
+
+describe('the page of a service, from the catalog', () => {
+  const guided = readMcpCatalogEntry({
+    ...linear,
+    about: 'Linear is a tracker.',
+    can: ['Find issues', 'Create an issue', 'Change status'],
+    canRu: ['Найдёт задачи', 'Заведёт задачу', 'Сменит статус'],
+    steps: ['Do this', 'Do that'],
+    links: [
+      { kind: 'docs', url: linear.docsUrl },
+      { kind: 'pricing', url: 'https://linear.app/pricing' },
+    ],
+  });
+
+  it('finds the service of an address: a catalog id, a server id, a custom server, or nothing', () => {
+    const kept = readMcpServer(server());
+    const own = readMcpServer(server({ id: 'z9', name: 'Own', catalogId: '' }));
+    expect(findService('linear', [kept], catalog)?.server?.id).toBe('m1');
+    expect(findService('m1', [kept], catalog)?.entry?.id).toBe('linear');
+    expect(findService('linear', [], catalog)?.server).toBeNull();
+    expect(findService('z9', [own], catalog)).toEqual({ entry: null, server: own });
+    expect(findService('nope', [kept], catalog)).toBeNull();
+  });
+
+  it("takes the entry's own steps and links, and the sign-in's generic steps when it has none", () => {
+    expect(stepsOf(guided)).toEqual(['Do this', 'Do that']);
+    expect(stepsOf(readMcpCatalogEntry(linear))).toHaveLength(3);
+    expect(stepsOf(readMcpCatalogEntry(github))[0]).toMatch(/Create token/);
+    const kinds = linksOf(guided).map((link) => link.kind);
+    // Docs once, though the entry's docsUrl says it too; the order is the page's.
+    expect(kinds).toEqual(['docs', 'pricing']);
+  });
+
+  it('reads what a connected server can do from its tools: things and what is done to them', () => {
+    const tools = ['issue', 'project', 'cycle', 'comment'].flatMap((thing) =>
+      ['list', 'get', 'create'].map((verb) => ({ name: `${verb}_${thing}`, description: '' })),
+    );
+    const lines = canFromTools(tools);
+    expect(lines).toHaveLength(4);
+    expect(lines[0]).toMatch(/^(issue|project|cycle|comment): list, get, create$/);
+    // Names that say little: the first sentences of the descriptions.
+    const vague = ['a', 'b', 'c', 'd', 'e', 'f'].map((n) => ({
+      name: `tool${n}`,
+      description: `Does ${n}. And more.`,
+    }));
+    expect(canFromTools(vague).slice(0, 2)).toEqual(['Does a.', 'Does b.']);
+  });
+
+  it('shows the guide of a service: its description, what the agent can do, steps and links', () => {
+    render(<Host {...props({ item: 'linear', mcp: { servers: [], catalog: [guided] } })} />);
+    expect(screen.getByText('Linear is a tracker.')).toBeTruthy();
+    expect(screen.getByText('Create an issue')).toBeTruthy();
+    expect(screen.getByText('Do that')).toBeTruthy();
+    expect(screen.getByText('Prices').closest('a')?.getAttribute('href')).toBe('https://linear.app/pricing');
+    expect(within(screen.getByRole('article')).getAllByRole('link')).toHaveLength(2);
   });
 });

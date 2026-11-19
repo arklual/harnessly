@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -183,7 +184,7 @@ func newMCPRig(t *testing.T) *mcpTestRig {
 	sf := safeFor(d)
 	t.Cleanup(sf.files.Close)
 	ms := mcpconn.New(dir, &connSecrets{store: sf.store}, nil)
-	rig := &mcpTestRig{d: d, ms: ms, routes: mcpRoutesOf(d, ms, nil)}
+	rig := &mcpTestRig{d: d, ms: ms, routes: mcpRoutesOf(d, ms, nil, nil)}
 	rig.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		for _, rt := range rig.routes {
 			if rt.Match(r) {
@@ -508,7 +509,8 @@ func TestMCPAgentConfigs(t *testing.T) {
 	var servers []mcpconn.Server
 	enabled := func() []mcpconn.Server { return servers }
 	cfg := mcpClaudeConfig(enabled, runtimeCfg, filepath.Join(dir, "mcp"))
-	if path, allow := cfg(); path != "" || allow != nil {
+	// Nothing connected: the hub is there all the same, the first own service is made through it.
+	if path, allow := cfg(); path == "" || strings.Join(allow, ",") != "mcp__harnessly-hub" {
 		t.Fatalf("no servers: %q %v", path, allow)
 	}
 	servers = []mcpconn.Server{{ID: "abc", Slug: "linear"}, {ID: "def", Slug: "notion"}}
@@ -575,5 +577,85 @@ func TestSafePromptNamesConnections(t *testing.T) {
 	raw, _ = os.ReadFile(build("ws"))
 	if !strings.Contains(string(raw), "Connected now: arXiv [arxiv].") || !strings.Contains(string(raw), "harnessly-hub") {
 		t.Fatalf("%s", raw)
+	}
+}
+
+// The page makes a service of the person's own from its form, describes it by hand, and removes it; the keys the
+// person types go to the safe and come back nowhere.
+func TestPageMakesDescribesAndRemovesAnOwnService(t *testing.T) {
+	apiKey := "sk-page-" + "typed-" + "key-12345"
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+apiKey {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer api.Close()
+	rig := newMCPRig(t)
+	form := `{"input":{"kind":"api","name":"Billing","url":"` + api.URL + `/v1","checkPath":"/ping",
+		"keys":[{"name":"TOKEN","label":"Token"}],"apiHeaders":{"Authorization":"Bearer {TOKEN}"},
+		"category":"payments","about":"Our billing."},"values":{"TOKEN":"` + apiKey + `"}}`
+	if w := rig.call("POST", "/api/platform/mcp/custom", form, nil); w.Code != http.StatusUnauthorized {
+		t.Fatalf("no session: %d", w.Code)
+	}
+	if w := rig.call("POST", "/api/platform/mcp/custom", strings.Replace(form, apiKey, "wrong", 1), mcpPage); w.Code != http.StatusFailedDependency {
+		t.Fatalf("a wrong key: %d %s", w.Code, w.Body)
+	}
+	w := rig.call("POST", "/api/platform/mcp/custom", form, mcpPage)
+	srv, _ := decode(t, w)["server"].(map[string]any)
+	if w.Code != 200 || srv["catalogId"] != "custom-billing" || srv["state"] != "ok" || strings.Contains(w.Body.String(), apiKey) {
+		t.Fatalf("make: %d %s", w.Code, w.Body)
+	}
+	id := srv["id"].(string)
+	// A form the record cannot take says why.
+	w = rig.call("POST", "/api/platform/mcp/custom", `{"input":{"kind":"api","name":"X","url":"https://x.example.com","apiHeaders":{"X-Key":"sk-literal"}}}`, mcpPage)
+	if msg, _ := decode(t, w)["message"].(string); w.Code != http.StatusBadRequest || !strings.Contains(msg, "literal") {
+		t.Fatalf("a literal key: %d %s", w.Code, w.Body)
+	}
+	// The description is edited by hand; the connection stays.
+	w = rig.call("PATCH", "/api/platform/mcp/"+id, `{"name":"Billing API","custom":{"category":"finance","about":"Billing, v2.","can":["issue an invoice"]}}`, mcpPage)
+	srv, _ = decode(t, w)["server"].(map[string]any)
+	custom, _ := srv["custom"].(map[string]any)
+	if w.Code != 200 || srv["name"] != "Billing API" || custom["about"] != "Billing, v2." || custom["category"] != "finance" || srv["url"] == "" {
+		t.Fatalf("describe: %d %s", w.Code, w.Body)
+	}
+	// A catalog entry's page cannot be rewritten this way.
+	if w := rig.call("POST", "/api/platform/mcp", `{"catalogId":"custom-billing"}`, mcpPage); w.Code == 200 {
+		t.Fatalf("a custom id as a catalog id: %s", w.Body)
+	}
+	if w := rig.call("DELETE", "/api/platform/mcp/"+id, "", mcpPage); w.Code != http.StatusNoContent {
+		t.Fatalf("delete: %d", w.Code)
+	}
+	if list, _ := rig.ms.List(); len(list) != 0 {
+		t.Fatalf("left: %+v", list)
+	}
+}
+
+// A secret the person put in the safe by `harnessly secret ask` is read by the runtime for a service of their own that
+// names it (keys[].safe), and copied into the service's own credential; the agent never holds it.
+func TestOwnServiceTakesTheKeyOfTheSafe(t *testing.T) {
+	key := "sk-from-" + "the-safe-" + "9876543210"
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Key") != key {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer api.Close()
+	rig := newMCPRig(t)
+	if _, _, err := safeFor(rig.d).store.Put("custom-ledger-key", key); err != nil {
+		t.Fatal(err)
+	}
+	in := mcpconn.CustomInput{Kind: "api", Name: "Ledger", URL: api.URL, CheckPath: "/x",
+		Keys: []mcpconn.CustomKey{{Name: "KEY", Safe: "custom-ledger-key"}}, APIHeaders: map[string]string{"X-Key": "{KEY}"}}
+	plan, err := rig.ms.PlanCustom(context.Background(), in, nil)
+	if err != nil || !strings.Contains(plan.Checked, "2xx") {
+		t.Fatalf("plan with a safe key: %v %q", err, plan.Checked)
+	}
+	srv, _, err := rig.ms.SaveCustom(context.Background(), in, nil)
+	if err != nil || srv.State != "ok" {
+		t.Fatalf("save: %v %+v", err, srv)
 	}
 }

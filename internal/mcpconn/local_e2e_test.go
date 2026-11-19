@@ -42,6 +42,10 @@ func TestRealLocalServers(t *testing.T) {
 				switch {
 				case f.Default != "":
 					env[f.Name] = f.Default
+				case f.Name == "MDB_MCP_CONNECTION_STRING":
+					env[f.Name] = "mongodb://127.0.0.1:1/test"
+				case f.Name == "NEO4J_URI":
+					env[f.Name] = "bolt://127.0.0.1:7687"
 				case strings.Contains(f.Name, "URL") || strings.Contains(f.Name, "HOST"):
 					env[f.Name] = "https://example.com"
 				case strings.Contains(f.Name, "PORT"):

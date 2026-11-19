@@ -757,6 +757,7 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 	routes := append(appTerminalRoutes(d, reg, chats, live, workspaceOf), appBrowserRoutes(d, reg, live, workspaceOf)...)
 	routes = append(routes, appAIRoutes(d, reg, chats, live)...)
 	routes = append(routes, appSecretRoutes(d, reg, chats, live)...)
+	routes = append(routes, appConnectionRoutes(d, reg, storage, views, live)...)
 	return append(routes, []gate.Route{
 		{Match: is(platformAPI + "/apps/files"), Handler: files},
 		{Match: is(platformAPI + "/apps/files/upload"), Handler: http.HandlerFunc(upload)},

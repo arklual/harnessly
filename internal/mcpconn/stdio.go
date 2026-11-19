@@ -563,7 +563,30 @@ func (s *Service) localSpecOf(srv Server, env map[string]string) localSpec {
 			all[f.Name] = path
 		}
 	}
-	return localSpec{command: srv.Command, env: all, dir: dir}
+	return localSpec{command: expandArgs(srv.Command, srv.Env, all), env: all, dir: dir}
+}
+
+// expandArgs puts the typed value of a field into the command line where an argument holds "{FIELD}": a server that
+// takes its setting as an argument, not an environment variable (a SQLite file's path). A field left empty keeps the
+// braces out of the line: the argument is dropped.
+func expandArgs(command []string, fields []EnvField, values map[string]string) []string {
+	out := make([]string, 0, len(command))
+	for _, arg := range command {
+		drop := false
+		for _, f := range fields {
+			tag := "{" + f.Name + "}"
+			if strings.Contains(arg, tag) {
+				if values[f.Name] == "" {
+					drop = true
+				}
+				arg = strings.ReplaceAll(arg, tag, values[f.Name])
+			}
+		}
+		if !drop {
+			out = append(out, arg)
+		}
+	}
+	return out
 }
 
 // localEnvOf reads the keys of a local server from the safe; none kept is an empty set (a server without keys).

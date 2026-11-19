@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Your own service in Settings → Connections (docs/mcp-connections.md): the company's internal API, a self-made
+  MCP server or a local one gets the same record, page and hub tools as a catalog service, and a stable id `custom-<slug>`
+  that an app's manifest can name. An agent connects it with the hub's `connection_add` (kind found out from the address,
+  docs or OpenAPI file, tried first, the key asked through the safe, the person's yes on a card in the chat); the page has
+  «Connect with the agent» and a manual form, and the description of a service of one's own can be edited by hand.
 - Anonymous telemetry (docs/self-host/telemetry.md): a release reports harnessly's own errors (page, runtime, Sinopia)
   as `$exception`, scrubbed of addresses, e-mails, paths, ids and tokens, and a daily heartbeat with the version, to the
   PostHog linked in at release time. Off with `install.sh --disable-telemetry`, `HARNESSLY_TELEMETRY=off`,

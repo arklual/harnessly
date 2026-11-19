@@ -1,0 +1,34 @@
+id: hub-pick-cbr
+title: "Официальный курс — это ЦБ, а не биржа: агент берёт «Курсы ЦБ РФ», хотя Мосбиржа тоже подключена"
+tags: [connections, hub, finance]
+timeout_s: 300
+# Both the Bank of Russia rates and the Moscow Exchange are connected, and both can answer «dollar». «Official
+# rate» is the central bank's: the agent asks `cbr`, not `moex`.
+setup:
+  connections: [cbr, moex, coingecko-api]
+covers:
+  - 'internal/mcpconn/hub.go'
+  - 'internal/mcpconn/catalog_api.go'
+  - 'internal/mcpconn/catalog.go'
+prompt: какой сегодня официальный курс доллара к рублю у Центробанка?
+expect:
+  - name: looked the connection up through the hub
+    called: harnessly-hub\.(search_tools|connections|api_request)
+  - name: asked the Bank of Russia rates
+    called: harnessly-hub\.api_request
+    args: {connection: '(?i).*cbr.*'}
+  - name: did not ask the exchange or the crypto service
+    not_called: harnessly-hub\.api_request
+    args: {connection: '(?i).*(moex|coingecko).*'}
+  - name: did not go around the hub
+    not_called: Bash
+    args: {command: '(?i)(?s).*(curl|wget|python|requests).*(cbr|cbr-xml-daily|moex).*'}
+  - name: answered with a rate
+    text: '(?i)\d{2,3}[.,]\d+'
+variants:
+  - id: v1
+    kind: english
+    text: "What is today's official USD to RUB rate set by the Central Bank of Russia?"
+  - id: v2
+    kind: short
+    text: "курс доллара цб"

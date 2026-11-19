@@ -18,11 +18,33 @@ used.
 
 Address and headers (docs.higgsfield.ai): `https://api.higgsfield.ai`, `Authorization: Key <id>:<secret>`.
 
+## Higgsfield MCP 2.0: without a key
+
+Higgsfield's own MCP server (`mcp.higgsfield.ai/mcp`) is a connection of **Settings → Connections → Higgsfield (MCP)**,
+signed in with the person's Higgsfield account (OAuth). Its plan, or its free 72-hour trial, pays: no API key. When no
+provider holds a key, `generate_video` and `generate_images` (with `provider`/`model`) go through it, and it alone makes
+audio (`generate_audio`). `provider: "higgsfield-mcp"` picks it even when a key exists.
+
+- Models are the MCP's catalog: video `seedance` (Seedance 2.5, default), `kling` (Kling 3.0), `minimax`, `marketing`;
+  pictures `gpt_image_2_6` (default), `soul` (Soul 2); audio `speech` (Seed Audio, default), `music` (Suno, 15–360 s),
+  `sfx` (Mirelo). Any other id of its `models_explore` passes as it is; `params` carries a model's own settings.
+- The price is asked first (`estimate_<kind>_cost`, in credits) and counted at $0.07 a credit, the Starter plan's (bigger
+  plans pay less), so `max_usd` and the daily cap hold for every plan. The card shows both.
+- Frames go up by `media_upload` → PUT → `media_confirm` (an address by `media_import_url`), and the first and last frame
+  take the roles the model lists.
+- When the person holds trial generations that cover the model, Higgsfield asks what pays: the job stops, the agent asks
+  the person and runs it again with `allowance: "trial"` or `"credits"`. A trial generation costs nothing.
+- The MCP has no cancel for a generation. An account without a plan or trial answers 403 on `/mcp/workspaces`; the
+  agent is told to start one at higgsfield.ai/mcp.
+- Everything else of the MCP (presets, Marketing Studio, 3D, GPU boxes, its gallery) agents reach through the
+  harnessly-hub tools on the `higgsfield-mcp` connection.
+
 ## What an agent can do
 
 | Tool | What it does |
 | --- | --- |
 | `generate_video` | A clip from one or two frames (image → video) or from a prompt (text → video). `model`: `kling` (default), `seedance`, `ltx` or an endpoint ID. `estimate_only` gives the price and makes nothing. |
+| `generate_audio` | Music, speech or a sound effect, through the Higgsfield MCP connection only. The card plays it. |
 | `wait_video` / `cancel_video` | Wait for a job that outlived the call; cancel one that the provider has not begun. |
 | `generate_images` with `provider` / `model` | A picture from Higgsfield (`soul`, `z-image`) instead of Codex. Without them Codex draws, as before. |
 

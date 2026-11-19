@@ -1,0 +1,32 @@
+id: app-connections-sidebar
+title: «Приложение в сайдбаре с письмами из Яндекс Почты» — через hl.connections, а не ключ и не свой сервер
+tags: [apps]
+timeout_s: 600
+covers:
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/hlcli/app*.go'
+  - 'internal/mcpconn/hub.go'
+prompt: сделай приложение для сайдбара, которое показывает мои непрочитанные письма из Яндекс Почты. Почта у меня уже подключена в настройках
+expect:
+  - name: the manifest names the person's Yandex Mail connection and asks the right to read it
+    check: |
+      m=$(find . -path '*/harnessly/app.json' -not -path '*/node_modules/*' | head -1)
+      [ -n "$m" ] && grep -q '"connections"' "$m" && grep -q 'yandex-mail' "$m" && grep -q 'connections\.read' "$m"
+  - name: it is a widget of the sidebar (the side target)
+    check: |
+      m=$(find . -path '*/harnessly/app.json' -not -path '*/node_modules/*' | head -1)
+      [ -n "$m" ] && grep -q '"side"' "$m"
+  - name: the view reads through hl.connections
+    check: grep -rEq 'hl\.connections\.(api|call)' --include='*.js' --include='*.html' --include='*.ts' --exclude-dir=node_modules .
+  - name: no key, sign-in or request of its own in the app
+    check: '! grep -rEq "OAuth |Bearer |YANDEX_|Authorization|fetch\(" --include="*.js" --include="*.html" --include="*.ts" --exclude-dir=node_modules .'
+variants:
+  - id: v1
+    kind: short
+    text: "виджет в сайдбар: мои непрочитанные письма из Яндекс Почты (почта подключена)"
+  - id: v2
+    kind: english
+    text: "build me a sidebar app that lists my unread Yandex Mail messages; the mail is already connected in my settings"
+  - id: v3
+    kind: long
+    text: "хочу в сайдбаре приложение, которое тянет мои непрочитанные письма из Яндекс Почты и показывает списком; подключение к почте я уже сделал в настройках, ключи в приложение класть не надо"

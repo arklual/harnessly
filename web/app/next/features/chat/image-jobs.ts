@@ -126,11 +126,14 @@ export const jobOf = (jobs: readonly IImageJob[], images: ImageGen, at: number):
 };
 
 /** The names of the harnessly picture and video tools: the card follows their jobs (Codex's own tool has none). */
-export const followsJob = (tool: string): boolean => /(^|__)(generate|wait)_(images|video)$/.test(tool);
+export const followsJob = (tool: string): boolean => /(^|__)(generate|wait)_(images|video|audio)$/.test(tool);
 
 const CLIP = /\.(mp4|webm|mov)$/i;
-/** Whether a file of a card is a clip (generate_video) and not a picture. */
-export const isClip = (path: string): boolean => CLIP.test(path);
+const AUDIO = /\.(mp3|wav|m4a|ogg|flac|aac)$/i;
+/** Whether a file of a card is music, speech or a sound (generate_audio). */
+export const isAudio = (path: string): boolean => AUDIO.test(path);
+/** Whether a file of a card plays in place (a clip of generate_video, or audio) and is not a picture. */
+export const isClip = (path: string): boolean => CLIP.test(path) || AUDIO.test(path);
 
 export interface ICardView {
   /** One per picture: its file, or null while it is being drawn. */

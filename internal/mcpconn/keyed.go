@@ -408,6 +408,9 @@ func (s *Service) CallAPI(ctx context.Context, id string, in APIRequest) (APIAns
 // slugBase is what a new server's slug is made of: its catalog id (a Russian name would lose its letters: «Московская
 // биржа (ISS)» is not «iss»), else its name.
 func slugBase(srv Server) string {
+	if srv.Custom != nil {
+		return slugOf(strings.TrimPrefix(srv.CatalogID, CustomPrefix))
+	}
 	if srv.CatalogID != "" {
 		return slugOf(srv.CatalogID)
 	}

@@ -151,6 +151,16 @@
   background: var(--hx-bg-stage);
   object-fit: contain;
 }
+/* Music, speech or a sound: the browser's player across the middle of the tile */
+.hx-img[data-audio] .hx-img__audio {
+  inset: 50% var(--hx-space-3, 12px) auto;
+  height: auto;
+  background: none;
+  transform: translateY(-50%);
+}
+.hx-img[data-audio][data-ready='true'] .hx-img__audio {
+  transform: translateY(-50%);
+}
 .hx-imgs__meta {
   margin: 0;
   color: var(--hx-fg-3);

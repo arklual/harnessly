@@ -563,6 +563,7 @@ export async function connect(options = {}) {
       case 'harnessly/notifications/storage':
       case 'harnessly/notifications/visibility':
       case 'harnessly/notifications/agents':
+      case 'harnessly/notifications/connections':
       case 'harnessly/notifications/event':
       case 'harnessly/notifications/files-changed':
       case 'harnessly/notifications/terminal-output':
@@ -639,6 +640,31 @@ export async function connect(options = {}) {
   // A value into the safe, never read back (secrets.write): the app's own secret, or with shared the person's.
   hl.secrets = {
     put: (name, value, { shared = false } = {}) => request('harnessly/secrets.put', { name, value, shared }),
+  };
+  // The person's connections from Settings → Connections, as the manifest's `connections` names them (connections.read):
+  // list, tools, call a tool, an API request, ask for the person's agreement. Each is checked by the manifest, by the
+  // person's agreement to this app and by what it reads; a change goes out only after the person's yes in the host's
+  // dialog (connections.act). A key never reaches the view. A connection that is not made, or waits for a sign-in, is
+  // `auth_required` with `signIn.connection`; one the person has not agreed to is `permission_denied`.
+  const parseBody = (a) => {
+    let body = a.body;
+    if (typeof body === 'string' && /json/i.test(a.contentType ?? '')) {
+      try {
+        body = JSON.parse(body);
+      } catch {
+        // not JSON after all: the text stays
+      }
+    }
+    return { status: a.status, ok: a.status >= 200 && a.status < 300, contentType: a.contentType ?? '', body };
+  };
+  hl.connections = {
+    list: () => request('harnessly/connections.list', {}).then((r) => r.connections.map((c) => ({ ...c, access: c.access || null }))),
+    tools: (connection) => request('harnessly/connections.tools', { connection }).then((r) => r.tools),
+    call: (connection, tool, args = {}) => request('harnessly/connections.call', { connection, tool, args }),
+    api: (connection, { method = 'GET', path, query, body } = {}) =>
+      request('harnessly/connections.api', { connection, method, path, query, body }).then(parseBody),
+    request: (connection, { access } = {}) =>
+      request('harnessly/connections.request', { connection, access }).then((r) => ({ granted: r.granted === true, access: r.access || null })),
   };
   hl.pane = { open: (target) => request('harnessly/pane.open', { target }) };
   // A view that draws its own bar (chrome none) shows the host's actions there: share, the right pane, the host's menu.

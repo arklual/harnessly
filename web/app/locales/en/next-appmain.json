@@ -197,5 +197,12 @@
   "next.appdown.homeText": "Everything is in place. Try again in a minute.",
   "next.appmain.back": "Back",
   "next.appmain.home": "Home",
-  "next.appmain.collapse": "Collapse"
+  "next.appmain.collapse": "Collapse",
+  "next.appview.elevate.connections": "use one of your connected services",
+  "next.appview.connectConfirm": "The app wants to do this through your {name}:\n{what}\n{detail}\nIt is done in your name. Allow it once?",
+  "next.appview.connectConsentRead": "The app wants to read data from your {name}. {reason}\nIt can only read, never send or change anything. You can take this back in the app's settings.",
+  "next.appview.connectConsentAll": "The app wants to read data from your {name} and act through it. {reason}\nEach change still waits for your OK. You can take this back in the app's settings.",
+  "next.inspector.connectionGroup": "The app can use any of your {category} services; none is connected yet",
+  "next.inspector.connectionReads": "The app reads {name} as you; it changes nothing",
+  "next.inspector.connectionAllowRead": "Allow reading"
 }

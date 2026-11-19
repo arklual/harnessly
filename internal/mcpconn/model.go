@@ -91,10 +91,12 @@ type Server struct {
 	// Guide tells an agent how to use an API: its main paths, in a few lines.
 	Guide string `json:"guide,omitempty"`
 	// Problem says in a few words why a local server does not start (no npx on the machine), when it is known.
-	Problem   string    `json:"problem,omitempty"`
-	Tools     []Tool    `json:"tools,omitempty"`
-	CreatedAt time.Time `json:"createdAt"`
-	CheckedAt time.Time `json:"checkedAt,omitzero"`
+	Problem string `json:"problem,omitempty"`
+	Tools   []Tool `json:"tools,omitempty"`
+	// Custom marks the person's own service: CatalogID is custom-<slug> and this is its description.
+	Custom    *CustomMeta `json:"custom,omitempty"`
+	CreatedAt time.Time   `json:"createdAt"`
+	CheckedAt time.Time   `json:"checkedAt,omitzero"`
 }
 
 // ProbeResult is what a pasted URL turned out to be.

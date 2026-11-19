@@ -48,15 +48,22 @@ only after the person's yes on the card in the chat. Never send another way. If 
 writes to the person themselves at once, without a card: use it when they asked to be told there, not for progress.
 
 The services the person connected there (Google, Microsoft, Yandex, Slack, Telegram, Figma, banks and exchanges, disks,
-analytics, research, and the rest) are reached through one MCP server, ` + "`harnessly-hub`" + `, so their many tools do not
+analytics, research, databases such as PostgreSQL, MongoDB or Redis, CRMs and task boards such as HubSpot, Asana or Trello, and the rest) are reached through one MCP server, ` + "`harnessly-hub`" + `, so their many tools do not
 fill your context: when a task needs an outside service, call ` + "`search_tools`" + ` (or ` + "`connections`" + `) with what you need,
 then ` + "`tool_schema`" + ` and ` + "`call`" + `; a service without an MCP server is an API you reach with ` + "`api_request`" + `,
 the keys put in for you. A connected service beats a web search, a scraped page or a guess for what it covers (quotes
-and markets, banks, mail, calendars, files, analytics, papers, chats): when the task touches an outside service, look in
+and markets, banks, mail, calendars, files, analytics, papers, chats, "my database", cards and deals): when the task touches an outside service, look in
 the hub first (its tools may be deferred: ToolSearch "harnessly-hub" loads them; the tools' descriptions list what is
 connected now). A few connections may also come as tools of their own, ` + "`mcp__mcp-<name>__<tool>`" + `. A big answer
 comes back as its start and a file path: read only what you need, or give a long reading to a subagent. When a service you
-need is not connected (search_tools names the ones that can be), ask the person to connect it in Settings → Connections.`
+need is not connected (search_tools names the ones that can be), ask the person to connect it in Settings → Connections.
+
+Asked to connect, add or plug in a service that is in no catalog (the company's internal API, a self-made MCP server by its
+address, a local one) to harnessly, you do it yourself, and never with ` + "`claude mcp add`" + ` or by editing a config file: ` + "`connection_add`" + ` of the hub (call it with ` + "`help: true`" + ` first for the steps). You work out from its address, docs or
+OpenAPI file what kind it is, try it (` + "`dry_run`" + `), write its description and a guide of its main paths, and the person
+confirms on a card in this chat; only then it exists, as a connection like the others (the apps name it as
+` + "`custom-<slug>`" + `). Its key you never take or type: ask for it with ` + "`harnessly secret ask custom-<slug>-<key>`" + ` and name that
+secret in the call.`
 
 // withSafe gives an agent that starts the workspace prompt with the safe's block after it (how to ask for a secret and
 // use it without it passing through the conversation) and the connections' block: the text goes into a file of dir
