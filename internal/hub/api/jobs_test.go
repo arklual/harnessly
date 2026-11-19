@@ -71,9 +71,6 @@ func TestBuilderPoolJobFlow(t *testing.T) {
 	if r := member.Do("PUT", "/api/machines/"+builder.MachineID+"/builder", map[string]any{"role": "builder"}); r.Code != http.StatusForbidden {
 		t.Fatalf("a member made a builder: %s", r)
 	}
-	if r := owner.Do("PUT", "/api/machines/"+builder.MachineID+"/builder", map[string]any{"role": "builder"}); r.Code != http.StatusOK {
-		t.Fatalf("role: %s", r)
-	}
 	var list struct {
 		Builders []struct {
 			ID    string
@@ -82,11 +79,17 @@ func TestBuilderPoolJobFlow(t *testing.T) {
 			Ready bool
 		}
 	}
-	r = member.Do("GET", "/api/spaces/"+spaceID+"/builders", nil)
-	r.JSON(&list)
-	if len(list.Builders) != 1 || list.Builders[0].ID != builder.MachineID || list.Builders[0].Slots != 2 || !list.Builders[0].Ready || len(list.Builders[0].Caps) != 2 {
-		t.Fatalf("builders: %s", r)
-	}
+	// The agent came back with the job feature a moment ago; until the hub has its new hello the role is set but the
+	// labels are not asked, and setting the role again asks them.
+	s.Eventually("the builder is ready with the labels its agent detected", func() bool {
+		if r := owner.Do("PUT", "/api/machines/"+builder.MachineID+"/builder", map[string]any{"role": "builder"}); r.Code != http.StatusOK {
+			t.Fatalf("role: %s", r)
+		}
+		list.Builders = nil
+		member.Do("GET", "/api/spaces/"+spaceID+"/builders", nil).JSON(&list)
+		return len(list.Builders) == 1 && list.Builders[0].ID == builder.MachineID && list.Builders[0].Slots == 2 &&
+			list.Builders[0].Ready && len(list.Builders[0].Caps) == 2
+	})
 	var mv struct{ Machine struct{ Role string } }
 	owner.Do("GET", "/api/machines/"+builder.MachineID, nil).JSON(&mv)
 	if mv.Machine.Role != "builder" {

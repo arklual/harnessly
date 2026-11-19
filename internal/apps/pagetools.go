@@ -109,6 +109,12 @@ type openCommand struct {
 // orphan says nobody waits for the command's end; the lock is held.
 func (c *openCommand) orphan() bool { return c.waiters == 0 }
 
+// join counts one more caller waiting for the command's end; the lock is held.
+func (c *openCommand) join() {
+	c.waiters++
+	c.left = 0
+}
+
 // ms0 is a duration in the journal's milliseconds.
 func ms0(d time.Duration) int64 { return d.Milliseconds() }
 
@@ -424,6 +430,9 @@ func (p *PageTools) Resume(ctx context.Context, conv string) (PageAnswer, PageCo
 	}
 	p.mu.Lock()
 	c := p.cmds[p.keys[conv+"\x00"+k.key]]
+	if c != nil {
+		c.join()
+	}
 	p.mu.Unlock()
 	if c == nil {
 		return PageAnswer{}, PageCommand{}, nil, false
@@ -469,7 +478,9 @@ func (p *PageTools) put(ctx context.Context, pc PageCall, conv string, ttl time.
 		p.mu.Unlock()
 		return PageAnswer{}, ErrPageCallBusy
 	}
-	// Written before the page may take it.
+	// Written before the page may take it, with its caller counted: a page that asks before wait runs must not take the
+	// command for one whose caller left.
+	c.join()
 	p.save(c)
 	p.cmds[c.ID] = c
 	if c.Key != "" {
@@ -485,13 +496,10 @@ func (p *PageTools) put(ctx context.Context, pc PageCall, conv string, ttl time.
 	return p.wait(ctx, c)
 }
 
-// wait waits for a command's end and says how it ended. The caller that leaves cancels a command it gave no key for;
-// one with a key is left to its term, for the caller's proxy asks again after a restart of the runtime.
+// wait waits for a command's end and says how it ended; the caller joined the command under the lock before. The caller
+// that leaves cancels a command it gave no key for; one with a key is left to its term, for the caller's proxy asks
+// again after a restart of the runtime.
 func (p *PageTools) wait(ctx context.Context, c *openCommand) (PageAnswer, error) {
-	p.mu.Lock()
-	c.waiters++
-	c.left = 0
-	p.mu.Unlock()
 	defer func() {
 		p.mu.Lock()
 		if c.waiters--; c.waiters == 0 {
