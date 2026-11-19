@@ -29,6 +29,10 @@ type HookConfig struct {
 	// RoleGuard is the command line of the chats' role hook (`harnessly hook role-guard`, internal/chatrole); "" adds
 	// nothing. It runs last on PreToolUse, where it refuses what a planning or coordinating chat may not do.
 	RoleGuard string
+	// PermissionScript is the runtime's permission hook script (hooksetup.PermissionHookScript); "" adds nothing. It
+	// runs after Script on PermissionRequest and holds the request until the person answers the chat's card, whose
+	// decision Codex takes; printing nothing leaves the question to Codex's own dialog in the terminal.
+	PermissionScript string
 
 	mu    sync.Mutex
 	cache *userHooks
@@ -205,6 +209,10 @@ func (h *HookConfig) Flags() (args []string, parseError bool, err error) {
 // GuardTimeoutSeconds is how long Codex waits for the apps' guard (apps.GuardTimeoutSeconds).
 const GuardTimeoutSeconds = 15
 
+// PermissionTimeoutSeconds is how long Codex lets the permission hook wait for the person: a day. Codex draws no
+// dialog meanwhile (its spinner runs), and the question goes to its dialog when the hook gives up.
+const PermissionTimeoutSeconds = 24 * 60 * 60
+
 // FlagsWithGuard is Flags with the apps' guard command as the first PreToolUse hook of the launch, before the runtime's own
 // and the person's: the hook comes by `-c` on the launch line, so the agent has no file to edit it out of. "" adds none.
 func (h *HookConfig) FlagsWithGuard(guard string) (args []string, parseError bool, err error) {
@@ -224,6 +232,10 @@ func (h *HookConfig) FlagsWithGuard(guard string) (args []string, parseError boo
 		}
 		if h.RoleGuard != "" && ev == "PreToolUse" {
 			cmds = append(cmds, command(h.RoleGuard+" 2>/dev/null || true"))
+		}
+		if h.PermissionScript != "" && ev == "PermissionRequest" {
+			cmds = append(cmds, tomlTable{keys: []string{"type", "command", "timeout"}, m: map[string]any{"type": "command",
+				"command": `[ ! -f "` + h.PermissionScript + `" ] || sh "` + h.PermissionScript + `"`, "timeout": int64(PermissionTimeoutSeconds)}})
 		}
 		ours := tomlTable{keys: []string{"matcher", "hooks"}, m: map[string]any{"matcher": ".*", "hooks": cmds}}
 		entries := append([]any{ours}, u.byEvent[ev]...)

@@ -1,0 +1,23 @@
+id: design-scene3d-add
+title: 3D-сцена Sinopia — готовый .blend агент превращает в документ командой design scene3d add, без второго документа и без форм
+tags: [design, scene3d]
+timeout_s: 300
+covers:
+  - 'cmd/runtime/agent_skills.go'
+  - 'internal/hlcli/design_scene3d.go'
+  - 'cmd/runtime/v2_designly_scene3d.go'
+prompt: Человек прикрепил к чату сцену /tmp/eval-scene/out/villa.blend (проект blender-lab лежит в /tmp/eval-scene). Покажи её ему как документ Sinopia, сцену не пересобирай.
+expect:
+  - name: made the document with the scene3d command, with the file or the blend
+    called: Bash
+    args: {command: '(?s).*design scene3d add.*(--file|--blend).*'}
+  - name: did not start Blender
+    not_called: Bash
+    args: {command: '(?s).*(^|[ /])blender (-b|--background).*'}
+variants:
+  - id: v1
+    kind: short
+    text: "Вот сцена /tmp/eval-scene/out/villa.blend (проект /tmp/eval-scene). Открой её мне как документ, не пересобирай."
+  - id: v2
+    kind: english
+    text: "I attached the scene /tmp/eval-scene/out/villa.blend (the project is /tmp/eval-scene). Open it for me as a Sinopia document; do not rebuild it."

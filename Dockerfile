@@ -11,7 +11,7 @@
 # Claude Code and Codex are not part of the default image: install them with the with-agents target, mount the
 # binaries from the host, or install them into the home volume (docs/deploy.md).
 
-ARG GO_VERSION=1.26.5
+ARG GO_VERSION=1.26.11
 ARG NODE_VERSION=22
 ARG DEBIAN_VERSION=bookworm
 

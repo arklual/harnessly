@@ -273,7 +273,12 @@ const designPromptText = "## Sinopia Design\n\n" +
 	"When the person asks for a page as HTML or a file (\"дай HTML страницы\", \"скинь макет файлом\"), run " +
 	"`harnessly design export <project> \"<page>\"`: it builds one self-contained HTML (styles, fonts, pictures inside) and hands it over " +
 	"itself, as a card in the chat. A whole project goes with `--zip`. Do not copy or rewrite a board's HTML by hand, " +
-	"and do not search the machine for it. `harnessly --help` has the rest (open a board, check it, its history).\n\n"
+	"and do not search the machine for it. `harnessly --help` has the rest (open a board, check it, its history).\n\n" +
+	"A 3D scene is a Sinopia document too, and the person never fills a form for it. When you save a Blender scene as a .blend " +
+	"(the blender-lab skill), or the person attaches a .blend to the chat, run `harnessly design scene3d add --root <the project's folder> " +
+	"--blend out/<scene>.blend` (for an attachment: `--file <its path>`): it makes the document, or finds the one of the same .blend, " +
+	"and opens it in the right pane. Run it again after every rebuild; do not make a second document or open the .blend yourself. " +
+	"A .glb, .fbx or .obj is converted to a .blend with headless Blender first.\n\n"
 
 // checksPromptText is how to run builds, tests and linters on a machine other agents and people share.
 const checksPromptText = "## Checks on a shared machine\n\n" +

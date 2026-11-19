@@ -189,7 +189,8 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 		launcherScript: launcherScriptConfig(c),
 		codexArgs: codex.LaunchConfig{
 			Hooks: &codex.HookConfig{Script: filepath.Join(c.DataDir, "codex-hook.sh"), UserConfig: filepath.Join(c.Home, ".codex", "config.toml"),
-				BudgetScript: budgetScript(c.DataDir), RoleGuard: roleGuardCommand(c.DataDir)},
+				BudgetScript: budgetScript(c.DataDir), RoleGuard: roleGuardCommand(c.DataDir),
+				PermissionScript: filepath.Join(c.DataDir, hooksetup.PermissionHookFile)},
 			MCP:      codexMCP(c),
 			ExtraMCP: mcpCodexServers(mcpEnabled, codexMCP(c), c.Port),
 			WorkspacePrompt: withNotifyBots(bots, shared, promptDir,

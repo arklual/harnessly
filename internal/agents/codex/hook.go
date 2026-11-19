@@ -183,6 +183,17 @@ func parseApplyPatchCommand(command string) []PatchEntry {
 	return out
 }
 
+// PatchPaths are the files an apply_patch body adds, changes or deletes, in its order; none when it names none.
+func PatchPaths(command string) []string {
+	var out []string
+	for _, line := range strings.Split(command, "\n") {
+		if m := fileHeader.FindStringSubmatch(line); m != nil {
+			out = append(out, m[2])
+		}
+	}
+	return out
+}
+
 func parseExec(p map[string]any) *PermissionRequest {
 	ec := asRecord(p["exec_command"])
 	command, _ := str(ec, "command")

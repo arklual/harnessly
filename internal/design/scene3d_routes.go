@@ -272,8 +272,9 @@ func (a *API) CLIScene3D(r *http.Request) Answer {
 	return JSON(r, http.StatusBadRequest, errorBody(locale.Pick("what is state or comments", "what — state или comments")), h)
 }
 
-// CLIScene3DAdd is POST {title, root, blend, script?} (edit): a new 3D scene document over a blender-lab project folder
-// of this machine; {id, title}. The settings are only written here, on the machine: a page cannot point at a path.
+// CLIScene3DAdd is POST {title?, root, blend | file, script?, project?} (edit): the 3D scene document over a blender-lab project
+// folder of this machine, a new one or (the same .blend) the one it already has; {id, title, existed}. file is a .blend
+// from elsewhere, copied into the project; project is a project the person's brief already made. The settings are only written here, on the machine: a page cannot point at a path.
 func (a *API) CLIScene3DAdd(r *http.Request) Answer {
 	raw, no := a.CLIGuard(r)
 	if no != nil {
@@ -289,14 +290,17 @@ func (a *API) CLIScene3DAdd(r *http.Request) Answer {
 	root, _ := strField(body, "root")
 	blend, _ := strField(body, "blend")
 	script, _ := strField(body, "script")
-	p, err := a.L.CreateScene3D(title, a.person(r), Scene3DSettings{Root: root, Blend: blend, Script: script})
+	project, _ := strField(body, "project")
+	file, _ := strField(body, "file")
+	p, existed, err := a.L.AddScene3D(a.person(r), Scene3DAdd{Title: title, Root: root, Blend: blend, Script: script, Project: project, File: file})
 	if err != nil {
 		return a.deckFail(r, err, "make the 3D scene")
 	}
 	return JSON(r, http.StatusOK, struct {
-		ID    string `json:"id"`
-		Title string `json:"title"`
-	}{p.ID, p.Title}, h)
+		ID      string `json:"id"`
+		Title   string `json:"title"`
+		Existed bool   `json:"existed"`
+	}{p.ID, p.Title, existed}, h)
 }
 
 // CLIScene3DFrame is POST {project, cam, frame, wait?: seconds} (view): the draft frame; with wait it holds until the frame is
@@ -532,40 +536,4 @@ func (a *API) Scene3DOutputFileRoute(w http.ResponseWriter, r *http.Request) {
 		ctype = "application/json"
 	}
 	a.sceneBodyFile(w, r, file, ctype, "private, max-age=31536000, immutable")
-}
-
-// Scene3DProjects is GET [?root=<absolute folder>] (a session): the blender-lab projects of this machine to make a 3D scene of,
-// with their .blend files and scripts; with root, that folder only. The page's «Create» menu offers them.
-func (a *API) Scene3DProjects(r *http.Request) Answer {
-	if _, no := a.Guard(r, http.MethodGet); no != nil {
-		return *no
-	}
-	list, err := a.L.Scene3DDiscover(QueryString(r, "root"))
-	if err != nil {
-		return a.deckFail(r, err, "look for projects")
-	}
-	return JSON(r, http.StatusOK, struct {
-		Projects []Scene3DProject `json:"projects"`
-	}{list}, noStore())
-}
-
-// Scene3DNew is POST {title?, root, blend, script?} (a session): a new 3D scene document over a project of this machine;
-// {id, title}. The page's «Create» menu makes it: the folder is the person's pick on their own machine.
-func (a *API) Scene3DNew(r *http.Request) Answer {
-	body, no := a.Guard(r, http.MethodPost)
-	if no != nil {
-		return *no
-	}
-	title, _ := strField(body, "title")
-	root, _ := strField(body, "root")
-	blend, _ := strField(body, "blend")
-	script, _ := strField(body, "script")
-	p, err := a.L.CreateScene3D(title, a.person(r), Scene3DSettings{Root: root, Blend: blend, Script: script})
-	if err != nil {
-		return a.deckFail(r, err, "make the 3D scene")
-	}
-	return JSON(r, http.StatusOK, struct {
-		ID    string `json:"id"`
-		Title string `json:"title"`
-	}{p.ID, p.Title}, noStore())
 }

@@ -32,8 +32,6 @@ func designScene3DRoutes(d deps) []gate.JSONRoute {
 	return []gate.JSONRoute{
 		designRoute(scene3dPath(""), a.Scene3D),
 		designRoute(scene3dPath("/build"), a.Scene3DBuild),
-		designRoute(scene3dPath("/projects"), a.Scene3DProjects),
-		designRoute(scene3dPath("/new"), a.Scene3DNew),
 		designRoute(scene3dPath("/frame"), a.Scene3DFrame),
 		designRoute(scene3dPath("/comments"), a.Scene3DComments),
 		designRoute(scene3dPath("/view"), a.Scene3DView),

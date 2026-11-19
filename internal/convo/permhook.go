@@ -119,6 +119,10 @@ func (c *conv) askPermission(ask PermissionAsk, reply chan PermissionReply, now 
 			command := summary
 			g.p.Command = &command
 		}
+		if !plan && g.p.Tool == nil {
+			tool := ask.Tool
+			g.p.Tool = &tool
+		}
 		if plan {
 			md := planOfInput(ask.Input)
 			g.p.PlanMD = &md

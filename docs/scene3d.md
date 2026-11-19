@@ -17,6 +17,12 @@ harnessly design scene3d add --root /home/me/blender-lab --blend out/retro_conve
 harnessly design scene3d get|comments|frame <project> …
 ```
 
+Nobody fills a form for a scene. The person writes the scene in words in «Что нарисуем?» (the kind «3D-сцена»): the
+runtime makes a project and starts an agent that builds it with the blender-lab skill, and `design scene3d add --project <id> …`
+turns that project into the scene. An agent that saves a `.blend` in any chat, or gets one attached (`add --file <path>` copies it
+into the project's `out/`), runs the same command: it opens the document in the right pane. The same `.blend` is the same
+document, so a rebuild adds nothing and the viewer re-reads the file by itself.
+
 ## The viewer
 
 The machine exports the `.blend` with headless Blender (modifiers applied, big meshes decimated, textures shrunk to JPEG) to a

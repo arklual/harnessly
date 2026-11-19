@@ -439,6 +439,33 @@ func (s *Store) SetTabLaunchModes(sessionName string, fast bool, permission stri
 	})
 }
 
+// SetTabLaunchModel writes the model and the effort a tab's next launch starts with (launch.model and launch.effort of
+// its metadata), keeping the rest of the launch; "" leaves the CLI's own.
+func (s *Store) SetTabLaunchModel(sessionName, model, effort string) error {
+	return s.mutateTab(sessionName, func(tab *jsvalue.Object) bool {
+		meta := tab.Object(s.cfg.MetaKey)
+		var launch *jsvalue.Object
+		if meta != nil && meta.Object("launch") != nil {
+			launch = jsvalue.Clone(meta.Object("launch")).(*jsvalue.Object)
+		} else {
+			launch = jsvalue.NewObject("model", nil, "effort", nil)
+		}
+		for key, v := range map[string]string{"model": model, "effort": effort} {
+			if v != "" {
+				launch.Set(key, v)
+			} else {
+				launch.Set(key, nil)
+			}
+		}
+		next, changed := MergeMeta(meta, jsvalue.NewObject("launch", launch))
+		if !changed {
+			return false
+		}
+		tab.Set(s.cfg.MetaKey, next)
+		return true
+	})
+}
+
 // TabLaunchFast says whether the tab of a session starts in fast mode (launch.fast of its metadata): what a
 // GPT chat's relay reads on each request. ok is false when no tab has the session.
 func (s *Store) TabLaunchFast(sessionName string) (fast, ok bool) {

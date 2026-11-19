@@ -83,7 +83,13 @@ import '@/next/styles/designly.css';
 import { DESIGN_KIND, type TDesignKind } from '@/next/features/designly/design-kind';
 export { DESIGN_KIND, type TDesignKind };
 
-const KINDS = [DESIGN_KIND.site, DESIGN_KIND.slides, DESIGN_KIND.video, DESIGN_KIND.ds] as const;
+const KINDS = [
+  DESIGN_KIND.site,
+  DESIGN_KIND.slides,
+  DESIGN_KIND.video,
+  DESIGN_KIND.scene3d,
+  DESIGN_KIND.ds,
+] as const;
 
 export interface IDesignCard {
   id: string;
@@ -149,8 +155,6 @@ export interface IDesignlyCompose {
   appKinds?: readonly IAppKind[] | null;
   /** A new document of an app's type, named by the brief typed so far; resolves once it is made, rejects (the caller says why). */
   onAppKind?: (kind: IAppKind, brief: string) => Promise<void>;
-  /** «3D scene»: a tile that opens the dialog for a blender-lab project; absent: no tile. */
-  onScene3d?: () => void;
 }
 
 export interface IDesignlyHomeProps {
@@ -301,7 +305,6 @@ const Hero = ({
   maxText = DEFAULT_MAX_TEXT,
   appKinds = null,
   onAppKind,
-  onScene3d,
   inputRef,
 }: IHeroProps) => {
   const [kind, setKind] = useState<TDesignKind>(initialKind);
@@ -329,7 +332,7 @@ const Hero = ({
   const system = offered.find((x) => x.id === ds)?.label ?? null;
   const isDeck = kind === DESIGN_KIND.slides;
   const isVideo = kind === DESIGN_KIND.video;
-  const hasSettings = kind !== DESIGN_KIND.ds;
+  const hasSettings = kind !== DESIGN_KIND.ds && kind !== DESIGN_KIND.scene3d;
   const busy = sending || uploads.uploading || (isDeck && deck.reading);
 
   const settingsLabel = () => {
@@ -465,17 +468,6 @@ const Hero = ({
               </span>
             </button>
           ))}
-          {onScene3d && (
-            <button type="button" className="hx-dl-start" onClick={onScene3d}>
-              <span className="hx-dl-start__ic">
-                <Icon name={DESIGN_KIND_ICON.scene3d} />
-              </span>
-              <span className="hx-dl-start__text">
-                <span className="hx-dl-start__name">{t('next.designly.kinds.scene3d')}</span>
-                <span className="hx-dl-start__desc">{t('next.designly.kindsDesc.scene3d')}</span>
-              </span>
-            </button>
-          )}
           {onAppKind &&
             appKinds?.map((k) => (
               <button

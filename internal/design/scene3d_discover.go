@@ -1,6 +1,7 @@
 package design
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -157,4 +158,131 @@ func (l *Library) CreateScene3D(title, person string, s Scene3DSettings) (Create
 	}
 	l.AnnounceNewBy(p.ID, person)
 	return p, nil
+}
+
+// Scene3DAdd is what the agent's `design scene3d add` asks: a 3D scene document over a built .blend. Project is a project
+// the person's brief already made (the scene is written into it instead of a new one); File is a .blend that lies
+// elsewhere (a chat's attachment): it is copied into Root/out.
+type Scene3DAdd struct {
+	Title, Root, Blend, Script, Project, File string
+}
+
+// AddScene3D makes the scene's document, or finds the one that already points at the same .blend (a rebuilt scene is the
+// same document: no duplicates) and answers whether it was there before.
+func (l *Library) AddScene3D(person string, a Scene3DAdd) (CreatedProject, bool, error) {
+	if a.File != "" {
+		blend, err := l.scene3dTake(&a)
+		if err != nil {
+			return CreatedProject{}, false, err
+		}
+		a.Blend = blend
+	}
+	if a.Root != "" && filepath.IsAbs(a.Blend) {
+		if rel, err := filepath.Rel(a.Root, a.Blend); err == nil && !strings.HasPrefix(rel, "..") {
+			a.Blend = filepath.ToSlash(rel)
+		}
+	}
+	if a.Root != "" && filepath.IsAbs(a.Script) {
+		if rel, err := filepath.Rel(a.Root, a.Script); err == nil && !strings.HasPrefix(rel, "..") {
+			a.Script = filepath.ToSlash(rel)
+		}
+	}
+	s := Scene3DSettings{V: 1, Root: a.Root, Blend: a.Blend, Script: a.Script}
+	if err := ValidateScene3DSettings(s); err != nil {
+		return CreatedProject{}, false, err
+	}
+	if id, ok := l.scene3dOver(s); ok {
+		if old, err := l.ReadScene3DSettings(id); err == nil && a.Script != "" && old.Script != a.Script {
+			old.Script = a.Script
+			if err := l.InitScene3D(id, old); err != nil {
+				return CreatedProject{}, false, err
+			}
+		}
+		return l.scene3dProject(id), true, nil
+	}
+	if a.Project != "" {
+		if err := l.InitScene3D(a.Project, s); err != nil {
+			return CreatedProject{}, false, err
+		}
+		return l.scene3dProject(a.Project), false, nil
+	}
+	p, err := l.CreateScene3D(a.Title, person, s)
+	return p, false, err
+}
+
+func (l *Library) scene3dProject(id string) CreatedProject {
+	p := CreatedProject{ID: id, Dir: l.ArtifactDir(id)}
+	if art := l.ReadArtifact(id); art != nil {
+		p.Title = art.Title
+	}
+	return p
+}
+
+// scene3dOver is the scene document that already points at the same project folder and .blend.
+func (l *Library) scene3dOver(s Scene3DSettings) (string, bool) {
+	same := func(a, b string) bool {
+		if ra, err := filepath.EvalSymlinks(a); err == nil {
+			a = ra
+		}
+		if rb, err := filepath.EvalSymlinks(b); err == nil {
+			b = rb
+		}
+		return filepath.Clean(a) == filepath.Clean(b)
+	}
+	for _, art := range l.ListArtifacts() {
+		if !l.IsScene3D(art.ID) {
+			continue
+		}
+		o, err := l.ReadScene3DSettings(art.ID)
+		if err == nil && same(o.Root, s.Root) && filepath.ToSlash(filepath.Clean(o.Blend)) == filepath.ToSlash(filepath.Clean(s.Blend)) {
+			return art.ID, true
+		}
+	}
+	return "", false
+}
+
+// scene3dTake copies the .blend a.File into the project's out/ (the first project found when no Root is given) and answers
+// its path relative to Root.
+func (l *Library) scene3dTake(a *Scene3DAdd) (string, error) {
+	if !filepath.IsAbs(a.File) || !strings.EqualFold(filepath.Ext(a.File), ".blend") {
+		return "", deckErr(http400, "file: an absolute path of a .blend (convert a .glb, .fbx or .obj to .blend first)",
+			"file: абсолютный путь к .blend (.glb, .fbx и .obj сначала переведи в .blend)")
+	}
+	src, err := os.Open(a.File)
+	if err != nil {
+		return "", deckErr(http404, "No such file: "+a.File, "Нет файла: "+a.File)
+	}
+	defer src.Close()
+	if st, err := src.Stat(); err != nil || !st.Mode().IsRegular() {
+		return "", deckErr(http400, "file: not a regular file", "file: это не файл")
+	}
+	if a.Root == "" {
+		found, _ := l.Scene3DDiscover("")
+		if len(found) == 0 {
+			return "", deckErr(http400, "root: no blender-lab project found, give --root", "root: проект blender-lab не найден, укажи --root")
+		}
+		a.Root = found[0].Root
+	}
+	if !filepath.IsAbs(a.Root) {
+		return "", deckErr(http400, "root: an absolute path", "root: абсолютный путь")
+	}
+	if rel, err := filepath.Rel(a.Root, a.File); err == nil && !strings.HasPrefix(rel, "..") {
+		return filepath.ToSlash(rel), nil
+	}
+	out := filepath.Join(a.Root, "out")
+	if err := os.MkdirAll(out, 0o755); err != nil {
+		return "", err
+	}
+	dst, err := os.Create(filepath.Join(out, filepath.Base(a.File)))
+	if err != nil {
+		return "", err
+	}
+	if _, err := io.Copy(dst, src); err != nil {
+		dst.Close()
+		return "", err
+	}
+	if err := dst.Close(); err != nil {
+		return "", err
+	}
+	return "out/" + filepath.Base(a.File), nil
 }

@@ -1044,47 +1044,6 @@ li[data-resolved='true'] .hx-scene3d__pinno {
   font: inherit;
   padding: 8px;
 }
-.hx-scene3d-new {
-  width: min(560px, calc(100vw - 32px));
-}
-.hx-scene3d-new__body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-height: 60vh;
-  overflow-y: auto;
-}
-.hx-scene3d-new__field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: var(--hx-text-sm);
-  color: var(--hx-fg-2);
-}
-.hx-scene3d-new__field select,
-.hx-scene3d-new__field input {
-  height: var(--hx-control-sm);
-  border: 1px solid var(--hx-border);
-  border-radius: var(--hx-radius-sm);
-  background: var(--hx-bg-window);
-  color: var(--hx-fg-1);
-  font: inherit;
-  padding: 0 8px;
-  min-width: 0;
-}
-.hx-scene3d-new__row {
-  display: flex;
-  gap: 8px;
-}
-.hx-scene3d-new__row input {
-  flex: 1;
-}
-.hx-scene3d__error-line {
-  margin: 0;
-  color: var(--hx-p-red-500);
-  font-size: var(--hx-text-sm);
-  overflow-wrap: anywhere;
-}
 .hx-scene3d__follow {
   width: auto;
   min-width: var(--hx-control-sm);

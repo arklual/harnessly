@@ -1050,6 +1050,60 @@ func TestScene3DDiscoverFindsProjectsAroundTheLibrary(t *testing.T) {
 	}
 }
 
+// The agent's `scene3d add`: a rebuilt .blend is the same document, a project the brief made becomes the scene, a .blend from
+// elsewhere is copied into the project.
+func TestAddScene3DKeepsOneDocumentPerBlend(t *testing.T) {
+	parent := t.TempDir()
+	lib := filepath.Join(parent, "design-artifacts")
+	if err := os.MkdirAll(lib, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	l := testLibrary(t, lib)
+	lab := filepath.Join(parent, "lab")
+	writeFile(t, filepath.Join(lab, "scenes", "car.py"), "# car")
+	writeFile(t, filepath.Join(lab, "out", "car.blend"), "v1")
+	first, existed, err := l.AddScene3D("", Scene3DAdd{Root: lab, Blend: "out/car.blend"})
+	if err != nil || existed || !l.IsScene3D(first.ID) {
+		t.Fatalf("first: %+v %v %v", first, existed, err)
+	}
+	// Rebuilt: the same document, the script is learnt, an absolute path is the same file.
+	again, existed, err := l.AddScene3D("", Scene3DAdd{Root: lab, Blend: filepath.Join(lab, "out", "car.blend"), Script: "scenes/car.py"})
+	if err != nil || !existed || again.ID != first.ID || again.Title != first.Title {
+		t.Fatalf("again: %+v %v %v", again, existed, err)
+	}
+	if got, _ := l.ReadScene3DSettings(first.ID); got.Script != "scenes/car.py" {
+		t.Errorf("script not kept: %+v", got)
+	}
+	// The project the brief made becomes the scene.
+	made, err := l.CreateProject("desert drive")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(lab, "out", "desert.blend"), "x")
+	got, existed, err := l.AddScene3D("", Scene3DAdd{Root: lab, Blend: "out/desert.blend", Project: made.ID})
+	if err != nil || existed || got.ID != made.ID || !l.IsScene3D(made.ID) {
+		t.Fatalf("project: %+v %v %v", got, existed, err)
+	}
+	// An attachment: copied into out/, then the same file is the same document.
+	att := filepath.Join(parent, "uploads", "villa.blend")
+	writeFile(t, att, "villa")
+	v, existed, err := l.AddScene3D("", Scene3DAdd{File: att, Root: lab})
+	if err != nil || existed || !l.IsScene3D(v.ID) {
+		t.Fatalf("file: %+v %v %v", v, existed, err)
+	}
+	if b, err := os.ReadFile(filepath.Join(lab, "out", "villa.blend")); err != nil || string(b) != "villa" {
+		t.Errorf("not copied: %q %v", b, err)
+	}
+	if v2, existed, err := l.AddScene3D("", Scene3DAdd{File: att, Root: lab}); err != nil || !existed || v2.ID != v.ID {
+		t.Errorf("file again: %+v %v %v", v2, existed, err)
+	}
+	for _, bad := range []Scene3DAdd{{File: filepath.Join(parent, "uploads", "m.glb"), Root: lab}, {File: "rel.blend", Root: lab}, {Root: lab, Blend: "out/none.blend"}} {
+		if _, _, err := l.AddScene3D("", bad); err == nil {
+			t.Errorf("%+v accepted", bad)
+		}
+	}
+}
+
 // A scene that keeps textures beside it is run where its project is; a self-contained .blend may go to a builder.
 func TestScene3DNeedsProjectWhenTexturesLieBesideIt(t *testing.T) {
 	lab := t.TempDir()

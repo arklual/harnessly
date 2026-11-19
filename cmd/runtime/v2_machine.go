@@ -473,8 +473,8 @@ func (m *liveMachine) readLoad() wire.MachineLoad {
 	return l
 }
 
-// agentsNow is the agent CLIs as the preflight finds them, with the models each takes. Only Claude changes its model
-// in a running conversation (/model in its box).
+// agentsNow is the agent CLIs as the preflight finds them, with the models each takes. Both change the model of a
+// running conversation: Claude by /model in its box, Codex by a resume on its session with the new launch.
 func agentsNow(r preflight.Result, models func(wire.Provider) []wire.AgentModel) []wire.MachineAgent {
 	list := func(p wire.Provider) []wire.AgentModel {
 		if models == nil {
@@ -491,7 +491,7 @@ func agentsNow(r preflight.Result, models func(wire.Provider) []wire.AgentModel)
 		claude.Status = wire.InstallLoginRequired
 	}
 	codex := wire.MachineAgent{Provider: wire.ProviderCodex, Version: r.Codex.Version, Status: wire.InstallReady,
-		Models: list(wire.ProviderCodex)}
+		Models: list(wire.ProviderCodex), CanSwitchModel: true}
 	switch {
 	case !r.Codex.Installed:
 		codex.Status = wire.InstallMissing

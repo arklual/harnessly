@@ -78,6 +78,11 @@ func Read(styled string, provider wire.Provider) Screen {
 	s := Screen{Readable: true, Plain: st.Plain, Busy: st.Busy, Panel: st.Panel, Input: st.Input, InputLine: st.InputLine,
 		styled: styled}
 	s.Menu, s.Options = menuOf(st)
+	if st.InputLine && st.Menu != nil && screen.InputLineRow(styled) <= screen.MenuBottomRow(st.Plain, st.Menu) {
+		// The input line is below everything: a ❯ or › line at or above a menu's options is the prompt of an earlier
+		// message (Claude) or the menu's focused option (Codex), and the menu stands in place of the input line.
+		s.Input, s.InputLine = "", false
+	}
 	if st.Menu != nil {
 		// A picker scrolled in its window (the /model list) stays as it is: the person reads it in the terminal.
 		s.cut = st.Menu.Cut && (len(st.Menu.Options) == 1 || s.Menu == MenuPlan || s.Menu == MenuPermission)

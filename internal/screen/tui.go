@@ -251,6 +251,17 @@ func inputMarker(line string, escapeEnds bool) (string, bool) {
 // at column 0 with ❯ or › (leading SGR resets aside). An input showing its dim placeholder reads "". ok is false when
 // no input line is on screen. Only the input line itself counts: a wrapped draft is judged by its first line.
 func ReadInputLine(styled string) (text string, ok bool) {
+	text, row := readInputLine(styled)
+	return text, row >= 0
+}
+
+// InputLineRow is the row, from the top of the capture, of the line ReadInputLine reads; -1 when there is none.
+func InputLineRow(styled string) int {
+	_, row := readInputLine(styled)
+	return row
+}
+
+func readInputLine(styled string) (string, int) {
 	lines := trimEndLines(styled)
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := lines[i]
@@ -289,11 +300,31 @@ func ReadInputLine(styled string) (text string, ok bool) {
 			break
 		}
 		if dim {
-			return "", true
+			return "", i
 		}
-		return trim(strings.ReplaceAll(StripANSI(rest), " ", " ")), true
+		return trim(strings.ReplaceAll(StripANSI(rest), " ", " ")), i
 	}
-	return "", false
+	return "", -1
+}
+
+// MenuBottomRow is the row, from the top of the plain capture, of the menu's last option as drawn; -1 when it is not
+// found. An input line at or above it is no input line: the prompt of an earlier message in the scrollback (Claude), or
+// the menu's own focused option (Codex marks it with the › of its input line).
+func MenuBottomRow(plain string, m *Menu) int {
+	if m == nil || len(m.Options) == 0 {
+		return -1
+	}
+	num, ok := OptionNumber(m.Options[len(m.Options)-1])
+	if !ok {
+		return -1
+	}
+	lines := trimEndLines(plain)
+	for i := len(lines) - 1; i >= 0; i-- {
+		if mm := numberedLineRE.FindStringSubmatch(lines[i]); mm != nil && mm[2] == num {
+			return i
+		}
+	}
+	return -1
 }
 
 // State is one look at a styled capture.

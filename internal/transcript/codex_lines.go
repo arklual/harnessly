@@ -490,13 +490,14 @@ func (s *codexState) responseItem(p *jsvalue.Object, ts float64) []*jsvalue.Obje
 		if callID == s.imageCall {
 			s.imageCall = ""
 		}
-		text := codexOutputText(prop(p, "output"))
+		// A script that printed exec_command's whole answer shows the command's output, not the JSON around it.
+		text := codexPrinted(codexOutputText(prop(p, "output")))
 		result := codexEntry("tool-result", ts, "toolUseId", callID, "isError", false, "summary", summarizeCodexOutput(text))
 		if text != "" && cardResult(text) == "" {
 			setResultText(result, text)
 		}
 		// The addresses the output names, as Claude's results keep them: a delivered file, a page shown or read.
-		if links := resultLinks(codexPrinted(text), false); len(links) > 0 {
+		if links := resultLinks(text, false); len(links) > 0 {
 			result.Set("links", links)
 		}
 		if rep, ok := codexPictureReport(text); ok {
@@ -1110,9 +1111,12 @@ func codexPrinted(text string) string {
 			continue
 		}
 		var answer struct {
-			Output *string `json:"output"`
+			Output   *string         `json:"output"`
+			ExitCode json.RawMessage `json:"exit_code"`
+			WallTime json.RawMessage `json:"wall_time_seconds"`
 		}
-		if json.Unmarshal([]byte(line), &answer) == nil && answer.Output != nil {
+		// Only exec_command's answer: a JSON line the command itself printed stays as it is.
+		if json.Unmarshal([]byte(line), &answer) == nil && answer.Output != nil && (answer.ExitCode != nil || answer.WallTime != nil) {
 			lines[i] = *answer.Output
 		}
 	}

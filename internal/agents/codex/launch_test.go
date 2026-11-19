@@ -411,3 +411,36 @@ func TestRuntimeArgsExtraMCP(t *testing.T) {
 		t.Fatalf("a server under the runtime's own name: %q", args)
 	}
 }
+
+// the permission hook holds Codex's question for the chat's card, a day at most; only on PermissionRequest.
+func TestHookFlagsWithThePermissionScript(t *testing.T) {
+	h := &HookConfig{Script: "/d/codex-hook.sh", UserConfig: filepath.Join(t.TempDir(), "none.toml"), PermissionScript: "/d/permission-hook.sh"}
+	args, _, err := h.Flags()
+	if err != nil {
+		t.Fatal(err)
+	}
+	byEvent := map[string]string{}
+	for i := 1; i < len(args); i += 2 {
+		k, v, _ := strings.Cut(args[i], "=")
+		byEvent[k] = v
+	}
+	want := `[{matcher=".*",hooks=[{type="command",command="/d/codex-hook.sh"},{type="command",command="[ ! -f \"/d/permission-hook.sh\" ] || sh \"/d/permission-hook.sh\"",timeout=86400}]}]`
+	if got := byEvent["hooks.PermissionRequest"]; got != want {
+		t.Fatalf("PermissionRequest: %s", got)
+	}
+	for ev, v := range byEvent {
+		if ev != "hooks.PermissionRequest" && strings.Contains(v, "permission-hook") {
+			t.Fatalf("%s runs the permission hook: %s", ev, v)
+		}
+	}
+}
+
+func TestPatchPaths(t *testing.T) {
+	body := "*** Begin Patch\n*** Add File: /h/.codex/skills/a/SKILL.md\n+x\n*** Update File: b.go\n@@\n-y\n+z\n*** End Patch"
+	if got := PatchPaths(body); len(got) != 2 || got[0] != "/h/.codex/skills/a/SKILL.md" || got[1] != "b.go" {
+		t.Fatalf("paths %q", got)
+	}
+	if got := PatchPaths("echo hi"); len(got) != 0 {
+		t.Fatalf("no patch: %q", got)
+	}
+}

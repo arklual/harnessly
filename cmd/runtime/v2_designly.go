@@ -263,6 +263,10 @@ func (d *v2Designly) Create(ctx context.Context, c wire.DesignlyCreate) (wire.De
 // createTask is the task of the first message of a new project: the library's start, the pages, what the project is,
 // and for a deck what the person asked of it.
 func createTask(lib *design.Library, id, title, brief string, c wire.DesignlyCreate, systemLine string) string {
+	if c.Kind == wire.DesignScene3D {
+		// A 3D scene is made in a blender-lab project, not in boards: the brief and what to do with the finished .blend.
+		return scene3dTask(lib.Config().Texts.CLI, id, title, brief)
+	}
 	task := lib.NewProjectPrompt(title, brief) + "\n\n" + lib.PagesHint(id) + "\n\n" + kindLine(c.Kind)
 	if c.Deck != nil {
 		task += "\n" + deckLine(c.Deck, lib.Config().Texts.CLI, id)
@@ -306,6 +310,8 @@ func kindLine(k wire.DesignKind) string {
 				"нет, оставь пустым местом: блок с data-image-slot и data-image-prompt=\"<что нарисовать>\", человек нарисует его на слайде.")
 	case wire.DesignVideo:
 		return videoKindLine()
+	case wire.DesignScene3D:
+		return locale.Pick("The project is a 3D scene made in Blender by code.", "Проект — 3D-сцена, собранная в Blender кодом.")
 	case wire.DesignDS:
 		return locale.Pick("The project is a design system: the boards show its components, tokens and rules.", "Проект — дизайн-система: доски показывают её компоненты, токены и правила.")
 	}
@@ -806,7 +812,7 @@ func (d *v2Designly) FromHTML(ctx context.Context, c wire.DesignlyFromHTML) (wir
 	// A deck, a video or a design system takes no board of a page's mockup.
 	fits := func(id string) bool {
 		k := kindOf(st, lib, id)
-		return k != wire.DesignSlides && k != wire.DesignVideo && k != wire.DesignDS
+		return k != wire.DesignSlides && k != wire.DesignVideo && k != wire.DesignDS && k != wire.DesignScene3D
 	}
 	spec := design.MockupSpec{Conv: c.Conv, HTML: c.HTML, Title: c.Title, Person: person, Fits: fits,
 		Candidates: []string{c.Project, st.CreatedFrom[c.Conv], st.LastMockup[c.Conv]}}

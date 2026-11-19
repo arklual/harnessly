@@ -267,11 +267,59 @@ func TestAModelTheAgentDoesNotTakeIsRefusedAndNotRecorded(t *testing.T) {
 	}
 }
 
-func TestACodexConversationHasNoModelCommand(t *testing.T) {
+// a Codex chat changes its model and effort whenever the person asks. Codex has no command for it in its box,
+// so the agent is started again on its session with the new launch: at its prompt at once, during a turn after it, and
+// nothing is typed into it.
+func TestACodexChatChangesItsModelByAResume(t *testing.T) {
 	r := newRig(t)
-	r.rt.Import([]ImportTab{{ID: "tab-cx", Session: "s1", Title: "x", Provider: wire.ProviderCodex, Cwd: "/w", TranscriptPath: r.path}}, nil)
-	if res := r.do(wire.ModelCmd{OpID: "mo1", ID: "tab-cx", Model: "gpt-5"}); res.R != wire.ResultRefused || res.Code != wire.RefuseUnsupported {
+	terms := &fakeTerms{owned: true}
+	r.deps = func(d *Deps) { d.Terminals = terms }
+	r.rt = r.runtime()
+	r.pane.screen = tui(t, "codex-idle-placeholder.ansi.txt")
+	r.rt.Import([]ImportTab{{ID: r.id, Session: "s1", Title: "x", Provider: wire.ProviderCodex, Cwd: "/w", TranscriptPath: r.path,
+		AgentSessionID: "01a1f2ed-8cc0-7802-8134-f89ad181da9f"}}, nil)
+	r.settle(wire.StateReady)
+	high := wire.EffortHigh
+	if res := r.do(wire.ModelCmd{OpID: "mo1", ID: r.id, Model: "gpt-5", Effort: &high}); res.R != wire.ResultAccepted {
 		t.Fatalf("%+v", res)
+	}
+	if len(r.pane.calls) != 0 || len(terms.stopped) != 1 || len(r.launcher.resumed) != 1 {
+		t.Fatalf("calls %v, stopped %v, resumed %v", r.pane.calls, terms.stopped, r.launcher.resumed)
+	}
+	if m := r.modelOf(); m == nil || m.ID != "gpt-5" || m.Effort == nil || *m.Effort != high {
+		t.Fatalf("recorded %+v", m)
+	}
+	// Ultracode is Claude's alone.
+	if res := r.do(wire.ModelCmd{OpID: "mo2", ID: r.id, Model: "gpt-5", Ultracode: on()}); res.R != wire.ResultRefused || res.Code != wire.RefuseUnsupported {
+		t.Fatalf("%+v", res)
+	}
+
+	// At work: the change waits for the turn's end, then goes the same way.
+	r.rt.LaunchReady(r.id)
+	r.busy()
+	if err := r.rt.Hook(r.id, Hook{Kind: "prompt-submit"}); err != nil {
+		t.Fatal(err)
+	}
+	r.settle(wire.StateWorking)
+	low := wire.EffortLow
+	if res := r.do(wire.ModelCmd{OpID: "mo3", ID: r.id, Model: "gpt-5", Effort: &low}); res.R != wire.ResultAccepted {
+		t.Fatalf("%+v", res)
+	}
+	if p := r.record().PendingModel; p == nil || len(terms.stopped) != 1 {
+		t.Fatalf("pending %+v, stopped %v", p, terms.stopped)
+	}
+	r.pane.screen = tui(t, "codex-idle-placeholder.ansi.txt")
+	if err := r.rt.Hook(r.id, Hook{Kind: "stop"}); err != nil {
+		t.Fatal(err)
+	}
+	for range 5 {
+		r.tick(time.Second)
+	}
+	if len(terms.stopped) != 2 || len(r.launcher.resumed) != 2 || r.record().PendingModel != nil {
+		t.Fatalf("stopped %v, resumed %v, pending %+v", terms.stopped, r.launcher.resumed, r.record().PendingModel)
+	}
+	if m := r.modelOf(); m.Effort == nil || *m.Effort != low {
+		t.Fatalf("recorded %+v", m)
 	}
 }
 

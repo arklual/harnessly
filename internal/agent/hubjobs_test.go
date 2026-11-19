@@ -89,11 +89,13 @@ func TestJobRunsOnABuilderAndTheResultComesBack(t *testing.T) {
 	s.Eventually("both agents linked", func() bool {
 		return s.Hub.Registry.Get(build.MachineID) != nil && s.Hub.Registry.Get(home.MachineID) != nil
 	})
-	if r := owner.Do("PUT", "/api/machines/"+build.MachineID+"/builder", map[string]any{"role": "builder"}); r.Code != 200 {
-		t.Fatalf("role: %s", r)
-	}
 	var list []builders.Builder
+	// Linked is not yet heard: until the hub has the agent's hello, setting the role does not ask for its labels, and
+	// setting it again does.
 	s.Eventually("the builder is ready with the labels its agent detected", func() bool {
+		if r := owner.Do("PUT", "/api/machines/"+build.MachineID+"/builder", map[string]any{"role": "builder"}); r.Code != 200 {
+			t.Fatalf("role: %s", r)
+		}
 		list, err = client.Builders(context.Background())
 		return err == nil && len(list) == 1 && list[0].Ready && strings.Contains(strings.Join(list[0].Caps, ","), "blender")
 	})

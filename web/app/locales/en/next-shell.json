@@ -484,6 +484,7 @@
   "next.designly.hint.slides": "For example: quarter results for the team, about eight slides",
   "next.designly.hint.ds": "For example: a design system for festival landings — colors, fonts, buttons",
   "next.designly.hint.video": "For example: a 30-second teaser of checkout in two clicks, for stories too",
+  "next.designly.hint.scene3d": "For example: a retro convertible drives across a desert, three cameras, sunset",
   "next.designly.kind": "What we make",
   "next.designly.kinds.site": "Site mockup",
   "next.designly.kinds.slides": "Slides",
@@ -1699,5 +1700,5 @@
   "next.folderSuggest.why": "Picked by the chat's prompts and the chats already in your folders. Choose another folder if it is not the one:",
   "next.folderSuggest.other": "Folders",
   "next.designly.kinds.scene3d": "3D scene",
-  "next.designly.kindsDesc.scene3d": "A Blender scene to view and pin"
+  "next.designly.kindsDesc.scene3d": "Describe a scene: the agent builds it in Blender"
 }

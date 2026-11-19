@@ -187,3 +187,113 @@ func TestPermissionHookLeavesAQuestion(t *testing.T) {
 		t.Fatalf("a card: %d", n)
 	}
 }
+
+// Codex holds its question on the hook and draws only its spinner meanwhile. The spinner is no answer: the
+// chat waits on the card until the person decides, and the decision goes to the hook.
+func TestCodexHookWaitsThroughItsSpinner(t *testing.T) {
+	r := newRig(t)
+	r.busy()
+	r.rt.Import([]ImportTab{{ID: r.id, Session: "s1", Title: "work", Provider: wire.ProviderCodex, Cwd: "/w",
+		TranscriptPath: r.path}}, nil)
+	r.settle(wire.StateWorking)
+	got := r.permissionHook(context.Background(), PermissionAsk{Tool: "Edit",
+		Input: json.RawMessage(`{"file_path":"/h/.codex/skills/a/SKILL.md"}`), Cwd: "/w"})
+	p := r.waitCards(1)[0]
+	if p.Command == nil || *p.Command != "/h/.codex/skills/a/SKILL.md" {
+		t.Fatalf("card: %+v", p)
+	}
+	for range 10 {
+		r.tick(time.Second)
+	}
+	if st := r.state(); st.K != wire.StateWaitingPermission || st.PermissionID != p.ID {
+		t.Fatalf("the spinner ended the wait: %+v", st)
+	}
+	if res := r.do(wire.DecideCmd{OpID: "d1", ConversationID: r.id, PermissionID: p.ID, OptionID: "1"}); res.R != wire.ResultAccepted {
+		t.Fatalf("decide: %+v", res)
+	}
+	if a := answered(t, got); !a.ok || a.reply.Behavior != "allow" {
+		t.Fatalf("answer: %+v", a)
+	}
+	if k := r.state().K; k != wire.StateWorking {
+		t.Fatalf("after the answer: %s", k)
+	}
+}
+
+// Codex stopped with esc is back at its prompt and leaves its hook running: the card closes and the hook ends,
+// or the chat would wait on a question nobody reads.
+func TestCodexStoppedLetsItsHookGo(t *testing.T) {
+	r := newRig(t)
+	r.busy()
+	r.rt.Import([]ImportTab{{ID: r.id, Session: "s1", Title: "work", Provider: wire.ProviderCodex, Cwd: "/w",
+		TranscriptPath: r.path}}, nil)
+	r.settle(wire.StateWorking)
+	got := r.permissionHook(context.Background(), PermissionAsk{Tool: "Bash", Input: json.RawMessage(`{"command":"mkdir -p /h/x"}`)})
+	p := r.waitCards(1)[0]
+	if p.Tool == nil || *p.Tool != "Bash" || p.Command == nil || *p.Command != "$ mkdir -p /h/x" {
+		t.Fatalf("card: %+v", p)
+	}
+	r.pane.screen = tui(t, "codex-idle-placeholder.ansi.txt")
+	for range 3 {
+		r.tick(time.Second)
+	}
+	if a := answered(t, got); a.ok {
+		t.Fatalf("the hook got an answer: %+v", a)
+	}
+	if g := r.snap().Permissions[0].State; g.K != wire.GateStateClosed || g.Reason != wire.ClosedAgentMovedOn {
+		t.Fatalf("card: %+v", g)
+	}
+	if k := r.state().K; k == wire.StateWaitingPermission {
+		t.Fatalf("still waiting")
+	}
+}
+
+// a Codex dialog the screen made a card of goes (esc in the terminal): Codex back at its prompt closes the card,
+// so an idle chat offers no buttons for a question nobody asks any more.
+func TestCodexAtItsPromptClosesTheScreenCard(t *testing.T) {
+	r := newRig(t)
+	r.busy()
+	r.rt.Import([]ImportTab{{ID: r.id, Session: "s1", Title: "work", Provider: wire.ProviderCodex, Cwd: "/w",
+		TranscriptPath: r.path}}, nil)
+	r.settle(wire.StateWorking)
+	r.pane.screen = tui(t, "codex-exec-approval.ansi.txt")
+	r.tick(time.Second)
+	p := r.waitCards(1)[0]
+	if p.State.K != wire.GateStateOpen || len(p.Options) != 3 {
+		t.Fatalf("card: %+v", p)
+	}
+	if k := r.state().K; k != wire.StateWaitingPermission {
+		t.Fatalf("state %s", k)
+	}
+	// esc: Codex aborts the turn and stands at its prompt. A turn's end leaves a screen card open (it may be another
+	// agent's question), so the prompt is what closes it.
+	r.pane.screen = tui(t, "codex-idle-placeholder.ansi.txt")
+	if err := r.rt.Hook(r.id, Hook{Kind: "stop"}); err != nil {
+		t.Fatal(err)
+	}
+	for range 5 {
+		r.tick(time.Second)
+	}
+	if g := r.snap().Permissions[0].State; g.K != wire.GateStateClosed {
+		t.Fatalf("card after esc: %+v, state %s", g, r.state().K)
+	}
+	if k := r.state().K; k == wire.StateWaitingPermission {
+		t.Fatalf("still waiting")
+	}
+}
+
+// a dialog no hook announced stands in a Claude turn. The scrollback keeps the person's earlier prompt behind
+// a ❯, which read as the input line, so the chat said «working» and asked nothing; the dialog gets its card.
+func TestClaudeUnannouncedDialogGetsACard(t *testing.T) {
+	r := working(t)
+	r.pane.screen = tui(t, "claude-2.1.310-switch-model-confirm.ansi.txt")
+	for range 8 {
+		r.tick(time.Second)
+	}
+	ps := r.snap().Permissions
+	if len(ps) != 1 || ps[0].Kind != wire.PermDialog || len(ps[0].Options) != 2 {
+		t.Fatalf("cards: %+v", ps)
+	}
+	if st := r.state(); st.K != wire.StateWaitingPermission || st.PermissionID != ps[0].ID {
+		t.Fatalf("state: %+v", st)
+	}
+}

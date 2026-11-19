@@ -516,6 +516,7 @@
   "next.designly.hint.slides": "Например: итоги квартала для команды, слайдов на восемь",
   "next.designly.hint.ds": "Например: дизайн-система для лендингов фестиваля — цвета, шрифты, кнопки",
   "next.designly.hint.video": "Например: тизер оплаты в два клика на 30 секунд, и для сторис тоже",
+  "next.designly.hint.scene3d": "Например: ретро-кабриолет едет по пустыне, три камеры, закат",
   "next.designly.kind": "Что делаем",
   "next.designly.kinds.site": "Макет сайта",
   "next.designly.kinds.slides": "Слайды",
@@ -1763,5 +1764,5 @@
   "next.folderSuggest.why": "Выбрано по запросам чата и чатам, что уже лежат в ваших папках. Если не та — выберите другую:",
   "next.folderSuggest.other": "Папки",
   "next.designly.kinds.scene3d": "3D-сцена",
-  "next.designly.kindsDesc.scene3d": "Сцена Blender: смотреть и ставить пины"
+  "next.designly.kindsDesc.scene3d": "Опиши сцену: агент соберёт её в Blender"
 }

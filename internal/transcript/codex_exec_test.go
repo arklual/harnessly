@@ -117,3 +117,21 @@ func TestCodexCodeModeLongScriptIsCut(t *testing.T) {
 		t.Errorf("summary is not cut: %q", got)
 	}
 }
+
+// A script that printed exec_command's whole answer: the feed shows the command's output, not the JSON around it; a
+// JSON line the command itself printed stays.
+func TestCodexCodeModePrintedAnswerShowsTheOutput(t *testing.T) {
+	call := `{"type":"response_item","timestamp":"2026-01-01T00:00:00Z","payload":{"type":"custom_tool_call","name":"exec","call_id":"call_1","status":"completed","input":"text(await tools.exec_command({cmd:\"pwd\"}))"}}`
+	out := `{"type":"response_item","timestamp":"2026-01-01T00:00:01Z","payload":{"type":"custom_tool_call_output","call_id":"call_1","output":[{"type":"input_text","text":"Script completed\nWall time 0.7 seconds\nOutput:\n"},{"type":"input_text","text":"{\"chunk_id\":\"1fd7d9\",\"wall_time_seconds\":0.32,\"exit_code\":0,\"original_token_count\":1504,\"output\":\"/work/harnessly\\n\"}"}]}}`
+	entries := ParseCodexContent(call+"\n"+out+"\n", CodexOptions{})
+	if len(entries) != 2 {
+		t.Fatalf("entries: %d", len(entries))
+	}
+	got := stringify(entries[1])
+	if strings.Contains(got, "original_token_count") || !strings.Contains(got, "/work/harnessly") {
+		t.Fatalf("result: %s", got)
+	}
+	if got := codexPrinted(`{"name":"x","output":"y"}`); got != `{"name":"x","output":"y"}` {
+		t.Fatalf("a command's own JSON changed: %s", got)
+	}
+}

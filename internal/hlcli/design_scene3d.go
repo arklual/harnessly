@@ -45,8 +45,13 @@ func (c *cli) designScene3D(args []string) error {
 
 const scene3DHelp = `design scene3d — a 3D scene of a blender-lab project as a Sinopia document
 
-  design scene3d add --root DIR --blend out/scene.blend [--script scenes/scene.py] [--title T]
-        make the document over a blender-lab project folder (DIR is absolute); open it in the Sinopia tab
+  design scene3d add --root DIR --blend out/scene.blend [--script scenes/scene.py] [--title T] [--no-open]
+        make the document over a blender-lab project folder (DIR is absolute) and open it in the right pane. The same .blend is
+        the same document: run it after every rebuild, nothing is duplicated, the viewer re-reads the file by itself
+  design scene3d add --file /path/scene.blend [--root DIR]
+        a .blend that lies elsewhere (a chat's attachment): copied into DIR/out (the first blender-lab project when no DIR)
+  design scene3d add --project ID --root DIR --blend out/scene.blend
+        write the scene into the project the person's request already made (the brief of a «3D scene» start names its id)
   design scene3d get <project>         the model's state, objects, cameras, animation and open pins
   design scene3d comments <project> [--open]
         the pins: object, point, camera, frame and the text
@@ -56,31 +61,49 @@ Coordinates are Blender's (z up).
 `
 
 func (c *cli) scene3DAdd(args []string) error {
-	f, err := parseFlags(args, map[string]string{"root": "root", "blend": "blend", "script": "script", "title": "title"})
+	args, on := switches(args, "no-open")
+	f, err := parseFlags(args, map[string]string{"root": "root", "blend": "blend", "script": "script", "title": "title", "project": "project", "file": "file"})
 	if err != nil {
 		return err
 	}
-	root, blend := f.values["root"], f.values["blend"]
-	if root == "" || blend == "" || len(f.pos) != 0 {
-		return usageErr("design scene3d add --root DIR --blend out/scene.blend [--script scenes/scene.py] [--title T]")
+	root, blend, file := f.values["root"], f.values["blend"], f.values["file"]
+	if (blend == "" && file == "") || (blend != "" && root == "") || len(f.pos) != 0 {
+		return usageErr("design scene3d add (--root DIR --blend out/scene.blend | --file /path/scene.blend [--root DIR]) [--script scenes/scene.py] [--title T] [--project ID] [--no-open]")
 	}
 	title := f.values["title"]
 	if title == "" {
-		title = strings.TrimSuffix(blend[strings.LastIndex(blend, "/")+1:], ".blend")
+		name := blend
+		if name == "" {
+			name = file
+		}
+		title = strings.TrimSuffix(name[strings.LastIndex(name, "/")+1:], ".blend")
 	}
-	raw, err := c.request(http.MethodPost, designScene3DAddPath, nil, map[string]any{"title": title, "root": root, "blend": blend, "script": f.values["script"]})
+	raw, err := c.request(http.MethodPost, designScene3DAddPath, nil, map[string]any{"title": title, "root": root, "blend": blend, "script": f.values["script"], "project": f.values["project"], "file": file})
 	if err != nil {
+		return err
+	}
+	var out struct {
+		ID, Title string
+		Existed   bool
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
 		return err
 	}
 	if c.json {
 		c.printRaw(raw)
 		return nil
 	}
-	var out struct{ ID, Title string }
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return err
+	if out.Existed {
+		c.out("3D scene %s is already there for this .blend: %s (it follows the file on its own, no new document)\n", out.ID, out.Title)
+	} else {
+		c.out("3D scene %s made: %s\n", out.ID, out.Title)
 	}
-	c.out("3D scene %s made: %s\n", out.ID, out.Title)
+	// The document opens in the right pane of this chat by itself; without a pane (a plain terminal) it is only said.
+	if !on["no-open"] {
+		if err := c.open([]string{"design", out.ID}); err != nil {
+			c.out("(not opened in the pane: %v; open it with `harnessly open design %s`)\n", err, out.ID)
+		}
+	}
 	return nil
 }
 

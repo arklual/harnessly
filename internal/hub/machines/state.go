@@ -247,8 +247,12 @@ func (s *Service) disconnected(l *link.Link, m store.Machine, current bool) {
 		_ = s.db.S().TouchMachine(ctx, m.ID, s.now().UTC())
 	}
 	s.res.mu.Lock()
-	delete(s.res.features, m.ID)
-	delete(s.res.latest, m.ID)
+	// The agent may have come back here while the touch above was written: its new link said its features already,
+	// and they are not this link's to drop.
+	if now := s.reg.Get(m.ID); now == nil || now.Remote() {
+		delete(s.res.features, m.ID)
+		delete(s.res.latest, m.ID)
+	}
 	s.res.mu.Unlock()
 	s.Publish(ctx, m)
 }

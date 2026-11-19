@@ -2,6 +2,8 @@ module github.com/ly-solutions/harnessly
 
 go 1.26.0
 
+toolchain go1.26.11
+
 // The front-end's npm packages may carry Go files of their own.
 ignore ./web/node_modules
 

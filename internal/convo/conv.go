@@ -165,8 +165,10 @@ type conv struct {
 	dialogSince time.Time
 	quietSince  time.Time
 	// menuGone counts the looks in a row that found no menu for a question the screen holds open.
-	menuGone  int
-	quietSize int64
+	menuGone int
+	// staleLooks counts the looks a Codex chat stood at its prompt with a screen card still open (closeStaleCodexCards).
+	staleLooks int
+	quietSize  int64
 	// quietTurn: the turn ended on silence, not by the transcript; the agent seen at work again opens it again.
 	quietTurn string
 	// compactAt: when the agent's state took compacting (see CompactHold).
@@ -1242,6 +1244,19 @@ func (c *conv) seeing(s seen, now time.Time) {
 	}
 	if look.Menu != typist.NoMenu {
 		c.menuGone = 0
+	} else if k == wire.StateWaitingPermission && c.codexHookWaits() {
+		// Codex shows its spinner while the hook waits. Back at its prompt, it was stopped (esc) and will not read the
+		// answer, but it leaves the hook running: the card closes, which ends the hook too.
+		if look.PromptReady() {
+			c.menuGone++
+		} else {
+			c.menuGone = 0
+		}
+		if c.menuGone >= menuGoneLooks {
+			c.menuGone = 0
+			c.moveOn(c.rec.State.PermissionID, now)
+			c.input(agentstate.Input{K: agentstate.GateResolved}, now)
+		}
 	} else if k == wire.StateWaitingPermission && (look.Busy || look.InputLine && (c.fd.OpenTurn() == "" || c.onDialog())) {
 		// The prompt left and the agent works: it went past the permission. A prompt asked after the turn (a background
 		// agent's) leaves the input box behind, with no spinner of the chat's own.
@@ -1282,6 +1297,7 @@ func (c *conv) seeing(s seen, now time.Time) {
 		c.limitOnScreen(look.Plain, now)
 	}
 	c.promptUnseen(look, now)
+	c.closeStaleCodexCards(look, now)
 	c.resumeHookGates(now)
 	c.updateNow(now)
 }
@@ -1379,6 +1395,44 @@ func (c *conv) permissionOnScreen(look typist.Screen, now time.Time) {
 	}
 	c.input(agentstate.Input{K: agentstate.PermissionPrompt, GateID: p.ID}, now)
 	c.gateOnScreen(g, look, now)
+}
+
+// closeStaleCodexCards: Codex at its prompt asks nothing (no agent of its own asks on that screen meanwhile), so a card
+// the screen opened that is still open was left by a dialog that went (esc, a stopped turn) and would offer buttons
+// nobody reads: it closes after a second look.
+func (c *conv) closeStaleCodexCards(look typist.Screen, now time.Time) {
+	if c.rec.Provider != wire.ProviderCodex || !look.PromptReady() || c.typing || waitingKind(c.rec.State.K) {
+		c.staleLooks = 0
+		return
+	}
+	var stale []string
+	for _, id := range c.order {
+		if g := c.openGate(id); c.foreignGate(g) && g.reply == nil {
+			stale = append(stale, id)
+		}
+	}
+	if len(stale) == 0 {
+		c.staleLooks = 0
+		return
+	}
+	if c.staleLooks++; c.staleLooks < menuGoneLooks {
+		return
+	}
+	c.staleLooks = 0
+	for _, id := range stale {
+		c.moveOn(id, now)
+	}
+}
+
+// codexHookWaits: Codex holds its question on the permission hook, which waits for the card. Codex draws no dialog
+// meanwhile, only its spinner, so the spinner is no sign the agent went past the question: the hook's answer or its end
+// (hookGone) is.
+func (c *conv) codexHookWaits() bool {
+	if c.rec.Provider != wire.ProviderCodex {
+		return false
+	}
+	g := c.openGate(c.rec.State.PermissionID)
+	return g != nil && g.reply != nil
 }
 
 // pendingOf is the main agent's pending call the menu on the screen is about. A subagent's calls are not in the main

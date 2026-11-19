@@ -27,14 +27,17 @@ var modelIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}(\[1m\])?$`)
 //     once: the server applies it at the first moment the agent is at its prompt, before the next queued message is
 //     typed (see applyPending). A change asked again replaces the one waiting.
 //
-// Codex has no command for it in its box that a page could rely on, so its conversations are refused unsupported.
+// Codex has no command for it in its box that a page could rely on (its /model is a menu for a person), so a Codex chat
+// takes the change by a restart on its session (restartWith): at its prompt at once, while it works when the turn is
+// over. The conversation goes on where it was; only the model, the effort and the modes of its launch change.
 func (c *conv) model(m wire.ModelCmd, finish func(wire.CmdResult), now time.Time) {
 	c.mark, c.markConvs = 0, 0
 	if c.deletedAt != 0 {
 		finish(wire.Refused(wire.RefuseNotFound))
 		return
 	}
-	if c.rec.Provider != wire.ProviderClaude {
+	if c.rec.Provider != wire.ProviderClaude && c.rec.Provider != wire.ProviderCodex ||
+		c.rec.Provider == wire.ProviderCodex && m.UltracodeAfter(c.rec.Model) {
 		finish(wire.Refused(wire.RefuseUnsupported))
 		return
 	}
@@ -214,6 +217,10 @@ func (c *conv) typeModel(m wire.ModelCmd, diff modelDiff, done func(err error, n
 		done(typist.ErrNotAtPrompt, c.d.Clock.Now())
 		return
 	}
+	if c.rec.Provider == wire.ProviderCodex {
+		c.restartCodex(m, diff, done)
+		return
+	}
 	session, clock := c.rec.Session, c.d.Clock
 	onProfile := c.rec.Model != nil && c.rec.Model.Profile != ""
 	// A permission mode shift+tab cannot reach truthfully is the restart's, after what is typed (restartInMode).
@@ -322,10 +329,40 @@ func (c *conv) canRestart() bool {
 		(c.rec.AgentSessionID != "" || c.rec.TranscriptPath != "")
 }
 
+// restartCodex takes a change into a Codex chat by starting its agent again on its session with the new launch: the
+// model and effort (Launcher.Resume writes them to the tab's launch from the record), the fast and permission modes.
+func (c *conv) restartCodex(m wire.ModelCmd, diff modelDiff, done func(err error, now time.Time)) {
+	took := modelTook{model: diff.model, effort: diff.effort, fast: diff.fast, permission: diff.permission}
+	next := took.on(c.rec.Model, m, diff)
+	if next == nil {
+		done(nil, c.d.Clock.Now())
+		return
+	}
+	if diff.model && !diff.effort && m.Effort != nil {
+		next.Effort = m.Effort
+	}
+	c.restartWith(*next, func(err error, now time.Time) {
+		done(err, now)
+		c.read(now)
+		c.pump(now)
+	})
+}
+
 // restartInMode starts the chat's agent again in the permission mode: its terminal is stopped the way an idle
 // one is, under the pane's lock, the record takes the mode, and the agent is resumed on its session at once, with the
 // mode on its launch line (the tab's launch keeps it, Launcher.Resume). The queue waits meanwhile, as for a switch.
 func (c *conv) restartInMode(to wire.PermissionMode, done func(err error, now time.Time)) {
+	next := wire.Model{}
+	if c.rec.Model != nil {
+		next = *c.rec.Model
+	}
+	next.Permission = to
+	c.restartWith(next, done)
+}
+
+// restartWith stops the chat's agent and resumes it on its session with the record's model set to next first: the
+// resume's launch takes its modes (and, for Codex, its model and effort) from there.
+func (c *conv) restartWith(next wire.Model, done func(err error, now time.Time)) {
 	if !c.canRestart() {
 		done(errNoRestart, c.d.Clock.Now())
 		return
@@ -351,12 +388,10 @@ func (c *conv) restartInMode(to wire.PermissionMode, done func(err error, now ti
 		c.lookSeq++
 		c.looking, c.lookAgain = false, false
 		c.input(agentstate.Input{K: agentstate.Shell, Resumable: true}, now)
-		next := wire.Model{}
-		if c.rec.Model != nil {
-			next = *c.rec.Model
-		}
-		next.Permission = to
 		c.applied(&next, now)
+		if k, ok := c.d.Launcher.(ModeKeeper); ok {
+			k.KeepModes(c.rec.Session, next.Fast, next.Permission)
+		}
 		c.resume(now)
 		done(nil, now)
 	})

@@ -21,6 +21,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agentbrowser"
 	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/catalog"
 	"github.com/ly-solutions/harnessly/internal/chatmove"
 	"github.com/ly-solutions/harnessly/internal/chatwork"
@@ -794,7 +795,7 @@ func (v *v2Live) permissionRequest(ctx context.Context, session string, f map[st
 	}
 	tool, _ := f["tool_name"].(string)
 	cwd, _ := f["cwd"].(string)
-	input, err := json.Marshal(f["tool_input"])
+	input, err := json.Marshal(permissionInput(&tool, f["tool_input"]))
 	if err != nil {
 		return nil, false
 	}
@@ -818,6 +819,22 @@ func (v *v2Live) permissionRequest(ctx context.Context, session string, f map[st
 		return nil, false
 	}
 	return map[string]any{"hookSpecificOutput": map[string]any{"hookEventName": "PermissionRequest", "decision": decision}}, true
+}
+
+// permissionInput is the call the card shows. Codex asks about a patch with its whole body (tool apply_patch): the card
+// names the files it edits, as Claude's Edit does.
+func permissionInput(tool *string, input any) any {
+	if *tool != "apply_patch" {
+		return input
+	}
+	body, _ := input.(map[string]any)
+	command, _ := body["command"].(string)
+	paths := codex.PatchPaths(command)
+	if len(paths) == 0 {
+		return input
+	}
+	*tool = "Edit"
+	return map[string]any{"file_path": strings.Join(paths, ", ")}
 }
 
 // --- starting agents ---
@@ -1053,6 +1070,16 @@ func (l *v2Launcher) Resume(conv wire.Conversation) error {
 	// that never chose one keeps what its tab started with.
 	if m := conv.Model; m != nil && m.Permission != "" {
 		if err := c.store.SetTabLaunchModes(conv.Session, m.Fast, string(m.Permission)); err != nil {
+			return err
+		}
+	}
+	// A Codex chat changes its model and effort by a resume (convo restartCodex): the record says what it runs on now.
+	if m := conv.Model; conv.Provider == wire.ProviderCodex && m != nil && m.ID != "" {
+		effort := ""
+		if m.Effort != nil {
+			effort = string(*m.Effort)
+		}
+		if err := c.store.SetTabLaunchModel(conv.Session, m.ID, effort); err != nil {
 			return err
 		}
 	}
