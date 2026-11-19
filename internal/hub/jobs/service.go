@@ -622,19 +622,25 @@ func (s *Service) place(ctx context.Context, j store.HeavyJob, pools map[string]
 }
 
 func (s *Service) start(ctx context.Context, j store.HeavyJob, m Candidate, reason string, pools map[string][]Candidate) {
+	// The builder is written down before it hears of the job: it asks for the input as soon as the start lands, maybe
+	// before this call returns, and the hub hands the input only to the job's own machine.
+	j.MachineID = m.ID
+	if err := s.db.S().UpdateHeavyJob(ctx, j); err != nil {
+		s.log.Warn("jobs: record the builder", "job", j.ID, "error", err)
+		return
+	}
 	_, err := s.link.Do(ctx, m.ID, hubproto.OpJobStart, hubproto.JobStart{JobID: j.ID, Argv: j.Argv, Env: j.Env, TimeoutSec: j.TimeoutSec,
 		Input: j.HasInput, Outputs: j.Outputs}, callTimeout)
 	if err != nil {
+		j.MachineID = ""
 		var he *httpx.Error
-		if errors.As(err, &he) && (he.Code == "busy" || he.Code == "machine_offline") {
-			return // try again on the next look
-		}
 		if errors.As(err, &he) && (he.Code == "machine_policy" || he.Code == "invalid_request") {
 			s.finish(&j, hubproto.HeavyFailed, nil, "the builder "+m.Name+" refused it: "+he.Message, "")
-			_ = s.db.S().UpdateHeavyJob(ctx, j)
-			return
+		} else if !errors.As(err, &he) || (he.Code != "busy" && he.Code != "machine_offline") {
+			s.log.Warn("jobs: start", "job", j.ID, "machine", m.ID, "error", err)
 		}
-		s.log.Warn("jobs: start", "job", j.ID, "machine", m.ID, "error", err)
+		// busy, offline or another error: back in the queue for the next look
+		_ = s.db.S().UpdateHeavyJob(ctx, j)
 		return
 	}
 	now := s.now().UTC()
