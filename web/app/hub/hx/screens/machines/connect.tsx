@@ -1,6 +1,7 @@
 // «Подключить машину» as a page, the board's `pConnect()`: a strip of steps and the card of the current one. It works on the
 // calls the old sheet used (code of a new machine, «эта машина», a look at the tenant's machines until the new one dials in).
-// The board's step «Чья машина» is not here: the hub's code has no owner to pick, so the page does not invent one.
+// The hub's code carries no owner: the code is the creator's, so «Чья машина» is applied once the machine is in (a name, and for
+// a shared one its team and the team's access) with the calls the card already uses.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { hhmm } from '../../../lib/format';
@@ -8,7 +9,7 @@ import { useCopy, useNow } from '../../../lib/hooks';
 import { useSession } from '../../../lib/session';
 import { Sure } from '../../../ui/parts';
 import { orgErrorText } from '../../../org/api/errors';
-import type { OrgMachine } from '../../../org/api/machines';
+import type { MachineSetup, OrgMachine } from '../../../org/api/machines';
 import type { IssuedCode, MachineProfile } from '../../../org/api/tenant';
 import { useOrg } from '../../../org/context';
 import type { TenantRef } from '../../../org/types';
@@ -50,7 +51,10 @@ const PROFILES: { value: MachineProfile; title: string; sub: string }[] = [
   { value: 'full', title: 'С вашим доступом', sub: 'Агенты видят все ваши файлы.' },
 ];
 
-const STEPS = ['Где машина', 'Установка', 'Проверка'];
+const STEPS = ['Где машина', 'Чья машина', 'Установка', 'Проверка'];
+
+type Owner = 'me' | 'team';
+const AGENT_NAME = { claude: 'Claude Code', codex: 'Codex' } as const;
 
 interface Joined {
   id: string;
@@ -108,7 +112,7 @@ export const ConnectPage = ({
   onClose: () => void;
   onOpen: (id: string) => void;
 }) => {
-  const { api } = useOrg();
+  const { api, scope, shell } = useOrg();
   const { config, me } = useSession();
   const localOffered = config.connect.local.available && me?.user.isAdmin === true;
   const [step, setStep] = useState(1);
@@ -116,16 +120,26 @@ export const ConnectPage = ({
   const [tenantId, setTenantId] = useState(tenants[0]?.id ?? '');
   const [profile, setProfile] = useState<MachineProfile>('dir');
   const [sure, setSure] = useState(false);
+  const [owner, setOwner] = useState<Owner>('me');
+  const [teamId, setTeamId] = useState('');
+  const [name, setName] = useState('');
+  const [setup, setSetup] = useState<MachineSetup | null>(null);
+  const [trusting, setTrusting] = useState(false);
+  const [applied, setApplied] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [issued, setIssued] = useState<IssuedCode | null>(null);
   const [joined, setJoined] = useState<Joined | null>(null);
   // The machines the tenant had when the code was issued: a new id among them later is the one that used the code.
   const known = useRef<Set<string>>(new Set());
-  const waiting = step === 2 && issued !== null && joined === null;
+  const waiting = step === 3 && issued !== null && joined === null;
   const now = useNow(1000, waiting);
   const expired = issued !== null && new Date(issued.expiresAt).getTime() <= now;
   const { copied, copy } = useCopy();
+  // The hub lists the teams of the tenant the person is in now; for another tenant there is nothing to pick from.
+  const teams = scope.kind === 'tenant' && scope.tenant.id === tenantId ? shell.teams : [];
+  const team = teams.find((t) => t.id === teamId) ?? teams[0] ?? null;
+  const canOwn = owner === 'me' || team !== null;
   const canNext = tenantId !== '' && (where === 'local' || profile !== 'full' || sure);
 
   const issue = async () => {
@@ -134,7 +148,7 @@ export const ConnectPage = ({
     try {
       known.current = new Set((await api.spaceMachines(tenantId)).map((m) => m.id));
       setIssued(await api.issueMachineCode(tenantId, profile, profile === 'full'));
-      setStep(2);
+      setStep(3);
     } catch (e) {
       setError(e);
     } finally {
@@ -148,7 +162,7 @@ export const ConnectPage = ({
     try {
       const m = await api.claimLocalMachine(tenantId);
       setJoined({ id: m.id, name: m.name, status: m.status });
-      setStep(3);
+      setStep(4);
     } catch (e) {
       setError(e);
     } finally {
@@ -165,7 +179,7 @@ export const ConnectPage = ({
           const fresh = list.find((m) => !known.current.has(m.id));
           if (alive && fresh) {
             setJoined({ id: fresh.id, name: fresh.name, status: fresh.status });
-            setStep(3);
+            setStep(4);
           }
         },
         // A failed look is not a reason to stop waiting: the next one may pass.
@@ -180,7 +194,8 @@ export const ConnectPage = ({
 
   const fresh = joined ? (machines.find((m) => m.id === joined.id) ?? null) : null;
   const live = fresh ? fresh.state === 'online' || fresh.state === 'idle' : joined?.status === 'online';
-  const ready = joined !== null && live;
+  const trusted = setup === null || setup.runtime === 'ready';
+  const ready = joined !== null && live && trusted;
 
   // The list is asked again until the machine is in it and answers.
   const refreshRef = useRef(refresh);
@@ -188,14 +203,71 @@ export const ConnectPage = ({
     refreshRef.current = refresh;
   });
   useEffect(() => {
-    if (step !== 3) return;
+    if (step !== 4) return;
     refreshRef.current();
     if (ready && fresh) return;
     const timer = window.setInterval(() => refreshRef.current(), POLL_MS);
     return () => window.clearInterval(timer);
   }, [step, ready, fresh]);
 
+  // What the hub knows of the machine after it dialed in: confirmation, the agents and their sign-in.
+  const joinedId = joined?.id ?? null;
+  const settled =
+    setup !== null &&
+    setup.runtime === 'ready' &&
+    setup.agents.every((a) => !a.installed || a.login !== 'unknown');
+  useEffect(() => {
+    if (step !== 4 || joinedId === null || settled) return;
+    let alive = true;
+    const look = () =>
+      api.machineDetail(joinedId).then(
+        (d) => alive && setSetup(d.setup ?? null),
+        () => undefined,
+      );
+    void look();
+    const timer = window.setInterval(() => void look(), POLL_MS);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [api, step, joinedId, settled]);
+
+  // «Чья машина» is applied once, when the machine is in: the name and, for a shared one, its team and the team's access.
+  const applying = useRef<string | null>(null);
+  useEffect(() => {
+    if (step !== 4 || joinedId === null || applying.current === joinedId) return;
+    applying.current = joinedId;
+    const todo = async () => {
+      const wanted = name.trim();
+      if (owner === 'team' && team) {
+        await api.moveMachine(joinedId, tenantId, team.id);
+        await api.setMachineAccess(joinedId, { mode: 'team', personIds: [] });
+      }
+      if (wanted !== '' && wanted !== joined?.name) await api.renameMachine(joinedId, wanted);
+    };
+    todo().then(
+      () => setApplied('ok'),
+      (e: unknown) => setApplied(orgErrorText(e)),
+    );
+  }, [api, step, joinedId, owner, team, tenantId, name, joined?.name]);
+
+  const trust = async () => {
+    if (joinedId === null) return;
+    setTrusting(true);
+    try {
+      await api.trustMachine(joinedId);
+      setSetup((x) => (x ? { ...x, runtime: 'ready' } : x));
+    } catch (e) {
+      setError(e);
+    } finally {
+      setTrusting(false);
+    }
+  };
+
   const reset = () => {
+    setSetup(null);
+    setApplied(null);
+    applying.current = null;
     setStep(1);
     setIssued(null);
     setJoined(null);
@@ -294,7 +366,66 @@ export const ConnectPage = ({
       </>
     );
   }
-  if (step === 2 && where === 'local') {
+  if (step === 2) {
+    body = (
+      <div className="stack">
+        <Radio
+          on={owner === 'me'}
+          title="Моя"
+          sub={`Владелец — ${me?.user.name || me?.user.email || 'вы'}. Чаты на ней открываете вы, подтверждаете её тоже вы.`}
+          onPick={() => setOwner('me')}
+        />
+        {teams.length > 0 && (
+          <div
+            className={`radio ${owner === 'team' ? 'on' : ''}`}
+            role="radio"
+            aria-checked={owner === 'team'}
+            tabIndex={0}
+            onClick={() => setOwner('team')}
+            onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setOwner('team'))}
+          >
+            <span className="hd-o" />
+            <div style={{ flex: 1 }}>
+              <b>Общая для команды</b>
+              <div className="mut sm">Сборочная или общая машина: открывать чаты может любой в команде.</div>
+              {owner === 'team' && (
+                <select
+                  className="inp"
+                  aria-label="Команда"
+                  style={{ marginTop: 8, maxWidth: 280 }}
+                  value={team?.id ?? ''}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => setTeamId(e.target.value)}
+                >
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          </div>
+        )}
+        <label className="mut sm" htmlFor="cn-name" style={{ marginTop: 6 }}>
+          Название машины
+        </label>
+        <input
+          id="cn-name"
+          className="inp"
+          style={{ maxWidth: 360 }}
+          maxLength={60}
+          placeholder="Если не задать, возьмём имя, с которым она назовётся сама"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <div className="mut2 sm">
+          Название видно в списке машин. Поменять его и передать машину можно потом в её карточке.
+        </div>
+      </div>
+    );
+  }
+  if (step === 3 && where === 'local') {
     body = (
       <div className="fixbox ok">
         <b>Команд не нужно</b>
@@ -305,7 +436,7 @@ export const ConnectPage = ({
       </div>
     );
   }
-  if (step === 2 && where === 'other' && issued) {
+  if (step === 3 && where === 'other' && issued) {
     body = (
       <>
         <div className="mut" style={{ marginBottom: 10 }}>
@@ -336,7 +467,7 @@ export const ConnectPage = ({
       </>
     );
   }
-  if (step === 3 && joined) {
+  if (step === 4 && joined) {
     const state = fresh?.state ?? (joined.status === 'online' ? 'online' : 'offline');
     body = (
       <>
@@ -355,6 +486,63 @@ export const ConnectPage = ({
               {fresh.runnerOutdated && (
                 <div className="mut sm">Есть новее — обновить можно из карточки машины.</div>
               )}
+            </Check>
+          )}
+          {live && setup && (
+            <Check s={setup.runtime === 'ready' ? 'ok' : 'err'}>
+              {setup.runtime === 'ready' ? 'Машина подтверждена' : 'Машина ждёт подтверждения'}
+              {setup.runtime === 'needs_trust' && (
+                <>
+                  <div className="mut sm" style={{ margin: '4px 0 8px' }}>
+                    Подтвердите, что это ваша машина: пока этого нет, чаты на ней не откроются.
+                  </div>
+                  <Btn variant="primary" size="sm" icon="check" busy={trusting} onClick={() => void trust()}>
+                    Это моя машина — подтвердить
+                  </Btn>
+                </>
+              )}
+              {setup.runtime === 'blocked' && (
+                <div className="mut sm">
+                  Этот хаб не предлагает подтверждать машины: нужен адрес для машин (HUB_RUNTIME_DOMAIN).
+                </div>
+              )}
+            </Check>
+          )}
+          {live &&
+            setup?.agents.map((a) => (
+              <Check key={a.provider} s={a.installed ? 'ok' : 'skip'}>
+                {AGENT_NAME[a.provider]} {a.installed ? 'поставлен' : 'не поставлен'}
+                {a.installed && a.version && <span className="mut2 sm"> · {a.version}</span>}
+                {!a.installed && <span className="mut2 sm"> · поставить можно позже из карточки машины</span>}
+              </Check>
+            ))}
+          {live && setup && setup.agents.some((a) => a.installed) && (
+            <Check
+              s={
+                setup.agents.some((a) => a.installed && a.login === 'out')
+                  ? 'err'
+                  : setup.agents.some((a) => a.installed && a.login === 'unknown')
+                    ? 'run'
+                    : 'ok'
+              }
+            >
+              Агенты вошли в аккаунты
+              {setup.agents
+                .filter((a) => a.installed && a.login === 'out')
+                .map((a) => (
+                  <div key={a.provider} className="mut sm">
+                    {AGENT_NAME[a.provider]}: вход не выполнен — чаты на нём не стартуют, войдите на машине.
+                  </div>
+                ))}
+              {setup.accounts.length > 0 && (
+                <div className="mut2 sm">{setup.accounts.map((c) => `«${c.label}»`).join(' · ')}</div>
+              )}
+            </Check>
+          )}
+          {applied !== null && applied !== 'ok' && (
+            <Check s="err">
+              Название или команду применить не удалось
+              <div className="mut sm">{applied}. Поменять их можно в карточке машины.</div>
             </Check>
           )}
           <Check s={fresh ? 'ok' : 'run'}>
@@ -385,19 +573,23 @@ export const ConnectPage = ({
 
   const next =
     step === 1 ? (
+      <Btn variant="primary" disabled={!canNext} onClick={() => (setError(null), setStep(2))}>
+        Дальше
+      </Btn>
+    ) : step === 2 ? (
       <Btn
         variant="primary"
         busy={pending && where === 'other'}
-        disabled={!canNext}
-        onClick={() => (where === 'local' ? (setError(null), setStep(2)) : void issue())}
+        disabled={!canOwn}
+        onClick={() => (where === 'local' ? (setError(null), setStep(3)) : void issue())}
       >
         {where === 'local' ? 'Дальше' : 'Показать команду'}
       </Btn>
-    ) : step === 2 && where === 'local' ? (
+    ) : step === 3 && where === 'local' ? (
       <Btn variant="primary" busy={pending} onClick={() => void claimLocal()}>
         Подключить эту машину
       </Btn>
-    ) : step === 2 && expired ? (
+    ) : step === 3 && expired ? (
       <Btn variant="primary" busy={pending} onClick={() => void issue()}>
         Новая команда
       </Btn>
@@ -424,8 +616,8 @@ export const ConnectPage = ({
             </div>
           )}
           <div className="row" style={{ marginTop: 22 }}>
-            {step === 2 && !joined && (
-              <Btn variant="ghost" onClick={() => setStep(1)} disabled={pending}>
+            {(step === 2 || (step === 3 && !joined)) && (
+              <Btn variant="ghost" onClick={() => setStep(step - 1)} disabled={pending}>
                 Назад
               </Btn>
             )}

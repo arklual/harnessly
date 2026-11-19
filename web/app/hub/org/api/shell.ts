@@ -12,4 +12,6 @@ export interface ShellApi {
   links(org: string): Promise<OrgLinks>;
   /** Replaces them (an empty object clears); only the organization's admin may. Resolves with what the hub kept. */
   setLinks(org: string, value: OrgLinks): Promise<OrgLinks>;
+  /** Takes the viewer out of the organization: its tenants, teams and role; their machines there are revoked. */
+  leaveOrg(org: string): Promise<void>;
 }

@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"database/sql"
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -473,7 +474,30 @@ func (s Store) AddCall(ctx context.Context, c UsageCall) (bool, error) {
 		return false, err
 	}
 	n, _ := res.RowsAffected()
-	return n > 0, nil
+	if n == 0 {
+		return false, nil
+	}
+	// the call added to its session's sums (usage_session_sums); a long one to the long sums as well
+	list := int64(0)
+	if c.ListCostMicros != nil {
+		list = *c.ListCostMicros
+	}
+	cw := c.CacheWrite5m + c.CacheWrite1h
+	var long [6]int64
+	if c.Input+c.CacheRead+cw >= LongContextTokens {
+		long = [6]int64{1, list, c.Input, c.Output, c.CacheRead, cw}
+	}
+	_, err = s.q.Exec(ctx, sessionSumsInsert+`VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT (org_key, provider, session_key, model) DO UPDATE SET calls = usage_session_sums.calls + 1,
+		list_cost_micros = usage_session_sums.list_cost_micros + excluded.list_cost_micros, input = usage_session_sums.input + excluded.input,
+		output = usage_session_sums.output + excluded.output, cache_read = usage_session_sums.cache_read + excluded.cache_read,
+		cache_write = usage_session_sums.cache_write + excluded.cache_write, long_calls = usage_session_sums.long_calls + excluded.long_calls,
+		long_list_micros = usage_session_sums.long_list_micros + excluded.long_list_micros,
+		long_input = usage_session_sums.long_input + excluded.long_input, long_output = usage_session_sums.long_output + excluded.long_output,
+		long_cache_read = usage_session_sums.long_cache_read + excluded.long_cache_read,
+		long_cache_write = usage_session_sums.long_cache_write + excluded.long_cache_write`,
+		c.OrgKey, c.Provider, c.SessionKey, c.Model, list, c.Input, c.Output, c.CacheRead, cw, long[0], long[1], long[2], long[3], long[4], long[5])
+	return true, err
 }
 
 // UsageTotals is a sum of calls.
@@ -672,8 +696,49 @@ func (s Store) Rollup(ctx context.Context, orgKey string, hours []int64) error {
 			unpriced_calls, input, output, cache_read, cache_write, list_cost_micros, paid_cost_micros) `+rollupSelect, h, orgKey, h, h+3600000); err != nil {
 			return err
 		}
+		if err := s.sumSessionsOfHour(ctx, orgKey, h); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// LongContextTokens is the context (input, cache read and both cache writes) from which a call is a long one: the
+// long_* sums of usage_session_sums.
+const LongContextTokens = 250_000
+
+// sessionSumsSelect sums the calls of the sessions the condition names by session and model, the long calls apart.
+const sessionSumsSelect = `SELECT org_key, provider, session_key, model, COUNT(*), COALESCE(SUM(list_cost_micros), 0), SUM(input), SUM(output),
+	SUM(cache_read), SUM(cache_write_5m + cache_write_1h),
+	SUM(CASE WHEN input + cache_read + cache_write_5m + cache_write_1h >= 250000 THEN 1 ELSE 0 END),
+	SUM(CASE WHEN input + cache_read + cache_write_5m + cache_write_1h >= 250000 THEN COALESCE(list_cost_micros, 0) ELSE 0 END),
+	SUM(CASE WHEN input + cache_read + cache_write_5m + cache_write_1h >= 250000 THEN input ELSE 0 END),
+	SUM(CASE WHEN input + cache_read + cache_write_5m + cache_write_1h >= 250000 THEN output ELSE 0 END),
+	SUM(CASE WHEN input + cache_read + cache_write_5m + cache_write_1h >= 250000 THEN cache_read ELSE 0 END),
+	SUM(CASE WHEN input + cache_read + cache_write_5m + cache_write_1h >= 250000 THEN cache_write_5m + cache_write_1h ELSE 0 END)
+	FROM usage_calls WHERE %s GROUP BY org_key, provider, session_key, model`
+
+const sessionSumsInsert = `INSERT INTO usage_session_sums (org_key, provider, session_key, model, calls, list_cost_micros, input, output, cache_read,
+	cache_write, long_calls, long_list_micros, long_input, long_output, long_cache_read, long_cache_write) `
+
+// sumSessionsOfHour sums anew every session that has a call in the hour, all its calls, of every hour, included.
+func (s Store) sumSessionsOfHour(ctx context.Context, orgKey string, hour int64) error {
+	touched := `(provider, session_key) IN (SELECT DISTINCT provider, session_key FROM usage_calls WHERE org_key = ? AND ts >= ? AND ts < ?)`
+	if _, err := s.q.Exec(ctx, `DELETE FROM usage_session_sums WHERE org_key = ? AND `+touched, orgKey, orgKey, hour, hour+3600000); err != nil {
+		return err
+	}
+	_, err := s.q.Exec(ctx, sessionSumsInsert+fmt.Sprintf(sessionSumsSelect, `org_key = ? AND `+touched), orgKey, orgKey, hour, hour+3600000)
+	return err
+}
+
+// ResumSessions sums every session of the organization anew from its calls: the catch-up for what usage_session_sums
+// missed, such as the calls a previous release took while both ran, or calls removed with a space.
+func (s Store) ResumSessions(ctx context.Context, orgKey string) error {
+	if _, err := s.q.Exec(ctx, `DELETE FROM usage_session_sums WHERE org_key = ?`, orgKey); err != nil {
+		return err
+	}
+	_, err := s.q.Exec(ctx, sessionSumsInsert+fmt.Sprintf(sessionSumsSelect, `org_key = ?`), orgKey)
+	return err
 }
 
 // RollupRow is one row of usage_rollup_hour.

@@ -42,7 +42,7 @@ var DataKinds = []DataKind{
 	{Name: "review drafts", Owner: OwnerHub, Tables: []string{"review_notes"},
 		Keep: "no term", OwnerDeletes: "the person removes a note on the review page or sends the review, which clears its notes; when the chat leaves the hub (history.Sweeper, after its term) its drafts go with it"},
 	{Name: "spend", Owner: OwnerMachine,
-		Tables:       []string{"usage_calls", "usage_rollup_hour", "usage_quarantine", "tool_usage_day", "ingest_cursors", "agent_sessions", "agent_session_mrs", "session_facts"},
+		Tables:       []string{"usage_calls", "usage_rollup_hour", "usage_session_sums", "usage_quarantine", "tool_usage_day", "ingest_cursors", "agent_sessions", "agent_session_mrs", "session_facts"},
 		Keep:         "no term",
 		OwnerDeletes: "a machine never takes a fact back: what was pulled stays as the account of the spend, also after the machine is gone"},
 	{Name: "agent memory", Owner: OwnerMachine, Tables: []string{"memory_notes"},

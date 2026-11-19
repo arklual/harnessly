@@ -101,11 +101,14 @@ if [ -n "$keys" ]; then
     OSS_KEYS=$keys xargs -0 perl -i -pe '
       BEGIN { $k = qr/(?:$ENV{OSS_KEYS})-\d+/ }
       if ($ARGV =~ /\.md$/ || /^\s*(?:\/\/|\/\*|\*|#)/) {
+        my $was = $_;
         s/^(\s*(?:\/\/|\/\*\*?|\*|#)\s*)\((?:$k)(?:, (?:$k))*\)[.,;:]? ?/$1/;
         s/ ?\((?:$k)(?:, (?:$k))*\)//g;
         s/\((?:$k)(?:, (?:$k))*[:;,] /(/g;
         s/, (?:$k)(?:, (?:$k))*\)/)/g;
         s/^(\s*(?:\/\/|\/\*\*?|\*|#)\s*)(?:$k)[:.] /$1/;
+        # A comment line that was only a tag keeps its `// ` with a trailing blank, which prettier refuses.
+        s/[ \t]+(\r?\n?)$/$1/ if $_ ne $was;
       }'
   # The index takes the files as they are now; only the stripped ones change.
   git -C "$src" --work-tree="$work/tree" add -A -f -- .

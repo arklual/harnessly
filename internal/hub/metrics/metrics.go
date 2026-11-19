@@ -211,13 +211,14 @@ func ObserveHTTP(path string, status int) {
 // /m/. Streams (a socket, an event stream, a long poll) are not timed: their time is how long someone listened.
 
 const (
-	areaDesign  = routeGroups + iota // /m/…/design/…, /m/…/designly/…, and the same under /agents/ (the workspace's runtime)
-	areaHistory                      // /m/…/history/…, /agents/…/history/…, /api/…/history/…
-	areaStore                        // /store/
+	areaDesign     = routeGroups + iota // /m/…/design/…, /m/…/designly/…, and the same under /agents/ (the workspace's runtime)
+	areaHistory                         // /m/…/history/…, /agents/…/history/…, /api/…/history/…
+	areaStore                           // /store/
+	areaDesignHome                      // …/design/home: Sinopia's home in one answer, apart from the rest of design (HRN-1418)
 	latencyAreas
 )
 
-var areaNames = [latencyAreas]string{"agent_link", "agent", "api", "machine", "workspace", "sites", "apps", "download", "health", "other", "design", "history", "store"}
+var areaNames = [latencyAreas]string{"agent_link", "agent", "api", "machine", "workspace", "sites", "apps", "download", "health", "other", "design", "history", "store", "design_home"}
 
 // latencyBuckets are the upper bounds in seconds; 0.4 and 1 are the targets of lists and screens (docs/hub/deploy.md, HUB_METRICS_LISTEN).
 var latencyBuckets = [...]float64{0.025, 0.05, 0.1, 0.2, 0.4, 0.7, 1, 2, 5, 15}
@@ -236,6 +237,8 @@ var httpLatency [latencyAreas][len(methodNames)]latency
 func LatencyArea(path string) int {
 	g := RouteGroup(path)
 	switch {
+	case (g == RouteMachine || g == RouteWorkspace) && strings.HasSuffix(path, "/design/home"):
+		return areaDesignHome
 	case (g == RouteMachine || g == RouteWorkspace) && (strings.Contains(path, "/design/") || strings.Contains(path, "/designly/")):
 		return areaDesign
 	case (g == RouteMachine || g == RouteWorkspace || g == RouteAPI) && strings.Contains(path, "/history/"):

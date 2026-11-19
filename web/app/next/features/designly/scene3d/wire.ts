@@ -155,12 +155,32 @@ export const readFrame = (v: unknown): IScene3dFrame | null => {
   };
 };
 
+const readBake = (v: unknown): IScene3dMeta['bake'] | null => {
+  const r = rec(v);
+  if (!r) return null;
+  const out: NonNullable<IScene3dMeta['bake']> = {};
+  for (const [name, t] of Object.entries(r)) {
+    const track = rec(t);
+    if (!track || (track.m !== 'e' && track.m !== 'q')) continue;
+    const width = track.m === 'e' ? 10 : 11;
+    const rows = arr(track.rows).flatMap((row) => {
+      const x = arr(row);
+      return x.length === width && x.every((n) => typeof n === 'number' && Number.isFinite(n))
+        ? [x as number[]]
+        : [];
+    });
+    if (rows.length > 0) out[name] = { m: track.m, rows };
+  }
+  return Object.keys(out).length > 0 ? out : null;
+};
+
 const readMeta = (v: unknown): IScene3dMeta | null => {
   const r = rec(v);
   if (!r) return null;
   const b = arr(r.bounds).map((x) => num(x));
   const res = arr(r.res).map((x) => num(x));
   const stats = rec(r.stats) ?? {};
+  const bake = readBake(r.bake);
   return {
     version: num(r.version),
     fps: num(r.fps, 24),
@@ -209,6 +229,7 @@ const readMeta = (v: unknown): IScene3dMeta | null => {
         : [];
     }),
     bounds: [b[0] ?? -5, b[1] ?? -5, b[2] ?? 0, b[3] ?? 5, b[4] ?? 5, b[5] ?? 3],
+    ...(bake ? { bake } : {}),
     stats: {
       tris: num(stats.tris),
       trisOut: num(stats.trisOut),

@@ -100,6 +100,32 @@ export interface Summary {
   spendUsd: number;
   sessions: number;
   mrs: number;
+  /** The comparison period's figures; null: the hub has no figure to compare with. */
+  prev?: { spendUsd: number | null; sessions: number | null; mrs: number | null };
+  /** The spend to the end of an open period at the pace of the last 7 days (API prices); null for a closed period. */
+  forecastUsd?: number | null;
+  /** The budget the scope is held to (API-price estimate of the limit); null: no limit set. */
+  budgetUsd?: number | null;
+}
+
+/** The ways the screen cuts the spend. */
+export type SpendSplit = 'team' | 'person' | 'model';
+
+export interface SpendSlice {
+  /** The team, person or model id (the model's name); `''` is «без команды». */
+  key: string;
+  label: string;
+  usd: number;
+  calls: number;
+}
+
+/** The spend by day, split by team or model; a value is USD at API prices. */
+export interface DailySpend {
+  split: 'team' | 'model';
+  days: string[];
+  lines: { id: string; name: string; values: number[] }[];
+  /** The comparison period's whole spend. */
+  cmpTotalUsd: number | null;
 }
 
 /** One line of a hover bubble: «Фронт · 14%». */
@@ -249,9 +275,43 @@ export interface LimitAccount {
 /** The history of the limit windows of the scope's accounts; null: the viewer may not see money, or the hub has no history. */
 export type LimitHistory = LimitAccount[] | null;
 
+/** The way a session was started, as the hub's efficiency overview names it. */
+export type EffChannelId = 'tab' | 'automation' | 'eval';
+
+export interface EffChannel {
+  id: EffChannelId;
+  sessions: number;
+  usd: number;
+  mrs: number;
+}
+
+/** A person's weekly pulse: three marks 1..5, nobody else sees them. */
+export interface EffPulseMarks {
+  speed: number;
+  quality: number;
+  friction: number;
+}
+
+export interface EffPulse {
+  /** Monday of the current week, YYYY-MM-DD. */
+  week: string;
+  answered: boolean;
+  /** The answer of the current week; null before it is given. */
+  current: EffPulseMarks | null;
+}
+
 export interface AnalyticsApi {
   analyticsFrame(): Promise<AnalyticsFrame>;
   analytics(query: AnalyticsQuery): Promise<AnalyticsData>;
   analyticsChart(query: AnalyticsQuery, kpi: KpiId): Promise<KpiChart>;
   limitWindows(query: AnalyticsQuery): Promise<LimitHistory>;
+  /** The spend of the period by day (a chart window), by team or model. */
+  spendDaily(query: AnalyticsQuery, split: 'team' | 'model'): Promise<DailySpend | null>;
+  /** The spend of the period cut by team, person or model; null: the viewer may not see money. */
+  spendBy(query: AnalyticsQuery, by: SpendSplit): Promise<SpendSlice[] | null>;
+  /** Where the spend comes from by session start; null: the hub does not serve the efficiency overview. */
+  efficiencyChannels(query: AnalyticsQuery): Promise<EffChannel[] | null>;
+  /** The viewer's own pulse; null: the hub does not serve it (the efficiency flag is off). */
+  efficiencyPulse(): Promise<EffPulse | null>;
+  savePulse(marks: EffPulseMarks): Promise<EffPulse>;
 }

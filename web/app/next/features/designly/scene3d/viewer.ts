@@ -3,13 +3,15 @@
 // or a point on a surface with a click, plays the animation, draws the pins and takes a picture of the viewport. Loaded
 // lazily: three.js is a chunk of its own.
 import {
-  AmbientLight,
+  ACESFilmicToneMapping,
   Box3,
+  Euler,
+  Quaternion,
   BufferGeometry,
   CanvasTexture,
   Color,
   DirectionalLight,
-  GridHelper,
+  DoubleSide,
   Group,
   HemisphereLight,
   Material,
@@ -17,9 +19,15 @@ import {
   MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
+  PCFSoftShadowMap,
   PerspectiveCamera,
+  PlaneGeometry,
+  PMREMGenerator,
   Raycaster,
   Scene,
+  ShaderMaterial,
+  ShadowMaterial,
+  SRGBColorSpace,
   Sprite,
   SpriteMaterial,
   Vector2,
@@ -31,8 +39,10 @@ import {
   type Intersection,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
+  bakeSpan,
   blenderToThree,
   canvasFov,
   poseAt,
@@ -84,13 +94,19 @@ export class SceneViewer {
   private readonly originals = new Map<Mesh, Material | Material[]>();
   private readonly raycaster = new Raycaster();
   private readonly clay = new MeshStandardMaterial({ color: 0xc9c9cc, roughness: 0.85, metalness: 0 });
-  private readonly wire = new MeshBasicMaterial({ color: 0x20242b, wireframe: true });
+  // Mid grey: a wire reads on the light and on the dark stage alike.
+  private readonly wire = new MeshBasicMaterial({ color: 0x7d8490, wireframe: true });
+  private readonly sun = new DirectionalLight(0xfff4e6, 2.6);
   private readonly selection = new Box3Helper(new Box3(), new Color(0xffb020));
   private mixer: AnimationMixer | null = null;
   private clipSeconds = 0;
   private mode: TViewMode = VIEW_MODE.material;
   private camName = '';
   private frame: number;
+  /** Where the animation is, in frames, between whole ones while playing. */
+  private pos: number;
+  private followNode: Object3D | null = null;
+  private followAt: Vector3 | null = null;
   private playing = false;
   private raf = 0;
   private last = 0;
@@ -106,15 +122,37 @@ export class SceneViewer {
     this.meta = meta;
     this.ev = events;
     this.frame = meta.start;
-    this.renderer = new WebGLRenderer({ antialias: true, alpha: false });
+    this.pos = meta.start;
+    // The canvas is see-through: the stage's backdrop (scene3d.css, the theme's tokens) shows behind the model.
+    this.renderer = new WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: false });
+    this.renderer.setClearColor(0x000000, 0);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.outputColorSpace = SRGBColorSpace;
+    this.renderer.toneMapping = ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 0.9;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = PCFSoftShadowMap;
     this.renderer.domElement.className = 'hx-scene3d__canvas';
     host.appendChild(this.renderer.domElement);
-    this.scene.background = new Color(0xe7e8ec);
-    this.scene.add(new HemisphereLight(0xffffff, 0x8a8f99, 1.4));
-    const sun = new DirectionalLight(0xffffff, 2.2);
-    sun.position.set(6, 12, 8);
-    this.scene.add(new AmbientLight(0xffffff, 0.2), sun, this.model, this.pinGroup);
+    // Studio light: a soft room for reflections and fill, a key light that casts the shadows, a faint sky/ground bounce.
+    const pmrem = new PMREMGenerator(this.renderer);
+    const room = new RoomEnvironment();
+    this.scene.environment = pmrem.fromScene(room, 0.04).texture;
+    this.scene.environmentIntensity = 0.45;
+    room.dispose();
+    pmrem.dispose();
+    this.sun.position.set(6, 12, 8);
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.bias = -0.0004;
+    this.sun.shadow.normalBias = 0.02;
+    this.scene.add(
+      new HemisphereLight(0xffffff, 0x60646c, 0.35),
+      this.sun,
+      this.sun.target,
+      this.model,
+      this.pinGroup,
+    );
     this.selection.visible = false;
     this.scene.add(this.selection);
     this.orbitCam.position.set(6, 4, 8);
@@ -138,7 +176,11 @@ export class SceneViewer {
     this.model.add(gltf.scene);
     gltf.scene.traverse((o) => {
       this.nodes.set(blenderName(o), o);
-      if (isMesh(o)) this.originals.set(o, o.material);
+      if (isMesh(o)) {
+        this.originals.set(o, o.material);
+        o.castShadow = true;
+        o.receiveShadow = true;
+      }
       // The scene's own cameras are drawn from their sampled paths (the glTF's camera nodes know no constraints).
       if ((o as PerspectiveCamera).isCamera) o.visible = false;
     });
@@ -187,12 +229,42 @@ export class SceneViewer {
     this.orbitCam.far = Math.max(2000, radius * 400);
     this.orbitCam.near = Math.max(0.02, radius / 500);
     this.orbitCam.updateProjectionMatrix();
-    const grid = new GridHelper(Math.ceil(radius * 6), Math.ceil(radius * 6), 0x9aa0ab, 0xc3c7d0);
-    grid.position.set(center.x, keep.min.y, center.z);
-    (grid.material as Material).opacity = 0.5;
-    (grid.material as Material).transparent = true;
-    this.scene.add(grid);
+    this.stageFloor(center, keep.min.y, radius);
     this.controls.update();
+  }
+
+  /** The floor of the stage: a shadow catcher, a grid that fades out with distance, and the key light fitted to the model. */
+  private stageFloor(center: Vector3, y: number, radius: number): void {
+    const size = Math.max(radius * 12, 20);
+    const shadow = new Mesh(
+      new PlaneGeometry(size, size),
+      new ShadowMaterial({ opacity: 0.32, transparent: true, depthWrite: false }),
+    );
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.set(center.x, y - radius * 0.002, center.z);
+    shadow.receiveShadow = true;
+    shadow.renderOrder = -2;
+    const grid = new Mesh(
+      new PlaneGeometry(size, size),
+      gridMaterial(Math.max(radius / 8, 0.25), size * 0.42),
+    );
+    grid.rotation.x = -Math.PI / 2;
+    grid.position.set(center.x, y - radius * 0.001, center.z);
+    grid.renderOrder = -1;
+    grid.raycast = () => undefined;
+    shadow.raycast = () => undefined;
+    this.scene.add(shadow, grid);
+    const reach = Math.max(radius * 1.6, 3);
+    this.sun.position.copy(center).add(new Vector3(0.5, 1, 0.35).normalize().multiplyScalar(reach * 3));
+    this.sun.target.position.copy(center);
+    const cam = this.sun.shadow.camera;
+    cam.left = -reach;
+    cam.right = reach;
+    cam.top = reach;
+    cam.bottom = -reach;
+    cam.near = reach * 0.5;
+    cam.far = reach * 6;
+    cam.updateProjectionMatrix();
   }
 
   // ---- looks
@@ -202,7 +274,6 @@ export class SceneViewer {
     for (const [mesh, original] of this.originals) {
       mesh.material = mode === VIEW_MODE.clay ? this.clay : mode === VIEW_MODE.wire ? this.wire : original;
     }
-    this.scene.background = new Color(mode === VIEW_MODE.wire ? 0xf4f5f7 : 0xe7e8ec);
     this.draw();
   }
 
@@ -250,7 +321,7 @@ export class SceneViewer {
     if (this.camName) {
       const cam = this.meta.cameras.find((c) => c.n === this.camName);
       if (cam) {
-        const p = poseAt(cam, this.frame);
+        const p = poseAt(cam, this.pos);
         return {
           n: cam.n,
           pos: roundVec(p.pos),
@@ -287,7 +358,7 @@ export class SceneViewer {
     if (this.camName) {
       const cam = this.meta.cameras.find((c) => c.n === this.camName);
       if (cam) {
-        const p = poseAt(cam, this.frame);
+        const p = poseAt(cam, this.pos);
         this.orbitScene.position.fromArray(blenderToThree(p.pos));
         this.orbitScene.up.set(0, 1, 0);
         this.orbitScene.lookAt(new Vector3().fromArray(blenderToThree(p.target)));
@@ -312,10 +383,48 @@ export class SceneViewer {
 
   /** Puts the model at a frame of the animation. */
   seek(frame: number): void {
-    this.frame = Math.min(this.meta.end, Math.max(this.meta.start, Math.round(frame)));
-    this.mixer?.setTime(Math.min(timeOf(this.meta, this.frame), this.clipSeconds || Infinity));
+    this.pos = Math.min(this.meta.end, Math.max(this.meta.start, Math.round(frame)));
+    this.applyTime();
+  }
+
+  /** The model at `this.pos`: the glTF's actions by the mixer, what the export baked (drivers, constraints) over them. */
+  private applyTime(): void {
+    this.frame = Math.floor(this.pos);
+    this.mixer?.setTime(Math.min(timeOf(this.meta, this.pos), this.clipSeconds || Infinity));
+    this.applyBake(this.pos);
     this.refreshSelection();
     this.draw();
+  }
+
+  /** Sets the nodes the actions do not move: wheels turned by drivers, objects held by constraints. Blender's axes become
+   *  glTF's as the exporter does it for every node: a location (x, z, -y), a scale (x, z, y), a quaternion (w, x, z, -y). */
+  private applyBake(frame: number): void {
+    const bake = this.meta.bake;
+    if (!bake) return;
+    for (const [name, track] of Object.entries(bake)) {
+      const node = this.nodes.get(name);
+      const rows = track.rows;
+      if (!node || rows.length === 0) continue;
+      const span = bakeSpan(rows, frame);
+      if (!span) continue;
+      const { a, b, k } = span;
+      const mix = (n: number) => (a[n] ?? 0) + ((b[n] ?? 0) - (a[n] ?? 0)) * k;
+      const q = new Quaternion();
+      let sx: number, sy: number, sz: number;
+      if (track.m === 'e') {
+        // Blender's XYZ euler turns about x first: three.js names that order ZYX
+        q.setFromEuler(new Euler(mix(4), mix(5), mix(6), 'ZYX'));
+        [sx, sy, sz] = [mix(7), mix(8), mix(9)];
+      } else {
+        const qa = new Quaternion(a[5], a[6], a[7], a[4]);
+        const qb = new Quaternion(b[5], b[6], b[7], b[4]);
+        q.copy(qa).slerp(qb, k);
+        [sx, sy, sz] = [mix(8), mix(9), mix(10)];
+      }
+      node.position.set(mix(1), mix(3), -mix(2));
+      node.quaternion.set(q.x, q.z, -q.y, q.w);
+      node.scale.set(sx, sz, sy);
+    }
   }
 
   currentFrame(): number {
@@ -324,13 +433,13 @@ export class SceneViewer {
 
   play(): void {
     if (this.playing) return;
-    if (this.frame >= this.meta.end) this.seek(this.meta.start);
+    if (this.pos >= this.meta.end) this.seek(this.meta.start);
     this.playing = true;
     this.last = performance.now();
     this.ev.onPlaying(true);
     const tick = (now: number) => {
       if (!this.playing || this.disposed) return;
-      const next = this.frame + ((now - this.last) / 1000) * (this.meta.fps || 24);
+      const next = this.pos + ((now - this.last) / 1000) * (this.meta.fps || 24);
       this.last = now;
       if (next >= this.meta.end) {
         this.seek(this.meta.end);
@@ -338,7 +447,8 @@ export class SceneViewer {
         this.ev.onFrame(this.frame);
         return;
       }
-      this.seekFloat(next);
+      this.pos = next;
+      this.applyTime();
       if (now - this.emitted > 66) {
         this.emitted = now;
         this.ev.onFrame(this.frame);
@@ -346,14 +456,6 @@ export class SceneViewer {
       this.raf = requestAnimationFrame(tick);
     };
     this.raf = requestAnimationFrame(tick);
-  }
-
-  /** Between frames while playing: the model at the exact time, the frame number rounded down. */
-  private seekFloat(frame: number): void {
-    this.frame = Math.floor(frame);
-    this.mixer?.setTime(Math.min(timeOf(this.meta, frame), this.clipSeconds || Infinity));
-    this.refreshSelection();
-    this.draw();
   }
 
   pause(): void {
@@ -455,6 +557,16 @@ export class SceneViewer {
     this.draw();
   }
 
+  /** Where a point of the scene (Blender's axes) is on the canvas, in px; null when it is behind the camera. */
+  screenOf(p: TVec3): { x: number; y: number } | null {
+    const v = new Vector3().fromArray(blenderToThree(p)).project(this.active());
+    if (v.z > 1) return null;
+    return {
+      x: ((v.x + 1) / 2) * (this.host.clientWidth || 1),
+      y: ((1 - v.y) / 2) * (this.host.clientHeight || 1),
+    };
+  }
+
   // ---- picture
 
   /** The viewport as a JPEG data URL, at most `max` px wide. */
@@ -465,7 +577,13 @@ export class SceneViewer {
     const out = document.createElement('canvas');
     out.width = Math.max(1, Math.round(src.width * k));
     out.height = Math.max(1, Math.round(src.height * k));
-    out.getContext('2d')?.drawImage(src, 0, 0, out.width, out.height);
+    const g = out.getContext('2d');
+    if (g) {
+      // The canvas is see-through: the picture gets the stage's colour under it, not black.
+      g.fillStyle = getComputedStyle(this.host).getPropertyValue('--hx-bg-stage').trim() || '#808080';
+      g.fillRect(0, 0, out.width, out.height);
+      g.drawImage(src, 0, 0, out.width, out.height);
+    }
     return out.toDataURL('image/jpeg', quality);
   }
 
@@ -482,7 +600,36 @@ export class SceneViewer {
     });
   }
 
+  /** The orbit keeps an object in the middle while it moves: «follow» takes the object (its Blender name), '' lets it go. */
+  follow(name: string): void {
+    const node = name ? this.nodes.get(name) : undefined;
+    this.followNode = node ?? null;
+    this.followAt = null;
+    if (node) this.keepFollowed(true);
+    this.draw();
+  }
+
+  following(): string {
+    return this.followNode ? blenderName(this.followNode) : '';
+  }
+
+  /** Moves the orbit (eye and target) by what the followed object moved since the last look; at the start it is put in the middle. */
+  private keepFollowed(start = false): void {
+    const node = this.followNode;
+    if (!node || this.camName !== '') return;
+    node.updateWorldMatrix(true, true);
+    const box = new Box3().setFromObject(node);
+    if (box.isEmpty()) return;
+    const now = box.getCenter(new Vector3());
+    const from = start || !this.followAt ? this.controls.target.clone() : this.followAt;
+    const delta = now.clone().sub(from);
+    this.orbitCam.position.add(delta);
+    this.controls.target.add(delta);
+    this.followAt = now;
+  }
+
   private render(): void {
+    this.keepFollowed();
     if (this.camName === '') this.controls.update();
     this.renderer.render(this.scene, this.active());
   }
@@ -510,6 +657,7 @@ export class SceneViewer {
     }
     this.clay.dispose();
     this.wire.dispose();
+    this.scene.environment?.dispose();
     this.renderer.dispose();
     el.remove();
   }
@@ -542,4 +690,41 @@ function pinTexture(n: number, resolved: boolean, active: boolean): CanvasTextur
   const tex = new CanvasTexture(c);
   textures.set(key, tex);
   return tex;
+}
+
+/** A floor grid drawn in the shader: thin lines every `step` m, a heavier one every five, fading out by `fade` m. */
+function gridMaterial(step: number, fade: number): ShaderMaterial {
+  return new ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    side: DoubleSide,
+    uniforms: { uStep: { value: step }, uFade: { value: fade }, uColor: { value: new Color(0x8a909b) } },
+    vertexShader: `
+      varying vec3 vWorld;
+      varying vec3 vCenter;
+      void main() {
+        vec4 w = modelMatrix * vec4(position, 1.0);
+        vWorld = w.xyz;
+        vCenter = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+        gl_Position = projectionMatrix * viewMatrix * w;
+      }`,
+    fragmentShader: `
+      uniform float uStep;
+      uniform float uFade;
+      uniform vec3 uColor;
+      varying vec3 vWorld;
+      varying vec3 vCenter;
+      float line(vec2 p, float s) {
+        vec2 g = abs(fract(p / s - 0.5) - 0.5) / fwidth(p / s);
+        return 1.0 - min(min(g.x, g.y), 1.0);
+      }
+      void main() {
+        vec2 p = vWorld.xz;
+        float a = max(line(p, uStep) * 0.35, line(p, uStep * 5.0) * 0.7);
+        float d = length(vWorld.xz - vCenter.xz);
+        a *= 1.0 - smoothstep(uFade * 0.25, uFade, d);
+        if (a < 0.01) discard;
+        gl_FragColor = vec4(uColor, a * 0.55);
+      }`,
+  });
 }

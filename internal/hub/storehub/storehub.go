@@ -247,6 +247,11 @@ func (s *Store) CoversRoom(ctx context.Context, spaceID string) (*filestore.Stor
 	return s.srv.Room(ctx, s.Room(spaceID, filestore.KindCovers))
 }
 
+// ThumbsRoom is a space's thumbs collection as the hub reads it itself.
+func (s *Store) ThumbsRoom(ctx context.Context, spaceID string) (*filestore.Store, error) {
+	return s.srv.Room(ctx, s.Room(spaceID, filestore.KindThumbs))
+}
+
 // AppsRoom is a space's apps collection as the hub reads it itself: the guest links it serves.
 func (s *Store) AppsRoom(ctx context.Context, spaceID string) (*filestore.Store, error) {
 	return s.srv.Room(ctx, s.Room(spaceID, filestore.KindApps))
@@ -389,6 +394,11 @@ func (s *Store) authorize(r *http.Request, coll string) (filestore.Access, error
 	}
 	if coll == filestore.KindCovers && s.design != nil {
 		if err := s.coversFilter(r.Context(), m, &acc); err != nil {
+			return filestore.Access{}, err
+		}
+	}
+	if coll == filestore.KindThumbs && s.design != nil {
+		if err := s.thumbsFilter(r.Context(), m, &acc); err != nil {
 			return filestore.Access{}, err
 		}
 	}

@@ -6,6 +6,7 @@ import type {
   EnvDelivery,
   EnvEntryRow,
   EnvLayer,
+  EnvMachineDelivery,
   ItemDelivery,
 } from '../../../../hub-api/env';
 import { Btn, Icon } from '../../ui';
@@ -160,6 +161,20 @@ export const CatalogCards = ({
 
 const sum = (d: ItemDelivery | null) => (d ? d.ok + d.pending + d.error : 0);
 
+// How far one machine got: off line, never reported, an older list, or ok of total items of the current one in.
+const MachinePill = ({ m }: { m: EnvMachineDelivery }) => {
+  if (!m.online && m.state !== 'current') return <span className="pill bad">машина не на связи</span>;
+  if (m.state === 'silent') return <span className="pill warn">ещё не ответила</span>;
+  if (m.state === 'stale') return <span className="pill warn">старый список · ждёт</span>;
+  if (m.total > 0 && m.ok < m.total)
+    return (
+      <span className="pill warn">
+        {m.ok} из {m.total} · ждёт
+      </span>
+    );
+  return <span className="pill ok">{m.total > 0 ? `${m.ok} из ${m.total}` : 'актуально'}</span>;
+};
+
 export const ApplyPanel = ({
   delivery,
   rows,
@@ -172,52 +187,94 @@ export const ApplyPanel = ({
   onTest: (() => void) | null;
 }) => {
   const withD = rows.filter((r) => r.delivery && sum(r.delivery) > 0);
+  const perMachine = delivery?.rows && delivery.rows.length > 0 ? delivery.rows : null;
+  const tools = (
+    <>
+      <Btn variant="ghost" size="sm" onClick={onLogs}>
+        <Icon i="file-text" size="sm" />
+        Логи
+      </Btn>
+      {onTest && (
+        <Btn variant="ghost" size="sm" onClick={onTest}>
+          <Icon i="shield-check" size="sm" />
+          Проверить
+        </Btn>
+      )}
+    </>
+  );
   return (
     <>
-      <div className="t-card viz-card dash-tile hd-card flat">
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Машины</th>
-              <th>Применено</th>
-              <th>Последний раз</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td className="nm">{delivery ? `${delivery.machines} в работе` : 'Нет данных'}</td>
-              <td>
-                {delivery ? (
-                  <span className={`pill ${delivery.current >= delivery.machines ? 'ok' : 'warn'}`}>
-                    {delivery.current} из {delivery.machines} со свежим списком
-                  </span>
-                ) : (
-                  <span className="mut2">—</span>
-                )}
-                {delivery && delivery.reported < delivery.machines && (
-                  <span className="mut2 sm"> · ответили {delivery.reported}</span>
-                )}
-              </td>
-              <td className="mut">
-                {delivery?.lastAt ? new Date(delivery.lastAt).toLocaleString('ru-RU') : '—'}
-              </td>
-              <td className="num">
-                <Btn variant="ghost" size="sm" onClick={onLogs}>
-                  <Icon i="file-text" size="sm" />
-                  Логи
-                </Btn>
-                {onTest && (
-                  <Btn variant="ghost" size="sm" onClick={onTest}>
-                    <Icon i="shield-check" size="sm" />
-                    Проверить
+      {perMachine ? (
+        <div className="t-card viz-card dash-tile hd-card flat">
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Машина</th>
+                <th>Применено</th>
+                <th>Последний раз</th>
+                <th className="num">{tools}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {perMachine.map((m) => (
+                <tr key={m.id}>
+                  <td className="nm">{m.name}</td>
+                  <td>
+                    <MachinePill m={m} />
+                  </td>
+                  <td className="mut">{m.at ? new Date(m.at).toLocaleString('ru-RU') : '—'}</td>
+                  <td />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="t-card viz-card dash-tile hd-card flat">
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Машины</th>
+                <th>Применено</th>
+                <th>Последний раз</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="nm">{delivery ? `${delivery.machines} в работе` : 'Нет данных'}</td>
+                <td>
+                  {delivery ? (
+                    <span className={`pill ${delivery.current >= delivery.machines ? 'ok' : 'warn'}`}>
+                      {delivery.current} из {delivery.machines} со свежим списком
+                    </span>
+                  ) : (
+                    <span className="mut2">—</span>
+                  )}
+                  {delivery && delivery.reported < delivery.machines && (
+                    <span className="mut2 sm"> · ответили {delivery.reported}</span>
+                  )}
+                </td>
+                <td className="mut">
+                  {delivery?.lastAt ? new Date(delivery.lastAt).toLocaleString('ru-RU') : '—'}
+                </td>
+                <td className="num">
+                  <Btn variant="ghost" size="sm" onClick={onLogs}>
+                    <Icon i="file-text" size="sm" />
+                    Логи
                   </Btn>
-                )}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                  {onTest && (
+                    <Btn variant="ghost" size="sm" onClick={onTest}>
+                      <Icon i="shield-check" size="sm" />
+                      Проверить
+                    </Btn>
+                  )}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
       {withD.length > 0 && (
         <div className="t-card viz-card dash-tile hd-card flat" style={{ marginTop: 16 }}>
           <table className="tbl">

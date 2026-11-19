@@ -112,6 +112,21 @@ export const markersOf = (meta: IScene3dMeta): IScene3dMarker[] =>
 export const hFov = (vfov: number, aspect: number): number =>
   (2 * Math.atan(Math.tan((vfov * Math.PI) / 360) * aspect) * 180) / Math.PI;
 
+/** The two samples a frame lies between in a baked track and how far along (0..1) it is; before the first and after the last the
+ *  nearest one holds. */
+export const bakeSpan = (
+  rows: readonly (readonly number[])[],
+  frame: number,
+): { a: readonly number[]; b: readonly number[]; k: number } | null => {
+  if (rows.length === 0) return null;
+  let i = 0;
+  while (i < rows.length - 1 && (rows[i + 1]?.[0] ?? 0) <= frame) i++;
+  const a = rows[i] as readonly number[];
+  const b = (rows[Math.min(i + 1, rows.length - 1)] ?? a) as readonly number[];
+  const span = (b[0] ?? 0) - (a[0] ?? 0);
+  return { a, b, k: span <= 0 ? 0 : Math.min(1, Math.max(0, (frame - (a[0] ?? 0)) / span)) };
+};
+
 export interface ICamPose {
   pos: TVec3;
   target: TVec3;

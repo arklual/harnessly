@@ -51,6 +51,9 @@ export interface IScene3dMeta {
   /** min xyz, max xyz (Blender's axes). */
   bounds: readonly [number, number, number, number, number, number];
   stats: IScene3dStats;
+  /** Objects the glTF's actions do not carry (drivers, constraints): their local transform at sampled frames, "e": location,
+   *  XYZ euler, scale; "q": location, quaternion (w x y z), scale. */
+  bake?: Record<string, { m: 'e' | 'q'; rows: number[][] }>;
 }
 
 export const MODEL_STATUS = { none: 'none', building: 'building', ready: 'ready', failed: 'failed' } as const;

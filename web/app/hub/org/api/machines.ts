@@ -97,6 +97,27 @@ export interface OrgMachine {
   opensRuntime?: boolean;
   /** The hostname the machine reported; machines of one server share it. */
   host?: string;
+  /** The machine was registered but its agent has never connected (the hub's status `pending`). */
+  pending?: boolean;
+}
+
+/** One agent of the machine as the agent reported it in its hello: installed or not, its version, whether it is signed in. */
+export interface MachineAgent {
+  provider: 'claude' | 'codex';
+  installed: boolean;
+  version: string | null;
+  login: 'in' | 'out' | 'unknown';
+}
+
+/** What the machine's card shows beyond the list row (`GET /api/machines/{id}`: `machine` and `setup`). */
+export interface MachineSetup {
+  /** Whether the hub opens the machine's page: `needs_trust` waits for someone to say the machine is theirs. */
+  runtime: 'ready' | 'needs_trust' | 'blocked';
+  agents: MachineAgent[];
+  /** How many items of the team's environment the machine reported as put in place; null: it has not reported. */
+  env: { applied: number; total: number; reportedAt: string | null } | null;
+  /** The accounts its agents worked on last (by provider); empty when no chat has run yet. */
+  accounts: { provider: string; label: string; kind: string; plan: string }[];
 }
 
 export interface MachineGroup {
@@ -172,6 +193,8 @@ export interface MachineDetail {
   consoleUrl?: string | null;
   /** Why the provider's plans could not be read; the resources editor then stays closed. */
   providerError?: string | null;
+  /** What the machine reported to the hub; absent when the hub did not answer. */
+  setup?: MachineSetup;
 }
 
 /** What a resize would cost: the new price per month and the difference from the current one. */

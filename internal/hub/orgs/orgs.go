@@ -53,6 +53,10 @@ type Deps struct {
 	EnvChanged func()
 	// PeopleChanged runs after a person's team or role changed: what they may see is different; nil: nothing.
 	PeopleChanged func(userID string)
+	// MemberGone runs after a person left a tenant (their live connections to it are ended); nil: nothing.
+	MemberGone func(spaceID, userID string)
+	// MachineGone runs for each machine revoked because its owner left; nil: nothing.
+	MachineGone func(m store.Machine)
 }
 
 // Service is the organizations side of the hub.
@@ -67,6 +71,8 @@ type Service struct {
 	onLimits func()
 	onEnv    func()
 	onPeople func(userID string)
+	gone     func(spaceID, userID string)
+	mGone    func(m store.Machine)
 	rates    *rates.Book
 	features *features.Store
 	bus      events.OrgBus
@@ -74,7 +80,7 @@ type Service struct {
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, lim: d.Limiter, log: d.Log, now: d.Now, onLimits: d.LimitsChanged, onEnv: d.EnvChanged, onPeople: d.PeopleChanged, rates: d.Rates, features: d.Features, bus: d.Events}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, lim: d.Limiter, log: d.Log, now: d.Now, onLimits: d.LimitsChanged, onEnv: d.EnvChanged, onPeople: d.PeopleChanged, rates: d.Rates, features: d.Features, bus: d.Events, gone: d.MemberGone, mGone: d.MachineGone}
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -126,6 +132,7 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("GET /api/orgs", s.Gate(s.list))
 	mux.Handle("POST /api/orgs", s.Gate(s.create))
 	mux.Handle("GET /api/orgs/{org}", s.OrgGate(s.get))
+	mux.Handle("POST /api/orgs/{org}/leave", s.OrgGate(s.leave))
 	mux.Handle("PATCH /api/orgs/{org}", s.OrgGate(s.patch))
 	mux.Handle("POST /api/orgs/{org}/tenants", s.OrgGate(s.createTenant))
 	mux.Handle("POST /api/orgs/{org}/tenants/move", s.OrgGate(s.move))

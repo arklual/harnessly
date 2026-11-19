@@ -26,6 +26,7 @@ import { NAV_HINT, navOf } from './nav';
 import { Btn, Icon, initial, LayerCtx, usePop } from './ui';
 import { withBase } from '../lib/base';
 import { canOpen } from './screens/machines/calc';
+import { useMachineAttention } from './screens/machines/use-machines';
 import { useHxTheme } from './theme';
 
 // The organization's colour on the switcher's mark: one of the design's, stable for the organization.
@@ -256,6 +257,7 @@ const Nav = ({ onPick }: { onPick: () => void }) => {
   const team = shell.teams.find((t) => t.id === shell.viewer.teamId);
   const ui = useHostUI();
   const hasViews = (ui?.views.length ?? 0) > 0;
+  const attention = useMachineAttention();
   // An item the person folded or unfolded by hand; otherwise the item of the open screen is unfolded.
   const [folded, setFolded] = useState<Record<string, boolean>>({});
   const groups = useMemo(
@@ -309,6 +311,11 @@ const Nav = ({ onPick }: { onPick: () => void }) => {
                     <Icon i={it.icon} />
                   </span>
                   <span className="hx-nav__label">{it.label}</span>
+                  {it.section === 'machines' && attention > 0 && (
+                    <span className="hd-cnt" title="Машинам нужен шаг">
+                      {attention}
+                    </span>
+                  )}
                 </button>
               );
               if (!subs || !it.section) return <Fragment key={it.id}>{btn}</Fragment>;

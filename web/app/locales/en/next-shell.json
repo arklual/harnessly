@@ -1697,5 +1697,7 @@
   "next.folderSuggest.unfold": "Show the whole notice",
   "next.folderSuggest.fold": "Fold the notice",
   "next.folderSuggest.why": "Picked by the chat's prompts and the chats already in your folders. Choose another folder if it is not the one:",
-  "next.folderSuggest.other": "Folders"
+  "next.folderSuggest.other": "Folders",
+  "next.designly.kinds.scene3d": "3D scene",
+  "next.designly.kindsDesc.scene3d": "A Blender scene to view and pin"
 }

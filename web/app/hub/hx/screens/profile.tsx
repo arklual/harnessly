@@ -13,6 +13,7 @@ import { currentLang, t, type Lang } from '../../lib/i18n';
 import { navigate } from '../../lib/router';
 import { useMe, useSession } from '../../lib/session';
 import type { AppToken } from '../../lib/types';
+import { OrgApiError, orgErrorText } from '../../org/api/errors';
 import { useOrg } from '../../org/context';
 import { useSignOut } from '../../screens/home';
 import { Head } from '../shell';
@@ -406,40 +407,85 @@ const Keys = () => {
 };
 
 const Orgs = () => {
-  const { shell } = useOrg();
+  const { shell, api } = useOrg();
   const cur = shell.org;
   const list = shell.orgs.length ? shell.orgs : [{ slug: cur.slug, name: cur.name, roleLabel: '' }];
+  const [ask, setAsk] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const leave = async (slug: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.leaveOrg(slug);
+      const rest = list.find((o) => o.slug !== slug);
+      window.location.assign(rest ? `/o/${rest.slug}` : '/');
+    } catch (e) {
+      setError(e instanceof OrgApiError && e.message ? e.message : orgErrorText(e));
+      setBusy(false);
+    }
+  };
   return (
-    <Card>
-      <table className="tbl">
-        <tbody>
-          {list.map((o) => (
-            <tr key={o.slug}>
-              <td>
-                <div className="row">
-                  <span className="hd-av" style={{ ['--c' as string]: orgColor(o.slug) }}>
-                    {initial(o.name)}
-                  </span>
-                  <div>
-                    <div className="nm">{o.name}</div>
-                    {o.roleLabel && <div className="mut2 sm">{o.roleLabel}</div>}
+    <>
+      <Card>
+        <table className="tbl">
+          <tbody>
+            {list.map((o) => (
+              <tr key={o.slug}>
+                <td>
+                  <div className="row">
+                    <span className="hd-av" style={{ ['--c' as string]: orgColor(o.slug) }}>
+                      {initial(o.name)}
+                    </span>
+                    <div>
+                      <div className="nm">{o.name}</div>
+                      {o.roleLabel && <div className="mut2 sm">{o.roleLabel}</div>}
+                    </div>
                   </div>
-                </div>
-              </td>
-              <td className="num">
-                {o.slug === cur.slug ? (
-                  <span className="pill acc">открыта</span>
-                ) : (
-                  <Btn size="sm" onClick={() => navigate(`/o/${o.slug}`)}>
-                    Перейти
-                  </Btn>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </Card>
+                </td>
+                <td className="num">
+                  {o.slug === cur.slug ? (
+                    <span className="pill acc">открыта</span>
+                  ) : (
+                    <Btn size="sm" onClick={() => navigate(`/o/${o.slug}`)}>
+                      Перейти
+                    </Btn>
+                  )}{' '}
+                  {ask === o.slug ? (
+                    <>
+                      <span className="mut2 sm">Ваши машины в ней отключатся.</span>{' '}
+                      <Btn size="sm" variant="primary" busy={busy} onClick={() => void leave(o.slug)}>
+                        Выйти
+                      </Btn>{' '}
+                      <Btn size="sm" variant="ghost" onClick={() => setAsk(null)}>
+                        Отмена
+                      </Btn>
+                    </>
+                  ) : (
+                    <Btn
+                      size="sm"
+                      variant="ghost"
+                      title="Выйти из организации"
+                      onClick={() => {
+                        setError(null);
+                        setAsk(o.slug);
+                      }}
+                    >
+                      Выйти
+                    </Btn>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+      {error && (
+        <p className="mut sm" style={{ marginTop: 8 }}>
+          {error}
+        </p>
+      )}
+    </>
   );
 };
 

@@ -349,6 +349,7 @@
 :where(.hd-host) .efx-hero .efx-lead b { font-weight:600; }
 :where(.hd-host) .efx-pq { display:flex; flex-direction:column; gap:12px; margin-top:14px; }
 :where(.hd-host) .efx-pr { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+:where(.hd-host) .efx-pr > div:first-child { flex:1 1 140px; min-width:0; }
 :where(.hd-host) .efx-fix { list-style:none; margin:4px 0 0; padding:0; display:flex; flex-direction:column; gap:2px; }
 :where(.hd-host) .efx-fixi { display:grid; grid-template-columns:32px minmax(0,1fr) auto; gap:14px; align-items:start; padding:14px 12px; border-radius:12px; cursor:pointer; transition:background .18s var(--hx-ease-out, ease-out); animation:hd-row .4s var(--hx-ease-out, ease-out) both; }
 :where(.hd-host) .efx-fixi:nth-child(2) { animation-delay:.05s } :where(.hd-host) .efx-fixi:nth-child(3) { animation-delay:.1s }
@@ -442,7 +443,7 @@
 @keyframes efx-grow { from { transform:scaleY(0) } to { transform:none } }
 :where(.hd-host) .efx-diff > td { background:color-mix(in srgb, #c8830b 8%, transparent); }
 @media (max-width: 900px) {
-  :where(.hd-host) .efx-mon { grid-template-columns:minmax(0,1fr) 92px; } :where(.hd-host) .efx-curday + .mut2 { display:none; } :where(.hd-host) .efx-chr { grid-template-columns:minmax(0,1fr) 54px 64px; } :where(.hd-host) .efx-chr__b { display:none; }
+  :where(.hd-host) .efx-mon { grid-template-columns:minmax(0,1fr) 92px; } :where(.hd-host) .efx-curday + .mut2 { display:none; } :where(.hd-host) .efx-chr { grid-template-columns:minmax(0,1fr) 88px 64px; } :where(.hd-host) .efx-chr__b { display:none; }
   :where(.hd-host) .efx-mon > .efx-mn { grid-column:1 / -1; border-bottom:0; min-height:0; padding-bottom:0; }
   :where(.hd-host) .efx-mon > .efx-lane, :where(.hd-host) .efx-mon > .efx-ticks { grid-column:1; }
   :where(.hd-host) .efx-ses { grid-template-columns:minmax(0,1fr); }
@@ -455,7 +456,7 @@
 /* Эффективность — доводка раскладки */
 :where(.hd-host) .efx-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 :where(.hd-host) .efx-chl { display: flex; flex-direction: column; gap: 2px; }
-:where(.hd-host) .efx-chr { display: grid; grid-template-columns: minmax(150px, 1.3fr) minmax(60px, 1fr) 54px 92px; align-items: center; gap: 12px; padding: 8px 10px; margin: 0 -10px; border: 0; background: none; border-radius: 10px; text-align: left; font: inherit; color: inherit; cursor: pointer; transition: background .15s; }
+:where(.hd-host) .efx-chr { display: grid; grid-template-columns: minmax(150px, 1.3fr) minmax(60px, 1fr) 88px 92px; align-items: center; gap: 12px; padding: 8px 10px; margin: 0 -10px; border: 0; background: none; border-radius: 10px; text-align: left; font: inherit; color: inherit; cursor: pointer; transition: background .15s; }
 :where(.hd-host) .efx-chr:hover { background: var(--hx-bg-hover); }
 :where(.hd-host) .efx-chr__n { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 :where(.hd-host) .efx-chr__b { height: 6px; border-radius: 3px; background: var(--hx-bg-hover); overflow: hidden; }
@@ -476,7 +477,7 @@
 :where(.hd-host) .efx-htbl th:nth-child(5) { width: 70px; }
 :where(.hd-host) .efx-htbl th:nth-child(6) { width: 110px; }
 :where(.hd-host) .efx-htbl th:nth-child(7) { width: 90px; }
-@media (max-width: 900px) { :where(.hd-host) .efx-chr { grid-template-columns: 1fr 54px; } :where(.hd-host) .efx-chr__b, :where(.hd-host) .efx-chr > .mut2 { display: none; } :where(.hd-host) .efx-tk { grid-template-columns: 1fr; } :where(.hd-host) .efx-htbl { table-layout: auto; } }
+@media (max-width: 900px) { :where(.hd-host) .efx-chr { grid-template-columns: 1fr 88px; } :where(.hd-host) .efx-chr__b, :where(.hd-host) .efx-chr > .mut2 { display: none; } :where(.hd-host) .efx-tk { grid-template-columns: 1fr; } :where(.hd-host) .efx-htbl { table-layout: auto; } }
 
 /* ---------- Логотип harnessly в шапке меню ---------- */
 :where(.hd-host) .hx-brand__mark--logo { width: 26px; height: 26px; }

@@ -8129,6 +8129,96 @@
         "model"
       ]
     },
+    "usage_session_sums": {
+      "columns": [
+        {
+          "name": "org_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "session_key",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "model",
+          "type": "TEXT",
+          "notNull": true
+        },
+        {
+          "name": "calls",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "list_cost_micros",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "input",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "output",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "cache_read",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "cache_write",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "long_calls",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "long_list_micros",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "long_input",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "long_output",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "long_cache_read",
+          "type": "BIGINT",
+          "notNull": true
+        },
+        {
+          "name": "long_cache_write",
+          "type": "BIGINT",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "org_key",
+        "provider",
+        "session_key",
+        "model"
+      ]
+    },
     "users": {
       "columns": [
         {

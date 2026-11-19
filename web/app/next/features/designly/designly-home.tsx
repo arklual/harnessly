@@ -149,6 +149,8 @@ export interface IDesignlyCompose {
   appKinds?: readonly IAppKind[] | null;
   /** A new document of an app's type, named by the brief typed so far; resolves once it is made, rejects (the caller says why). */
   onAppKind?: (kind: IAppKind, brief: string) => Promise<void>;
+  /** «3D scene»: a tile that opens the dialog for a blender-lab project; absent: no tile. */
+  onScene3d?: () => void;
 }
 
 export interface IDesignlyHomeProps {
@@ -299,6 +301,7 @@ const Hero = ({
   maxText = DEFAULT_MAX_TEXT,
   appKinds = null,
   onAppKind,
+  onScene3d,
   inputRef,
 }: IHeroProps) => {
   const [kind, setKind] = useState<TDesignKind>(initialKind);
@@ -462,6 +465,17 @@ const Hero = ({
               </span>
             </button>
           ))}
+          {onScene3d && (
+            <button type="button" className="hx-dl-start" onClick={onScene3d}>
+              <span className="hx-dl-start__ic">
+                <Icon name={DESIGN_KIND_ICON.scene3d} />
+              </span>
+              <span className="hx-dl-start__text">
+                <span className="hx-dl-start__name">{t('next.designly.kinds.scene3d')}</span>
+                <span className="hx-dl-start__desc">{t('next.designly.kindsDesc.scene3d')}</span>
+              </span>
+            </button>
+          )}
           {onAppKind &&
             appKinds?.map((k) => (
               <button
@@ -542,6 +556,7 @@ const cardSub = (card: IDesignCard, now: number): string => {
   const ago = formatAgoFull(card.updatedAt, now);
   if (card.appKind) return `${card.appKind} · ${ago}`;
   if (card.drawing) return t('next.designly.drawingShort');
+  if (card.kind === DESIGN_KIND.scene3d) return `${t('next.designly.kinds.scene3d')} · ${ago}`;
   const units = `${plural(card.boards, `next.designly.units.${card.kind}`)} · ${ago}`;
   return card.appLabel ? `${card.appLabel} · ${units}` : units;
 };

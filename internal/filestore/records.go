@@ -1,6 +1,8 @@
 package filestore
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"regexp"
@@ -121,4 +123,46 @@ func CoverID(rel string) (string, bool) {
 		return "", false
 	}
 	return strings.TrimSuffix(rel, ".jpg"), true
+}
+
+// KindThumbs holds the gallery picture of each board, `<project id>/<board key>.jpg`: the newest picture the machine drew,
+// kept in the store so the library shows its cards while that machine is off. The hub gives it under the access
+// of the project, like a cover.
+const KindThumbs = "thumbs"
+
+// MaxThumbBytes caps one board's picture.
+const MaxThumbBytes = 1 << 20
+
+var thumbKeyRe = regexp.MustCompile(`^[0-9a-f]{16}$`)
+
+// Thumbs is the policy of the thumbs collection: `<id>/<16 hex>.jpg` and nothing else.
+type Thumbs struct{}
+
+func (Thumbs) Synced(rel string) bool {
+	_, ok := ThumbID(rel)
+	return ok
+}
+
+func (Thumbs) SkippedDir(rel string) bool {
+	return rel != "." && rel != "" && (strings.Contains(rel, "/") || !recordIDRe.MatchString(rel))
+}
+
+// ThumbKey names a board inside its project's folder of the thumbs collection: it is fixed by the board's path, so a new
+// picture of the board replaces the old one.
+func ThumbKey(boardPath string) string {
+	sum := sha1.Sum([]byte(boardPath))
+	return hex.EncodeToString(sum[:])[:16]
+}
+
+// ThumbPath is where the picture of a board is in the thumbs collection.
+func ThumbPath(id, boardPath string) string { return id + "/" + ThumbKey(boardPath) + ".jpg" }
+
+// ThumbID is the project a path of the thumbs collection belongs to.
+func ThumbID(rel string) (string, bool) {
+	id, name, ok := strings.Cut(rel, "/")
+	key, jpg := strings.CutSuffix(name, ".jpg")
+	if !ok || !jpg || !SafeRel(rel) || !recordIDRe.MatchString(id) || !thumbKeyRe.MatchString(key) {
+		return "", false
+	}
+	return id, true
 }

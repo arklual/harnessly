@@ -204,7 +204,26 @@ export type ItemDelivery = { ok: number; pending: number; error: number; message
 
 // How far the screen's environment got: the working machines of the screen, those that reported what they hold, and
 // those that hold the current list.
-export type EnvDelivery = { machines: number; reported: number; current: number; lastAt: string | null };
+export type EnvDelivery = {
+  machines: number;
+  reported: number;
+  current: number;
+  lastAt: string | null;
+  // The machines one by one (absent from an older hub).
+  rows?: EnvMachineDelivery[];
+};
+
+// One machine on «Применение»: holds the current list, an older one, or never said what it holds; ok of total items of
+// its last report went in.
+export type EnvMachineDelivery = {
+  id: string;
+  name: string;
+  state: 'current' | 'stale' | 'silent';
+  ok: number;
+  total: number;
+  at: string | null;
+  online: boolean;
+};
 
 export type EnvLayer = {
   layer: EnvLayerKind;

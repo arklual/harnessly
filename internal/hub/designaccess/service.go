@@ -393,6 +393,9 @@ func (s *Service) ServeMachine(w http.ResponseWriter, r *http.Request, u store.U
 		}
 		return false
 	}
+	if r.Method == http.MethodGet && thumbPath.MatchString(p) {
+		return s.serveThumb(w, r, u, m)
+	}
 	if r.Method == http.MethodGet && searchPath.MatchString(p) {
 		s.searchRoute(w, r, u, m)
 		return true

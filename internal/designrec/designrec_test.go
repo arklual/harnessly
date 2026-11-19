@@ -160,3 +160,44 @@ func TestRefusedWriteIsNotRepeatedOnEveryPass(t *testing.T) {
 		t.Fatalf("after a change and an hour: record %d, cover %d", p, c)
 	}
 }
+
+// a board's picture is read and written once per drawing, and again only when a new drawing has other bytes.
+func TestThumbIsWrittenOncePerDrawing(t *testing.T) {
+	l, err := storelink.Open(storelink.Options{DataDir: t.TempDir(), Name: "box"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	s := &Syncer{Author: "t", Clients: func(k string) Store { return l.Client(k) }}
+	ctx := context.Background()
+	if err := l.Ready(ctx, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	reads := 0
+	pic := func(b string) func() ([]byte, error) {
+		return func() ([]byte, error) { reads++; return []byte(b), nil }
+	}
+	if ok, err := s.PushThumb(ctx, "shop", "Home.dc.html", "a-1.jpg", pic("\xff\xd8one")); err != nil || !ok {
+		t.Fatalf("first: %v %v", ok, err)
+	}
+	if ok, _ := s.PushThumb(ctx, "shop", "Home.dc.html", "a-1.jpg", pic("\xff\xd8one")); ok || reads != 1 {
+		t.Fatalf("the same drawing again: wrote %v, read %d times", ok, reads)
+	}
+	if ok, _ := s.PushThumb(ctx, "shop", "Home.dc.html", "a-2.jpg", pic("\xff\xd8one")); ok {
+		t.Fatal("a new drawing with the same bytes was written")
+	}
+	if ok, err := s.PushThumb(ctx, "shop", "Home.dc.html", "a-3.jpg", pic("\xff\xd8two")); err != nil || !ok {
+		t.Fatalf("changed: %v %v", ok, err)
+	}
+	cur, err := l.Client(filestore.KindThumbs).Current(ctx, filestore.ThumbPath("shop", "Home.dc.html"))
+	if err != nil || cur == nil || cur.Size != int64(len("\xff\xd8two")) {
+		t.Fatalf("in the store: %+v %v", cur, err)
+	}
+	if ok, _ := s.PushThumb(ctx, "Bad Id", "Home.dc.html", "x.jpg", pic("x")); ok {
+		t.Fatal("a picture of a bad id was written")
+	}
+	big := string(make([]byte, filestore.MaxThumbBytes+1))
+	if ok, _ := s.PushThumb(ctx, "shop", "Big.dc.html", "b.jpg", pic(big)); ok {
+		t.Fatal("a picture over the cap was written")
+	}
+}

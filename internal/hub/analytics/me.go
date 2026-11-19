@@ -44,6 +44,8 @@ type Deps struct {
 	Now  func() time.Time
 	// Rates is the exchange rate money is shown in; nil shows dollars.
 	Rates *rates.Book
+	// Cache is how long an answer of a heavy screen is served as it is (cache.go); zero computes every request.
+	Cache time.Duration
 }
 
 // Service serves the analytics endpoints.
@@ -53,6 +55,7 @@ type Service struct {
 	log   *slog.Logger
 	now   func() time.Time
 	rates *rates.Book
+	cache *respCache
 	// machines build the rows of the organization's machine list (UseMachines).
 	machines *machines.Service
 	// bus gets the live events (UseEvents); flags switch the signal checker on per organization (UseFeatures).
@@ -74,6 +77,9 @@ func New(d Deps) *Service {
 	if s.log == nil {
 		s.log = slog.Default()
 	}
+	if d.Cache > 0 {
+		s.cache = newRespCache(d.Cache, s.now)
+	}
 	return s
 }
 
@@ -81,8 +87,8 @@ func New(d Deps) *Service {
 func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("GET /api/me/usage", s.gate(s.meUsage))
 	mux.Handle("GET /api/me/sessions", s.gate(s.meSessions))
-	mux.Handle("GET /api/me/kpis", s.gate(s.meKPIs))
-	mux.Handle("GET /api/me/stats", s.gate(s.meStats))
+	mux.Handle("GET /api/me/kpis", s.gate(s.cached(s.meKPIs)))
+	mux.Handle("GET /api/me/stats", s.gate(s.cached(s.meStats)))
 	mux.Handle("GET /api/me/switches", s.gate(s.meSwitches))
 	s.mountOrg(mux)
 }

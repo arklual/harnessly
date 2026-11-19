@@ -58,6 +58,7 @@ export const shellMock = (ctx: MockCtx): ShellApi => ({
     mockLinks = value;
     return later(mockLinks);
   },
+  leaveOrg: async () => later(undefined),
   shell: async (org, tenant) => {
     const known = ORGS.find((o) => o.slug === org);
     if (!known) throw new OrgApiError('not_found', 'organization not found');

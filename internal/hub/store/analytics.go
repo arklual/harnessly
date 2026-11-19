@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"maps"
 	"math"
+	"slices"
 	"strings"
 )
 
@@ -211,7 +213,126 @@ func (s Store) SessionSumsOver(ctx context.Context, refs []SessionRef, minContex
 	return sums, err
 }
 
+// sessionChunk is the most sessions sessionSums looks up by key; more are picked from the whole organization's rows.
+const sessionChunk = 500
+
 func (s Store) sessionSums(ctx context.Context, refs []SessionRef, minContext int64) ([]SessionCallSum, map[SessionRef]int, error) {
+	// usage_session_sums holds every session's sums with and without the calls under LongContextTokens; any other cut is
+	// added up from the calls.
+	cols := ""
+	switch minContext {
+	case 0:
+		cols = `calls, list_cost_micros, input, output, cache_read, cache_write`
+	case LongContextTokens:
+		cols = `long_calls, long_list_micros, long_input, long_output, long_cache_read, long_cache_write`
+	default:
+		return s.sessionSumsFromCalls(ctx, refs, minContext)
+	}
+	byOrg := map[[2]string][]string{}
+	for _, r := range refs {
+		k := [2]string{r.OrgKey, r.Provider}
+		byOrg[k] = append(byOrg[k], r.SessionKey)
+	}
+	var sums []SessionCallSum
+	subagents := map[SessionRef]int{}
+	for k, keys := range byOrg {
+		orgKey, provider := k[0], k[1]
+		// The parent of each session: itself for a top-level one, its parent for a subagent.
+		owner := make(map[string]string, len(keys))
+		for _, key := range keys {
+			owner[key] = key
+		}
+		// Many sessions are read with the whole organization's rows and picked here: one scan is cheaper than the
+		// lookups of thousands of keys (3 ms against 66 ms per 2 000 keys on the hub's Postgres).
+		whole := len(keys) > sessionChunk
+		parts := [][]string{nil}
+		if !whole {
+			parts = [][]string{keys}
+		}
+		for _, part := range parts {
+			args := []any{orgKey, provider}
+			q := `SELECT session_key, parent_key FROM agent_sessions WHERE org_key = ? AND provider = ? AND parent_key <> ''`
+			if !whole {
+				q = `SELECT session_key, parent_key FROM agent_sessions WHERE org_key = ? AND provider = ? AND parent_key IN (` + placeholders(len(part)) + `)`
+				for _, key := range part {
+					args = append(args, key)
+				}
+			}
+			rows, err := s.q.Query(ctx, q, args...)
+			if err != nil {
+				return nil, nil, err
+			}
+			for rows.Next() {
+				var key, parent string
+				if err := rows.Scan(&key, &parent); err != nil {
+					rows.Close()
+					return nil, nil, err
+				}
+				if own, ok := owner[parent]; !ok || own != parent {
+					continue // a subagent of a session not asked for
+				}
+				owner[key] = parent
+				subagents[SessionRef{orgKey, provider, parent}]++
+			}
+			err = rows.Err()
+			rows.Close()
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+		acc := map[[2]string]*SessionCallSum{}
+		parts = [][]string{nil}
+		if !whole {
+			parts = [][]string{slices.Collect(maps.Keys(owner))}
+		}
+		for _, part := range parts {
+			args := []any{orgKey, provider}
+			q := `SELECT session_key, model, ` + cols + ` FROM usage_session_sums WHERE org_key = ? AND provider = ?`
+			if !whole {
+				q += ` AND session_key IN (` + placeholders(len(part)) + `)`
+				for _, key := range part {
+					args = append(args, key)
+				}
+			}
+			rows, err := s.q.Query(ctx, q, args...)
+			if err != nil {
+				return nil, nil, err
+			}
+			for rows.Next() {
+				var key, model string
+				var calls, list, in, out, cr, cw int64
+				if err := rows.Scan(&key, &model, &calls, &list, &in, &out, &cr, &cw); err != nil {
+					rows.Close()
+					return nil, nil, err
+				}
+				p, ok := owner[key]
+				if !ok || calls == 0 {
+					continue
+				}
+				a := acc[[2]string{p, model}]
+				if a == nil {
+					a = &SessionCallSum{SessionRef: SessionRef{orgKey, provider, p}, Model: model}
+					acc[[2]string{p, model}] = a
+				}
+				a.Calls += calls
+				a.ListCostMicros += list
+				a.Input, a.Output, a.CacheRead, a.CacheWrite = a.Input+in, a.Output+out, a.CacheRead+cr, a.CacheWrite+cw
+			}
+			err = rows.Err()
+			rows.Close()
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+		for _, a := range acc {
+			sums = append(sums, *a)
+		}
+	}
+	return sums, subagents, nil
+}
+
+// sessionSumsFromCalls is sessionSums added up from usage_calls, for a cut usage_session_sums does not hold.
+func (s Store) sessionSumsFromCalls(ctx context.Context, refs []SessionRef, minContext int64) ([]SessionCallSum, map[SessionRef]int, error) {
 	byOrg := map[[2]string][]string{}
 	for _, r := range refs {
 		k := [2]string{r.OrgKey, r.Provider}

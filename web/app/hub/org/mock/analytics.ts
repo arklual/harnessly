@@ -6,6 +6,7 @@ import type {
   AnalyticsFrame,
   AnalyticsQuery,
   Change,
+  EffPulse,
   FrameWeek,
   Kpi,
   KpiChart,
@@ -13,6 +14,7 @@ import type {
   Peers,
   SeriesLine,
   Signal,
+  SpendSlice,
   Waste,
   Week,
 } from '../api/analytics';
@@ -546,52 +548,111 @@ const chartFor = (ctx: MockCtx, q: AnalyticsQuery, kpiId: KpiId): KpiChart => {
   };
 };
 
-export const analyticsMock = (ctx: MockCtx): AnalyticsApi => ({
-  analyticsFrame: () => {
-    const all = weeks();
-    const defaultPeriod = monthPeriod(all);
-    const frame: AnalyticsFrame = { weeks: all, today: TODAY, defaultPeriod, lastChange: LAST_CHANGE };
-    return later(frame);
-  },
-  analytics: () => {
-    const member = ctx.role === 'member';
-    const lead = ctx.role === 'lead';
-    const data: AnalyticsData = {
-      scopeLabel: member ? 'Только твои чаты' : lead ? 'Команда Фронт' : 'Все команды тенанта',
-      summary: member ? { spendUsd: 96, sessions: 41, mrs: 6 } : { spendUsd: 810, sessions: 302, mrs: 44 },
-      kpis: kpisFor(),
-      signals: member ? [] : SIGNALS,
-      changes: CHANGES,
-      waste: member ? null : WASTE,
-      peers: member ? null : TEAM_PEERS,
-    };
-    return later(data, 400);
-  },
-  limitWindows: () =>
-    later(
-      ctx.role === 'member'
-        ? null
-        : [
-            {
-              id: 'acc-1',
-              label: 'Claude Max №1',
-              plan: 'max',
-              windows: [
-                {
-                  name: 'weekly',
-                  lengthSec: 604_800,
-                  avgPeakPct: 81,
-                  fullCycles: 1,
-                  cycles: [
-                    { endsAt: '2026-10-11T09:00:00Z', peakPct: 64, measures: 210 },
-                    { endsAt: '2026-10-18T09:00:00Z', peakPct: 78, measures: 224 },
-                    { endsAt: '2026-10-25T09:00:00Z', peakPct: 97, measures: 231 },
-                    { endsAt: '2026-11-01T09:00:00Z', peakPct: 85, measures: 219 },
-                  ],
-                },
-              ],
+export const analyticsMock = (ctx: MockCtx): AnalyticsApi => {
+  let pulse: EffPulse = { week: '2026-11-16', answered: false, current: null };
+  return {
+    analyticsFrame: () => {
+      const all = weeks();
+      const defaultPeriod = monthPeriod(all);
+      const frame: AnalyticsFrame = { weeks: all, today: TODAY, defaultPeriod, lastChange: LAST_CHANGE };
+      return later(frame);
+    },
+    analytics: () => {
+      const member = ctx.role === 'member';
+      const lead = ctx.role === 'lead';
+      const data: AnalyticsData = {
+        scopeLabel: member ? 'Только твои чаты' : lead ? 'Команда Фронт' : 'Все команды тенанта',
+        summary: member
+          ? { spendUsd: 96, sessions: 41, mrs: 6 }
+          : {
+              spendUsd: 810,
+              sessions: 302,
+              mrs: 44,
+              prev: { spendUsd: 705, sessions: 280, mrs: 39 },
+              forecastUsd: 1_040,
+              budgetUsd: 1_200,
             },
-          ],
-    ),
-  analyticsChart: (q, kpi) => later(chartFor(ctx, q, kpi), 450),
-});
+        kpis: kpisFor(),
+        signals: member ? [] : SIGNALS,
+        changes: CHANGES,
+        waste: member ? null : WASTE,
+        peers: member ? null : TEAM_PEERS,
+      };
+      return later(data, 400);
+    },
+    limitWindows: () =>
+      later(
+        ctx.role === 'member'
+          ? null
+          : [
+              {
+                id: 'acc-1',
+                label: 'Claude Max №1',
+                plan: 'max',
+                windows: [
+                  {
+                    name: 'weekly',
+                    lengthSec: 604_800,
+                    avgPeakPct: 81,
+                    fullCycles: 1,
+                    cycles: [
+                      { endsAt: '2026-10-11T09:00:00Z', peakPct: 64, measures: 210 },
+                      { endsAt: '2026-10-18T09:00:00Z', peakPct: 78, measures: 224 },
+                      { endsAt: '2026-10-25T09:00:00Z', peakPct: 97, measures: 231 },
+                      { endsAt: '2026-11-01T09:00:00Z', peakPct: 85, measures: 219 },
+                    ],
+                  },
+                ],
+              },
+            ],
+      ),
+    analyticsChart: (q, kpi) => later(chartFor(ctx, q, kpi), 450),
+    spendDaily: ({ period, compare }, split) => {
+      if (ctx.role === 'member') return later(null, 100);
+      const days = Array.from({ length: 30 }, (_, i) => addDays(period.to, i - 29));
+      const names = split === 'team' ? ['Фронт', 'Бэкенд', 'Продукт'] : ['Opus', 'Sonnet', 'Haiku'];
+      const lines = names.map((name, k) => ({
+        id: name,
+        name,
+        values: days.map((_, i) => Math.round(((k + 1) * 9 + ((i * (k + 3)) % 11) * 2) * 10) / 10),
+      }));
+      const cmp = daysBetween(compare.from, compare.to) + 1;
+      return later({ split, days, lines, cmpTotalUsd: cmp * 21 }, 300);
+    },
+    spendBy: (_, by) =>
+      later<SpendSlice[] | null>(
+        ctx.role === 'member'
+          ? null
+          : by === 'team'
+            ? [
+                { key: 'front', label: 'Фронт', usd: 380, calls: 9100 },
+                { key: 'back', label: 'Бэкенд', usd: 310, calls: 7400 },
+                { key: 'prod', label: 'Продукт', usd: 120, calls: 2600 },
+              ]
+            : by === 'person'
+              ? [
+                  { key: 'u1', label: 'Анна', usd: 210, calls: 5200 },
+                  { key: 'u2', label: 'Глеб', usd: 190, calls: 4300 },
+                ]
+              : [
+                  { key: 'opus', label: 'Opus', usd: 520, calls: 6100 },
+                  { key: 'sonnet', label: 'Sonnet', usd: 290, calls: 13000 },
+                ],
+        200,
+      ),
+    efficiencyChannels: () =>
+      later(
+        [
+          { id: 'tab', sessions: 62, usd: 318, mrs: 31 },
+          { id: 'automation', sessions: 19, usd: 74, mrs: 8 },
+          { id: 'eval', sessions: 5, usd: 20, mrs: 0 },
+        ],
+        300,
+      ),
+    efficiencyPulse: () => later(pulse, 200),
+    savePulse: (marks) => {
+      pulse = { week: pulse.week, answered: true, current: marks };
+      return later(pulse, 200);
+    },
+  };
+};

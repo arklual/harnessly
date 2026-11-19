@@ -83,6 +83,8 @@ var SpaceCascade = []SpaceCascadeStep{
 	{"tool_usage_day", bySpace},
 	{"usage_rollup_hour", bySpace},
 	{"usage_calls", `org_key = :key OR ` + byMachine},
+	// a cache of usage_calls: the hourly catch-up (Store.ResumSessions) drops the sums of a machine's calls removed here
+	{"usage_session_sums", `org_key = :key`},
 	{"usage_quarantine", byMachine},
 	{"env_runs", bySpace},
 

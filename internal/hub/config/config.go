@@ -333,6 +333,10 @@ type Config struct {
 	// HistoryDeletedKeep (HUB_HISTORY_DELETED_DAYS, 30 by default) is how long the hub keeps its copy of a chat after
 	// the chat was deleted on its machine; then the copy is removed with its turns. 0 keeps the copies for good.
 	HistoryDeletedKeep time.Duration
+	// AnalyticsCache (HUB_ANALYTICS_CACHE, 20s by default; 0 turns it off) is how long an answer of a heavy analytics
+	// screen (the overview, the KPIs, the effects of changes) is served as it is; past it the old answer is served while
+	// a new one is computed (internal/hub/analytics/cache.go).
+	AnalyticsCache time.Duration
 	// VaultKeys (HUB_VAULT_KEYS="v2:<base64 32 bytes>,v1:<base64>", the first one current) turns on the hub's central
 	// password safe (docs/hub/vault.md); empty: the safe is off. VaultSharedMembers and VaultSharedEditors
 	// (HUB_VAULT_SHARED_MEMBERS, HUB_VAULT_SHARED_EDITORS, comma-separated emails) say who sees and who changes the
@@ -861,6 +865,7 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		settle, window = 5*time.Second, 10*time.Second
 	}
 	c.ShutdownGrace = span("HUB_SHUTDOWN_GRACE", 20*time.Second)
+	c.AnalyticsCache = span("HUB_ANALYTICS_CACHE", 20*time.Second)
 	c.DrainSettle, c.DrainLinks = span("HUB_DRAIN_SETTLE", settle), span("HUB_DRAIN_LINKS", window)
 	if c.DrainSettle+c.DrainLinks >= c.ShutdownGrace {
 		bad("HUB_DRAIN_SETTLE and HUB_DRAIN_LINKS together must be shorter than HUB_SHUTDOWN_GRACE: the requests under way need the rest")

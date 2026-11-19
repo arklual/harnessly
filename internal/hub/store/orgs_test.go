@@ -190,7 +190,9 @@ func TestMigrationsAreAdditive(t *testing.T) {
 		// another machine had first (they are kept in machine_resource_conflicts): the unique index needs it.
 		// Fills the columns the migration adds.
 		"0051_access_by_person.sql": regexp.MustCompile(`(?is)^UPDATE resource_access_(people|requests) SET user_id = `),
-		"0050_provider_servers.sql": regexp.MustCompile(`(?is)^(INSERT INTO (machine_resource_conflicts|provider_servers) |UPDATE machine_resources SET external_id = '' WHERE machine_id IN \(SELECT machine_id FROM machine_resource_conflicts\))`),
+		// Fills the table the migration creates: the sums of the sessions' calls.
+		"0079_usage_session_sums.sql": regexp.MustCompile(`(?is)^INSERT INTO usage_session_sums `),
+		"0050_provider_servers.sql":   regexp.MustCompile(`(?is)^(INSERT INTO (machine_resource_conflicts|provider_servers) |UPDATE machine_resources SET external_id = '' WHERE machine_id IN \(SELECT machine_id FROM machine_resource_conflicts\))`),
 	}
 	entries, err := migrationFiles.ReadDir("migrations")
 	if err != nil {

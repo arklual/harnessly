@@ -60,8 +60,8 @@ type EffectResponse struct {
 func (s *Service) mountChanges(mux *http.ServeMux) {
 	mux.Handle("GET /api/orgs/{org}/changes", s.gate(s.listChanges))
 	mux.Handle("POST /api/orgs/{org}/changes", s.gate(s.createChange))
-	mux.Handle("GET /api/orgs/{org}/changes/effects", s.gate(s.changeEffects))
-	mux.Handle("GET /api/orgs/{org}/changes/{id}/effect", s.gate(s.changeEffect))
+	mux.Handle("GET /api/orgs/{org}/changes/effects", s.gate(s.cached(s.changeEffects)))
+	mux.Handle("GET /api/orgs/{org}/changes/{id}/effect", s.gate(s.cached(s.changeEffect)))
 }
 
 // EffectsResponse is the effect of every change of a list, in the list's order.

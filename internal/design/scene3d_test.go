@@ -40,6 +40,7 @@ type failBox struct{ err error }
 
 var scene3dTestMeta = Scene3DMeta{Version: 1, FPS: 24, Start: 1, End: 240, Res: [2]int{1920, 1080}, Camera: "cam1",
 	Objects: []Scene3DObject{{N: "car", T: "MESH", Tris: 1000}, {N: "wheel", T: "MESH", P: "car", Tris: 100}, {N: "cam1", T: "CAMERA"}},
+	Bake:    map[string]Scene3DBake{"wheel": {M: "e", Rows: [][]float64{{1, 0, 0, 0, 0, 0, 0, 1, 1, 1}, {240, 0, 0, 0, 60, 0, 0, 1, 1, 1}}}},
 	Cameras: []Scene3DCamera{{N: "cam1", Lens: 35, Fov: 40, Near: 0.1, Far: 100, Track: [][]float64{{1, 0, -5, 1, 0, 0, 1, 40}, {240, 10, -5, 1, 10, 0, 1, 40}}}}, Markers: []Scene3DMarker{}}
 
 func newScene3DRig(t *testing.T) *scene3dRig {
@@ -186,7 +187,7 @@ func TestScene3DSettingsAreChecked(t *testing.T) {
 func TestScene3DModelIsBuiltOnceAndKeptByHash(t *testing.T) {
 	r := newScene3DRig(t)
 	st := r.ready(t)
-	if st.Model.Meta == nil || len(st.Model.Meta.Objects) != 3 || st.Model.Bytes != 4 || st.Engine == "" {
+	if st.Model.Meta == nil || len(st.Model.Meta.Objects) != 3 || st.Model.Bytes != 4 || st.Engine == "" || len(st.Model.Meta.Bake["wheel"].Rows) != 2 {
 		t.Fatalf("%+v", st)
 	}
 	for i := 0; i < 3; i++ {
@@ -983,5 +984,68 @@ func TestScene3DFrameWaitOutlastsABusyMachine(t *testing.T) {
 	r.fail.Store(failBox{errBlenderBusy})
 	if _, _, err := r.l.scene3dFrameWait(context.Background(), "villa", Scene3DCam{N: "cam1"}, 5, 1500*time.Millisecond); err == nil {
 		t.Error("a busy machine for ever ended well")
+	}
+}
+
+func TestScene3DDiscoverFindsProjectsAroundTheLibrary(t *testing.T) {
+	parent := t.TempDir()
+	lib := filepath.Join(parent, "design-artifacts")
+	if err := os.MkdirAll(lib, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	l := testLibrary(t, lib)
+	writeFile(t, filepath.Join(parent, "lab", "scenes", "car.py"), "# car")
+	writeFile(t, filepath.Join(parent, "lab", "scenes", "notes.txt"), "x")
+	writeFile(t, filepath.Join(parent, "lab", "out", "old.blend"), "old")
+	writeFile(t, filepath.Join(parent, "lab", "out", "car.blend"), "new")
+	writeFile(t, filepath.Join(parent, "lab", "out", "car.blend1"), "backup")
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(filepath.Join(parent, "lab", "out", "old.blend"), old, old); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(parent, "stray", "thing.blend"), "x")
+	writeFile(t, filepath.Join(parent, "plain", "readme.md"), "x")
+	writeFile(t, filepath.Join(parent, ".hidden", "scenes", "a.py"), "x")
+	got, err := l.Scene3DDiscover("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, p := range got {
+		names = append(names, p.Name)
+	}
+	if len(got) != 2 || got[0].Name != "lab" || got[1].Name != "stray" {
+		t.Fatalf("found %v", names)
+	}
+	lab := got[0]
+	if len(lab.Blends) != 2 || lab.Blends[0] != "out/car.blend" || lab.Blends[1] != "out/old.blend" || len(lab.Scripts) != 1 || lab.Scripts[0] != "scenes/car.py" || lab.Root != filepath.Join(parent, "lab") {
+		t.Errorf("lab: %+v", lab)
+	}
+	if got[1].Blends[0] != "./thing.blend" && got[1].Blends[0] != "thing.blend" {
+		t.Errorf("stray: %+v", got[1])
+	}
+	// A folder typed in: that one only; a relative path or a folder with nothing is refused in words.
+	one, err := l.Scene3DDiscover(filepath.Join(parent, "lab"))
+	if err != nil || len(one) != 1 || one[0].Name != "lab" {
+		t.Fatalf("%+v %v", one, err)
+	}
+	for _, bad := range []string{"lab", filepath.Join(parent, "plain"), filepath.Join(parent, "none")} {
+		if _, err := l.Scene3DDiscover(bad); err == nil {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+	// A new scene from the pick: the document is a 3D scene, named after the .blend when no title is given.
+	p, err := l.CreateScene3D("", "", Scene3DSettings{Root: lab.Root, Blend: lab.Blends[0], Script: lab.Scripts[0]})
+	if err != nil || !l.IsScene3D(p.ID) || p.Title != "car" {
+		t.Fatalf("%+v %v", p, err)
+	}
+	if a := l.ReadArtifact(p.ID); a == nil {
+		t.Error("the new scene is not in the library listing")
+	}
+	if _, err := l.CreateScene3D("x", "", Scene3DSettings{Root: lab.Root, Blend: "out/none.blend"}); err == nil {
+		t.Error("a scene over a missing .blend made")
+	}
+	if left := l.ListArtifacts(); len(left) != 1 {
+		t.Errorf("a refused scene left a project: %d listed", len(left))
 	}
 }

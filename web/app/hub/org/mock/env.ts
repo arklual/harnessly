@@ -600,7 +600,18 @@ const view = (ctx: MockCtx): EnvResponse => {
     layers,
     teams: TEAMS.map((t) => ({ id: t.id, name: t.name, tenantId: TENANT_ID })),
     observed: [],
-    delivery: { machines: 4, reported: 3, current: 3, lastAt: iso(3) },
+    delivery: {
+      machines: 4,
+      reported: 3,
+      current: 3,
+      lastAt: iso(3),
+      rows: [
+        { id: 'm-1', name: 'dev-andrey', state: 'current', ok: 8, total: 8, at: iso(3), online: true },
+        { id: 'm-2', name: 'dev-anna', state: 'current', ok: 7, total: 8, at: iso(5), online: true },
+        { id: 'm-3', name: 'build-front', state: 'current', ok: 8, total: 8, at: iso(9), online: true },
+        { id: 'm-4', name: 'dev-gleb', state: 'silent', ok: 0, total: 0, at: null, online: false },
+      ],
+    },
   };
   return recount(base);
 };

@@ -399,3 +399,33 @@ func (l *Library) WarmThumbs(id string) {
 		<-d.done
 	}
 }
+
+// DrawnThumb is the newest picture a board has on this machine: Name is its file's name, which changes with each drawing.
+type DrawnThumb struct {
+	Board string
+	File  string
+	Name  string
+}
+
+// DrawnThumbs are the pictures the boards of a project have now, without drawing any (what goes to the store,
+// so the library shows its cards while this machine is off).
+func (l *Library) DrawnThumbs(id string) []DrawnThumb {
+	if !IsLibraryID(id) {
+		return nil
+	}
+	a := l.ReadArtifact(id)
+	if a == nil || len(a.Boards) == 0 {
+		return nil
+	}
+	dir := filepath.Join(l.ArtifactDir(id), ThumbDirname)
+	if _, err := os.Stat(dir); err != nil {
+		return nil
+	}
+	var out []DrawnThumb
+	for _, b := range a.Boards {
+		if f := earlierThumb(dir, thumbHash(b.Path)); f != "" {
+			out = append(out, DrawnThumb{Board: b.Path, File: f, Name: filepath.Base(f)})
+		}
+	}
+	return out
+}

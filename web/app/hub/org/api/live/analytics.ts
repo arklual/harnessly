@@ -12,6 +12,7 @@ import type {
   MeUsageResponse,
   OverviewResponse,
   Signal as ApiSignal,
+  SpendResponse,
   SignalsResponse,
   WasteItem as ApiWasteItem,
   WasteResponse,
@@ -26,7 +27,11 @@ import type {
   Change,
   ChangeKind,
   DetailRow,
+  DailySpend,
   Effect,
+  EffChannel,
+  EffPulse,
+  EffPulseMarks,
   DeltaKind,
   Kpi,
   KpiChart,
@@ -36,6 +41,7 @@ import type {
   Marker,
   Peers,
   Signal,
+  SpendSlice,
   Week,
 } from '../analytics';
 import { monthPeriod, type LimitHistory, type LimitWindow } from '../analytics';
@@ -344,6 +350,28 @@ interface LimitAccountApi {
   windows: LimitWindow[];
 }
 
+interface DailyApi {
+  split: 'team' | 'model';
+  days: string[];
+  lines: { key: string; values: number[] }[];
+  cmpTotalUsd: number | null;
+}
+
+interface PulseApi {
+  week: string;
+  answered: boolean;
+  answers: { week: string; speed: number; quality: number; friction: number }[];
+}
+
+const pulseOf = (r: PulseApi): EffPulse => {
+  const a = r.answers.find((x) => x.week === r.week);
+  return {
+    week: r.week,
+    answered: r.answered,
+    current: a ? { speed: a.speed, quality: a.quality, friction: a.friction } : null,
+  };
+};
+
 const scopeParam = (c: AnalyticsCtx): string => `${c.scope.kind}:${c.scope.id}`;
 
 export const liveAnalytics = (ctx: () => AnalyticsCtx): AnalyticsApi => ({
@@ -396,13 +424,17 @@ export const liveAnalytics = (ctx: () => AnalyticsCtx): AnalyticsApi => ({
     }
     const scope = scopeParam(c);
     // The effects of all the changes come in one request: one per change made the screen wait for a hundred of them.
-    const [kpis, overview, waste, changes, signals, effects] = await Promise.all([
+    const [kpis, overview, waste, changes, signals, effects, daily] = await Promise.all([
       contractGet<KpisResponse>(orgPath(c.org, '/kpis'), { scope, ...range(period), ...cmp, series: 'team' }),
       contractGet<OverviewResponse>(orgPath(c.org, '/overview'), { scope, ...range(period) }),
       contractGet<WasteResponse>(orgPath(c.org, '/waste'), { scope, ...range(period) }),
       contractGet<ChangesResponse>(orgPath(c.org, '/changes'), { scope, ...range(period) }),
       contractGet<SignalsResponse>(orgPath(c.org, '/signals'), { scope }),
       contractGet<EffectsResponse>(orgPath(c.org, '/changes/effects'), { scope, ...range(period) }),
+      // The comparison's spend is the only thing asked of it: a failure leaves the delta out, never the screen.
+      contractGet<DailyApi>(orgPath(c.org, '/spend/daily'), { scope, ...range(period), ...cmp }).catch(
+        () => null,
+      ),
     ]);
     const effectOf = new Map(effects.effects.map((e) => [e.change.id, e]));
     const items = waste.items.map((w, i) => ({
@@ -419,6 +451,13 @@ export const liveAnalytics = (ctx: () => AnalyticsCtx): AnalyticsApi => ({
         spendUsd: spentOf(overview.spend).usd,
         sessions: overview.tiles.sessions.value ?? 0,
         mrs: overview.tiles.mrs.value ?? 0,
+        prev: {
+          spendUsd: daily?.cmpTotalUsd ?? null,
+          sessions: overview.tiles.sessions.cmpValue,
+          mrs: overview.tiles.mrs.cmpValue,
+        },
+        forecastUsd: (overview.spend.forecastList ?? overview.spend.forecast)?.usd ?? null,
+        budgetUsd: overview.spend.limit?.amount.usd ?? null,
       },
       kpis: kpis.kpis.map(kpiOf),
       signals: signals.signals.map(signalOf),
@@ -449,6 +488,57 @@ export const liveAnalytics = (ctx: () => AnalyticsCtx): AnalyticsApi => ({
       })),
     }));
   },
+  spendDaily: async ({ period, compare }, split): Promise<DailySpend | null> => {
+    const c = ctx();
+    if (c.role === 'member') return null;
+    const win = chartWindow(period, isoDay(new Date()));
+    const r = await contractGet<DailyApi>(orgPath(c.org, '/spend/daily'), {
+      scope: scopeParam(c),
+      ...win,
+      split,
+      cmpFrom: compare.from,
+      cmpTo: addDays(compare.to, 1),
+    });
+    return {
+      split: r.split,
+      days: r.days,
+      lines: r.lines.map((l) => ({ id: l.key, name: l.key, values: l.values })),
+      cmpTotalUsd: r.cmpTotalUsd,
+    };
+  },
+  spendBy: async ({ period }, by): Promise<SpendSlice[] | null> => {
+    const c = ctx();
+    if (c.role === 'member') return null;
+    const r = await contractGet<SpendResponse>(orgPath(c.org, '/spend'), {
+      scope: scopeParam(c),
+      by,
+      ...range(period),
+    });
+    return r.rows.map((x) => ({ key: x.key, label: x.label, usd: spentOf(x).usd, calls: x.calls }));
+  },
+  efficiencyChannels: async ({ period }): Promise<EffChannel[] | null> => {
+    const c = ctx();
+    const days = Math.min(92, Math.max(1, daysBetween(period.from, period.to) + 1));
+    try {
+      const r = await contractGet<{
+        channels: { channel: EffChannel['id']; sessions: number; costUsd: number; mrs: number }[];
+      }>(orgPath(c.org, '/efficiency/overview'), { scope: c.role === 'member' ? 'me' : 'team', days });
+      return r.channels.map((x) => ({ id: x.channel, sessions: x.sessions, usd: x.costUsd, mrs: x.mrs }));
+    } catch (e) {
+      if (e instanceof OrgApiError && e.code === 'not_ready') return null;
+      throw e;
+    }
+  },
+  efficiencyPulse: async (): Promise<EffPulse | null> => {
+    try {
+      return pulseOf(await contractGet<PulseApi>(orgPath(ctx().org, '/efficiency/pulse')));
+    } catch (e) {
+      if (e instanceof OrgApiError && e.code === 'not_ready') return null;
+      throw e;
+    }
+  },
+  savePulse: async (marks: EffPulseMarks): Promise<EffPulse> =>
+    pulseOf(await http.post<PulseApi>(orgPath(ctx().org, '/efficiency/pulse'), marks)),
   analyticsChart: async ({ period, compare }, kpi): Promise<KpiChart> => {
     const c = ctx();
     if (c.role === 'member') throw new OrgApiError('not_ready', 'no daily KPI for a person yet');

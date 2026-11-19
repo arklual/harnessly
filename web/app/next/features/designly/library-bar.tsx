@@ -10,7 +10,7 @@ import MenuPanel, { MenuRoot, useMenuActions } from '@/next/ui/menu-panel';
 import { t } from '@/next/i18n';
 
 // Literals, not DESIGN_KIND: the home imports this file, and a value import back would be a cycle.
-const KINDS: readonly TDesignKind[] = ['site', 'slides', 'video', 'ds'];
+const KINDS: readonly TDesignKind[] = ['site', 'slides', 'video', 'scene3d', 'ds'];
 
 /** One choice of the filter menu: it stays open, so several can be set in a row. */
 const Choice = ({ on, label, onPick }: { on: boolean; label: string; onPick: () => void }) => (

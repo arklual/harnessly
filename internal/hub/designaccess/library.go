@@ -289,13 +289,35 @@ func (s *Service) coverRoute(w http.ResponseWriter, r *http.Request, u store.Use
 	if !ok || m.SpaceID == "" || !projectIDRe.MatchString(id) {
 		return fail("not_found", "Обложки нет")
 	}
-	t, err := s.read(r.Context(), m)
+	if may, err := s.mayOpen(r.Context(), u, m, id); err != nil || !may {
+		if err != nil {
+			return err
+		}
+		return fail("not_found", "Обложки нет")
+	}
+	b, err := c.Cover(r.Context(), m.SpaceID, id, maxCover)
 	if err != nil {
 		return err
 	}
+	if len(b) == 0 {
+		return fail("not_found", "Обложки нет")
+	}
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	_, _ = w.Write(b)
+	return nil
+}
+
+// mayOpen tells whether the person has a role in a project the hub has a row for.
+func (s *Service) mayOpen(ctx context.Context, u store.User, m store.Machine, id string) (bool, error) {
+	t, err := s.read(ctx, m)
+	if err != nil {
+		return false, err
+	}
 	rows, err := t.projects()
 	if err != nil {
-		return err
+		return false, err
 	}
 	for _, p := range rows {
 		if p.ID != id {
@@ -303,23 +325,9 @@ func (s *Service) coverRoute(w http.ResponseWriter, r *http.Request, u store.Use
 		}
 		f, err := t.fold(p, normEmail(u.Email))
 		if err != nil {
-			return err
+			return false, err
 		}
-		if f.Role == "" {
-			break
-		}
-		b, err := c.Cover(r.Context(), m.SpaceID, id, maxCover)
-		if err != nil {
-			return err
-		}
-		if len(b) == 0 {
-			break
-		}
-		w.Header().Set("Content-Type", "image/jpeg")
-		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		_, _ = w.Write(b)
-		return nil
+		return f.Role != "", nil
 	}
-	return fail("not_found", "Обложки нет")
+	return false, nil
 }

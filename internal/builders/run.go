@@ -229,13 +229,15 @@ func (c *Client) runLocal(ctx context.Context, job Job, spec Spec) (Result, erro
 	spec.logf("job %s: runs on this machine's own heavy slots, a draft: at most %s. %s", job.ID, limit, job.Reason)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	// the hub's status is the stop button of a local run too
+	// the hub's status is the stop button of a local run too; the pace is read here, not by the goroutine, which may
+	// outlive the call by one tick
+	every := PollEvery * 2
 	go func() {
 		for c != nil {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(PollEvery * 2):
+			case <-time.After(every):
 			}
 			if j, err := c.Get(ctx, job.ID); err == nil && j.Final() {
 				cancel()

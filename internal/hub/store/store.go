@@ -167,14 +167,17 @@ func Rebind(d Driver, query string) string {
 }
 
 func (db *DB) Exec(ctx context.Context, q string, args ...any) (sql.Result, error) {
+	defer logSlow(ctx, q, time.Now())
 	return db.sql.ExecContext(ctx, Rebind(db.driver, q), args...)
 }
 
 func (db *DB) Query(ctx context.Context, q string, args ...any) (*sql.Rows, error) {
+	defer logSlow(ctx, q, time.Now())
 	return db.sql.QueryContext(ctx, Rebind(db.driver, q), args...)
 }
 
 func (db *DB) QueryRow(ctx context.Context, q string, args ...any) *sql.Row {
+	defer logSlow(ctx, q, time.Now())
 	return db.sql.QueryRowContext(ctx, Rebind(db.driver, q), args...)
 }
 

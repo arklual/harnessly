@@ -102,6 +102,9 @@ export const liveShell = (remember: (view: OrgView, scope: ApiScope) => void): S
     const out = await http.patch<{ org: Org }>(orgPath(org), { links: value });
     return out.org.links ?? {};
   },
+  leaveOrg: async (org) => {
+    await http.post<unknown>(orgPath(org, '/leave'));
+  },
   looseSpaces: async () => {
     const { looseSpaces } = await http.get<OrgList>('/api/orgs');
     return looseSpaces.map((s) => ({ id: s.id, slug: s.slug, name: s.name, owner: s.role === 'owner' }));

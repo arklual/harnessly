@@ -1761,5 +1761,7 @@
   "next.folderSuggest.unfold": "Раскрыть уведомление",
   "next.folderSuggest.fold": "Свернуть уведомление",
   "next.folderSuggest.why": "Выбрано по запросам чата и чатам, что уже лежат в ваших папках. Если не та — выберите другую:",
-  "next.folderSuggest.other": "Папки"
+  "next.folderSuggest.other": "Папки",
+  "next.designly.kinds.scene3d": "3D-сцена",
+  "next.designly.kindsDesc.scene3d": "Сцена Blender: смотреть и ставить пины"
 }

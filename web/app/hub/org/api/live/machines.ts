@@ -11,6 +11,7 @@ import type {
   MachineGroup,
   MachinesApi,
   MachinesList,
+  MachineSetup,
   MachinesSummary,
   MovePlan,
   OrgMachine,
@@ -27,6 +28,9 @@ import {
   monthRub,
   rentOf,
   type WireExtras,
+  type WireSetup,
+  type WireView,
+  machineSetupOf,
   type WireMoney,
   type WirePoint,
 } from './machines-wire';
@@ -93,6 +97,7 @@ export const orgMachineOf = (raw: HubMachine, view: OrgView): OrgMachine => {
     rent: rent ? { provider: rent.provider, plan: rent.plan, price: rent.price } : null,
     managed: x.managed ?? null,
     opensRuntime: m.opensRuntime ?? true,
+    pending: m.status === 'pending',
     host: m.hostname || undefined,
     canManage: canAdmin || (teamCaps?.manage ?? false),
     canAdmin,
@@ -277,6 +282,16 @@ export const liveMachines = (ctx: () => MachinesCtx): MachinesApi => {
     }
   };
 
+  /** The card's extra facts come from the machine's own page; the card stays without them when it does not answer. */
+  const setupOf = async (id: string): Promise<MachineSetup | undefined> => {
+    try {
+      const r = await http.get<{ machine: WireView; setup?: WireSetup }>(`/api/machines/${id}`);
+      return machineSetupOf(r.machine, r.setup);
+    } catch {
+      return undefined;
+    }
+  };
+
   const detail = async (id: string): Promise<MachineDetail> => {
     const c = ctx();
     const found = (await list()).find((m) => m.id === id);
@@ -310,6 +325,7 @@ export const liveMachines = (ctx: () => MachinesCtx): MachinesApi => {
             { cpu: [], ram: [], disk: [] },
             { plan: null, consoleUrl: null, providerError: null },
           ];
+    const setup = await setupOf(id);
     return {
       machine,
       series,
@@ -320,6 +336,7 @@ export const liveMachines = (ctx: () => MachinesCtx): MachinesApi => {
       audience: { team: team ? team.memberCount : null, tenant: members.length },
       consoleUrl: res.consoleUrl,
       providerError: res.providerError,
+      setup,
     };
   };
 

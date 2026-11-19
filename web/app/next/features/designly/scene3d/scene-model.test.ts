@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bakeSpan,
   blenderToThree,
   canvasFov,
   poseAt,
@@ -122,5 +123,23 @@ describe('camera path', () => {
     expect(canvasFov(40, 16 / 9, 2)).toBe(40);
     expect(canvasFov(40, 16 / 9, 16 / 9)).toBe(40);
     expect(canvasFov(40, 16 / 9, 1)).toBeGreaterThan(40);
+  });
+});
+
+describe('baked tracks', () => {
+  const rows = [
+    [1, 0],
+    [13, 10],
+    [25, 40],
+  ];
+  it('finds the two samples and how far between them', () => {
+    expect(bakeSpan(rows, 7)).toEqual({ a: [1, 0], b: [13, 10], k: 0.5 });
+    expect(bakeSpan(rows, 13)?.a).toEqual([13, 10]);
+    expect(bakeSpan(rows, 19)?.k).toBe(0.5);
+  });
+  it('holds before the first and after the last', () => {
+    expect(bakeSpan(rows, -4)?.k).toBe(0);
+    expect(bakeSpan(rows, 99)).toEqual({ a: [25, 40], b: [25, 40], k: 0 });
+    expect(bakeSpan([], 3)).toBeNull();
   });
 });

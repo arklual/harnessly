@@ -327,12 +327,18 @@ func New(o Options) (*Hub, error) {
 		h.appTokens.signer.SetClock(o.Now)
 	}
 	h.Orgs = orgs.New(orgs.Deps{Config: cfg, DB: db, Auth: h.Auth, Limiter: o.Limiter, Log: log, Now: o.Now, LimitsChanged: limitsChanged, Rates: rb, Features: h.Features, Events: h.OrgEvents, PeopleChanged: h.Fleet.TouchUser,
+		MemberGone: func(spaceID, userID string) { px.Kick(spaceID, userID) },
+		MachineGone: func(m store.Machine) {
+			if h.Machines != nil {
+				h.Machines.Revoked(m)
+			}
+		},
 		EnvChanged: func() {
 			if h.EnvPush != nil {
 				h.EnvPush.Kick()
 			}
 		}})
-	h.Analytics = analytics.New(analytics.Deps{DB: db, Gate: h.Orgs.Gate, Log: log, Now: o.Now, Rates: rb})
+	h.Analytics = analytics.New(analytics.Deps{DB: db, Gate: h.Orgs.Gate, Log: log, Now: o.Now, Rates: rb, Cache: cfg.AnalyticsCache})
 	// A part is on for an organization when the instance switches it on for all (HUB_ENV_FEATURES, HUB_MACHINE_RESOURCES)
 	// or the organization's flags say so (features.Store: HUB_FEATURES_FORCE, the org's choice, HUB_FEATURES_DEFAULT).
 	envFeatures := o.EnvFeatures
@@ -977,6 +983,8 @@ func (h *Hub) Run(ctx context.Context) {
 	if p := mrsource.New(h.cfg.MRSourceURL, h.cfg.MRSourceGroups, h.cfg.MRSourceToken, h.db.S(), h.log); p != nil {
 		safego.Go("merge request source", func() { h.lead.Lead(ctx, "merge request source", p.Run) })
 	}
+	// every session's sums worked out anew from the calls: at start and hourly
+	safego.Go("session sums", func() { h.lead.Lead(ctx, "session sums", h.resumSessions) })
 	// warm the sums of the binaries before the first machine asks
 	safego.Go("dist manifest", func() { _, _ = h.Dist.Manifest() })
 	tick := time.NewTicker(10 * time.Minute)
@@ -993,6 +1001,34 @@ func (h *Hub) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
+		}
+	}
+}
+
+// resumSessions sums every organization's sessions anew from their calls, at once and then every hour, so that
+// usage_session_sums catches up with what it missed: the calls a previous release took while both ran, calls removed
+// with a space or a machine.
+func (h *Hub) resumSessions(ctx context.Context) {
+	for {
+		orgs, err := h.db.S().AllOrgs(ctx)
+		if err != nil && ctx.Err() == nil {
+			h.log.Warn("session sums", "error", err)
+		}
+		for _, o := range orgs {
+			start := time.Now()
+			if err := h.db.Tx(ctx, func(s store.Store) error { return s.ResumSessions(ctx, o.ID) }); err != nil {
+				if ctx.Err() != nil {
+					return
+				}
+				h.log.Warn("session sums", "org", o.ID, "error", err)
+				continue
+			}
+			h.log.Debug("session sums", "org", o.ID, "ms", time.Since(start).Milliseconds())
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Hour):
 		}
 	}
 }

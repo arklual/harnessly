@@ -11,6 +11,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/apps"
+	"github.com/ly-solutions/harnessly/internal/design"
 	"github.com/ly-solutions/harnessly/internal/designrec"
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/filestore"
@@ -162,13 +163,18 @@ func designRecordsRoutes() []gate.Route {
 	})}}
 }
 
-// pushCovers puts the cover picture of each project into the store, apart from the design's revisions.
+// pushCovers puts the cover picture of each project into the store, apart from the design's revisions, and the pictures
+// of its boards the gallery drew, so the hub's library shows its cards while this machine is off.
 func pushCovers(d deps) func(context.Context, *designrec.Syncer) {
 	return func(ctx context.Context, s *designrec.Syncer) {
 		lib := designAPI(d).L
 		for _, a := range lib.ListArtifacts() {
 			if a == nil || ctx.Err() != nil {
 				continue
+			}
+			if err := pushThumbs(ctx, s, lib.DrawnThumbs(a.ID), a.ID); err != nil {
+				agent.Log("warn", "design records: a board's picture did not reach the store", agent.F{K: "error", V: err.Error()})
+				return
 			}
 			p := lib.CoverFile(a.ID)
 			if p == "" {
@@ -187,4 +193,19 @@ func pushCovers(d deps) func(context.Context, *designrec.Syncer) {
 			}
 		}
 	}
+}
+
+func pushThumbs(ctx context.Context, s *designrec.Syncer, thumbs []design.DrawnThumb, id string) error {
+	for _, t := range thumbs {
+		read := func() ([]byte, error) {
+			if fi, err := os.Stat(t.File); err != nil || fi.Size() > filestore.MaxThumbBytes {
+				return nil, err
+			}
+			return os.ReadFile(t.File)
+		}
+		if _, err := s.PushThumb(ctx, id, t.Board, t.Name, read); err != nil {
+			return err
+		}
+	}
+	return nil
 }

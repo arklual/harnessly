@@ -12,6 +12,7 @@ import { liveOn } from '../flag';
 import { Head, Titles } from '../shell';
 import { money, plural } from './analytics/calc';
 import type { ChartMode } from './analytics/chart';
+import { SpendCard, SubsCard, WhereCard } from './analytics/spend';
 import { PeriodControls } from './analytics/header';
 import { Hero } from './analytics/hero';
 import { decodePeriod, encodePeriod, periodNameOf, type PickerState, queryOf } from './analytics/period';
@@ -65,10 +66,10 @@ const CHARTS: Record<Section, readonly KpiId[]> = {
   env: ['sessionStart', 'cache', 'reread', 'skills'],
 };
 /** The strip of figures of each sub-tab; `spend`, `mrs` and `waste` come from the totals, the rest are metrics. */
-type StripId = KpiId | 'spend' | 'mrs' | 'waste';
+type StripId = KpiId | 'spend' | 'mrs' | 'waste' | 'forecast';
 const STRIP: Record<Section, readonly StripId[]> = {
   home: ['spend', 'moneyPerMr', 'mrs', 'yield', 'autonomy', 'waste'],
-  money: ['spend', 'waste'],
+  money: ['spend', 'forecast', 'waste'],
   res: ['moneyPerMr', 'mrs', 'yield', 'timeToMr', 'mrPerPerson', 'mrSurvival'],
   agent: ['autonomy', 'waiting', 'parallel', 'toolErrors', 'waitingP90'],
   env: ['sessionStart', 'cache', 'cacheWrite1h', 'reread', 'skills'],
@@ -187,6 +188,15 @@ const ChartBlock = ({
   );
 };
 
+/** «+12%» against the period before: for money a rise is bad, for merged work it is good. */
+const changeOf = (now: number, was: number | null | undefined, upGood: boolean): StripCell['delta'] => {
+  if (typeof was !== 'number' || was <= 0) return null;
+  const pct = ((now - was) / was) * 100;
+  if (Math.abs(pct) < 0.5) return { text: 'как раньше', tone: 'flat' };
+  const up = pct > 0;
+  return { text: `${up ? '+' : '−'}${Math.round(Math.abs(pct))}%`, tone: up === upGood ? 'good' : 'bad' };
+};
+
 const stripCells = (ids: readonly StripId[], d: AnalyticsData): StripCell[] => {
   const out: StripCell[] = [];
   for (const id of ids) {
@@ -195,7 +205,7 @@ const stripCells = (ids: readonly StripId[], d: AnalyticsData): StripCell[] => {
         id,
         label: 'Расход',
         value: money(d.summary.spendUsd),
-        delta: null,
+        delta: changeOf(d.summary.spendUsd, d.summary.prev?.spendUsd, false),
         sub: `${d.summary.sessions} ${plural(d.summary.sessions, 'сессия', 'сессии', 'сессий')}`,
         hint: 'Сколько ушло на агентов за период.',
         go: null,
@@ -205,12 +215,25 @@ const stripCells = (ids: readonly StripId[], d: AnalyticsData): StripCell[] => {
         id,
         label: 'Смёрженных MR',
         value: String(d.summary.mrs),
-        delta: null,
+        delta: changeOf(d.summary.mrs, d.summary.prev?.mrs, true),
         sub: null,
         hint: 'MR, сделанные с агентом и влитые в основную ветку за период.',
         go: 'mrPerPerson',
       });
-    else if (id === 'waste') {
+    else if (id === 'forecast') {
+      const f = d.summary.forecastUsd;
+      if (typeof f !== 'number') continue;
+      const b = d.summary.budgetUsd;
+      out.push({
+        id,
+        label: 'Прогноз на месяц',
+        value: money(f),
+        delta: null,
+        sub: typeof b === 'number' && b > 0 ? `бюджет ${money(b)}` : null,
+        hint: 'Сколько выйдет за месяц, если расход пойдёт теми же темпами.',
+        go: null,
+      });
+    } else if (id === 'waste') {
       if (!d.waste) continue;
       const share = d.waste.totalUsd > 0 ? Math.round((d.waste.wasteUsd / d.waste.totalUsd) * 100) : 0;
       out.push({
@@ -366,7 +389,14 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
                   {staff && d.peers && <HeatCard peers={d.peers} kpis={d.kpis} onGo={onGo} />}
                 </>
               )}
-              {sec === 'money' && (staff && d.waste ? <WasteRows waste={d.waste} /> : null)}
+              {sec === 'money' && (
+                <>
+                  <SpendCard query={query} staff={staff} />
+                  <WhereCard query={query} staff={staff} />
+                  {staff && d.waste ? <WasteRows waste={d.waste} /> : null}
+                  <SubsCard query={query} />
+                </>
+              )}
               {sec === 'res' && (
                 <>
                   {charts(CHARTS.res)}

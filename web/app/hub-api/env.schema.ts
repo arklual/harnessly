@@ -105,7 +105,27 @@ export const envResponse = obj({
   layers: arr(envLayer),
   teams: arr(teamRef),
   observed: arr(observedTool),
-  delivery: nullable(obj({ machines: num, reported: num, current: num, lastAt: nullable(time) })),
+  delivery: nullable(
+    obj({
+      machines: num,
+      reported: num,
+      current: num,
+      lastAt: nullable(time),
+      rows: opt(
+        arr(
+          obj({
+            id: str,
+            name: str,
+            state: lit('current', 'stale', 'silent'),
+            ok: num,
+            total: num,
+            at: nullable(time),
+            online: bool,
+          }),
+        ),
+      ),
+    }),
+  ),
 });
 export const envCard = obj({
   entryId: str,

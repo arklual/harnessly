@@ -28,9 +28,9 @@ const (
 )
 
 func (s *Service) mountPeople(mux *http.ServeMux) {
-	mux.Handle("GET /api/orgs/{org}/people", s.gate(s.people))
-	mux.Handle("GET /api/me/week", s.gate(s.meWeek))
-	mux.Handle("GET /api/me/kpis/{kpi}/series", s.gate(s.meSeries))
+	mux.Handle("GET /api/orgs/{org}/people", s.gate(s.cached(s.people)))
+	mux.Handle("GET /api/me/week", s.gate(s.cached(s.meWeek)))
+	mux.Handle("GET /api/me/kpis/{kpi}/series", s.gate(s.cached(s.meSeries)))
 }
 
 // Chats are the chats of a week and the ones of them still running.

@@ -1,6 +1,7 @@
 // Designly over the machine's library: loads it with the design systems, asks again while a card is drawing (a
 // conversation in its folder works), starts a new project from a brief and waits for the runtime before the field
 // clears — the card comes from the library itself. A pin waits for the machine too.
+import Scene3dCreate from '@/next/features/designly/scene3d/scene3d-create';
 import { useTourFill } from '@/next/features/tour/use-tour-fill';
 import { uploadSrc } from '@/next/commands/uploads';
 import { AttachmentSrc } from '@/next/ui/attachment-thumb';
@@ -364,6 +365,9 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
     };
   }, [machine, restored]);
 
+  // «3D scene»: the dialog that picks a blender-lab project of the machine.
+  const [sceneOpen, setSceneOpen] = useState(false);
+
   const onAppKind = async (kind: IAppKind, name: string) => {
     const title = name ? titleOf(name) : kind.title;
     let created: { document: string };
@@ -466,6 +470,7 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
           },
           appKinds,
           onAppKind,
+          onScene3d: () => setSceneOpen(true),
           voice: {
             recording: voice.recording,
             onMic: voice.onMic,
@@ -476,6 +481,15 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
           },
           limits,
           maxText: limitsOf(machine).maxText,
+        }}
+      />
+      <Scene3dCreate
+        machine={machine}
+        open={sceneOpen}
+        onClose={() => setSceneOpen(false)}
+        onCreated={(id) => {
+          setSceneOpen(false);
+          goTo({ kind: ROUTE.site, id, edit: true });
         }}
       />
     </AttachmentSrc.Provider>

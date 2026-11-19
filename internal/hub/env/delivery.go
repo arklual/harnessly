@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
@@ -17,7 +18,25 @@ type Delivery struct {
 	Reported int     `json:"reported"`
 	Current  int     `json:"current"`
 	LastAt   *string `json:"lastAt"`
+	// Rows are the machines one by one, for the admin's table on «Применение».
+	Rows []MachineDelivery `json:"rows"`
 }
+
+// MachineDelivery is one machine on «Применение»: whether it holds the current list (State "current"), holds an older
+// one ("stale") or never said what it holds ("silent"); OK and Total count the items of its last report that went in;
+// At is that report; Online is whether the machine was seen in the last few minutes.
+type MachineDelivery struct {
+	ID     string  `json:"id"`
+	Name   string  `json:"name"`
+	State  string  `json:"state"`
+	OK     int     `json:"ok"`
+	Total  int     `json:"total"`
+	At     *string `json:"at"`
+	Online bool    `json:"online"`
+}
+
+// onlineWithin is how recently a machine must have been seen to count as on line in the table.
+const onlineWithin = 5 * time.Minute
 
 // ItemDelivery is what the machines said about one item: how many put it in, how many keep it without being able to
 // load it yet, how many failed it, and the first reason one of them gave.
@@ -47,7 +66,8 @@ func (q *req) delivery(tenants []store.Space, team string) (*Delivery, map[strin
 	if total > maxDeliveryMachines {
 		return nil, nil, nil
 	}
-	d := &Delivery{}
+	d := &Delivery{Rows: []MachineDelivery{}}
+	now := q.s.now()
 	items := map[string]*ItemDelivery{}
 	var last int64
 	for _, sp := range tenants {
@@ -66,27 +86,43 @@ func (q *req) delivery(tenants []store.Space, team string) (*Delivery, map[strin
 			}
 			d.Machines++
 			want := q.s.machineListMemo(q.w, sp.ID, m, memo)
+			name := m.Name
+			if name == "" {
+				name = m.Hostname
+			}
+			row := MachineDelivery{ID: m.ID, Name: name, State: "silent",
+				Online: m.LastSeenAt != nil && now.Sub(*m.LastSeenAt) < onlineWithin}
 			st, found := states[m.ID]
 			if !found || st.At.IsZero() {
 				// The hub sends no first empty list, so a machine that should hold nothing and never got anything holds
 				// what it should.
 				if want.empty() {
 					d.Current++
+					row.State = "current"
 				}
+				d.Rows = append(d.Rows, row)
 				continue
 			}
 			d.Reported++
+			row.State, row.At = "stale", msStr(st.At.UnixMilli())
 			if ms := st.At.UnixMilli(); ms > last {
 				last = ms
 			}
+			var applied []hubproto.EnvApplied
+			_ = json.Unmarshal([]byte(st.Applied), &applied)
+			row.Total = len(applied)
+			for _, a := range applied {
+				if a.Status == hubproto.EnvOK {
+					row.OK++
+				}
+			}
 			if !want.holds(st.Hash) {
+				d.Rows = append(d.Rows, row)
 				continue
 			}
 			d.Current++
-			var applied []hubproto.EnvApplied
-			if err := json.Unmarshal([]byte(st.Applied), &applied); err != nil {
-				continue
-			}
+			row.State = "current"
+			d.Rows = append(d.Rows, row)
 			for _, a := range applied {
 				it := items[a.ItemID]
 				if it == nil {

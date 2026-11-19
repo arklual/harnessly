@@ -2,6 +2,7 @@
 import { type CSSProperties, useState } from 'react';
 
 import { useNow } from '../../../lib/hooks';
+import { useOrg } from '../../../org/context';
 import type { OrgMachine } from '../../../org/api/machines';
 import { plural } from '../../../org/screens/machines/format';
 import { LoadRow } from '../../charts/spark';
@@ -24,6 +25,8 @@ const NEEDS: Record<string, string> = {
 };
 
 const CARD = 't-card viz-card dash-tile hd-card';
+const AGENT_NAME = { claude: 'Claude Code', codex: 'Codex' } as const;
+const START_CMD = 'harnessly agent start --autostart';
 const LIFE = ['Связь', 'Подтверждение', 'Подготовка', 'Готова к чатам'];
 
 const Skeleton = () => (
@@ -60,6 +63,9 @@ export const MachineDrawer = ({
   const own = useOpenMachine();
   const ws = opener ?? own;
   const [renaming, setRenaming] = useState<string | null>(null);
+  const { api, scope } = useOrg();
+  const [copied, setCopied] = useState(false);
+  const [reapply, setReapply] = useState<'idle' | 'busy' | 'sent' | 'fail'>('idle');
   const now = useNow(30_000, open);
   const d = card.detail;
   const m = d?.machine ?? hint;
@@ -93,7 +99,31 @@ export const MachineDrawer = ({
     if (!d || !m || !st) return <Skeleton />;
     const off = m.state === 'offline' || m.state === 'disabled';
     // The hub knows only whether the machine answers: before that it is at the first step, after it all are done.
-    const li = off ? 0 : 4;
+    const setup = d.setup ?? null;
+    const needsTrust = !off && setup?.runtime === 'needs_trust';
+    const preparing = !off && !needsTrust && setup?.env != null && setup.env.applied < setup.env.total;
+    const li = off ? 0 : needsTrust ? 1 : preparing ? 2 : 4;
+    const copyCmd = () => {
+      void navigator.clipboard?.writeText(START_CMD).then(
+        () => {
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 2000);
+        },
+        () => undefined,
+      );
+    };
+    const applyAgain = () => {
+      setReapply('busy');
+      api
+        .meRun({ mode: 'update', machineId: m.id }, scope.kind === 'tenant' ? scope.tenant.slug : undefined)
+        .then(
+          () => {
+            setReapply('sent');
+            window.setTimeout(() => card.reload(), 4000);
+          },
+          () => setReapply('fail'),
+        );
+    };
     const pill =
       st.st === 'busy'
         ? { cls: 'info', label: st.label }
@@ -135,7 +165,43 @@ export const MachineDrawer = ({
           <b>{st.label}</b>
           <div className="mut sm" style={{ marginTop: 6 }}>
             {st.hint}. Чаты на ней недоступны. Проверьте, что машина включена и у неё есть сеть: хаб увидит её
-            сам.
+            сам. Если машина включена, а агент на ней не запущен, запустите его на самой машине:
+          </div>
+          <div className="row" style={{ margin: '8px 0 10px', gap: 8 }}>
+            <code className="hd-code" style={{ flex: 1, overflowX: 'auto', whiteSpace: 'nowrap' }}>
+              {START_CMD}
+            </code>
+            <Btn variant="ghost" size="sm" icon="copy" onClick={copyCmd}>
+              {copied ? 'Скопировано' : 'Копировать'}
+            </Btn>
+          </div>
+          <Btn variant="primary" size="sm" icon="refresh-cw" onClick={() => card.reload()}>
+            Проверить снова
+          </Btn>
+        </div>
+      ) : needsTrust ? (
+        <div className="fixbox">
+          <b>Машина ждёт подтверждения</b>
+          <div className="mut sm" style={{ margin: '6px 0 10px' }}>
+            Хаб открывает страницу машины на своём адресе, поэтому пускает только подтверждённые машины. Если
+            вы подключили её сами, подтвердите, что она ваша.
+          </div>
+          <Btn
+            variant="primary"
+            size="sm"
+            icon="shield-check"
+            busy={ws.busyId === m.id}
+            onClick={() => void ws.trust(m.id).then(() => card.reload())}
+          >
+            Это моя машина — подтвердить
+          </Btn>
+        </div>
+      ) : preparing && setup?.env ? (
+        <div className="fixbox">
+          <b>Машина готовится</b>
+          <div className="mut sm" style={{ marginTop: 6 }}>
+            Окружение команды стоит на {setup.env.applied} из {setup.env.total}: чаты уже можно открывать,
+            остальное ставится при следующем обновлении.
           </div>
         </div>
       ) : m.runnerOutdated ? (
@@ -320,25 +386,106 @@ export const MachineDrawer = ({
           onCancel={() => url.setTab(null)}
           onSave={saveAccess}
         />
-        {m.runnerVersion && (
+        {(m.runnerVersion || (setup && setup.agents.length > 0)) && (
           <div className="sec">
             <h4>Агенты на машине</h4>
             <div className={CARD}>
-              <div className="row sp">
-                <div className="row">
-                  <b>Раннер harnessly</b>
-                  <span className={`pill ${m.runnerOutdated ? 'warn' : 'ok'}`}>
-                    <span className="hd-d" />
-                    {m.runnerVersion}
-                    {m.runnerOutdated ? ' · устарел' : ''}
-                  </span>
+              {setup?.agents.map((a) => {
+                const acc = setup.accounts.find((c) => c.provider === a.provider);
+                const login = !a.installed
+                  ? 'не поставлен'
+                  : a.login === 'out'
+                    ? 'вход не выполнен'
+                    : acc
+                      ? `работает на подписке «${acc.label}»`
+                      : a.login === 'in'
+                        ? 'вход выполнен'
+                        : null;
+                return (
+                  <div key={a.provider} style={{ marginBottom: 8 }}>
+                    <div className="row">
+                      <b>{AGENT_NAME[a.provider]}</b>
+                      <span className={`pill ${!a.installed ? '' : a.login === 'out' ? 'warn' : 'ok'}`}>
+                        <span className="hd-d" />
+                        {a.installed ? (a.version ?? 'поставлен') : 'не поставлен'}
+                      </span>
+                    </div>
+                    {login && (
+                      <div className="mut sm" style={{ marginTop: 2 }}>
+                        {login}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {m.runnerVersion && (
+                <div className="row sp">
+                  <div className="row">
+                    <b>Раннер harnessly</b>
+                    <span className={`pill ${m.runnerOutdated ? 'warn' : 'ok'}`}>
+                      <span className="hd-d" />
+                      {m.runnerVersion}
+                      {m.runnerOutdated ? ' · устарел' : ''}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
               {m.os && (
                 <div className="mut sm" style={{ marginTop: 4 }}>
                   {m.os}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+        {setup && (
+          <div className="sec">
+            <h4>Окружение и подписка</h4>
+            <div className={CARD}>
+              <div className="row sp">
+                <div>
+                  {setup.env ? (
+                    <div>
+                      Окружение команды применено{' '}
+                      <b>
+                        {setup.env.applied} из {setup.env.total}
+                      </b>
+                    </div>
+                  ) : (
+                    <div className="mut">Окружение: машина ещё не отчиталась</div>
+                  )}
+                  <div style={{ marginTop: 4 }}>
+                    {setup.accounts.length > 0 ? (
+                      <>
+                        Подписка —{' '}
+                        <b>
+                          {setup.accounts
+                            .map((c) => (c.plan ? `${c.label} (${c.plan})` : c.label))
+                            .join(', ')}
+                        </b>
+                      </>
+                    ) : (
+                      <span className="mut">Подписка: чатов на машине ещё не было</span>
+                    )}
+                  </div>
+                </div>
+                {m.mine && !disabled && m.state !== 'offline' && (
+                  <Btn
+                    variant="ghost"
+                    size="sm"
+                    icon="refresh-cw"
+                    busy={reapply === 'busy'}
+                    disabled={busy != null}
+                    onClick={applyAgain}
+                  >
+                    {reapply === 'sent'
+                      ? 'Запущено'
+                      : reapply === 'fail'
+                        ? 'Не вышло, ещё раз'
+                        : 'Применить заново'}
+                  </Btn>
+                )}
+              </div>
             </div>
           </div>
         )}

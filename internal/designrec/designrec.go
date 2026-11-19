@@ -249,21 +249,47 @@ func (s *Syncer) PushCover(ctx context.Context, id string, data []byte) (bool, e
 	if s.settled(key, hexSum) {
 		return false, nil
 	}
-	c := s.Clients(filestore.KindCovers)
-	cur, err := c.Current(ctx, filestore.CoverPath(id))
+	return s.putPicture(ctx, filestore.KindCovers, filestore.CoverPath(id), key, hexSum, hexSum, data)
+}
+
+// PushThumb puts the picture of a board into the thumbs collection when it is not there as it is now.
+// version is the drawing's own name: a picture already sent under it is not read again. It returns whether it wrote; a
+// picture over the cap is left out.
+func (s *Syncer) PushThumb(ctx context.Context, id, boardPath, version string, read func() ([]byte, error)) (bool, error) {
+	path := filestore.ThumbPath(id, boardPath)
+	if version == "" || !(filestore.Thumbs{}).Synced(path) {
+		return false, nil
+	}
+	key := filestore.KindThumbs + "/" + path
+	mark := "v:" + version
+	if s.settled(key, mark) {
+		return false, nil
+	}
+	data, err := read()
+	if err != nil || len(data) == 0 || len(data) > filestore.MaxThumbBytes {
+		return false, nil
+	}
+	sum := sha256.Sum256(data)
+	return s.putPicture(ctx, filestore.KindThumbs, path, key, mark, hex.EncodeToString(sum[:]), data)
+}
+
+// putPicture writes a picture unless the store has it already; mark is what the Syncer remembers it by.
+func (s *Syncer) putPicture(ctx context.Context, kind, path, key, mark, sha string, data []byte) (bool, error) {
+	c := s.Clients(kind)
+	cur, err := c.Current(ctx, path)
 	if err != nil {
 		return false, err
 	}
 	wrote := false
-	if cur == nil || cur.Deleted || cur.Sha != hexSum {
-		if _, err := c.Put(ctx, filestore.CoverPath(id), data, s.Author); errors.Is(err, filesync.ErrRefused) {
-			s.refuse(key, hexSum)
+	if cur == nil || cur.Deleted || cur.Sha != sha {
+		if _, err := c.Put(ctx, path, data, s.Author); errors.Is(err, filesync.ErrRefused) {
+			s.refuse(key, mark)
 			return false, nil
 		} else if err != nil {
-			return false, fmt.Errorf("cover %s: %w", id, err)
+			return false, fmt.Errorf("%s %s: %w", kind, path, err)
 		}
 		wrote = true
 	}
-	s.remember(key, hexSum)
+	s.remember(key, mark)
 	return wrote, nil
 }

@@ -220,3 +220,45 @@ export const startGeneration = (m: MachineId, artifact: string, p: IGenParams): 
     scene('/generate'),
     postJson({ artifact, action: 'start', confirm: true, ...p }),
   );
+
+/** A blender-lab project of the machine to make a 3D scene of. */
+export interface IScene3dProject {
+  root: string;
+  name: string;
+  blends: string[];
+  scripts: string[];
+}
+
+const readProject = (v: unknown): IScene3dProject | null => {
+  if (typeof v !== 'object' || v === null) return null;
+  const r = v as Record<string, unknown>;
+  const strs = (x: unknown): string[] =>
+    Array.isArray(x) ? x.filter((s): s is string => typeof s === 'string') : [];
+  return typeof r.root === 'string' && typeof r.name === 'string'
+    ? { root: r.root, name: r.name, blends: strs(r.blends), scripts: strs(r.scripts) }
+    : null;
+};
+
+/** The projects the machine finds around its library, or the one in `root` (an absolute folder the person typed). */
+export const discoverScene3d = async (
+  m: MachineId,
+  root = '',
+  signal?: AbortSignal,
+): Promise<IScene3dProject[]> => {
+  const answer = await runtimeJson<{ projects?: unknown }>(
+    m,
+    scene(root ? `/projects?${q({ root })}` : '/projects'),
+    { signal, cache: 'no-store' },
+  );
+  return (Array.isArray(answer.projects) ? answer.projects : []).flatMap((p) => readProject(p) ?? []);
+};
+
+/** A new 3D scene document over a project of the machine; its id. */
+export const createScene3d = async (
+  m: MachineId,
+  input: { title: string; root: string; blend: string; script: string },
+): Promise<{ id: string; title: string }> => {
+  const a = await runtimeJson<{ id?: unknown; title?: unknown }>(m, scene('/new'), postJson(input), 60_000);
+  if (typeof a.id !== 'string') throw new RuntimeError(t('next.failure.http'));
+  return { id: a.id, title: typeof a.title === 'string' ? a.title : input.title };
+};

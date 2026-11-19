@@ -17,7 +17,8 @@ import type {
 import { useOrg } from '../../../org/context';
 import { useLoad } from '../../../org/hooks';
 import { seatsOn } from '../../flag';
-import { applyOverlay, countByServers, sizeText } from './calc';
+import { useNow } from '../../../lib/hooks';
+import { applyOverlay, countByServers, machineSignals, sizeText } from './calc';
 
 const POLL_MS = 3_000;
 
@@ -40,6 +41,18 @@ export const useMachineList = () => {
   }, [loaded.data, over, seats]);
   const patch = useCallback((m: OrgMachine) => setOver((o) => ({ ...o, [m.id]: m })), []);
   return { data, error: loaded.error, reload: loaded.reload, refresh: loaded.refresh, patch };
+};
+
+/** How many machines of the open scope need a person's step: the count beside «Машины» in the menu. */
+export const useMachineAttention = (): number => {
+  const { scope, shell } = useOrg();
+  const slug = scope.kind === 'org' ? 'all' : scope.tenant.slug;
+  const loaded = useLoad((api) => api.machinesList(shell.org.slug, { scope: slug }), [shell.org.slug, slug]);
+  const now = useNow(60_000);
+  return useMemo(
+    () => (loaded.data ? machineSignals(loaded.data.groups, now).length : 0),
+    [loaded.data, now],
+  );
 };
 
 const withBusy = (d: MachineDetail, kind: MachineBusyKind): MachineDetail => ({

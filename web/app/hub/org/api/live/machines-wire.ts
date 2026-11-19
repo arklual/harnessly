@@ -1,7 +1,13 @@
 // What the machines endpoints of the hub carry beyond the old `HubMachine` (machine resources): the hardware,
 // the load now, the week's spend, the provider's server, the managed capabilities and the operations in flight. Every
 // field is optional here: a hub that does not send one leaves the screen with «—», never with a made-up number.
-import { type Money, type MachineBusyKind, type MachineManaged, type OrgMachine } from '../machines';
+import {
+  type Money,
+  type MachineBusyKind,
+  type MachineManaged,
+  type MachineSetup,
+  type OrgMachine,
+} from '../machines';
 
 export interface WireMoney {
   amount: number;
@@ -121,3 +127,34 @@ export const hourly = (points: readonly WirePoint[], pick: 'cpuAvg' | 'ramAvg' |
   }
   return out;
 };
+
+/** `GET /api/machines/{id}`: the part of the hub's View the card reads. */
+export interface WireView {
+  runtime?: string;
+  agents?: { provider: string; installed: boolean; version: string | null; login: string }[];
+}
+
+/** The `setup` of that answer (internal/hub/machines/setup.go). */
+export interface WireSetup {
+  env: { applied: number; total: number; reportedAt: string | null } | null;
+  accounts: { provider: string; label: string; kind: string; plan: string }[];
+}
+
+const LOGIN = { logged_in: 'in', logged_out: 'out' } as const;
+
+export const machineSetupOf = (v: WireView, s: WireSetup | undefined): MachineSetup => ({
+  runtime: v.runtime === 'needs_trust' || v.runtime === 'blocked' ? v.runtime : 'ready',
+  agents: (v.agents ?? [])
+    .filter(
+      (a): a is typeof a & { provider: 'claude' | 'codex' } =>
+        a.provider === 'claude' || a.provider === 'codex',
+    )
+    .map((a) => ({
+      provider: a.provider,
+      installed: a.installed,
+      version: a.version,
+      login: LOGIN[a.login as keyof typeof LOGIN] ?? 'unknown',
+    })),
+  env: s?.env ?? null,
+  accounts: s?.accounts ?? [],
+});

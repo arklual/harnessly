@@ -529,7 +529,11 @@ func (s *Service) get(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) err
 	if err != nil {
 		return err
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"machine": v})
+	setup, err := s.setup(r.Context(), m)
+	if err != nil {
+		return err
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"machine": v, "setup": setup})
 	return nil
 }
 

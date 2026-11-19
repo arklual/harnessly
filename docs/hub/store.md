@@ -257,4 +257,16 @@ The cover of a project (the first shot of its last check) is kept apart from the
 `<project id>.jpg`, at most 1 MB, with the access of the project (the same filter as the records). A runtime puts it there
 together with the records, under a hub and without one. With the switch `hub-design-owner` the hub's library points the card's
 `cover` at `GET /api/platform/design/store-cover?project=<id>&v=<sha>`, which gives the picture only to a person who may open the
-project (a closed project answers 404 like a missing cover). The previews of boards (`.thumbs/`) are not in the store yet.
+project (a closed project answers 404 like a missing cover). The hub reads a cover by its path
+(`Current` + blob) and lists them by the collection's changes.
+
+### Board pictures
+
+The picture of a board the library card shows is drawn by the machine into `.thumbs/` of the project. The newest one drawn of
+each board goes to the `thumbs` collection: `<project id>/<first 16 hex of sha1(board path)>.jpg`, at most 1 MB, with the access
+of the project. A runtime pushes them with the covers (on a library change and every 5 minutes), reads a file only when its
+name changed and writes it only when its bytes did; it draws nothing for the store. A machine that is on answers
+`GET /api/<platform>/design/library/thumb` itself, as before. While it is off and the switch `hub-design-owner` is on, the hub
+answers that route from the store: the picture only to a person who may open the project, `Cache-Control: private, no-cache`
+with an `ETag`, 404 with `no-store` when there is none. The picture may be of an earlier version of the board; pictures of
+deleted boards stay in the collection.

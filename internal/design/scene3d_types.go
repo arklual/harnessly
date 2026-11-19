@@ -30,7 +30,7 @@ const (
 	Scene3DTexMax        = 1024
 	Scene3DCacheMax      = 1 << 30 // bytes of drafts kept per scene before the oldest are dropped
 	scene3dMaxJobs       = 1       // drafts rendered at once by this runtime
-	scene3dExportVersion = 2       // moves with scene3d_export.py: a new exporter makes new models
+	scene3dExportVersion = 3       // moves with scene3d_export.py: a new exporter makes new models
 	scene3dMaxShot       = 400 << 10
 )
 
@@ -95,6 +95,15 @@ type Scene3DMeta struct {
 	Markers []Scene3DMarker `json:"markers"`
 	Bounds  [6]float64      `json:"bounds"` // min xyz, max xyz in Blender's axes
 	Stats   Scene3DStats    `json:"stats"`
+	// Bake is what the glTF's actions do not carry (drivers, constraints, NLA): an object's local transform at sampled frames, by name.
+	// m "e": [frame, location xyz, XYZ euler, scale xyz]; m "q": [frame, location, quaternion wxyz, scale]. Blender's axes.
+	Bake map[string]Scene3DBake `json:"bake,omitempty"`
+}
+
+// Scene3DBake is one baked object's samples.
+type Scene3DBake struct {
+	M    string      `json:"m"`
+	Rows [][]float64 `json:"rows"`
 }
 
 // The statuses of the model and of a frame.

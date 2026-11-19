@@ -41,7 +41,9 @@ type Rooms func(ctx context.Context, spaceID string) (Room, error)
 type Options struct {
 	Rooms Rooms
 	// Covers opens a space's covers collection; nil: no covers.
-	Covers Rooms
+	Covers PictureRooms
+	// Thumbs opens a space's collection of board pictures; nil: none.
+	Thumbs PictureRooms
 	// Dir holds the revisions put into folders and the contents they share (<data>/design-view).
 	Dir string
 	// GuestApp is the built web page: the guest page of a link is served from it.

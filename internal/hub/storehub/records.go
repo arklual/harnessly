@@ -29,6 +29,11 @@ func (s *Store) coversFilter(ctx context.Context, m store.Machine, acc *filestor
 	return s.entityFilter(ctx, m, acc, filestore.CoverID, false)
 }
 
+// thumbsFilter is the same for the thumbs collection: `<id>/<key>.jpg` follows the access of the project `<id>`.
+func (s *Store) thumbsFilter(ctx context.Context, m store.Machine, acc *filestore.Access) error {
+	return s.entityFilter(ctx, m, acc, filestore.ThumbID, false)
+}
+
 func (s *Store) entityFilter(ctx context.Context, m store.Machine, acc *filestore.Access, idOf func(string) (string, bool), records bool) error {
 	view, scope, err := s.view(ctx, m)
 	if err != nil {

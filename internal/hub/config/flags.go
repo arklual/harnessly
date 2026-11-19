@@ -32,6 +32,7 @@ var Flags = []Flag{
 	{Name: "HUB_ORGS", Owner: "access", Temporary: true, RemoveAfter: "2027-02-01"},
 	{Name: "HUB_RESOURCE_ACCESS", Owner: "access", Temporary: true, RemoveAfter: "2027-02-01"},
 	{Name: "HUB_SWITCHES", Owner: "access"},
+	{Name: "HUB_ANALYTICS_CACHE", Owner: "analytics"},
 	{Name: "HUB_EFFICIENCY_MARKERS", Owner: "analytics"},
 	{Name: "HUB_EFFICIENCY_REGRESSIONS", Owner: "analytics"},
 	{Name: "HUB_EFFICIENCY_TRACKER_PROJECT", Owner: "analytics"},

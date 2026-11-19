@@ -1,7 +1,8 @@
-// The 3D scene's shell: the bar, the stage with the viewer (orbit, the scene's cameras, modes, the frame guide), the side
-// panel (objects, pins, draft frames, checks) and the timeline. The viewer itself (three.js, viewer.ts) is loaded when a
-// model is ready. A pin is an object, a point on its surface, the view and the frame; a click on it takes the camera back.
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+// The 3D scene's shell: the bar, the stage with the viewer (orbit, the scene's cameras, modes, the frame guide) over the
+// timeline (scene3d-timeline.tsx), and the panel on the right that folds away (objects, pins, draft frames, checks). The
+// viewer itself (three.js, viewer.ts) is loaded when a model is ready. A pin is an object, a point on its surface, the
+// view and the frame; a click on it takes the camera back; its composer is a popover by the point.
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { t } from '@/next/i18n';
 import { platformPath, runtimePath } from '@/next/core/net/machine';
 import { BuilderPicker } from '@/next/features/builders/builder-picker';
@@ -25,8 +26,6 @@ import {
   CHECK,
   checksOf,
   clock,
-  durationOf,
-  markersOf,
   pathTo,
   timeOf,
   treeOf,
@@ -46,6 +45,7 @@ import {
 } from '@/next/features/designly/scene3d/types';
 import type { SceneViewer } from '@/next/features/designly/scene3d/viewer';
 import Clips from '@/next/features/designly/scene3d/scene3d-clips';
+import Timeline from '@/next/features/designly/scene3d/scene3d-timeline';
 import { putScene3dPin, resolveScene3dPin, setScene3d } from '@/next/stores/scene3d';
 
 export interface IScene3dViewProps {
@@ -153,6 +153,8 @@ const Scene3dView = (props: IScene3dViewProps) => {
   const [frame, setFrame] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [camera, setCamera] = useState(FREE);
+  /** The object the orbit follows while it moves (its Blender name), '' for none. */
+  const [following, setFollowing] = useState('');
   const [mode, setMode] = useState<TViewMode>(VIEW_MODE.material);
   const [tab, setTab] = useState<TTab>(TAB.objects);
   const [selected, setSelected] = useState('');
@@ -670,11 +672,49 @@ const Scene3dView = (props: IScene3dViewProps) => {
     { id: TAB.checks, label: t('next.scene3d.tabChecks'), n: checks.length },
   ];
 
-  const markers = meta ? markersOf(meta) : [];
-  const duration = meta ? durationOf(meta) : 0;
+  // ---- the layout: the panel on the right folds away; a narrow page starts with it folded
+  const root = useRef<HTMLDivElement | null>(null);
+  const [side, setSide] = useState<boolean | null>(null);
+  useLayoutEffect(() => {
+    if (side === null) setSide((root.current?.clientWidth ?? 1200) >= NARROW_PX);
+  }, [side]);
+  const sideOpen = side ?? true;
+  const openTab = (x: TTab) => {
+    setTab(x);
+    setSide(true);
+  };
+
+  // The pin's popover stands by its point and follows it while the view moves (read every frame while it is open).
+  const stageRef = useRef<HTMLElement | null>(null);
+  const [placed, setPlaced] = useState<IPlaced | null>(null);
+  const draftPoint = draft?.p;
+  useEffect(() => {
+    if (!draftPoint) return;
+    let raf = 0;
+    const follow = () => {
+      const at = viewer.current?.screenOf(draftPoint) ?? null;
+      const el = stageRef.current;
+      const next = at && el ? placePopover(at, el.clientWidth, el.clientHeight) : null;
+      setPlaced((cur) => (samePlace(cur, next) ? cur : next));
+      raf = requestAnimationFrame(follow);
+    };
+    raf = requestAnimationFrame(follow);
+    return () => {
+      cancelAnimationFrame(raf);
+      setPlaced(null);
+    };
+  }, [draftPoint]);
+  const anchor = draftPoint ? placed?.at : undefined;
+  const pop = draftPoint ? placed : null;
 
   return (
-    <div className="hx-scene3d" data-embed={props.pane ? '1' : '0'} data-pins={props.canPin ? '1' : '0'}>
+    <div
+      ref={root}
+      className="hx-scene3d"
+      data-embed={props.pane ? '1' : '0'}
+      data-pins={props.canPin ? '1' : '0'}
+      data-side={sideOpen ? 'open' : 'closed'}
+    >
       <header className="hx-scene3d__bar">
         {props.pane && (
           <button
@@ -705,9 +745,20 @@ const Scene3dView = (props: IScene3dViewProps) => {
             onClick={props.access.onOpen}
           >
             <Icon name="share" size="sm" />
-            {props.access.label}
+            <span className="hx-scene3d__wide">{props.access.label}</span>
           </button>
         )}
+        <button
+          type="button"
+          className="hx-head-btn"
+          aria-label={sideOpen ? t('next.scene3d.panelHide') : t('next.scene3d.panelShow')}
+          title={sideOpen ? t('next.scene3d.panelHide') : t('next.scene3d.panelShow')}
+          aria-pressed={sideOpen}
+          aria-controls="hx-scene3d-side"
+          onClick={() => setSide(!sideOpen)}
+        >
+          <Icon name="panel-right" />
+        </button>
         {props.onToggleMax && (
           <button
             type="button"
@@ -721,151 +772,218 @@ const Scene3dView = (props: IScene3dViewProps) => {
         )}
       </header>
 
-      <div className="hx-scene3d__main">
-        <section className="hx-scene3d__stage" aria-label={t('next.scene3d.stage')}>
-          <div className="hx-scene3d__view">{stage()}</div>
+      <div className="hx-scene3d__body">
+        <div className="hx-scene3d__work">
+          <section ref={stageRef} className="hx-scene3d__stage" aria-label={t('next.scene3d.stage')}>
+            <div className="hx-scene3d__view">{stage()}</div>
 
-          {loaded && meta && (
-            <div className="hx-scene3d__tools" role="toolbar" aria-label={t('next.scene3d.tools')}>
-              <label className="hx-scene3d__select">
-                <Icon name="camera" size="sm" />
-                <select
-                  value={camera}
-                  onChange={(e) => pickCamera(e.target.value)}
-                  aria-label={t('next.scene3d.camera')}
-                >
-                  <option value={FREE}>{t('next.scene3d.camFree')}</option>
-                  {meta.cameras.map((c) => (
-                    <option key={c.n} value={c.n}>
-                      {c.n}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <span className="hx-scene3d__seg" role="group" aria-label={t('next.scene3d.look')}>
-                {([VIEW_MODE.material, VIEW_MODE.clay, VIEW_MODE.wire] as const).map((m) => (
-                  <button key={m} type="button" aria-pressed={mode === m} onClick={() => pickMode(m)}>
-                    {t(MODE_KEYS[m])}
-                  </button>
-                ))}
-              </span>
-              <button
-                type="button"
-                className="hx-btn"
-                data-variant="ghost"
-                data-size="sm"
-                onClick={() => (viewer.current?.resetView(), pickCamera(FREE))}
-              >
-                <Icon name="locate" size="sm" />
-                {t('next.scene3d.reset')}
-              </button>
-              <span className="hx-scene3d__grow" />
-              <label className="hx-scene3d__select" title={t('next.scene3d.where')}>
-                <BuilderPicker
-                  value={builder}
-                  onChange={setBuilder}
-                  caps={['blender']}
-                  base={pickerBase}
-                  disabled={drafting}
-                />
-              </label>
-              <button
-                type="button"
-                className="hx-btn"
-                data-variant="primary"
-                data-size="sm"
-                disabled={drafting}
-                onClick={draftHere}
-                title={t('next.scene3d.draftHint', { engine: state?.engine ?? '' })}
-              >
-                <Icon name={drafting ? 'loader-circle' : 'image'} size="sm" />
-                {drafting ? t('next.scene3d.drafting') : t('next.scene3d.draft')}
-              </button>
-            </div>
-          )}
-
-          {failure && (
-            <div className="hx-scene3d__toast" role="alert">
-              {failure}
-              <button type="button" aria-label={t('next.scene3d.dismiss')} onClick={() => setFailure(null)}>
-                <Icon name="x" size="sm" />
-              </button>
-            </div>
-          )}
-
-          {shown && (
-            <figure className="hx-scene3d__draft">
-              <img src={frameUrl(machine, id, shown.key)} alt={t('next.scene3d.renderAlt')} />
-              <figcaption>
-                {t('next.scene3d.draftCaption', {
-                  cam: shown.cam?.n ?? t('next.scene3d.camFree'),
-                  time: meta ? clock(timeOf(meta, shown.frame)) : String(shown.frame),
-                  engine: shown.engine ?? '',
-                  where: shown.where ?? t('next.scene3d.here'),
-                })}
-                <button type="button" aria-label={t('next.scene3d.dismiss')} onClick={() => setShown(null)}>
-                  <Icon name="x" size="sm" />
-                </button>
-              </figcaption>
-            </figure>
-          )}
-
-          {draft && props.canPin && (
-            <form
-              className="hx-scene3d__composer"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void savePin();
-              }}
-            >
-              <p className="hx-scene3d__composerOn">
-                <Icon name="map-pin" size="sm" />
-                {draft.object
-                  ? t('next.scene3d.pinOn', { object: draft.object })
-                  : t('next.scene3d.pinOnScene')}
-                {meta && ` · ${clock(timeOf(meta, frame))}`}
-              </p>
-              <textarea
-                autoFocus
-                rows={3}
-                value={draft.text}
-                placeholder={t('next.scene3d.pinPlaceholder')}
-                onChange={(e) => setDraft({ ...draft, text: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                    e.preventDefault();
-                    void savePin();
-                  }
-                }}
-              />
-              <div className="hx-scene3d__composerRow">
+            {loaded && meta && (
+              <div className="hx-scene3d__tools" role="toolbar" aria-label={t('next.scene3d.tools')}>
+                <label className="hx-scene3d__select" title={t('next.scene3d.camera')}>
+                  <Icon name="camera" size="sm" />
+                  <select
+                    value={camera}
+                    onChange={(e) => pickCamera(e.target.value)}
+                    aria-label={t('next.scene3d.camera')}
+                  >
+                    <option value={FREE}>{t('next.scene3d.camFree')}</option>
+                    {meta.cameras.map((c) => (
+                      <option key={c.n} value={c.n}>
+                        {c.n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <button
                   type="button"
-                  className="hx-btn"
-                  data-variant="ghost"
-                  data-size="sm"
-                  onClick={() => setDraft(null)}
+                  className="hx-scene3d__icon"
+                  aria-label={t('next.scene3d.reset')}
+                  title={t('next.scene3d.reset')}
+                  onClick={() => (
+                    viewer.current?.follow(''),
+                    setFollowing(''),
+                    viewer.current?.resetView(),
+                    pickCamera(FREE)
+                  )}
                 >
-                  {t('next.scene3d.cancel')}
+                  <Icon name="locate" size="sm" />
                 </button>
                 <button
-                  type="submit"
-                  className="hx-btn"
+                  type="button"
+                  className="hx-scene3d__icon hx-scene3d__follow"
+                  aria-label={
+                    following === ''
+                      ? t('next.scene3d.follow')
+                      : t('next.scene3d.followOn', { object: following })
+                  }
+                  aria-pressed={following !== ''}
+                  disabled={camera !== FREE || (following === '' && selected === '')}
+                  title={t('next.scene3d.followHint')}
+                  onClick={() => {
+                    const next = following === '' ? selected : '';
+                    viewer.current?.follow(next);
+                    setFollowing(next);
+                  }}
+                >
+                  <Icon name="eye" size="sm" />
+                  {following !== '' && <span className="hx-scene3d__wide">{following}</span>}
+                </button>
+                <span className="hx-scene3d__sep" aria-hidden="true" />
+                <span className="hx-scene3d__seg" role="group" aria-label={t('next.scene3d.look')}>
+                  {([VIEW_MODE.material, VIEW_MODE.clay, VIEW_MODE.wire] as const).map((m) => (
+                    <button key={m} type="button" aria-pressed={mode === m} onClick={() => pickMode(m)}>
+                      {t(MODE_KEYS[m])}
+                    </button>
+                  ))}
+                </span>
+                <span className="hx-scene3d__sep" aria-hidden="true" />
+                <span className="hx-scene3d__select hx-scene3d__where" title={t('next.scene3d.where')}>
+                  <BuilderPicker
+                    value={builder}
+                    onChange={setBuilder}
+                    caps={['blender']}
+                    base={pickerBase}
+                    disabled={drafting}
+                  />
+                </span>
+                <button
+                  type="button"
+                  className="hx-btn hx-scene3d__draftBtn"
                   data-variant="primary"
                   data-size="sm"
-                  disabled={busy || !draft.text.trim()}
+                  disabled={drafting}
+                  onClick={draftHere}
+                  title={t('next.scene3d.draftHint', { engine: state?.engine ?? '' })}
                 >
-                  {t('next.scene3d.pinSave')}
+                  <Icon name={drafting ? 'loader-circle' : 'image'} size="sm" />
+                  <span className="hx-scene3d__wide">
+                    {drafting ? t('next.scene3d.drafting') : t('next.scene3d.draft')}
+                  </span>
                 </button>
               </div>
-            </form>
-          )}
-          {!draft && loaded && props.canPin && (
-            <p className="hx-scene3d__hint">{t('next.scene3d.pinHint')}</p>
-          )}
-        </section>
+            )}
 
-        <aside className="hx-scene3d__side">
+            {failure && (
+              <div className="hx-scene3d__toast" role="alert">
+                {failure}
+                <button type="button" aria-label={t('next.scene3d.dismiss')} onClick={() => setFailure(null)}>
+                  <Icon name="x" size="sm" />
+                </button>
+              </div>
+            )}
+
+            {shown && (
+              <figure className="hx-scene3d__draft">
+                <img src={frameUrl(machine, id, shown.key)} alt={t('next.scene3d.renderAlt')} />
+                <figcaption>
+                  <span>
+                    {t('next.scene3d.draftCaption', {
+                      cam: shown.cam?.n ?? t('next.scene3d.camFree'),
+                      time: meta ? clock(timeOf(meta, shown.frame)) : String(shown.frame),
+                      engine: shown.engine ?? '',
+                      where: shown.where ?? t('next.scene3d.here'),
+                    })}
+                  </span>
+                  <button type="button" aria-label={t('next.scene3d.dismiss')} onClick={() => setShown(null)}>
+                    <Icon name="x" size="sm" />
+                  </button>
+                </figcaption>
+              </figure>
+            )}
+
+            {draft && props.canPin && pop && anchor && (
+              <span
+                className="hx-scene3d__dot"
+                aria-hidden="true"
+                style={{ left: anchor.x, top: anchor.y }}
+              />
+            )}
+            {draft && props.canPin && (
+              <form
+                className="hx-scene3d__composer"
+                data-anchored={pop ? '1' : '0'}
+                data-side={pop?.side}
+                style={pop ? { left: pop.left, top: pop.top } : undefined}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void savePin();
+                }}
+              >
+                <p className="hx-scene3d__composerOn">
+                  <Icon name="map-pin" size="sm" />
+                  <span>
+                    {draft.object
+                      ? t('next.scene3d.pinOn', { object: draft.object })
+                      : t('next.scene3d.pinOnScene')}
+                    {meta && ` · ${clock(timeOf(meta, frame))}`}
+                  </span>
+                </p>
+                <textarea
+                  autoFocus
+                  rows={2}
+                  value={draft.text}
+                  placeholder={t('next.scene3d.pinPlaceholder')}
+                  onChange={(e) => setDraft({ ...draft, text: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      void savePin();
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setDraft(null);
+                    }
+                  }}
+                />
+                <div className="hx-scene3d__composerRow">
+                  <button
+                    type="button"
+                    className="hx-btn"
+                    data-variant="ghost"
+                    data-size="sm"
+                    onClick={() => setDraft(null)}
+                  >
+                    {t('next.scene3d.cancel')}
+                  </button>
+                  <button
+                    type="submit"
+                    className="hx-btn"
+                    data-variant="primary"
+                    data-size="sm"
+                    disabled={busy || !draft.text.trim()}
+                  >
+                    {t('next.scene3d.pinSave')}
+                  </button>
+                </div>
+              </form>
+            )}
+            {!draft && loaded && props.canPin && (
+              <p className="hx-scene3d__hint">{t('next.scene3d.pinHint')}</p>
+            )}
+          </section>
+
+          {loaded && meta && (
+            <Timeline
+              meta={meta}
+              frame={frame}
+              playing={playing}
+              pins={pins}
+              activePin={activePin}
+              frames={frames}
+              onSeek={seek}
+              onTogglePlay={togglePlay}
+              onPin={(pin) => {
+                goToPin(pin);
+                openTab(TAB.pins);
+              }}
+              onFrame={(f) => {
+                if (f.status === FRAME_STATUS.ready) setShown(f);
+                openTab(TAB.frames);
+              }}
+            />
+          )}
+        </div>
+
+        <aside id="hx-scene3d-side" className="hx-scene3d__side" hidden={!sideOpen}>
           <div className="hx-scene3d__tabs" role="tablist">
             {tabs.map((x) => (
               <button
@@ -879,6 +997,14 @@ const Scene3dView = (props: IScene3dViewProps) => {
                 {x.n ? <span className="hx-scene3d__badge">{x.n}</span> : null}
               </button>
             ))}
+            <button
+              type="button"
+              className="hx-scene3d__fold-side"
+              aria-label={t('next.scene3d.panelHide')}
+              onClick={() => setSide(false)}
+            >
+              <Icon name="x" size="sm" />
+            </button>
           </div>
           {tab === TAB.objects && (objectTab ?? <p className="hx-scene3d__empty">{waiting ?? ''}</p>)}
           {tab === TAB.pins && pinsTab}
@@ -886,56 +1012,34 @@ const Scene3dView = (props: IScene3dViewProps) => {
           {tab === TAB.checks && (checksTab ?? <p className="hx-scene3d__empty">{waiting ?? ''}</p>)}
         </aside>
       </div>
-
-      {loaded && meta && (
-        <footer className="hx-scene3d__timeline">
-          <button
-            type="button"
-            className="hx-head-btn"
-            aria-label={playing ? t('next.scene3d.pause') : t('next.scene3d.play')}
-            onClick={togglePlay}
-          >
-            <Icon name={playing ? 'pause' : 'play'} />
-          </button>
-          <span className="hx-scene3d__clock">{clock(timeOf(meta, frame))}</span>
-          <div className="hx-scene3d__scrub">
-            <input
-              type="range"
-              min={meta.start}
-              max={meta.end}
-              step={1}
-              value={frame}
-              aria-label={t('next.scene3d.timeline')}
-              onChange={(e) => seek(Number(e.target.value))}
-            />
-            <div className="hx-scene3d__ticks" aria-hidden="true">
-              {markers.map((m) => (
-                <i
-                  key={`${m.f}:${m.n}`}
-                  title={m.n}
-                  style={{ left: `${((m.f - meta.start) / Math.max(1, meta.end - meta.start)) * 100}%` }}
-                />
-              ))}
-              {pins.map((p, i) => (
-                <b
-                  key={p.id}
-                  data-resolved={p.resolved}
-                  title={p.text}
-                  style={{
-                    left: `${((p.scene.frame - meta.start) / Math.max(1, meta.end - meta.start)) * 100}%`,
-                  }}
-                >
-                  {i + 1}
-                </b>
-              ))}
-            </div>
-          </div>
-          <span className="hx-scene3d__clock">{clock(duration)}</span>
-        </footer>
-      )}
     </div>
   );
 };
+
+/** Narrower than this the panel starts folded and opens over the stage (scene3d.css has the same width). */
+const NARROW_PX = 760;
+const POPOVER_W = 280;
+const POPOVER_H = 150;
+
+interface IPlaced {
+  at: { x: number; y: number };
+  left: number;
+  top: number;
+  side: 'left' | 'right';
+}
+
+/** The popover beside its point: to the right when it fits, else to the left; inside the stage. */
+const placePopover = (at: { x: number; y: number }, W: number, H: number): IPlaced => {
+  const w = Math.min(POPOVER_W, W - 24);
+  const right = at.x + 16 + w <= W - 12;
+  const left = right ? at.x + 16 : Math.max(12, at.x - 16 - w);
+  const top = Math.min(Math.max(12, at.y - 28), Math.max(12, H - POPOVER_H - 12));
+  return { at, left, top, side: right ? 'right' : 'left' };
+};
+
+const samePlace = (a: IPlaced | null, b: IPlaced | null): boolean =>
+  a === b ||
+  (!!a && !!b && Math.abs(a.at.x - b.at.x) < 0.5 && Math.abs(a.at.y - b.at.y) < 0.5 && a.top === b.top);
 
 const CHECK_KEYS = {
   [CHECK.tris]: 'next.scene3d.checkTris',

@@ -4,6 +4,7 @@ import type {
   AccessMode,
   MachineAccess,
   MachineDetail,
+  MachineSetup,
   MachineGroup,
   MachinesApi,
   MachinesList,
@@ -355,8 +356,31 @@ export const machinesMock = (ctx: MockCtx): MachinesApi => {
       kept: ['id машины', 'ключ', 'история'],
     };
   };
+  /** What a machine reports: all but a couple in order, so that the card's rarer states can be seen. */
+  const setupOf = (m: OrgMachine): MachineSetup => ({
+    runtime: m.id === 'm3' ? 'needs_trust' : 'ready',
+    agents: [
+      { provider: 'claude', installed: true, version: '2.1.4', login: 'in' },
+      m.id === 'm4'
+        ? { provider: 'codex', installed: false, version: null, login: 'unknown' }
+        : { provider: 'codex', installed: true, version: '0.51.2', login: m.id === 'm2' ? 'out' : 'in' },
+    ],
+    env:
+      m.state === 'offline'
+        ? null
+        : { applied: m.id === 'm2' ? 6 : 8, total: 8, reportedAt: new Date().toISOString() },
+    accounts: [
+      {
+        provider: 'anthropic',
+        label: m.teamName === 'Бэкенд' ? 'Claude Max №2' : 'Claude Max №1',
+        kind: 'subscription',
+        plan: 'max',
+      },
+    ],
+  });
   const detail = (m: OrgMachine): MachineDetail => ({
     machine: m,
+    setup: setupOf(m),
     series:
       m.cpu === null
         ? { cpu: [], ram: [], disk: [] }

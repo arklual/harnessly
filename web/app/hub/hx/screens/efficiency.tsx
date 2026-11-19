@@ -4,7 +4,14 @@
 // before the hub began to keep cycles) is said on the screen, never drawn from nothing. Comes with the lively hub (`ui.hx.live`).
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { AnalyticsFrame, KpiId, LimitHistory } from '../../org/api/analytics';
+import type {
+  AnalyticsFrame,
+  EffChannel,
+  EffPulse,
+  EffPulseMarks,
+  KpiId,
+  LimitHistory,
+} from '../../org/api/analytics';
 import { orgErrorText } from '../../org/api/errors';
 import { useOrg } from '../../org/context';
 import { navigate } from '../../lib/router';
@@ -95,6 +102,145 @@ const LimitHistoryView = ({ history }: { history: LimitHistory }) => {
   );
 };
 
+const CHANNEL_NAME: Record<EffChannel['id'], string> = {
+  tab: 'Вкладки на машинах',
+  automation: 'Автоматизации',
+  eval: 'Эвалы',
+};
+
+const Channels = ({ channels }: { channels: EffChannel[] }) => {
+  const rows = channels.filter((c) => c.sessions > 0 || c.usd > 0);
+  if (rows.length === 0) return null;
+  const max = Math.max(...rows.map((c) => c.usd), 0.01);
+  return (
+    <div className="t-card viz-card dash-tile hd-card efx-chan">
+      <div className="ch">
+        <h3>Откуда расходы</h3>
+        <div className="hd-r">
+          <span className="mut2 sm">канал запуска · за MR</span>
+        </div>
+      </div>
+      <div className="efx-chl">
+        {rows.map((c) => (
+          <div key={c.id} className="efx-chr" style={{ cursor: 'default' }}>
+            <span className="efx-chr__n">{CHANNEL_NAME[c.id]}</span>
+            <span className="efx-chr__b">
+              <i style={{ width: `${((c.usd / max) * 100).toFixed(0)}%` }} />
+            </span>
+            <b className="num" style={{ whiteSpace: 'nowrap' }}>
+              {money(c.usd)}
+            </b>
+            <span className="mut2 sm num">{c.mrs > 0 ? `${money(c.usd / c.mrs)} / MR` : 'без MR'}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const PULSE_ASKS: { key: keyof EffPulseMarks; title: string; hint: string }[] = [
+  { key: 'speed', title: 'Скорость', hint: 'Агенты ускоряли работу' },
+  { key: 'quality', title: 'Доверие', hint: 'Сдавал работу агента без переделки' },
+  { key: 'friction', title: 'Трение', hint: 'Харнес не мешал: 1 — мешал сильно, 5 — не мешал' },
+];
+
+const Pulse = ({ pulse, onSaved }: { pulse: EffPulse; onSaved: (p: EffPulse) => void }) => {
+  const { api } = useOrg();
+  const [marks, setMarks] = useState<Partial<EffPulseMarks>>({});
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const done = pulse.answered && pulse.current && !editing;
+  const left = PULSE_ASKS.filter((a) => !marks[a.key]).length;
+  const save = () => {
+    if (left > 0) return;
+    setBusy(true);
+    setError(null);
+    api
+      .savePulse(marks as EffPulseMarks)
+      .then((r) => {
+        onSaved(r);
+        setEditing(false);
+      })
+      .catch(setError)
+      .finally(() => setBusy(false));
+  };
+  if (done && pulse.current) {
+    const c = pulse.current;
+    return (
+      <div className="t-card viz-card dash-tile hd-card efx-pulse">
+        <div className="ch">
+          <h3>Пульс недели</h3>
+          <div className="hd-r">
+            <span className="pill ok">сохранён</span>
+          </div>
+        </div>
+        <div className="mut">
+          Пульс недели с {dayText(pulse.week)} сохранён: скорость {c.speed}, доверие {c.quality}, трение{' '}
+          {c.friction}.
+        </div>
+        <div className="row" style={{ marginTop: 12 }}>
+          <Btn
+            size="sm"
+            icon="undo-2"
+            onClick={() => {
+              setMarks(c);
+              setEditing(true);
+            }}
+          >
+            Изменить
+          </Btn>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="t-card viz-card dash-tile hd-card efx-pulse">
+      <div className="ch">
+        <h3>Пульс недели</h3>
+        <div className="hd-r">
+          <span className="mut2 sm">30 секунд, раз в неделю</span>
+        </div>
+      </div>
+      <div className="mut sm">
+        Цифры не видят, как вам работается. Ответ видите только вы; в цифры команды он не попадает.
+      </div>
+      <div className="efx-pq">
+        {PULSE_ASKS.map((a) => (
+          <div key={a.key} className="efx-pr">
+            <div>
+              <b>{a.title}</b>
+              <div className="mut2 sm">{a.hint}</div>
+            </div>
+            <div className="hx-set__seg" role="radiogroup" aria-label={a.title}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className="hx-set__seg-item"
+                  role="radio"
+                  aria-checked={marks[a.key] === n}
+                  onClick={() => setMarks((m) => ({ ...m, [a.key]: n }))}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="row" style={{ marginTop: 14 }}>
+        <Btn variant="primary" size="sm" disabled={left > 0} busy={busy} onClick={save}>
+          Сохранить
+        </Btn>
+        <span className="mut2 sm">
+          {error ? orgErrorText(error) : left === 0 ? 'Готово к сохранению' : `Осталось ответить: ${left}`}
+        </span>
+      </div>
+    </div>
+  );
+};
+
 const Skeleton = () => (
   <div className="ef-sk" aria-hidden="true">
     <div className="hx-sk ef-sk__main" />
@@ -152,7 +298,7 @@ const Scales = () => {
 };
 
 const Body = ({ frame }: { frame: AnalyticsFrame }) => {
-  const { api, shell } = useOrg();
+  const { api, shell, base } = useOrg();
   const staff = shell.viewer.role !== 'member';
   const store = useMemo(() => createStore(api), [api]);
   const p = useParams();
@@ -191,6 +337,19 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
     () => api.limitWindows(query),
     () => undefined,
   );
+  const chKey = `effch:${dKey}`;
+  const channels = useAnswer(
+    chKey,
+    () => api.efficiencyChannels(query),
+    () => undefined,
+  );
+  const [pulseSaved, setPulseSaved] = useState<EffPulse | null>(null);
+  const pulseAnswer = useAnswer(
+    `effpulse:${base}`,
+    () => api.efficiencyPulse(),
+    () => undefined,
+  );
+  const pulse = pulseSaved ?? pulseAnswer.data ?? null;
   const chartKpi: KpiId = driver ?? 'moneyPerMr';
   const cKey = chartKey(query, chartKpi);
   const chart = useAnswer(
@@ -223,6 +382,33 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
     .map((w) => ({ ...w, week: (w.usd / days) * 7 }))
     .sort((a, b) => b.week - a.week);
 
+  const fixCard = d?.waste && staff && (
+    <div className="t-card viz-card dash-tile hd-card">
+      <div className="ch">
+        <h3>Что чинить первым</h3>
+        <div className="hd-r">
+          <span className="mut2 sm">по потерям в неделю</span>
+        </div>
+      </div>
+      {levers.length === 0 ? (
+        <p className="mut">Заметных потерь нет, чинить нечего.</p>
+      ) : (
+        <ol className="efx-fix">
+          {levers.slice(0, 3).map((w, i) => (
+            <li key={w.id} className="efx-fixi" style={{ cursor: 'default' }}>
+              <span className="efx-n">{i + 1}</span>
+              <div>
+                <b>{w.title}</b>
+                <div className="mut sm">{w.text}</div>
+              </div>
+              <span className="mut2 sm num">≈ {money(w.week)} в неделю</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+
   return (
     <>
       <div className="hb-head hd-head">
@@ -246,56 +432,36 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
           <div className="an-stage">
             <div className="mx ef">
               <div className="two">
-                <div className="t-card viz-card dash-tile hd-card efx-hero">
-                  <div className="efx-lead">
-                    За {nowName.title.toLowerCase()} — <b>{money(d.summary.spendUsd)}</b> в ценах API,{' '}
-                    {d.summary.sessions} {plural(d.summary.sessions, 'сессия', 'сессии', 'сессий')},{' '}
-                    {d.summary.mrs} {plural(d.summary.mrs, 'смёрженный MR', 'смёрженных MR', 'смёрженных MR')}
-                    {enough && price ? (
-                      <>
-                        : <b>{formatKpi('usd', price.value)} за MR</b>.
-                      </>
-                    ) : (
-                      '.'
-                    )}
-                  </div>
-                  {wastePct !== null && d.waste && (
-                    <div className="mut" style={{ marginTop: 6 }}>
-                      Без результата ушло {wastePct}% — {money(d.waste.wasteUsd)} из {money(d.waste.totalUsd)}
-                      .
+                <div className="efx-col">
+                  <div className="t-card viz-card dash-tile hd-card efx-hero">
+                    <div className="efx-lead">
+                      За {nowName.title.toLowerCase()} — <b>{money(d.summary.spendUsd)}</b> в ценах API,{' '}
+                      {d.summary.sessions} {plural(d.summary.sessions, 'сессия', 'сессии', 'сессий')},{' '}
+                      {d.summary.mrs}{' '}
+                      {plural(d.summary.mrs, 'смёрженный MR', 'смёрженных MR', 'смёрженных MR')}
+                      {enough && price ? (
+                        <>
+                          : <b>{formatKpi('usd', price.value)} за MR</b>.
+                        </>
+                      ) : (
+                        '.'
+                      )}
                     </div>
-                  )}
-                  <div className="mut2 sm" style={{ marginTop: 10 }}>
-                    {nowLabel} против {prevLabel} · {d.scopeLabel}
-                  </div>
-                </div>
-                {d.waste && staff && (
-                  <div className="t-card viz-card dash-tile hd-card">
-                    <div className="ch">
-                      <h3>Что чинить первым</h3>
-                      <div className="hd-r">
-                        <span className="mut2 sm">по потерям в неделю</span>
+                    {wastePct !== null && d.waste && (
+                      <div className="mut" style={{ marginTop: 6 }}>
+                        Без результата ушло {wastePct}% — {money(d.waste.wasteUsd)} из{' '}
+                        {money(d.waste.totalUsd)}.
                       </div>
-                    </div>
-                    {levers.length === 0 ? (
-                      <p className="mut">Заметных потерь нет, чинить нечего.</p>
-                    ) : (
-                      <ol className="efx-fix">
-                        {levers.slice(0, 3).map((w, i) => (
-                          <li key={w.id} className="efx-fixi" style={{ cursor: 'default' }}>
-                            <span className="efx-n">{i + 1}</span>
-                            <div>
-                              <b>{w.title}</b>
-                              <div className="mut sm">{w.text}</div>
-                            </div>
-                            <span className="mut2 sm num">≈ {money(w.week)} в неделю</span>
-                          </li>
-                        ))}
-                      </ol>
                     )}
+                    <div className="mut2 sm" style={{ marginTop: 10 }}>
+                      {nowLabel} против {prevLabel} · {d.scopeLabel}
+                    </div>
                   </div>
-                )}
+                  {channels.data && <Channels channels={channels.data} />}
+                </div>
+                {pulse && <Pulse pulse={pulse} onSaved={setPulseSaved} />}
               </div>
+              {pulse && fixCard}
               <section className="ef-main t-card" aria-label="Главный показатель">
                 <div className="ef-tabs" role="tablist" aria-label="Главный показатель">
                   {(

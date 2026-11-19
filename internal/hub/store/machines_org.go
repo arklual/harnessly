@@ -113,3 +113,34 @@ func (s Store) MachineUses(ctx context.Context, machineIDs []string, runningSinc
 	}
 	return out, nil
 }
+
+// MachineAccountUse is the account a machine's agent of one provider worked on at its latest session that had one.
+type MachineAccountUse struct {
+	Provider  string
+	AccountID string
+	Last      int64
+}
+
+// MachineAccountUses reads, for each provider, the account of the machine's newest top-level session that names one.
+func (s Store) MachineAccountUses(ctx context.Context, machineID string) ([]MachineAccountUse, error) {
+	rows, err := s.q.Query(ctx, `SELECT provider, account_id, MAX(updated_at) FROM agent_sessions
+		WHERE machine_id = ? AND account_id IS NOT NULL AND account_id <> '' GROUP BY provider, account_id
+		ORDER BY MAX(updated_at) DESC`, machineID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []MachineAccountUse
+	seen := map[string]bool{}
+	for rows.Next() {
+		var u MachineAccountUse
+		if err := rows.Scan(&u.Provider, &u.AccountID, &u.Last); err != nil {
+			return nil, err
+		}
+		if !seen[u.Provider] {
+			seen[u.Provider] = true
+			out = append(out, u)
+		}
+	}
+	return out, rows.Err()
+}

@@ -82,28 +82,7 @@ for o in objs:
 if bmin[0] > bmax[0]:
     bmin, bmax = Vector((-5, -5, 0)), Vector((5, 5, 3))
 
-# a mesh no camera of the scene sees at the marked frames is "off camera": checked at the markers' frames
 cams = [o for o in objs if o.type == "CAMERA"]
-off = []
-try:
-    from bpy_extras.object_utils import world_to_camera_view
-    frames = sorted({m.frame for m in sc.timeline_markers if m.camera}) or [sc.frame_start]
-    seen = set()
-    for f in frames[:8]:
-        sc.frame_set(f)
-        cam = next((m.camera for m in sc.timeline_markers if m.frame == f and m.camera), sc.camera)
-        if not cam:
-            continue
-        for o in objs:
-            if o.type != "MESH" or o.name in seen or tris[o.name] == 0:
-                continue
-            p = world_to_camera_view(sc, cam, o.matrix_world.translation)
-            if -0.1 <= p.x <= 1.1 and -0.1 <= p.y <= 1.1 and p.z > 0:
-                seen.add(o.name)
-    off = [o.name for o in objs if o.type == "MESH" and tris[o.name] > 0 and o.name not in seen and not o.hide_render]
-    sc.frame_set(sc.frame_start)
-except Exception:
-    off = []
 
 rx, ry = sc.render.resolution_x, sc.render.resolution_y
 
@@ -144,26 +123,71 @@ def sample(c, f):
 
 
 tracks = {c.name: [] for c in cams}
+bake = {}  # objects the glTF's actions do not carry (drivers, constraints, NLA): their local transform at the sampled frames
+off = []
+BAKE_MAX = 400
 try:
+    from bpy_extras.object_utils import world_to_camera_view
+
+    def baked(o):
+        ad = o.animation_data
+        return o.type != "CAMERA" and ((ad and (ad.drivers or ad.nla_tracks)) or len(o.constraints) > 0)
+
     sc.frame_set(sc.frame_start)
     dg.update()
     dyn = [c for c in cams if moving(c)]
+    movers = [o for o in objs if baked(o)][:BAKE_MAX]
     for c in cams:
         if c not in dyn:
             tracks[c.name].append(sample(c, sc.frame_start))
-    if dyn:
-        step = max(1, math.ceil((sc.frame_end - sc.frame_start + 1) / 20))
-        fs = set(range(sc.frame_start, sc.frame_end + 1, step)) | {sc.frame_end}
+    animated_any = bool(dyn) or bool(movers) or any(o.animation_data and o.animation_data.action for o in objs)
+    step = max(1, math.ceil((sc.frame_end - sc.frame_start + 1) / 20))
+    fs = {sc.frame_start}
+    if animated_any:
+        fs |= set(range(sc.frame_start, sc.frame_end + 1, step)) | {sc.frame_end}
         for m in sc.timeline_markers:
             fs |= {x for x in (m.frame - 1, m.frame) if sc.frame_start <= x <= sc.frame_end}
-        t0 = time.time()
-        for f in sorted(fs):
-            if time.time() - t0 > 100:
-                break
-            sc.frame_set(f)
-            dg.update()
-            for c in dyn:
-                tracks[c.name].append(sample(c, f))
+    meshes = [o for o in objs if o.type == "MESH" and tris[o.name] > 0 and not o.hide_render]
+    seen = set()
+    t0 = time.time()
+    for f in sorted(fs):
+        if time.time() - t0 > 100 and f != sc.frame_start:
+            break
+        sc.frame_set(f)
+        dg.update()
+        for c in dyn:
+            tracks[c.name].append(sample(c, f))
+        for o in movers:
+            ev = o.evaluated_get(dg)
+            pi = o.matrix_parent_inverse
+            ident = all(abs(pi[i][j] - (1.0 if i == j else 0.0)) < 1e-6 for i in range(4) for j in range(4))
+            euler = o.rotation_mode == "XYZ" and len(o.constraints) == 0 and ident
+            if euler:
+                row = [f, *ev.location, *ev.rotation_euler, *ev.scale]
+            else:
+                loc, rot, scl = ev.matrix_local.decompose()
+                row = [f, *loc, rot.w, rot.x, rot.y, rot.z, *scl]
+            bake.setdefault(o.name, {"m": "e" if euler else "q", "rows": []})["rows"].append([round(v, 5) for v in row])
+        # what a camera sees: the corners of a mesh's box against the camera's frame, at this frame, for every camera
+        for cam in cams:
+            for o in meshes:
+                if o.name in seen:
+                    continue
+                zs, xs, ys = [], [], []
+                behind = False
+                for corner in o.bound_box:
+                    pnt = world_to_camera_view(sc, cam, o.matrix_world @ Vector(corner))
+                    if pnt.z > 0:
+                        xs.append(pnt.x)
+                        ys.append(pnt.y)
+                    else:
+                        behind = True
+                if not xs:
+                    continue
+                # some of the box behind the camera: it reaches the frame unless it lies wholly to one side
+                if behind or (min(xs) <= 1 and max(xs) >= 0 and min(ys) <= 1 and max(ys) >= 0):
+                    seen.add(o.name)
+    off = [o.name for o in meshes if o.name not in seen]
     sc.frame_set(sc.frame_start)
 except Exception as e:
     print("HL_TRACK_FAIL", e)
@@ -185,6 +209,7 @@ meta = {
          "far": c.data.clip_end, "track": tracks.get(c.name, [])}
         for c in cams
     ],
+    "bake": bake,
     "markers": [{"f": m.frame, "n": m.name, "cam": m.camera.name if m.camera else ""} for m in sc.timeline_markers],
     "bounds": [round(v, 3) for v in (*bmin, *bmax)],
     "stats": {
