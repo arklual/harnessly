@@ -619,12 +619,14 @@ func (s *Service) Cancel(ctx context.Context, id string) (Snapshot, error) {
 			return snap, err
 		}
 	}
-	j.cancel()
+	// Canceled is written before the job's context is stopped: the job, seeing its context end, would otherwise
+	// settle first as failed with "context canceled".
 	s.settle(j, func(sn *Snapshot) {
 		if !sn.State.Ended() {
 			sn.State, sn.Error = Canceled, "canceled"
 		}
 	})
+	j.cancel()
 	<-j.done
 	end, _ := s.Get(id)
 	return end, nil

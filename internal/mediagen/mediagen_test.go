@@ -26,7 +26,7 @@ type fakeHF struct {
 	key      string
 	price    string
 	polls    atomic.Int32
-	doneAt   int32 // the poll that finds the request completed
+	doneAt   atomic.Int32 // the poll that finds the request completed
 	mu       sync.Mutex
 	submits  []map[string]any
 	idem     []string
@@ -37,7 +37,8 @@ type fakeHF struct {
 }
 
 func newFake(t *testing.T) *fakeHF {
-	f := &fakeHF{t: t, key: "kid:ksecret", price: "0.42", doneAt: 2}
+	f := &fakeHF{t: t, key: "kid:ksecret", price: "0.42"}
+	f.doneAt.Store(2)
 	mux := http.NewServeMux()
 	auth := func(w http.ResponseWriter, r *http.Request) bool {
 		if r.Header.Get("Authorization") != "Key "+f.key {
@@ -82,7 +83,7 @@ func newFake(t *testing.T) *fakeHF {
 				_, _ = io.WriteString(w, `{"status":"canceled","request_id":"rid-1"}`)
 			case f.status != "":
 				_, _ = io.WriteString(w, `{"status":"`+f.status+`","request_id":"rid-1","error":"Generation failed"}`)
-			case n >= f.doneAt:
+			case n >= f.doneAt.Load():
 				_, _ = io.WriteString(w, `{"status":"completed","request_id":"rid-1","video":{"url":"`+f.srv.URL+`/cdn/clip.mp4"}}`)
 			default:
 				_, _ = io.WriteString(w, `{"status":"in_progress","request_id":"rid-1"}`)
@@ -314,7 +315,7 @@ func TestRefusedKeyAndModeration(t *testing.T) {
 
 func TestCancelWhileQueued(t *testing.T) {
 	f := newFake(t)
-	f.doneAt = 1 << 30
+	f.doneAt.Store(1 << 30)
 	s := service(t, f)
 	snap, _ := s.Start(Request{Prompt: "a clip"})
 	for i := 0; i < 500; i++ {
@@ -329,7 +330,7 @@ func TestCancelWhileQueued(t *testing.T) {
 	}
 	// A request the provider has begun cannot be stopped; the job goes on.
 	f2 := newFake(t)
-	f2.doneAt = 1 << 30
+	f2.doneAt.Store(1 << 30)
 	f2.started.Store(true)
 	s2 := service(t, f2)
 	snap, _ = s2.Start(Request{Prompt: "a clip"})
@@ -342,7 +343,15 @@ func TestCancelWhileQueued(t *testing.T) {
 	if _, err := s2.Cancel(context.Background(), snap.ID); err == nil || !strings.Contains(err.Error(), "cannot be canceled") {
 		t.Errorf("cancel of a running request: %v", err)
 	}
-	f2.doneAt = 0
+	// The job goes on to its end before the test's directory is removed under it.
+	f2.doneAt.Store(0)
+	for i := 0; i < 2500; i++ {
+		if got, _ := s2.Get(snap.ID); got.State.Ended() {
+			return
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	t.Error("the request that could not be canceled never ended")
 }
 
 func TestPlanChecksTheModelsLimits(t *testing.T) {

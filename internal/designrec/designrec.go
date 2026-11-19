@@ -24,6 +24,11 @@ import (
 // a minute, each a 403 at the hub. A role given later is picked up within this time.
 const RefusedRetry = time.Hour
 
+// MaxRefusedRetry caps the wait of a write refused again and again: each refusal in a row doubles it from RefusedRetry.
+// With the pictures of every board a project nobody here may edit was asked once an hour per picture, all in
+// one burst, and the hub's guard took the machine for a scanner.
+const MaxRefusedRetry = 16 * time.Hour
+
 // Store is a collection of the store as a client has it (filesync.Client).
 type Store interface {
 	Put(ctx context.Context, path string, data []byte, author string) (filestore.Entry, error)
@@ -49,7 +54,8 @@ func CollectionOf(kind string) string {
 }
 
 // Syncer writes records and remembers what it wrote, so a record that did not change is not written again; a record the
-// store refused is not asked again for RefusedRetry while it stays the same.
+// store refused is not asked again for RefusedRetry (doubled with each refusal in a row, up to MaxRefusedRetry) while it
+// stays the same, and the pictures of its project are not offered for that time either.
 type Syncer struct {
 	Clients Clients
 	Author  string
@@ -57,13 +63,24 @@ type Syncer struct {
 	Now func() time.Time
 
 	mu      sync.Mutex
-	sent    map[string]string  // collection/id → sha of the record written
-	refused map[string]refusal // collection/id → the write the store refused
+	sent    map[string]string    // collection/id → sha of the record written
+	refused map[string]refusal   // collection/id → the write the store refused
+	closed  map[string]time.Time // project id → until when its pictures are not offered: the store refused one of its writes
 }
 
 type refusal struct {
-	sum string
-	at  time.Time
+	sum   string
+	n     int       // refusals in a row
+	until time.Time // not asked again before, while it stays as it was
+}
+
+// wait is how long the n-th refusal in a row keeps a write from being asked again.
+func wait(n int) time.Duration {
+	d := RefusedRetry
+	for i := 1; i < n && d < MaxRefusedRetry; i++ {
+		d *= 2
+	}
+	return min(d, MaxRefusedRetry)
 }
 
 func (s *Syncer) now() time.Time {
@@ -81,10 +98,18 @@ func (s *Syncer) settled(key, sum string) bool {
 		return true
 	}
 	r, ok := s.refused[key]
-	return ok && r.sum == sum && s.now().Sub(r.at) < RefusedRetry
+	return ok && r.sum == sum && s.now().Before(r.until)
 }
 
-func (s *Syncer) remember(key, sum string) {
+// shut: the store refused a write of the project a short while ago, so its pictures (each a write the hub checks by the
+// same right) are not offered one by one.
+func (s *Syncer) shut(project string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.now().Before(s.closed[project])
+}
+
+func (s *Syncer) remember(key, project, sum string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.sent == nil {
@@ -92,15 +117,22 @@ func (s *Syncer) remember(key, sum string) {
 	}
 	s.sent[key] = sum
 	delete(s.refused, key)
+	delete(s.closed, project)
 }
 
-func (s *Syncer) refuse(key, sum string) {
+func (s *Syncer) refuse(key, project, sum string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.refused == nil {
 		s.refused = map[string]refusal{}
+		s.closed = map[string]time.Time{}
 	}
-	s.refused[key] = refusal{sum: sum, at: s.now()}
+	n := s.refused[key].n + 1
+	until := s.now().Add(wait(n))
+	s.refused[key] = refusal{sum: sum, n: n, until: until}
+	if until.After(s.closed[project]) {
+		s.closed[project] = until
+	}
 }
 
 // Refused is how many writes the store refuses now (collection/id).
@@ -148,14 +180,14 @@ func (s *Syncer) Push(ctx context.Context, recs []filestore.Record) (int, error)
 		if cur == nil || cur.Deleted || cur.Sha != sum {
 			if _, err := c.Put(ctx, filestore.RecordPath(r.ID), b, s.Author); errors.Is(err, filesync.ErrRefused) {
 				// Not this machine's to write: the others go on, this one waits for a change or RefusedRetry.
-				s.refuse(key, sum)
+				s.refuse(key, r.ID, sum)
 				continue
 			} else if err != nil {
 				return n, fmt.Errorf("record %s: %w", key, err)
 			}
 			n++
 		}
-		s.remember(key, sum)
+		s.remember(key, r.ID, sum)
 	}
 	return n, nil
 }
@@ -246,10 +278,10 @@ func (s *Syncer) PushCover(ctx context.Context, id string, data []byte) (bool, e
 	sum := sha256.Sum256(data)
 	hexSum := hex.EncodeToString(sum[:])
 	key := filestore.KindCovers + "/" + id
-	if s.settled(key, hexSum) {
+	if s.settled(key, hexSum) || s.shut(id) {
 		return false, nil
 	}
-	return s.putPicture(ctx, filestore.KindCovers, filestore.CoverPath(id), key, hexSum, hexSum, data)
+	return s.putPicture(ctx, filestore.KindCovers, id, filestore.CoverPath(id), key, hexSum, hexSum, data)
 }
 
 // PushThumb puts the picture of a board into the thumbs collection when it is not there as it is now.
@@ -262,7 +294,7 @@ func (s *Syncer) PushThumb(ctx context.Context, id, boardPath, version string, r
 	}
 	key := filestore.KindThumbs + "/" + path
 	mark := "v:" + version
-	if s.settled(key, mark) {
+	if s.settled(key, mark) || s.shut(id) {
 		return false, nil
 	}
 	data, err := read()
@@ -270,11 +302,11 @@ func (s *Syncer) PushThumb(ctx context.Context, id, boardPath, version string, r
 		return false, nil
 	}
 	sum := sha256.Sum256(data)
-	return s.putPicture(ctx, filestore.KindThumbs, path, key, mark, hex.EncodeToString(sum[:]), data)
+	return s.putPicture(ctx, filestore.KindThumbs, id, path, key, mark, hex.EncodeToString(sum[:]), data)
 }
 
 // putPicture writes a picture unless the store has it already; mark is what the Syncer remembers it by.
-func (s *Syncer) putPicture(ctx context.Context, kind, path, key, mark, sha string, data []byte) (bool, error) {
+func (s *Syncer) putPicture(ctx context.Context, kind, project, path, key, mark, sha string, data []byte) (bool, error) {
 	c := s.Clients(kind)
 	cur, err := c.Current(ctx, path)
 	if err != nil {
@@ -283,13 +315,13 @@ func (s *Syncer) putPicture(ctx context.Context, kind, path, key, mark, sha stri
 	wrote := false
 	if cur == nil || cur.Deleted || cur.Sha != sha {
 		if _, err := c.Put(ctx, path, data, s.Author); errors.Is(err, filesync.ErrRefused) {
-			s.refuse(key, mark)
+			s.refuse(key, project, mark)
 			return false, nil
 		} else if err != nil {
 			return false, fmt.Errorf("%s %s: %w", kind, path, err)
 		}
 		wrote = true
 	}
-	s.remember(key, mark)
+	s.remember(key, project, mark)
 	return wrote, nil
 }

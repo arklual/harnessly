@@ -563,7 +563,7 @@ expect "a member sees the machines" "$(j '.machines|length')" 1
 call "$MEMBER" POST "/api/machines/$MID/agents/claude/check" '{}'
 expect "…but cannot run an agent operation" "$CODE" 403
 call "$MEMBER" POST "/api/spaces/$SID/machines/codes" '{"profile":"dir"}'
-expect "…nor ask for a registration code" "$CODE" 403
+expect "…but may ask for a registration code of their own (members connect their machines by default)" "$CODE" 201
 call "$MEMBER" GET "$BASE/api/auth/setup"
 expect "…but can open the machine" "$CODE" 200
 call "$MEMBER" PATCH "/api/spaces/$SID" '{"name":"mine now"}'

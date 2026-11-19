@@ -109,8 +109,8 @@ func (r *refusingStore) Put(ctx context.Context, path string, data []byte, autho
 	return r.Store.Put(ctx, path, data, author)
 }
 
-// a refused record or cover does not stop the others and is not asked again on every pass, only after it
-// changed or RefusedRetry passed.
+// a refused record does not stop the others and is not asked again on every pass, only after it changed or
+// its wait passed; the cover of its project waits as long.
 func TestRefusedWriteIsNotRepeatedOnEveryPass(t *testing.T) {
 	ctx := context.Background()
 	l, err := storelink.Open(storelink.Options{DataDir: t.TempDir(), Name: "box"})
@@ -137,10 +137,10 @@ func TestRefusedWriteIsNotRepeatedOnEveryPass(t *testing.T) {
 	if ok, err := s.PushCover(ctx, "theirs", []byte("\xff\xd8x")); err != nil || ok {
 		t.Fatalf("refused cover: %v %v", ok, err)
 	}
-	if s.Refused() != 2 {
-		t.Fatalf("refused %d", s.Refused())
+	if s.Refused() != 1 {
+		t.Fatalf("refused %d (the cover of a refused project is not offered)", s.Refused())
 	}
-	projects, covers := stores[filestore.KindProjects], stores[filestore.KindCovers]
+	projects, covers := stores[filestore.KindProjects], s.Clients(filestore.KindCovers).(*refusingStore)
 	for range 10 {
 		now = now.Add(time.Minute)
 		if n, err := s.Push(ctx, recs); err != nil || n != 0 {
@@ -148,16 +148,79 @@ func TestRefusedWriteIsNotRepeatedOnEveryPass(t *testing.T) {
 		}
 		_, _ = s.PushCover(ctx, "theirs", []byte("\xff\xd8x"))
 	}
-	if p, c := projects.puts[filestore.RecordPath("theirs")], covers.puts[filestore.CoverPath("theirs")]; p != 1 || c != 1 {
+	if p, c := projects.puts[filestore.RecordPath("theirs")], covers.puts[filestore.CoverPath("theirs")]; p != 1 || c != 0 {
 		t.Fatalf("refused writes asked again: record %d, cover %d", p, c)
 	}
-	// Changed, it is asked again at once; and so is the unchanged one an hour later.
+	// Changed, it is asked again at once. Refused again, the project stays shut twice as long: its cover is not offered
+	// an hour later, only after two.
 	recs[0].Title = "Theirs v2"
 	_, _ = s.Push(ctx, recs)
+	if p := projects.puts[filestore.RecordPath("theirs")]; p != 2 {
+		t.Fatalf("a changed record was not asked again: %d", p)
+	}
 	now = now.Add(RefusedRetry)
 	_, _ = s.PushCover(ctx, "theirs", []byte("\xff\xd8x"))
-	if p, c := projects.puts[filestore.RecordPath("theirs")], covers.puts[filestore.CoverPath("theirs")]; p != 2 || c != 2 {
-		t.Fatalf("after a change and an hour: record %d, cover %d", p, c)
+	if c := covers.puts[filestore.CoverPath("theirs")]; c != 0 {
+		t.Fatalf("the cover of a project refused twice in a row was offered after an hour: %d", c)
+	}
+	now = now.Add(RefusedRetry)
+	_, _ = s.PushCover(ctx, "theirs", []byte("\xff\xd8x"))
+	if c := covers.puts[filestore.CoverPath("theirs")]; c != 1 {
+		t.Fatalf("after two hours: cover %d", c)
+	}
+}
+
+// once the store refused a project, the pictures of its boards are not offered one by one, each a 404 and a
+// 403 at the hub; a write of the project that goes through opens it again.
+func TestPicturesOfARefusedProjectAreNotOffered(t *testing.T) {
+	ctx := context.Background()
+	l, err := storelink.Open(storelink.Options{DataDir: t.TempDir(), Name: "box"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	if err := l.Ready(ctx, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	deny := map[string]bool{filestore.RecordPath("theirs"): true}
+	stores := map[string]*refusingStore{}
+	now := time.Unix(1_800_000_000, 0)
+	s := &Syncer{Author: "t", Now: func() time.Time { return now }, Clients: func(k string) Store {
+		if stores[k] == nil {
+			stores[k] = &refusingStore{Store: l.Client(k), deny: deny, puts: map[string]int{}}
+		}
+		return stores[k]
+	}}
+	recs := []filestore.Record{{ID: "theirs", Title: "Theirs", Kind: "site", At: 1}}
+	_, _ = s.Push(ctx, recs)
+	pic := func() ([]byte, error) { return []byte("\xff\xd8x"), nil }
+	for i := range 20 {
+		if ok, err := s.PushThumb(ctx, "theirs", fmt.Sprintf("B%d.dc.html", i), "v1.jpg", pic); ok || err != nil {
+			t.Fatalf("a picture of a refused project: %v %v", ok, err)
+		}
+	}
+	if ok, _ := s.PushCover(ctx, "theirs", []byte("\xff\xd8x")); ok {
+		t.Fatal("the cover of a refused project was written")
+	}
+	if th := stores[filestore.KindThumbs]; th != nil && len(th.puts) > 0 {
+		t.Fatalf("pictures offered: %v", th.puts)
+	}
+	// A role given later: the record goes through at the next try, and the pictures follow.
+	delete(deny, filestore.RecordPath("theirs"))
+	now = now.Add(RefusedRetry)
+	if n, err := s.Push(ctx, recs); err != nil || n != 1 {
+		t.Fatalf("push after the role: %d %v", n, err)
+	}
+	if ok, err := s.PushThumb(ctx, "theirs", "B0.dc.html", "v1.jpg", pic); err != nil || !ok {
+		t.Fatalf("a picture after the role: %v %v", ok, err)
+	}
+}
+
+func TestRefusedWaitDoublesUpToTheCap(t *testing.T) {
+	for n, want := range map[int]time.Duration{1: time.Hour, 2: 2 * time.Hour, 3: 4 * time.Hour, 5: 16 * time.Hour, 9: MaxRefusedRetry} {
+		if got := wait(n); got != want {
+			t.Errorf("wait(%d) = %v, want %v", n, got, want)
+		}
 	}
 }
 
