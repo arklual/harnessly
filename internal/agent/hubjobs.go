@@ -327,16 +327,32 @@ func jobEnv(work string, extra map[string]string) []string {
 	return env
 }
 
+// inputSettle is how long a builder asks again for an input the hub does not give it yet: a hub of an older release
+// writes the job's builder down only after the start reached it, so the first ask can come before and get 404.
+var inputSettle = 5 * time.Second
+
 func (h *hub) fetchJobInput(ctx context.Context, id, work string) error {
-	res, err := h.jobsDo(ctx, http.MethodGet, "/"+id+"/input", nil, nil, "")
-	if err != nil {
-		return err
+	for deadline := time.Now().Add(inputSettle); ; {
+		res, err := h.jobsDo(ctx, http.MethodGet, "/"+id+"/input", nil, nil, "")
+		if err != nil {
+			return err
+		}
+		if res.StatusCode == http.StatusNotFound && time.Now().Before(deadline) {
+			_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 1<<16))
+			res.Body.Close()
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(200 * time.Millisecond):
+			}
+			continue
+		}
+		defer res.Body.Close()
+		if res.StatusCode != http.StatusOK {
+			return fmt.Errorf("the hub answered HTTP %d", res.StatusCode)
+		}
+		return builders.Unpack(res.Body, work)
 	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("the hub answered HTTP %d", res.StatusCode)
-	}
-	return builders.Unpack(res.Body, work)
 }
 
 func (h *hub) sendJobOutputs(ctx context.Context, st hubproto.JobStart, work string) ([]hubproto.JobFile, error) {

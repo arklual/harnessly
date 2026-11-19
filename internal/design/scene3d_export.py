@@ -18,13 +18,19 @@ objs = list(sc.objects)
 dg = bpy.context.evaluated_depsgraph_get()
 
 
+def poly_tris(me):
+    return sum(max(1, len(p.vertices) - 2) for p in me.polygons)
+
+
 def tris_of(o):
     if o.type not in ("MESH", "CURVE", "SURFACE", "FONT", "META"):
         return 0
     try:
+        if o.type == "MESH" and len(o.modifiers) == 0:
+            return poly_tris(o.data)  # no evaluation for what has no modifiers: a scene of scattered plants is millions
         ev = o.evaluated_get(dg)
         me = ev.to_mesh()
-        n = sum(max(1, len(p.vertices) - 2) for p in me.polygons)
+        n = poly_tris(me)
         ev.to_mesh_clear()
         return n
     except Exception:
@@ -34,39 +40,116 @@ def tris_of(o):
 tris = {o.name: tris_of(o) for o in objs}
 total = sum(tris.values())
 
-# --- decimate: only when the scene is over the budget, the biggest meshes first
+# --- decimate to the budget. A scene of scattered plants and rocks is tens of millions of triangles of which the browser can show
+# a few hundred thousand: what lies near a camera keeps its detail, what lies far gets little. Objects that share a mesh share
+# the decimated copy, so the file does not carry it once for each of them.
 out_total = total
 if total > tri_budget:
-    ratio = max(0.05, tri_budget / total)
-    for o in objs:
-        if o.type != "MESH" or tris[o.name] < 2000:
-            continue
+    import collections
+
+    # where the cameras are, at a few frames of the animation, and how far each mesh is from the nearest
+    cam_objs = [o for o in objs if o.type == "CAMERA"]
+    probe = sorted({sc.frame_start, sc.frame_end} | {sc.frame_start + (sc.frame_end - sc.frame_start) * k // 4 for k in (1, 2, 3)})
+    near = {}
+    meshes_all = [o for o in objs if o.type == "MESH" and tris[o.name] > 0]
+    for f in probe:
+        sc.frame_set(f)
+        dg.update()
+        cams_at = [c.matrix_world.translation.copy() for c in cam_objs] or [Vector((0, 0, 0))]
+        for o in meshes_all:
+            pos = o.matrix_world.translation
+            d = min((pos - c).length for c in cams_at)
+            near[o.name] = min(near.get(o.name, 1e9), d)
+    sc.frame_set(sc.frame_start)
+    dg.update()
+    weight = {o.name: tris[o.name] / (1.0 + (near.get(o.name, 1e9) / 8.0) ** 2) for o in meshes_all}
+    wsum = sum(weight.values()) or 1.0
+    FLOOR = 48  # a mesh keeps at least this many triangles: it is still a recognisable thing
+    CAP = 30000
+    work = bpy.data.scenes.new("hl_work")
+    by_data = collections.defaultdict(list)
+    for o in meshes_all:
         if o.data.shape_keys or any(m.type in ("ARMATURE", "SKIN") for m in o.modifiers):
             continue
-        m = o.modifiers.new("hl_decimate", "DECIMATE")
-        m.ratio = ratio
-        out_total -= int(tris[o.name] * (1 - ratio))
+        by_data[o.data].append(o)
+    for data, users in by_data.items():
+        n = max(tris[u.name] for u in users)
+        want = max(weight[u.name] / wsum * tri_budget for u in users)  # the best-placed user's share
+        # no single mesh needs more than CAP triangles in a browser, however near a camera it is
+        target = min(n, CAP, max(FLOOR, int(want)))
+        if target >= n:
+            continue
+        # The modifier is applied to a copy of the mesh on an object of its own: an object that is not visible in the view layer
+        # (the scatter is hidden for the viewport) is not evaluated, and its Decimate would change nothing.
+        # On a scene of its own, so that the evaluation sees one object, not the sixteen thousand of the real scene.
+        tmp_mesh = data.copy()
+        tmp = bpy.data.objects.new("hl_tmp", tmp_mesh)
+        work.collection.objects.link(tmp)
+        m = tmp.modifiers.new("hl_decimate", "DECIMATE")
+        m.ratio = max(0.001, target / n)
+        try:
+            with bpy.context.temp_override(scene=work, view_layer=work.view_layers[0], active_object=tmp, object=tmp, selected_objects=[tmp]):
+                bpy.ops.object.modifier_apply(modifier=m.name)
+            done = tmp.data
+        except Exception as e:
+            print("HL_DECIMATE_FAIL", data.name, e)
+            done = None
+        work.collection.objects.unlink(tmp)
+        bpy.data.objects.remove(tmp)
+        if done is None:
+            bpy.data.meshes.remove(tmp_mesh)
+            continue
+        for u in users:
+            u.data = done
+    out_total = sum(poly_tris(o.data) for o in meshes_all)
+    dg = bpy.context.evaluated_depsgraph_get()
 
-# --- textures: shrink the big ones, count the lost ones
+# --- textures: shrink the big ones to a small JPEG (or PNG where there is an alpha: leaves), count the lost ones. The exporter reads
+# the file an image points at, not the pixels in memory, so a shrunk image is written to a file of its own and pointed at it.
+import tempfile
+
+tex_dir = tempfile.mkdtemp(prefix="hl-tex-")
 missing = []
 for img in bpy.data.images:
     if img.source != "FILE" or img.name in ("Render Result", "Viewer Node"):
         continue
-    if not img.has_data:
+    # An image is loaded when something asks for its size: has_data is False for one nobody has looked at, so it is not the test.
+    w, h = img.size
+    if w == 0 or h == 0:
         try:
             img.reload()
         except Exception:
             pass
-    if not img.has_data:
+        w, h = img.size
+    if w == 0 or h == 0:
         missing.append(img.name)
         continue
-    w, h = img.size
-    if max(w, h) > tex_max:
-        k = tex_max / max(w, h)
-        try:
+    ext = os.path.splitext(img.filepath)[1].lower()
+    if max(w, h) <= tex_max and ext in (".jpg", ".jpeg", ".png"):
+        continue
+    try:
+        if max(w, h) > tex_max:
+            k = tex_max / max(w, h)
             img.scale(max(1, int(w * k)), max(1, int(h * k)))
-        except Exception:
-            pass
+        alpha = img.depth in (32, 128) and ext in (".png", ".tga", ".tif", ".tiff")
+        name = "".join(ch if ch.isalnum() else "_" for ch in img.name)[:80]
+        path = os.path.join(tex_dir, name + (".png" if alpha else ".jpg"))
+        img.filepath_raw = path
+        img.file_format = "PNG" if alpha else "JPEG"
+        if not alpha:
+            img.save(quality=82)
+        else:
+            img.save()
+    except Exception as e:
+        print("HL_TEX_FAIL", img.name, e)
+
+# an image whose file is gone has no size and the exporter refuses it: nothing is shown in its place, the rest goes through
+gone = set(missing)
+for mat in bpy.data.materials:
+    if mat.use_nodes and mat.node_tree:
+        for n in mat.node_tree.nodes:
+            if n.type == "TEX_IMAGE" and n.image and n.image.name in gone:
+                n.image = None
 
 # --- the scene's faults
 unapplied = [o.name for o in objs if o.type == "MESH" and any(abs(s - 1.0) > 1e-3 for s in o.scale)
@@ -229,5 +312,11 @@ want = dict(
     export_draco_mesh_compression_enable=False, use_visible=True, use_renderable=True,
 )
 known = set(bpy.ops.export_scene.gltf.get_rna_type().properties.keys())
-res = bpy.ops.export_scene.gltf(**{k: v for k, v in want.items() if k in known})
+args = {k: v for k, v in want.items() if k in known}
+try:
+    res = bpy.ops.export_scene.gltf(**args)
+except Exception as e:  # a texture the exporter cannot take must not cost the whole model: once more with no materials
+    print("HL_EXPORT_RETRY", e)
+    args["export_materials"] = "NONE"
+    res = bpy.ops.export_scene.gltf(**args)
 print("HL_EXPORT", res)

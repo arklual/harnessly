@@ -107,7 +107,10 @@ func TestFakeExampleCLI(t *testing.T) {
 		case <-done:
 		case <-time.After(30 * time.Second):
 		}
-		_ = srv.Close()
+		// Shutdown, not Close: the handler closed done before its answer left, and a cut connection reads as EOF
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_ = srv.Shutdown(ctx)
+		cancel()
 		fmt.Println("Signed in.")
 		os.Exit(0)
 	}

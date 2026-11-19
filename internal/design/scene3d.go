@@ -221,7 +221,9 @@ func runBlender(ctx context.Context, r blenderRun, workdir string) (string, stri
 	if err := os.WriteFile(script, r.Script, 0o600); err != nil {
 		return "", "", err
 	}
-	if scene3dBuilders != nil {
+	// A scene that reads files of its project (textures by relative paths) cannot be sent to a builder alone: its textures would
+	// be missing there. Such a scene runs on this machine, where the project is; a self-contained .blend may go to the pool.
+	if scene3dBuilders != nil && !scene3dNeedsProject(r.Blend) {
 		if c := scene3dBuilders(); c != nil {
 			return runOnPool(ctx, c, r, workdir)
 		}
@@ -232,6 +234,24 @@ func runBlender(ctx context.Context, r blenderRun, workdir string) (string, stri
 
 // runOnPool sends the run through the builders client: the hub places it on a builder with blender, or says why it goes
 // to this machine's own slots (the client then runs it here under heavy.Hold, nice and a limit, with draft env).
+// scene3dNeedsProject says the .blend lies in a project that keeps textures and assets beside it (blender-lab's assets/): the
+// folder of the .blend and the two above it are looked at. A very big .blend is not sent either.
+func scene3dNeedsProject(blend string) bool {
+	if st, err := os.Stat(blend); err == nil && st.Size() > scene3dPoolMaxBlend {
+		return true
+	}
+	dir := filepath.Dir(blend)
+	for i := 0; i < 3; i++ {
+		for _, n := range []string{"assets", "textures", "tex", "maps", "images"} {
+			if st, err := os.Stat(filepath.Join(dir, n)); err == nil && st.IsDir() {
+				return true
+			}
+		}
+		dir = filepath.Dir(dir)
+	}
+	return false
+}
+
 func runOnPool(ctx context.Context, c *builders.Client, r blenderRun, workdir string) (string, string, error) {
 	// A builder gets a folder to work in: the .blend (hard-linked where it can be, no copy of a big file), the script.
 	if err := linkOrCopy(r.Blend, filepath.Join(workdir, "scene.blend")); err != nil {
@@ -248,7 +268,17 @@ func runOnPool(ctx context.Context, c *builders.Client, r blenderRun, workdir st
 	if err == nil && res.ExitCode != 0 {
 		err = fmt.Errorf("Blender exited with %d", res.ExitCode)
 	}
+	if err != nil && strings.Contains(err.Error(), "exit code -1") {
+		err = fmt.Errorf("Blender was stopped on %s (the time limit of %s or a kill): %w", scene3dWhere(where), r.Timeout.Round(time.Second), err)
+	}
 	return string(log.b), where, err
+}
+
+func scene3dWhere(builder string) string {
+	if builder == "" {
+		return "this machine"
+	}
+	return "builder " + builder
 }
 
 func linkOrCopy(from, to string) error {
@@ -688,7 +718,7 @@ func (l *Library) scene3dRender(blend, dir, file string, cam Scene3DCam, frame i
 		"samples": Scene3DFrameSamples, "cam": cam})
 	out, where, err := scene3dBlender(context.Background(), blenderRun{
 		Title: "3D scene: draft frame", Blend: blend, Script: scene3dFramePy, Params: []string{string(spec)}, Outputs: []string{"frame.jpg"},
-		Timeout: Scene3DFrameTimeout * time.Second, SlotWait: Scene3DFrameSlotWait * time.Second, Tool: "blender-draft", Builder: builder,
+		Timeout: scene3dFrameTimeout(blend), SlotWait: Scene3DFrameSlotWait * time.Second, Tool: "blender-draft", Builder: builder,
 	}, work)
 	if err != nil {
 		if errors.Is(err, errBlenderBusy) {
@@ -967,4 +997,14 @@ func (l *Library) Scene3DStateOf(id string) (Scene3DState, error) {
 // (a clip, the outputs) takes it for «ask again», not for a failure.
 func scene3dBusyWords() string {
 	return locale3("The machine is busy with other work; try the frame again in a minute", "Машина занята другой работой; попробуйте кадр ещё раз через минуту")
+}
+
+// scene3dFrameTimeout is the limit of one draft: the base, and a second more for each megabyte of the scene (a heavy scene with
+// textures takes longer to load and to draw), at most ten minutes.
+func scene3dFrameTimeout(blend string) time.Duration {
+	d := Scene3DFrameTimeout * time.Second
+	if st, err := os.Stat(blend); err == nil {
+		d += time.Duration(st.Size()>>20) * time.Second
+	}
+	return min(d, 10*time.Minute)
 }

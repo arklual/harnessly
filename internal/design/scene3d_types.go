@@ -23,14 +23,15 @@ const (
 	Scene3DFrameW        = 640
 	Scene3DFrameH        = 360
 	Scene3DFrameSamples  = 12
-	Scene3DFrameTimeout  = 100 // seconds, the draft render's limit
-	Scene3DFrameSlotWait = 90  // seconds a draft waits for one of the machine's slots
-	Scene3DExportTimeout = 600 // seconds, the export's limit
+	Scene3DFrameTimeout  = 100  // seconds, the draft render's limit
+	Scene3DFrameSlotWait = 90   // seconds a draft waits for one of the machine's slots
+	Scene3DExportTimeout = 1800 // seconds, the export's limit: a scene with a thousand textures and an animated car takes minutes
 	Scene3DTriBudget     = 160000
 	Scene3DTexMax        = 1024
-	Scene3DCacheMax      = 1 << 30 // bytes of drafts kept per scene before the oldest are dropped
-	scene3dMaxJobs       = 1       // drafts rendered at once by this runtime
-	scene3dExportVersion = 3       // moves with scene3d_export.py: a new exporter makes new models
+	Scene3DCacheMax      = 1 << 30   // bytes of drafts kept per scene before the oldest are dropped
+	scene3dPoolMaxBlend  = 200 << 20 // a .blend over this is not sent to a builder
+	scene3dMaxJobs       = 1         // drafts rendered at once by this runtime
+	scene3dExportVersion = 3         // moves with scene3d_export.py: a new exporter makes new models
 	scene3dMaxShot       = 400 << 10
 )
 

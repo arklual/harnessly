@@ -280,7 +280,7 @@ func (l *Library) scene3dMakeOutputs(id, title, blend, hash, dir string, sp Scen
 	defer os.RemoveAll(tmp)
 	spec, _ := json.Marshal(map[string]any{"dir": "out", "cam": sp.Cam, "frames": sp.Frames, "w": Scene3DFrameW, "h": Scene3DFrameH, "samples": 4,
 		"passes": sp.Passes, "masks": sp.Masks, "far": Scene3DOutputsFar})
-	timeout := time.Duration(Scene3DFrameTimeout*(len(sp.Frames)*(len(sp.Passes)+len(sp.Masks))+1)) * time.Second
+	timeout := scene3dFrameTimeout(blend) * time.Duration(len(sp.Frames)*(len(sp.Passes)+len(sp.Masks))+1)
 	out, where, err := scene3dBlender(context.Background(), blenderRun{Title: "3D scene: outputs", Blend: blend, Script: scene3dOutputsPy, Params: []string{string(spec)},
 		Outputs: []string{"out/*.png", "out/*.jpg", "out/frames.json"}, Timeout: timeout, SlotWait: Scene3DFrameSlotWait * time.Second * 4, Tool: "blender-outputs"}, tmp)
 	if err != nil {

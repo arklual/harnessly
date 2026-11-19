@@ -1049,3 +1049,23 @@ func TestScene3DDiscoverFindsProjectsAroundTheLibrary(t *testing.T) {
 		t.Errorf("a refused scene left a project: %d listed", len(left))
 	}
 }
+
+// A scene that keeps textures beside it is run where its project is; a self-contained .blend may go to a builder.
+func TestScene3DNeedsProjectWhenTexturesLieBesideIt(t *testing.T) {
+	lab := t.TempDir()
+	writeFile(t, filepath.Join(lab, "out", "a.blend"), "x")
+	if scene3dNeedsProject(filepath.Join(lab, "out", "a.blend")) {
+		t.Error("a lone .blend was kept at home")
+	}
+	if err := os.MkdirAll(filepath.Join(lab, "assets", "wood"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if !scene3dNeedsProject(filepath.Join(lab, "out", "a.blend")) {
+		t.Error("a .blend beside assets/ was sent away from its textures")
+	}
+	deep := t.TempDir()
+	writeFile(t, filepath.Join(deep, "a", "b", "c", "x.blend"), "x")
+	if scene3dNeedsProject(filepath.Join(deep, "a", "b", "c", "x.blend")) {
+		t.Error("a far folder named nothing special kept at home")
+	}
+}
