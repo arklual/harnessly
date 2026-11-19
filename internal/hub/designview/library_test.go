@@ -151,11 +151,15 @@ func TestKeptBlobTimeIsMadeOfItsContents(t *testing.T) {
 	var times []time.Time
 	for range 2 {
 		v := New(Options{Rooms: func(context.Context, string) (Room, error) { return room, nil }, Dir: t.TempDir()})
+		// As a fill does: the prune New starts takes a blob nothing links yet.
+		pruneMu.RLock()
 		file, err := v.blob(context.Background(), room, "s1", sha)
 		if err != nil {
+			pruneMu.RUnlock()
 			t.Fatal(err)
 		}
 		st, err := os.Stat(file)
+		pruneMu.RUnlock()
 		if err != nil {
 			t.Fatal(err)
 		}

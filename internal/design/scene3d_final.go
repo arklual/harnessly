@@ -189,12 +189,14 @@ func (l *Library) StartScene3DFinal(id, planID string, confirm bool) (Scene3DFin
 	s3Final.Lock()
 	s3Final.jobs[job.ID] = job
 	s3Final.Unlock()
+	// The answer is copied before the work starts: from then on the job changes under s3Final only.
+	started := *job
 	s3Wg.Add(1)
 	go func() {
 		defer s3Wg.Done()
 		l.scene3dFinal(id, s, blend, hash, job)
 	}()
-	return *job, nil
+	return started, nil
 }
 
 // Scene3DFinals are the final renders of this runtime (newest first).
