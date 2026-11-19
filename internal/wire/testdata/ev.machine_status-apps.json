@@ -1,0 +1,12 @@
+{
+  "f": "ev",
+  "ch": "machine",
+  "seq": 504,
+  "e": {
+    "type": "machine_status",
+    "reach": "online",
+    "runtime": null,
+    "agents": [],
+    "appsAt": 1792656000000
+  }
+}

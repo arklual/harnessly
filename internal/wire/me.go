@@ -58,6 +58,7 @@ var PrefKeys = []string{
 	"hx-show-test-chats", "voice.lang", "hx-next-new-chat-choice", "hx.next.quickPrompts", "hx-top-tabs",
 	"hx-looks",
 	"hx-widgets",
+	"hx-folders",
 }
 
 // Limit of one value of Prefs.

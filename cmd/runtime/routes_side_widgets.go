@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
@@ -114,7 +115,29 @@ func sideWidgetRoutes(d deps) []gate.Route {
 		}
 		secretJSON(w, http.StatusOK, map[string]any{"text": text, "at": now.UnixMilli()})
 	}
-	return []gate.Route{{Match: func(r *http.Request) bool { return pathIs(r, path) }, Handler: http.HandlerFunc(handle)}}
+	content := func(w http.ResponseWriter, r *http.Request) {
+		if sameorigin.Refuse(w, r) {
+			return
+		}
+		if !d.SessionOK(r) {
+			secretJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+			return
+		}
+		if r.Method != http.MethodGet {
+			secretJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+			return
+		}
+		c, err := sideWidgetService(d).Content(r.URL.Query().Get("id"))
+		if err != nil {
+			secretJSON(w, http.StatusNotFound, map[string]string{"error": "no-widget"})
+			return
+		}
+		secretJSON(w, http.StatusOK, c)
+	}
+	return []gate.Route{
+		{Match: func(r *http.Request) bool { return pathIs(r, path) }, Handler: http.HandlerFunc(handle)},
+		{Match: func(r *http.Request) bool { return pathIs(r, platformAPI+"/side-widgets/content") }, Handler: http.HandlerFunc(content)},
+	}
 }
 
 // The widgets an agent makes (internal/sidewidget): one service per data folder, for the CLI's route and the MCP tools.
@@ -144,6 +167,10 @@ func sideWidgetService(d deps) *sidewidget.Service {
 //
 // Under /api/cli/apps/, so the agent of a chat with apps reaches it too: it makes only a sandboxed view of the side
 // target with no permission (`local.widget-<name>`), nothing else of the apps.
+// sideWidgetChatOf is the chat a tmux session runs (set with the apps' routes): a widget an agent makes from a terminal
+// is for that chat.
+var sideWidgetChatOf atomic.Pointer[func(session string) string]
+
 func sideWidgetCLIRoutes(d deps) []gate.Route {
 	path := "/api/cli/apps/side-widgets"
 	handle := func(w http.ResponseWriter, r *http.Request) {
@@ -166,10 +193,11 @@ func sideWidgetCLIRoutes(d deps) []gate.Route {
 			return
 		}
 		var b struct {
-			Op    string           `json:"op"`
-			Name  string           `json:"name"`
-			Spec  sidewidget.Spec  `json:"spec"`
-			Patch sidewidget.Patch `json:"patch"`
+			Op      string           `json:"op"`
+			Session string           `json:"session"`
+			Name    string           `json:"name"`
+			Spec    sidewidget.Spec  `json:"spec"`
+			Patch   sidewidget.Patch `json:"patch"`
 		}
 		raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 		if err != nil || json.Unmarshal(raw, &b) != nil {
@@ -186,15 +214,30 @@ func sideWidgetCLIRoutes(d deps) []gate.Route {
 			}
 			secretJSON(w, status, map[string]string{"error": "refused", "message": err.Error()})
 		}
+		chat := ""
+		if of := sideWidgetChatOf.Load(); of != nil && b.Session != "" {
+			chat = (*of)(b.Session)
+		}
 		switch b.Op {
 		case "create":
+			spec, err := sidewidget.Place(b.Spec, chat)
+			if err != nil {
+				refuse(err)
+				return
+			}
+			b.Spec = spec
 			if _, err := s.Create(b.Spec); err != nil {
 				refuse(err)
 				return
 			}
 			secretJSON(w, http.StatusOK, map[string]string{"message": sidewidget.Created(b.Spec.Name, b.Spec.Title)})
 		case "update":
-			if _, err := s.Update(b.Name, b.Patch); err != nil {
+			patch, err := sidewidget.PlacePatch(b.Patch, chat)
+			if err != nil {
+				refuse(err)
+				return
+			}
+			if _, err := s.Update(b.Name, patch); err != nil {
 				refuse(err)
 				return
 			}

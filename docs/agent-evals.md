@@ -107,6 +107,9 @@ opened.
 
 Scenarios where one chat hands work to others (`evals/agent/orch-*.yaml`) need three things more:
 
+- **The person's memory**: `setup.memory` (name → text, `MEMORY.md` and notes) is put into the memory folder of the stand's
+  workspace project, as earlier chats left it: `widget-offer-after-no` / `-after-yes` seed what the person answered to the
+  offer of a progress widget. Claude only: Codex has no such memory.
 - **The workspace as a project**: `setup.workspace` copies fixture folders into it and `setup.run` runs a script there
   (`git init` and a first commit), so a check can ask `git diff` what changed.
 - **Waiting for the helpers**: a chat that delegates ends its turn and is woken by its chats' answers. With `settle_s`

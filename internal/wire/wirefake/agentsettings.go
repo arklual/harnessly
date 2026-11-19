@@ -56,7 +56,7 @@ func (a *agentSettings) reset() {
 			rev: 1,
 			options: map[wire.AgentOptionKey]any{
 				wire.OptModel: "gpt-5.5", wire.OptEffort: "medium", wire.OptSandboxMode: "workspace-write", wire.OptApproval: "on-request",
-				wire.OptSearch: "cached", wire.OptHistory: true,
+				wire.OptSearch: "cached", wire.OptHistory: true, wire.OptMemories: true,
 			},
 			mcp: []wire.AgentMcp{{Name: "docs", Kind: wire.McpHTTP, Target: "docs.example.com", Enabled: true}},
 		},

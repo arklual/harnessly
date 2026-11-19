@@ -211,8 +211,8 @@ func ObserveHTTP(path string, status int) {
 // /m/. Streams (a socket, an event stream, a long poll) are not timed: their time is how long someone listened.
 
 const (
-	areaDesign  = routeGroups + iota // /m/…/design/…, /m/…/designly/…
-	areaHistory                      // /m/…/history/…, /api/…/history/…
+	areaDesign  = routeGroups + iota // /m/…/design/…, /m/…/designly/…, and the same under /agents/ (the workspace's runtime)
+	areaHistory                      // /m/…/history/…, /agents/…/history/…, /api/…/history/…
 	areaStore                        // /store/
 	latencyAreas
 )
@@ -236,9 +236,9 @@ var httpLatency [latencyAreas][len(methodNames)]latency
 func LatencyArea(path string) int {
 	g := RouteGroup(path)
 	switch {
-	case g == RouteMachine && (strings.Contains(path, "/design/") || strings.Contains(path, "/designly/")):
+	case (g == RouteMachine || g == RouteWorkspace) && (strings.Contains(path, "/design/") || strings.Contains(path, "/designly/")):
 		return areaDesign
-	case (g == RouteMachine || g == RouteAPI) && strings.Contains(path, "/history/"):
+	case (g == RouteMachine || g == RouteWorkspace || g == RouteAPI) && strings.Contains(path, "/history/"):
 		return areaHistory
 	case path == "/store" || strings.HasPrefix(path, "/store/"):
 		return areaStore

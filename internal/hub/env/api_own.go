@@ -22,8 +22,23 @@ import (
 // never replaced: an own item of the same kind and name is refused, and one added before the organization's is left out
 // of the lists (withoutShadowed).
 
-// ownKinds are what a person may add for themselves.
-var ownKinds = map[string]bool{store.CatalogSkill: true, store.CatalogMCP: true}
+// ownKinds are what a person may add for themselves. An own app is an app the person installed for
+// themselves: put in their own layer, it reaches every machine of theirs, the way the organization's apps reach all.
+var ownKinds = map[string]bool{store.CatalogSkill: true, store.CatalogMCP: true, store.CatalogApp: true}
+
+// ownAppSource: an own app comes from a repository address; the organization's repositories and its «off for all»
+// are not the person's to use.
+func ownAppSource(kind string, src json.RawMessage) error {
+	if kind != store.CatalogApp {
+		return nil
+	}
+	var raw map[string]any
+	_ = json.Unmarshal(src, &raw)
+	if raw["repo"] != nil || raw["off"] != nil {
+		return httpx.Invalid("source", "Своё приложение берут по адресу репозитория (repoUrl, branch, path)")
+	}
+	return nil
+}
 
 // maxOwnItems bounds a person's own items in one organization.
 const maxOwnItems = 30
@@ -100,7 +115,10 @@ func ownView(c store.CatalogItem) map[string]any {
 // addOwn adds an own item and its entry.
 func (s *Service) addOwn(o *own, in OwnIn) (store.CatalogItem, error) {
 	if !ownKinds[in.Kind] {
-		return store.CatalogItem{}, httpx.Invalid("kind", "Своё — это skill или mcp")
+		return store.CatalogItem{}, httpx.Invalid("kind", "Своё — это skill, mcp или app")
+	}
+	if err := ownAppSource(in.Kind, in.Source); err != nil {
+		return store.CatalogItem{}, err
 	}
 	name, err := CleanText("name", deref(in.Name), maxNameRunes, true)
 	if err != nil {
@@ -158,6 +176,9 @@ func (s *Service) patchOwn(o *own, id string, in OwnIn) (store.CatalogItem, erro
 		}
 	}
 	if len(in.Source) > 0 {
+		if err := ownAppSource(c.Kind, in.Source); err != nil {
+			return c, err
+		}
 		src, err := CleanSource(c.Kind, in.Source)
 		if err != nil {
 			return c, err

@@ -28,10 +28,12 @@ const (
 	DesignDS     DesignKind = "ds"
 	// DesignVideo is a deck folder with meta/video.json: scenes on a time line rendered to MP4.
 	DesignVideo DesignKind = "video"
+	// DesignScene3D is a folder with meta/scene3d.json over a blender-lab project: a 3D scene viewed in the page, with pins.
+	DesignScene3D DesignKind = "scene3d"
 )
 
 // DesignKinds is every DesignKind, in the schema's order.
-var DesignKinds = []DesignKind{DesignSite, DesignSlides, DesignDS, DesignVideo}
+var DesignKinds = []DesignKind{DesignSite, DesignSlides, DesignDS, DesignVideo, DesignScene3D}
 
 // The bounds of what a person writes for a new project.
 const (

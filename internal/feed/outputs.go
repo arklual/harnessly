@@ -74,6 +74,26 @@ func (b *builder) ran(command, stdout string) {
 	}
 }
 
+// maxPages bounds the boards a design's card names.
+const maxPages = 12
+
+// mergePages adds the boards just written to those the turn wrote before: once each, the last written last.
+func mergePages(have, add []string) []string {
+	for _, p := range add {
+		for i, h := range have {
+			if h == p {
+				have = append(have[:i:i], have[i+1:]...)
+				break
+			}
+		}
+		have = append(have, p)
+	}
+	if len(have) > maxPages {
+		have = have[len(have)-maxPages:]
+	}
+	return have
+}
+
 // addOutput puts a thing into the turn's outputs once: what is named again keeps its place, and a thing the turn
 // made stays made however often it changed it after.
 func addOutput(t *turn, out wire.TurnOutput) {
@@ -85,6 +105,9 @@ func addOutput(t *turn, out wire.TurnOutput) {
 		if have.Kind == out.Kind && have.Ref == out.Ref {
 			if out.Op == wire.OutputCreated {
 				t.rec.Outputs[i].Op = out.Op
+			}
+			if out.Kind == wire.OutputDesign {
+				t.rec.Outputs[i].Pages = mergePages(t.rec.Outputs[i].Pages, out.Pages)
 			}
 			if out.Kind == wire.OutputDelivery {
 				// A file handed over again after a change is the new bytes: the card vouches for the last hand-over.

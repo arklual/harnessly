@@ -1,4 +1,4 @@
-// The «Организация» screen of the new hub (admin): the organization's own settings. The rule for apps on
+// The «Настройки организации» screen of the new hub (admin): the organization's own settings. The rule for apps on
 // its machines and the links for the chat. The switch changes after the hub answered, and the machines get the rule with their list.
 // Its own chunk: it loads when the person opens the section.
 import { useEffect, useState } from 'react';
@@ -49,41 +49,60 @@ const Screen = () => {
 
   return (
     <>
-      <Titles title="Организация" lead={shell.org.name} />
-      <div className="hx-set__group">
-        <div className="hx-set__group-title">Приложения</div>
-        <div className="hx-set__card">
-          <div className="hx-set__row" data-busy={busy ? 'true' : undefined}>
-            <span className="hx-set__row-text">
-              <span className="hx-set__row-label" id="apps-consent-label">
+      <div className="hb-head hd-head">
+        <Titles
+          title="Настройки организации"
+          lead={`${shell.org.name} · машины и чаты, ссылки в чатах`}
+          scope={false}
+        />
+      </div>
+      <div style={{ maxWidth: 1100 }}>
+        <h2 className="hd-sech is-first" data-sec="chats">
+          Машины и чаты
+          <span className="mut2 sm">Что можно приложениям на машинах организации.</span>
+        </h2>
+        <div className="t-card viz-card dash-tile hd-card flat">
+          <div className="set" data-busy={busy ? 'true' : undefined}>
+            <div>
+              <div className="hd-t" id="apps-consent-label">
                 Не спрашивать разрешений у приложений
-              </span>
-              <span className="hx-set__row-hint">
+              </div>
+              <div className="hd-d">
                 Приложения на машинах организации получат все права, которые просят, без вопроса. Уже выданное
                 при выключении остаётся.
-              </span>
-            </span>
-            <span className="hx-set__spin">
-              <i className="hx-icon" data-i="loader-circle" data-size="sm" aria-hidden="true" />
-            </span>
-            {value !== null && (
-              <button
-                type="button"
-                className="hx-switch"
-                role="switch"
-                aria-checked={value === 'auto' ? 'true' : 'false'}
-                aria-labelledby="apps-consent-label"
-                onClick={toggle}
-              >
-                <i />
-              </button>
-            )}
+              </div>
+            </div>
+            <div>
+              {value === null ? (
+                <span className="hx-sk" style={{ display: 'inline-block', width: 40, height: 24 }} />
+              ) : (
+                <button
+                  type="button"
+                  className="hx-switch"
+                  role="switch"
+                  aria-checked={value === 'auto' ? 'true' : 'false'}
+                  aria-labelledby="apps-consent-label"
+                  disabled={busy}
+                  onClick={toggle}
+                >
+                  <i />
+                </button>
+              )}
+            </div>
           </div>
         </div>
-        {loaded && 'error' in loaded && <div className="hx-set__foot">{loaded.error}</div>}
-        {failed && <div className="hx-set__foot">{failed}</div>}
+        {loaded && 'error' in loaded && (
+          <p className="mut sm" style={{ marginTop: 8 }}>
+            {loaded.error}
+          </p>
+        )}
+        {failed && (
+          <p className="mut sm" style={{ marginTop: 8 }}>
+            {failed}
+          </p>
+        )}
+        <LinksSection />
       </div>
-      <LinksSection />
     </>
   );
 };

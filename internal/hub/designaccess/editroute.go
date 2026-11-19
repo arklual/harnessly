@@ -19,7 +19,7 @@ import (
 // machine off the hub reads it from the store. Everything else, and a project the store has nothing of, goes to the
 // machine as before.
 
-var editPath = regexp.MustCompile(`^/api/[A-Za-z0-9_-]+/design/((?:deck|video)(?:/[a-z]+)?)$`)
+var editPath = regexp.MustCompile(`^/api/[A-Za-z0-9_-]+/design/((?:deck|video|scene3d)(?:/[a-z]+)?)$`)
 
 // editBodyMax caps what the hub reads of an edit (a slide's patch is the largest); a larger body goes to the machine.
 const editBodyMax = 4 << 20

@@ -706,12 +706,27 @@ const DesignRow = ({ output, context }: { output: TurnOutput; context: IOutputsC
     paneLabel: t('next.turnMade.openDesign'),
   });
   const src = context.shown.preview && context.machine ? designThumb(context.machine, output.ref) : null;
+  // The boards the turn wrote: each opens the design on itself; «Открыть» opens the last one written.
+  const pages = output.pages ?? [];
+  const openPage = context.onOpen ? (page: string) => context.onOpen?.(output, page) : null;
   return (
     <Rich
       preview={<Preview src={src} icon={KIND_ICON.design} />}
       title={output.title}
       kind={withVia(output.op === 'changed' ? `${kind} · ${t('next.outputs.changed')}` : kind, output)}
-      openLabel={t('next.turnMade.openDesign')}
+      extra={
+        pages.length > 0 && openPage ? (
+          <span className="hx-made__pages" onClick={stop}>
+            {[...pages].reverse().map((page) => (
+              <button key={page} type="button" className="hx-made__page" onClick={() => openPage(page)}>
+                <Icon name="file" size="sm" />
+                {page.replace(/\.dc\.html$/, '')}
+              </button>
+            ))}
+          </span>
+        ) : undefined
+      }
+      openLabel={pages.length > 1 ? t('next.turnMade.openLastPage') : t('next.turnMade.openDesign')}
       openIcon="palette"
       onOpen={onOpen}
       onShare={null}

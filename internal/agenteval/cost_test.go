@@ -40,3 +40,26 @@ func TestCostIncludesOpenAIUsage(t *testing.T) {
 		t.Fatalf("got %g, want %g; GPT is not free", got, want)
 	}
 }
+
+func TestReportShowsTimeScale(t *testing.T) {
+	text := Summarize([]Result{{Scenario: "cron", Model: "haiku", State: Pass, TimeScale: 60}}, nil, 0).Markdown("cron")
+	if !strings.Contains(text, "time ×60") {
+		t.Fatalf("the report hides the time scale: %s", text)
+	}
+	if text := Summarize([]Result{{Scenario: "cron", Model: "haiku", State: Pass}}, nil, 0).Markdown("cron"); strings.Contains(text, "time ×") {
+		t.Fatalf("a plain-clock report shows a scale: %s", text)
+	}
+}
+
+func TestScenarioHoldAndCheckpoints(t *testing.T) {
+	sc, err := ParseScenario("c.yaml", []byte("id: cc\nprompt: do\nhold_s: 18000\ncheckpoints:\n  - {name: first, after: 25m, by: 40m, kind: tool, match: Bash, min: 1}\nexpect: [{text: x}]\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sc.HoldS != 18000 || len(sc.Checkpoints) != 1 || sc.Checkpoints[0]["by"] != "40m" {
+		t.Fatalf("hold %d, checkpoints %v", sc.HoldS, sc.Checkpoints)
+	}
+	if _, err := ParseScenario("c.yaml", []byte("id: cc\nprompt: do\nhold_s: -1\nexpect: [{text: x}]\n")); err == nil {
+		t.Fatal("a negative hold_s was taken")
+	}
+}

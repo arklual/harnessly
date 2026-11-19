@@ -149,6 +149,17 @@ func New(cfg Config) *Library {
 	if cfg.Texts.Tag == "" {
 		cfg.Texts.Tag = "design"
 	}
+	// The board script names these globals in code (`window.{{pages}} && …`): an empty one, as the hub's libraries
+	// leave it, makes the guest script a syntax error and a guest link's board loses its links and live updates.
+	if cfg.Texts.KitGlobal == "" {
+		cfg.Texts.KitGlobal = "DesignKit"
+	}
+	if cfg.Texts.PagesGlobal == "" {
+		cfg.Texts.PagesGlobal = "DesignPages"
+	}
+	if cfg.Texts.ArgsGlobal == "" {
+		cfg.Texts.ArgsGlobal = "__DESIGN_ARGS"
+	}
 	l := &Library{cfg: cfg, locks: map[string]*sync.Mutex{}, hashed: &hashIndex{}}
 	l.live.init()
 	l.loadAccess()

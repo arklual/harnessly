@@ -1,0 +1,39 @@
+id: schedule-cron-every-30m
+title: Крон «каждые 30 минут» живёт сессию в 2,5 часа и срабатывает по расписанию
+tags: [schedule]
+agents: [claude]
+timeout_s: 600
+# 2,5 часа на часах агента. Со сжатием времени (harnessly eval run --time-scale 60) это 2,5 минуты, и весь
+# прогон укладывается минут в пять; без него сценарий честно держит раннер два с половиной часа.
+hold_s: 9000
+covers:
+  - 'internal/timescale/**'
+  - 'internal/convo/**'
+  - 'internal/agenteval/**'
+prompt: Поставь в этой сессии крон (CronCreate, не рутину хаба) каждые 30 минут — пусть дописывает в файл log.txt текущее время командой `date -u +%H:%M >> log.txt`. Сейчас сам не запускай, первый раз пусть сработает крон. Скажи коротко, когда поставишь.
+expect:
+  - name: set a cron
+    called: CronCreate
+  - name: the cron wrote the log
+    file: {glob: log.txt}
+# Окна — в минутах агента от первой реплики. Повторяющийся крон Claude Code срабатывает до ~15 минут позже своей
+# минуты (его собственный разброс), поэтому первому срабатыванию дано 30 + 15 минут после постановки. Считается только
+# Bash агента: в аргументах CronCreate тоже есть log.txt.
+checkpoints:
+  - name: first firing
+    after: 2m
+    by: 55m
+    kind: tool_call
+    match: '^Bash .*log\.txt'
+    min: 1
+  - name: keeps firing every half hour
+    after: 55m
+    by: 120m
+    kind: tool_call
+    match: '^Bash .*log\.txt'
+    min: 2
+  - name: no flood
+    by: 150m
+    kind: tool_call
+    match: '^Bash .*log\.txt'
+    max: 8

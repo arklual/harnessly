@@ -36,6 +36,8 @@ const (
 	relayFleetUser  = "fu"
 	relayOrg        = "o"
 	relayOrgKick    = "ok"
+	// relayNotices is a person's notices event: the bell's news, reads and switches, and a machine's slot.
+	relayNotices = "n"
 )
 
 // relayMsg is one thing a replica tells the others.
@@ -66,6 +68,9 @@ type Relay struct {
 	// again when the send fails, and never dropped for a full queue of plain events.
 	kicks  chan relayMsg
 	warned sync.Once
+	// notices takes a person's notices event of another replica (nil until Notices).
+	noticesMu sync.Mutex
+	notices   func(person string, data json.RawMessage)
 }
 
 // NewRelay makes the relay of the replica called id. Any of the buses may be nil. Nothing moves until Run.
@@ -106,6 +111,18 @@ func (r *Relay) send(m relayMsg) {
 		if m.kick() {
 			r.log.Error("events relay: a kick was not passed to the other replicas, its queue is full", "user", m.User)
 		}
+	}
+}
+
+// Notices joins the notices streams of the replicas: deliver gets what another replica's person was told, and
+// the returned send passes what this replica's was told to the others. An event longer than RelayMax stays here, so the
+// caller sends a short one (a reference the others read from the database).
+func (r *Relay) Notices(deliver func(person string, data json.RawMessage)) (send func(person string, data json.RawMessage)) {
+	r.noticesMu.Lock()
+	r.notices = deliver
+	r.noticesMu.Unlock()
+	return func(person string, data json.RawMessage) {
+		r.send(relayMsg{Bus: relayNotices, User: person, Data: data})
 	}
 }
 
@@ -209,6 +226,13 @@ func (r *Relay) receive(payload string) {
 	case relayOrgKick:
 		if r.org != nil {
 			r.org.kick(m.Key, m.User)
+		}
+	case relayNotices:
+		r.noticesMu.Lock()
+		deliver := r.notices
+		r.noticesMu.Unlock()
+		if deliver != nil && m.User != "" {
+			deliver(m.User, m.Data)
 		}
 	}
 }

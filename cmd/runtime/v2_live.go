@@ -172,6 +172,7 @@ func newV2Live(d deps, c *core) *v2Live {
 	codexLoginHub.Store(codexHub)
 	v.machine = newLiveMachine(v2Machine, version, features, d.DataDir, func() int { return v.rt.Busy() }, c.preflight, c.v2Models)
 	v.machine.offers = profileOffers(v.profiles)
+	apps.Open(d.DataDir).OnChange(v.machine.appsChanged)
 	followExtProviders(d.DataDir, extSvc, v.profiles, v.machine.republishProfiles)
 	if c.agents != nil {
 		v.machine.skip = c.agents.claude.SkipPermissions
@@ -215,7 +216,7 @@ func newV2Live(d deps, c *core) *v2Live {
 	notices := newChatNotices(c, &noticesRT)
 	var projects atomic.Pointer[projectsFeed]
 	v.rt = convo.New(convo.Deps{PersonOf: design.PersonIn, ProjectsChanged: func([]wire.Project) { projects.Load().changed() }, Notify: notices.notice, Moves: moveStore, Index: index, Digest: digest, ExportDir: filepath.Join(d.DataDir, "v2", "chat-exports"), AgentSession: ses.Find, SessionAccount: noteSessionAccount(d.DataDir, v.profiles), MachineID: v2Machine, Publisher: publisher, Machine: v.tm, Launcher: v.starter, Input: codexInputOf(c), Handoffs: handoffs,
-		Uploads: v2Uploads{uploads}, Refs: v2Refs{v}, Store: convo.NewStore(filepath.Join(d.DataDir, "v2")), Log: v2Log{}, Limits: wire.DefaultLimits, Models: v.machine.modelsOf, Background: v2Background{reader: c.bg, flows: &workflows.Reader{}}, Meta: &sessionmeta.Reader{Index: c.transcripts}, Transcripts: c.transcripts, Shots: &shots.Reader{Index: c.transcripts}, PictureRoots: []string{shots.ScratchRoot(), uploadsDir(d), uploads.Dir, imagesDir(d), codexImagesDir(d)}, Titler: titler.Title, Summarizer: turnSummarizer(d.DataDir, summarizer.Summarize), SummaryModel: func() *wire.NoticeSummaryModel { return runtimeSettings.RuntimeSettings().NoticeSummary }, Closer: v2Closer{v}, DefaultCwd: d.WorkspaceRoot, FolderGone: folderGone,
+		Uploads: v2Uploads{uploads}, Refs: v2Refs{v}, Store: convo.NewStore(filepath.Join(d.DataDir, "v2")), Log: v2Log{}, Limits: wire.DefaultLimits, Models: v.machine.modelsOf, Background: v2Background{reader: c.bg, flows: &workflows.Reader{}}, Meta: &sessionmeta.Reader{Index: c.transcripts}, Transcripts: c.transcripts, Shots: &shots.Reader{Index: c.transcripts}, PictureRoots: []string{shots.ScratchRoot(), uploadsDir(d), uploads.Dir, imagesDir(d), mediaDir(d), codexImagesDir(d)}, Titler: titler.Title, Summarizer: turnSummarizer(d.DataDir, summarizer.Summarize), SummaryModel: func() *wire.NoticeSummaryModel { return runtimeSettings.RuntimeSettings().NoticeSummary }, Closer: v2Closer{v}, DefaultCwd: d.WorkspaceRoot, FolderGone: folderGone,
 		Terminals: terminals, IdleStop: func() time.Duration { return runtimeSettings.RuntimeSettings().IdleStop.After() },
 		IdleFloor: idleFloor, MemoryShort: memoryShort, PressureStop: pressureFloor, LegacyLife: !sessionOwnerOn(os.Getenv),
 		TerminalOff: chatGuard.Off,
@@ -226,7 +227,7 @@ func newV2Live(d deps, c *core) *v2Live {
 		Rewinder:    v2Rewinder{c},
 		Window:      v2Window(&history.Stats{Dir: filepath.Join(d.DataDir, "session-stats")}),
 		Cost:        v2Cost(&history.Stats{Dir: filepath.Join(d.DataDir, "session-stats")}),
-		Compact:     v2Compact(agentFiles(d.Home)),
+		Compact:     v2Compact(agentFiles(d.Home), filepath.Join(env("CODEX_HOME", filepath.Join(d.Home, ".codex")), "config.toml")),
 		AutoContinue: func() (bool, bool) {
 			s := runtimeSettings.RuntimeSettings()
 			return s.LimitContinue != wire.Off, s.RestartContinue != wire.Off
@@ -250,6 +251,8 @@ func newV2Live(d deps, c *core) *v2Live {
 	v.srv.Uploads = uploads
 	v.work = newChatWork(v)
 	v.srv.Work = v.work.Reg
+	// The smart notice's open questions go to the hub too.
+	v.srv.Slot = newSlotFeed(noticeSlot)
 	if terminals != nil {
 		// What the page saves goes into the journal of the settings' changes.
 		v.srv.RuntimeSettings = journaledRuntimeSettings{inner: runtimeSettings, dataDir: d.DataDir}
@@ -1117,8 +1120,34 @@ func profileKeyGone(store *providers.Store, conv wire.Conversation) error {
 	return errProfileKeyGone
 }
 
-// folderGone: the folder is not there, or is no folder (GitHub #108).
-func folderGone(dir string) bool {
-	st, err := os.Stat(dir)
-	return err != nil || !st.IsDir()
+// folderAnswerWithin is how long a new chat waits for its folder to answer. A project on a network disk (NFS) that hangs
+// keeps stat in the kernel for as long as the disk is away; the chat then waited out the command's whole budget and the
+// page showed «Запускаем агента…» for ten seconds a try.
+const folderAnswerWithin = 3 * time.Second
+
+// folderGone: not-found when the folder is not there or is no folder (GitHub #108), timeout when it does not answer.
+func folderGone(dir string) wire.RefuseCode {
+	return folderCheck(dir, folderAnswerWithin, os.Stat)
+}
+
+func folderCheck(dir string, within time.Duration, stat func(string) (os.FileInfo, error)) wire.RefuseCode {
+	got := make(chan wire.RefuseCode, 1)
+	// The stat stuck on a hung disk is left behind: it ends when the disk answers, and nobody waits for it.
+	go func() {
+		st, err := stat(dir)
+		if err != nil || !st.IsDir() {
+			got <- wire.RefuseNotFound
+			return
+		}
+		got <- ""
+	}()
+	timer := time.NewTimer(within)
+	defer timer.Stop()
+	select {
+	case code := <-got:
+		return code
+	case <-timer.C:
+		v2Log{}.Warn("folder does not answer: a new chat is refused", "dir", dir, "within", within.String())
+		return wire.RefuseTimeout
+	}
 }

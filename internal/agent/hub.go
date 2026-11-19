@@ -82,6 +82,8 @@ type hub struct {
 
 	// eval is the runner of the hub's evaluation runs (hubeval.go), made when first asked.
 	eval evalState
+	// jobs are the heavy jobs this machine runs for the hub as a builder (hubjobs.go).
+	jobs jobsState
 
 	// Set by start.
 	ctx      context.Context
@@ -117,6 +119,8 @@ type hub struct {
 
 	// work is the chats' work the runtime said, for the hub (chatwork.go).
 	work workCache
+	// slot is the smart notice's open questions the runtime said, for the hub (noticeslot.go).
+	slot slotCache
 }
 
 // hasSecret says whether a variable is in the environment the machine's chats start with: the agent's env files, or
@@ -545,6 +549,9 @@ func (h *hub) hello() hubproto.Hello {
 	}
 	if h.evalServed() {
 		features = append(features, hubproto.FeatureEvalRun)
+	}
+	if h.jobsServed() {
+		features = append(features, hubproto.FeatureJobRun)
 	}
 	var hw *hubproto.Hardware
 	if h.metrics != nil {

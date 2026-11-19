@@ -55,6 +55,9 @@ type Deps struct {
 	Design DesignSink
 	// Projects keeps the machines' registry of projects; nil: the hub takes none.
 	Projects ProjectsSink
+	// NoticeSlot keeps the open questions of the machines' smart notice (internal/hub/noticehub); nil: the
+	// hub takes none.
+	NoticeSlot NoticeSlotSink
 	// Docs answers the machines' doc.publish and doc.acl (internal/hub/docs); nil: nobody answers.
 	Docs DocsSink
 	// Proposals answers the machines' env.propose and env.own; nil: nobody answers.
@@ -122,6 +125,11 @@ type DesignSink interface {
 	Event(m store.Machine, e hubproto.DesignEvent)
 }
 
+// NoticeSlotSink keeps the open questions of a machine's smart notice; raw is the `noticeslot` event.
+type NoticeSlotSink interface {
+	Slot(ctx context.Context, m store.Machine, raw json.RawMessage)
+}
+
 // ProjectsSink keeps the registry of a machine's projects (internal/hub/projreg).
 type ProjectsSink interface {
 	Event(m store.Machine, e hubproto.ProjectsEvent)
@@ -157,6 +165,7 @@ type Service struct {
 	env       EnvSink
 	design    DesignSink
 	projects  ProjectsSink
+	slot      NoticeSlotSink
 	docs      DocsSink
 	proposals EnvProposals
 	tbotJoin  TbotJoinSink
@@ -185,7 +194,7 @@ type Service struct {
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget, env: d.Env, design: d.Design, projects: d.Projects, docs: d.Docs, proposals: d.Proposals, tbotJoin: d.TbotJoin, automations: d.Automations, history: d.History, prov: d.Provider, pub: d.Publisher, gate: d.Features, notice: d.Notice}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget, env: d.Env, design: d.Design, projects: d.Projects, slot: d.NoticeSlot, docs: d.Docs, proposals: d.Proposals, tbotJoin: d.TbotJoin, automations: d.Automations, history: d.History, prov: d.Provider, pub: d.Publisher, gate: d.Features, notice: d.Notice}
 	s.res.init()
 	if s.now == nil {
 		s.now = time.Now
@@ -323,6 +332,11 @@ type View struct {
 	// Runtime is whether the machine's page opens on this hub: ready, needs_trust (an owner of its space can allow it)
 	// or blocked (docs/hub/api.md, «Trusting a machine»).
 	Runtime string `json:"runtime"`
+	// Role is "agents" (chats are placed on the machine) or "builder" (heavy jobs are, chats never; HRN-1683). Caps and
+	// Slots are the builder's labels and heavy slots.
+	Role  string   `json:"role"`
+	Caps  []string `json:"caps"`
+	Slots int      `json:"slots"`
 }
 
 // info is what the hub remembers of a machine's last reports, in the form the API sends them.
@@ -390,6 +404,14 @@ func (s *Service) View(ctx context.Context, m store.Machine) (View, error) {
 	}
 	if v.Runtime, err = s.runtimeState(ctx, m); err != nil {
 		return View{}, err
+	}
+	b, _, err := s.db.S().MachineBuilderOf(ctx, m.ID)
+	if err != nil {
+		return View{}, err
+	}
+	v.Role, v.Caps, v.Slots = b.Role, b.Caps, b.Slots
+	if v.Caps == nil {
+		v.Caps = []string{}
 	}
 	if len(v.Proxy) == 0 {
 		v.Proxy = emptyProxy

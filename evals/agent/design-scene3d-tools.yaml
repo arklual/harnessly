@@ -1,0 +1,26 @@
+id: design-scene3d-tools
+title: 3D-сцена Sinopia — агент берёт пины и описание сцены инструментами scene_*, а не читает файлы проекта и не лезет в .blend
+tags: [design, scene3d]
+timeout_s: 480
+setup:
+  design: [fixtures/villa3d]
+covers:
+  - 'internal/design/scenetools.go'
+  - 'internal/design/scene3d_apply.go'
+  - 'cmd/runtime/v2_delegate.go'
+prompt: В 3D-сцене Sinopia Design «villa3d» есть открытый пин. Прочитай его инструментом сцены и скажи, на каком объекте он и что просят изменить. Сцену не меняй.
+expect:
+  - name: read the pins with the scene tool
+    called: '.*scene_comments.*'
+  - name: named the object and the ask
+    text: '(?i)roof|крыш'
+  - name: did not open the .blend or run Blender
+    not_called: Bash
+    args: {command: '(?s).*blender.*'}
+variants:
+  - id: v1
+    kind: short
+    text: "«villa3d» (3D-сцена): прочитай открытый пин инструментом сцены — объект и что просят. Не меняй."
+  - id: v2
+    kind: english
+    text: "The 3D scene «villa3d» has an open pin. Read it with the scene tool and tell me the object and the requested change. Do not change the scene."

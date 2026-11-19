@@ -23,6 +23,8 @@ import {
   type RowMode,
   type ServerRow,
   serverRows,
+  type StepCounts,
+  type StepFilter,
   type Tile,
   verText,
   weekText,
@@ -32,26 +34,35 @@ export const Tiles = ({ tiles }: { tiles: readonly Tile[] }) => (
   <div className="dash hb-dash mo-tiles">
     <div className="sx-wrap">
       <div className="sx-grid">
-        {tiles.map((t, i) => (
-          <div
-            key={t.label}
-            className="sx-tile mo-tile"
-            style={{ '--sx-i': i, '--sx-tone': t.tone } as CSSProperties}
-          >
-            <span className="sx-tile__top">
-              <span className="sx-tile__icon">
-                <Icon i={t.icon} size="sm" />
+        {tiles.map((t, i) => {
+          const body = (
+            <>
+              <span className="sx-tile__top">
+                <span className="sx-tile__icon">
+                  <Icon i={t.icon} size="sm" />
+                </span>
+                {t.onPick && <Icon i="arrow-up-right" className="sx-tile__go" />}
               </span>
-            </span>
-            <span className="sx-tile__chart">
-              {t.strip ? <Strip parts={t.strip} /> : <Bars values={t.bars ?? []} />}
-            </span>
-            <span className="sx-tile__label">{t.label}</span>
-            <span className="sx-tile__value">
-              <Count text={t.value} />
-            </span>
-          </div>
-        ))}
+              <span className="sx-tile__chart">
+                {t.strip ? <Strip parts={t.strip} /> : <Bars values={t.bars ?? []} />}
+              </span>
+              <span className="sx-tile__label">{t.label}</span>
+              <span className="sx-tile__value">
+                <Count text={t.value} />
+              </span>
+            </>
+          );
+          const style = { '--sx-i': i, '--sx-tone': t.tone } as CSSProperties;
+          return t.onPick ? (
+            <button key={t.label} type="button" className="sx-tile mo-tile" style={style} onClick={t.onPick}>
+              {body}
+            </button>
+          ) : (
+            <div key={t.label} className="sx-tile mo-tile" style={style}>
+              {body}
+            </div>
+          );
+        })}
       </div>
     </div>
   </div>
@@ -162,7 +173,7 @@ export const MlLink = ({ url, text }: { url: string | null; text: string }) =>
 
 export interface SegOption<T extends string> {
   id: T;
-  label: string;
+  label: ReactNode;
 }
 
 export const Seg = <T extends string>({
@@ -190,6 +201,38 @@ export const Seg = <T extends string>({
       </button>
     ))}
   </div>
+);
+
+const STEPS = [
+  ['all', 'Все'],
+  ['step', 'Требуют шага'],
+  ['ready', 'Готовы'],
+  ['mine', 'Мои'],
+] as const;
+
+/** The chips «Все / Требуют шага / Готовы / Мои» with the numbers. */
+export const StepChips = ({
+  value,
+  counts,
+  onPick,
+}: {
+  value: StepFilter;
+  counts: StepCounts;
+  onPick: (f: StepFilter) => void;
+}) => (
+  <Seg
+    label="Фильтр"
+    value={value}
+    onPick={onPick}
+    options={STEPS.map(([id, label]) => ({
+      id,
+      label: (
+        <>
+          {label} <span className="hd-n">{counts[id]}</span>
+        </>
+      ),
+    }))}
+  />
 );
 
 const MACHINE_SORTS: SortKey[] = [
@@ -466,7 +509,7 @@ export const Group = ({
     <div className="mo-g" aria-expanded={open} style={{ '--i': index } as CSSProperties}>
       <button type="button" className="mo-g__head" onClick={onToggle}>
         <Icon i="chevron-right" size="sm" className="mo-g__chev" />
-        <span className="hb-dot">{initial(group.name)}</span>
+        <span className="hd-gmark">{initial(group.name)}</span>
         <span className="mo-g__t">
           <b>{group.name}</b>
           <small>{sub}</small>

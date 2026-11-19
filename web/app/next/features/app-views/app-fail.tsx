@@ -62,9 +62,19 @@ interface IAppFailProps {
   logKey: string;
   conversation: ConvId | null;
   onRetry: () => void;
+  /** A card under the right column: no prose, one icon and one button, the reason in a tooltip. */
+  compact?: boolean;
 }
 
-const AppFail = ({ machine, app, failure, logKey, conversation, onRetry }: IAppFailProps) => {
+const AppFail = ({
+  machine,
+  app,
+  failure,
+  logKey,
+  conversation,
+  onRetry,
+  compact = false,
+}: IAppFailProps) => {
   const [journal, setJournal] = useState(false);
   const [handed, setHanded] = useState(false);
   const log = useBridgeLog(logKey);
@@ -94,6 +104,15 @@ const AppFail = ({ machine, app, failure, logKey, conversation, onRetry }: IAppF
     setDraftText(conversation, have === '' ? note : `${have}\n\n${note}`);
     setHanded(true);
   };
+  if (compact)
+    return (
+      <div className="hx-appfail" data-compact="true" role="alert" title={failureText(failure)}>
+        <Icon name="circle-alert" size="md" />
+        <Button size="sm" variant="ghost" icon="refresh-cw" onClick={onRetry}>
+          {t('next.appfail.refresh')}
+        </Button>
+      </div>
+    );
   return (
     <div className="hx-appfail" role="alert">
       <div className="hx-appfail__head">

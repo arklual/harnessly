@@ -184,7 +184,7 @@ func (c *core) layoutRoutes(f *gate.Gate, d deps) []gate.Route {
 		if ref != "" && board != "" && !lib.HasPages(ref) {
 			lib.QueueControl(ref, design.Control{Board: board})
 		}
-		return ref, board
+		return ref, boardPlace(lib, ref, board)
 	}
 	// `design panel … show` and `design claim` open the design in the chat's pane (and above it, by the intents' lift).
 	designAPI(d).OpenPane = c.designOpenPane(lib)
@@ -231,7 +231,9 @@ func (c *core) designOpenPane(lib *design.Library) func(session, ref, board stri
 			return false
 		}
 		// The board goes with the request (place): the pane's design viewer turns to it, pages of its own or not.
-		cmd := panel.Command{Kind: "open", Tab: "design", Target: ref, Place: board}
+		// Auto: the agent works on the design, it did not ask to show it, so its tab goes behind with a dot and the
+		// pane stays as the person left it; only `open` brings the pane out.
+		cmd := panel.Command{Kind: "open", Tab: "design", Target: ref, Place: boardPlace(lib, ref, board), Auto: true}
 		if paneauto.Repeated(c.intents, tabID, cmd, time.Now()) == "" {
 			c.intents.Add(tabID, cmd.JSON())
 			if c.sync != nil {
@@ -243,4 +245,16 @@ func (c *core) designOpenPane(lib *design.Library) func(session, ref, board stri
 		}
 		return true
 	}
+}
+
+// boardPlace is the board as the pane's design viewer opens it: its file (`Pay.dc.html`). An agent names a board by
+// its title or key, and the viewer asked for a title shows «Такого макета нет».
+func boardPlace(lib *design.Library, ref, board string) string {
+	if board == "" {
+		return ""
+	}
+	if file := lib.BoardFileOf(ref, board); file != "" {
+		return file
+	}
+	return board
 }

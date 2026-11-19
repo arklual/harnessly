@@ -40,6 +40,7 @@ import {
   probeMcp,
   removeMcp,
   renameMcp,
+  setMcpEnv,
   setMcpHeader,
   startMcpSignIn,
   type IMcpList,
@@ -163,6 +164,7 @@ const McpPart = ({ machine }: { machine: MachineId }) => {
       onSignIn={signIn}
       onRefresh={refresh}
       onHeader={(id, header) => replaced(setMcpHeader(machine, id, header))}
+      onEnv={(id, env) => replaced(setMcpEnv(machine, id, env))}
       onCheck={(id) => replaced(checkMcp(machine, id))}
       onRename={(id, name) => replaced(renameMcp(machine, id, name))}
       onEnable={(id, enabled) => replaced(enableMcp(machine, id, enabled))}

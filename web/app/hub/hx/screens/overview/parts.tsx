@@ -274,10 +274,6 @@ export const HeadTiles = ({
 const toneOfSignal = (s: Signal): 'risk' | 'warn' => (s.severity === 'critical' ? 'risk' : 'warn');
 
 /** «Отложить»: the signal goes at once; if the hub refuses it comes back with the reason. */
-const SNOOZE: { span: SnoozeFor; label: string; hint: string }[] = [
-  { span: 'day', label: 'на день', hint: 'Скрыть сигнал на сутки. Если станет хуже, он вернётся раньше' },
-  { span: 'week', label: 'на неделю', hint: 'Скрыть сигнал на 7 дней. Если станет хуже, он вернётся раньше' },
-];
 
 export const Attention = ({ signals, base }: { signals: Signal[]; base: string }) => {
   const { api } = useOrg();
@@ -320,94 +316,96 @@ export const Attention = ({ signals, base }: { signals: Signal[]; base: string }
     );
   };
   return (
-    <Card
-      label="Требует внимания"
-      className="dash-span-12 mx-attention"
-      title={
-        <span className="at-title">
-          Требует внимания
-          {shown.length > 0 && (
-            <>
-              {' '}
-              <span className="at-title__count">{shown.length}</span>
-            </>
-          )}
-        </span>
-      }
-      description="Что требует решения сегодня: кнопка ведёт к исправлению, «Отложить» прячет сигнал на время"
+    <div
+      className="t-card viz-card dash-tile mx-attention hd-card"
+      role="region"
+      aria-label="Требует внимания"
     >
-      {last && (
-        <p className="at-undo" role="status">
-          <span>
-            Сигнал «{last.s.title}» отложен {last.span === 'week' ? 'на неделю' : 'на день'}
-          </span>
-          <button type="button" className="at-undo__btn" disabled={last.busy} onClick={undo}>
-            {last.busy ? 'Возвращаем' : 'Вернуть'}
-          </button>
-          <button type="button" className="at-undo__x" aria-label="Скрыть" onClick={() => setLast(null)}>
-            <Icon i="x" size="sm" />
-          </button>
-        </p>
-      )}
-      {failed && (
-        <p className="ov-error-line" role="alert">
-          {failed.text}
-        </p>
-      )}
-      {shown.length === 0 ? (
-        <p className="ov-empty">Всё спокойно: сейчас ничего не требует внимания.</p>
-      ) : (
-        <div className="at-grid" style={css({ '--at-cols': 1 })}>
-          {shown.map((s, i) => (
-            <div
-              key={s.id}
-              className="at-cell"
-              data-tone={toneOfSignal(s)}
-              data-link={s.action ? '1' : undefined}
-              style={css({ '--i': i, '--at-span': 1, '--j': 0, '--jr': 0 })}
-              onClick={s.action ? () => goSignal(base, s.action!) : undefined}
-            >
-              <span className="at-cell__dot" aria-hidden="true" />
-              <span className="at-cell__text">
-                <b className="at-cell__title">{s.title}</b>
-                <span className="at-cell__detail">{s.detail}</span>
-              </span>
-              <span className="at-cell__acts">
-                {s.action && (
-                  <button
-                    type="button"
-                    className="at-cell__action"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      goSignal(base, s.action!);
-                    }}
-                  >
-                    {s.action.label}
-                    <Icon i="arrow-up-right" size="sm" />
-                  </button>
-                )}
-                <span className="at-cell__snooze" role="group" aria-label="Отложить">
-                  <span>Отложить</span>
-                  {SNOOZE.map((o) => (
-                    <button
-                      key={o.span}
-                      type="button"
-                      title={o.hint}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        put(s, o.span);
-                      }}
-                    >
-                      {o.label}
-                    </button>
-                  ))}
+      <header className="viz-card__header">
+        <div className="viz-card__heading">
+          <div className="viz-card__title-row">
+            <h3 className="viz-card__title">
+              <span className="at-title">
+                Требует внимания{' '}
+                <span className="at-title__count" data-zero={shown.length ? undefined : ''}>
+                  {shown.length}
                 </span>
               </span>
-            </div>
-          ))}
+            </h3>
+          </div>
         </div>
-      )}
-    </Card>
+      </header>
+      <div className="viz-card__body">
+        {last && (
+          <p className="at-undo" role="status">
+            <span>
+              Сигнал «{last.s.title}» отложен {last.span === 'week' ? 'на неделю' : 'до завтра'}
+            </span>
+            <button type="button" className="at-undo__btn" disabled={last.busy} onClick={undo}>
+              {last.busy ? 'Возвращаем' : 'Вернуть'}
+            </button>
+            <button type="button" className="at-undo__x" aria-label="Скрыть" onClick={() => setLast(null)}>
+              <Icon i="x" size="sm" />
+            </button>
+          </p>
+        )}
+        {failed && (
+          <p className="ov-error-line" role="alert">
+            {failed.text}
+          </p>
+        )}
+        {shown.length === 0 ? (
+          <div className="hd-empty">
+            <span className="hd-empty__ic">
+              <Icon i="circle-check" />
+            </span>
+            <b>Всё в порядке</b>
+            <span>Ничего не требует действий.</span>
+          </div>
+        ) : (
+          <div className="at-grid" style={css({ '--at-cols': 1 })}>
+            {shown.map((s, i) => (
+              <div
+                key={s.id}
+                className="at-cell hd-att"
+                data-tone={toneOfSignal(s)}
+                style={css({ '--i': i, '--at-span': 1, '--j': 0, '--jr': 0 })}
+              >
+                <span className="at-cell__dot" aria-hidden="true" />
+                <span className="at-cell__text">
+                  <b className="at-cell__title">{s.title}</b>
+                  <span className="at-cell__detail">{s.detail}</span>
+                </span>
+                <span className="at-cell__action hd-att__acts">
+                  {s.action && (
+                    <button
+                      type="button"
+                      className="hx-btn hd-btn"
+                      data-variant={i === 0 && s.severity === 'critical' ? 'primary' : 'outline'}
+                      onClick={() => goSignal(base, s.action!)}
+                    >
+                      {s.action.label}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="hx-btn hd-btn"
+                    data-variant="ghost"
+                    data-size="sm"
+                    data-shape="icon"
+                    title="Отложить до завтра: уберёт сигнал до завтра. Если проблема останется, он вернётся"
+                    aria-label="Отложить до завтра"
+                    onClick={() => put(s, 'day')}
+                  >
+                    <Icon i="clock" size="sm" />
+                  </button>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 

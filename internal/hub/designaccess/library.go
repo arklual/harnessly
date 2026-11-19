@@ -276,7 +276,7 @@ func libraryKind(k string) string {
 	switch k {
 	case "slides", "deck":
 		return "slides"
-	case "ds", "video":
+	case "ds", "video", "scene3d":
 		return k
 	}
 	return "site"

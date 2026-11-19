@@ -284,6 +284,7 @@ func appRoutes(d deps, c *core) []gate.Route {
 	installLock(d, reg)
 	installShareGate(d, reg)
 	liveAppsOf.init(reg, c)
+	sideWidgetChatOf.Store(&chats.ofSession)
 	return append(appRouteList(d, reg, version, chats), chatRoutes(d, chats)...)
 }
 

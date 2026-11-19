@@ -46,7 +46,7 @@ afterEach(() => cleanup());
 describe('machine card: transfer to another tenant', () => {
   it('offers the transfer to a tenant admin and opens its dialog', async () => {
     const setDlg = await open('admin');
-    const btn = await screen.findByRole('button', { name: /Перенести…/ });
+    const btn = await screen.findByRole('button', { name: /^Перенести/ });
     fireEvent.click(btn);
     expect(setDlg).toHaveBeenCalledWith('move');
   });
@@ -54,7 +54,7 @@ describe('machine card: transfer to another tenant', () => {
   it('does not offer it to someone who cannot administer the machine', async () => {
     await open('lead');
     await screen.findByText('Нагрузка за сутки');
-    expect(screen.queryByRole('button', { name: /Перенести…/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Перенести/ })).toBeNull();
   });
 });
 

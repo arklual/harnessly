@@ -1,0 +1,26 @@
+id: widget-scope-global
+title: Виджет, который человек просит видеть везде («во всех чатах») — агент делает его глобальным (HRN-1664)
+tags: [widgets]
+agents: [claude]
+timeout_s: 300
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/hlcli/widget.go'
+  - 'internal/sidewidget/**'
+prompt: >-
+  Сделай виджет, который прикидывает, хватит ли мне лимитов до конца дня, и хочу видеть его справа во всех чатах, а не только в этом.
+expect:
+  - name: made it for every chat
+    any_of:
+      - called: harnessly\.widget_create
+        args: {scope: 'global'}
+      - called: Bash
+        args: {command: 'harnessly widget create\b(?s:.*)--scope[ =]global'}
+variants:
+  - id: v1
+    kind: short
+    text: "виджет: хватит ли лимитов до вечера — чтобы был справа в каждом чате"
+  - id: v2
+    kind: english
+    text: "Make a widget that estimates whether my limits last until the end of the day, and show it on the right in every chat, not only this one."

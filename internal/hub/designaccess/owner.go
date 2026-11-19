@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"regexp"
 	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
@@ -34,7 +35,14 @@ const (
 	MetaByHub     = "hub"
 )
 
-var metaKinds = map[string]bool{"site": true, "slides": true, "ds": true, "video": true, "deck": true, "kit": true, "app-doc": true, "design": true}
+var metaKinds = map[string]bool{"site": true, "slides": true, "ds": true, "video": true, "scene3d": true, "deck": true, "kit": true, "app-doc": true, "design": true}
+
+// appKindRe is a document type an app adds (apps.appKindRe: <publisher>.<name>, up to two more segments). The machine
+// records a document of an app's type with that type, and the apps' catalog (apps_catalog.go) finds the app's documents
+// by it; the hub does not import internal/apps, so the pattern is repeated here.
+var appKindRe = regexp.MustCompile(`^[a-z][a-z0-9-]{0,39}(\.[a-z][a-z0-9-]{0,39}){1,3}$`)
+
+func metaKind(k string) bool { return metaKinds[k] || appKindRe.MatchString(k) }
 
 // OwnerOn says whether the hub owns the design facts for the person the machine runs for.
 func (s *Service) OwnerOn(ctx context.Context, m store.Machine) bool {
@@ -60,7 +68,7 @@ func (s *Service) RecordMeta(ctx context.Context, m store.Machine, project strin
 	meta.Title = clip(strings.TrimSpace(meta.Title), maxTitle)
 	meta.Preview = clip(strings.TrimSpace(meta.Preview), 512)
 	meta.Kit = clip(strings.TrimSpace(meta.Kit), 128)
-	if !metaKinds[meta.Kind] {
+	if !metaKind(meta.Kind) {
 		meta.Kind = ""
 	}
 	changed := false

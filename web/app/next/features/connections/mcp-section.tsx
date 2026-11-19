@@ -20,14 +20,19 @@ import {
 import {
   CatalogCard,
   ConnectForm,
+  EnvFields,
   HeaderFields,
   headerOf,
+  StartingHint,
+  useEnvValues,
   type IPicked,
   type TConnectMcp,
   type TProbeResult,
 } from '@/next/features/connections/mcp-catalog';
 import {
   catalogGroups,
+  envPayload,
+  isKeyed,
   isQuietState,
   mcpReasonText,
   mcpStateText,
@@ -57,7 +62,7 @@ const CATALOG_FIRST = 6;
 /** The lists' stand-ins while they are on their way: one array each, so the leaving lists see no change. */
 const NO_SERVERS: readonly IMcpServer[] = [];
 
-const PANEL = { rename: 'rename', remove: 'remove', token: 'token' } as const;
+const PANEL = { rename: 'rename', remove: 'remove', token: 'token', keys: 'keys' } as const;
 type TPanel = (typeof PANEL)[keyof typeof PANEL];
 
 const ACTION = {
@@ -66,6 +71,7 @@ const ACTION = {
   toggle: 'toggle',
   remove: 'remove',
   token: 'token',
+  keys: 'keys',
 } as const;
 type TAction = (typeof ACTION)[keyof typeof ACTION];
 
@@ -81,6 +87,8 @@ export interface IMcpActions {
   onEnable: (id: string, enabled: boolean) => TDone;
   onRemove: (id: string) => TDone;
   onHeader: (id: string, header: IMcpHeader) => TDone;
+  /** New keys of a local server or an API; a key left out stays as it is. */
+  onEnv: (id: string, env: Readonly<Record<string, string>>) => TDone;
 }
 
 export interface IMcpSectionProps extends IMcpActions {
@@ -126,6 +134,12 @@ const RowMenu = ({ server, disabled, onAction }: IRowMenuProps) => {
           <Icon name="refresh-cw" size="sm" />
           <span className="hx-cmenu__txt">{t('next.connections.check')}</span>
         </Menu.Item>
+        {isKeyed(server) && server.env.length > 0 && (
+          <Menu.Item className="hx-cmenu__item" onClick={() => onAction(ACTION.keys)}>
+            <Icon name="key-round" size="sm" />
+            <span className="hx-cmenu__txt">{t('next.connections.mcp.keys')}</span>
+          </Menu.Item>
+        )}
         <Menu.Item className="hx-cmenu__item" onClick={() => onAction(ACTION.rename)}>
           <Icon name="pencil" size="sm" />
           <span className="hx-cmenu__txt">{t('next.connections.rename')}</span>
@@ -228,6 +242,8 @@ const NEXT = { signIn: 'signIn', token: 'token', none: 'none' } as const;
 type TNext = (typeof NEXT)[keyof typeof NEXT];
 
 const nextStep = (added: IMcpAdded): TNext => {
+  // A local server or an API has no sign-in: its keys went with the request.
+  if (isKeyed(added.server)) return NEXT.none;
   const start: IMcpAuthStart | null = added.authStart;
   if (start === null) {
     // A runtime that does not say: the server's own state decides.
@@ -262,6 +278,7 @@ const McpRow = ({ server, tokenUrl, tokenPrefix, ask, leaving, actions, signin }
   const [draft, setDraft] = useState(server.name);
   const [header, setHeader] = useState(() => firstHeader(server, ask));
   const [value, setValue] = useState('');
+  const env = useEnvValues(server.env, false);
   const [busy, setBusy] = useState<TAction | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [kept, setKept] = useState('');
@@ -291,7 +308,8 @@ const McpRow = ({ server, tokenUrl, tokenPrefix, ask, leaving, actions, signin }
 
   const problem = flow === null ? mcpStateText(server) : null;
   const asksPerson = flow === null && needsPerson(server);
-  const signsIn = !takesToken(server);
+  const keyed = isKeyed(server) && server.env.length > 0;
+  const signsIn = !takesToken(server) && !isKeyed(server);
   const working = busy !== null || (flow !== null && flow.phase === FLOW.opening);
 
   const run = async (action: TAction, call: () => TDone): Promise<boolean> => {
@@ -325,6 +343,11 @@ const McpRow = ({ server, tokenUrl, tokenPrefix, ask, leaving, actions, signin }
       setPanel(PANEL.token);
       return;
     }
+    if (action === ACTION.keys) {
+      env.clear();
+      setPanel(PANEL.keys);
+      return;
+    }
     setPanel(PANEL.remove);
   };
 
@@ -350,8 +373,16 @@ const McpRow = ({ server, tokenUrl, tokenPrefix, ask, leaving, actions, signin }
     if (await run(ACTION.token, () => actions.onHeader(server.id, sent))) setPanel(null);
   };
 
+  const keysSent = envPayload(server.env, env.values);
+  const sendKeys = async () => {
+    if (Object.keys(keysSent).length === 0 || busy !== null) return;
+    env.clear();
+    if (await run(ACTION.keys, () => actions.onEnv(server.id, keysSent))) setPanel(null);
+  };
+
   const close = () => {
     setPanel(null);
+    env.clear();
     setValue('');
     setError(null);
   };
@@ -392,7 +423,17 @@ const McpRow = ({ server, tokenUrl, tokenPrefix, ask, leaving, actions, signin }
                   : t('next.connections.mcp.signIn')}
               </SetButton>
             )}
-            {asksPerson && !signsIn && panel !== PANEL.token && (
+            {asksPerson && keyed && panel !== PANEL.keys && (
+              <SetButton
+                tone="ghost"
+                icon="key-round"
+                disabled={leaving || working}
+                onClick={() => pick(ACTION.keys)}
+              >
+                {t('next.connections.mcp.keys')}
+              </SetButton>
+            )}
+            {asksPerson && !signsIn && !isKeyed(server) && panel !== PANEL.token && (
               <SetButton
                 tone="ghost"
                 icon="key-round"
@@ -431,6 +472,38 @@ const McpRow = ({ server, tokenUrl, tokenPrefix, ask, leaving, actions, signin }
                     {t('next.connections.save')}
                   </SetButton>
                   <SetButton tone="ghost" disabled={busy === ACTION.token} onClick={close}>
+                    {t('next.connections.cancel')}
+                  </SetButton>
+                </div>
+              </div>
+            )}
+          </Reveal>
+          <Reveal open={panel === PANEL.keys && !leaving}>
+            {panel === PANEL.keys && (
+              <div className="hx-conn-row__panel">
+                <EnvFields
+                  fields={server.env}
+                  values={env.values}
+                  keep
+                  disabled={busy !== null}
+                  invalid={error !== null}
+                  onChange={(name, next) => {
+                    env.set(name, next);
+                    setError(null);
+                  }}
+                  onSubmit={() => void sendKeys()}
+                />
+                {busy === ACTION.keys && <StartingHint />}
+                <div className="hx-conn-row__buttons">
+                  <SetButton
+                    tone="primary"
+                    busy={busy === ACTION.keys}
+                    disabled={Object.keys(keysSent).length === 0}
+                    onClick={() => void sendKeys()}
+                  >
+                    {t('next.connections.save')}
+                  </SetButton>
+                  <SetButton tone="ghost" disabled={busy === ACTION.keys} onClick={close}>
                     {t('next.connections.cancel')}
                   </SetButton>
                 </div>
@@ -520,33 +593,41 @@ const Head = () => (
   </div>
 );
 
+interface ICatalogSearchProps {
+  query: string;
+  onQuery: (query: string) => void;
+}
+
+/** A search over the catalog's names, what each gives and its group; it filters as the person types. */
+const CatalogSearch = ({ query, onQuery }: ICatalogSearchProps) => (
+  <div className="hx-mcp-search">
+    <Icon name="search" size="sm" className="hx-mcp-search__icon" />
+    <input
+      className="hx-set__input hx-mcp-search__input"
+      type="search"
+      value={query}
+      autoComplete="off"
+      spellCheck={false}
+      aria-label={t('next.connections.mcp.search')}
+      placeholder={t('next.connections.mcp.search')}
+      onChange={(event) => onQuery(event.target.value)}
+    />
+  </div>
+);
+
 interface ICatalogGroupsProps {
   catalog: readonly { item: IMcpCatalogEntry; leaving: boolean }[];
+  query: string;
   picked: IPicked | null;
   onPick: (entry: IMcpCatalogEntry) => void;
 }
 
-/** The whole catalog: a search over names and what each gives, then the services in their groups. */
-const CatalogGroups = ({ catalog, picked, onPick }: ICatalogGroupsProps) => {
-  const [query, setQuery] = useState('');
+/** The catalog the query finds, in its groups. */
+const CatalogGroups = ({ catalog, query, picked, onPick }: ICatalogGroupsProps) => {
   const ids = useId();
   const groups = catalogGroups(catalog, (row) => row.item, query);
   return (
     <div className="hx-mcp-all">
-      <div className="hx-mcp-search">
-        <Icon name="search" size="sm" className="hx-mcp-search__icon" />
-        <input
-          id={`${ids}-search`}
-          className="hx-set__input hx-mcp-search__input"
-          type="search"
-          value={query}
-          autoComplete="off"
-          spellCheck={false}
-          aria-label={t('next.connections.mcp.search')}
-          placeholder={t('next.connections.mcp.search')}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      </div>
       {groups.map((group) => (
         <section key={group.kind} className="hx-mcp-group" aria-labelledby={`${ids}-${group.kind}`}>
           <h3 id={`${ids}-${group.kind}`} className="hx-mcp-group__title">
@@ -591,6 +672,7 @@ const McpSection = ({
   const [ask, setAsk] = useState<ITokenAsk | null>(null);
   const [picked, setPicked] = useState<IPicked | null>(null);
   const [all, setAll] = useState(false);
+  const [query, setQuery] = useState('');
   const form = useRef<HTMLDivElement>(null);
 
   const pick = (entry: IPicked['entry']) => {
@@ -623,6 +705,8 @@ const McpSection = ({
     },
     [onAdd, prepare, release, start],
   );
+
+  const searching = query.trim() !== '';
 
   if (mcp === null)
     return (
@@ -665,7 +749,8 @@ const McpSection = ({
           onUnpick={() => setPicked(null)}
         />
       </Group>
-      {catalog.length > 0 && !all && (
+      {catalog.length > CATALOG_FIRST && <CatalogSearch query={query} onQuery={setQuery} />}
+      {catalog.length > 0 && !all && !searching && (
         <div className="hx-mcp-cat">
           {catalog.slice(0, CATALOG_FIRST).map(({ item, leaving }) => (
             <CatalogCard
@@ -678,8 +763,10 @@ const McpSection = ({
           ))}
         </div>
       )}
-      {catalog.length > 0 && all && <CatalogGroups catalog={catalog} picked={picked} onPick={pick} />}
-      {!all && catalog.length > CATALOG_FIRST && (
+      {catalog.length > 0 && (all || searching) && (
+        <CatalogGroups catalog={catalog} query={query} picked={picked} onPick={pick} />
+      )}
+      {!all && !searching && catalog.length > CATALOG_FIRST && (
         <button type="button" className="hx-mcp-more" onClick={() => setAll(true)}>
           {t('next.connections.mcp.more')}
           <Icon name="chevron-down" size="sm" />

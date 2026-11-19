@@ -244,8 +244,8 @@ func hubEnvRoutesWith(d deps, call envOwnCaller) []gate.Route {
 				Hint   string          `json:"hint"`
 				Source json.RawMessage `json:"source"`
 			}
-			if json.NewDecoder(http.MaxBytesReader(w, r.Body, 64*1024)).Decode(&in) != nil || !hubEnvKinds[in.Kind] {
-				notifyJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request", "message": "Нужны kind (skill или mcp), name и source"})
+			if json.NewDecoder(http.MaxBytesReader(w, r.Body, 64*1024)).Decode(&in) != nil || !(hubEnvKinds[in.Kind] || in.Kind == "app") {
+				notifyJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request", "message": "Нужны kind (skill, mcp или app), name и source"})
 				return
 			}
 			res, err := call(hubproto.EnvOwnRequest{Action: hubproto.EnvOwnAdd, Kind: in.Kind, Name: &in.Name, Hint: &in.Hint, Source: in.Source})

@@ -40,7 +40,7 @@ func CollectionOf(kind string) string {
 	switch kind {
 	case "ds", "system":
 		return filestore.KindSystems
-	case "video":
+	case "video", "scene3d":
 		return filestore.KindVideos
 	case "slides", "deck":
 		return filestore.KindDecks

@@ -89,7 +89,37 @@ const github = {
   blurbRu: 'Репозитории, задачи и пул-реквесты',
 };
 
+// A local server and an API from the catalog: keys only, nothing to probe.
+const exa = {
+  id: 'exa',
+  name: 'Exa Search',
+  kind: 'search',
+  url: '',
+  transport: 'stdio',
+  runtime: 'npx',
+  auth: 'env',
+  command: ['npx', '-y', 'exa-mcp-server'],
+  env: [
+    { name: 'EXA_API_KEY', label: 'Exa API key', secret: true, hint: 'From dashboard.exa.ai' },
+    { name: 'EXA_REGION', label: 'Region', optional: true, default: 'us' },
+  ],
+  tokenUrl: 'https://dashboard.exa.ai/api-keys',
+  blurb: 'Web search for agents',
+  blurbRu: 'Поиск по вебу для агентов',
+};
+const open = {
+  id: 'open-meteo',
+  name: 'Open-Meteo',
+  kind: 'utility',
+  url: 'https://api.open-meteo.com',
+  transport: 'api',
+  auth: 'none',
+  blurb: 'Weather forecasts',
+  blurbRu: 'Прогноз погоды',
+};
+
 const catalog = [readMcpCatalogEntry(linear), readMcpCatalogEntry(github)];
+const keyedCatalog = [...catalog, readMcpCatalogEntry(exa), readMcpCatalogEntry(open)];
 
 const props = (over: Partial<IMcpSectionProps> = {}): IMcpSectionProps => ({
   mcp: { servers: [], catalog },
@@ -103,6 +133,7 @@ const props = (over: Partial<IMcpSectionProps> = {}): IMcpSectionProps => ({
   onSignIn: vi.fn(async () => ({ authUrl: AUTH_URL })),
   onRefresh: vi.fn(async () => undefined),
   onHeader: vi.fn(async () => null),
+  onEnv: vi.fn(async () => null),
   onCheck: vi.fn(async () => null),
   onRename: vi.fn(async () => null),
   onEnable: vi.fn(async () => null),
@@ -127,6 +158,26 @@ describe('the MCP readers', () => {
     expect(readMcpServer(server({ transport: undefined })).transport).toBe('http');
     expect(() => readMcpServer(server({ auth: 'magic' }))).toThrow();
     expect(openCatalog(catalog, [s]).map((e) => e.id)).toEqual(['github']);
+  });
+
+  it('reads local servers and APIs, tolerant of what a runtime leaves out', () => {
+    const entry = readMcpCatalogEntry(exa);
+    expect(entry.transport).toBe('stdio');
+    expect(entry.url).toBe('');
+    expect(entry.auth).toBe('env');
+    expect(entry.env.map((f) => [f.name, f.secret, f.optional, f.default])).toEqual([
+      ['EXA_API_KEY', true, false, ''],
+      ['EXA_REGION', false, true, 'us'],
+    ]);
+    expect(readMcpCatalogEntry(open).env).toEqual([]);
+    expect(readMcpCatalogEntry({ ...linear, kind: 'finance' }).kind).toBe('finance');
+    const s = readMcpServer(
+      server({ transport: 'stdio', auth: 'env', env: exa.env, problem: 'uvx is not installed' }),
+    );
+    expect(s.env).toHaveLength(2);
+    expect(s.problem).toBe('uvx is not installed');
+    expect(readMcpServer(server()).env).toEqual([]);
+    expect(readMcpServer(server()).problem).toBe('');
   });
 
   it("puts «Bearer» (or the entry's own prefix) before a bare token in Authorization only", () => {
@@ -383,6 +434,183 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
     });
     const signin = calls.find((c) => pathOf(c.url).endsWith('/mcp/m1/signin'));
     expect(JSON.parse(signin?.body ?? '{}').origin).toBe(window.location.origin);
+  });
+
+  it('a local server asks for its keys: no probe, and «Connect» keeps it with the keys', async () => {
+    const p = props({
+      mcp: { servers: [], catalog: keyedCatalog },
+      onAdd: vi.fn(async () => ({
+        server: readMcpServer(
+          server({ id: 'e1', name: 'Exa Search', url: 'stdio:exa', transport: 'stdio', auth: 'env' }),
+        ),
+        authStart: null,
+      })),
+    });
+    render(<McpSection {...p} />);
+    fireEvent.click(card('Exa Search'));
+    expect(await screen.findByText(/starts on this machine through npx\/uvx/)).toBeTruthy();
+    expect(p.onProbe).not.toHaveBeenCalled();
+    expect(screen.getByText('From dashboard.exa.ai')).toBeTruthy();
+    expect(screen.getByText('Create a token').closest('a')?.getAttribute('href')).toBe(exa.tokenUrl);
+    const key = screen.getByLabelText('Exa API key') as HTMLInputElement;
+    expect(key.type).toBe('password');
+    // The optional field starts with its default and does not hold «Connect» back.
+    expect((screen.getByLabelText('Region (optional)') as HTMLInputElement).value).toBe('us');
+    const connect = screen.getByText('Connect').closest('button') as HTMLButtonElement;
+    expect(connect.disabled).toBe(true);
+    fireEvent.change(key, { target: { value: ' exa-secret ' } });
+    expect(connect.disabled).toBe(false);
+    fireEvent.click(connect);
+    await waitFor(() => expect(p.onAdd).toHaveBeenCalled());
+    expect(vi.mocked(p.onAdd).mock.calls[0]?.[0]).toMatchObject({
+      url: '',
+      catalogId: 'exa',
+      header: null,
+      env: { EXA_API_KEY: 'exa-secret', EXA_REGION: 'us' },
+    });
+    // Kept: the form lets the entry go.
+    await waitFor(() => expect(screen.queryByLabelText('Exa API key')).toBeNull());
+  });
+
+  it('says the server is starting while a local server is added, and shows a refusal', async () => {
+    let refuse: (answer: { error: string }) => void = () => {};
+    const p = props({
+      mcp: { servers: [], catalog: keyedCatalog },
+      onAdd: vi.fn(() => new Promise<{ error: string }>((resolve) => (refuse = resolve))),
+    });
+    render(<McpSection {...p} />);
+    fireEvent.click(card('Exa Search'));
+    fireEvent.change(await screen.findByLabelText('Exa API key'), { target: { value: 'bad' } });
+    fireEvent.click(screen.getByText('Connect'));
+    expect(await screen.findByText(/first time can take a couple of minutes/)).toBeTruthy();
+    act(() => refuse({ error: 'The server refused' }));
+    expect(await screen.findByText('The server refused')).toBeTruthy();
+    expect(screen.queryByText(/first time can take/)).toBeNull();
+  });
+
+  it('connects an API without keys in one press', async () => {
+    const p = props({
+      mcp: { servers: [], catalog: keyedCatalog },
+      onAdd: vi.fn(async () => ({
+        server: readMcpServer(
+          server({
+            id: 'o1',
+            name: 'Open-Meteo',
+            url: 'https://api.open-meteo.com',
+            transport: 'api',
+            auth: 'none',
+          }),
+        ),
+        authStart: null,
+      })),
+    });
+    render(<McpSection {...p} />);
+    fireEvent.click(card('Open-Meteo'));
+    expect(await screen.findByText(/agents reach it through the hub/)).toBeTruthy();
+    fireEvent.click(screen.getByText('Connect'));
+    await waitFor(() => expect(p.onAdd).toHaveBeenCalled());
+    expect(vi.mocked(p.onAdd).mock.calls[0]?.[0]).toMatchObject({ catalogId: 'open-meteo', env: {} });
+    expect(p.onProbe).not.toHaveBeenCalled();
+  });
+
+  it("a local server's row has a keys panel: an empty field keeps the key, and the problem shows", async () => {
+    const local = readMcpServer(
+      server({
+        id: 'e1',
+        name: 'Exa Search',
+        catalogId: 'exa',
+        url: 'stdio:exa',
+        transport: 'stdio',
+        auth: 'env',
+        state: 'unreachable',
+        tools: [],
+        me: '',
+        problem: 'uvx is not installed on this machine',
+        env: exa.env,
+      }),
+    );
+    const p = props({ mcp: { servers: [local], catalog: keyedCatalog } });
+    render(<McpSection {...p} />);
+    expect(screen.getByText('Local server on this machine')).toBeTruthy();
+    expect(screen.getByText('uvx is not installed on this machine')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for «Exa Search»' }));
+    fireEvent.click(await screen.findByText('Keys'));
+    const key = (await screen.findByLabelText('Exa API key')) as HTMLInputElement;
+    expect(key.value).toBe('');
+    // The rename panel's «Save» is folded away; the keys panel's is the one next to the keys.
+    const save = key.closest('.hx-conn-row__panel')?.querySelector('button.hx-set__btn') as HTMLButtonElement;
+    expect(save.textContent).toBe('Save');
+    expect(save.disabled).toBe(true);
+    fireEvent.change(key, { target: { value: 'new-key' } });
+    fireEvent.click(save);
+    await waitFor(() => expect(p.onEnv).toHaveBeenCalledWith('e1', { EXA_API_KEY: 'new-key' }));
+    expect(p.onHeader).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByLabelText('Exa API key')).toBeNull());
+  });
+
+  it('the search filters the catalog live, over names, words and group names', () => {
+    const many = [
+      ...keyedCatalog,
+      ...['a', 'b', 'c', 'd'].map((n) =>
+        readMcpCatalogEntry({
+          ...linear,
+          id: `t-${n}`,
+          name: `Tasks ${n}`,
+          url: `https://${n}.example.com/mcp`,
+        }),
+      ),
+    ];
+    render(<McpSection {...props({ mcp: { servers: [], catalog: many } })} />);
+    // Searching opens the groups without «Show all».
+    fireEvent.change(screen.getByLabelText('Find a service'), { target: { value: 'web search' } });
+    expect(screen.getByText('Exa Search')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Search and web' })).toBeTruthy();
+    expect(screen.queryByText('Tasks a')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Find a service'), { target: { value: 'utilities' } });
+    expect(screen.getByText('Open-Meteo')).toBeTruthy();
+    expect(screen.queryByText('Exa Search')).toBeNull();
+  });
+
+  it('talks to the runtime for keys: add with env, then PUT the new ones', async () => {
+    const calls: { url: string; method: string; body: string }[] = [];
+    const local = server({
+      id: 'e1',
+      name: 'Exa Search',
+      catalogId: 'exa',
+      url: 'stdio:exa',
+      transport: 'stdio',
+      auth: 'env',
+      env: exa.env,
+    });
+    setFetch(async (url, init) => {
+      const method = init.method ?? 'GET';
+      calls.push({ url, method, body: String(init.body ?? '') });
+      if (method === 'PUT' && pathOf(url).endsWith('/mcp/e1/env')) return json(200, { server: local });
+      if (method === 'POST' && pathOf(url).endsWith('/mcp'))
+        return json(200, { server: local, authStart: null });
+      if (pathOf(url).endsWith('/mcp')) return json(200, { servers: [], catalog: [exa] });
+      return json(200, { connections: [] });
+    });
+    render(<ConnectionsPage machine={MACHINE} />);
+    fireEvent.click(await screen.findByRole('button', { name: /^Exa Search/ }));
+    fireEvent.change(await screen.findByLabelText('Exa API key'), { target: { value: 'k1' } });
+    fireEvent.click(screen.getByText('Connect'));
+    await screen.findByText(/^Local server on this machine/);
+    const add = calls.find((c) => c.method === 'POST' && pathOf(c.url).endsWith('/mcp'));
+    expect(JSON.parse(add?.body ?? '{}')).toEqual({
+      catalogId: 'exa',
+      env: { EXA_API_KEY: 'k1', EXA_REGION: 'us' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for «Exa Search»' }));
+    fireEvent.click(await screen.findByText('Keys'));
+    const key = (await screen.findByLabelText('Exa API key')) as HTMLInputElement;
+    fireEvent.change(key, { target: { value: 'k2' } });
+    fireEvent.click(
+      key.closest('.hx-conn-row__panel')?.querySelector('button.hx-set__btn') as HTMLButtonElement,
+    );
+    await waitFor(() => expect(calls.some((c) => c.method === 'PUT')).toBe(true));
+    const put = calls.find((c) => c.method === 'PUT');
+    expect(JSON.parse(put?.body ?? '{}')).toEqual({ env: { EXA_API_KEY: 'k2' } });
   });
 
   it('shows no MCP part on a machine whose runtime has none yet', async () => {

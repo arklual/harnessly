@@ -81,6 +81,20 @@
   color: var(--hx-fg-2);
   font-size: var(--hx-text-sm);
 }
+/* A card of the right column that did not start: one icon, one button, centred, inside the card's own size. */
+.hx-appfail[data-compact] {
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hx-space-1);
+  padding: var(--hx-space-2);
+  overflow: hidden;
+  color: var(--hx-fg-3);
+}
+.hx-appview__skeleton[data-state] .hx-appview__skeleton-bar {
+  max-width: 100%;
+}
 .hx-appfail__head {
   display: flex;
   align-items: flex-start;

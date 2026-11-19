@@ -23,6 +23,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/chatrole"
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/peers"
+	"github.com/ly-solutions/harnessly/internal/timescale"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -785,7 +786,7 @@ func (s *Service) Wait(ctx context.Context, callerID, id string, timeout time.Du
 	if poll <= 0 {
 		poll = 500 * time.Millisecond
 	}
-	deadline := time.NewTimer(timeout)
+	deadline := time.NewTimer(timescale.Real(timeout))
 	defer deadline.Stop()
 	tick := time.NewTicker(poll)
 	defer tick.Stop()

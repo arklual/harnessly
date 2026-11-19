@@ -113,6 +113,7 @@ const DESIGN_KIND_KEY: Readonly<Record<DesignArtifact['kind'], string>> = {
   slides: 'slides',
   ds: 'ds',
   video: 'video',
+  scene3d: 'scene3d',
 };
 
 const designDetail = (

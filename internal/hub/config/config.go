@@ -289,6 +289,8 @@ type Config struct {
 	RolloutToken           string
 	AutomationsNotifyURL   string
 	AutomationsNotifyToken string
+	// RoutinesModel (HUB_ROUTINES_MODEL, default sonnet) is the model a routine runs on when it names none.
+	RoutinesModel          string
 	AutomationsGitLabURL   string
 	AutomationsGitLabToken string
 	AutomationsMRProjects  []string
@@ -342,6 +344,9 @@ type Config struct {
 	// Peers (HUB_PEERS=on) lets the machines' agents exchange messages between their chats through the hub
 	// (docs/hub/peers.md); off: POST /agent/peers/* answer 404.
 	Peers bool
+	// Builders (HUB_BUILDERS, on by default) keeps the pool of builder machines and the queue of heavy jobs
+	// (docs/hub/builders.md); off: /agent/jobs/* and the builders' routes answer 404 and no job is placed.
+	Builders bool
 	// TbotJoin (HUB_TBOT_JOIN=on) lets a machine ask for the join token of a Teleport machine identity its operator
 	// prepared, which the person the bot belongs to approves in the hub (docs/hub/tbot-join.md); off: the machines'
 	// requests are refused and GET /api/me/tbot-joins answers 404. The rollout switch tbot-join narrows it per person.
@@ -915,6 +920,9 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		bad("HUB_LAUNCH_TOKEN must be 32 characters or more")
 	}
 	c.AutomationsNotifyURL, c.AutomationsNotifyToken = strings.TrimRight(get("HUB_AUTOMATIONS_NOTIFY_URL"), "/"), get("HUB_AUTOMATIONS_NOTIFY_TOKEN")
+	if c.RoutinesModel = strings.TrimSpace(get("HUB_ROUTINES_MODEL")); c.RoutinesModel == "" {
+		c.RoutinesModel = "sonnet"
+	}
 	c.AutomationsGitLabURL, c.AutomationsGitLabToken = strings.TrimRight(get("HUB_AUTOMATIONS_GITLAB_URL"), "/"), get("HUB_AUTOMATIONS_GITLAB_TOKEN")
 	for _, p := range strings.Split(get("HUB_AUTOMATIONS_MR_PROJECTS"), ",") {
 		if p = strings.TrimSpace(p); p != "" {
@@ -1011,6 +1019,13 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	case "off", "false", "0", "no":
 	default:
 		bad("HUB_USAGE_INGEST must be on or off")
+	}
+	switch strings.ToLower(def("HUB_BUILDERS", "on")) {
+	case "on", "true", "1", "yes":
+		c.Builders = true
+	case "off", "false", "0", "no":
+	default:
+		bad("HUB_BUILDERS must be on or off")
 	}
 	switch strings.ToLower(def("HUB_PEERS", "off")) {
 	case "on", "true", "1", "yes":

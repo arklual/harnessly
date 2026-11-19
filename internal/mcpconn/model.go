@@ -22,6 +22,12 @@ const (
 	HTTP Transport = "http"
 	// SSE is the legacy HTTP+SSE transport (MCP 2024-11-05): a GET stream announces where to POST.
 	SSE Transport = "sse"
+	// Stdio is a local server: a program of this machine the runtime starts and speaks to over
+	// stdin/stdout; agents reach it through the same proxy.
+	Stdio Transport = "stdio"
+	// API is a service with no MCP server, only an HTTP API: agents call it through the gateway's
+	// api_request, the runtime puts the keys in.
+	API Transport = "api"
 )
 
 // Auth is how the server signs in.
@@ -31,6 +37,8 @@ const (
 	AuthOAuth  Auth = "oauth"
 	AuthHeader Auth = "header"
 	AuthNone   Auth = "none"
+	// AuthEnv: a local server's keys, given to its process as environment variables.
+	AuthEnv Auth = "env"
 )
 
 // State is how the server answered last.
@@ -69,7 +77,21 @@ type Server struct {
 	Enabled bool   `json:"enabled"`
 	State   State  `json:"state"`
 	// Me is who or what the server signs in as, when known.
-	Me        string    `json:"me,omitempty"`
+	Me string `json:"me,omitempty"`
+	// Command starts a local server (transport stdio), from its catalog entry.
+	Command []string `json:"command,omitempty"`
+	// FixedEnv is set in a local server's environment as its catalog entry says.
+	FixedEnv map[string]string `json:"fixedEnv,omitempty"`
+	// Env is the fields a local server takes (names and labels; their values are in the safe).
+	Env []EnvField `json:"env,omitempty"`
+	// APIHeaders and APIQuery place an API's keys: values with {VAR} taken from Env (transport api).
+	APIHeaders map[string]string `json:"apiHeaders,omitempty"`
+	APIQuery   map[string]string `json:"apiQuery,omitempty"`
+	CheckPath  string            `json:"checkPath,omitempty"`
+	// Guide tells an agent how to use an API: its main paths, in a few lines.
+	Guide string `json:"guide,omitempty"`
+	// Problem says in a few words why a local server does not start (no npx on the machine), when it is known.
+	Problem   string    `json:"problem,omitempty"`
 	Tools     []Tool    `json:"tools,omitempty"`
 	CreatedAt time.Time `json:"createdAt"`
 	CheckedAt time.Time `json:"checkedAt,omitzero"`

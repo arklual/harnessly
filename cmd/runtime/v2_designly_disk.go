@@ -20,9 +20,9 @@ const designlyLinksFor = time.Minute
 
 // designlyProject is what the list reads of one project's folder besides its boards.
 type designlyProject struct {
-	video, deck bool
-	owner       design.Owner
-	owned       bool
+	video, deck, scene3d bool
+	owner                design.Owner
+	owned                bool
 }
 
 type designlyProjectAt struct {
@@ -47,7 +47,7 @@ type designlyDisk struct {
 }
 
 func readDesignlyProject(lib *design.Library, id string) designlyProject {
-	p := designlyProject{video: lib.IsVideo(id), deck: lib.IsDeck(id)}
+	p := designlyProject{video: lib.IsVideo(id), deck: lib.IsDeck(id), scene3d: lib.IsScene3D(id)}
 	p.owner, p.owned = lib.ReadOwner(id)
 	return p
 }

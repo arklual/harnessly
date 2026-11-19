@@ -5,6 +5,10 @@
   outline: 0;
 }
 .hx-cmenu-pos > .hx-cmenu {
+  /* Never taller than the room the positioner left: longer, it scrolls inside, on every menu of the app. */
+  max-height: var(--available-height, 80vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   position: relative;
   top: auto;
   left: auto;

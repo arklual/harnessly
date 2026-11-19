@@ -1,0 +1,25 @@
+id: hub-papers
+title: Свежие статьи — наука через хаб (arXiv/OpenAlex), большой ответ не целиком в контекст
+tags: [connections, hub, research]
+timeout_s: 360
+# Research connections are on; the agent searches papers through the hub and lists real titles with links.
+setup:
+  connections: [arxiv, openalex, moex]
+covers:
+  - 'internal/mcpconn/hub.go'
+  - 'internal/mcpconn/catalog_api.go'
+  - 'cmd/runtime/safe_prompt.go'
+prompt: найди 3 свежие научные статьи (препринты) про model context protocol и дай ссылки
+expect:
+  - name: used a research connection through the hub
+    called: harnessly-hub\.api_request
+    args: {connection: '(?i).*(arxiv|openalex).*'}
+  - name: not the bank or the exchange
+    not_called: harnessly-hub\.api_request
+    args: {connection: '(?i).*moex.*'}
+  - name: gave links
+    text: '(?i)(arxiv\.org|doi\.org|openalex\.org)'
+variants:
+  - id: v1
+    kind: english
+    text: "Find three recent research papers (preprints) about the Model Context Protocol, with links."

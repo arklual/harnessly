@@ -35,6 +35,11 @@ type Tools struct {
 	Allowed func(path string) bool
 	// Readable says whether a picture may be changed (source).
 	Readable func(path string) bool
+	// Media draws a picture with a media provider (Higgsfield) when a call names a provider or a model of its own; nil: the
+	// provider and model arguments are refused.
+	Media interface {
+		Image(ctx context.Context, args *jsvalue.Object) *jsvalue.Object
+	}
 }
 
 var _ mcpserver.Toolset = Tools{}
@@ -68,6 +73,8 @@ func (Tools) Tools() []any {
 					"transparent", jsvalue.NewObject("type", "boolean", "description", "Transparent background (icons, stickers)."),
 					"save_to", jsvalue.NewObject("type", "string", "description", "A folder to copy the pictures into: absolute, or relative to this chat's folder. Omit to keep them in harnessly's own store."),
 					"name", jsvalue.NewObject("type", "string", "description", "The files' name stem in save_to (default image-<id>); they get -1, -2 … ."),
+					"provider", jsvalue.NewObject("type", "string", "description", "Draw with a media provider of Settings → Providers (Higgsfield) instead of Codex: it spends the person's balance there, so only when they asked for it or named it. Omit for the default (Codex, free of charge)."),
+					"model", jsvalue.NewObject("type", "string", "description", "With provider: soul (default), z-image or an endpoint ID of the provider."),
 					"source", jsvalue.NewObject("type", "string", "description", "A picture file to change instead of drawing a new one: absolute, or relative to this chat's folder. The prompt then says what to change; the original stays as it is."),
 				),
 				"required", []any{"prompt"},
@@ -103,6 +110,20 @@ func (t Tools) Call(ctx context.Context, name string, args *jsvalue.Object) *jsv
 			return mcpserver.TextResult("no such job: "+id, true)
 		}
 		return t.wait(ctx, id)
+	}
+	if prov, model := strings.TrimSpace(str(args, "provider")), strings.TrimSpace(str(args, "model")); prov != "" || model != "" {
+		if strings.EqualFold(prov, "codex") && model == "" {
+			// Codex is the default: naming it changes nothing.
+		} else if t.Media == nil {
+			return mcpserver.TextResult("refused: pictures by a provider are not available on this machine", true)
+		} else if strings.TrimSpace(str(args, "source")) != "" {
+			return mcpserver.TextResult("refused: a picture is changed by Codex only: leave provider and model out when you pass source", true)
+		} else {
+			if strings.EqualFold(prov, "higgsfield") {
+				args.Set("provider", "")
+			}
+			return t.Media.Image(ctx, args)
+		}
 	}
 	req := Request{
 		Prompt: str(args, "prompt"), Count: num(args, "count"), Shape: Shape(str(args, "shape")),

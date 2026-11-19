@@ -25,6 +25,7 @@ import (
 //	{"k":"ev","ch":"conv:tab-x","seq":12,"e":{…}}     one event, the same as the "ev" frame of the socket
 //	{"k":"convs","conversations":[…]}                 the answer to {"k":"convs"}: every chat's record
 //	{"k":"work","entries":[…]}                        the chats' work (WorkFeed): all of it first, then each change
+//	{"k":"slot","notices":[…]}                        the smart notice's open questions (Slot): the list now, then each new list
 //
 // Frames from the agent: {"k":"convs"} asks for the list; {"k":"ping"} is answered with {"k":"pong"}.
 const (
@@ -88,6 +89,14 @@ func (s *Server) Replica(w http.ResponseWriter, r *http.Request) {
 		stopWork := s.Work.WatchWork(own)
 		defer stopWork()
 		for _, f := range s.Work.WorkFrames() {
+			own(f)
+		}
+	}
+	if s.Slot != nil {
+		// The open questions of the smart notice: the list now, then the whole list again each time it moves.
+		stopSlot := s.Slot.WatchWork(own)
+		defer stopSlot()
+		for _, f := range s.Slot.WorkFrames() {
 			own(f)
 		}
 	}

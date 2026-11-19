@@ -32,6 +32,7 @@ internal/filestore 8
 internal/hub/designaccess 8
 internal/hub/spaces 8
 internal/imagegen 8
+internal/mediagen 3
 internal/prompts 8
 internal/typist 8
 internal/voice/engine 8

@@ -105,6 +105,8 @@ var SpaceCascade = []SpaceCascadeStep{
 	{"env_presets", layeredOnSpace},
 	{"env_proposals", byMachine},
 	{"tbot_joins", byMachine},
+	{"heavy_jobs", bySpace},
+	{"machine_builders", byMachine},
 	{"env_groups", layeredOnSpace},
 	{"catalog_items", `(owner_layer = 'tenant' AND owner_scope = :id) OR (owner_layer = 'team' AND owner_scope IN ` + teamsOfSpace + `)`},
 

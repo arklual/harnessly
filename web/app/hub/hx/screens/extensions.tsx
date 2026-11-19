@@ -101,7 +101,9 @@ const Extensions = () => {
   const theme = document.documentElement.dataset.hxTheme ?? 'light';
   return (
     <div className="hx-set">
-      <Titles title="Расширения" lead="Настройки, которые добавили расширения этого хаба." />
+      <div className="hb-head hd-head">
+        <Titles title="Расширения" lead="Настройки, которые добавили расширения этого хаба." scope={false} />
+      </div>
       {ui === null && <div className="hxh-wait" role="status" aria-label="Загрузка" />}
       {ui !== null && ui.views.length === 0 && <p className="hx-ext__empty">Расширений с настройками нет.</p>}
       {ui?.views.map((v) => (

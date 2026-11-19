@@ -31,7 +31,7 @@ func (s *Service) UseAppsCatalog(k AppKinder, on func(ctx context.Context, email
 }
 
 // ownKinds are the kinds of Sinopia's own: a project of one of them is not a document of an app's type.
-var ownKinds = map[string]bool{"": true, "design": true, "site": true, "slides": true, "deck": true, "ds": true, "video": true}
+var ownKinds = map[string]bool{"": true, "design": true, "site": true, "slides": true, "deck": true, "ds": true, "video": true, "scene3d": true}
 
 // appsCatalogRoute answers the two routes; false leaves them to the machine.
 func (s *Service) appsCatalogRoute(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine, docs bool) bool {

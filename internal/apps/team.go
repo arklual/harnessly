@@ -123,7 +123,11 @@ func (r *Registry) writeTeam(t teamFile) error {
 	if err != nil {
 		return err
 	}
-	return writeFileAtomic(r.teamFile(), append(raw, '\n'))
+	if err := writeFileAtomic(r.teamFile(), append(raw, '\n')); err != nil {
+		return err
+	}
+	r.changed()
+	return nil
 }
 
 // teamHas: the team installed the app. Called with the lock held.

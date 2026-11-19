@@ -43,6 +43,8 @@ type Deps struct {
 	Now    func() time.Time
 	// Gate holds the schedule and wait triggers behind SwitchTriggers; nil: on for everyone.
 	Gate Gate
+	// Bell puts a notice into a person's bell of harnessly (routines' results); nil: no notices.
+	Bell func(ctx context.Context, userID, email, icon, key, title, text, link string) bool
 }
 
 // Service serves the rules and runs and starts the runs.
@@ -56,10 +58,11 @@ type Service struct {
 	prefix string
 	client *http.Client
 	gate   Gate
+	bell   func(ctx context.Context, userID, email, icon, key, title, text, link string) bool
 }
 
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, links: d.Links, log: d.Log, now: d.Now, client: &http.Client{}, gate: d.Gate}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, links: d.Links, log: d.Log, now: d.Now, client: &http.Client{}, gate: d.Gate, bell: d.Bell}
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -118,6 +121,9 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("PATCH "+p+"/rules/{id}", s.guard(s.patchRule))
 	mux.Handle("DELETE "+p+"/rules/{id}", s.guard(s.removeRule))
 	mux.Handle("GET "+p+"/runs", s.guard(s.listRuns))
+	mux.Handle("GET "+p+"/routines", s.guard(s.listRoutines))
+	mux.Handle("POST "+p+"/rules/{id}/run", s.guard(s.runNow))
+	mux.Handle("GET "+p+"/routines/feed", httpx.Handler(s.feed))
 	mux.Handle("POST "+p+"/runs/{id}/decision", s.guard(s.decision))
 	mux.Handle("POST "+p+"/hook", httpx.Handler(s.hook))
 	mux.HandleFunc("POST "+p+"/hook/m/{machine}/{conn}", s.webhook)
@@ -133,6 +139,9 @@ type ruleBody struct {
 	Limits         *Limits  `json:"limits"`
 	MachineID      *string  `json:"machineId"`
 	Enabled        *bool    `json:"enabled"`
+	Routine        *Routine `json:"routine"`
+	// State replaces a routine's memory; "" clears it.
+	State *string `json:"state"`
 }
 
 func validLimits(l Limits) error {
@@ -168,9 +177,22 @@ func (s *Service) apply(ctx context.Context, r *Rule, b ruleBody) error {
 		r.MachineID = strings.TrimSpace(*b.MachineID)
 	}
 	if b.Enabled != nil {
+		if *b.Enabled && !r.Enabled {
+			r.FailStreak, r.PausedReason = 0, ""
+		}
 		r.Enabled = *b.Enabled
 	}
-	if r.Model == "" {
+	if b.Routine != nil {
+		r.Routine = b.Routine
+	}
+	if b.State != nil {
+		r.State = clip(*b.State, maxState)
+	}
+	if err := checkRoutine(r.Routine); err != nil {
+		return err
+	}
+	routineDefaults(r)
+	if r.Model == "" && r.Routine == nil {
 		r.Model = "sonnet"
 	}
 	switch {
@@ -485,13 +507,7 @@ func (s *Service) Event(m store.Machine, ev link.Event) {
 	if ev.Name != hubproto.EventAutomationResult {
 		return
 	}
-	var e struct {
-		RunID       string `json:"runId"`
-		ResultToken string `json:"resultToken"`
-		Summary     string `json:"summary"`
-		BugIssueID  string `json:"bugIssueId"`
-		MRURL       string `json:"mrUrl"`
-	}
+	var e Report
 	if json.Unmarshal(ev.Raw, &e) != nil || e.RunID == "" || e.ResultToken == "" {
 		return
 	}
@@ -508,7 +524,13 @@ func (s *Service) Event(m store.Machine, ev link.Event) {
 			e.MRURL = ""
 		}
 		if len(e.Summary) > 8000 {
-			e.Summary = e.Summary[:8000]
+			e.Summary = clip(e.Summary, 8000)
+		}
+		if rule, err := s.ruleOfRun(ctx, e.RunID); err == nil && rule.Routine != nil {
+			if _, err := s.recordRoutine(ctx, rule, e); err != nil {
+				s.log.Warn("routine report not taken", "machine", m.ID, "run", e.RunID, "error", err)
+			}
+			return
 		}
 		if err := s.recordResult(ctx, e.RunID, e.ResultToken, e.Summary, e.BugIssueID, e.MRURL); err != nil {
 			s.log.Warn("automation report not taken", "machine", m.ID, "run", e.RunID, "error", err)

@@ -497,8 +497,8 @@ func TestMCPProxyLegacySSE(t *testing.T) {
 	}
 }
 
-// The agents get every enabled server through the proxy: Claude a config file with the runtime's token and the allow
-// rules, Codex its -c flags.
+// The agents get the hub and every enabled server through the proxy: Claude a config file with the runtime's token and
+// the allow rules, Codex its -c flags. Past mcpDirectMax tools in all, only the hub.
 func TestMCPAgentConfigs(t *testing.T) {
 	dir := t.TempDir()
 	runtimeCfg := filepath.Join(dir, "preview-mcp.json")
@@ -513,7 +513,7 @@ func TestMCPAgentConfigs(t *testing.T) {
 	}
 	servers = []mcpconn.Server{{ID: "abc", Slug: "linear"}, {ID: "def", Slug: "notion"}}
 	path, allow := cfg()
-	if path == "" || strings.Join(allow, ",") != "mcp__mcp-linear,mcp__mcp-notion" {
+	if path == "" || strings.Join(allow, ",") != "mcp__harnessly-hub,mcp__mcp-linear,mcp__mcp-notion" {
 		t.Fatalf("%q %v", path, allow)
 	}
 	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
@@ -533,15 +533,47 @@ func TestMCPAgentConfigs(t *testing.T) {
 	if s := got.Servers["mcp-linear"]; s.Type != "http" || s.URL != "http://127.0.0.1:8022/api/cli/mcp-proxy/abc" || s.Headers["x-cli-token"] != "tok" {
 		t.Fatalf("%s", raw)
 	}
+	if s := got.Servers["harnessly-hub"]; s.URL != "http://127.0.0.1:8022/api/cli/mcp-hub" || s.Headers["x-cli-token"] != "tok" {
+		t.Fatalf("hub: %s", raw)
+	}
 	if again, _ := cfg(); again != path {
 		t.Fatalf("not written by content: %q %q", again, path)
 	}
 	own := codex.MCP{Server: "harnessly", TokenHeader: "x-cli-token", TokenEnv: "HARNESSLY_CLI_TOKEN"}
 	cx := mcpCodexServers(enabled, own, 8022)()
-	if len(cx) != 2 || cx[0] != (codex.MCP{Server: "mcp-linear", URL: "http://127.0.0.1:8022/api/cli/mcp-proxy/abc", TokenHeader: "x-cli-token", TokenEnv: "HARNESSLY_CLI_TOKEN"}) {
+	if len(cx) != 3 || cx[0].Server != "harnessly-hub" || cx[1] != (codex.MCP{Server: "mcp-linear", URL: "http://127.0.0.1:8022/api/cli/mcp-proxy/abc", TokenHeader: "x-cli-token", TokenEnv: "HARNESSLY_CLI_TOKEN"}) {
 		t.Fatalf("%+v", cx)
 	}
+	// Many tools: the hub alone; an API is never a server of its own.
+	many := make([]mcpconn.Tool, mcpDirectMax+1)
+	servers = []mcpconn.Server{{ID: "abc", Slug: "linear", Tools: many}, {ID: "x", Slug: "moex", Transport: mcpconn.API}}
+	if _, allow := cfg(); strings.Join(allow, ",") != "mcp__harnessly-hub" {
+		t.Fatalf("many tools: %v", allow)
+	}
+	servers = []mcpconn.Server{{ID: "x", Slug: "moex", Transport: mcpconn.API}}
+	if _, allow := cfg(); strings.Join(allow, ",") != "mcp__harnessly-hub" {
+		t.Fatalf("an API: %v", allow)
+	}
+	servers = []mcpconn.Server{{ID: "abc", Slug: "linear"}, {ID: "def", Slug: "notion"}}
 	if mcpCodexServers(enabled, own, 0)() != nil {
 		t.Fatal("no port, no servers")
+	}
+}
+
+// The prompt names what the hub reaches now, read at every launch.
+func TestSafePromptNamesConnections(t *testing.T) {
+	dir := t.TempDir()
+	base := filepath.Join(dir, "p.md")
+	_ = os.WriteFile(base, []byte("workspace"), 0o600)
+	line := ""
+	build := withSafe(true, dir, func(string) string { return base }, func() string { return line })
+	raw, _ := os.ReadFile(build("ws"))
+	if strings.Contains(string(raw), "reaches these services") {
+		t.Fatal("named connections when there are none")
+	}
+	line = "Connected now: arXiv [arxiv]."
+	raw, _ = os.ReadFile(build("ws"))
+	if !strings.Contains(string(raw), "Connected now: arXiv [arxiv].") || !strings.Contains(string(raw), "harnessly-hub") {
+		t.Fatalf("%s", raw)
 	}
 }

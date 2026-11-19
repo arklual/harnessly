@@ -250,7 +250,7 @@ func uploadsRoute(r *http.Request) ([]string, string, bool) {
 // workspaceAccess is which files the viewer shows, hands over and the agent delivers: the workspace's folders, the
 // shared projects, the machine's design library and the temp folders, no secrets.
 func workspaceAccess(d deps) *files.Access {
-	roots := []string{d.WorkspaceRoot, sharedProjects, files.NodeTempDir(), "/tmp", imagesDir(d), codexImagesDir(d)}
+	roots := []string{d.WorkspaceRoot, sharedProjects, files.NodeTempDir(), "/tmp", imagesDir(d), mediaDir(d), codexImagesDir(d)}
 	// The design library is the team's (the machine's design folder): its boards and their sources open like the workspace's
 	// files, never as «only files of the current project».
 	if lib := design.RootOf(designConfig(d)); lib != "" {

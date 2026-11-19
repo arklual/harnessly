@@ -45,6 +45,10 @@ export interface ISideWidgetsProps {
   onMove: (id: string, at: string, after: boolean) => void;
   onFold: (id: string, folded: boolean) => void;
   onRemove: (id: string) => void;
+  /** Where a widget shows: every chat, or some chats. */
+  scopeOf?: (widget: ISideWidget) => 'all' | 'chats';
+  /** The person moves a widget to every chat, or to this chat only; none when no chat is on screen. */
+  onScope?: (id: string, scope: 'all' | 'here') => void;
 }
 
 /** Whether an element is in the stack's view; true until the observer says, so a card does not blink empty. */
@@ -80,80 +84,96 @@ interface ICardProps {
   tool: ReactNode;
   onFold: (id: string, folded: boolean) => void;
   onRemove: (id: string) => void;
+  scope: 'all' | 'chats' | null;
+  onScope?: (id: string, scope: 'all' | 'here') => void;
 }
 
-const Card = memo(({ widget, look, root, renderBody, tool, onFold, onRemove }: ICardProps) => {
-  const [card, setCard] = useState<HTMLElement | null>(null);
-  const [body, setBody] = useState<HTMLDivElement | null>(null);
-  const onScreen = useOnScreen(card, root);
-  const folded = widget.folded === true;
-  const drawn = !folded && onScreen;
-  useKeptHeight(card, drawn ? body : null);
-  const menu = useMenuActions();
-  return (
-    <section
-      ref={setCard}
-      className="hx-wg"
-      data-flip={widget.id}
-      data-drag={DRAG}
-      data-drag-id={widget.id}
-      data-drop={DRAG}
-      data-drop-id={widget.id}
-      data-folded={folded || undefined}
-      aria-label={look.title}
-    >
-      <header className="hx-wg__head">
-        <button
-          type="button"
-          className="hx-wg__name"
-          aria-expanded={!folded}
-          onClick={() => onFold(widget.id, !folded)}
-        >
-          <Icon name={look.icon} size="sm" className="hx-wg__icon" />
-          <span className="hx-wg__title">{look.title}</span>
-          <Icon name="chevron-down" size="sm" className="hx-wg__chev" />
-        </button>
-        {!folded && tool}
-        <MenuRoot actionsRef={menu}>
-          <Menu.Trigger
-            render={
-              <button type="button" className="hx-wg__more" aria-label={t('next.widgets.menu')}>
-                <Icon name="ellipsis" size="sm" />
-              </button>
-            }
-          />
-          <MenuPanel
-            actions={menu}
-            className="hx-cmenu"
-            label={t('next.widgets.menu')}
-            side="bottom"
-            align="end"
+const Card = memo(
+  ({ widget, look, root, renderBody, tool, onFold, onRemove, scope, onScope }: ICardProps) => {
+    const [card, setCard] = useState<HTMLElement | null>(null);
+    const [body, setBody] = useState<HTMLDivElement | null>(null);
+    const onScreen = useOnScreen(card, root);
+    const folded = widget.folded === true;
+    const drawn = !folded && onScreen;
+    useKeptHeight(card, drawn ? body : null);
+    const menu = useMenuActions();
+    return (
+      <section
+        ref={setCard}
+        className="hx-wg"
+        data-flip={widget.id}
+        data-drag={DRAG}
+        data-drag-id={widget.id}
+        data-drop={DRAG}
+        data-drop-id={widget.id}
+        data-folded={folded || undefined}
+        aria-label={look.title}
+      >
+        <header className="hx-wg__head">
+          <button
+            type="button"
+            className="hx-wg__name"
+            aria-expanded={!folded}
+            onClick={() => onFold(widget.id, !folded)}
           >
-            <Menu.Item className="hx-cmenu__item" onClick={() => onFold(widget.id, !folded)}>
-              <Icon name={folded ? 'chevron-down' : 'chevron-up'} size="sm" />
-              <span className="hx-cmenu__txt">
-                {folded ? t('next.widgets.unfold') : t('next.widgets.fold')}
-              </span>
-            </Menu.Item>
-            <Menu.Item className="hx-cmenu__item" data-danger="true" onClick={() => onRemove(widget.id)}>
-              <Icon name="trash-2" size="sm" />
-              <span className="hx-cmenu__txt">{t('next.widgets.remove')}</span>
-            </Menu.Item>
-          </MenuPanel>
-        </MenuRoot>
-      </header>
-      <div className="hx-wg__clip" inert={folded || undefined}>
-        <div className="hx-wg__keep" data-away={(!folded && !onScreen) || undefined}>
-          {drawn && (
-            <div ref={setBody} className="hx-wg__body">
-              {renderBody(widget)}
-            </div>
-          )}
+            <Icon name={look.icon} size="sm" className="hx-wg__icon" />
+            <span className="hx-wg__title">{look.title}</span>
+            <Icon name="chevron-down" size="sm" className="hx-wg__chev" />
+          </button>
+          {!folded && tool}
+          <MenuRoot actionsRef={menu}>
+            <Menu.Trigger
+              render={
+                <button type="button" className="hx-wg__more" aria-label={t('next.widgets.menu')}>
+                  <Icon name="ellipsis" size="sm" />
+                </button>
+              }
+            />
+            <MenuPanel
+              actions={menu}
+              className="hx-cmenu"
+              label={t('next.widgets.menu')}
+              side="bottom"
+              align="end"
+            >
+              <Menu.Item className="hx-cmenu__item" onClick={() => onFold(widget.id, !folded)}>
+                <Icon name={folded ? 'chevron-down' : 'chevron-up'} size="sm" />
+                <span className="hx-cmenu__txt">
+                  {folded ? t('next.widgets.unfold') : t('next.widgets.fold')}
+                </span>
+              </Menu.Item>
+              {onScope && scope === 'all' && (
+                <Menu.Item className="hx-cmenu__item" onClick={() => onScope(widget.id, 'here')}>
+                  <Icon name="pin" size="sm" />
+                  <span className="hx-cmenu__txt">{t('next.widgets.scope.here')}</span>
+                </Menu.Item>
+              )}
+              {onScope && scope === 'chats' && (
+                <Menu.Item className="hx-cmenu__item" onClick={() => onScope(widget.id, 'all')}>
+                  <Icon name="layers" size="sm" />
+                  <span className="hx-cmenu__txt">{t('next.widgets.scope.all')}</span>
+                </Menu.Item>
+              )}
+              <Menu.Item className="hx-cmenu__item" data-danger="true" onClick={() => onRemove(widget.id)}>
+                <Icon name="trash-2" size="sm" />
+                <span className="hx-cmenu__txt">{t('next.widgets.remove')}</span>
+              </Menu.Item>
+            </MenuPanel>
+          </MenuRoot>
+        </header>
+        <div className="hx-wg__clip" inert={folded || undefined}>
+          <div className="hx-wg__keep" data-away={(!folded && !onScreen) || undefined}>
+            {drawn && (
+              <div ref={setBody} className="hx-wg__body">
+                {renderBody(widget)}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </section>
-  );
-});
+      </section>
+    );
+  },
+);
 Card.displayName = 'SideWidgetCard';
 
 const Gallery = ({ entries }: { entries: readonly IGalleryEntry[] }) => {
@@ -199,6 +219,8 @@ const SideWidgets = ({
   onMove,
   onFold,
   onRemove,
+  scopeOf,
+  onScope,
 }: ISideWidgetsProps) => {
   const listRef = useRef<HTMLDivElement>(null);
   const [root, setRoot] = useState<HTMLDivElement | null>(null);
@@ -229,6 +251,8 @@ const SideWidgets = ({
             tool={renderTool?.(w) ?? null}
             onFold={onFold}
             onRemove={onRemove}
+            scope={scopeOf?.(w) ?? null}
+            onScope={onScope}
           />
         ))}
       </div>

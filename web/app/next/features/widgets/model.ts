@@ -40,9 +40,17 @@ export const canAdd = (state: ISideWidgets, kind: TBuiltinWidget): boolean =>
 
 const KINDS: readonly string[] = Object.values(WIDGET_KIND);
 
+/** Where a widget shows: in every chat, or in the chats listed. */
+export type TWidgetChats = 'all' | readonly string[];
+
 export interface ISideWidget {
   id: string;
   kind: TWidgetKind;
+  /**
+   * The person's word on where it shows. Absent: the widget's own (an app's widget an agent made for a chat shows in
+   * that chat, every other one in every chat).
+   */
+  chats?: TWidgetChats;
   folded?: boolean;
   /** An app's widget: the app and its view. */
   app?: string;
@@ -65,6 +73,8 @@ export const NO_WIDGETS: ISideWidgets = { items: [], seen: [] };
 export const MAX_WIDGETS = 12;
 export const MAX_NOTE = 2000;
 const MAX_SEEN = 100;
+/** The most chats one widget is pinned to. */
+const MAX_CHATS = 50;
 
 export const appWidgetKey = (app: string, view: string): string => `${app}/${view}`;
 
@@ -79,6 +89,11 @@ const readItem = (v: unknown): ISideWidget | null => {
   if (!id || !kind || !KINDS.includes(kind)) return null;
   const item: ISideWidget = { id, kind: kind as TWidgetKind };
   if (v.folded === true) item.folded = true;
+  if (v.chats === 'all') item.chats = 'all';
+  else if (Array.isArray(v.chats)) {
+    const chats = v.chats.filter((c): c is string => typeof c === 'string' && c !== '').slice(0, MAX_CHATS);
+    if (chats.length > 0) item.chats = chats;
+  }
   if (kind === WIDGET_KIND.app) {
     const app = str(v.app);
     const view = str(v.view);
@@ -203,14 +218,62 @@ export const withNewApps = (
   return next === state ? null : next;
 };
 
-/** Apps' widgets whose app is no longer installed are not drawn (they stay saved: the app may come back). */
+/** Where the stack is drawn: the chat on screen (null: none, the start page), and the chat an app's widget was made for. */
+export interface IWidgetPlace {
+  chat: string | null;
+  /** The chat a view's widget block names, if it names one (an agent made it for that chat). */
+  madeFor: (app: string, view: string) => string | undefined;
+}
+
+/** Where a widget shows now: the person's word, else the widget's own. */
+export const chatsOf = (x: ISideWidget, place: IWidgetPlace): TWidgetChats => {
+  if (x.chats) return x.chats;
+  const made = x.kind === WIDGET_KIND.app ? place.madeFor(x.app ?? '', x.view ?? '') : undefined;
+  return made ? [made] : 'all';
+};
+
+/** Whether a widget shows in the chat on screen. */
+export const shownHere = (x: ISideWidget, place: IWidgetPlace): boolean => {
+  const chats = chatsOf(x, place);
+  return chats === 'all' || (place.chat !== null && chats.includes(place.chat));
+};
+
+/**
+ * What the stack draws in this chat. Apps' widgets whose app is no longer installed are not drawn (they stay saved: the
+ * app may come back); while the apps are not known yet (`installed` is null) they are drawn as placeholders.
+ */
 export const shownWidgets = (
   state: ISideWidgets,
   installed: ((app: string, view: string) => boolean) | null,
+  place: IWidgetPlace = { chat: null, madeFor: () => undefined },
 ): ISideWidget[] =>
   state.items.filter(
-    (x) => x.kind !== WIDGET_KIND.app || (installed !== null && installed(x.app ?? '', x.view ?? '')),
+    (x) =>
+      shownHere(x, place) &&
+      (x.kind !== WIDGET_KIND.app || installed === null || installed(x.app ?? '', x.view ?? '')),
   );
+
+/** The widget shows in every chat (the person's word). */
+export const withAllChats = (state: ISideWidgets, id: string): ISideWidgets =>
+  withItem(state, id, (x) => ({ ...x, chats: 'all' }));
+
+/** The widget shows in this chat only. */
+export const withOnlyChat = (state: ISideWidgets, id: string, chat: string): ISideWidgets =>
+  withItem(state, id, (x) => ({ ...x, chats: [chat] }));
+
+/** The widget shows in this chat too: pinned from the gallery of a chat it was not in. */
+export const withPinnedChat = (
+  state: ISideWidgets,
+  id: string,
+  chat: string,
+  place: IWidgetPlace,
+): ISideWidgets => {
+  const item = state.items.find((x) => x.id === id);
+  if (!item) return state;
+  const chats = chatsOf(item, place);
+  if (chats === 'all' || chats.includes(chat)) return state;
+  return withItem(state, id, (x) => ({ ...x, chats: [...chats, chat].slice(-MAX_CHATS) }));
+};
 
 /** How long is left of a timer, in whole seconds, never below zero. */
 export const timerLeft = (endsAt: number, now: number): number =>

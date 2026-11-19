@@ -5,6 +5,8 @@ import (
 	"math"
 	"sort"
 	"strings"
+
+	"github.com/ly-solutions/harnessly/internal/timescale"
 )
 
 // CellStat is one scenario × model of a report.
@@ -55,6 +57,8 @@ type Report struct {
 	Infra       int        `json:"infra"`
 	USD         float64    `json:"usd"`
 	CostUnknown bool       `json:"costUnknown,omitempty"`
+	// TimeScale is the compression of the agents' clock the runs went on; 0 is the plain clock.
+	TimeScale float64 `json:"timeScale,omitempty"`
 	// Failures are the failed runs, each with its first failed expectation.
 	Failures []Result `json:"-"`
 }
@@ -76,6 +80,7 @@ func Summarize(results, against []Result, noise float64) Report {
 		}
 		models[r.Model] = true
 		rep.Setup = r.Setup
+		rep.TimeScale = max(rep.TimeScale, r.TimeScale)
 		rep.USD += r.USD
 		c.USD += r.USD
 		rep.CostUnknown = rep.CostUnknown || r.CostUnknown
@@ -195,7 +200,11 @@ func (rep Report) Markdown(title string) string {
 	if rep.CostUnknown {
 		costText = fmt.Sprintf("cost unknown (known subtotal $%.2f; not a free run)", rep.USD)
 	}
-	fmt.Fprintf(&b, "Setup `%s` · %d runs judged, %d infrastructure failures not counted · %s\n\n", rep.Setup, rep.Runs, rep.Infra, costText)
+	scale := ""
+	if l := timescale.Label(rep.TimeScale); l != "" {
+		scale = " · time " + l + " (the agents' schedule compressed; Codex runs on the plain clock)"
+	}
+	fmt.Fprintf(&b, "Setup `%s` · %d runs judged, %d infrastructure failures not counted · %s%s\n\n", rep.Setup, rep.Runs, rep.Infra, costText, scale)
 	b.WriteString("Each cell: passed/runs, 95% Wilson interval in brackets; ▲/▼ a change beyond noise against the earlier run.\n\n")
 	b.WriteString("| Scenario |")
 	for _, m := range rep.Models {

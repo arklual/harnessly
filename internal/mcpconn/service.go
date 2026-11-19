@@ -183,6 +183,8 @@ type AddInput struct {
 	// Transport is a hint: SSE tries the legacy transport first. The probe decides.
 	Transport Transport    `json:"transport,omitempty"`
 	Header    *HeaderInput `json:"header,omitempty"`
+	// Env is the keys of a local server, by variable name.
+	Env map[string]string `json:"env,omitempty"`
 	// Owner makes the server one app's own sign-in (Server.Owner); the runtime sets it, a request body cannot.
 	Owner string `json:"-"`
 }
@@ -239,6 +241,12 @@ func (s *Service) Add(ctx context.Context, in AddInput) (Server, *AuthStart, err
 	entry, fromCatalog := catalogEntry(in.CatalogID)
 	if in.CatalogID != "" && !fromCatalog {
 		return Server{}, nil, fmt.Errorf("%w: unknown catalog entry", ErrBadRequest)
+	}
+	if fromCatalog && entry.Transport == Stdio {
+		return s.addLocal(ctx, entry, in)
+	}
+	if fromCatalog && entry.Transport == API {
+		return s.addAPI(ctx, entry, in)
 	}
 	if in.URL == "" && fromCatalog {
 		in.URL = entry.URL
@@ -311,7 +319,7 @@ func (s *Service) Add(ctx context.Context, in AddInput) (Server, *AuthStart, err
 	if err != nil {
 		return Server{}, nil, err
 	}
-	srv.Slug = uniqueSlug(slugOf(srv.Name), f.Servers, srv.ID)
+	srv.Slug = uniqueSlug(slugBase(srv), f.Servers, srv.ID)
 	f.Servers = append(f.Servers, srv)
 	if err := s.writeAll(f); err != nil {
 		return Server{}, nil, err
@@ -449,6 +457,9 @@ func (s *Service) Check(ctx context.Context, id string) (Server, error) {
 	if err != nil {
 		return Server{}, err
 	}
+	if srv.Transport == Stdio || srv.Transport == API {
+		return s.checkKeyed(ctx, srv)
+	}
 	header, err := s.Authorize(ctx, id)
 	if err != nil && !errors.Is(err, ErrSignInRequired) {
 		return s.update(id, func(x *Server) error {
@@ -527,7 +538,7 @@ func (s *Service) Reauthorize(ctx context.Context, id string) (http.Header, erro
 
 func (s *Service) authorize(ctx context.Context, srv Server, force bool) (http.Header, error) {
 	switch srv.Auth {
-	case AuthNone:
+	case AuthNone, AuthEnv:
 		return http.Header{}, nil
 	case AuthHeader:
 		cr, err := s.readCred(srv.ID)
@@ -590,6 +601,7 @@ func (s *Service) Remove(id string) error {
 		return err
 	}
 	s.dropFlows(id)
+	runner.drop(id)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	f, err := s.readAll()

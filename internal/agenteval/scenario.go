@@ -43,6 +43,13 @@ type Scenario struct {
 	// delegated to, teammates) wrote to its transcript for this many seconds, and the person's chat is not working. A
 	// chat that delegates ends its turn and is woken by its chats' answers; without it the run is judged half-way.
 	SettleS int `yaml:"settle_s" json:"settleS,omitempty"`
+	// HoldS keeps the run going this long from its start, on the agents' clock: a session that lives by a schedule
+	// (a cron «every 30 minutes», a wakeup in an hour) is watched for that long and then judged, its schedule still
+	// running. On a compressed clock it lasts HoldS/scale of the wall clock; timeout_s is added after it.
+	HoldS int `yaml:"hold_s" json:"holdS,omitempty"`
+	// Checkpoints are what evallab judges over the time of a long session (what an agent did by when, in the
+	// agents' minutes); the runtime's eval keeps them as they are.
+	Checkpoints []map[string]any `yaml:"checkpoints" json:"checkpoints,omitempty"`
 
 	dir string
 	raw []byte
@@ -65,6 +72,12 @@ type Variant struct {
 type Setup struct {
 	// Files are written into the workspace: path → content.
 	Files map[string]string `yaml:"files" json:"files,omitempty"`
+	// Memory are notes of the person's memory for the workspace's project (Claude Code's memory folder): name → content,
+	// a name like `MEMORY.md` or `side-widget-offers.md`. What the person told the agent in earlier chats.
+	Memory map[string]string `yaml:"memory" json:"memory,omitempty"`
+	// CodexMemory are files of Codex's memory folder (~/.codex/memories: memory_summary.md…): name → content, what its
+	// earlier chats left (Codex builds its memories from past chats in the background, hours after them).
+	CodexMemory map[string]string `yaml:"codex_memory" json:"codexMemory,omitempty"`
 	// Design are folders (relative to the scenario file) copied into the stand's design library as projects.
 	Design []string `yaml:"design" json:"design,omitempty"`
 	// Kits are UI kit folders (relative to the scenario file, each with its design-system.json naming the kit's id and
@@ -74,6 +87,9 @@ type Setup struct {
 	RuntimeEnv map[string]string `yaml:"runtime_env" json:"runtimeEnv,omitempty"`
 	// Workspace are folders (relative to the scenario file) whose contents are copied into the workspace.
 	Workspace []string `yaml:"workspace" json:"workspace,omitempty"`
+	// Connections are catalog entries of Settings → Connections (mcpconn) connected on the stand before the chat
+	// starts: only ones that need no keys (moex, arxiv, openalex…), since a stand has no safe of the person.
+	Connections []string `yaml:"connections" json:"connections,omitempty"`
 	// Run is a shell script run in the workspace, inside the stand's sandbox, after the files are in place (git init).
 	Run string `yaml:"run" json:"run,omitempty"`
 }
@@ -146,6 +162,7 @@ const (
 	defaultTimeoutS = 300
 	maxTimeoutS     = 1800
 	maxSettleS      = 600
+	maxHoldS        = 7 * 24 * 3600
 )
 
 var idRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,63}$`)
@@ -214,6 +231,9 @@ func ParseScenario(name string, raw []byte) (*Scenario, error) {
 	if s.TimeoutS < 0 || s.TimeoutS > maxTimeoutS {
 		return nil, fmt.Errorf("%s: timeout_s is 0 to %d", name, maxTimeoutS)
 	}
+	if s.HoldS < 0 || s.HoldS > maxHoldS {
+		return nil, fmt.Errorf("%s: hold_s is 0 to %d", name, maxHoldS)
+	}
 	if s.SettleS < 0 || s.SettleS > maxSettleS {
 		return nil, fmt.Errorf("%s: settle_s is 0 to %d", name, maxSettleS)
 	}
@@ -238,6 +258,16 @@ func ParseScenario(name string, raw []byte) (*Scenario, error) {
 	for p := range s.Setup.Files {
 		if filepath.IsAbs(p) || strings.Contains(filepath.ToSlash(filepath.Clean(p)), "..") {
 			return nil, fmt.Errorf("%s: setup file %q is inside the workspace", name, p)
+		}
+	}
+	for p := range s.Setup.Memory {
+		if p != filepath.Base(p) || !strings.HasSuffix(p, ".md") {
+			return nil, fmt.Errorf("%s: memory note %q is a name ending in .md", name, p)
+		}
+	}
+	for p := range s.Setup.CodexMemory {
+		if p != filepath.Base(p) || p == "." || p == ".." {
+			return nil, fmt.Errorf("%s: codex memory file %q is a plain name", name, p)
 		}
 	}
 	for k := range s.Setup.RuntimeEnv {

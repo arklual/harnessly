@@ -43,7 +43,8 @@ export const SHOWN_BY_DEFAULT: TShownKinds = {
 export interface IOutputsContext {
   shown: TShownKinds;
   /** A thing the turn made, in the pane; without it the cards are not something to tap. */
-  onOpen?: (output: TurnOutput) => void;
+  /** A thing the turn made, in the pane; a design's board (page) opens that board. */
+  onOpen?: (output: TurnOutput, page?: string) => void;
   /** A plain file of the turn, in the pane's Files. */
   onOpenFile?: (path: string) => void;
   /** Where a file the agent handed over is saved from; without it the card has only its viewer. */

@@ -190,6 +190,13 @@ func (h *hub) signedCall(ctx context.Context, sign func(ed25519.PrivateKey, stri
 		}
 		return errors.New("the hub did not accept this machine")
 	}
+	var said struct {
+		Error   string `json:"error"`
+		Message string `json:"message"`
+	}
+	if json.Unmarshal(data, &said) == nil && said.Message != "" {
+		return fmt.Errorf("%s (HTTP %d)", said.Message, res.StatusCode)
+	}
 	return fmt.Errorf("the hub answered HTTP %d", res.StatusCode)
 }
 

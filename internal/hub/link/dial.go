@@ -310,8 +310,27 @@ func (d *Dialer) AdmitPeers(r *http.Request) (store.Machine, error) {
 	return m, err
 }
 
+// AdmitJobs checks the signed request of a machine about heavy jobs (POST /agent/jobs/...) and returns the machine. Its
+// nonces are kept apart from the dial's and the messages'.
+func (d *Dialer) AdmitJobs(r *http.Request) (store.Machine, error) {
+	m, err := d.admit(r, hubproto.VerifyJobs, false, "jobs:")
+	if err == nil && m.DisabledAt != nil {
+		err = errDisabled
+	}
+	return m, err
+}
+
 // AdmitMemory checks the signed request of a machine about its person's memory (POST /agent/memory/*) and returns the
 // machine. Its nonces are kept apart from the dial's and the messages'.
+// AdmitRoutines checks the signed routines call of a machine (POST /agent/routines) and returns the machine.
+func (d *Dialer) AdmitRoutines(r *http.Request) (store.Machine, error) {
+	m, err := d.admit(r, hubproto.VerifyRoutines, false, "routines:")
+	if err == nil && m.DisabledAt != nil {
+		err = errDisabled
+	}
+	return m, err
+}
+
 func (d *Dialer) AdmitMemory(r *http.Request) (store.Machine, error) {
 	m, err := d.admit(r, hubproto.VerifyMemory, false, "memory:")
 	if err == nil && m.DisabledAt != nil {

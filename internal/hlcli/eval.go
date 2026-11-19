@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agenteval"
+
+	"github.com/ly-solutions/harnessly/internal/timescale"
 )
 
 const evalHelp = `harnessly eval: does harnessly by itself make an agent behave (docs/agent-evals.md)
@@ -147,6 +149,7 @@ func (c *cli) evalRun(args []string) error {
 	root := fs.String("root", "", "where runs are kept (default ~/.harnessly-eval)")
 	portBase := fs.Int("port-base", 19400, "the first stand's port")
 	realImages := fs.Bool("real-images", false, "draw pictures with Codex for real")
+	timeScale := fs.Float64("time-scale", timescale.Parse(os.Getenv(timescale.Env)), "compress the agents' schedule: at 60 a cron every 30 minutes fires every 30 s (Claude only; default $HL_TIME_SCALE)")
 	setupFile := fs.String("setup-file", "", "the setup under test: runtime and agent settings (default <dir>/setups/default.yaml)")
 	if err := fs.Parse(args); err != nil {
 		return usageErr("eval run: %v", err)
@@ -238,7 +241,8 @@ func (c *cli) evalRun(args []string) error {
 	o := agenteval.Options{Scenarios: scenarios, Models: ms, Variants: *variants, Repeats: *repeats, Parallel: *parallel,
 		MaxRuns: *maxRuns, MaxUSD: *maxUSD, Retries: *retries, Setup: *setup, Out: out, PortBase: *portBase, Log: c.env.Stderr,
 		Stand: agenteval.StandConfig{Root: standRoot(out, stamp), Runtime: rt, Harnessly: self, Tools: toolDirs, Login: loginDir,
-			RealImages: *realImages, RuntimeEnv: su.RuntimeEnv, AgentEnv: su.AgentEnv, ClaudeConfig: su.ClaudeConfig, PromptSuffix: su.PromptSuffix}}
+			RealImages: *realImages, RuntimeEnv: su.RuntimeEnv, AgentEnv: su.AgentEnv, ClaudeConfig: su.ClaudeConfig, PromptSuffix: su.PromptSuffix,
+			TimeScale: *timeScale}}
 	if *reuse {
 		o.Reuse = map[string]agenteval.Result{}
 		for _, prev := range previousRuns(base, "") {

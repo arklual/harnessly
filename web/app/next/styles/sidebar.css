@@ -183,6 +183,21 @@ a.hx-brand__name {
 .hx-nav__group[aria-expanded='true'] .hx-nav__kids {
   grid-template-rows: 1fr;
 }
+/* A closed folder's chats that are at work or wait for a look: drawn as its kids are, under its head. */
+.hx-nav__peek {
+  display: flex;
+  flex-direction: column;
+  margin-left: calc(16px * var(--hx-kids-indent, 1));
+  padding-left: calc(10px * var(--hx-kids-indent, 1));
+  border-left: calc(1px * var(--hx-kids-indent, 1)) solid var(--hx-border-strong);
+}
+.hx-nav__peek .hx-nav__kid {
+  /* The folder is closed, its rows are faded out; the ones it lets through stay seen. */
+  opacity: 1;
+}
+.hx-nav__peek:empty {
+  display: none;
+}
 /* «Дальше» under a folder's first chats: a quiet row of its own, the rest of the folder behind it. */
 .hx-folder-more {
   display: flex;

@@ -1,3 +1,4 @@
+import '@fontsource-variable/inter';
 import '@kit';
 import './hub.css';
 

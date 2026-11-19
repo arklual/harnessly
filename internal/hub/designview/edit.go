@@ -28,17 +28,18 @@ import (
 
 // EditRoutes are the edits the hub saves itself, by their path under <platform api>/design/.
 var EditRoutes = map[string]func(*design.API, *http.Request) design.Answer{
-	"deck":           (*design.API).Deck,
-	"deck/settings":  (*design.API).DeckSettings,
-	"deck/notes":     (*design.API).DeckNotes,
-	"deck/patch":     (*design.API).DeckPatch,
-	"deck/comments":  (*design.API).DeckComments,
-	"deck/pdf":       (*design.API).DeckPdf,
-	"video":          (*design.API).Video,
-	"video/settings": (*design.API).VideoSettings,
-	"video/scene":    (*design.API).VideoScene,
-	"video/overlay":  (*design.API).VideoOverlay,
-	"video/comments": (*design.API).VideoComments,
+	"deck":             (*design.API).Deck,
+	"deck/settings":    (*design.API).DeckSettings,
+	"deck/notes":       (*design.API).DeckNotes,
+	"deck/patch":       (*design.API).DeckPatch,
+	"deck/comments":    (*design.API).DeckComments,
+	"deck/pdf":         (*design.API).DeckPdf,
+	"video":            (*design.API).Video,
+	"video/settings":   (*design.API).VideoSettings,
+	"video/scene":      (*design.API).VideoScene,
+	"video/overlay":    (*design.API).VideoOverlay,
+	"video/comments":   (*design.API).VideoComments,
+	"scene3d/comments": (*design.API).Scene3DComments,
 }
 
 // workspace is the hub's working copy of one project: the files as of head, with what each was when written.

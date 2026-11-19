@@ -32,6 +32,7 @@ export const SYNCED_PREFS = [
   'hx-top-tabs',
   'hx-looks',
   'hx-widgets',
+  'hx-folders',
 ] as const;
 export type TSyncedPref = (typeof SYNCED_PREFS)[number];
 

@@ -9,6 +9,10 @@ skills/upstream/agent-skills/plugins/harnessly/**
 internal/*/tools.go
 internal/design/kittools.go
 internal/mcpserver/**
+internal/mcpconn/hub.go
+internal/mcpconn/catalog*.go
+cmd/runtime/safe_prompt.go
+cmd/runtime/mcp_agents.go
 internal/codemode/**
 internal/hlcli/**
 !**/*_test.go

@@ -48,6 +48,9 @@ type Info struct {
 	Every   int      `json:"every,omitempty"`
 	Sources []string `json:"sources,omitempty"`
 	Size    string   `json:"size,omitempty"`
+	// Scope is chat or global; Chat the conversation of a chat widget.
+	Scope string `json:"scope,omitempty"`
+	Chat  string `json:"chat,omitempty"`
 }
 
 func (s *Service) now() time.Time {
@@ -111,6 +114,9 @@ type Patch struct {
 	Sources *[]string `json:"sources,omitempty"`
 	Smart   *string   `json:"smart,omitempty"`
 	Every   *int      `json:"every,omitempty"`
+	// Scope and Chat change where the widget shows; Chat is the caller's chat when the scope becomes chat.
+	Scope *string `json:"scope,omitempty"`
+	Chat  *string `json:"chat,omitempty"`
 }
 
 // Apply is the spec with the patch's fields.
@@ -127,6 +133,8 @@ func (p Patch) Apply(sp Spec) Spec {
 	set(&sp.JS, p.JS)
 	set(&sp.Size, p.Size)
 	set(&sp.Smart, p.Smart)
+	set(&sp.Scope, p.Scope)
+	set(&sp.Chat, p.Chat)
 	if p.Refresh != nil {
 		sp.Refresh = *p.Refresh
 	}
@@ -233,7 +241,7 @@ func (s *Service) List() ([]Info, error) {
 			continue
 		}
 		sp, _ := s.readSpec(name)
-		out = append(out, Info{Name: name, ID: a.ID, Title: sp.Title, Smart: sp.Smart, Every: sp.Every, Sources: sp.Sources, Size: sp.Size})
+		out = append(out, Info{Name: name, ID: a.ID, Title: sp.Title, Smart: sp.Smart, Every: sp.Every, Sources: sp.Sources, Size: sp.Size, Scope: scopeOf(sp), Chat: sp.ChatOf()})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
@@ -253,4 +261,26 @@ func (s *Service) Remove(name string) error {
 		return err
 	}
 	return os.RemoveAll(dir)
+}
+
+// scopeOf is chat or global as a widget's spec says it.
+func scopeOf(sp Spec) string {
+	if sp.ChatOf() != "" {
+		return ScopeChat
+	}
+	return ScopeGlobal
+}
+
+// Content is what the card of a widget made by an agent shows now, by the widget's app id: the page hands it to
+// the live frame, and keeps the last one to draw the card at once when a chat opens.
+func (s *Service) Content(appID string) (Content, error) {
+	name := NameOf(appID)
+	if name == "" {
+		return Content{}, ErrNotFound
+	}
+	sp, ok := s.readSpec(name)
+	if !ok {
+		return Content{}, ErrNotFound
+	}
+	return ContentOf(sp), nil
 }

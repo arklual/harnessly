@@ -173,6 +173,7 @@ func (s *Service) Fire(ctx context.Context) {
 		}
 	}
 	s.fireTimers(ctx, byID, allowed)
+	s.sweepRoutines(ctx)
 }
 
 func (s *Service) fireSchedule(ctx context.Context, r Rule) {

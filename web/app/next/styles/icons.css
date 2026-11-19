@@ -606,3 +606,6 @@
 .hx-icon[data-i='captions'] {
   --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Crect width=%2218%22 height=%2214%22 x=%223%22 y=%225%22 rx=%222%22 ry=%222%22 /%3E%3Cpath d=%22M7 15h4M15 15h2M7 11h2M13 11h4%22 /%3E%3C/svg%3E');
 }
+.hx-icon[data-i='box'] {
+  --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z%22 /%3E%3Cpath d=%22m3.3 7 8.7 5 8.7-5%22 /%3E%3Cpath d=%22M12 22V12%22 /%3E%3C/svg%3E');
+}

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ly-solutions/harnessly/internal/agentbrowser/provision"
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/extproviders"
 	"github.com/ly-solutions/harnessly/internal/preflight"
@@ -252,6 +253,15 @@ func TestAgentBrowserMachineCheck(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	t.Setenv("RUNTIME_BROWSER_CHROME", "")
 	t.Setenv("RUNTIME_BROWSER_DOWNLOAD", "off")
+	// A machine with no Chrome: the test does not depend on what the machine it runs on has (a snap chromium is found
+	// by its absolute path whatever PATH says).
+	was := agentBrowserConfig
+	agentBrowserConfig = func(data string) provision.Config {
+		cfg := was(data)
+		cfg.LookPath = func(string) (string, error) { return "", exec.ErrNotFound }
+		return cfg
+	}
+	t.Cleanup(func() { agentBrowserConfig = was })
 	check = checkAgentBrowser(t.Context(), t.TempDir())
 	if check.OK || !strings.Contains(check.Detail, "DOWNLOAD=off") {
 		t.Fatalf("%+v", check)

@@ -97,3 +97,45 @@ next.
 - Redirects are not followed, there is no overall timeout (a stream lasts as long as the agent keeps it), and cloud
   metadata addresses (169.254.0.0/16) are refused. Log lines name the server id and the status only.
 - A server turned off for agents answers 404.
+
+## Local servers, APIs and the hub
+
+The catalog has three kinds of entries (`internal/mcpconn/catalog*.go`, about 320 in all):
+
+- **Remote MCP servers** (`transport: http|sse`): the vendor's own hosted server, signed in with OAuth (dynamic client
+  registration), a typed header or nothing. `TestRealRemoteServers` (`HARNESSLY_E2E_REMOTE=1`) probes every one as the
+  page does. Not here, and why: Figma's and Slack's hosted servers admit only their own list of clients; Google's and
+  Microsoft's (Gmail, Drive, Graph) have no client registration; T-Invest's needs the Russian root CA.
+- **Local servers** (`transport: stdio`): an open-source MCP server the runtime starts itself, `npx -y <pkg>@<version>`
+  or `uvx <pkg>==<version>` (uv is installed into `~/.local/bin` on first need). The person types the entry's fields
+  (`env`); they are kept in the safe as one credential `mcp-<id>` and given to the process as environment variables,
+  with nothing else of the runtime's environment. One process serves every chat of the machine: the runtime makes the
+  handshake once, answers the agents' `initialize` from it, gives every request an id of its own, refuses the server's
+  requests to the client (sampling, roots) and stops a process idle for 15 minutes. `PUT <platform>/mcp/<id>/env`
+  changes the keys (an empty one keeps its value) and restarts the process. `Server.problem` says why one does not start
+  (no npx, the package does not run, the keys were refused). `TestRealLocalServers` (`HARNESSLY_E2E_MCP=all|<ids>`)
+  starts every one with made-up keys.
+- **APIs** (`transport: api`): a service with no MCP server worth running (Moscow Exchange ISS, Steam, T-Invest,
+  Tochka, Yandex Music/Disk/Metrica/Webmaster/Direct/Tracker, Selectel, Figma REST, Higgsfield, Telegram Bot, VK,
+  Mattermost, amoCRM, Bitrix24, exchanges, arXiv, OpenAlex, PubMed…). The entry has a base address (it may hold a
+  `{FIELD}`: a self-hosted Mattermost, a Bitrix24 webhook), where the keys go (`apiHeaders`, `apiQuery`, `{BASIC:A:B}`
+  for basic auth), a `checkPath` asked when the keys are typed, and a `guide` of the main paths for the agent. A path
+  never leaves the base; an answer never carries a key back.
+
+### The hub
+
+Agents get one MCP server for all of it, `harnessly-hub` (`/api/cli/mcp-hub`, `internal/mcpconn/hub.go`), so a
+hundred connections do not put thousands of tool descriptions into every chat:
+
+| tool | what it does |
+|---|---|
+| `search_tools(query)` | ranks the tools of every turned-on connection by the words of the task (Russian or English); names catalog services that are not connected but would fit |
+| `connections(query?)` | the connections in one line each; with a query, the matching ones with their tools |
+| `tool_schema(connection, tool)` | the tool's input schema, read live (kept 10 minutes) |
+| `call(connection, tool, arguments)` | calls it; a failure on the way is tried once more (OAuth token refreshed, local process restarted); an answer over 12 000 characters is saved to a file and only its start comes back with the path |
+| `api_request(connection, method, path, query, body)` | a request to an API connection with the person's keys |
+| `manage(connection, check|on|off)` | checks a connection again, turns it on or off |
+
+When the turned-on servers have at most 40 tools together, agents also get them as servers of their own
+(`mcp__mcp-<slug>__<tool>`), as before; past that, only the hub. The scenarios `evals/agent/hub-*.yaml` check that an
+agent finds and uses connections through the hub (`setup.connections` connects keyless catalog entries on the stand).

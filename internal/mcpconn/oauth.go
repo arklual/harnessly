@@ -36,6 +36,8 @@ const (
 type cred struct {
 	Header string     `json:"header,omitempty"`
 	OAuth  *oauthCred `json:"oauth,omitempty"`
+	// Env is a local server's keys by variable name.
+	Env map[string]string `json:"env,omitempty"`
 }
 
 type oauthCred struct {

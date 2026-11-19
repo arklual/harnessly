@@ -47,7 +47,7 @@ describe('a chat history from the cluster copy', () => {
     const res = await loadOlderTurns('a', 'tab-1', 't5');
     expect('ok' in res).toBe(true);
     expect(urls()).toEqual([
-      '/gw/history/conversations/tab-1?limit=20&before=t5&caps=delegation,workflows,profiles,msgstatus,links',
+      '/gw/history/conversations/tab-1?limit=20&before=t5&caps=delegation,workflows,profiles,msgstatus,links,appssync',
     ]);
   });
 
@@ -60,7 +60,7 @@ describe('a chat history from the cluster copy', () => {
     const res = await loadOlderTurns('a', 'tab-1', 't5');
     expect('ok' in res).toBe(true);
     expect(urls()[1]).toBe(
-      '/m/a/conversations/tab-1/turns?before=t5&limit=20&caps=delegation,workflows,profiles,msgstatus,links',
+      '/m/a/conversations/tab-1/turns?before=t5&limit=20&caps=delegation,workflows,profiles,msgstatus,links,appssync',
     );
   });
 
@@ -120,7 +120,7 @@ describe('a chat history from the cluster copy', () => {
     net.getPage.mockResolvedValue({ ok: true, value: { turns: [], entries: [], beforeTurnId: null } });
     await loadOlderTurns('a', 'tab-1', 't5');
     expect(urls()).toEqual([
-      '/m/a/conversations/tab-1/turns?before=t5&limit=20&caps=delegation,workflows,profiles,msgstatus,links',
+      '/m/a/conversations/tab-1/turns?before=t5&limit=20&caps=delegation,workflows,profiles,msgstatus,links,appssync',
     ]);
   });
 
@@ -132,7 +132,7 @@ describe('a chat history from the cluster copy', () => {
       .mockResolvedValueOnce({ ok: true, value: { turns: [], entries: [], beforeTurnId: null } });
     await loadOlderTurns('a', 'tab-1', 't0');
     expect(urls()[1]).toBe(
-      '/m/a/conversations/tab-1/turns?before=t0&limit=20&caps=delegation,workflows,profiles,msgstatus,links',
+      '/m/a/conversations/tab-1/turns?before=t0&limit=20&caps=delegation,workflows,profiles,msgstatus,links,appssync',
     );
   });
 
@@ -203,7 +203,7 @@ describe('a chat history from the cluster copy', () => {
     });
     await loadRewound('a', 'tab-1', 0);
     expect(urls()).toEqual([
-      '/gw/history/conversations/tab-1/rewinds/0/turns?caps=delegation,workflows,profiles,msgstatus,links',
+      '/gw/history/conversations/tab-1/rewinds/0/turns?caps=delegation,workflows,profiles,msgstatus,links,appssync',
     ]);
   });
 });

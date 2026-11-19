@@ -605,6 +605,8 @@ type DeckCommentSpec struct {
 	T0, T1 *int64
 	Format VideoFormat
 	Block  string
+	// A 3D scene's pin: set, the comment is one (AddScene3DComment), Page, X and Y are not used.
+	Scene *Scene3DAnchor
 }
 
 func cleanCommentText(s string) string {

@@ -395,7 +395,7 @@ func TestSealShutsTheDataFolder(t *testing.T) {
 	for rel, body := range map[string]string{
 		"config.json": "authSecret", "agent.json": "machine-token", "secrets/github": "safe-value", "tmux.conf": "run evil",
 		"status-hook.sh": "#!/bin/sh\n", "port": "1234\n", "hooks.json": "{}", "workspaces/w/claude-prompt.md": "prompt", "workspaces/w/layout.json": "layout",
-		"design/p/index.html": "site",
+		"design/p/index.html": "site", "v2/uploads/up_shot.png": "png",
 	} {
 		p := filepath.Join(data, rel)
 		if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
@@ -407,7 +407,7 @@ func TestSealShutsTheDataFolder(t *testing.T) {
 	}
 	check := `d="$1"
 for f in config.json agent.json secrets/github tmux.conf workspaces/w/layout.json; do [ -e "$d/$f" ] && echo "SEEN $f"; done
-for f in port status-hook.sh hooks.json workspaces/w/claude-prompt.md; do [ -r "$d/$f" ] || echo "MISSING $f"; (echo x >> "$d/$f") 2>/dev/null && echo "WROTE $f"; done
+for f in port status-hook.sh hooks.json workspaces/w/claude-prompt.md v2/uploads/up_shot.png; do [ -r "$d/$f" ] || echo "MISSING $f"; (echo x >> "$d/$f") 2>/dev/null && echo "WROTE $f"; done
 (echo x >> "$d/design/p/index.html") 2>/dev/null || echo "DESIGN READ-ONLY"
 (echo evil > "$d/tmux.conf") 2>/dev/null
 mv "$d" "$d.moved" 2>/dev/null && echo MOVED

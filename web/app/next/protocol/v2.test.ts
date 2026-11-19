@@ -532,6 +532,12 @@ describe('backend profiles', () => {
     };
     expect(upsert.e.conv.model.profile).toBe('kimi');
   });
+  it('reads the moment the machine told its apps changed (HRN-1663)', () => {
+    const status = parseServerFrame(fixture('ev.machine_status-apps')) as unknown as {
+      e: { appsAt: number };
+    };
+    expect(status.e.appsAt).toBe(1792656000000);
+  });
   it('names the profile beside the model in a command', () => {
     const create = fixture('cmd.conversation.create-profile') as { body: unknown };
     expect(parseCommand('conversation.create', create.body).body).toMatchObject({ profile: 'kimi' });
@@ -559,7 +565,7 @@ describe('backend profiles', () => {
     expect(() => parsePage.login(bad)).toThrow(ProtocolError);
   });
   it('asks for the cap', () => {
-    expect(v2.CAPS_QUERY).toBe('caps=delegation,workflows,profiles,msgstatus,links');
+    expect(v2.CAPS_QUERY).toBe('caps=delegation,workflows,profiles,msgstatus,links,appssync');
   });
 });
 

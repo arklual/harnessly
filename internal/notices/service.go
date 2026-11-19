@@ -29,6 +29,9 @@ func (s *Service) emit(person string, e Event) {
 	}
 }
 
+// Tell gives an event to the person's streams (and to OnChange) without a change of the store: a machine's slot moved.
+func (s *Service) Tell(person string, e Event) { s.emit(person, e) }
+
 // State is what a page reads when it opens: unread items, what was read lately, the switches.
 type State struct {
 	Items    []Item   `json:"items"`

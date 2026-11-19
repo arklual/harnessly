@@ -11,7 +11,7 @@ export type TTab =
   /** The conversation's managed browser, independent of preview tabs. */
   | { id: string; kind: 'agent-browser' }
   | { id: string; kind: 'machine' }
-  | { id: string; kind: 'designly'; design: string | null }
+  | { id: string; kind: 'designly'; design: string | null; page?: string | null; pageAt?: number }
   | { id: string; kind: 'subagent'; focus: string | null }
   /** `against`: the file is shown against another state of it — 'git:<ref>' or the path of another file.
    *  `at`: the place in the file to show (a line «Найти в файлах» found). */

@@ -8,29 +8,22 @@ import type { OverviewData, OverviewPeriod } from '../../org/api/overview';
 import { useOrg } from '../../org/context';
 import { useLoad } from '../../org/hooks';
 import { Titles } from '../shell';
-import {
-  Attention,
-  Efficiency,
-  HeadTiles,
-  LoadFailed,
-  PeopleSpend,
-  Skeleton,
-  SpendDonut,
-  Subscriptions,
-} from './overview/parts';
+import { Attention, HeadTiles, LoadFailed, Skeleton } from './overview/parts';
+import { TeamsSpendCard, TopSpendersCard } from './overview/top';
 import { MemberView } from './overview/member';
 import { ActiveDrawer, useOpenActive } from './overview/active';
 import { SpendDrawer, useOpenSpend } from './overview/spend';
 import { overviewLead, PERIODS } from './overview/fmt';
 import '../styles/overview.css';
 
-/** The period lives in the address (`?period=week`), so a link and a reload keep it; the month is the default. */
+/** The period lives in the address (`?period=month`), so a link and a reload keep it; the week is the default. */
 const usePeriod = (): [OverviewPeriod, (p: OverviewPeriod) => void] => {
   const { path, search } = useLocation();
-  const period: OverviewPeriod = new URLSearchParams(search).get('period') === 'week' ? 'week' : 'month';
+  const raw = new URLSearchParams(search).get('period');
+  const period: OverviewPeriod = raw === 'month' || raw === 'day' ? raw : 'week';
   const set = (p: OverviewPeriod) => {
     const q = new URLSearchParams(search);
-    if (p === 'week') q.set('period', 'week');
+    if (p !== 'week') q.set('period', p);
     else q.delete('period');
     const s = q.toString();
     navigate(s ? `${path}?${s}` : path, { replace: true });
@@ -77,12 +70,18 @@ const Head = ({
   teamName: string | null;
   period: OverviewPeriod;
   onPeriod: (p: OverviewPeriod) => void;
-}) => (
-  <div className="hb-head">
-    <Titles title="Обзор" lead={overviewLead(role, { tenantName, teamName }, period)} />
-    <PeriodSeg value={period} onChange={onPeriod} />
-  </div>
-);
+}) => {
+  const { shell } = useOrg();
+  return (
+    <div className="hb-head hd-head">
+      <Titles
+        title="Обзор"
+        lead={overviewLead(role, { tenantName, teamName, orgName: shell.org.name }, period)}
+      />
+      <PeriodSeg value={period} onChange={onPeriod} />
+    </div>
+  );
+};
 
 interface ViewProps {
   period: OverviewPeriod;
@@ -134,21 +133,10 @@ const StaffView = ({
               onActive={openActive}
             />
             <Attention signals={shown.signals} base={base} />
-            {role === 'lead' && shown.byPerson && (
-              <PeopleSpend data={shown.byPerson} base={base} period={period} />
-            )}
-            {role === 'admin' && shown.byTeam && (
-              <div className="mx-split">
-                <SpendDonut
-                  data={shown.byTeam}
-                  period={period}
-                  base={base}
-                  onSpend={() => openSpend('team')}
-                />
-                <Efficiency rows={shown.byTeam.efficiency} base={base} period={period} />
-              </div>
-            )}
-            <Subscriptions items={shown.subscriptions} base={base} />
+            <div className="two even">
+              <TeamsSpendCard period={period} />
+              <TopSpendersCard who={shown.tiles.active.who} />
+            </div>
           </div>
         </div>
       </div>

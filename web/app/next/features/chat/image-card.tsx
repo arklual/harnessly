@@ -9,6 +9,7 @@ import {
   cardView,
   columnsOf,
   followsJob,
+  isClip,
   jobOf,
   listJobs,
   shapeOf,
@@ -88,29 +89,36 @@ interface ITileProps {
   shape: Shape | null;
   tone: number;
   onOpen: () => void;
+  /** A clip plays in place (controls), a picture opens in the viewer. */
+  clip: boolean;
 }
 
 const TONES = 4;
 
-const Tile = ({ src, name, shape, tone, onOpen }: ITileProps) => {
+const Tile = ({ src, name, shape, tone, onOpen, clip }: ITileProps) => {
   const [loaded, setLoaded] = useState(false);
   const [natural, setNatural] = useState<Shape | null>(null);
   const [broken, setBroken] = useState(false);
   const ready = src !== null && loaded;
   const frame = shape ?? natural ?? 'square';
-  return (
-    <button
-      type="button"
-      className="hx-img"
-      data-shape={frame}
-      data-ready={ready}
-      data-broken={broken || undefined}
-      disabled={src === null}
-      aria-label={src === null ? t('next.images.drawing') : t('next.pictures.open', { name })}
-      onClick={onOpen}
-    >
-      <span className="hx-img__ph" data-tone={tone % TONES} aria-hidden="true" />
-      {src !== null && !broken && (
+  const media =
+    src !== null && !broken ? (
+      clip ? (
+        <video
+          className="hx-img__pic"
+          src={src}
+          controls
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          onLoadedMetadata={(event) => {
+            setNatural(shapeOfSize(event.currentTarget.videoWidth, event.currentTarget.videoHeight));
+            setLoaded(true);
+          }}
+          onError={() => setBroken(true)}
+        />
+      ) : (
         <img
           className="hx-img__pic"
           src={src}
@@ -123,7 +131,37 @@ const Tile = ({ src, name, shape, tone, onOpen }: ITileProps) => {
           }}
           onError={() => setBroken(true)}
         />
-      )}
+      )
+    ) : null;
+  const placeholder = <span className="hx-img__ph" data-tone={tone % TONES} aria-hidden="true" />;
+  // A clip plays in its tile, with its own controls: a button around it would hold controls inside a control.
+  if (clip) {
+    return (
+      <div
+        className="hx-img"
+        data-shape={frame}
+        data-ready={ready}
+        data-broken={broken || undefined}
+        data-clip
+      >
+        {placeholder}
+        {media}
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      className="hx-img"
+      data-shape={frame}
+      data-ready={ready}
+      data-broken={broken || undefined}
+      disabled={src === null}
+      aria-label={src === null ? t('next.images.drawing') : t('next.pictures.open', { name })}
+      onClick={onOpen}
+    >
+      {placeholder}
+      {media}
     </button>
   );
 };
@@ -134,7 +172,8 @@ const Card = ({ host, entry }: { host: IImageHost; entry: ImageEntry }) => {
   const view = cardView(images, live);
   const [viewing, setViewing] = useState<number | null>(null);
   const [wide, setWide] = useState(false);
-  const files = view.tiles.filter((path): path is string => path !== null);
+  // The viewer steps through the pictures; a clip plays in its tile.
+  const files = view.tiles.filter((path): path is string => path !== null && !isClip(path));
   const shape = shapeOf(images.shape);
   const cols = columnsOf(view.tiles.length);
   const current = viewing === null ? undefined : files[viewing];
@@ -160,7 +199,11 @@ const Card = ({ host, entry }: { host: IImageHost; entry: ImageEntry }) => {
               name={path === null ? '' : nameOf(path)}
               shape={shape}
               tone={i}
-              onOpen={() => setViewing(files.indexOf(path ?? ''))}
+              clip={path !== null && isClip(path)}
+              onOpen={() => {
+                // A clip plays where it is; the viewer is for pictures.
+                if (path !== null && !isClip(path)) setViewing(files.indexOf(path));
+              }}
             />
           ))}
         </div>
@@ -168,6 +211,7 @@ const Card = ({ host, entry }: { host: IImageHost; entry: ImageEntry }) => {
       {view.failed !== null && (
         <p className="hx-imgs__err">{t('next.images.failed', { why: view.failed })}</p>
       )}
+      {live?.meta !== undefined && <p className="hx-imgs__meta">{live.meta}</p>}
       {images.prompt !== '' && (
         <button
           type="button"

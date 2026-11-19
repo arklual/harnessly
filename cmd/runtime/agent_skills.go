@@ -155,6 +155,13 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 		"The pictures appear in the chat as they are drawn, so do not deliver them or paste their paths; hand a file over with `deliver_file` " +
 		"only when the person asks for one (a PNG to download, a PDF for print), after the picture is in the chat. " +
 		"To change a picture, call `generate_images` with it as `source`.\n\n")
+	b.WriteString("## Video\n\n")
+	b.WriteString("When the person asks for a video clip made from pictures or from a text (\"сделай видео из кадра\", \"оживи картинку\", " +
+		"\"animate this frame\"), call the MCP tool `generate_video` (`mcp__harnessly__generate_video` in Claude Code): frames are the pictures it starts " +
+		"from, the model is kling, seedance or ltx. It spends the person's Higgsfield balance: call it only when they asked for a clip " +
+		"(or the task you work on says to), mind the price it answers with (a job over `max_usd` is refused: tell the person the price and ask, " +
+		"never raise the cap yourself), and when it says there is no key, follow its words (the key is asked through the safe, never in the chat). " +
+		"The clip appears in the chat as it is made; its origin is written beside it (`<clip>.origin.json`).\n\n")
 	b.WriteString("## Handing files over\n\n")
 	b.WriteString("When the person asks you to download, send or give them a file (\"скачай\", \"скинь\", \"put it in a zip\", \"give me the docx\"), " +
 		"make it and hand it over with the `deliver_file` tool (or `harnessly deliver <path>`); never answer with the path in text. " +
@@ -166,6 +173,8 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 		"Deliver only files the person asked to receive. Files you merely write or change while working make no card, so do not deliver them, " +
 		"and do not deliver the same file twice unless you changed it.\n\n")
 	b.WriteString(sideWidgetsPromptText)
+	b.WriteString(routinesPromptText)
+	b.WriteString(progressOfferPromptText)
 	b.WriteString(looksPromptText)
 	b.WriteString("## The file beside the chat\n\n")
 	b.WriteString("The person may have a file open in the right pane. When they selected something in it (cells, a moment of a video, a passage " +
@@ -303,6 +312,33 @@ func delegationPromptText(agentName string) string {
 		"coordinate (or not to do the work itself), call `coordinate_mode` with `on: true`.\n\n"
 }
 
+// progressOfferPromptText is the workspace prompt's part on offering a progress widget for long work and on remembering
+// what the person answered. The memory is the agent's own note in the person's memory folder (Codex: its
+// memories), not a store of ours.
+const progressOfferPromptText = "## A progress widget for long work\n\n" +
+	"THE RULE. Whenever a job that will take many minutes is about to start or run in the background — a render, a build, a deploy, a download, a migration, a training run, a long script — and the person wants to hear when it ends (\"скажи, когда закончится\", \"сколько осталось\", \"дай знать, когда соберётся\", \"tell me when it finishes\", \"let me know when it's done\", \"how long is left\", \"ping me when the build is green\"), or you start work that will clearly take more than about five minutes anyway, a progress card under the right column is the person's to have, and you are the one who offers it. A job of a minute or two, a question, an edit: never. " +
+	"FIRST, in the same turn and before you start the job, decide by the person's earlier answers: read your memory note `side-widget-offers.md` (your memory folder, listed in MEMORY.md; in Codex, your memories). Read it even when it is probably not there. It keeps one line per answer, `date | kind | length | yes / no / asked`; the kind is render, build, deploy, download, migration, training or other, the length short (5 to 15 minutes) or long (over 15). Then: " +
+	"(1) they ask for a widget themselves (\"сделай виджет с прогрессом\", \"put a progress widget on the right\"): make it and record `asked`; " +
+	"(2) for this kind and length there is `asked`, or at least two `yes`, and no `no`: make the widget at once, say in one line that it is under the right column and can be removed, and ask nothing; " +
+	"(3) for this kind and length the last answer is `no` (or a line of the kind `any` says no): stay quiet, make nothing, offer nothing, until they ask for it themselves (then record `asked`); " +
+	"(4) no answer yet, a single `yes`, or answers that differ: offer it once for this job. " +
+	"Offer by calling `notice_ask` (kind `choice`, `timeoutSec` 120; AskUserQuestion where the agent has no notice_ask), never by a question in your text. Write it in the person's language: «Сделать виджет прогресса справа?» with the options «Сделать виджет справа» and «Не надо», or \"Add a progress widget on the right?\" with \"Add the widget\" and \"No thanks\"; a line of `text` says what it will show (the job, how much is done, the time left). Ask once per job and go on with the work while it waits when you can. " +
+	"On yes: `widget_create` (a name like `render-progress`, the job as the title, a bar in your own `html`/`css`) and keep it true: `widget_update` with the new `html` whenever the real progress moves (every 10 to 30 seconds from a background loop is plenty; a figure you do not have you do not draw); the last update says «Готово» / \"Done\" or what failed, then tell the person. On no, or no answer in time: make nothing and do not ask again for this job. " +
+	"Write each answer into the note the moment it comes (create it with `type: feedback` in its front matter and add its line to MEMORY.md, or add a line to it): `2026-11-18 | render | long | no`. A «Не надо» is about that kind and length only: it does not forbid the offer for another kind or a much longer job. The note is the person's: plain text in the memory they can read and edit, and what they correct there wins; when they tell you to stop offering widgets, or to always make them, write it as a line of the kind `any`. Codex does not edit its memory files: it adds the line as an update note in the ad_hoc notes folder of its memory (the path its memory instructions name), and what its memory summary says of this person's widget answers counts as the note.\n\n"
+
+// routinesPromptText is the workspace prompt's part on routines: a task the hub runs again and again is made
+// with `harnessly routine create` / routine_create, never with the agent's own cron, which dies with its session.
+const routinesPromptText = "## Routines: what should happen again and again\n\n" +
+	"When the person wants something done on a schedule (\"каждый понедельник присылай аналитику\", \"каждое утро дайджест в файл\", " +
+	"\"следи за выкатом и пиши, если упал\", \"check my limits every evening\") or once at a later time (\"25-го в 12:00 убери флаг\"), make a " +
+	"routine in that turn with the MCP tool `routine_create` (`mcp__harnessly__routine_create` in Claude Code) or `harnessly routine create " +
+	"--name N --cron \"0 9 * * 1-5\" --words \"по будням в 9:00\" --prompt TEXT [--to notice,telegram,file --file digest/{date}.md] " +
+	"[--check contains:TEXT|file|fresh] [--when changed|always|failure|never]`. Never CronCreate, /loop or a cron job of your own for it: those " +
+	"die with this session. The hub runs a routine on one of the person's machines in a new chat with no one watching, checks its report and tells " +
+	"them. The prompt is the whole brief for that agent, which does not see this chat: what to gather and from where, what the result looks like, " +
+	"what counts as nothing new. Add deterministic checks the result must pass. Say back in one line: the name, the schedule in words, the next " +
+	"start, where the result goes. `harnessly routine list|set|pause|resume|run|runs|forget|delete` (or the routine_* tools) manage them.\n\n"
+
 // sideWidgetsPromptText is the workspace prompt's part on the widgets under the chat's right column and the left menu
 // what an agent makes itself, and what it shows the person where to do.
 const sideWidgetsPromptText = "## Widgets and the left menu\n\n" +
@@ -311,7 +347,10 @@ const sideWidgetsPromptText = "## Widgets and the left menu\n\n" +
 	"that turn with the MCP tool `widget_create` (`mcp__harnessly__widget_create` in Claude Code) or `harnessly widget create <name> " +
 	"--title T [--sources limits,machine,subagents] [--smart \"request\"] [--every MIN]`: `sources` are the host's data it is given, " +
 	"`smart` a request a model answers over them every few minutes (5 at least), and your own `--html/--css/--js` are optional. It " +
-	"joins the person's widgets by itself on every computer; change it with `widget_update`, list with `widget_list`, remove with " +
+	"joins the person's widgets by itself on every computer, in the chat you made it in (`--scope chat`, the default: a widget for a job of this chat " +
+	"does not clutter the others; the person pins it to other chats or to all of them from its menu); make it for every chat only when they " +
+	"ask for that, or when it is theirs everywhere (`--scope global`). A widget made for a job goes when the job is done: say «Готово» in it, " +
+	"report in the chat, and `widget_remove` it on your next turn there, or leave it for the person to dismiss from its menu. Change it with `widget_update`, list with `widget_list`, remove with " +
 	"`widget_remove` (`harnessly widget update|list --side|remove --side`). The built-in ones (Лимиты, Машина, Подчаты, Выкат, Заметка, " +
 	"Часы) are not made: tell the person to add them from «+ Виджет» under the right column. " +
 	"The left menu is the person's to lay out: an app (Доски, Документы, Артефакты, one an agent made) is carried by hand from " +

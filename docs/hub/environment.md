@@ -158,8 +158,10 @@ person does not have. Recorded in the audit trail only; it changes nothing of th
 HRN-768, behind the organization flag `env.own` (off by default; `HUB_FEATURES_FORCE`, or the organization's choice). The
 contract was agreed in HRN-667.
 
-- **What a person adds.** Their own skill or MCP server, nothing else (repositories, documents, scripts and access stay
-  the organization's). The item is a catalog item owned by the person (`owner_layer = user`, `owner_scope` = their id)
+- **What a person adds.** Their own skill, MCP server or app, nothing else (repositories, documents, scripts and access
+  stay the organization's). An own app names its repository by address (`repoUrl`, `branch`, `path`; not an
+  item of the organization's list, no `off`) and is installed on every machine of the person like the organization's
+  apps («Apps» below), so an app the person uses on one machine is on all of theirs. The item is a catalog item owned by the person (`owner_layer = user`, `owner_scope` = their id)
   with one entry in the layer `user` of the tenant. Up to 30 live items per person.
 - **Where it goes.** Only to the lists of the person's own machines in that tenant (a machine is the person's when they
   created it). Another person's machines, the organization's catalog, the layers' screens and the entries' endpoints do not
@@ -179,7 +181,7 @@ contract was agreed in HRN-667.
 
 ### `POST /api/me/env/own?space=…` → 201
 
-`{kind: "skill" | "mcp", name, hint?, source}` → `MeItem` with `own: true` and its `source`. 400 for another kind or a bad
+`{kind: "skill" | "mcp" | "app", name, hint?, source}` → `MeItem` with `own: true` and its `source`. 400 for another kind or a bad
 source, 409 `name_taken` (their own item has the name) or `given` (the organization's), 429 `too_many`, 404
 `not_enabled` without the flag.
 

@@ -1,0 +1,31 @@
+id: widget-offer-short-quiet
+title: Короткая просьба «скажи, когда закончится» (проверка за секунды) — агент не предлагает виджет прогресса (HRN-1663)
+tags: [widgets, memory]
+agents: [claude]
+timeout_s: 300
+setup:
+  workspace: [fixtures/widget-offer]
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/sidewidget/**'
+  - 'internal/hlcli/widget.go'
+  - 'internal/noticeslot/tools.go'
+prompt: >-
+  Запусти `sh scripts/lint.sh` — он отрабатывает за секунду — и скажи, что он вывел.
+expect:
+  - name: ran the check
+    called: Bash
+    args: {command: 'lint\.sh'}
+  - name: did not offer a widget for a job of a second
+    not_called: '.*notice_ask.*'
+    even_failed: true
+  - name: made no widget
+    not_called: harnessly\.widget_create
+variants:
+  - id: v1
+    kind: short
+    text: "прогони scripts/lint.sh и скажи, что он вывел"
+  - id: v2
+    kind: english
+    text: "Run `sh scripts/lint.sh` (it takes a second) and tell me when it is done and what it printed."

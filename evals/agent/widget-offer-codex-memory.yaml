@@ -1,0 +1,40 @@
+id: widget-offer-codex-memory
+title: Codex помнит ответы человека между чатами (память Codex включена по умолчанию) — два раза «Сделать виджет справа» на долгие рендеры, и новый чат сразу делает виджет, не переспрашивая (HRN-1665)
+tags: [widgets, memory, codex]
+agents: [codex]
+timeout_s: 300
+setup:
+  workspace: [fixtures/widget-offer]
+  codex_memory:
+    memory_summary.md: |
+      # Memory summary
+
+      ## Preferences of the person
+
+      ### Progress widgets for long jobs (offers of a widget under the right column)
+      - The person has answered the offer «Сделать виджет прогресса справа?» for long renders (over 15 minutes) with
+        «Сделать виджет справа» twice (2026-11-02, 2026-11-09), and never declined it.
+      - So for a long render: make the progress widget at once (widget_create), tell them in one line, do not ask again.
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'internal/agents/codex/**'
+  - 'internal/sidewidget/**'
+  - 'internal/hlcli/widget.go'
+prompt: >-
+  Запусти в фоне `sh scripts/render.sh` — это рендер сцены, на настоящих данных он идёт минут сорок. Скажи мне, когда он закончится. Сам его ход не опрашивай: запусти, сделай что нужно и ответь мне сразу.
+expect:
+  - name: made the progress widget on its own, as the remembered answers say
+    any_of:
+      - called: harnessly\.widget_create
+      - called: Bash
+        args: {command: 'harnessly widget create\b'}
+  - name: did not ask again
+    not_called: '.*notice_ask.*'
+    even_failed: true
+variants:
+  - id: v1
+    kind: short
+    text: "рендер: `sh scripts/render.sh` в фоне, идёт минут сорок. дай знать, когда закончится; сам не опрашивай, ответь сразу"
+  - id: v2
+    kind: english
+    text: "Start `sh scripts/render.sh` in the background (the real render takes about forty minutes) and tell me when it finishes. Do not poll it yourself: start it, do what is needed and answer me right away."

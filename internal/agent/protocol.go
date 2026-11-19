@@ -89,6 +89,14 @@ type evAutomationResult struct {
 	Summary     string `json:"summary"`
 	BugIssueID  string `json:"bugIssueId,omitempty"`
 	MrURL       string `json:"mrUrl,omitempty"`
+	// A routine's report: how it went, the full text, what it made, the memory for the next run and the
+	// channels it reached. The hub checks them; an automation's report leaves them empty.
+	Outcome   string           `json:"outcome,omitempty"`
+	Body      string           `json:"body,omitempty"`
+	Artifacts []map[string]any `json:"artifacts,omitempty"`
+	State     *string          `json:"state,omitempty"`
+	Delivered []string         `json:"delivered,omitempty"`
+	Error     string           `json:"error,omitempty"`
 }
 
 // DocBinding is the conversation a document was published from (docs.bound).

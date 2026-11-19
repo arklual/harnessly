@@ -281,10 +281,12 @@ func (c LaunchConfig) runtimeArgs(workspaceID, verb, session string, launch *age
 	}
 	args = append(args, hookArgs...)
 	args = append(args, MCPArgs(c.MCP)...)
+	servers := []string{c.MCP.Server}
 	if c.ExtraMCP != nil {
 		for _, m := range c.ExtraMCP() {
 			if m.Server != "" && m.URL != "" && m.Server != c.MCP.Server {
 				args = append(args, MCPArgs(m)...)
+				servers = append(servers, m.Server)
 			}
 		}
 	}
@@ -293,12 +295,15 @@ func (c LaunchConfig) runtimeArgs(workspaceID, verb, session string, launch *age
 			continue
 		}
 		args = append(args, AppServerArgs(srv, c.MCP.TokenEnv)...)
+		servers = append(servers, srv.Name)
 	}
 	args = append(args, "--dangerously-bypass-hook-trust", "-c", "check_for_update_on_startup=false")
+	args = append(args, c.tuningArgs(prof, launch, servers)...)
 	args = append(args, devArgs...)
 	args = append(args, c.shellEnvArgs(prof.KeyEnv)...)
 	args = append(args, c.permissionArgs(launch)...)
 	args = append(args, FastArgs(launch)...)
+	args = append(args, c.memoryArgs(prof)...)
 	launchArgs, err := RuntimeLaunchArgs(launch)
 	if err != nil {
 		return Start{}, false, err
@@ -310,6 +315,23 @@ func (c LaunchConfig) runtimeArgs(workspaceID, verb, session string, launch *age
 		start.Prefix = inputPrefix(socket, args)
 	}
 	return start, configParseError, nil
+}
+
+// tuningArgs are the defaults of tuning.go for this launch, against the config.toml of the sign-in it uses.
+func (c LaunchConfig) tuningArgs(prof agents.CodexProfile, launch *agents.Launch, servers []string) []string {
+	if c.Hooks == nil || c.Hooks.UserConfig == "" {
+		return nil
+	}
+	path := c.Hooks.UserConfig
+	if prof.Home != "" {
+		path = filepath.Join(prof.Home, "config.toml")
+	}
+	model := ""
+	if launch != nil && launch.Model != nil {
+		model = *launch.Model
+	}
+	// A backend profile (another provider's models, its key) has no window of the catalog's.
+	return TunedArgs(path, model, servers, prof.KeyEnv == "" && len(prof.Args) == 0)
 }
 
 // appsPrefix are the shell words the CLI of a chat with apps runs behind: the apps' environment, the launch's own token

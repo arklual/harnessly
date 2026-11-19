@@ -35,10 +35,13 @@ const (
 	APIOpenAI API = "openai"
 	// APIAnthropic: GET <base>/v1/models and POST <base>/v1/messages, the key in x-api-key.
 	APIAnthropic API = "anthropic"
+	// APIHiggsfield: a media provider (media.go): video and pictures by asynchronous requests, POST <base>/<model> and
+	// GET <base>/requests/<id>/status, the key (key ID and secret as "id:secret") in Authorization: Key <id>:<secret>.
+	APIHiggsfield API = "higgsfield"
 )
 
 // Valid says whether a is a protocol the registry knows.
-func (a API) Valid() bool { return a == APIOpenAI || a == APIAnthropic }
+func (a API) Valid() bool { return a == APIOpenAI || a == APIAnthropic || a == APIHiggsfield }
 
 // Limits of what a person may save.
 const (
@@ -60,10 +63,12 @@ const (
 	ReasonBadURL    = "bad-url"
 	ReasonBadAPI    = "bad-api"
 	ReasonBadKey    = "bad-key"
-	ReasonBadModel  = "bad-model"
-	ReasonNotFound  = "not-found"
-	ReasonTooMany   = "too-many"
-	ReasonFailed    = "failed"
+	// ReasonBadMediaKey: a Higgsfield key is the key ID and the secret, "id:secret".
+	ReasonBadMediaKey = "bad-media-key"
+	ReasonBadModel    = "bad-model"
+	ReasonNotFound    = "not-found"
+	ReasonTooMany     = "too-many"
+	ReasonFailed      = "failed"
 )
 
 // Refusal is a reason the caller is told.
@@ -248,6 +253,9 @@ type View struct {
 // ClaudeCLI says whether Claude Code runs a chat straight on the provider: it speaks the Anthropic API.
 func (p Provider) ClaudeCLI() bool { return p.API == APIAnthropic }
 
+// Media says whether the provider makes video and pictures, not text: no chat and no background feature runs on it.
+func (p Provider) Media() bool { return p.API == APIHiggsfield }
+
 // Proxied says whether Claude Code runs a chat on the provider through the runtime's proxy, which turns Anthropic's
 // Messages into the provider's /chat/completions: it speaks the OpenAI API.
 func (p Provider) Proxied() bool { return p.API == APIOpenAI }
@@ -298,6 +306,8 @@ var presets = []Preset{
 		Models: []Model{{ID: "glm-5.3", Label: "GLM 5.3"}, {ID: "glm-5.3-flash", Label: "GLM 5.3 Flash"}}},
 	{ID: "glm-cn", Name: "GLM · bigmodel.cn", BaseURL: "https://open.bigmodel.cn/api/anthropic", API: APIAnthropic, KeyURL: "https://open.bigmodel.cn/usercenter/apikeys",
 		Models: []Model{{ID: "glm-5.3", Label: "GLM 5.3"}, {ID: "glm-5.3-flash", Label: "GLM 5.3 Flash"}}},
+	// A media provider: video and pictures (internal/mediagen). Its key is the key ID and the secret, "id:secret".
+	{ID: "higgsfield", Name: "Higgsfield", BaseURL: HiggsfieldBase, API: APIHiggsfield, KeyURL: "https://console.higgsfield.ai", Models: HiggsfieldModels()},
 	{ID: PresetCustom, Name: "Свой адрес", API: APIOpenAI},
 }
 

@@ -218,3 +218,52 @@ func TestWithoutTheFlagThereIsNoOwnLayer(t *testing.T) {
 		t.Fatalf("machine own without the flag = %+v", r)
 	}
 }
+
+// An own app: an app the person installs for themselves reaches every machine of theirs and nobody else's;
+// the organization's repositories and its «off for all» are not theirs to name.
+func TestAPersonsOwnAppReachesEveryMachineOfTheirs(t *testing.T) {
+	a := newAcme(t, hubtest.Env("HUB_FEATURES_FORCE", env.FeatureOwn))
+	vm1 := a.machineOf(t, a.vera)
+	vm2 := a.machineOf(t, a.vera)
+	dm := a.machineOf(t, a.dina)
+	app := map[string]any{"repoUrl": "https://git.example.com/team/inbox.git", "branch": "main", "path": "pack/example.inbox"}
+	r := a.vera.Do("POST", "/api/me/env/own?space="+a.tenant, map[string]any{"kind": "app", "name": "Входящие", "source": app})
+	if r.Code != 201 {
+		t.Fatalf("own app: %s", r)
+	}
+	for _, bad := range []map[string]any{
+		{"repo": "some-repo-item", "path": "x"},
+		{"repoUrl": "https://git.example.com/a.git", "branch": "main", "path": "x", "off": true},
+	} {
+		if r := a.vera.Do("POST", "/api/me/env/own?space="+a.tenant, map[string]any{"kind": "app", "name": "Другое", "source": bad}); r.Code != 400 {
+			t.Fatalf("own app %v: %s", bad, r)
+		}
+	}
+	appsOf := func(machineID string) []string {
+		link := &fakeLink{id: machineID, status: "ok"}
+		p := env.NewPusher(env.PushDeps{DB: a.s.DB, Reg: link, Features: env.StaticFeatures([]string{"env", env.FeatureOwn}), Now: a.s.Clock.Now, Every: time.Hour})
+		defer p.Close()
+		p.Connected(machineID, hubproto.Hello{Features: []string{hubproto.FeatureEnvironment, hubproto.FeatureEnvSetup, hubproto.FeatureEnvApps}})
+		if err := p.Push(context.Background()); err != nil {
+			t.Fatalf("push: %v", err)
+		}
+		var out []string
+		for _, s := range link.sent {
+			for _, it := range s.Items {
+				if it.Kind == "app" && it.Name == "Входящие" {
+					out = append(out, it.Name)
+				}
+			}
+		}
+		return out
+	}
+	if got := appsOf(vm1.MachineID); len(got) != 1 {
+		t.Fatalf("vera's first machine: %v", got)
+	}
+	if got := appsOf(vm2.MachineID); len(got) != 1 {
+		t.Fatalf("vera's second machine: %v", got)
+	}
+	if got := appsOf(dm.MachineID); len(got) != 0 {
+		t.Fatalf("dina's machine got vera's app: %v", got)
+	}
+}

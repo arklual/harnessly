@@ -5,6 +5,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/timescale"
 	"github.com/ly-solutions/harnessly/internal/typist"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -171,7 +172,7 @@ func (c *conv) bgAgents(now time.Time) {
 	if w.Commands == 1 {
 		w.Command = commands[0]
 	}
-	if c.bgWake > 0 && int64(c.bgWake) > ms(now) {
+	if c.bgWake > 0 && int64(c.bgWake) > ms(timescale.At(now)) {
 		at := c.bgWake
 		w.WakeupAt = &at
 	}

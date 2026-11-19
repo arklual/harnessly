@@ -23,6 +23,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agentnet"
+	"github.com/ly-solutions/harnessly/internal/timescale"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -50,6 +51,10 @@ type StandConfig struct {
 	ClaudeConfig map[string]any
 	// PromptSuffix is added to the person's words: an arm of a comparison that names the way to work («use subchats»).
 	PromptSuffix string
+	// TimeScale compresses the stand's schedule: at 60 an agent's cron «every 30 minutes» fires every 30
+	// seconds and the runtime's idle windows are 60 times shorter. Only Claude Code's clock can be moved: a Codex
+	// stand runs on the plain clock whatever is asked. 0 or 1 is the plain clock.
+	TimeScale float64
 }
 
 // SetupFile is a setup kept as a file: the environment under test, as configuration.
@@ -104,7 +109,14 @@ type Stand struct {
 	token string
 	proc  *exec.Cmd
 	cfg   StandConfig
+	clock timescale.Clock
 }
+
+// standClock is a stand's clock: compressed from now when the setup asks for a time scale.
+func standClock(cfg StandConfig) timescale.Clock { return timescale.New(cfg.TimeScale, time.Now()) }
+
+// Clock is the stand's clock: compressed when the setup asked for a time scale.
+func (s *Stand) Clock() timescale.Clock { return s.clock }
 
 // ErrInfra marks a failure of the stand, not of the agent: such a run is retried and never counted.
 var ErrInfra = errors.New("infrastructure")
@@ -129,7 +141,7 @@ func Up(cfg StandConfig, name string, port int) (*Stand, error) {
 	}
 	// The workspace lives in the home, as a person's does: the runtime serves a chat's files only from there.
 	s := &Stand{Dir: dir, Home: filepath.Join(dir, "home"), Data: filepath.Join(dir, "data"), Work: filepath.Join(dir, "home", "work"),
-		Library: filepath.Join(dir, "design"), Port: port, name: name, cfg: cfg}
+		Library: filepath.Join(dir, "design"), Port: port, name: name, cfg: cfg, clock: standClock(cfg)}
 	for _, d := range []string{s.Home, s.Data, s.Work, s.Library, filepath.Join(s.Home, ".claude"), filepath.Join(s.Home, ".codex"),
 		filepath.Join(s.Home, ".local", "bin"), filepath.Join(s.Data, "agent-env")} {
 		if err := os.MkdirAll(d, 0o700); err != nil {
@@ -227,6 +239,17 @@ func (s *Stand) writeHome(cfg StandConfig) error {
 		// (harnessly secret run --env NAME=…) and is never written into the setup file.
 		env[k] = os.Expand(v, func(name string) string { return os.Getenv(name) })
 	}
+	// A compressed schedule moves the agents' wall clock with a preload of Bun (Claude Code is a Bun build); the file
+	// lies outside the home, where the agent does not look.
+	if s.clock.On() {
+		preload := filepath.Join(s.Dir, "timescale.js")
+		if err := os.WriteFile(preload, []byte(timescale.Preload), 0o600); err != nil {
+			return err
+		}
+		for k, v := range s.clock.PreloadEnv(preload, env["BUN_OPTIONS"]) {
+			env[k] = v
+		}
+	}
 	keys := make([]string, 0, len(env))
 	for k := range env {
 		keys = append(keys, k)
@@ -289,6 +312,9 @@ func (s *Stand) start(cfg StandConfig) error {
 		return infra("%v", err)
 	}
 	env = append(env, "TMPDIR="+tmp, "CLAUDE_CODE_TMPDIR="+tmp)
+	for k, v := range s.clock.Env() {
+		env = append(env, k+"="+v)
+	}
 	argv := append([]string{cfg.Harnessly, "eval", "sandbox"}, s.sandboxArgs(cfg)...)
 	argv = append(argv, "--", cfg.Runtime)
 	cmd := exec.Command(argv[0], argv[1:]...)
@@ -455,6 +481,11 @@ func (s *Stand) Wait(ctx context.Context, tab string, timeout time.Duration) str
 }
 
 var nonAlnum = regexp.MustCompile(`[^a-zA-Z0-9]`)
+
+// memoryDir is where Claude Code keeps the memory of the stand's workspace project.
+func (s *Stand) memoryDir() string {
+	return filepath.Join(s.Home, ".claude", "projects", nonAlnum.ReplaceAllString(s.Work, "-"), "memory")
+}
 
 // transcriptFile is the Claude Code session of the person's chat: the one that started first. A chat the agent
 // delegated to works in the same folder and often writes last, so the newest file is not the person's.

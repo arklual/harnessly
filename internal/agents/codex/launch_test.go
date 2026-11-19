@@ -69,7 +69,10 @@ func TestRuntimeArgsOrder(t *testing.T) {
 		"-c", `mcp_servers.rt-preview.url="http://127.0.0.1:8022/api/cli/preview/mcp"`,
 		"-c", `mcp_servers.rt-preview.default_tools_approval_mode="approve"`,
 		"-c", `mcp_servers.rt-preview.env_http_headers={"x-rt-token"="RT_PREVIEW_TOKEN"}`,
-		"--dangerously-bypass-hook-trust", "-c", "check_for_update_on_startup=false", "-m", "gpt-5.4", "-c", `model_reasoning_effort="xhigh"`)
+		"--dangerously-bypass-hook-trust", "-c", "check_for_update_on_startup=false",
+		"-c", "project_doc_max_bytes=65536", "-c", "background_terminal_max_timeout=900000",
+		"-c", "mcp_servers.rt-preview.startup_timeout_sec=30", "-c", "mcp_servers.rt-preview.tool_timeout_sec=300",
+		"-c", "features.memories=true", "-m", "gpt-5.4", "-c", `model_reasoning_effort="xhigh"`)
 	if !slices.Equal(args, want) {
 		t.Fatalf("got  %q\nwant %q", args, want)
 	}
@@ -335,7 +338,7 @@ func TestContainerSandboxArgs(t *testing.T) {
 		t.Fatal(err)
 	}
 	i := slices.Index(args, `sandbox_mode="danger-full-access"`)
-	if i < 1 || args[i-1] != "-c" || !slices.Equal(args[i+1:i+4], []string{"-c", `approval_policy="never"`, "-m"}) {
+	if i < 1 || args[i-1] != "-c" || !slices.Equal(args[i+1:i+4], []string{"-c", `approval_policy="never"`, "-c"}) {
 		t.Fatalf("container sandbox flags: %q", args)
 	}
 	for _, a := range args[i-1 : i+3] {

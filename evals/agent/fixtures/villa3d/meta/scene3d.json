@@ -1,0 +1,6 @@
+{
+  "v": 1,
+  "root": "/var/lib/harnessly-eval/blender-lab",
+  "blend": "out/villa.blend",
+  "script": "scenes/villa.py"
+}

@@ -2,6 +2,7 @@ package wire
 
 import (
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -174,5 +175,31 @@ func TestAnOlderPageGetsAStallAsAnUnconfirmedFailure(t *testing.T) {
 	}
 	if !CapsOf(httptest.NewRequest("GET", "/api/v2/socket?caps=delegation,workflows,profiles,msgstatus", nil)).MsgStatus {
 		t.Fatal("the cap is read")
+	}
+}
+
+// the push of a change of the machine's apps is a machine_status that carries appsAt; a page that does not name
+// the cap (appssync) gets the same status without it, so an open tab of an older build neither fails to decode it nor
+// reads again.
+func TestAppsAtGoesOnlyToAPageThatReadsIt(t *testing.T) {
+	ev := MachineStatusEv{Reach: ReachOnline, Agents: []MachineAgent{}, AppsAt: 1_792_656_000_000}
+	old, changed := eventFor(ev, Caps{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true})
+	if !changed || old.(MachineStatusEv).AppsAt != 0 || old.(MachineStatusEv).Reach != ReachOnline {
+		t.Fatalf("a page without the cap: %+v changed=%v", old, changed)
+	}
+	if _, changed := eventFor(ev, AllCaps); changed {
+		t.Fatal("a page with the cap is given the event as it is")
+	}
+	if _, changed := eventFor(MachineStatusEv{Reach: ReachOnline}, Caps{}); changed {
+		t.Fatal("a status that tells no change of the apps is left alone")
+	}
+	// Every older form of the page that has the caps before this one is in the hub's list.
+	last := olderCaps[len(olderCaps)-1]
+	if !last.Links || last.AppsSync {
+		t.Fatalf("the newest older form: %+v", last)
+	}
+	b, err := Marshal(EvFrame{Ch: ChannelMachine, Seq: 1, E: old})
+	if err != nil || strings.Contains(string(b), "appsAt") {
+		t.Fatalf("%s %v", b, err)
 	}
 }

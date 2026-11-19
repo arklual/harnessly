@@ -253,7 +253,17 @@ type ViewWidget struct {
 	Sources []string `json:"sources,omitempty"`
 	// Smart makes the widget ask a model now and then; its short answer is in hl.context.data.smart.
 	Smart *WidgetSmart `json:"smart,omitempty"`
+	// Chat is the conversation the widget was made for: the page shows it in that chat, and in the ones the
+	// person pins it to, not in every chat. Empty: a widget for every chat.
+	Chat string `json:"chat,omitempty"`
+	// Shell names the part of the widget a change of its markup or style does not touch (its script): while it stays the
+	// same the page keeps the card's frame and hands the new markup to it as data (hl.context.data.content), so an update
+	// does not blink. Empty: any new install starts the frame anew.
+	Shell string `json:"shell,omitempty"`
 }
+
+// WidgetChatRe is what a conversation id looks like: the runtime's tab id.
+var WidgetChatRe = regexp.MustCompile(`^tab-[A-Za-z0-9_-]{1,80}$`)
 
 // WidgetSmart is a smart widget's request: what to ask the model over the widget's sources, and how often (minutes).
 type WidgetSmart struct {
@@ -294,6 +304,12 @@ func (w *ViewWidget) check(path string, add func(field, format string, args ...a
 		if !contains(WidgetSources, s) {
 			add(fmt.Sprintf("%s.sources[%d]", path, j), "%q is not a source: %s", s, strings.Join(WidgetSources, ", "))
 		}
+	}
+	if len(w.Shell) > 64 {
+		add(path+".shell", "is up to 64 characters")
+	}
+	if w.Chat != "" && !WidgetChatRe.MatchString(w.Chat) {
+		add(path+".chat", "%q is not a conversation id", w.Chat)
 	}
 	if w.Smart != nil {
 		if n := utf8.RuneCountInString(strings.TrimSpace(w.Smart.Prompt)); n == 0 || n > WidgetSmartPromptMax {

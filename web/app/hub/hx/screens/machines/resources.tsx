@@ -4,6 +4,7 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
+  type ReactNode,
   useEffect,
   useRef,
   useState,
@@ -250,8 +251,11 @@ export const ResourcesSection = ({
   onEdit,
   onCancel,
   onApply,
+  meters,
 }: {
   d: MachineDetail;
+  /** The load right now as meters (the board's «Ресурсы»), drawn above the size. */
+  meters?: ReactNode;
   editing: boolean;
   /** An action is running or the machine is switched off: nothing to change now. */
   locked: boolean;
@@ -285,6 +289,7 @@ export const ResourcesSection = ({
       </div>
       {!showEdit && (
         <>
+          {meters}
           <div className="md-res">
             <div>
               <b>{cores > 0 ? cores : '—'}</b>

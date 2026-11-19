@@ -71,6 +71,9 @@ type Registry struct {
 	onTeamChange []func()
 	// onPublicChange is told, without blocking, that this machine put an app in the public catalog.
 	onPublicChange func()
+	// onChange is told, without blocking, that the installed list was written here (an install, an update, a removal,
+	// a consent): the page's apps are read again at once.
+	onChange []func()
 	// consentPolicy says whether the organization's rule gives apps their rights without asking (consent.go).
 	consentPolicy func() bool
 	// orgOff says whether the organization turned an environment item's app off (envinstall.go).
@@ -92,6 +95,21 @@ func (r *Registry) OnTeamChange(f func()) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.onTeamChange = append(r.onTeamChange, f)
+}
+
+// OnChange adds what is called after the installed list is written on this machine: an agent's widget made, changed or
+// removed reaches every open page by it, with no reload. The function must not block.
+func (r *Registry) OnChange(f func()) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.onChange = append(r.onChange, f)
+}
+
+// changed tells the OnChange hooks; r.mu may be held by the caller.
+func (r *Registry) changed() {
+	for _, f := range r.onChange {
+		f()
+	}
 }
 
 // teamChanged tells the hooks; r.mu is held by the caller.
@@ -158,7 +176,11 @@ func (r *Registry) write(list []Installed) error {
 	if err != nil {
 		return err
 	}
-	return writeFileAtomic(r.file(), append(raw, '\n'))
+	if err := writeFileAtomic(r.file(), append(raw, '\n')); err != nil {
+		return err
+	}
+	r.changed()
+	return nil
 }
 
 // userInstalls are the apps the person installed on this machine.

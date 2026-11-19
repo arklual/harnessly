@@ -200,10 +200,14 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 		events, _ := field[[]string](req, "events")
 		l.subscribe(events)
 		work, projects := slices.Contains(events, hubproto.EventChatWork), slices.Contains(events, hubproto.EventProjects)
-		if work || projects {
+		slot := slices.Contains(events, hubproto.EventNoticeSlot)
+		if work || projects || slot {
 			return empty(), func() {
 				if work {
 					h.sendWork(l)
+				}
+				if slot {
+					h.sendSlot(l)
 				}
 				if projects {
 					h.sendProjectsFull(l)
@@ -303,6 +307,9 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 	case hubproto.OpDocResult, hubproto.OpDocsDeliver:
 		// Served on an observe link only when the operator opted in with AGENT_HUB_DOCS=on (hubdocs.go).
 		return h.opDocs(op, req)
+	case hubproto.OpJobCaps, hubproto.OpJobStart, hubproto.OpJobPoll, hubproto.OpJobCancel:
+		// Served only when the operator opted in with AGENT_HUB_JOBS=on (hubjobs.go).
+		return h.opJob(op, req)
 	case hubproto.OpEvalRunStart, hubproto.OpEvalRunPoll, hubproto.OpEvalRunStop:
 		// Served only when the operator opted in with AGENT_HUB_EVAL=on and the machine can sandbox a run (hubeval.go).
 		return h.opEval(op, req)

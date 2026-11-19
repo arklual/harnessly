@@ -327,6 +327,7 @@
   "next.search.designKind.slides": "Презентация",
   "next.search.designKind.ds": "Дизайн-система",
   "next.search.designKind.video": "Видео",
+  "next.search.designKind.scene3d": "3D-сцена",
   "next.search.docBoard": "Доска",
   "next.search.mrDraft": "черновик",
   "next.search.versionOf": "Версия {n}",
@@ -1753,5 +1754,12 @@
   "next.chat.nextPull": "Следующий чат: {title}",
   "next.header.switchChat": "Переключить чат",
   "next.header.machine": "Машина",
-  "next.header.layers": "Слои"
+  "next.header.layers": "Слои",
+  "next.folderSuggest.ask": "Переместить этот чат в папку «{project}»?",
+  "next.folderSuggest.yes": "Переместить",
+  "next.folderSuggest.no": "Не надо",
+  "next.folderSuggest.unfold": "Раскрыть уведомление",
+  "next.folderSuggest.fold": "Свернуть уведомление",
+  "next.folderSuggest.why": "Выбрано по запросам чата и чатам, что уже лежат в ваших папках. Если не та — выберите другую:",
+  "next.folderSuggest.other": "Папки"
 }

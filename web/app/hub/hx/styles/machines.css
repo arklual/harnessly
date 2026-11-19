@@ -206,3 +206,42 @@
 .hb .mt-row[data-seat='1'] .mt-name {
   padding-left: 22px;
 }
+
+/* The card as the board draws it (`drawerMachine`): its own head `.dh`, sections `.sec h4`, no footer bar. */
+.hb .md .hb-sheet__head {
+  display: none;
+}
+.hb .md .hb-sheet__body {
+  padding: 18px 22px 24px;
+}
+.hb .md .md-sec {
+  padding: 0;
+  margin-top: 24px;
+  box-shadow: none !important;
+}
+.hb .md .md-sec__t {
+  margin-bottom: 10px;
+  font-size: var(--hx-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--hx-fg-3);
+}
+.hb .md .md-sec__head .md-sec__t {
+  margin: 0;
+}
+.hb .md .md-status,
+.hb .md .md-ext {
+  margin-top: 12px;
+}
+.hb .md .md-rename {
+  margin-top: 12px;
+}
+@media (max-width: 640px) {
+  .hb .md .hb-sheet__body {
+    padding: 16px 16px 24px;
+  }
+}
+.hb .md .md-res {
+  margin-top: 14px;
+}

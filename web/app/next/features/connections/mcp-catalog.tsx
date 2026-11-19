@@ -7,12 +7,22 @@ import { McpGlyph } from '@/next/features/connections/glyphs';
 import {
   DEFAULT_HEADER,
   MCP_AUTH,
+  MCP_TRANSPORT,
   type IMcpAddInput,
   type IMcpCatalogEntry,
+  type IMcpEnvField,
   type IMcpHeader,
   type IMcpProbe,
 } from '@/next/features/connections/mcp-api';
-import { blurbOf, headerValue, probeLine } from '@/next/features/connections/mcp-model';
+import {
+  blurbOf,
+  envDefaults,
+  envPayload,
+  envReady,
+  headerValue,
+  isKeyed,
+  probeLine,
+} from '@/next/features/connections/mcp-model';
 import { hostOf } from '@/next/features/connections/model';
 import { FormError, SetButton } from '@/next/features/settings/rows';
 import { t } from '@/next/i18n';
@@ -134,6 +144,198 @@ export const headerOf = (name: string, value: string, prefix: string): IMcpHeade
   return { name: header, value: headerValue(header, value, prefix) };
 };
 
+interface IEnvFieldsProps {
+  fields: readonly IMcpEnvField[];
+  values: Readonly<Record<string, string>>;
+  /** The keys are kept already: an empty field keeps the stored one. */
+  keep: boolean;
+  disabled: boolean;
+  invalid: boolean;
+  onChange: (name: string, value: string) => void;
+  onSubmit: () => void;
+}
+
+/** One input per key of a local server or an API: masked for a secret, plain otherwise, with its hint under it. */
+export const EnvFields = ({
+  fields,
+  values,
+  keep,
+  disabled,
+  invalid,
+  onChange,
+  onSubmit,
+}: IEnvFieldsProps) => {
+  const ids = useId();
+  return (
+    <div className="hx-mcp-env">
+      {fields.map((field, index) => {
+        const label = field.optional ? t('next.connections.optional', { label: field.label }) : field.label;
+        const id = `${ids}-${index}`;
+        const value = values[field.name] ?? '';
+        const placeholder = keep && field.secret ? t('next.connections.mcp.keepKey') : field.default;
+        return (
+          <div key={field.name} className="hx-conn-form__field">
+            {field.secret ? (
+              <>
+                <span className="hx-conn-form__label">{label}</span>
+                <SecretField
+                  value={value}
+                  onChange={(next) => onChange(field.name, next)}
+                  label={label}
+                  placeholder={placeholder}
+                  disabled={disabled}
+                  invalid={invalid}
+                  onSubmit={onSubmit}
+                />
+              </>
+            ) : (
+              <>
+                <label className="hx-conn-form__label" htmlFor={id}>
+                  {label}
+                </label>
+                <input
+                  id={id}
+                  className="hx-set__input"
+                  value={value}
+                  disabled={disabled}
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  placeholder={placeholder}
+                  aria-invalid={invalid || undefined}
+                  onChange={(event) => onChange(field.name, event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') onSubmit();
+                  }}
+                />
+              </>
+            )}
+            {field.hint !== '' && <span className="hx-mcp-env__hint">{field.hint}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+/** The keys' form's state: what was typed per variable name. */
+export const useEnvValues = (fields: readonly IMcpEnvField[], withDefaults: boolean) => {
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    withDefaults ? envDefaults(fields) : {},
+  );
+  const set = (name: string, value: string) => setValues((now) => ({ ...now, [name]: value }));
+  const clear = () => setValues({});
+  return { values, set, clear };
+};
+
+/** What a local server or an API still needs from the person: said once, under the keys. */
+export const StartingHint = () => (
+  <p className="hx-conn-found__note" role="status">
+    {t('next.connections.mcp.starting')}
+  </p>
+);
+
+interface IKeyedCardProps {
+  entry: IMcpCatalogEntry;
+  onConnect: TConnectMcp;
+  /** Kept: the form lets the entry go. */
+  onDone: () => void;
+  onCancel: () => void;
+}
+
+/**
+ * A local server or an API from the catalog: nothing to probe, only its keys. The press of «Connect» keeps it with
+ * the keys; the first start of a local server can take a couple of minutes.
+ */
+const KeyedCard = ({ entry, onConnect, onDone, onCancel }: IKeyedCardProps) => {
+  const env = useEnvValues(entry.env, true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const alive = useAlive();
+  const local = entry.transport === MCP_TRANSPORT.stdio;
+  const ready = envReady(entry.env, env.values);
+
+  const connect = async () => {
+    if (busy || !ready) return;
+    setBusy(true);
+    setError(null);
+    const refused = await onConnect(
+      {
+        url: '',
+        name: '',
+        catalogId: entry.id,
+        transport: null,
+        header: null,
+        env: envPayload(entry.env, env.values),
+      },
+      false,
+    );
+    if (!alive.current) return;
+    setBusy(false);
+    if (refused !== null) {
+      setError(refused);
+      return;
+    }
+    onDone();
+  };
+
+  return (
+    <div className="hx-conn-found">
+      <div className="hx-conn-found__head">
+        <McpGlyph id={entry.id} name={entry.name} />
+        <span className="hx-conn-found__text">
+          <span className="hx-conn-found__name">{entry.name}</span>
+          {blurbOf(entry) !== '' && <span className="hx-conn-found__sub">{blurbOf(entry)}</span>}
+        </span>
+      </div>
+      <p className="hx-conn-found__note">
+        {local ? t('next.connections.mcp.localNote') : t('next.connections.mcp.apiNote')}
+      </p>
+      {entry.guide !== '' && <p className="hx-conn-found__note">{entry.guide}</p>}
+      {entry.env.length > 0 && (
+        <EnvFields
+          fields={entry.env}
+          values={env.values}
+          keep={false}
+          disabled={busy}
+          invalid={error !== null}
+          onChange={(name, value) => {
+            env.set(name, value);
+            setError(null);
+          }}
+          onSubmit={() => void connect()}
+        />
+      )}
+      {(entry.tokenUrl !== '' || entry.docsUrl !== '') && (
+        <div className="hx-mcp-env__links">
+          {entry.tokenUrl !== '' && (
+            <a className="hx-conn-found__token" href={entry.tokenUrl} target="_blank" rel="noreferrer">
+              {t('next.connections.createToken')}
+              <Icon name="external-link" size="sm" />
+            </a>
+          )}
+          {entry.docsUrl !== '' && (
+            <a className="hx-conn-found__token" href={entry.docsUrl} target="_blank" rel="noreferrer">
+              {t('next.connections.mcp.docs')}
+              <Icon name="external-link" size="sm" />
+            </a>
+          )}
+        </div>
+      )}
+      {busy && <StartingHint />}
+      <div className="hx-conn-found__actions">
+        <SetButton tone="primary" busy={busy} disabled={!ready} onClick={() => void connect()}>
+          {t('next.connections.connect')}
+        </SetButton>
+        <SetButton tone="ghost" disabled={busy} onClick={onCancel}>
+          {t('next.connections.cancel')}
+        </SetButton>
+      </div>
+      <ErrorLine error={error} />
+    </div>
+  );
+};
+
 interface ICatalogCardProps {
   entry: IMcpCatalogEntry;
   leaving: boolean;
@@ -203,6 +405,8 @@ export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConn
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState<TBusy | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // A local server or an API from the catalog: its keys' form takes the place of the probe's card.
+  const [keyed, setKeyed] = useState<IPicked | null>(null);
   const alive = useAlive();
   const ids = useId();
   const card = usePresence(probe, CARD_EXIT_MS);
@@ -233,8 +437,17 @@ export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConn
   // A catalog card fills the address and looks at it at once; nothing is kept yet.
   const lastPick = useRef<number | null>(null);
   const takePick = useEffectEvent((next: IPicked) => {
-    setUrl(next.entry.url);
     setEntry(next.entry);
+    if (isKeyed(next.entry)) {
+      // Nothing to probe: only keys to ask for.
+      setUrl('');
+      setProbe(null);
+      setError(null);
+      setKeyed(next);
+      return;
+    }
+    setKeyed(null);
+    setUrl(next.entry.url);
     void find(next.entry.url, next.entry);
   });
   useEffect(() => {
@@ -249,6 +462,7 @@ export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConn
     setProbe(null);
     setUrl('');
     setEntry(null);
+    setKeyed(null);
     setName('');
     setValue('');
     setError(null);
@@ -311,6 +525,7 @@ export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConn
               if (probe !== null) setProbe(null);
               if (entry !== null && next.trim() !== entry.url) {
                 setEntry(null);
+                setKeyed(null);
                 onUnpick();
               }
             }}
@@ -396,6 +611,9 @@ export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConn
             </SetButton>
           </div>
         </div>
+      )}
+      {keyed !== null && (
+        <KeyedCard key={keyed.at} entry={keyed.entry} onConnect={onConnect} onDone={reset} onCancel={reset} />
       )}
       <ErrorLine error={error} />
     </div>

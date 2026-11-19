@@ -1,0 +1,34 @@
+id: widget-offer-asked-recorded
+title: Человек сам просит виджет с прогрессом долгого рендера — агент делает его сразу, без предложения, и записывает ответ «asked» в память (HRN-1663)
+tags: [widgets, memory]
+agents: [claude]
+timeout_s: 600
+setup:
+  workspace: [fixtures/widget-offer]
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/sidewidget/**'
+  - 'internal/hlcli/widget.go'
+  - 'internal/noticeslot/tools.go'
+prompt: >-
+  Запусти в фоне `sh scripts/render.sh` (на настоящих данных около сорока минут) и сделай мне справа виджет, где видно, сколько кадров уже готово.
+expect:
+  - name: made the widget
+    any_of:
+      - called: harnessly\.widget_create
+      - called: Bash
+        args: {command: 'harnessly widget create\b'}
+  - name: did not ask what was asked for
+    not_called: '.*notice_ask.*'
+    even_failed: true
+  - name: wrote the answer into the memory note
+    any_of:
+      - called: Write
+        args: {file_path: '(?s:.*/memory/side-widget-offers\.md)', content: '(?s:.*asked.*)'}
+      - called: Bash
+        args: {command: '(?s:.*side-widget-offers\.md(?s:.*)asked|asked(?s:.*)side-widget-offers\.md)'}
+variants:
+  - id: v1
+    kind: short
+    text: "рендер `sh scripts/render.sh` в фоне (около сорока минут) + виджет справа с прогрессом по кадрам"

@@ -165,6 +165,8 @@ export interface TurnOutput {
   mime?: string;
   size?: number;
   sha256?: string;
+  /** A design: the boards of it the turn wrote (their files in the project), the last written last. */
+  pages?: string[];
 }
 export const ENTRY_KINDS = [
   'user',
@@ -302,7 +304,7 @@ export const CLIENT_FRAME_KINDS = ['hello', 'sub', 'unsub', 'ping'] as const;
 /** The optional parts of the frames this page reads, named in its socket's address (?caps=…) and in the HTTP calls
  *  that carry them: the runtime sends them only to a page that names them, so a tab left on an older build never meets
  *  a field it refuses. Not in hello: a runtime older than the page refuses a field of hello it does not know. */
-export const CLIENT_CAPS = ['delegation', 'workflows', 'profiles', 'msgstatus', 'links'] as const;
+export const CLIENT_CAPS = ['delegation', 'workflows', 'profiles', 'msgstatus', 'links', 'appssync'] as const;
 /** CLIENT_CAPS as a query: `caps=…`. */
 export const CAPS_QUERY = `caps=${CLIENT_CAPS.join(',')}`;
 export type ClientFrameKind = (typeof CLIENT_FRAME_KINDS)[number];
@@ -713,8 +715,8 @@ export interface Terminal {
   createdAt: Ms;
 }
 /** `video` is a deck folder with meta/video.json: scenes on a time line rendered to MP4. */
-export type DesignKind = 'site' | 'slides' | 'ds' | 'video';
-export const DESIGN_KINDS: readonly DesignKind[] = ['site', 'slides', 'ds', 'video'];
+export type DesignKind = 'site' | 'slides' | 'ds' | 'video' | 'scene3d';
+export const DESIGN_KINDS: readonly DesignKind[] = ['site', 'slides', 'ds', 'video', 'scene3d'];
 
 /** What a chat made, opened or changed that the tools home lists: a document, a board, a design, a tracker task, a merge
  *  request (the block of merge requests under a finished task reads it). */
@@ -1204,6 +1206,7 @@ export const AGENT_OPTION_KEYS = [
   'approval',
   'search',
   'history',
+  'memories',
   'ultracode',
 ] as const;
 export type AgentOptionKey = (typeof AGENT_OPTION_KEYS)[number];
@@ -2001,6 +2004,8 @@ export type MachineEvent =
       agents: MachineAgent[];
       /** Absent: the health the page holds stays as it was. */
       health?: MachineHealth;
+      /** The installed apps changed at this moment: read them again (appssync cap). */
+      appsAt?: Ms;
     }
   | { type: 'machine_load'; load: MachineLoad };
 export type ConvsEvent =
@@ -3452,7 +3457,7 @@ const convEventKinds = {
   feed_reset: { turns: array(turn), entries: array(entry), beforeTurnId: nullable(turnId) },
 } satisfies Record<ConvEventType, Shape>;
 const machineEvent: Decoder<MachineEvent> = variants('type', machineEventKinds, undefined, {
-  machine_status: { health: machineHealth },
+  machine_status: { health: machineHealth, appsAt: ms },
 });
 const convsEvent: Decoder<ConvsEvent> = variants('type', convsEventKinds);
 const convEvent: Decoder<ConvEvent> = variants('type', convEventKinds, undefined, {

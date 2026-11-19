@@ -1,0 +1,10 @@
+#!/bin/sh
+# A stand-in for Blender: "renders" the frame the scene script names by writing a file where the output path says.
+out=out/frame.png
+while [ $# -gt 0 ]; do
+	case $1 in -o) out=$2.png; shift ;; esac
+	shift
+done
+mkdir -p "$(dirname "$out")"
+printf 'PNG draft render, local=%s\n' "${HARNESSLY_JOB_LOCAL:-0}" > "$out"
+echo "Blender (mock) saved: $out"

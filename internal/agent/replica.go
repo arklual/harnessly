@@ -133,6 +133,8 @@ type replica struct {
 
 	// work takes the runtime's `work` frames (chatwork.go); nil drops them.
 	work func(frame []byte)
+	// slot takes the runtime's `slot` frames (noticeslot.go); nil drops them.
+	slot func(frame []byte)
 }
 
 func newReplica(a *Agent) *replica {
@@ -147,6 +149,11 @@ func newReplica(a *Agent) *replica {
 			a.hub.takeWork(frame)
 		}
 	}
+	r.slot = func(frame []byte) {
+		if a.hub != nil && !a.hub.observe {
+			a.hub.takeSlot(frame)
+		}
+	}
 	return r
 }
 
@@ -155,6 +162,7 @@ func newReplica(a *Agent) *replica {
 func newHubReplica(h *hub) *replica {
 	r := newReplicaWith(h.emitHistory, func() bool { return len(h.hubLinks()) > 0 })
 	r.work = h.takeWork
+	r.slot = h.takeSlot
 	return r
 }
 
@@ -756,6 +764,10 @@ func (r *replica) frame(data []byte) {
 	case "work":
 		if r.work != nil {
 			r.work(data)
+		}
+	case "slot":
+		if r.slot != nil {
+			r.slot(data)
 		}
 	}
 }

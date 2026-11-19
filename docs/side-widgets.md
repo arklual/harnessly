@@ -51,6 +51,48 @@ The view's manifest (`views[].widget`, the `side` target, docs/apps/reference.md
 | `sources` | The host's data the view gets in `hl.context.data.sources`: `limits`, `machine`, `subagents`. Nothing else of the page reaches it. |
 | `smart` | `{prompt, every}`: a request a model answers over the sources in at most three short lines, every `every` minutes (5 to 1440, default 30) and at once on the card's button; the answer is in `hl.context.data.smart` (`{text, at, asking}`). |
 
+### It shows at once, with no reload
+
+Every write of the installed list (a widget made, changed or removed by `harnessly widget` / the MCP tools, an app
+installed or removed) is told to the open pages on the machine channel of the socket: the event `machine_apps`
+(`{at}`, no list; a burst of writes within 120 ms goes out once). The page reads the machine's apps again
+(`stores/apps-changed.ts` → `refreshInstalledApps`), so a new widget joins the stack, a removed one leaves, and a changed
+one (`widget_update` of `html`/`css`/`js`) is a new install of the app (its `updatedAt` moves): the card's frame starts
+anew on it. The old poll of three minutes stays only as a fallback.
+
+### Widgets of a chat, and a fast open
+
+A widget an agent makes is for the chat it made it in: `harnessly widget create --scope chat|global` (the MCP tool's
+`scope`; chat is the default, global for what is the person's everywhere). The chat is the one the agent's session
+runs (the CLI sends its tmux session, the MCP tool knows its chat); it is written into the view's widget block
+(`views[].widget.chat`, `internal/apps`), so an `update` with `--scope global|chat` moves it. The page shows an app's
+widget in its chat and in the chats the person pinned it to; the person's word (`chats` of the item in
+`prefs["hx-widgets"]`: `all`, or a list of chats) wins over the agent's, and is changed in the card's menu («Только в
+этом чате», «Показывать во всех чатах») and from another chat's «+ Виджет» (it pins the widget there too). The built-in
+widgets are global until the person pins one. A widget for a job is removed by the agent when the job is done (say
+«Готово» in it, report, `widget remove --side`), or dismissed by the person from the menu.
+
+Opening a chat no longer waits for the machine's list of apps (a read that starts the view server): the last list of the
+apps that have a widget is kept in the browser (`features/widgets/cache.ts`, `hx-wg-apps:<machine>`) and the stack is
+drawn from it at once; the live list replaces it when it comes. With nothing kept yet the cards are placeholders
+(a shimmering bar), not a blank. `features/widgets/apps-cache.test.tsx` measures it: with a machine that answers the list
+in 800 ms the stack has its apps after 800 ms cold and at the first render from the kept list.
+
+### A progress widget, offered by the agent
+
+When the person asks to be told when something long ends (a render, a build, a deploy, a download, a migration), or an
+agent starts work of more than about five minutes, the agent offers a card under the right column itself: a
+`notice_ask` choice «Сделать виджет прогресса справа?» with «Сделать виджет справа» and «Не надо». On the first it makes
+the widget (`widget_create`) and keeps it true with `widget_update`; on the second it makes nothing. The text agents
+are given is in `cmd/runtime/agent_skills.go` (`progressOfferPromptText`).
+
+What the person answered is the agent's memory, not a store of ours: the note `side-widget-offers.md` in the memory
+folder of the project (Claude Code's memory, synced by docs/hub/memory-sync.md), one line per answer,
+`date | kind | length | yes / no / asked` (kind: render, build, deploy, download, migration, training, other; length:
+short is 5 to 15 minutes, long over 15; the kind `any` is a standing rule). It is plain text the person reads and edits.
+The agent decides by it: `asked`, or two `yes` and no `no` for the kind and length → makes the widget without asking;
+the last answer `no` → neither offers nor makes it; otherwise offers once.
+
 ### Smart widgets
 
 The page asks `POST <platform>/side-widgets/smart {key, prompt, data}` only while the card is unfolded and on screen,
@@ -79,4 +121,5 @@ agent asked to move an app says where the person does it.
 - `web/app/next/features/widgets/model.test.ts`, `web/app/next/features/sidebar/nav-layout.test.ts`.
 - `internal/sidewidget` (the package, the service, the MCP tools), `internal/bgmodel/widget_test.go`,
   `cmd/runtime/routes_side_widgets_test.go`.
-- Agent scenarios: `evals/agent/side-widget-*.yaml` (docs/agent-evals.md).
+- Agent scenarios: `evals/agent/side-widget-*.yaml`, `evals/agent/widget-offer-*.yaml`, `evals/agent/widget-scope-*.yaml` (docs/agent-evals.md).
+- The push: `cmd/runtime/v2_machine_apps_test.go`, `web/app/next/features/app-views/apps-pushed.test.tsx`.

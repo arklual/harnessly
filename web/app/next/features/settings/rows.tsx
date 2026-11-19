@@ -111,6 +111,8 @@ export const SegControl = <V extends string | number>({
 
 /** Room the menu keeps from what lies over the page's foot (the Settings field), px. */
 const MENU_GAP = 8;
+/** The air kept between a menu and the edge of the window. */
+const MENU_EDGE = 8;
 
 /**
  * True when the menu under its button would go under what lies over the page's foot (the agent's field of Settings,
@@ -137,6 +139,8 @@ export const MenuControl = ({
   const list = useRef<HTMLDivElement>(null);
   const phone = usePhone();
   const [up, setUp] = useState(false);
+  // The room on the side the menu opens to: longer than it, the list scrolls inside (the menu never leaves the screen).
+  const [room, setRoom] = useState<number | null>(null);
   const current = choices.find((choice) => choice.value === value);
 
   // Before the frame is painted: the menu stands where it fits.
@@ -145,7 +149,12 @@ export const MenuControl = ({
     const menuEl = list.current;
     if (!open || phone || !button || !menuEl) return;
     const foot = Number.parseFloat(getComputedStyle(button).getPropertyValue('--hx-isle-h') || '0');
-    setUp(opensUp(button.getBoundingClientRect(), menuEl.offsetHeight, window.innerHeight, foot));
+    const rect = button.getBoundingClientRect();
+    const upward = opensUp(rect, menuEl.scrollHeight, window.innerHeight, foot);
+    const below = window.innerHeight - foot - rect.bottom - MENU_GAP - MENU_EDGE;
+    const above = rect.top - MENU_GAP - MENU_EDGE;
+    setUp(upward);
+    setRoom(Math.max(120, upward ? above : below));
   }, [open, phone]);
 
   useEffect(() => {
@@ -187,6 +196,7 @@ export const MenuControl = ({
             data-state={menu.state}
             data-up={up || undefined}
             data-sheet={phone || undefined}
+            style={!phone && room !== null ? { maxHeight: room } : undefined}
             role="listbox"
             aria-label={label}
           >

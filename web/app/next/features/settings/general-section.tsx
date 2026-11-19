@@ -7,6 +7,7 @@ import { LANGUAGE_NAMES, parseLanguage, type TLanguage } from '@/platform/langua
 import { useEffect, useState, type ReactNode } from 'react';
 import { Group, LinkRow, MenuRow, SegRow, SwitchRow } from '@/next/features/settings/rows';
 import FeedLookRows from '@/next/features/settings/feed-look-rows';
+import FoldersGroup from '@/next/features/settings/folders-group';
 import { t } from '@/next/i18n';
 import type { PersonSettings } from '@/next/stores/me';
 import type { TShownKind, TShownKinds } from '@/next/features/chat/outputs';
@@ -282,6 +283,7 @@ const GeneralSection = ({
         />
       </Group>
     )}
+    <FoldersGroup />
     <Group title={t('next.settings.general.feed')}>
       {FEED_ROWS.map((kind) => (
         <SwitchRow

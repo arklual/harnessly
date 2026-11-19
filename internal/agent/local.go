@@ -293,6 +293,11 @@ func (a *Agent) automationReport(w http.ResponseWriter, r *http.Request) {
 	}
 	runID, ok1 := field[string](obj, "runId")
 	resultToken, ok2 := field[string](obj, "resultToken")
+	if !ok2 {
+		// A report sent as a file (curl --data @report.json) carries the token in a header, so the file holds no secret.
+		resultToken = r.Header.Get("X-Result-Token")
+		ok2 = resultToken != ""
+	}
 	summary, ok3 := field[string](obj, "summary")
 	if !ok1 || !ok2 || !ok3 {
 		w.WriteHeader(400)
@@ -315,6 +320,14 @@ func (a *Agent) automationReport(w http.ResponseWriter, r *http.Request) {
 	ev := evAutomationResult{Event: "automations.result", RunID: runID, ResultToken: resultToken, Summary: summary}
 	ev.BugIssueID, _ = field[string](obj, "bugIssueId")
 	ev.MrURL, _ = field[string](obj, "mrUrl")
+	ev.Outcome, _ = field[string](obj, "outcome")
+	ev.Body, _ = field[string](obj, "body")
+	ev.Error, _ = field[string](obj, "error")
+	if st, ok := field[string](obj, "state"); ok {
+		ev.State = &st
+	}
+	ev.Artifacts, _ = field[[]map[string]any](obj, "artifacts")
+	ev.Delivered, _ = field[[]string](obj, "delivered")
 	a.broadcast(ev)
 	if a.hub != nil {
 		a.hub.emitAutomationResult(ev)

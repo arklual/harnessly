@@ -164,6 +164,13 @@ export const QUICK = [
   { id: '30', days: 30, label: '30 дн' },
 ] as const;
 
+/** The head's segment as the board has it: a week, a month, a quarter. */
+export const QUICK_SEG = [
+  { id: '7', days: 7, label: '7 дней' },
+  { id: '30', days: 30, label: '30 дней' },
+  { id: '90', days: 90, label: '90 дней' },
+] as const;
+
 const DAY_WORD = ['день', 'дня', 'дней'] as const;
 
 const dayWord = (n: number): string =>

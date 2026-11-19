@@ -280,6 +280,8 @@ func TestGuestLinkOverTheRoutes(t *testing.T) {
 // The page, the CLI and the app's removal tell the cluster through the machine agent: the team changed, a guest link
 // was made (its hash, never its token) or ended.
 func TestAppsEventsReachTheMachineAgent(t *testing.T) {
+	// The header the agent's token goes in is the machine's own setting; the test's agent reads the default one.
+	t.Setenv("RUNTIME_AGENT_TOKEN_HEADER", "")
 	r := newShareRig(t)
 	events := make(chan map[string]any, 32)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

@@ -32,6 +32,8 @@ const (
 	FeatureUIAgent = "ui-agent"
 	// FeatureWidget: the short line a smart widget of the chat's right column asks for.
 	FeatureWidget = "widget"
+	// FeatureFolder: the folder the app offers for a chat that has none, after a few prompts.
+	FeatureFolder = "folder-suggest"
 )
 
 // Feature is one background feature as Settings lists it.
@@ -68,6 +70,9 @@ func Features() []Feature {
 		{ID: FeatureWidget, Live: true,
 			Title:       locale.Pick("Smart widgets", "Умные виджеты"),
 			Description: locale.Pick("A widget under the chat's right column that asks a model now and then and shows its short answer. Without a pick it runs on the machine's Claude Haiku.", "Виджет под правой колонкой чата, который время от времени спрашивает модель и показывает её короткий вывод. Без выбора — Claude Haiku машины по подписке.")},
+		{ID: FeatureFolder, Live: true,
+			Title:       locale.Pick("Folder for a chat", "Папка для чата"),
+			Description: locale.Pick("After a few prompts a chat without a folder gets an offer of the fitting one. Without a pick it runs on the machine's Claude Haiku.", "Через несколько промптов чату без папки предлагается подходящая. Без выбора — Claude Haiku машины по подписке.")},
 	}
 }
 
@@ -272,7 +277,7 @@ func (r *Runner) resolve(feature string) (Choice, bool) {
 		return c, true
 	}
 	// A smart widget runs on the machine's own Claude by its subscription when nothing is picked for it.
-	if feature == FeatureWidget {
+	if feature == FeatureWidget || feature == FeatureFolder {
 		if r.Agent == nil {
 			return Choice{}, false
 		}
@@ -297,7 +302,7 @@ func (r *Runner) resolve(feature string) (Choice, bool) {
 	}
 	var first *Choice
 	for _, v := range views {
-		if !v.HasKey || len(v.Models) == 0 || v.Models[0].ID == "" {
+		if v.API == extproviders.APIHiggsfield || !v.HasKey || len(v.Models) == 0 || v.Models[0].ID == "" {
 			continue
 		}
 		c := Choice{Provider: v.ID, Model: v.Models[0].ID}
@@ -321,7 +326,7 @@ var quickModel = regexp.MustCompile(`(?i)(haiku|flash|mini|lite|nano|air|small|t
 func quickChoice(views []extproviders.View) (Choice, bool) {
 	var first *Choice
 	for _, v := range views {
-		if !v.HasKey {
+		if !v.HasKey || v.API == extproviders.APIHiggsfield {
 			continue
 		}
 		k := slices.IndexFunc(v.Models, func(m extproviders.Model) bool { return m.ID != "" && quickModel.MatchString(m.ID) })

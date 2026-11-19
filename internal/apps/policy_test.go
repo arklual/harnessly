@@ -125,6 +125,15 @@ func TestSnapshotKeepsTheAppsOn(t *testing.T) {
 		{Call{Tool: "Edit", Input: map[string]any{"file_path": "/home/me/dev-app/harnessly/app.json"}}, DecideDeny},
 		{Call{Tool: "Edit", Input: map[string]any{"file_path": "/home/me/dev-app/../dev-app/x"}}, DecideDeny},
 		{Call{Tool: "Edit", Input: map[string]any{"file_path": "/home/me/dev-application/x"}}, DecideNone},
+		// A line the shell rewrites is refused only when it can still run `harnessly app …`.
+		{Call{Tool: "Bash", Input: map[string]any{"command": "x=off; harnessly app $x a.b"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly $(echo app) off a.b"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly $'\\x61'pp off a.b"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "h=/usr/bin/harnessly; $h app off a.b"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "cd /work/harnessly && grep -rn '$x' internal | head"}}, DecideNone},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "artifacts publish --file a.html --slug zadachi-v-harnessly-k3x9 --title \"Задачи в harnessly: $(date)\""}}, DecideNone},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly design new \"Регулярные задачи\" && echo $HOME"}}, DecideNone},
+		{Call{Tool: "Bash", Input: map[string]any{"command": `curl -d '{"name":"Ядро harnessly"}' -H "Authorization: Bearer $(cat t)" https://x`}}, DecideNone},
 	} {
 		if v, _ := s.Decide(c.call); v.Decision != c.want {
 			t.Errorf("%+v: %s", c.call, v.Decision)

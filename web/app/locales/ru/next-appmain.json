@@ -155,6 +155,7 @@
   "next.appfail.reason.waiting.connection": "Ждёт подключения",
   "next.appfail.reason.waiting.other": "Ждёт настройки",
   "next.appfail.retry": "Повторить",
+  "next.appfail.refresh": "Обновить",
   "next.appfail.journal": "Открыть журнал",
   "next.appfail.journalHide": "Скрыть журнал",
   "next.appfail.journalEmpty": "В журнале пока пусто",

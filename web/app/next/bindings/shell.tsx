@@ -57,6 +57,7 @@ import { useReadWhileVisible } from '@/next/bindings/read-while-visible';
 import { connectionStore } from '@/next/stores/connection';
 import { useAll } from '@/next/core/store';
 import { hub } from '@/next/core/realtime/hub';
+import FolderSuggestion from '@/next/features/folder-suggest/folder-suggestion';
 import ChatHeader, { type IChatHeaderProps } from '@/next/features/header/chat-header';
 import type { IHeaderGoal } from '@/next/features/header/goal-dialog';
 import { settled } from '@/next/bindings/outcome';
@@ -129,6 +130,7 @@ import {
   AppDocPage,
   AppMainPage,
   AppsListPage,
+  RoutinesPage,
   AppsScreen,
   DesignlySite,
   DesignlyView,
@@ -1168,6 +1170,13 @@ const Shell = ({ owner }: IShellProps) => {
   ];
   const moreAll: readonly IMoreItem[] = [
     {
+      id: 'routines',
+      icon: 'clock',
+      label: t('next.routines.title'),
+      current: route.kind === ROUTE.routines,
+      onSelect: () => openScreen({ kind: ROUTE.routines }),
+    },
+    {
       id: 'tasks',
       icon: 'list-checks',
       label: t('next.sidebar.tasks'),
@@ -1507,6 +1516,7 @@ const Shell = ({ owner }: IShellProps) => {
       : toolOf('manage', 'sliders-horizontal', t('next.sidebar.manage'), { kind: ROUTE.manage });
   const homeTools: readonly IHomeTool[] = [
     toolOf('designly', 'palette', t('next.sidebar.designly'), { kind: ROUTE.designly }),
+    toolOf('routines', 'clock', t('next.routines.title'), { kind: ROUTE.routines }),
     ...(hubFirst ? [] : [toolOf('tasks', 'list-checks', t('next.sidebar.tasks'), { kind: ROUTE.tasks })]),
     {
       id: 'search',
@@ -1785,6 +1795,7 @@ const Shell = ({ owner }: IShellProps) => {
       {route.kind !== ROUTE.site &&
         route.kind !== ROUTE.invite &&
         route.kind !== ROUTE.tasks &&
+        route.kind !== ROUTE.routines &&
         route.kind !== ROUTE.apps &&
         route.kind !== ROUTE.help &&
         route.kind !== ROUTE.learn &&
@@ -1825,6 +1836,15 @@ const Shell = ({ owner }: IShellProps) => {
             chats={{ list: shownChats, onOpen: openChat }}
           />
         )}
+      {route.kind === ROUTE.chat && (
+        <FolderSuggestion
+          chat={chat}
+          machine={record?.machineId ?? null}
+          projects={model.projects}
+          chats={shownChats}
+          onMove={(id, projectId) => model.actions.onMove?.(id, projectId) ?? Promise.resolve()}
+        />
+      )}
       {/* The chat read to its end and pulled further: the next active chat, as in Telegram (HRN-1491). */}
       <NextChatPull
         enabled={phone && route.kind === ROUTE.chat}
@@ -1927,6 +1947,15 @@ const Shell = ({ owner }: IShellProps) => {
       )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.tasks && !hubFirst && model.active && (
         <AppsScreen key={model.active} machine={model.active} onOpenDrawer={() => setDrawerOpen(true)} />
+      )}
+      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.routines && model.active && (
+        <RoutinesPage
+          key={model.active}
+          machine={model.active}
+          id={route.id}
+          run={route.run}
+          onOpenDrawer={() => setDrawerOpen(true)}
+        />
       )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.apps && model.active && (
         <AppsListPage key={model.active} machine={model.active} onOpenDrawer={() => setDrawerOpen(true)} />

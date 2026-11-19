@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/filestore"
+	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/storelink"
 )
 
@@ -44,5 +46,35 @@ func TestRecordsReachTheEmbeddedStore(t *testing.T) {
 	<-done
 	if !strings.Contains(strings.ToLower(body), `"ok":true`) {
 		t.Fatalf("the store lacks the entities: %s", body)
+	}
+}
+
+// a document of a type an app adds is recorded with that type, so the hub lists it among the app's documents;
+// the library's own projects keep the library's kind.
+func TestLibraryRecordsCarryTheAppDocumentType(t *testing.T) {
+	dir := t.TempDir()
+	d := deps{DataDir: dir, Home: t.TempDir(), CLI: &gate.CLIToken{DataDir: dir, Headers: []string{"x-cli-token"}}}
+	lib := designAPI(d).L
+	t.Cleanup(lib.StopWatching)
+	site, err := lib.CreateProject("Лендинг")
+	if err != nil {
+		t.Fatal(err)
+	}
+	note, err := lib.CreateProject("Мои заметки")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := apps.Open(dir).SetDocKind(note.ID, "notes.doc"); err != nil {
+		t.Fatal(err)
+	}
+	kinds := map[string]string{}
+	for _, r := range libraryRecords(d) {
+		kinds[r.ID] = r.Kind
+	}
+	if kinds[note.ID] != "notes.doc" {
+		t.Fatalf("the app's document: %q (%v)", kinds[note.ID], kinds)
+	}
+	if k := kinds[site.ID]; k == "" || k == "notes.doc" {
+		t.Fatalf("the site: %q", k)
 	}
 }

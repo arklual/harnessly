@@ -297,6 +297,7 @@ const AddForm = ({ preset, another, start, onAdd, onClose }: IAddFormProps) => {
         {(custom || another) && <span className="hx-extp__label">{t('next.extProviders.key')}</span>}
         {keyField}
         <small className="hx-extp__hint">
+          {preset.api === EXT_API.higgsfield && `${t('next.extProviders.key.pair')} · `}
           {t('next.extProviders.key.safe')}
           {preset.keyUrl !== '' && (
             <>

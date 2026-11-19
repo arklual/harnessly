@@ -107,7 +107,7 @@ export const Tiles = ({ kpis, selected, nowLabel, prevLabel, onPick, onHover }: 
       const items = kpis.filter((k) => k.group === g.id);
       if (items.length === 0) return null;
       return (
-        <div key={g.id} className="anm-group">
+        <div key={g.id} className="anm-group" data-hx-part={g.id}>
           <div className="anm-group__h">{g.title}</div>
           <div className="anm-grid">
             {items.map((k) => (

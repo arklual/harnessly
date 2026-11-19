@@ -3,27 +3,28 @@
 // its sender saw. The numbers are asked by the period; the old ones stay (dimmed) until the new ones come.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { AnalyticsFrame, KpiId } from '../../org/api/analytics';
+import type { AnalyticsData, AnalyticsFrame, AnalyticsQuery, KpiId } from '../../org/api/analytics';
 import { orgErrorText } from '../../org/api/errors';
 import { useOrg } from '../../org/context';
 import { navigate, useLocation } from '../../lib/router';
 import { Btn } from '../ui';
-import { Titles } from '../shell';
-import { Attention, Changes, PeersCard, WasteCard } from './analytics/cards';
-import { totalsText } from './analytics/calc';
+import { liveOn } from '../flag';
+import { Head, Titles } from '../shell';
+import { money, plural } from './analytics/calc';
 import type { ChartMode } from './analytics/chart';
 import { PeriodControls } from './analytics/header';
 import { Hero } from './analytics/hero';
-import {
-  compareNameOf,
-  decodePeriod,
-  encodePeriod,
-  periodNameOf,
-  type PickerState,
-  queryOf,
-} from './analytics/period';
+import { decodePeriod, encodePeriod, periodNameOf, type PickerState, queryOf } from './analytics/period';
 import { chartKey, createStore, dataKey, useAnswer } from './analytics/store';
-import { Tiles } from './analytics/tiles';
+import {
+  AttentionCard,
+  ChangesCard,
+  HeatCard,
+  kpiCell,
+  Strip,
+  type StripCell,
+  WasteRows,
+} from './analytics/macro';
 
 const KPI_IDS: readonly KpiId[] = [
   'moneyPerMr',
@@ -38,13 +39,45 @@ const KPI_IDS: readonly KpiId[] = [
   'sessionStart',
   'cache',
   'skills',
+  'cacheWrite1h',
+  'mrSurvival',
+  'waitingP90',
 ];
-const FIRST_KPI: KpiId = 'moneyPerMr';
 const FIRST_MODE: ChartMode = 'teams';
+
+/** The sub-tabs of the board (`ASEC`): the address carries `s`, the first one has none. */
+const SECTIONS = [
+  ['home', 'Главная'],
+  ['money', 'Деньги'],
+  ['res', 'Результат'],
+  ['agent', 'Работа агента'],
+  ['env', 'Контекст и кэш'],
+] as const;
+type Section = (typeof SECTIONS)[number][0];
+const sectionOf = (s: string | null): Section => SECTIONS.find(([id]) => id === s)?.[0] ?? 'home';
+
+/** The big charts of each sub-tab, in the board's order (the ones the hub draws). */
+const CHARTS: Record<Section, readonly KpiId[]> = {
+  home: ['moneyPerMr'],
+  money: [],
+  res: ['moneyPerMr', 'timeToMr', 'mrSurvival'],
+  agent: ['autonomy', 'waitingP90', 'toolErrors', 'parallel'],
+  env: ['sessionStart', 'cache', 'reread', 'skills'],
+};
+/** The strip of figures of each sub-tab; `spend`, `mrs` and `waste` come from the totals, the rest are metrics. */
+type StripId = KpiId | 'spend' | 'mrs' | 'waste';
+const STRIP: Record<Section, readonly StripId[]> = {
+  home: ['spend', 'moneyPerMr', 'mrs', 'yield', 'autonomy', 'waste'],
+  money: ['spend', 'waste'],
+  res: ['moneyPerMr', 'mrs', 'yield', 'timeToMr', 'mrPerPerson', 'mrSurvival'],
+  agent: ['autonomy', 'waiting', 'parallel', 'toolErrors', 'waitingP90'],
+  env: ['sessionStart', 'cache', 'cacheWrite1h', 'reread', 'skills'],
+};
 
 interface Picked {
   picker: PickerState;
-  kpi: KpiId;
+  /** The metric opened on a chart of its own (a click on a figure, a link of a signal); null: only the sub-tab's charts. */
+  kpi: KpiId | null;
   mode: ChartMode;
 }
 
@@ -53,7 +86,7 @@ const fromUrl = (frame: AnalyticsFrame, staff: boolean): Picked => {
   const k = q.get('k');
   return {
     picker: decodePeriod(frame.weeks, { p: q.get('p'), c: q.get('c') }, frame.defaultPeriod),
-    kpi: KPI_IDS.find((id) => id === k) ?? FIRST_KPI,
+    kpi: KPI_IDS.find((id) => id === k) ?? null,
     mode: staff && q.get('m') !== 'cmp' ? FIRST_MODE : 'cmp',
   };
 };
@@ -65,7 +98,7 @@ const toUrl = (frame: AnalyticsFrame, p: Picked, staff: boolean): void => {
   const per = encodePeriod(frame.weeks, p.picker);
   set('p', per.p);
   set('c', per.c);
-  set('k', p.kpi === FIRST_KPI ? null : p.kpi);
+  set('k', p.kpi);
   set('m', staff && p.mode !== FIRST_MODE ? p.mode : null);
   const s = q.toString();
   const next = `${location.pathname}${s ? `?${s}` : ''}${location.hash}`;
@@ -104,12 +137,108 @@ const EFFICIENCY_KPIS: readonly KpiId[] = [
   'waitingP90',
 ];
 
+/** One big chart of the board: it asks for its own series and draws it under the metric's name. */
+const ChartBlock = ({
+  id,
+  data,
+  query,
+  store,
+  staff,
+  mode,
+  onMode,
+  teamOrder,
+  marker,
+}: {
+  id: KpiId;
+  data: AnalyticsData;
+  query: AnalyticsQuery;
+  store: ReturnType<typeof createStore>;
+  staff: boolean;
+  mode: ChartMode;
+  onMode: (m: ChartMode) => void;
+  teamOrder: readonly string[];
+  marker?: { value: string | null; set: (id: string | null) => void };
+}) => {
+  const key = chartKey(query, id);
+  const chart = useAnswer(
+    key,
+    () => store.chart(query, id),
+    () => store.forget(key),
+  );
+  const kpi = data.kpis.find((k) => k.id === id);
+  if (!kpi) return null;
+  const shown = chart.data ? (data.kpis.find((k) => k.id === chart.data?.kpi) ?? null) : null;
+  return (
+    <div data-hx-chart={id}>
+      <Hero
+        kpi={kpi}
+        chart={chart.data}
+        fresh={chart.fresh}
+        error={chart.error}
+        retry={chart.reload}
+        staff={staff}
+        mode={mode}
+        onMode={onMode}
+        shownKpi={shown}
+        teamOrder={teamOrder}
+        {...(marker ? { marker: marker.value, onMarker: marker.set } : {})}
+      />
+    </div>
+  );
+};
+
+const stripCells = (ids: readonly StripId[], d: AnalyticsData): StripCell[] => {
+  const out: StripCell[] = [];
+  for (const id of ids) {
+    if (id === 'spend')
+      out.push({
+        id,
+        label: 'Расход',
+        value: money(d.summary.spendUsd),
+        delta: null,
+        sub: `${d.summary.sessions} ${plural(d.summary.sessions, 'сессия', 'сессии', 'сессий')}`,
+        hint: 'Сколько ушло на агентов за период.',
+        go: null,
+      });
+    else if (id === 'mrs')
+      out.push({
+        id,
+        label: 'Смёрженных MR',
+        value: String(d.summary.mrs),
+        delta: null,
+        sub: null,
+        hint: 'MR, сделанные с агентом и влитые в основную ветку за период.',
+        go: 'mrPerPerson',
+      });
+    else if (id === 'waste') {
+      if (!d.waste) continue;
+      const share = d.waste.totalUsd > 0 ? Math.round((d.waste.wasteUsd / d.waste.totalUsd) * 100) : 0;
+      out.push({
+        id,
+        label: 'Ушло впустую',
+        value: `${share}%`,
+        delta: null,
+        sub: money(d.waste.wasteUsd),
+        hint: 'Доля расхода, которая не дала результата.',
+        go: null,
+      });
+    } else {
+      const k = d.kpis.find((x) => x.id === id);
+      if (k) out.push(kpiCell(k));
+    }
+  }
+  return out;
+};
+
 const Body = ({ frame }: { frame: AnalyticsFrame }) => {
   const { api, shell, base } = useOrg();
+  const live = liveOn(shell.features);
+  // The change pinned on the big charts; the list of changes pins it too.
+  const [pinned, setPinned] = useState<string | null>(null);
   const staff = shell.viewer.role !== 'member';
   const store = useMemo(() => createStore(api), [api]);
   const [picked, setPicked] = useState<Picked>(() => fromUrl(frame, staff));
-  // A link into the open screen (a signal's «Смотреть») changes the address with a new entry: take its KPI.
+  // A link into the open screen (a signal's «Смотреть», a sub-tab of the menu) changes the address with a new entry.
   const { search } = useLocation();
   const [seenSearch, setSeenSearch] = useState(search);
   if (search !== seenSearch) {
@@ -118,6 +247,7 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
     const id = KPI_IDS.find((x) => x === k);
     if (id && id !== picked.kpi) setPicked((p) => ({ ...p, kpi: id }));
   }
+  const sec = sectionOf(new URLSearchParams(search).get('s'));
   const { picker, kpi: kpiId, mode } = picked;
   const teamOrder = useMemo(() => shell.teams.map((t) => t.name), [shell.teams]);
 
@@ -135,36 +265,90 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
     () => store.data(query),
     () => store.forget(dKey),
   );
-  const cKey = chartKey(query, kpiId);
-  const chart = useAnswer(
-    cKey,
-    () => store.chart(query, kpiId),
-    () => store.forget(cKey),
-  );
 
   const onPicker = useCallback((next: PickerState) => setPicked((p) => ({ ...p, picker: next })), []);
-  const onKpi = useCallback((id: KpiId) => setPicked((p) => ({ ...p, kpi: id })), []);
   const onMode = useCallback((m: ChartMode) => setPicked((p) => ({ ...p, mode: m })), []);
-  // The series is fetched while the pointer is still on the tile, so the click finds it ready.
-  const warm = useCallback((id: KpiId) => void store.chart(query, id).catch(() => undefined), [store, query]);
+  // A click on a figure opens the chart of its metric: on the sub-tab's own chart, or one added at the end.
+  const onGo = useCallback((id: KpiId) => {
+    setPicked((p) => ({ ...p, kpi: id }));
+    window.setTimeout(() => {
+      document
+        .querySelector(`[data-hx-chart="${id}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 160);
+  }, []);
+  const goSection = (to: Section) => {
+    const q = new URLSearchParams(location.search);
+    if (to === 'home') q.delete('s');
+    else q.set('s', to);
+    const qs = q.toString();
+    navigate(`${location.pathname}${qs ? `?${qs}` : ''}`);
+  };
 
   const nowName = periodNameOf(frame.weeks, picker);
-  const prevName = compareNameOf(frame.weeks, picker);
-  const nowLabel = `${nowName.title.toLowerCase()} (${nowName.dates})`;
-  const prevLabel = `${prevName.title.toLowerCase()} (${prevName.dates})`;
   const d = data.data;
-  const kpi = d?.kpis.find((k) => k.id === kpiId) ?? null;
-  const shownKpi = chart.data ? (d?.kpis.find((k) => k.id === chart.data?.kpi) ?? null) : null;
   const lead = d
-    ? `${d.scopeLabel} · за ${nowLabel}: ${data.fresh ? totalsText(d.summary) : 'считаем'}`
+    ? `${d.scopeLabel} · ${nowName.dates}: ${
+        data.fresh
+          ? `${money(d.summary.spendUsd)} · ${d.summary.sessions} ${plural(d.summary.sessions, 'сессия', 'сессии', 'сессий')} · ${d.summary.mrs} MR`
+          : 'считаем'
+      }`
     : 'Считаем';
+  const label = SECTIONS.find(([id]) => id === sec)?.[1] ?? '';
+  const title =
+    sec === 'home' ? (
+      'Аналитика'
+    ) : (
+      <>
+        <span className="an-crumb" role="button" tabIndex={0} onClick={() => goSection('home')}>
+          Аналитика
+        </span>
+        <span className="an-crumb__s">/</span>
+        {label}
+      </>
+    );
+
+  const marker = live ? { value: pinned, set: setPinned } : undefined;
+  const chartProps = { query, store, staff, mode, onMode, teamOrder, marker };
+  const extra = kpiId && !CHARTS[sec].includes(kpiId) ? kpiId : null;
+  const pickChange = live
+    ? (id: string) => {
+        // The charts show only the changes of their days: one out of them stays a row to read.
+        const next = pinned === id ? null : id;
+        setPinned(next);
+        if (next)
+          document
+            .querySelector('[data-hx-part="chart"]')
+            ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    : undefined;
+  const allChanges = () => navigate(`${base}/efficiency`);
+  const changes = d && (
+    <ChangesCard
+      changes={d.changes}
+      selected={pinned}
+      {...(pickChange ? { onPick: pickChange } : {})}
+      onAll={allChanges}
+    />
+  );
+  const charts = (ids: readonly KpiId[]) =>
+    d && ids.map((id) => <ChartBlock key={id} id={id} data={d} {...chartProps} />);
 
   return (
     <>
-      <div className="hb-head">
-        <Titles title="Аналитика" lead={lead} />
-        <PeriodControls weeks={frame.weeks} change={frame.lastChange} state={picker} onChange={onPicker} />
-      </div>
+      <Head
+        title={title}
+        lead={lead}
+        acts={
+          <PeriodControls
+            weeks={frame.weeks}
+            change={frame.lastChange}
+            state={picker}
+            onChange={onPicker}
+            compact
+          />
+        }
+      />
       <div className="dash hb-dash anx" data-busy={d && !data.fresh && !data.error ? '1' : undefined}>
         {data.error && !data.fresh ? (
           <Failure title="Не удалось загрузить аналитику" error={data.error} retry={data.reload} />
@@ -173,46 +357,42 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
         ) : (
           <div className="an-stage">
             <div className="mx">
-              <Tiles
-                kpis={d.kpis}
-                selected={kpiId}
-                nowLabel={nowLabel}
-                prevLabel={prevLabel}
-                onPick={onKpi}
-                onHover={warm}
-              />
-              {kpi && (
-                <Hero
-                  kpi={kpi}
-                  chart={chart.data}
-                  fresh={chart.fresh}
-                  error={chart.error}
-                  retry={chart.reload}
-                  staff={staff}
-                  mode={mode}
-                  onMode={onMode}
-                  shownKpi={shownKpi}
-                  teamOrder={teamOrder}
-                />
+              <Strip cells={stripCells(STRIP[sec], d)} onGo={onGo} />
+              {sec === 'home' && (
+                <>
+                  {staff && <AttentionCard signals={d.signals} base={base} />}
+                  {changes}
+                  {charts(CHARTS.home)}
+                  {staff && d.peers && <HeatCard peers={d.peers} kpis={d.kpis} onGo={onGo} />}
+                </>
               )}
-              {kpi && (shell.features ?? []).includes('ui.hx.live') && (
+              {sec === 'money' && (staff && d.waste ? <WasteRows waste={d.waste} /> : null)}
+              {sec === 'res' && (
+                <>
+                  {charts(CHARTS.res)}
+                  {staff && d.peers && <HeatCard peers={d.peers} kpis={d.kpis} onGo={onGo} />}
+                </>
+              )}
+              {sec === 'agent' && charts(CHARTS.agent)}
+              {sec === 'env' && (
+                <>
+                  {charts(CHARTS.env)}
+                  {changes}
+                </>
+              )}
+              {extra && charts([extra])}
+              {extra && live && EFFICIENCY_KPIS.includes(extra) && (
                 <div className="anx-what">
                   <Btn
                     size="sm"
                     icon="gauge"
                     data-variant="outline"
-                    onClick={() =>
-                      navigate(`${base}/efficiency${EFFICIENCY_KPIS.includes(kpi.id) ? `?k=${kpi.id}` : ''}`)
-                    }
+                    onClick={() => navigate(`${base}/efficiency?k=${extra}`)}
                   >
                     Разрез на экране «Эффективность»
                   </Btn>
                 </div>
               )}
-              <Changes changes={d.changes} />
-              {staff && <Attention signals={d.signals} base={base} />}
-              {staff && d.waste && <WasteCard waste={d.waste} />}
-              {staff && d.peers && <PeersCard peers={d.peers} teamOrder={teamOrder} />}
             </div>
           </div>
         )}
@@ -231,7 +411,7 @@ const Screen = () => {
   if (frame.data) return <Body key={base} frame={frame.data} />;
   return (
     <>
-      <div className="hb-head">
+      <div className="hb-head hd-head">
         <Titles title="Аналитика" lead="Считаем" />
       </div>
       <div className="dash hb-dash anx">

@@ -28,7 +28,9 @@ export const HxAuth = ({ mode }: { mode: 'signin' | 'signup' }) => {
   return (
     <AuthFrame
       title={login ? t('auth.signinTitle') : t('auth.signupTitle')}
-      lead={login || phase === 'sent' ? undefined : t('auth.lead')}
+      lead={
+        phase === 'sent' ? undefined : login ? 'Один аккаунт — для всех ваших организаций.' : t('auth.lead')
+      }
       footer={
         phase === 'form' && (
           <div className="hxa__stack">
@@ -77,21 +79,18 @@ export const HxAuth = ({ mode }: { mode: 'signin' | 'signup' }) => {
             </Btn>
           )}
           {f.passkey && f.oauth.length > 0 && <Or>{t('common.or')}</Or>}
-          {f.oauth.length > 0 && (
-            <div className="hxa__row">
-              {f.oauth.map((p) => (
-                <Btn
-                  key={p.id}
-                  size="lg"
-                  icon={p.kind === 'github' ? 'git-branch' : p.kind === 'oidc' ? 'log-in' : undefined}
-                  onClick={() => f.startOauth(p.id)}
-                >
-                  {p.kind === 'oidc' ? t('auth.viaOidc', { name: p.name }) : p.name}
-                </Btn>
-              ))}
-            </div>
-          )}
-          {byMail && hasOthers && <Or>{t('auth.orByMail')}</Or>}
+          {f.oauth.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className="hxa__oauth"
+              data-primary={p.kind === 'oidc' && !f.passkey ? '' : undefined}
+              onClick={() => f.startOauth(p.id)}
+            >
+              <Icon i={p.kind === 'github' ? 'git-branch' : p.kind === 'oidc' ? 'shield-check' : 'log-in'} />
+              {p.kind === 'oidc' ? `Войти через ${p.name}` : `Продолжить с ${p.name}`}
+            </button>
+          ))}
           {byMail && (
             <form
               className="hxa__stack"
@@ -100,31 +99,34 @@ export const HxAuth = ({ mode }: { mode: 'signin' | 'signup' }) => {
                 void f.send();
               }}
             >
-              <label className="hxa__field">
-                <span className="hxa__label">{t('auth.mail')}</span>
+              <div className="hxa__mail">
                 <input
                   className="hx-set__input"
                   type="email"
                   autoComplete="email"
-                  placeholder="you@example.com"
+                  aria-label={t('auth.mail')}
+                  placeholder="почта@компания.ru"
                   value={email}
                   onChange={(e) => f.setEmail(e.target.value)}
                   aria-invalid={error ? true : undefined}
                   autoFocus={!hasOthers}
                 />
-              </label>
+                <Btn type="submit" variant="primary" busy={busy === 'send'}>
+                  {t('auth.getCode')}
+                </Btn>
+              </div>
               {error && (
                 <p className="hxa__err" role="alert">
                   <Icon i="circle-alert" />
                   {error}
                 </p>
               )}
-              <Btn type="submit" size="lg" variant={hasOthers ? undefined : 'primary'} busy={busy === 'send'}>
-                {t('auth.getCode')}
-              </Btn>
             </form>
           )}
           {config.auth.email.mode === 'log' && <p className="hxa__note">{t('auth.logMode')}</p>}
+          <p className="hxa__note hxa__center-note">
+            Есть приглашение? Откройте ссылку из письма — попадёте сразу в нужную команду.
+          </p>
         </>
       )}
 

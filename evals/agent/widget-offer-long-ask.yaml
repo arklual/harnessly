@@ -1,0 +1,44 @@
+id: widget-offer-long-ask
+title: Просьба «скажи, когда закончится» про долгий рендер — агент сам предлагает виджет прогресса справа карточкой с вариантами, не создавая его молча (HRN-1663)
+tags: [widgets, memory]
+agents: [claude]
+timeout_s: 600
+setup:
+  workspace: [fixtures/widget-offer]
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/sidewidget/**'
+  - 'internal/hlcli/widget.go'
+  - 'internal/noticeslot/tools.go'
+prompt: >-
+  Запусти в фоне `sh scripts/render.sh` — это рендер сцены, на настоящих данных он идёт минут сорок. Скажи мне, когда он закончится.
+expect:
+  - name: offered the progress widget with a card of options
+    any_of:
+      - called: '.*notice_ask.*'
+        even_failed: true
+        args: {title: '(?is).*(виджет|widget).*'}
+      - called: AskUserQuestion
+        even_failed: true
+      - called: Bash
+        even_failed: true
+        args: {command: '(?is).*harnessly notice ask.*(виджет|widget).*'}
+  - name: did not make the widget before the person said yes
+    not_called: harnessly\.widget_create
+variants:
+  - id: v1
+    kind: short
+    text: "рендер: `sh scripts/render.sh` в фоне, идёт минут сорок. дай знать, когда закончится"
+  - id: v2
+    kind: indirect
+    text: "Мне надо дождаться рендера (`sh scripts/render.sh`, на боевых данных около сорока минут), а я отойду. Сколько осталось и когда он кончится — подскажешь?"
+  - id: v3
+    kind: english
+    text: "Start `sh scripts/render.sh` in the background (the real render takes about forty minutes) and tell me when it finishes."
+  - id: v4
+    kind: english
+    text: "Kick off `sh scripts/render.sh` in the background. It's the real scene render, about forty minutes. Let me know when it's done."
+  - id: v5
+    kind: english
+    text: "can you run `sh scripts/render.sh` for me (real data, ~40 min) and tell me how long is left?"

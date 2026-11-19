@@ -179,6 +179,10 @@ func (s *Service) connected(l *link.Link, m store.Machine) {
 	if s.projects != nil && slices.Contains(hello.Features, hubproto.FeatureProjects) {
 		events = append(slices.Clone(events), hubproto.EventProjects)
 	}
+	if s.slot != nil {
+		// An agent that does not know the event never sends it.
+		events = append(slices.Clone(events), hubproto.EventNoticeSlot)
+	}
 	if s.history != nil && slices.Contains(hello.Features, hubproto.FeatureHistory) {
 		events = append(slices.Clone(events), hubproto.EventHistoryEvents, hubproto.EventHistoryBackfill)
 	}
@@ -380,6 +384,11 @@ func (s *Service) dispatch(ctx context.Context, l *link.Link, m store.Machine, e
 		}
 	case hubproto.EventReplBatch:
 		s.replBatch(ctx, l, ev)
+	case hubproto.EventNoticeSlot:
+		if s.slot != nil {
+			// In order, on the link's own reader: a newer list must not be overtaken by an older one.
+			s.slot.Slot(ctx, m, ev.Raw)
+		}
 	case hubproto.EventChatWork:
 		if w, ok := s.history.(workSink); ok && s.history != nil {
 			w.Work(ctx, m, ev.Raw)

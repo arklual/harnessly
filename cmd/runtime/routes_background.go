@@ -191,6 +191,10 @@ func backgroundRoutes(d deps) []gate.Route {
 		}
 		offered := []backgroundProvider{}
 		for _, v := range views {
+			if v.API == extproviders.APIHiggsfield {
+				// A provider of video and pictures: no background feature runs on it.
+				continue
+			}
 			offered = append(offered, backgroundProvider{ID: v.ID, Name: v.Name, API: v.API, Models: v.Models})
 		}
 		secretJSON(w, http.StatusOK, map[string]any{"features": backgroundView(runner, summary), "providers": offered})

@@ -18,6 +18,9 @@ export interface IDesignlyPaneProps {
   conv: ConvId;
   /** The design on screen; null: the library. */
   design: string | null;
+  /** The board to show (a board the chat's turn wrote); null: the design's own first page. pageAt opens it again. */
+  page?: string | null;
+  pageAt?: number;
   onOpen: (id: string | null) => void;
 }
 
@@ -50,11 +53,15 @@ const PaneDesign = ({
   id,
   conv,
   onBack,
+  page,
+  pageAt,
 }: {
   machine: MachineId;
   id: string;
   conv: ConvId;
   onBack: () => void;
+  page: string | null;
+  pageAt: number;
 }) => {
   const [isDoc, setIsDoc] = useState<boolean | null>(null);
   useEffect(() => {
@@ -71,15 +78,23 @@ const PaneDesign = ({
   return isDoc ? (
     <PaneDoc machine={machine} id={id} conv={conv} onBack={onBack} />
   ) : (
-    <DesignlyPaneSite machine={machine} id={id} conv={conv} onBack={onBack} />
+    <DesignlyPaneSite machine={machine} id={id} conv={conv} onBack={onBack} page={page} pageAt={pageAt} />
   );
 };
 
-const DesignlyPane = ({ machine, conv, design, onOpen }: IDesignlyPaneProps) =>
+const DesignlyPane = ({ machine, conv, design, page = null, pageAt = 0, onOpen }: IDesignlyPaneProps) =>
   design === null ? (
     <DesignlyLibrary machine={machine} onOpen={onOpen} />
   ) : (
-    <PaneDesign key={design} machine={machine} id={design} conv={conv} onBack={() => onOpen(null)} />
+    <PaneDesign
+      key={design}
+      machine={machine}
+      id={design}
+      conv={conv}
+      page={page}
+      pageAt={pageAt}
+      onBack={() => onOpen(null)}
+    />
   );
 
 export default DesignlyPane;

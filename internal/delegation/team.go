@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/convo"
+	"github.com/ly-solutions/harnessly/internal/timescale"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -267,7 +268,7 @@ func (s *Service) WaitAll(ctx context.Context, callerID string, timeout time.Dur
 	if poll <= 0 {
 		poll = 500 * time.Millisecond
 	}
-	deadline := time.NewTimer(timeout)
+	deadline := time.NewTimer(timescale.Real(timeout))
 	defer deadline.Stop()
 	tick := time.NewTicker(poll)
 	defer tick.Stop()

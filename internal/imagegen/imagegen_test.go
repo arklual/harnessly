@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/mcpserver"
 )
 
 // fakeCodex writes a script that acts as `codex exec --json`: it names a thread and drops pictures into the thread's
@@ -276,4 +277,41 @@ func TestABusyCallWaitsForASlot(t *testing.T) {
 	if strings.Contains(text, "busy") || !strings.Contains(text, "Done: ") {
 		t.Fatalf("the call should have waited for a slot and drawn: %s", text)
 	}
+}
+
+type fakeMedia struct{ got *jsvalue.Object }
+
+func (f *fakeMedia) Image(_ context.Context, args *jsvalue.Object) *jsvalue.Object {
+	f.got = args
+	return mcpserver.TextResult("job_id: m1\nDone: 1 image(s).", false)
+}
+
+func TestAProviderOrModelGoesToTheMediaProviderAndCodexStaysTheDefault(t *testing.T) {
+	media := &fakeMedia{}
+	tools := Tools{S: &Service{Dir: t.TempDir()}, Media: media}
+	out := tools.Call(context.Background(), ToolGenerate, jsvalue.NewObject("prompt", "a dog", "model", "soul"))
+	if media.got == nil || str(media.got, "model") != "soul" {
+		t.Fatalf("not routed: %v", out)
+	}
+	// With no media service the call is refused in words, not drawn by Codex behind the person's back.
+	out = Tools{S: &Service{Dir: t.TempDir()}}.Call(context.Background(), ToolGenerate, jsvalue.NewObject("prompt", "a dog", "provider", "higgsfield"))
+	if text := toolText(out); !strings.Contains(text, "not available") {
+		t.Errorf("answer %q", text)
+	}
+	out = tools.Call(context.Background(), ToolGenerate, jsvalue.NewObject("prompt", "a dog", "model", "soul", "source", "/a.png"))
+	if text := toolText(out); !strings.Contains(text, "changed by Codex only") {
+		t.Errorf("answer %q", text)
+	}
+}
+
+func toolText(o *jsvalue.Object) string {
+	v, _ := o.Get("content")
+	list, _ := v.([]any)
+	var b strings.Builder
+	for _, c := range list {
+		if co, ok := c.(*jsvalue.Object); ok {
+			b.WriteString(str(co, "text"))
+		}
+	}
+	return b.String()
 }

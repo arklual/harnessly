@@ -10,18 +10,10 @@ import { useOrg } from '../../org/context';
 import type { MemberRole, Person, TeamBlock, TeamsView } from '../../org/api/teams';
 import { kRub, needsText } from '../../org/screens/teams/format';
 import { Btn, Icon, initial, usePop } from '../ui';
-import { Titles } from '../shell';
+import { Head } from '../shell';
 import { InviteSheet } from './teams/extra';
 import { TeamEditSheet } from './teams/team-edit';
-import {
-  budgetOf,
-  envSummary,
-  machinesHint,
-  personMeta,
-  ROLE_HINT,
-  secretsText,
-  teamLead,
-} from './teams/model';
+import { budgetOf, envSummary, machinesHint, seenOf, ROLE_HINT, secretsText, teamLead } from './teams/model';
 import { machinesPerPerson, setRole } from './teams/ops';
 import { LoadFailed, Problem, TeamsSkeleton } from './teams/parts';
 import { PersonOrTeamSheet, type Subject } from './teams/sheet';
@@ -107,35 +99,44 @@ const PeopleGroup = ({
   apply: (op: Op) => Promise<boolean>;
   onOpen: (id: string) => void;
 }) => (
-  <div className="hx-set__group">
-    <div className="hx-set__group-title">Люди</div>
-    <div className="hx-set__card">
-      {b.people.length === 0 && (
-        <div className="hb-row tm-row">
-          <span className="hb-row__t">
-            <small>В команде пока никого</small>
-          </span>
-        </div>
-      )}
-      {b.people.map((p) => (
-        <div className="hb-row tm-row" key={p.id}>
-          <button
-            type="button"
-            className="tm-hit"
-            onClick={() => onOpen(p.id)}
-            aria-label={`Открыть: ${p.name}`}
-          >
-            <span className="hx-avatar">{initial(p.name)}</span>
-            <span className="hb-row__t">
-              <b>{p.name}</b>
-              <small>{personMeta(p, now)}</small>
-            </span>
-            <span className="hb-row__v">{p.invited ? '—' : kRub(p.spentRub)}</span>
-          </button>
-          <RoleMenu p={p} apply={apply} />
-        </div>
-      ))}
-    </div>
+  <div className="t-card viz-card dash-tile hd-card flat" style={{ marginBottom: 16 }}>
+    <table className="tbl">
+      <thead>
+        <tr>
+          <th>Человек</th>
+          <th>Роль</th>
+          <th>Активность</th>
+          <th className="num">Расход</th>
+          <th className="num">Машины</th>
+        </tr>
+      </thead>
+      <tbody>
+        {b.people.length === 0 && (
+          <tr>
+            <td colSpan={5} className="hd-empty">
+              В команде пока никого
+            </td>
+          </tr>
+        )}
+        {b.people.map((p) => (
+          <tr key={p.id} className="click" onClick={() => onOpen(p.id)}>
+            <td>
+              <div className="row">
+                <span className="hd-av">{initial(p.name)}</span>
+                <span className="nm">{p.name}</span>
+                {p.self && <span className="pill acc">вы</span>}
+              </div>
+            </td>
+            <td onClick={(e) => e.stopPropagation()}>
+              <RoleMenu p={p} apply={apply} />
+            </td>
+            <td className="mut">{p.invited ? 'приглашение отправлено' : seenOf(p, now).text}</td>
+            <td className="num">{p.invited ? '—' : kRub(p.spentRub)}</td>
+            <td className="num">{p.machines ?? '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   </div>
 );
 
@@ -329,23 +330,26 @@ const Page = ({ teamId }: { teamId: string | null }) => {
   const lead = b ? teamLead(b) : '';
   return (
     <>
-      <div className="hb-head">
-        <Titles title={b?.name ?? 'Команда'} lead={lead} />
-        {b && view && (
-          <div className="hb-tools">
-            {admin && b.id && (
-              <Btn size="sm" icon="pencil" data-variant="outline" onClick={() => url.open({ dlg: 'edit' })}>
-                Изменить
-              </Btn>
-            )}
-            {view.can.invite && invitee && (
-              <Btn size="sm" icon="mail" data-variant="outline" onClick={() => url.open({ dlg: 'invite' })}>
-                Пригласить
-              </Btn>
-            )}
-          </div>
-        )}
-      </div>
+      <Head
+        title={b ? `Команда ${b.name}` : 'Команда'}
+        lead={b?.leadName ? `Лид — ${b.leadName}. Состав и лимиты меняет лид.` : lead}
+        acts={
+          b && view ? (
+            <>
+              {admin && b.id && (
+                <Btn icon="pencil" data-variant="outline" onClick={() => url.open({ dlg: 'edit' })}>
+                  Изменить
+                </Btn>
+              )}
+              {view.can.invite && invitee && (
+                <Btn variant="primary" icon="plus" onClick={() => url.open({ dlg: 'invite' })}>
+                  Пригласить
+                </Btn>
+              )}
+            </>
+          ) : undefined
+        }
+      />
       {tabs.length > 0 && (
         <div className="hb-tenants" role="group" aria-label="Тенант">
           {tabs.map((t) => (

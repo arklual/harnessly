@@ -1,24 +1,34 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
-contextBridge.exposeInMainWorld('electronAPI', {
+// The page's bridge to the desktop shell. Each call is one IPC request that the main process answers (main.ts);
+// the table keeps a call's name, its channel and its arguments on one line.
+const ask =
+  <A extends unknown[]>(channel: string) =>
+  (...args: A): Promise<unknown> =>
+    ipcRenderer.invoke(channel, ...args);
+
+const bridge = {
   isElectron: true,
   platform: process.platform,
-  openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
-  getSystemResources: () => ipcRenderer.invoke('get-system-resources'),
-  showNotification: (title: string, body: string) => ipcRenderer.invoke('show-notification', title, body),
-  openNewWindow: () => ipcRenderer.invoke('open-new-window'),
-  closeWindow: () => ipcRenderer.invoke('close-window'),
-  setDockBadge: (count: number) => ipcRenderer.invoke('set-dock-badge', count),
-  setLocale: (locale: string) => ipcRenderer.invoke('set-locale', locale),
-  setNativeTheme: (theme: string) => ipcRenderer.invoke('set-native-theme', theme),
-  connect: (url: string) => ipcRenderer.invoke('desktop:connect', url),
-  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
-  onNotificationClick: (callback: () => void) => {
-    const handler = () => callback();
-    ipcRenderer.on('notification-click', handler);
+  openExternal: ask<[url: string]>('open-external'),
+  getSystemResources: ask<[]>('get-system-resources'),
+  showNotification: ask<[title: string, body: string]>('show-notification'),
+  openNewWindow: ask<[]>('open-new-window'),
+  closeWindow: ask<[]>('close-window'),
+  setDockBadge: ask<[count: number]>('set-dock-badge'),
+  setLocale: ask<[locale: string]>('set-locale'),
+  setNativeTheme: ask<[theme: string]>('set-native-theme'),
+  connect: ask<[url: string]>('desktop:connect'),
+  checkForUpdates: ask<[]>('check-for-updates'),
+  /** Calls back on a click on the shell's notification; the returned function stops it. */
+  onNotificationClick(callback: () => void): () => void {
+    const listener = () => callback();
+    ipcRenderer.on('notification-click', listener);
     return () => {
-      ipcRenderer.removeListener('notification-click', handler);
+      ipcRenderer.removeListener('notification-click', listener);
     };
   },
-});
+};
+
+contextBridge.exposeInMainWorld('electronAPI', bridge);

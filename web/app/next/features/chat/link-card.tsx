@@ -4,6 +4,7 @@
 // ⌘/Ctrl-click opens it in a new tab of the browser, and a right click or a held finger opens the link's menu.
 import { createContext, lazy, Suspense, useContext, useState, type ReactNode } from 'react';
 import { useLinkMenu } from '@/next/features/chat/link-menu';
+import { slugWords } from '@/next/features/chat/link-name';
 import { previewSrc, useLinkCardMeta, whenText } from '@/next/features/chat/link-card-meta';
 import { openOutside } from '@/next/features/chat/pane-sites';
 import { isOutsideClick, RefContext } from '@/next/features/chat/ref-chip';
@@ -87,12 +88,12 @@ export const cardSlugOf = (
 
 const ICONS = { doc: 'file-text', board: 'workflow' } as const satisfies Record<TCardKind, string>;
 
-/** The name the card shows: the link's text, else the last part of its path. */
+/** The name the card shows: the link's text, else the slug at the end of its path as words. */
 export const cardTitle = (href: string, text: string): string => {
   if (text && text !== href) return text;
   try {
     const last = new URL(href).pathname.split('/').filter(Boolean).pop() ?? '';
-    return decodeURIComponent(last) || new URL(href).host;
+    return last ? slugWords(last) : new URL(href).host;
   } catch {
     return href;
   }

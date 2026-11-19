@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/timescale"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -48,7 +49,7 @@ func (c *conv) notAtRest(now time.Time) string {
 		return "timer"
 	case c.deletedAt == 0 && !c.titleDueAt.IsZero():
 		return "title due"
-	case c.rec.BgAgents > 0 || c.bgWake > ms(now) || c.bgCrons > 0:
+	case c.rec.BgAgents > 0 || c.bgWake > ms(timescale.At(now)) || c.bgCrons > 0:
 		return "background"
 	case c.fd != nil && !c.fd.Released():
 		return "feed read"
@@ -99,7 +100,7 @@ func (r *Runtime) Unload() []string {
 	for _, a := range r.all() {
 		v := a.last.Load()
 		now := r.d.Clock.Now()
-		if v == nil || now.Sub(time.Unix(0, a.used.Load())) < UnloadAfter {
+		if v == nil || now.Sub(time.Unix(0, a.used.Load())) < timescale.Real(UnloadAfter) {
 			continue
 		}
 		if k := v.rec.State.K; k != wire.StateStopped && k != wire.StateGone {
@@ -146,7 +147,7 @@ func (r *Runtime) park(a *actor, now time.Time) bool {
 	}
 	// Whoever asks for a conversation by its id marks the use under this lock before sending anything: a use since
 	// the sweep looked keeps the actor, and one after this turn finds the conversation parked and wakes it.
-	if r.actors[id] != a || now.Sub(time.Unix(0, a.used.Load())) < UnloadAfter || len(a.mail) > 0 || r.stopping() {
+	if r.actors[id] != a || now.Sub(time.Unix(0, a.used.Load())) < timescale.Real(UnloadAfter) || len(a.mail) > 0 || r.stopping() {
 		return false
 	}
 	delete(r.actors, id)

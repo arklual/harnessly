@@ -4,6 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { platformPath, runtimePath } from '@/next/core/net/machine';
 import { postJson, runtimeJson, RuntimeError } from '@/next/core/net/runtime-json';
 import type { MachineId } from '@/next/protocol/v2';
+import { onAppsChanged } from '@/next/stores/apps-changed';
 import type {
   ISelectedNode,
   ISinopia,
@@ -59,6 +60,10 @@ export interface IViewWidget {
   refresh?: number;
   sources?: ('limits' | 'machine' | 'subagents')[];
   smart?: { prompt: string; every?: number };
+  /** The chat an agent made the widget for: it shows there, and where the person pins it. */
+  chat?: string;
+  /** What a change of the widget's markup or style leaves as it was: the frame stays and gets the markup as data. */
+  shell?: string;
 }
 
 export interface IBranding {
@@ -782,6 +787,9 @@ export const refreshInstalledApps = (m: MachineId): void => {
   rereads.set(m, (rereads.get(m) ?? 0) + 1);
   for (const f of rereadListeners) f();
 };
+
+// The machine says its apps changed (an agent made, changed or removed a widget, an app was installed): read again now.
+onAppsChanged(refreshInstalledApps);
 
 /** The apps that wait for the person's word, light: no view server is started for it. */
 export const loadConsentApps = async (m: MachineId): Promise<IInstalledApp[]> =>

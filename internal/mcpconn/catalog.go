@@ -1,5 +1,7 @@
 package mcpconn
 
+import "slices"
+
 // Kind groups the catalog on the page: what part of the person's work a server reaches.
 type Kind string
 
@@ -14,11 +16,40 @@ const (
 	KindSupport    Kind = "support"
 	KindPayments   Kind = "payments"
 	KindSites      Kind = "sites"
+	KindChat       Kind = "chat"
+	KindSocial     Kind = "social"
+	KindFiles      Kind = "files"
+	KindCloud      Kind = "cloud"
+	KindDesign     Kind = "design"
+	KindMedia      Kind = "media"
+	KindSearch     Kind = "search"
+	KindResearch   Kind = "research"
+	KindSEO        Kind = "seo"
+	KindFinance    Kind = "finance"
+	KindCRM        Kind = "crm"
+	KindUtility    Kind = "utility"
 )
 
 // Kinds is the order of the catalog's groups on the page.
-var Kinds = []Kind{KindMail, KindCalendar, KindMeetings, KindTasks, KindDocs, KindCode, KindMonitoring, KindSupport,
-	KindPayments, KindSites}
+var Kinds = []Kind{KindMail, KindCalendar, KindChat, KindSocial, KindMeetings, KindTasks, KindDocs, KindFiles,
+	KindDesign, KindMedia, KindSearch, KindResearch, KindSEO, KindCode, KindCloud, KindMonitoring, KindSupport, KindCRM,
+	KindPayments, KindFinance, KindSites, KindUtility}
+
+// EnvField is one key a local server takes: an environment variable of its process the person fills in.
+type EnvField struct {
+	Name string `json:"name"`
+	// Label is the field's Russian caption.
+	Label string `json:"label"`
+	// Secret hides what is typed (a token, a password); a plain setting (a region, a folder) is shown.
+	Secret   bool `json:"secret,omitempty"`
+	Optional bool `json:"optional,omitempty"`
+	// Hint says in a few words where to get the value.
+	Hint string `json:"hint,omitempty"`
+	// Default is put in when the person leaves the field empty.
+	Default string `json:"default,omitempty"`
+	// File: the value is a file's content (a service account's JSON); the server gets the path of a 0600 file with it.
+	File bool `json:"file,omitempty"`
+}
 
 // CatalogEntry is a well-known remote MCP server the page offers. Its URL and auth are a starting point only:
 // connecting always probes, so a stale hint corrects itself. Every entry is the vendor's own hosted server, its address
@@ -45,9 +76,24 @@ type CatalogEntry struct {
 	Blurb    string `json:"blurb"`
 	// BlurbRu is one sentence of what an agent can do with the server.
 	BlurbRu string `json:"blurbRu"`
+	// Command starts a local server (transport stdio): npx or uvx with the package at a pinned version. Such an entry
+	// has no URL; its keys are Env.
+	Command []string   `json:"command,omitempty"`
+	Env     []EnvField `json:"env,omitempty"`
+	// APIHeaders and APIQuery place the keys of an API entry (transport api; URL is its base): "{VAR}" in a value is
+	// the field VAR of Env. CheckPath is a GET under the base that answers 2xx once the keys are right.
+	APIHeaders map[string]string `json:"apiHeaders,omitempty"`
+	APIQuery   map[string]string `json:"apiQuery,omitempty"`
+	CheckPath  string            `json:"checkPath,omitempty"`
+	// Guide tells an agent the API's main paths, a few lines (transport api).
+	Guide string `json:"guide,omitempty"`
+	// FixedEnv is set in a local server's environment whatever the person types (telemetry off, a safe default).
+	FixedEnv map[string]string `json:"fixedEnv,omitempty"`
+	// Runtime is the program the machine needs for a local server: "npx" or "uvx".
+	Runtime string `json:"runtime,omitempty"`
 }
 
-var catalog = []CatalogEntry{
+var remoteCatalog = []CatalogEntry{
 	// Mail and calendar.
 	{ID: "yandex-mail", Name: "Яндекс Почта", Kind: KindMail, URL: "https://mcp.360.yandex.net/v1/mail/mcp", Transport: HTTP,
 		Auth: AuthHeader, HeaderName: "Authorization", TokenPrefix: "OAuth ",
@@ -179,6 +225,9 @@ var catalog = []CatalogEntry{
 		Blurb:   "Manages your Wix sites: pages, store, bookings and other site data",
 		BlurbRu: "Поработает с сайтами Wix: страницы, магазин, бронирования и другие данные сайта"},
 }
+
+// catalog is the remote servers, the local ones (catalog_local.go) and the APIs (catalog_api.go).
+var catalog = slices.Concat(remoteCatalog, remoteMoreCatalog, localCatalog, localMoreCatalog, apiCatalog)
 
 func catalogEntry(id string) (CatalogEntry, bool) {
 	if id == "" {

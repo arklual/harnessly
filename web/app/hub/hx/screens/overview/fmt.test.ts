@@ -28,7 +28,10 @@ describe('thousandBare', () => {
 describe('overviewLead', () => {
   it('names the scope and the period', () => {
     expect(overviewLead('admin', { tenantName: 'Продукт', teamName: null }, 'week')).toBe(
-      'Тенант Продукт · неделя',
+      'Продукт · что происходит и что сделать',
+    );
+    expect(overviewLead('admin', { tenantName: null, teamName: null, orgName: 'Акме' }, 'day')).toBe(
+      'Акме · что происходит и что сделать',
     );
     expect(overviewLead('lead', { tenantName: null, teamName: 'Фронт' }, 'week')).toBe(
       'Команда Фронт · неделя',
@@ -38,7 +41,7 @@ describe('overviewLead', () => {
       'Только твоя работа · неделя',
     );
     expect(overviewLead('admin', { tenantName: null, teamName: null }, 'week')).toBe(
-      'Вся организация · неделя',
+      'Вся организация · что происходит и что сделать',
     );
   });
 });

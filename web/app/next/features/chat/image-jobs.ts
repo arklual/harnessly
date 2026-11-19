@@ -19,6 +19,8 @@ export interface IImageJob {
   /** For a change of a picture: the picture it changes and how (absent for a new picture). */
   source?: string;
   mode?: string;
+  /** A clip of a media provider (generate_video): the line under it, the provider, the model and the price. */
+  meta?: string;
 }
 
 /** How often a running job is asked about. */
@@ -34,6 +36,35 @@ const pathOf = (v: unknown): string | null => {
   const copy = typeof v.copy === 'string' ? v.copy : '';
   if (copy !== '') return copy;
   return typeof v.path === 'string' && v.path !== '' ? v.path : null;
+};
+
+/** The states of a media job: waiting at the machine or the provider is still running to the card; a cancel is a failure. */
+const MEDIA_STATES: Readonly<Record<string, JobState>> = {
+  queued: 'running',
+  running: 'running',
+  done: 'done',
+  failed: 'failed',
+  canceled: 'failed',
+};
+
+/** A job of the media provider (`<platform>/media`): its files, not images, and its own words for the state. */
+const decodeMediaJob = (v: unknown): IImageJob | null => {
+  if (!isRecord(v)) return null;
+  const { id, prompt, state, files, error, startedAt, meta } = v;
+  if (typeof id !== 'string' || typeof prompt !== 'string' || typeof startedAt !== 'number') return null;
+  const mapped = typeof state === 'string' ? MEDIA_STATES[state] : undefined;
+  if (mapped === undefined || !Array.isArray(files)) return null;
+  const job: IImageJob = {
+    id,
+    prompt,
+    count: 1,
+    state: mapped,
+    paths: files.map(pathOf).filter((path): path is string => path !== null),
+    error: typeof error === 'string' ? error : null,
+    startedAt,
+  };
+  if (typeof meta === 'string' && meta !== '') job.meta = meta;
+  return job;
 };
 
 const decodeJob = (v: unknown): IImageJob | null => {
@@ -62,13 +93,28 @@ export const listJobs = async (
   conv: ConvId,
   signal: AbortSignal,
 ): Promise<IImageJob[]> => {
-  const url = runtimePath(platformPath(`/images?conv=${encodeURIComponent(conv)}`), machine);
+  const [pictures, clips] = await Promise.all([
+    listOf('images', machine, conv, signal, decodeJob),
+    // A machine without the media service has no such route: its pictures are still listed.
+    listOf('media', machine, conv, signal, decodeMediaJob).catch(() => []),
+  ]);
+  return [...pictures, ...clips];
+};
+
+const listOf = async (
+  route: 'images' | 'media',
+  machine: MachineId,
+  conv: ConvId,
+  signal: AbortSignal,
+  decode: (v: unknown) => IImageJob | null,
+): Promise<IImageJob[]> => {
+  const url = runtimePath(platformPath(`/${route}?conv=${encodeURIComponent(conv)}`), machine);
   const res = await fetch(url, { credentials: 'same-origin', signal });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const doc: unknown = await res.json();
   const list = isRecord(doc) ? doc.jobs : null;
   if (!Array.isArray(list)) throw new Error('bad answer');
-  return list.map(decodeJob).filter((job): job is IImageJob => job !== null);
+  return list.map(decode).filter((job): job is IImageJob => job !== null);
 };
 
 /** The job a call is drawing: by its job id once the call knows it, else the first job with its brief started after it. */
@@ -79,8 +125,12 @@ export const jobOf = (jobs: readonly IImageJob[], images: ImageGen, at: number):
   return mine.sort((a, b) => a.startedAt - b.startedAt)[0] ?? null;
 };
 
-/** The names of the harnessly picture tools: the card follows their jobs (Codex's own tool has none). */
-export const followsJob = (tool: string): boolean => /(^|__)(generate|wait)_images$/.test(tool);
+/** The names of the harnessly picture and video tools: the card follows their jobs (Codex's own tool has none). */
+export const followsJob = (tool: string): boolean => /(^|__)(generate|wait)_(images|video)$/.test(tool);
+
+const CLIP = /\.(mp4|webm|mov)$/i;
+/** Whether a file of a card is a clip (generate_video) and not a picture. */
+export const isClip = (path: string): boolean => CLIP.test(path);
 
 export interface ICardView {
   /** One per picture: its file, or null while it is being drawn. */

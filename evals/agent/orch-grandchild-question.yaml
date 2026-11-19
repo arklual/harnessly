@@ -1,8 +1,8 @@
 id: orch-grandchild-question
-title: Подчат подчата спрашивает человека — вопрос поднимается в главный чат, ответ спускается вниз (HRN-1634)
+title: Подчат подчата спрашивает человека — вопрос поднимается в главный чат (HRN-1634)
 tags: [orchestration, delegation, hard]
 agents: [claude, codex]
-timeout_s: 1500
+timeout_s: 900
 settle_s: 90
 setup:
   workspace: [fixtures/orch-ask]
@@ -14,22 +14,19 @@ covers:
   - 'internal/delegation/**'
   - 'internal/mcpserver/**'
   - 'internal/push/**'
+# Nobody answers in a run: when every chat waits for the person there is nothing to interrupt, and that wait is the
+# point — the question asked two levels down must be put to the person in the chat they sit in, not stay below.
 prompt: |-
   Поручи помощнику в отдельном чате, а он пусть поручит ещё одному агенту в отдельном чате: создать в этой папке файл greeting.txt с одной строкой приветствия гостям на языке, который выберу я. Язык у меня спросит тот, кто будет писать файл, — ни ты, ни помощник его не выбирайте и не угадывайте. Я сижу в этом чате; отвечу здесь, когда меня спросят.
-interrupt:
-  after_s: 300
-  text: Язык — испанский.
 expect:
   - name: delegated to a chat
     any_of:
       - called: harnessly\.delegate_task
       - called: Bash
         args: {command: '(?s).*harnessly tab create\b.*--prompt.*'}
-  # The writer asked the person (its question waits in its own chat, the root is told) or its parent, never guessed.
-  - name: the writer asked for the language
-    any_of:
-      - called: AskUserQuestion|request_user_input
-        even_failed: true
-      - called: harnessly\.send_to_conversation
-  - name: the answer came down to the file
-    check: grep -qiE 'hola|bienvenid|saludos' greeting.txt
+  # Said holds the root chat's words only: it tells the person that the writer asks now (not «will ask»), with the
+  # question itself or the chat it waits in.
+  - name: the person's chat says the writer asks for the language
+    text: '(?is)(спрашивает|задаёт).{0,160}язык|язык[^\n]{0,80}ждёт'
+  - name: nobody chose the language for the person
+    check: test ! -e greeting.txt

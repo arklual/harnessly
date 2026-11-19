@@ -35,18 +35,21 @@ export interface IStatusEntry {
   panelType?: TPanelType | null;
   terminalStatus?: 'idle' | 'running' | 'server';
   listeningPorts?: number[];
+  // The agent in the tab and what it is doing.
   agentProviderId?: TAgentProvider | null;
-  agentSummary?: string | null;
-  lastUserMessage?: string | null;
-  lastAssistantMessage?: string | null;
-  currentAction?: ICurrentAction | null;
-  readyForReviewAt?: number | null;
-  busySince?: number | null;
-  dismissedAt?: number | null;
   agentSessionId?: string | null;
-  compactingSince?: number | null;
+  agentSummary?: string | null;
+  currentAction?: ICurrentAction | null;
   lastEvent?: ILastEvent | null;
   eventSeq?: number;
+  // The last words each way.
+  lastAssistantMessage?: string | null;
+  lastUserMessage?: string | null;
+  // Moments, ms since the epoch.
+  busySince?: number | null;
+  compactingSince?: number | null;
+  readyForReviewAt?: number | null;
+  dismissedAt?: number | null;
   launchingSince?: number | null;
   launchFailed?: boolean;
   hooksMissing?: boolean;

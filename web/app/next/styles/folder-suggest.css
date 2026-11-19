@@ -1,0 +1,122 @@
+/* «Переместить в папку?» under the chat's header: one quiet line with two choices. */
+.hx-foldersug {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  z-index: 15;
+  margin: 6px 16px 0;
+  padding: 8px 10px 8px 14px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 12px;
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+.hx-foldersug__txt {
+  flex: 1;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hx-foldersug__yes {
+  flex: none;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--hx-primary);
+  color: var(--hx-primary-fg);
+  font: inherit;
+  cursor: pointer;
+}
+.hx-foldersug__yes:disabled {
+  opacity: 0.6;
+}
+.hx-foldersug__no {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+}
+.hx-foldersug__no:hover {
+  background: var(--hx-bg-hover);
+}
+
+.hx-foldersug__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* The text and the arrow are one button: a press unfolds the notice to read it whole and pick another folder. */
+.hx-foldersug__head {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hx-foldersug__chev {
+  flex: none;
+  color: var(--hx-fg-3);
+  transition: transform 300ms var(--hx-ease-out);
+}
+.hx-foldersug[data-open] .hx-foldersug__chev {
+  transform: rotate(180deg);
+}
+.hx-foldersug[data-open] .hx-foldersug__txt {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
+.hx-foldersug__more {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 40vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.hx-foldersug__why {
+  margin: 0;
+  color: var(--hx-fg-3);
+}
+.hx-foldersug__pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hx-foldersug__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 999px;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  cursor: pointer;
+}
+.hx-foldersug__chip[data-suggested] {
+  border-color: var(--hx-primary);
+}
+.hx-foldersug__chip:hover {
+  background: var(--hx-bg-hover);
+}

@@ -133,13 +133,7 @@ func notificationRoutes(d deps) []gate.Route {
 	}
 	var handler http.Handler
 	if svc != nil {
-		handler = svc.Handler(func(r *http.Request) (string, bool) {
-			p := strings.TrimSpace(r.URL.Query().Get("person"))
-			if p == "" {
-				p = "local"
-			}
-			return p, len(p) <= 200 && p != slotPerson
-		})
+		handler = svc.Handler(func(r *http.Request) (string, bool) { return noticePerson(d, r), true })
 	}
 	strip := func(r *http.Request) *http.Request {
 		r2 := r.Clone(r.Context())
@@ -166,4 +160,18 @@ func notificationRoutes(d deps) []gate.Route {
 				}
 			}))},
 	}
+}
+
+// noticePerson is whose notices a request reads: the person its session was signed for, never a word of the request.
+// A session the hub opened for a person carries their email; the machine's own login (and the agent's) is "local".
+func noticePerson(d deps, r *http.Request) string {
+	if d.Claims != nil {
+		if sub, ok := d.Claims(r)["sub"].(string); ok {
+			sub = strings.ToLower(strings.TrimSpace(sub))
+			if strings.Contains(sub, "@") && len(sub) <= 254 {
+				return sub
+			}
+		}
+	}
+	return "local"
 }

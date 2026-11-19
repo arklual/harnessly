@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode"
 )
 
 // The tool policy of the apps on in a chat: what the app-guard hook answers for each tool call the agent makes.
@@ -515,6 +516,57 @@ func selfCommand(part string) bool {
 	return false
 }
 
+// hiddenAppCommand says whether a line the shell may rewrite (a substitution, a variable, a glob, a brace) can still
+// run `harnessly app …`: harnessly is called with `app` or with a first word the line does not spell out (`$x`,
+// `$'\x61'pp`, `$(echo app)`), or the binary is put into a variable. Every other harnessly in such a line — a folder
+// (`cd …/harnessly && …`), a word of a title, `harnessly design new` next to a `$(cat …)` — is not one:
+// refusing those stopped publishing documents, designs and tracker calls in any chat with an app on.
+func hiddenAppCommand(line string) bool {
+	clean := strings.Map(func(r rune) rune {
+		if r == '"' || r == '\'' || r == '\\' {
+			return -1
+		}
+		return r
+	}, line)
+	for _, op := range []string{"&&", "||", ";", "|", "&", "(", ")", "`"} {
+		clean = strings.ReplaceAll(clean, op, " ; ")
+	}
+	words := strings.Fields(clean)
+	for i, w := range words {
+		if !strings.HasSuffix(w, "harnessly") {
+			continue
+		}
+		if strings.Contains(w, "=") {
+			return true // h=harnessly; $h app off
+		}
+		j := i + 1
+		for j < len(words) && strings.HasPrefix(words[j], "-") {
+			if words[j] == "-w" || words[j] == "--workspace" {
+				j++
+			}
+			j++
+		}
+		if j >= len(words) || words[j] == ";" {
+			continue // a folder or harnessly with no command
+		}
+		sub := words[j]
+		if sub == "app" || sub == "apps" || !shellPlain(sub) {
+			return true
+		}
+	}
+	return false
+}
+
+// shellPlain is a word the shell leaves as it is: letters, digits, '-', '_', '.', ':' and ','.
+func shellPlain(w string) bool {
+	for _, r := range w {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && !strings.ContainsRune("-_.:,", r) {
+			return false
+		}
+	}
+	return w != ""
+}
+
 // Decide is the snapshot's verdict for one call, with the reason the agent reads.
 func (s Snapshot) Decide(call Call) (Verdict, string) {
 	if rule := s.selfChange(call); rule != "" {
@@ -546,7 +598,7 @@ func (s Snapshot) selfChange(call Call) string {
 				return "Bash(harnessly app …)"
 			}
 		}
-		if strings.Contains(line, "harnessly") && (opaque || strings.ContainsAny(line, "$*?[{")) {
+		if strings.Contains(line, "harnessly") && (opaque || strings.ContainsAny(line, "$*?[{")) && hiddenAppCommand(line) {
 			return "Bash(harnessly …)"
 		}
 		var forms []string

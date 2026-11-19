@@ -17,3 +17,17 @@ func TestParseReport(t *testing.T) {
 		t.Fatal("not a report")
 	}
 }
+
+func TestTheVideoToolsAreCardsOfTheSameKind(t *testing.T) {
+	if !IsGenerate("mcp__harnessly__generate_video") || !IsWait("wait_video") || IsGenerate("cancel_video") {
+		t.Fatal("the video tools' names")
+	}
+	got, ok := ParseReport("job_id: ab12\nDone: 1 video(s). Higgsfield · Kling 3.0 Std · 5 s · ≈ $0.42.\n1. /data/media/ab12/video-1.mp4\nThe person already sees it.")
+	if !ok || got.JobID != "ab12" || got.State != Done || len(got.Paths) != 1 || got.Paths[0] != "/data/media/ab12/video-1.mp4" {
+		t.Errorf("%+v", got)
+	}
+	got, _ = ParseReport("job_id: ab12\nStill drawing: the video is being made at Higgsfield.\n")
+	if got.State != Drawing {
+		t.Errorf("%+v", got)
+	}
+}

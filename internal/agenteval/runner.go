@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/designkit"
+	"github.com/ly-solutions/harnessly/internal/mcpconn"
 	"github.com/ly-solutions/harnessly/internal/pricing"
 )
 
@@ -96,7 +97,10 @@ type Result struct {
 	// quiet.
 	ActiveS int `json:"activeS,omitempty"`
 	// InterruptAt is when the scenario's interrupt was sent (Unix seconds).
-	InterruptAt int64   `json:"interruptAt,omitempty"`
+	InterruptAt int64 `json:"interruptAt,omitempty"`
+	// TimeScale is how much faster the agents' clock went: WallS and InterruptAt are on the wall clock,
+	// the times of the facts on the agents'. 0 is the plain clock.
+	TimeScale   float64 `json:"timeScale,omitempty"`
 	USD         float64 `json:"usd"`
 	CostUnknown bool    `json:"costUnknown,omitempty"`
 	Transcript  string  `json:"transcript,omitempty"`
@@ -310,9 +314,18 @@ func runOne(ctx context.Context, o Options, c Cell, key, worker string, port int
 	cfg := o.Stand
 	cfg.RuntimeEnv = merged(cfg.RuntimeEnv, c.Scenario.Setup.RuntimeEnv)
 	cfg.LogsDir = filepath.Join(o.Out, "stand-logs", key)
+	if c.Model.Agent != "claude" {
+		// Only Claude Code's clock is moved: a Codex on the plain clock with a compressed runtime would be judged
+		// against windows that are not its own.
+		cfg.TimeScale = 0
+	}
 	stand, err := Up(cfg, worker, freePort(port, max(1, o.Parallel)))
 	if err != nil {
 		return finish(Infra, err)
+	}
+	clock := stand.Clock()
+	if clock.On() {
+		r.TimeScale = clock.Factor
 	}
 	defer func() {
 		// A run that did not pass keeps its stand's logs: the stand's folder goes with it.
@@ -333,7 +346,8 @@ func runOne(ctx context.Context, o Options, c Cell, key, worker string, port int
 		return finish(Infra, err)
 	}
 	timeout := time.Duration(c.Scenario.Timeout()) * time.Second
-	deadline := t0.Add(timeout)
+	hold := clock.Real(time.Duration(c.Scenario.HoldS) * time.Second)
+	deadline := t0.Add(hold + timeout)
 	if it := c.Scenario.Interrupt; it != nil {
 		at := time.Now().Add(time.Duration(it.AfterS) * time.Second)
 		r.TurnState = stand.Wait(ctx, tab, time.Until(at))
@@ -350,6 +364,15 @@ func runOne(ctx context.Context, o Options, c Cell, key, worker string, port int
 		}
 	} else {
 		r.TurnState = stand.Wait(ctx, tab, timeout)
+	}
+	if hold > 0 && r.TurnState != "timeout" {
+		// The session lives by its schedule for the hold: its crons and wakeups start turns of their own. At the end
+		// the turn under way is let finish, and the run is judged with the schedule still set.
+		select {
+		case <-ctx.Done():
+		case <-time.After(time.Until(t0.Add(hold))):
+		}
+		r.TurnState = stand.Wait(ctx, tab, time.Until(deadline))
 	}
 	settled := true
 	if c.Scenario.SettleS > 0 && r.TurnState != "timeout" && ctx.Err() == nil {
@@ -375,6 +398,7 @@ func runOne(ctx context.Context, o Options, c Cell, key, worker string, port int
 		code, out := stand.Exec(ctx, chk, []string{fmt.Sprintf("EVAL_STARTED_AT=%d", t0.Unix()), "EVAL_INTERRUPT_AT=" + interrupt}, 5*time.Minute)
 		facts.Checks = append(facts.Checks, CheckResult{Command: chk, Exit: code, Output: out})
 	}
+	facts.TimeScale = r.TimeScale
 	r.Facts = &facts
 	var costKnown bool
 	r.USD, costKnown = pricedCost(facts)
@@ -439,6 +463,24 @@ func prepare(s *Stand, sc *Scenario) error {
 			return infra("%v", err)
 		}
 	}
+	for p, content := range sc.Setup.Memory {
+		dst := filepath.Join(s.memoryDir(), p)
+		if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
+			return infra("%v", err)
+		}
+		if err := os.WriteFile(dst, []byte(content), 0o600); err != nil {
+			return infra("%v", err)
+		}
+	}
+	for p, content := range sc.Setup.CodexMemory {
+		dst := filepath.Join(s.Home, ".codex", "memories", p)
+		if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
+			return infra("%v", err)
+		}
+		if err := os.WriteFile(dst, []byte(content), 0o600); err != nil {
+			return infra("%v", err)
+		}
+	}
 	for _, d := range sc.Setup.Workspace {
 		if err := copyTree(filepath.Join(sc.Dir(), filepath.FromSlash(d)), s.Work); err != nil {
 			return infra("workspace fixture %s: %v", d, err)
@@ -458,6 +500,17 @@ func prepare(s *Stand, sc *Scenario) error {
 	for _, d := range sc.Setup.Kits {
 		if err := installKit(filepath.Join(sc.Dir(), filepath.FromSlash(d)), designkit.DefaultDir(s.Data)); err != nil {
 			return infra("kit fixture %s: %v", d, err)
+		}
+	}
+	if len(sc.Setup.Connections) > 0 {
+		ms := mcpconn.New(s.Data, noSecrets{}, nil)
+		for _, id := range sc.Setup.Connections {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+			srv, _, err := ms.Add(ctx, mcpconn.AddInput{CatalogID: id})
+			cancel()
+			if err != nil || srv.State != mcpconn.StateOK {
+				return infra("connection %s: %v %s %s", id, err, srv.State, srv.Problem)
+			}
 		}
 	}
 	if len(sc.Setup.Design) > 0 {
@@ -551,3 +604,10 @@ func freePort(start, step int) int {
 	}
 	return start
 }
+
+// noSecrets is the safe of a stand: empty, its connections take no keys.
+type noSecrets struct{}
+
+func (noSecrets) Put(string, string) error      { return errors.New("a stand keeps no secrets") }
+func (noSecrets) Reveal(string) (string, error) { return "", mcpconn.ErrNotFound }
+func (noSecrets) Remove(string) error           { return nil }

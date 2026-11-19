@@ -1,6 +1,6 @@
 ---
 name: harnessly
-description: Work inside a harnessly workspace — show a document, board, file, dev server or merge request to the person in the right pane of the conversation, draw a mockup or a working prototype as a Sinopia Design board («сделай макет», «прототип», «чтобы кнопки работали»), make a widget under the chat's right column («сделай виджет, который показывает…»), change how harnessly looks — a theme, colours, a background of the chats, an animated one («сделай тему как ночной Токио», «поставь на эту папку матрицу»), list the workspace's tabs, and start, brief and read another agent in a new tab (Claude Code or Codex) with the `harnessly` command. Use when you run in a harnessly tab (the `harnessly` command exists and `TMUX` is set) and the person should see something you made, asks to "open", "show me" or "put it on the side", or when a task is worth handing to a parallel agent ("ask another agent to review", "run this in a separate tab", "check what the other tab did").
+description: Work inside a harnessly workspace — show a document, board, file, dev server or merge request to the person in the right pane of the conversation, draw a mockup or a working prototype as a Sinopia Design board («сделай макет», «прототип», «чтобы кнопки работали»), make a widget under the chat's right column («сделай виджет, который показывает…»), make a routine — a task the hub runs again and again on a schedule and reports («каждый понедельник присылай аналитику», «каждое утро дайджест в файл», «следи за выкатом»), change how harnessly looks — a theme, colours, a background of the chats, an animated one («сделай тему как ночной Токио», «поставь на эту папку матрицу»), list the workspace's tabs, and start, brief and read another agent in a new tab (Claude Code or Codex) with the `harnessly` command. Use when you run in a harnessly tab (the `harnessly` command exists and `TMUX` is set) and the person should see something you made, asks to "open", "show me" or "put it on the side", or when a task is worth handing to a parallel agent ("ask another agent to review", "run this in a separate tab", "check what the other tab did").
 ---
 
 # harnessly
@@ -46,8 +46,7 @@ harnessly open https://gitlab.example.com/g/p/-/merge_requests/12 # a merge requ
 
 A turn that made many things (several documents, a batch of tasks, merge requests, screenshots) opens one, the one to
 look at first, or none: the chat already shows what the turn made as cards under your answer. Name the rest as links;
-never open tasks or merge requests one by one. `harnessly open` shows a thing to the person and reads
-nothing for you: read a task with `harnessly issue <KEY>`, a merge request with `glab` or the GitLab API. The pane itself opens at most three quiet tabs in ten minutes.
+never open tasks or merge requests one by one. The pane itself opens at most three quiet tabs in ten minutes.
 
 In your reply, still name the link or path in words: the pane is a convenience, the reply is the record.
 
@@ -72,8 +71,65 @@ harnessly widget remove --side limits-forecast
 - Your own page is sandboxed: `hl.context.data` is `{sources, smart}`, `hl.on('context', fn)` brings new data; no
   network, no secrets, no chats, no script in the markup (put it in `--js`).
 - It joins the person's widgets by itself on every computer; say it is there, under the right column.
+- `--scope chat` (the default) shows the widget in the chat you made it in only; the person pins it to other chats, or to
+  every chat, from the card's menu. `--scope global` is for what is theirs in every chat (the limits, the machine's load).
+- A widget for a job goes when the job is done: «Готово» / "Done" in it, tell the person, then
+  `harnessly widget remove --side <name>` on your next turn there (or leave it: the person dismisses it from its menu).
+- `harnessly widget update <name> --html @card.html` changes the card where it stands (no reload, no blink), so a progress
+  bar may be updated every 10-30 seconds from a background loop.
 - Moving an app in the left menu («перенеси Доски в основные кнопки») is the person's: they carry it by hand in the menu
   or in Настройки → Оформление → «Меню слева».
+
+### A progress widget for long work: offer it yourself
+
+When a job of many minutes is about to start or run in the background (a render, a build, a deploy, a download, a
+migration, a long script) and the person wants to hear when it ends («скажи, когда закончится», «сколько осталось»,
+"tell me when it finishes", "let me know when it's done", "how long is left"), or you start work that clearly takes more
+than about five minutes, offer a progress widget under the right column. Never for a job of a minute or two.
+
+1. **First**, in the same turn and before the job starts, read your memory note `side-widget-offers.md` (your memory folder;
+   in Codex, your memories), even when it is probably not there. One line per answer:
+   `date | kind | length | yes / no / asked` (kind: render, build, deploy, download, migration, training, other; length:
+   short 5-15 min, long over 15; a line of the kind `any` is a standing rule).
+2. Decide by it. They asked for a widget themselves: make it, record `asked`. `asked`, or two `yes` and no `no` for this
+   kind and length: make it at once, say so in one line, ask nothing. The last answer is `no`: stay quiet, make nothing,
+   offer nothing. No answer yet, one `yes`, or mixed: offer once.
+3. Offer with `notice_ask` (kind `choice`, `timeoutSec` 120), not in your text, in the person's language:
+   «Сделать виджет прогресса справа?» — «Сделать виджет справа» / «Не надо»; or "Add a progress widget on the right?" —
+   "Add the widget" / "No thanks". Yes: `widget_create render-progress --title … --html @card.html`, then `widget_update`
+   with the real progress (never a figure you do not have); the last update says «Готово» / "Done" or what failed. No, or
+   no answer: nothing, and not again for this job.
+4. Write the answer into the note at once (`type: feedback` in its front matter, a line in MEMORY.md). It is the person's
+   file: what they correct there wins. Codex does not edit its memory files: it adds the line as an update note in the ad_hoc notes folder of its memory.
+
+## Routines: what should happen again and again
+
+When the person wants something done on a schedule — «каждый понедельник присылай аналитику», «каждое утро дайджест
+в файл», «следи за выкатом и пиши, если упал», "check my limits every evening" — or once at a later time («25-го в
+12:00 убери флаг»), make a **routine**: the hub runs it on one of the person's machines in a new chat, with no one
+watching, checks the result and tells them. Never a cron job, `/loop` or `CronCreate` of your own: those die with
+this session.
+
+```bash
+harnessly routine create --name "Дайджест дня" --cron "0 9 * * 1-5" --words "по будням в 9:00" \
+  --prompt "Собери, что изменилось за сутки в моих задачах и MR. Разделы: Итог, Ждут меня, Риски." \
+  --to notice,telegram,file --file digest/{date}.md --check contains:Риски --check file --check fresh
+harnessly routine list                    # on|paused, schedule, next start, last runs (+ ok, . quiet, x failed)
+harnessly routine set ID --when failure   # only tell when it fails; pause|resume|run|runs|forget|delete ID
+```
+
+The same as MCP tools: `routine_create`, `routine_update`, `routine_list`, `routine_run`, `routine_runs`, `routine_delete`.
+
+- The prompt is the whole brief for the run's agent, which does not see this chat: what to gather and from where,
+  what the result looks like, what counts as «nothing new» (then the run is quiet and the person is not disturbed).
+- The schedule is cron in the person's zone (`--tz`, Europe/Moscow by default) plus their own words (`--words`).
+- Checks are deterministic and done by the hub: `contains:TEXT`, `regex:EXPR`, `artifact[:KIND]`, `file`, `fresh`.
+  A run that fails one is a failed run; three failed runs in a row pause the routine with one notice.
+- Channels besides the run's chat: `notice` (the bell, the default), `telegram`, `messenger`, `mail`, `file` (a new
+  version of `--file` every run), `doc`. `--when changed|always|failure|never` says when the person hears.
+- `--autonomy read` (default) only gathers; `draft` prepares MRs and drafts; `act` changes things but never merges,
+  deploys or writes to people.
+- Say back in one line what you made: the name, the schedule in words, the next start, where the result goes.
 
 ## The look of harnessly
 
@@ -150,7 +206,7 @@ The chats you delegate (the `delegate_task` tool of the `harnessly` MCP server) 
 
 ## Boards and documents
 
-Make a diagram with the `boards` skill and publish a write-up with `harnessly docs publish FILE.md [--slug S]` (through the hub, so it shows in the person's Documents app; `artifacts publish` is the fallback only when it says there is no hub); both print links. Then
+Make a diagram with the `boards` skill and publish a write-up with the `artifacts` skill; both print links. Then
 `harnessly open` them. Every document you publish records this conversation, so the pane can list the
 documents of the conversation.
 

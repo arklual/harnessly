@@ -858,6 +858,22 @@
           "name": "updated_at",
           "type": "bigint",
           "notNull": true
+        },
+        {
+          "name": "routine",
+          "type": "text"
+        },
+        {
+          "name": "state",
+          "type": "text"
+        },
+        {
+          "name": "fail_streak",
+          "type": "integer"
+        },
+        {
+          "name": "paused_reason",
+          "type": "text"
         }
       ],
       "primaryKey": [
@@ -949,6 +965,14 @@
         {
           "name": "attempts",
           "type": "integer"
+        },
+        {
+          "name": "outcome",
+          "type": "text"
+        },
+        {
+          "name": "result",
+          "type": "text"
         }
       ],
       "primaryKey": [
@@ -3635,6 +3659,149 @@
         "key"
       ]
     },
+    "heavy_jobs": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "user_id",
+          "type": "text"
+        },
+        {
+          "name": "from_machine",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "caps",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "want_machine",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "argv",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "env",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "outputs",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "timeout_sec",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "has_input",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "local",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "exit_code",
+          "type": "integer"
+        },
+        {
+          "name": "error",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "log_tail",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "result",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "cancel_wanted",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "started_at",
+          "type": "bigint"
+        },
+        {
+          "name": "finished_at",
+          "type": "bigint"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "heavy_jobs_active",
+          "columns": [
+            "status"
+          ]
+        },
+        {
+          "name": "heavy_jobs_space",
+          "columns": [
+            "space_id",
+            "created_at"
+          ]
+        }
+      ]
+    },
     "history_conversations": {
       "columns": [
         {
@@ -4339,6 +4506,42 @@
         },
         {
           "name": "synced_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "machine_id"
+      ]
+    },
+    "machine_builders": {
+      "columns": [
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "caps",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "slots",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "updated_by",
+          "type": "text"
+        },
+        {
+          "name": "updated_at",
           "type": "bigint",
           "notNull": true
         }

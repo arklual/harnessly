@@ -771,6 +771,9 @@ type TurnOutput struct {
 	Mime   string `json:"mime,omitempty"`
 	Size   int64  `json:"size,omitempty"`
 	SHA256 string `json:"sha256,omitempty"`
+	// A design (kind design): the boards of it the turn wrote, by their file in the project, the last written last.
+	// The card opens the design on them, not on its first page.
+	Pages []string `json:"pages,omitempty"`
 }
 
 // TurnSummary is a turn as the sidebar row and the notifications need it.
@@ -1597,6 +1600,10 @@ type MachineStatusEv struct {
 	Runtime *RuntimeInfo   `json:"runtime"`
 	Agents  []MachineAgent `json:"agents"`
 	Health  *MachineHealth `json:"health,omitempty"`
+	// AppsAt, set by the one status that tells it, is when the machine's installed apps changed (unix ms): the page
+	// reads them again (an app installed or removed, a widget an agent made, changed or removed; HRN-1663). The rest of
+	// the event is the machine as it is, so a page that does not read it (CapAppsSync) gets the same event without it.
+	AppsAt int64 `json:"appsAt,omitempty"`
 }
 
 // MachineLoadEv is the machine's load, every 2 s while a subscriber asked for it.

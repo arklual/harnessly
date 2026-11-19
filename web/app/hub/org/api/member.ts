@@ -55,7 +55,7 @@ export interface MyOverview {
 }
 
 export interface MemberApi {
-  myOverview(period: 'week' | 'month'): Promise<MyOverview>;
+  myOverview(period: 'day' | 'week' | 'month'): Promise<MyOverview>;
   /** Asks the lead for a bigger limit; the lead gets a signal. Resolves when the hub accepted it. */
   requestMoreLimit(): Promise<{ sent: true }>;
 }

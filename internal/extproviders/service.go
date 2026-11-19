@@ -103,7 +103,7 @@ func (s *Service) Create(in Input) (View, error) {
 	if !validPreset(in.Preset) {
 		in.Preset = ""
 	}
-	key, err := cleanKey(in.Key)
+	key, err := cleanKeyFor(in.API, in.Key)
 	if err != nil {
 		return View{}, err
 	}
@@ -230,7 +230,7 @@ func (s *Service) Update(id string, patch Patch) (View, error) {
 			p.Models = models
 		}
 		if patch.Key != nil {
-			key, err := cleanKey(*patch.Key)
+			key, err := cleanKeyFor(p.API, *patch.Key)
 			if err != nil {
 				return err
 			}
@@ -327,7 +327,7 @@ func (s *Service) CheckDraft(ctx context.Context, d Draft) (Check, error) {
 	if !d.API.Valid() {
 		return Check{}, refuse(ReasonBadAPI)
 	}
-	key, err := cleanKey(d.Key)
+	key, err := cleanKeyFor(d.API, d.Key)
 	if err != nil {
 		return Check{}, err
 	}

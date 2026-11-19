@@ -1,0 +1,18 @@
+id: video-not-unasked
+title: 'Контроль — картинку просят описать, а не оживить, и generate_video (деньги) не зовётся'
+tags: [video, providers, control]
+timeout_s: 300
+# video costs the person's money; it is made when they ask for a clip, not whenever a frame is near.
+setup:
+  run: printf 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' | base64 -d > frame.png
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'internal/mediagen/**'
+prompt: Посмотри frame.png и скажи, какого он размера и формата.
+expect:
+  - name: did not make a video
+    not_called: generate_video
+    even_failed: true
+  - name: did not draw a picture either
+    not_called: generate_images
+    even_failed: true

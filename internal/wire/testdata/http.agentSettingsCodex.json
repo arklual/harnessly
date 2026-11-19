@@ -15,7 +15,8 @@
       {"key": "network", "value": null},
       {"key": "approval", "value": "on-request"},
       {"key": "search", "value": "cached"},
-      {"key": "history", "value": true}
+      {"key": "history", "value": true},
+      {"key": "memories", "value": true}
     ],
     "rules": null,
     "env": [],

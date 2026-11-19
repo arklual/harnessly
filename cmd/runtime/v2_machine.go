@@ -370,6 +370,33 @@ type liveMachine struct {
 	machine wire.Machine
 	subs    map[int]func(wire.Event)
 	next    int
+	// appsTimer holds the one pending apps push: writes of the installed list that come in a burst are told once.
+	appsTimer *time.Timer
+}
+
+// appsTellDelay is how long a burst of writes of the installed list is gathered into one push.
+const appsTellDelay = 120 * time.Millisecond
+
+// appsChanged tells every socket of the machine channel that the installed apps changed, so the pages read them again
+// It never blocks the writer: the status goes out from a timer, once for a burst.
+func (m *liveMachine) appsChanged() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.appsTimer != nil {
+		return
+	}
+	m.appsTimer = time.AfterFunc(appsTellDelay, func() {
+		m.mu.Lock()
+		m.appsTimer = nil
+		ev, subs := m.statusLocked()
+		m.mu.Unlock()
+		// The machine as it is, with the moment the apps changed: a page of an older build gets it without that moment
+		// and takes it for the status it holds (the cap appssync, wire/caps.go).
+		ev.AppsAt = time.Now().UnixMilli()
+		for _, fn := range subs {
+			fn(ev)
+		}
+	})
 }
 
 func newLiveMachine(id, version string, features []wire.Feature, dataDir string, busy func() int, check func() preflight.Result,

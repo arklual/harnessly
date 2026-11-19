@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { ImageGen } from '@/next/protocol/v2';
-import { cardView, columnsOf, followsJob, jobOf, type IImageJob } from '@/next/features/chat/image-jobs';
+import {
+  cardView,
+  columnsOf,
+  followsJob,
+  isClip,
+  jobOf,
+  type IImageJob,
+} from '@/next/features/chat/image-jobs';
 
 const images = (over: Partial<ImageGen> = {}): ImageGen => ({
   count: 3,
@@ -47,5 +54,25 @@ describe('the picture card', () => {
   it('follows the jobs of harnessly tools only', () => {
     expect(followsJob('mcp__harnessly__generate_images')).toBe(true);
     expect(followsJob('mcp__image_gen__imagegen')).toBe(false);
+    // The video tool's call is a card of the same kind, its job asked about on the media route.
+    expect(followsJob('mcp__harnessly__generate_video')).toBe(true);
+    expect(followsJob('mcp__harnessly__wait_video')).toBe(true);
+    expect(followsJob('mcp__harnessly__cancel_video')).toBe(false);
+  });
+});
+
+describe('a clip in the card', () => {
+  it('tells a clip from a picture by its file', () => {
+    expect(isClip('/data/media/ab12/video-1.mp4')).toBe(true);
+    expect(isClip('/data/media/ab12/video-1.MP4')).toBe(true);
+    expect(isClip('/data/images/ab12/1.png')).toBe(false);
+    expect(isClip('/data/media/ab12/video-1.mp4.origin.json')).toBe(false);
+  });
+
+  it('shows the clip once done and the price line of a job that is being made', () => {
+    const live = job({ count: 1, meta: 'Higgsfield · Kling 3.0 Std · 5 s · ≈ $0.42' });
+    expect(cardView(images({ count: 1 }), live).tiles).toEqual([null]);
+    const view = cardView(images({ count: 1, state: 'done', done: ['/media/video-1.mp4'] }), null);
+    expect(view.tiles).toEqual(['/media/video-1.mp4']);
   });
 });

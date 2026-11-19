@@ -1,0 +1,36 @@
+id: video-no-key
+title: '«Оживи кадр» без ключа Higgsfield — агент зовёт generate_video, получает понятный ответ и просит ключ через сейф'
+tags: [video, providers, secrets]
+timeout_s: 420
+# The stand has no Higgsfield key (neither a provider nor the safe's higgsfield-key): generate_video answers with
+# the way out, and the agent follows it: the key is asked through the safe, never in the chat, and nothing is drawn with code.
+setup:
+  run: printf 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' | base64 -d > frame.png
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'internal/mediagen/**'
+  - 'internal/imagegen/tools.go'
+prompt: Сделай из кадра frame.png пятисекундный клип через Higgsfield — камера медленно наезжает.
+expect:
+  - name: tried the video tool
+    called: harnessly\.generate_video
+    even_failed: true
+  - name: asked for the key through the safe
+    called: Bash
+    even_failed: true
+    args: {command: '(?s).*harnessly secret ask\s+\S+.*'}
+  - name: did not ask for it with a plain question
+    not_called: AskUserQuestion
+    even_failed: true
+  - name: did not make a clip with code
+    not_called: Bash
+    args: {command: '(?i)ffmpeg|moviepy|cv2|zoompan'}
+  - name: did not ask to paste the key into the chat
+    text_not: '(?i)(пришли|вставь|скинь|отправь|напиши|дай|send|paste|share)\S*\s+(мне\s+|me\s+)?(сюда\s+)?(the\s+|your\s+|этот\s+|свой\s+)?(ключ|токен|key|token)\s*(сюда|в чат|мне|here|in the chat|in chat|to me)'
+variants:
+  - id: v1
+    kind: english
+    text: "Animate frame.png into a 5 second clip with Higgsfield, slow push-in."
+  - id: v2
+    kind: short
+    text: "оживи frame.png (higgsfield), 5 секунд"

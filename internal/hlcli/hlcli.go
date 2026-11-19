@@ -241,8 +241,14 @@ func (c *cli) run(args []string) error {
 		return c.widget(rest)
 	case "peers", "peer":
 		return c.peers(rest)
+	case "builders", "builder":
+		return c.builders(rest)
+	case "job", "jobs":
+		return c.job(rest)
 	case "memory", "mem":
 		return c.memory(rest)
+	case "routine", "routines":
+		return c.routine(rest)
 	case "secret", "secrets":
 		return c.secret(rest)
 	case "settings", "setting":

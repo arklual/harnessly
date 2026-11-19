@@ -262,6 +262,9 @@
   background: var(--hx-bg-hover);
   animation: hx-wg-wait 1.4s ease-in-out infinite;
 }
+.hx-wg__wait[data-tall] {
+  height: 72px;
+}
 @keyframes hx-wg-wait {
   50% {
     opacity: 0.55;
@@ -447,6 +450,15 @@
 }
 .hx-wga[data-size='l'] {
   height: 240px;
+}
+.hx-wga__kept {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
 }
 .hx-wga .hx-appview__box {
   height: 100%;

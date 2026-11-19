@@ -47,14 +47,24 @@ instructions), and ` + "`harnessly connector act ID ACTION key=value… --why \"
 only after the person's yes on the card in the chat. Never send another way. If ` + "`harnessly connectors`" + ` shows the service is not connected, say so and point the person to Settings → Connections: do not look for mail programs, accounts or tokens on the machine, and do not try IMAP, SMTP or curl yourself. A connected Telegram bot's ` + "`notify`" + `
 writes to the person themselves at once, without a card: use it when they asked to be told there, not for progress.
 
-The MCP servers the person connected there (Atlassian, Linear, Notion, Sentry, GitHub, …) are already your tools, named
-` + "`mcp__mcp-<name>__<tool>`" + ` (in Codex, the server ` + "`mcp-<name>`" + `); they sign in for you. When a service you need has no such
-tools, ask the person to connect its MCP server in Settings → Connections and to start a new chat.`
+The services the person connected there (Google, Microsoft, Yandex, Slack, Telegram, Figma, banks and exchanges, disks,
+analytics, research, and the rest) are reached through one MCP server, ` + "`harnessly-hub`" + `, so their many tools do not
+fill your context: when a task needs an outside service, call ` + "`search_tools`" + ` (or ` + "`connections`" + `) with what you need,
+then ` + "`tool_schema`" + ` and ` + "`call`" + `; a service without an MCP server is an API you reach with ` + "`api_request`" + `,
+the keys put in for you. A connected service beats a web search, a scraped page or a guess for what it covers (quotes
+and markets, banks, mail, calendars, files, analytics, papers, chats): when the task touches an outside service, look in
+the hub first (its tools may be deferred: ToolSearch "harnessly-hub" loads them; the tools' descriptions list what is
+connected now). A few connections may also come as tools of their own, ` + "`mcp__mcp-<name>__<tool>`" + `. A big answer
+comes back as its start and a file path: read only what you need, or give a long reading to a subagent. When a service you
+need is not connected (search_tools names the ones that can be), ask the person to connect it in Settings → Connections.`
 
 // withSafe gives an agent that starts the workspace prompt with the safe's block after it (how to ask for a secret and
 // use it without it passing through the conversation) and the connections' block: the text goes into a file of dir
 // named by its hash.
-func withSafe(on bool, dir string, prompt func(string) string) func(string) string {
+//
+// connected, when not nil, is the line of what the person has connected now (mcpconn.ConnectedLine), read at every
+// launch: the agent learns which services the hub reaches without their tools in its context.
+func withSafe(on bool, dir string, prompt func(string) string, connected ...func() string) func(string) string {
 	if !on {
 		return prompt
 	}
@@ -67,7 +77,13 @@ func withSafe(on bool, dir string, prompt func(string) string) func(string) stri
 		if text != "" {
 			text += "\n\n"
 		}
-		text += secrets.PromptBlock() + "\n\n" + connectionsPromptBlock + "\n\n" + settingsPromptBlock
+		text += secrets.PromptBlock() + "\n\n" + connectionsPromptBlock
+		for _, now := range connected {
+			if line := now(); line != "" {
+				text += "\n\nThe hub reaches these services of the person right now; look there before a web search for anything they cover. " + line
+			}
+		}
+		text += "\n\n" + settingsPromptBlock
 		sum := sha256.Sum256([]byte(text))
 		target := filepath.Join(dir, "safe-"+hex.EncodeToString(sum[:])[:16]+".md")
 		if have, err := os.ReadFile(target); err == nil && string(have) == text {

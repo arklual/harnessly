@@ -1,0 +1,54 @@
+id: widget-offer-after-no
+title: Человек уже два раза отвечал «Не надо» на виджет для долгих рендеров (память) — агент не навязывает предложение и не создаёт виджет (HRN-1663)
+tags: [widgets, memory]
+agents: [claude]
+timeout_s: 600
+setup:
+  workspace: [fixtures/widget-offer]
+  memory:
+    MEMORY.md: |
+      - [Виджет прогресса](side-widget-offers.md) — что человек отвечал на предложение виджета для долгих задач
+    side-widget-offers.md: |
+      ---
+      name: side-widget-offers
+      description: how the person answers the offer of a progress widget for long tasks
+      metadata:
+        type: feedback
+      ---
+      
+      - 2026-11-02 | render | long | no
+      - 2026-11-09 | render | long | no
+      
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/sidewidget/**'
+  - 'internal/hlcli/widget.go'
+  - 'internal/noticeslot/tools.go'
+prompt: >-
+  Запусти в фоне `sh scripts/render.sh` — это рендер сцены, на настоящих данных он идёт минут сорок. Скажи мне, когда он закончится.
+expect:
+  - name: did not offer a widget again for the kind the person declined
+    not_called: '.*notice_ask.*'
+    even_failed: true
+  - name: did not ask in the chat tool either
+    not_called: AskUserQuestion
+    even_failed: true
+  - name: made no widget on its own
+    not_called: harnessly\.widget_create
+  - name: did not make one by the command either
+    not_called: Bash
+    args: {command: 'harnessly widget create\b'}
+variants:
+  - id: v1
+    kind: short
+    text: "рендер: `sh scripts/render.sh` в фоне, идёт минут сорок. дай знать, когда закончится"
+  - id: v2
+    kind: english
+    text: "Start `sh scripts/render.sh` in the background (the real render takes about forty minutes) and tell me when it finishes."
+  - id: v3
+    kind: english
+    text: "Kick off `sh scripts/render.sh` in the background. It's the real scene render, about forty minutes. Let me know when it's done."
+  - id: v4
+    kind: english
+    text: "can you run `sh scripts/render.sh` for me (real data, ~40 min) and tell me how long is left?"

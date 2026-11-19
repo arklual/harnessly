@@ -315,6 +315,7 @@
   "next.search.designKind.slides": "Presentation",
   "next.search.designKind.ds": "Design system",
   "next.search.designKind.video": "Video",
+  "next.search.designKind.scene3d": "3D scene",
   "next.search.docBoard": "Board",
   "next.search.mrDraft": "draft",
   "next.search.versionOf": "Version {n}",
@@ -1689,5 +1690,12 @@
   "next.chat.nextPull": "Next chat: {title}",
   "next.header.switchChat": "Switch chat",
   "next.header.machine": "Machine",
-  "next.header.layers": "Layers"
+  "next.header.layers": "Layers",
+  "next.folderSuggest.ask": "Move this chat to “{project}”?",
+  "next.folderSuggest.yes": "Move",
+  "next.folderSuggest.no": "Not now",
+  "next.folderSuggest.unfold": "Show the whole notice",
+  "next.folderSuggest.fold": "Fold the notice",
+  "next.folderSuggest.why": "Picked by the chat's prompts and the chats already in your folders. Choose another folder if it is not the one:",
+  "next.folderSuggest.other": "Folders"
 }

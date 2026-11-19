@@ -9,7 +9,7 @@ const TIMEOUT_MS = 10_000;
 /** The machine asks the provider over the internet: a check is given longer than a write. */
 const CHECK_TIMEOUT_MS = 40_000;
 
-export const EXT_API = { openai: 'openai', anthropic: 'anthropic' } as const;
+export const EXT_API = { openai: 'openai', anthropic: 'anthropic', higgsfield: 'higgsfield' } as const;
 export type TExtApi = (typeof EXT_API)[keyof typeof EXT_API];
 
 /** The levels of reasoning a model may take (extproviders.ModelEfforts), in their order. */
@@ -97,7 +97,8 @@ export interface IExtRegistry {
 }
 
 const readApi = (v: unknown): TExtApi => {
-  if (v !== EXT_API.openai && v !== EXT_API.anthropic) throw new Error('answer: api');
+  if (v !== EXT_API.openai && v !== EXT_API.anthropic && v !== EXT_API.higgsfield)
+    throw new Error('answer: api');
   return v;
 };
 

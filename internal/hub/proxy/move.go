@@ -182,8 +182,14 @@ func (s *Service) moveStatus(w http.ResponseWriter, r *http.Request, u store.Use
 		return
 	}
 	conv := q.Get("conv")
-	if !movePattern.MatchString(conv) {
+	if conv != "" && !movePattern.MatchString(conv) {
 		writeMoveFail(w, failBadReq)
+		return
+	}
+	if conv == "" {
+		// The list of chats asks about the machine alone (which rows get «Перенести на машину»): no chat, nothing moved.
+		on := s.reg.Get(src.m.ID) != nil || s.resumeFrom(r.Context(), u, src)
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"enabled": on, "moved": nil})
 		return
 	}
 	if s.reg.Get(src.m.ID) == nil {

@@ -12,3 +12,4 @@ import '../charts/stat-tile.css';
 import './analytics.css';
 import './auth.css';
 import './live.css';
+import './design.css';

@@ -117,6 +117,17 @@ describe('what a turn made', () => {
     );
   });
 
+  it('names the boards of a design the turn wrote, and each opens the design on itself (HRN-1691)', () => {
+    const edited: TurnOutput = { ...design, pages: ['Главная.dc.html', 'Регулярные задачи.dc.html'] };
+    const { onOpen } = draw(SHOWN_BY_DEFAULT, [edited]);
+    const chips = screen.getAllByRole('button', { name: /^(Главная|Регулярные задачи)$/ });
+    // The last one written comes first.
+    expect(chips.map((b) => b.textContent)).toEqual(['Регулярные задачи', 'Главная']);
+    fireEvent.click(chips[1]);
+    expect(onOpen).toHaveBeenLastCalledWith(edited, 'Главная.dc.html');
+    expect(screen.getByRole('button', { name: /Открыть последнюю|Open the last one/ })).toBeTruthy();
+  });
+
   it('lists what it made at the end of the answer, «Открыть» and «Поделиться» on what is read', () => {
     const { onOpen } = draw(SHOWN_BY_DEFAULT);
     const block = screen.getByRole('region', { name: /Сделано за ход|Made this turn/ });

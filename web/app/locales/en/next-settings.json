@@ -135,6 +135,8 @@
   "next.settings.opt.codex.search": "Web search",
   "next.settings.opt.codex.history": "Save the history",
   "next.settings.opt.codex.history.hint": "To continue past sessions",
+  "next.settings.opt.codex.memories": "Memory across chats",
+  "next.settings.opt.codex.memories.hint": "Codex remembers your answers and habits and uses them in later chats; on by default",
   "next.settings.choice.model.unset": "Default",
   "next.settings.choice.fallbackModel.unset": "Wait for the main one",
   "next.settings.choice.effort.low": "Low",
@@ -673,5 +675,12 @@
   "next.settings.general.feed.preview": "Previews of documents and designs",
   "next.settings.general.feed.preview.hint": "A picture of the document, board or design on its card",
   "next.settings.general.feed.bigShots": "Large screenshots",
-  "next.settings.general.feed.bigShots.hint": "The first one large, the rest in a grid"
+  "next.settings.general.feed.bigShots.hint": "The first one large, the rest in a grid",
+  "next.settings.general.folders": "Project folders",
+  "next.settings.general.folders.rows": "Chats shown at once",
+  "next.settings.general.folders.rows.hint": "How many chats a folder shows before «More».",
+  "next.settings.general.folders.peek": "Show live chats in a closed folder",
+  "next.settings.general.folders.peek.hint": "A chat at work or waiting for your look, opened today, stays visible under its closed folder.",
+  "next.settings.general.folders.suggest": "Suggest a folder for a chat",
+  "next.settings.general.folders.suggest.hint": "After a few prompts the app offers to put a chat without a folder into the fitting one."
 }

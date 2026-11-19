@@ -5,6 +5,7 @@ import { machineNow, noteServerTime, pageClock } from '@/next/core/clock';
 import { noteCursor, noteLastEntry, resumeOf } from '@/next/core/realtime/cursors';
 import type { Sink } from '@/next/core/realtime/client';
 import { shownConnection } from '@/next/core/realtime/grace';
+import { noteAppsChanged } from '@/next/stores/apps-changed';
 import { connectionStore } from '@/next/stores/connection';
 import {
   applyBackground,
@@ -168,6 +169,7 @@ export function applyMachineEvent(machine: MachineId, e: MachineEvent): void {
       agents: e.agents,
       ...(e.health ? { health: e.health } : {}),
     }));
+    if (e.appsAt) noteAppsChanged(machine);
   } else {
     machineLoadStore.set(machine, e.load);
   }

@@ -3077,6 +3077,34 @@ html[data-theme='dark'] .hx-ref[data-type='link'] {
   gap: 6px;
   margin-top: 6px;
 }
+/* The boards of a design the turn wrote: each a chip that opens the design on it. */
+.hx-made__pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.hx-made__page {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.hx-made__page:hover {
+  background: var(--hx-bg-active);
+}
 .hx-made__btn {
   display: inline-flex;
   align-items: center;

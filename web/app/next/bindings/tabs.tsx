@@ -57,6 +57,7 @@ const FIXED: Record<
   [ROUTE.videoNew]: { icon: 'clapperboard', title: () => t('next.video.create.title') },
   [ROUTE.invite]: { icon: 'palette', title: () => t('next.tabs.designly') },
   [ROUTE.tasks]: { icon: 'list-checks', title: () => t('next.sidebar.tasks') },
+  [ROUTE.routines]: { icon: 'clock', title: () => t('next.routines.title') },
   [ROUTE.apps]: { icon: 'layout-grid', title: () => t('next.sidebar.apps') },
   [ROUTE.review]: { icon: 'git-pull-request', title: () => t('next.reviewApp.title') },
   [ROUTE.help]: { icon: 'book-open', title: () => t('next.sidebar.help') },

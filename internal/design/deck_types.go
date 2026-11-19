@@ -172,6 +172,9 @@ type DeckComment struct {
 	Format VideoFormat `json:"format,omitempty"`
 	Block  string      `json:"block,omitempty"`
 	Frame  string      `json:"frame,omitempty"`
+	// A 3D scene's pin (View DeckCommentScene3D): the object, the point, the camera and the frame it sits at.
+	// X, Y and Page stay empty.
+	Scene *Scene3DAnchor `json:"scene,omitempty"`
 }
 
 // DeckGuestResolution is meta/comments/g-<gatewayId>.json: a guest comment (kept by the gateway) marked resolved here.

@@ -229,7 +229,7 @@ export const useChatBackground = (
               {widgetsMounted && machine && (
                 <div className="hx-wgs-wrap" data-shown={widgetsShown} data-pop={widgetsPop || undefined}>
                   {conv && onOpenOutput && <ChatDocs machine={machine} conv={conv} onOpen={onOpenOutput} />}
-                  <SideWidgetsBinding machine={machine} onOpenChat={onOpenChat} />
+                  <SideWidgetsBinding machine={machine} chat={conv} onOpenChat={onOpenChat} />
                 </div>
               )}
             </>

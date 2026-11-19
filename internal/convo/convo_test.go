@@ -1825,11 +1825,24 @@ func TestImportKeepsTheAppMarkUntilMoved(t *testing.T) {
 // GitHub #108: a chat asked to start in a folder that is gone is refused at once; nothing is launched or queued.
 func TestCreateInAGoneFolderIsRefused(t *testing.T) {
 	r := newRig(t)
-	r.rt.d.FolderGone = func(dir string) bool { return dir == "/gone" }
+	r.rt.d.FolderGone = func(dir string) wire.RefuseCode {
+		switch dir {
+		case "/gone":
+			return wire.RefuseNotFound
+		case "/hung":
+			return wire.RefuseTimeout
+		}
+		return ""
+	}
 	res := r.do(wire.ConversationCreateCmd{OpID: "c1", Cwd: "/gone", Provider: wire.ProviderClaude,
 		First: &wire.FirstMessage{ClientID: "first", Text: "start here", AttachmentIDs: []string{}}})
 	if res.R != wire.ResultRefused || res.Code != wire.RefuseNotFound || len(r.launcher.launched) != 0 {
 		t.Fatalf("create in a gone folder: %+v, launched %v", res, r.launcher.launched)
+	}
+	// a folder on a network disk that does not answer refuses the chat with timeout, nothing launched.
+	if res := r.do(wire.ConversationCreateCmd{OpID: "c3", Cwd: "/hung", Provider: wire.ProviderClaude}); res.R != wire.ResultRefused ||
+		res.Code != wire.RefuseTimeout || len(r.launcher.launched) != 0 {
+		t.Fatalf("create in a folder that does not answer: %+v, launched %v", res, r.launcher.launched)
 	}
 	if res := r.do(wire.ConversationCreateCmd{OpID: "c2", Cwd: "/w", Provider: wire.ProviderClaude}); res.R != wire.ResultAccepted {
 		t.Fatalf("create in a folder that is there: %+v", res)

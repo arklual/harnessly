@@ -293,7 +293,10 @@ const AppFrame = ({
   // when it stops waiting, so the view then starts anew.
   const waits = app.state === APP_STATE.waiting;
   // A new version of the app starts the view anew; it reopens what it had open from `data`.
-  const key = `${machine}|${app.id}|${appStamp(app)}|${view.id}|${viewPort}|${reload}|${reloadToken}|${waits ? 'w' : ''}`;
+  // A widget whose script did not change keeps its frame through an update of its markup: the page hands the new one in
+  // as data.
+  const installStamp = view.widget?.shell ? `shell:${view.widget.shell}` : appStamp(app);
+  const key = `${machine}|${app.id}|${installStamp}|${view.id}|${viewPort}|${reload}|${reloadToken}|${waits ? 'w' : ''}`;
   const state: TFrameState = health.key === key ? health.state : LOADING;
   // The frame's key, by a name the bridge's effect does not shadow.
   const frameKey = key;
@@ -329,6 +332,8 @@ const AppFrame = ({
   // under Activity) runs the effect below again, and must not open a new session and load the view anew
   // while the one it shows is still its own.
   const openedFor = useRef<{ sign: string; slot: number | null } | null>(null);
+  // Whether the view needs the slot it opened in to stay its own: a widget does not.
+  const slotKeepsCookie = target !== 'side';
   const openedNow = useRef(opened);
   useEffect(() => {
     openedNow.current = opened;
@@ -344,7 +349,7 @@ const AppFrame = ({
       openedNow.current?.key === key &&
       openedNow.current.src !== null &&
       was?.sign === sign &&
-      (was.slot === null || slotLeases.slotOf(lease) === was.slot)
+      (was.slot === null || !slotKeepsCookie || slotLeases.slotOf(lease) === was.slot)
     )
       return () => {
         live = false;
@@ -460,12 +465,14 @@ const AppFrame = ({
     lease,
     app.id,
     target,
+    slotKeepsCookie,
     chat,
     doc,
   ]);
 
   // A new version of the app reaches the machine by itself: while the view is up, the page looks for it.
-  const stamp = appStamp(app);
+  // The install the frame stands on: a widget's update that leaves its script alone is not a new one.
+  const stamp = installStamp;
   const latestApp = useRef(app);
   useEffect(() => {
     latestApp.current = app;
@@ -496,13 +503,17 @@ const AppFrame = ({
     };
   }, [view.url, view.id, waits, chat, machine, app.id, target, doc, key]);
 
-  // The slot went to a page used less recently: ask again, and get another.
+  // The slot went to a page used less recently: ask again, and get another. Not for a widget: its page and its files are
+  // loaded (a view's files go to the view server with no cookie), so a slot taken from it changes nothing, and asking again
+  // made a stack of more widgets than slots take them from each other without end.
   useEffect(
     () =>
-      slotLeases.onTaken((taken) => {
-        if (taken === lease) setReload((n) => n + 1);
-      }),
-    [lease],
+      slotKeepsCookie
+        ? slotLeases.onTaken((taken) => {
+            if (taken === lease) setReload((n) => n + 1);
+          })
+        : undefined,
+    [lease, slotKeepsCookie],
   );
 
   const context = useMemo<IViewContext>(
@@ -1215,14 +1226,20 @@ const AppFrame = ({
           aria-hidden={state.k === 'ready'}
           aria-busy={state.k !== 'ready'}
         >
-          {skeleton ?? (
-            <>
-              <Icon name={app.icon || 'layout-grid'} />
-              <span className="hx-appview__skeleton-name">{skeletonText}</span>
-              <span className="hx-appview__skeleton-bar" />
-              <span className="hx-appview__skeleton-bar" />
-            </>
-          )}
+          {skeleton ??
+            (target === 'side' ? (
+              <>
+                <span className="hx-appview__skeleton-bar" />
+                <span className="hx-appview__skeleton-bar" />
+              </>
+            ) : (
+              <>
+                <Icon name={app.icon || 'layout-grid'} />
+                <span className="hx-appview__skeleton-name">{skeletonText}</span>
+                <span className="hx-appview__skeleton-bar" />
+                <span className="hx-appview__skeleton-bar" />
+              </>
+            ))}
         </div>
       )}
       {state.k === 'failed' && !retrying && (
@@ -1232,6 +1249,7 @@ const AppFrame = ({
           failure={state.failure}
           logKey={logKey(app.id, chat)}
           conversation={conversation}
+          compact={target === 'side'}
           onRetry={() => {
             setAutoTries(0);
             setReload((n) => n + 1);

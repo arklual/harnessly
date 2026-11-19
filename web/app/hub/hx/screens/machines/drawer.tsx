@@ -1,11 +1,13 @@
 // The machine card: what is going on with it, its load over a day, its resources, who may start chats, and the actions.
-import { useState } from 'react';
+import { type CSSProperties, useState } from 'react';
 
 import { useNow } from '../../../lib/hooks';
 import type { OrgMachine } from '../../../org/api/machines';
+import { plural } from '../../../org/screens/machines/format';
 import { LoadRow } from '../../charts/spark';
 import { Btn, Drawer, Icon } from '../../ui';
 import { AccessSection } from './access';
+import { BuilderSection } from './builder';
 import { canOpen, cardSub, cleanName, statusOf } from './calc';
 import { MachineDialogs } from './dialogs';
 import { DebugLog, DebugPanel } from './debug';
@@ -20,6 +22,9 @@ const NEEDS: Record<string, string> = {
   tenant_admin: 'Может поменять: админ тенанта',
   team_lead: 'Может поменять: лид команды',
 };
+
+const CARD = 't-card viz-card dash-tile hd-card';
+const LIFE = ['Связь', 'Подтверждение', 'Подготовка', 'Готова к чатам'];
 
 const Skeleton = () => (
   <div className="mx-skel-card" role="status" aria-label="Загрузка">
@@ -62,6 +67,7 @@ export const MachineDrawer = ({
   const disabled = d?.machine.state === 'disabled';
   const st = d && m ? statusOf(m, busy?.kind ?? null, card.done, now) : null;
   const locked = busy != null || disabled === true;
+  const canRestart = m != null && m.canManage && m.state !== 'offline' && busy == null;
 
   const apply = (to: { cores: number; ramGb: number; diskGb: number }) => {
     url.setTab(null);
@@ -86,6 +92,91 @@ export const MachineDrawer = ({
     }
     if (!d || !m || !st) return <Skeleton />;
     const off = m.state === 'offline' || m.state === 'disabled';
+    // The hub knows only whether the machine answers: before that it is at the first step, after it all are done.
+    const li = off ? 0 : 4;
+    const pill =
+      st.st === 'busy'
+        ? { cls: 'info', label: st.label }
+        : st.st === 'on'
+          ? m.runnerOutdated
+            ? { cls: 'warn', label: 'Нужно обновить' }
+            : { cls: 'ok', label: 'Готова к чатам' }
+          : { cls: st.st === 'off' ? 'bad' : '', label: st.label };
+    const chatsLine = m.chats
+      ? `${m.chats} ${plural(m.chats, 'чат идёт', 'чата идут', 'чатов идут')} сейчас`
+      : 'Сейчас свободна';
+    const fix =
+      st.st === 'busy' ? (
+        <div className="fixbox ok">
+          <div className="row sp">
+            <div>
+              <b>{st.label}</b>
+              <div className="mut sm">{st.hint}</div>
+            </div>
+            {busy?.kind === 'drain' && (
+              <button type="button" className="md-link hd-link" onClick={() => void card.cancelRestart()}>
+                Отменить
+              </button>
+            )}
+          </div>
+        </div>
+      ) : disabled ? (
+        <div className="fixbox">
+          <b>{st.label}</b>
+          <div className="mut sm" style={{ margin: '6px 0 10px' }}>
+            {st.hint}
+          </div>
+          <Btn variant="primary" size="sm" icon="play" onClick={() => void card.enable()}>
+            Подключить обратно
+          </Btn>
+        </div>
+      ) : m.state === 'offline' ? (
+        <div className="fixbox bad">
+          <b>{st.label}</b>
+          <div className="mut sm" style={{ marginTop: 6 }}>
+            {st.hint}. Чаты на ней недоступны. Проверьте, что машина включена и у неё есть сеть: хаб увидит её
+            сам.
+          </div>
+        </div>
+      ) : m.runnerOutdated ? (
+        <div className="fixbox">
+          <b>Раннер устарел: {m.runnerVersion}</b>
+          <div className="mut sm" style={{ margin: '6px 0 10px' }}>
+            Раннер подхватит новую версию при перезапуске: выберем «Раннер» и подтвердим.
+          </div>
+          <Btn
+            variant="primary"
+            size="sm"
+            icon="download"
+            aria-disabled={!canRestart}
+            title={!m.canManage ? NEEDS.team_lead : undefined}
+            onClick={() => canRestart && url.setDlg('restart')}
+          >
+            Обновить раннер
+          </Btn>
+        </div>
+      ) : (
+        <div className="fixbox ok">
+          <div className="row sp">
+            <div>
+              <b>{st.label === 'Простаивает' ? 'Простаивает' : 'Готова к чатам'}</b>
+              <div className="mut sm">{card.done ?? chatsLine}</div>
+            </div>
+            {canOpen(m) && (
+              <Btn
+                variant="primary"
+                size="sm"
+                icon="external-link"
+                busy={ws.busyId === m.id}
+                disabled={busy != null}
+                onClick={() => void ws.open(m.id)}
+              >
+                Открыть
+              </Btn>
+            )}
+          </div>
+        </div>
+      );
     return (
       <>
         {ws.error?.id === id && ws.error.untrusted && !card.error && (
@@ -131,17 +222,37 @@ export const MachineDrawer = ({
             </button>
           </div>
         )}
-        <div className="md-status" data-st={st.st}>
-          <span className="mo-dot" data-st={st.st} />
-          <span className="md-spin" aria-hidden="true" />
-          <b>{st.label}</b>
-          <span className="md-status__hint">{st.hint}</span>
-          {busy?.kind === 'drain' && (
-            <button type="button" className="md-link" onClick={() => void card.cancelRestart()}>
-              Отменить
-            </button>
-          )}
+        <div className="dh">
+          <div>
+            <h2>{m.name}</h2>
+            <div className="mut sm">
+              {cardSub(m)}
+              {m.runnerVersion ? ` · раннер ${m.runnerVersion}` : ''}
+            </div>
+          </div>
+          <div className="hd-x row">
+            <span className={`pill ${pill.cls}`}>
+              <span className="hd-d" />
+              {pill.label}
+            </span>
+            <Btn variant="ghost" size="sm" shape="icon" aria-label="Закрыть" onClick={url.close}>
+              <Icon i="x" />
+            </Btn>
+          </div>
         </div>
+        <div className="life">
+          {LIFE.map((s, i) => {
+            const done = i < li || li === 4;
+            return (
+              <div key={s} className={`st ${done ? 'done' : i === li ? 'cur' : ''}`}>
+                <b>{s}</b>
+                {done ? 'готово' : i === li ? 'сейчас здесь' : 'дальше'}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ height: 14 }} />
+        {fix}
         {mlUrl && (
           <a className="md-ext" href={mlUrl} target="_blank" rel="noopener noreferrer">
             <span className="md-ext__ic">
@@ -154,22 +265,53 @@ export const MachineDrawer = ({
             <Icon i="arrow-up-right" size="sm" className="md-ext__go" />
           </a>
         )}
-        <div className="md-sec">
-          <div className="md-sec__t">Нагрузка за сутки</div>
-          <div className="md-load">
-            <LoadRow label="Процессор" values={d.series.cpu} off={off} />
-            <LoadRow label="Память" values={d.series.ram} off={off} />
-            <LoadRow label="Диск" values={d.series.disk} off={off} />
+        <div className="sec">
+          <h4>Чья машина</h4>
+          <div className={CARD}>
+            <div className="set" style={{ padding: '0 0 12px' }}>
+              <div>
+                <div className="hd-t">
+                  {m.ownerName
+                    ? `Владелец — ${m.ownerName}`
+                    : `Общая машина${m.teamName ? ` команды ${m.teamName}` : ''}`}
+                </div>
+                <div className="hd-d">
+                  Машина, подготовленная админом для сотрудника, становится его: с тем же id, ключом и чатами.
+                </div>
+              </div>
+              {m.canAdmin && (
+                <Btn
+                  variant="outline"
+                  size="sm"
+                  aria-disabled={locked}
+                  onClick={() => {
+                    if (locked) return;
+                    card.clearError();
+                    url.setDlg('owner');
+                  }}
+                >
+                  Передать
+                </Btn>
+              )}
+            </div>
+            <div className="set" style={{ padding: '12px 0 0' }}>
+              <div>
+                <div className="hd-t">
+                  Тенант — {m.tenantName}
+                  {m.teamName ? ` · команда ${m.teamName}` : ''}
+                </div>
+                <div className="hd-d">
+                  Машина сохранит id и ключ. Перед переносом покажем, что изменится: команда, доступ и лимиты.
+                </div>
+              </div>
+              {m.canAdmin && (
+                <Btn variant="outline" size="sm" disabled={locked} onClick={() => url.setDlg('move')}>
+                  Перенести
+                </Btn>
+              )}
+            </div>
           </div>
         </div>
-        <ResourcesSection
-          d={d}
-          editing={url.tab === 'resources'}
-          locked={locked}
-          onEdit={() => url.setTab('resources')}
-          onCancel={() => url.setTab(null)}
-          onApply={apply}
-        />
         <AccessSection
           d={d}
           editing={url.tab === 'access'}
@@ -178,21 +320,129 @@ export const MachineDrawer = ({
           onCancel={() => url.setTab(null)}
           onSave={saveAccess}
         />
-        {/* The hub says whom it lists the openings to (canSeeDebug): the creator and who manages the tenant. */}
-        {m.canSeeDebug === true && <DebugLog id={id} />}
-        {m.canAdmin && (
-          <div className="md-sec">
-            <div className="md-sec__head">
-              <span className="md-sec__t">Название</span>
-              {renaming === null && busy == null && (
-                <button type="button" className="hb-add" onClick={() => setRenaming(m.name)}>
-                  Переименовать
-                </button>
+        {m.runnerVersion && (
+          <div className="sec">
+            <h4>Агенты на машине</h4>
+            <div className={CARD}>
+              <div className="row sp">
+                <div className="row">
+                  <b>Раннер harnessly</b>
+                  <span className={`pill ${m.runnerOutdated ? 'warn' : 'ok'}`}>
+                    <span className="hd-d" />
+                    {m.runnerVersion}
+                    {m.runnerOutdated ? ' · устарел' : ''}
+                  </span>
+                </div>
+              </div>
+              {m.os && (
+                <div className="mut sm" style={{ marginTop: 4 }}>
+                  {m.os}
+                </div>
               )}
             </div>
-            {renaming === null ? (
-              <p className="md-acc-sum">{m.name}</p>
+          </div>
+        )}
+        <ResourcesSection
+          d={d}
+          editing={url.tab === 'resources'}
+          locked={locked}
+          onEdit={() => url.setTab('resources')}
+          onCancel={() => url.setTab(null)}
+          onApply={apply}
+          meters={
+            m.cpu != null ? (
+              (
+                [
+                  ['Процессор', m.cpu],
+                  ['Память', m.ram],
+                  ['Диск', m.disk],
+                ] as const
+              ).map(([l, v]) =>
+                v == null ? null : (
+                  <div key={l} className="row" style={{ margin: '6px 0' }}>
+                    <span className="mut" style={{ width: 90 }}>
+                      {l}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <span
+                        className="hd-meter"
+                        data-t={v > 85 ? 'bad' : v > 65 ? 'warn' : 'ok'}
+                        style={{ '--w': `${Math.max(2, Math.min(100, v))}%` } as CSSProperties}
+                      >
+                        <i />
+                      </span>
+                    </div>
+                    <span className="num" style={{ width: 44 }}>
+                      {Math.round(v)}%
+                    </span>
+                  </div>
+                ),
+              )
             ) : (
+              <div className="mut sm">Появятся, когда машина будет на связи.</div>
+            )
+          }
+        />
+        <div className="sec">
+          <h4>Нагрузка за сутки</h4>
+          <div className="md-load">
+            <LoadRow label="Процессор" values={d.series.cpu} off={off} />
+            <LoadRow label="Память" values={d.series.ram} off={off} />
+            <LoadRow label="Диск" values={d.series.disk} off={off} />
+          </div>
+        </div>
+        <BuilderSection id={id} tenantId={m.tenantId} canAdmin={m.canAdmin} />
+        {/* The hub says whom it lists the openings to (canSeeDebug): the creator and who manages the tenant. */}
+        {m.canSeeDebug === true && <DebugLog id={id} />}
+        <div className="sec">
+          <h4>Действия</h4>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            {m.canAdmin && renaming === null && busy == null && (
+              <Btn variant="outline" size="sm" onClick={() => setRenaming(m.name)}>
+                Переименовать
+              </Btn>
+            )}
+            {!disabled && (
+              <Btn
+                variant="outline"
+                size="sm"
+                icon="rotate-cw"
+                aria-disabled={!canRestart}
+                title={
+                  !m.canManage ? NEEDS.team_lead : m.state === 'offline' ? 'Машина не на связи' : undefined
+                }
+                onClick={() => canRestart && url.setDlg('restart')}
+              >
+                Перезапустить
+              </Btn>
+            )}
+            {!disabled && (
+              <Btn
+                variant="outline"
+                size="sm"
+                className="md-danger"
+                aria-disabled={!m.canAdmin || busy != null}
+                title={!m.canAdmin && m.needs ? NEEDS[m.needs] : undefined}
+                onClick={() => m.canAdmin && busy == null && url.setDlg('off')}
+              >
+                Отключить
+              </Btn>
+            )}
+            {m.canAdmin && (
+              <Btn
+                variant="outline"
+                size="sm"
+                icon="trash-2"
+                className="md-danger"
+                disabled={busy != null}
+                onClick={() => url.setDlg('remove')}
+              >
+                Убрать машину…
+              </Btn>
+            )}
+          </div>
+          {m.canAdmin && renaming !== null && (
+            <>
               <form
                 className="md-rename"
                 onSubmit={(e) => {
@@ -216,141 +466,20 @@ export const MachineDrawer = ({
                   Сохранить
                 </Btn>
               </form>
-            )}
+              <p className="md-note">
+                Название от 1 до 60 символов. Так машину видят все, у кого есть к ней доступ.
+              </p>
+            </>
+          )}
+          {m.canAdmin && (
             <p className="md-note">
-              Название от 1 до 60 символов. Так машину видят все, у кого есть к ней доступ.
+              «Убрать машину»: она пропадёт из хаба, её ключ перестанет работать. Сам сервер не удаляется.
             </p>
-          </div>
-        )}
-        {m.canAdmin && (
-          <div className="md-sec">
-            <div className="md-sec__head">
-              <span className="md-sec__t">Владелец</span>
-              <button
-                type="button"
-                className="hb-add"
-                aria-disabled={locked}
-                onClick={() => {
-                  if (locked) return;
-                  card.clearError();
-                  url.setDlg('owner');
-                }}
-              >
-                Передать
-              </button>
-            </div>
-            <p className="md-acc-sum">{m.ownerName ?? 'Общая машина, владельца нет'}</p>
-            <p className="md-note">
-              Машина, подготовленная админом для сотрудника, становится его: с тем же id, ключом и чатами.
-            </p>
-          </div>
-        )}
-        {m.canAdmin && (
-          <div className="md-sec">
-            <div className="md-sec__t">Перенести в другой тенант</div>
-            <p className="md-note">
-              Машина сохранит id и ключ. Перед переносом покажем, что изменится: команда, доступ и лимиты.
-            </p>
-            <Btn
-              variant="outline"
-              size="sm"
-              icon="arrow-right-left"
-              disabled={locked}
-              onClick={() => url.setDlg('move')}
-            >
-              Перенести…
-            </Btn>
-          </div>
-        )}
-        {m.canAdmin && (
-          <div className="md-sec md-remove">
-            <div className="md-sec__t">Убрать машину</div>
-            <p className="md-note">
-              Машина пропадёт из хаба, её ключ перестанет работать. Сам сервер не удаляется.
-            </p>
-            <Btn
-              variant="outline"
-              size="sm"
-              icon="trash-2"
-              className="md-danger"
-              disabled={busy != null}
-              onClick={() => url.setDlg('remove')}
-            >
-              Убрать машину…
-            </Btn>
-          </div>
-        )}
+          )}
+        </div>
       </>
     );
   };
-
-  const canRestart = m != null && m.canManage && m.state !== 'offline' && busy == null;
-  const actions =
-    d && m ? (
-      <div className="md-actions">
-        {disabled ? (
-          busy == null && (
-            <Btn variant="primary" size="sm" icon="play" onClick={() => void card.enable()}>
-              Подключить обратно
-            </Btn>
-          )
-        ) : (
-          <>
-            {canOpen(m) && (
-              <Btn
-                variant="primary"
-                size="sm"
-                icon="external-link"
-                busy={ws.busyId === m.id}
-                disabled={busy != null}
-                onClick={() => void ws.open(m.id)}
-              >
-                Открыть
-              </Btn>
-            )}
-            {m.runnerOutdated && (
-              <Btn
-                variant="outline"
-                size="sm"
-                icon="download"
-                aria-disabled={!canRestart}
-                title={
-                  !m.canManage
-                    ? NEEDS.team_lead
-                    : 'Раннер подхватит новую версию при перезапуске: выберем «Раннер» и подтвердим'
-                }
-                onClick={() => canRestart && url.setDlg('restart')}
-              >
-                Обновить раннер
-              </Btn>
-            )}
-            <Btn
-              variant="outline"
-              size="sm"
-              icon="rotate-cw"
-              aria-disabled={!canRestart}
-              title={
-                !m.canManage ? NEEDS.team_lead : m.state === 'offline' ? 'Машина не на связи' : undefined
-              }
-              onClick={() => canRestart && url.setDlg('restart')}
-            >
-              Перезапустить
-            </Btn>
-            <span className="hx-spacer" />
-            <Btn
-              variant="ghost"
-              size="sm"
-              className="md-danger"
-              aria-disabled={!m.canAdmin || busy != null}
-              title={!m.canAdmin && m.needs ? NEEDS[m.needs] : undefined}
-              onClick={() => m.canAdmin && busy == null && url.setDlg('off')}
-            >
-              Отключить
-            </Btn>
-          </>
-        )}
-      </div>
-    ) : null;
 
   const dialogs =
     d && m ? (
@@ -398,12 +527,7 @@ export const MachineDrawer = ({
       }
       title={m?.name ?? ''}
       sub={m ? cardSub(m) : undefined}
-      over={
-        <>
-          {actions}
-          {dialogs}
-        </>
-      }
+      over={<>{dialogs}</>}
     >
       {body()}
     </Drawer>

@@ -129,3 +129,35 @@ func (c cronSpec) lastSlot(now, since time.Time, window time.Duration, loc *time
 	}
 	return time.Time{}, false
 }
+
+// next is the first slot after t (in t's location), within 400 days; false when there is none. A day or an hour that
+// cannot match is stepped over whole.
+func (c cronSpec) next(t time.Time) (time.Time, bool) {
+	t = t.Truncate(time.Minute).Add(time.Minute)
+	end := t.AddDate(0, 0, 400)
+	for t.Before(end) {
+		dayOK := c.month&(1<<uint(t.Month())) != 0
+		if dayOK {
+			domOK := c.dom&(1<<uint(t.Day())) != 0
+			dowOK := c.dow&(1<<uint(t.Weekday())) != 0
+			if c.domAny || c.dowAny {
+				dayOK = domOK && dowOK
+			} else {
+				dayOK = domOK || dowOK
+			}
+		}
+		if !dayOK {
+			t = time.Date(t.Year(), t.Month(), t.Day()+1, 0, 0, 0, 0, t.Location())
+			continue
+		}
+		if c.hour&(1<<uint(t.Hour())) == 0 {
+			t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour()+1, 0, 0, 0, t.Location())
+			continue
+		}
+		if c.matches(t) {
+			return t, true
+		}
+		t = t.Add(time.Minute)
+	}
+	return time.Time{}, false
+}

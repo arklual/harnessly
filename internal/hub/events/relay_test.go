@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"sync"
 	"testing"
@@ -53,6 +54,7 @@ type replica struct {
 	broker *Broker
 	fleet  *FleetBus
 	org    *MemoryBus
+	relay  *Relay
 }
 
 func twoReplicas(t *testing.T) (a, b replica, w *wire) {
@@ -64,6 +66,7 @@ func twoReplicas(t *testing.T) (a, b replica, w *wire) {
 	mk := func(id string) replica {
 		r := replica{broker: NewBroker(), fleet: NewFleetBus(), org: NewMemoryBus(nil)}
 		relay := NewRelay(id, w, r.broker, r.fleet, r.org, nil)
+		r.relay = relay
 		wg.Add(1)
 		go func() { defer wg.Done(); relay.Run(ctx) }()
 		return r
@@ -168,5 +171,26 @@ func TestRelayDropsWhatDoesNotFit(t *testing.T) {
 	}
 	if n := w.notified(); n != 1 {
 		t.Errorf("%d notifications sent, want 1", n)
+	}
+}
+
+func TestRelayCarriesNoticesToTheOtherReplicaOnly(t *testing.T) {
+	a, b, _ := twoReplicas(t)
+	type got struct {
+		person string
+		data   string
+	}
+	atA, atB := make(chan got, 4), make(chan got, 4)
+	sendA := a.relay.Notices(func(p string, d json.RawMessage) { atA <- got{p, string(d)} })
+	b.relay.Notices(func(p string, d json.RawMessage) { atB <- got{p, string(d)} })
+	sendA("user-1", json.RawMessage(`{"type":"read","keys":["k"]}`))
+	g := within(t, atB, "the notices event")
+	if g.person != "user-1" || g.data != `{"type":"read","keys":["k"]}` {
+		t.Fatalf("got %+v", g)
+	}
+	select {
+	case g := <-atA:
+		t.Fatalf("the sender heard its own event: %+v", g)
+	case <-time.After(100 * time.Millisecond):
 	}
 }

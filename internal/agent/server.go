@@ -56,6 +56,10 @@ func (a *Agent) handler(w http.ResponseWriter, r *http.Request) {
 		a.envOwnRoute(w, r)
 		return
 	}
+	if a.localToken != "" && r.Method == http.MethodPost && r.URL.RequestURI() == RoutinesRoute {
+		a.routinesRoute(w, r)
+		return
+	}
 	if a.localToken != "" && r.Method == http.MethodPost && r.URL.RequestURI() == "/history/read" {
 		a.centralHistoryRoute(w, r)
 		return
@@ -100,6 +104,11 @@ func (a *Agent) handler(w http.ResponseWriter, r *http.Request) {
 	// (signed with the pair's secret), not by agent.json.
 	if (r.Method == http.MethodPost && r.URL.RequestURI() == "/peers/send") || (r.Method == http.MethodGet && r.URL.RequestURI() == "/peers/directory") {
 		a.peersRoute(w, r)
+		return
+	}
+	// The pool of builder machines of the hub: the CLI and the runtime reach it through the agent.
+	if a.localToken != "" && (r.URL.Path == "/jobs" || strings.HasPrefix(r.URL.Path, "/jobs/")) {
+		a.jobsRoute(w, r)
 		return
 	}
 	// The memory of this machine's person, kept by the hub (docs/hub/memory-sync.md): the same relay token, its own audience.

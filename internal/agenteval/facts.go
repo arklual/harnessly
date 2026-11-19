@@ -16,7 +16,10 @@ import (
 // Facts are what a run left, read after the agent's turn. They are saved with the run, so a run is judged again
 // without running it.
 type Facts struct {
-	Calls []Call `json:"calls"`
+	// TimeScale is the compression of the agents' clock: the times of the calls are on it. 0 is the plain
+	// clock.
+	TimeScale float64 `json:"timeScale,omitempty"`
+	Calls     []Call  `json:"calls"`
 	// Said is everything the agent wrote to the person, in order; Final is its last message.
 	Said  []string `json:"said"`
 	Final string   `json:"final"`

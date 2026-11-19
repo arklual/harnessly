@@ -5,7 +5,10 @@ import {
   MCP_KINDS,
   MCP_REASONS,
   MCP_STATE,
+  MCP_TRANSPORT,
+  isKeyedTransport,
   type IMcpCatalogEntry,
+  type IMcpEnvField,
   type IMcpProbe,
   type IMcpServer,
   type TMcpKind,
@@ -25,6 +28,22 @@ export const mcpReasonText = (code: string): string =>
 export const blurbOf = (entry: IMcpCatalogEntry): string =>
   locale() === 'ru' && entry.blurbRu !== '' ? entry.blurbRu : entry.blurb;
 
+/** A local server or an API: it takes keys, not a sign-in or a header. */
+export const isKeyed = (item: { transport: IMcpServer['transport'] }): boolean =>
+  isKeyedTransport(item.transport);
+
+/** The reason a local server does not start, in the person's words when it is a common one, else as it came. */
+export const mcpProblemText = (problem: string): string => {
+  const missing = /^(npx|uvx) is not installed on this machine\.?$/i.exec(problem.trim());
+  if (missing !== null) return t('next.connections.mcp.problem.missing', { tool: missing[1].toLowerCase() });
+  const known: Record<string, string> = {
+    "the server's package does not run": t('next.connections.mcp.problem.broken'),
+    'the keys were refused': t('next.connections.mcp.problem.refused'),
+    'did not answer': t('next.connections.mcp.problem.silent'),
+  };
+  return known[problem.trim()] ?? problem;
+};
+
 /** The server needs the person (a sign-in or a token) before agents can use it. */
 export const needsPerson = (server: IMcpServer): boolean =>
   server.state === MCP_STATE.signin || server.state === MCP_STATE.denied;
@@ -35,10 +54,17 @@ export const takesToken = (server: IMcpServer): boolean =>
 
 /** A sign-in the person has not finished yet: said calmly, it is not a failure. */
 export const isQuietState = (server: IMcpServer): boolean =>
-  server.state === MCP_STATE.signin && !takesToken(server) && server.tools.length === 0;
+  server.state === MCP_STATE.signin && !takesToken(server) && !isKeyed(server) && server.tools.length === 0;
 
 /** What the server's last answer found, when it is not fine; null when it is (nothing to say then). */
 export const mcpStateText = (server: IMcpServer): string | null => {
+  if (isKeyed(server)) {
+    // A local server says by itself why it does not start.
+    if (server.problem !== '') return mcpProblemText(server.problem);
+    if (server.state === MCP_STATE.ok) return null;
+    if (server.state === MCP_STATE.unreachable) return t('next.connections.mcp.state.unreachable');
+    return t('next.connections.mcp.state.keys');
+  }
   if (server.state === MCP_STATE.ok) return null;
   if (server.state === MCP_STATE.unreachable) return t('next.connections.mcp.state.unreachable');
   if (server.oauthUnavailable) return t('next.connections.mcp.state.oauthUnavailable');
@@ -46,12 +72,18 @@ export const mcpStateText = (server: IMcpServer): string | null => {
   return t('next.connections.mcp.state.signin');
 };
 
+/** Where the server is: its host, «on this machine» for a local one, «API · host» for an API. */
+const whereOf = (server: IMcpServer): string => {
+  if (server.transport === MCP_TRANSPORT.stdio) return t('next.connections.mcp.local');
+  if (server.transport === MCP_TRANSPORT.api)
+    return t('next.connections.mcp.apiVia', { host: hostOf(server.url) });
+  return hostOf(server.url);
+};
+
 /** «mcp.linear.app · as anna@acme.com»; «off for agents» when it is turned off. */
 export const mcpSubLine = (server: IMcpServer): string => {
-  const where =
-    server.me === ''
-      ? hostOf(server.url)
-      : t('next.connections.mcp.as', { host: hostOf(server.url), who: server.me });
+  const host = whereOf(server);
+  const where = server.me === '' ? host : t('next.connections.mcp.as', { host, who: server.me });
   return server.enabled ? where : t('next.connections.mcp.offLine', { where });
 };
 
@@ -73,6 +105,27 @@ export const headerValue = (name: string, typed: string, prefix: string): string
   if (name.trim().toLowerCase() !== DEFAULT_HEADER.toLowerCase() || /\s/.test(value)) return value;
   return `${prefix === '' ? 'Bearer ' : prefix}${value}`;
 };
+
+/** What the keys' form starts with: every field empty but those that have a default. */
+export const envDefaults = (fields: readonly IMcpEnvField[]): Record<string, string> =>
+  Object.fromEntries(fields.map((field) => [field.name, field.default]));
+
+/** The keys as they are sent: what was typed, trimmed; an empty field is left out (on an edit it keeps the stored key). */
+export const envPayload = (
+  fields: readonly IMcpEnvField[],
+  values: Readonly<Record<string, string>>,
+): Record<string, string> =>
+  Object.fromEntries(
+    fields
+      .map((field) => [field.name, (values[field.name] ?? '').trim()])
+      .filter(([, value]) => value !== ''),
+  );
+
+/** Every key that is not optional has something in it. */
+export const envReady = (
+  fields: readonly IMcpEnvField[],
+  values: Readonly<Record<string, string>>,
+): boolean => fields.every((field) => field.optional || (values[field.name] ?? '').trim() !== '');
 
 /** The catalog without what is connected already. */
 export const openCatalog = (

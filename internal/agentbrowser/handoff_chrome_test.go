@@ -125,6 +125,10 @@ func TestChromeHandoffResetsHistory(t *testing.T) {
 			value := "generated-" + strings.Repeat("h6", 17)
 			encoded, err := json.Marshal(value)
 			must(t, err)
+			// The new tab answers before its page is in: on a slow runner document.body is still null.
+			eventually(t, 5*time.Second, func() bool {
+				return string(evaluate(t, i, tab.ID, "location.pathname+':'+document.readyState")) == `"/login:complete"`
+			})
 			evaluate(t, i, tab.ID, `document.body.innerHTML='<input type="password">';document.querySelector('input').value=`+string(encoded)+`;true`)
 			_, err = i.Call(t.Context(), tab.ID, "Page.navigate", map[string]any{"url": server.URL + "/account"})
 			must(t, err)

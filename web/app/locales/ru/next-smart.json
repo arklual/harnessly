@@ -1,6 +1,7 @@
 {
   "next.extProviders.title": "По API",
   "next.extProviders.key.safe": "Ключ уйдёт в сейф машины",
+  "next.extProviders.key.pair": "Видео и картинки: ID ключа и secret через двоеточие, id:secret",
   "next.extProviders.offer": "Для сводок и подсказок",
   "next.extProviders.offer.chats": "Для чатов, сводок и подсказок",
   "next.extProviders.offer.custom": "Любой сервер с API как у OpenAI или Anthropic",

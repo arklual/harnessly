@@ -155,6 +155,7 @@
   "next.appfail.reason.waiting.connection": "Waiting for a connection",
   "next.appfail.reason.waiting.other": "Waiting to be set up",
   "next.appfail.retry": "Try again",
+  "next.appfail.refresh": "Refresh",
   "next.appfail.journal": "Open the log",
   "next.appfail.journalHide": "Hide the log",
   "next.appfail.journalEmpty": "The log is empty so far",

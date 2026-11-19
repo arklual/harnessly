@@ -1,0 +1,24 @@
+id: design-scene3d-pins
+title: Пины 3D-сцены Sinopia — агент читает комментарии на объектах командой design scene3d, а не лезет в файлы проекта
+tags: [design, scene3d]
+timeout_s: 480
+setup:
+  design: [fixtures/villa3d]
+covers:
+  - 'internal/hlcli/design_scene3d.go'
+  - 'internal/hlcli/design.go'
+  - 'internal/design/scene3d_routes.go'
+prompt: В проекте Sinopia Design «villa3d» (3D-сцена) люди оставили пины. Что они просят изменить и на каком объекте?
+expect:
+  - name: read the pins with the scene3d command
+    called: Bash
+    args: {command: '(?s).*harnessly design scene3d (comments|get)\s.*'}
+  - name: named the object and the ask
+    text: '(?i)roof|крыш'
+variants:
+  - id: v1
+    kind: short
+    text: "Sinopia Design, 3D-сцена «villa3d»: какие пины оставили и что в них просят?"
+  - id: v2
+    kind: english
+    text: "In the Sinopia Design 3D scene «villa3d» people left pins. Which object and what change do they ask for?"

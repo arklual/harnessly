@@ -22,6 +22,8 @@ func TestParseScenarioRefusesWhatCannotBeJudged(t *testing.T) {
 		"args alone":    "id: a1\nprompt: x\nexpect: [{args: {a: b}}]\n",
 		"escaping file": "id: a1\nprompt: x\nsetup: {files: {'../x': y}}\nexpect: [{called: a}]\n",
 		"bad agent":     "id: a1\nagents: [gpt]\nprompt: x\nexpect: [{called: a}]\n",
+		"memory path":   "id: a1\nprompt: x\nsetup: {memory: {'../x.md': y}}\nexpect: [{called: a}]\n",
+		"memory kind":   "id: a1\nprompt: x\nsetup: {memory: {x.txt: y}}\nexpect: [{called: a}]\n",
 	} {
 		if _, err := ParseScenario(name, []byte(body)); err == nil {
 			t.Errorf("%s: accepted", name)
@@ -30,6 +32,22 @@ func TestParseScenarioRefusesWhatCannotBeJudged(t *testing.T) {
 	s, err := ParseScenario("ok", []byte("id: a1\nprompt: x\nvariants: [{id: v1, text: y}]\nexpect: [{called: a}]\n"))
 	if err != nil || s.Set != SetDev || len(s.Prompts()) != 2 || s.Timeout() != defaultTimeoutS {
 		t.Fatalf("%v %+v", err, s)
+	}
+}
+
+// a scenario can give the person's memory for the workspace's project, as earlier chats left it.
+func TestScenarioMemoryIsPutInTheStandsMemoryFolder(t *testing.T) {
+	sc, err := ParseScenario("m", []byte("id: a1\nprompt: x\nsetup: {memory: {MEMORY.md: '- [a](a.md)', a.md: note}}\nexpect: [{called: a}]\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := &Stand{Home: t.TempDir(), Work: filepath.Join(t.TempDir(), "work")}
+	if err := prepare(st, sc); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(st.memoryDir(), "a.md"))
+	if err != nil || string(raw) != "note" || !strings.Contains(st.memoryDir(), filepath.Join(".claude", "projects")) {
+		t.Fatalf("%q %v %s", raw, err, st.memoryDir())
 	}
 }
 

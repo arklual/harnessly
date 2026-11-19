@@ -7,6 +7,8 @@
   "next.widgets.fold": "Свернуть",
   "next.widgets.unfold": "Развернуть",
   "next.widgets.remove": "Убрать",
+  "next.widgets.scope.here": "Только в этом чате",
+  "next.widgets.scope.all": "Показывать во всех чатах",
   "next.widgets.full": "Виджетов уже двенадцать — уберите один",
   "next.widgets.smart.now": "Спросить сейчас",
   "next.widgets.limits.title": "Лимиты",

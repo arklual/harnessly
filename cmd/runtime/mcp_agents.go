@@ -21,6 +21,34 @@ import (
 // mcpProxyPath is the proxy's route; a server's address is this plus its id.
 const mcpProxyPath = "/api/cli/mcp-proxy/"
 
+// mcpHubPath is the hub: one MCP server with tools to find, read and call the tools of every connection.
+const mcpHubPath = "/api/cli/mcp-hub"
+
+// mcpHubName is the name agents know the hub by: its tools come as mcp__harnessly-hub__<tool>.
+const mcpHubName = "harnessly-hub"
+
+// mcpDirectMax is the most tools the connections may have together for agents to get them as servers of their own
+// besides the hub: a few servers cost little context, a hundred would fill it, and then the hub alone finds them.
+const mcpDirectMax = 40
+
+// mcpDirect is the servers agents get as their own MCP servers: every enabled one with tools, unless together they
+// have more tools than mcpDirectMax. An API has no tools of its own: only the hub reaches it.
+func mcpDirect(list []mcpconn.Server) []mcpconn.Server {
+	var out []mcpconn.Server
+	n := 0
+	for _, srv := range list {
+		if srv.Slug == "" || srv.ID == "" || srv.Transport == mcpconn.API {
+			continue
+		}
+		n += len(srv.Tools)
+		out = append(out, srv)
+	}
+	if n > mcpDirectMax {
+		return nil
+	}
+	return out
+}
+
 // mcpAgentServerName is the name an agent knows a server by: Claude's tools come as mcp__mcp-<slug>__<tool>.
 func mcpAgentServerName(srv mcpconn.Server) string { return "mcp-" + srv.Slug }
 
@@ -42,12 +70,9 @@ func mcpClaudeConfig(enabled func() []mcpconn.Server, runtimeMCP, dir string) fu
 		if !ok {
 			return "", nil
 		}
-		servers := map[string]any{}
-		allow := make([]string, 0, len(list))
-		for _, srv := range list {
-			if srv.Slug == "" || srv.ID == "" {
-				continue
-			}
+		servers := map[string]any{mcpHubName: map[string]any{"type": "http", "url": base + mcpHubPath, "headers": headers}}
+		allow := []string{"mcp__" + mcpHubName}
+		for _, srv := range mcpDirect(list) {
 			name := mcpAgentServerName(srv)
 			servers[name] = map[string]any{"type": "http", "url": base + mcpProxyPath + url.PathEscape(srv.ID), "headers": headers}
 			allow = append(allow, "mcp__"+name)
@@ -138,11 +163,12 @@ func mcpCodexServers(enabled func() []mcpconn.Server, own codex.MCP, port int) f
 		if port <= 0 || own.TokenHeader == "" || own.TokenEnv == "" {
 			return nil
 		}
-		var out []codex.MCP
-		for _, srv := range enabled() {
-			if srv.Slug == "" || srv.ID == "" {
-				continue
-			}
+		list := enabled()
+		if len(list) == 0 {
+			return nil
+		}
+		out := []codex.MCP{{Server: mcpHubName, URL: codex.MCPURL(port, mcpHubPath), TokenHeader: own.TokenHeader, TokenEnv: own.TokenEnv}}
+		for _, srv := range mcpDirect(list) {
 			out = append(out, codex.MCP{Server: mcpAgentServerName(srv), URL: codex.MCPURL(port, mcpProxyPath+url.PathEscape(srv.ID)),
 				TokenHeader: own.TokenHeader, TokenEnv: own.TokenEnv})
 		}
@@ -158,6 +184,15 @@ func mcpEnabledOf(dataDir string) func() []mcpconn.Server {
 	}
 	svc := mcpconn.New(dataDir, nil, nil)
 	return svc.Enabled
+}
+
+// mcpConnectedOf is the line of the person's connections for an agent's prompt, read at every launch.
+func mcpConnectedOf(dataDir string) func() string {
+	if strings.TrimSpace(dataDir) == "" {
+		return func() string { return "" }
+	}
+	svc := mcpconn.New(dataDir, nil, nil)
+	return func() string { return mcpconn.ConnectedLine(svc) }
 }
 
 // appConnections is apps.ConnectionSource over the person's connections of this machine: a launch reads the file at

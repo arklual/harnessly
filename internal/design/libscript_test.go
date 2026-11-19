@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"io"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -51,5 +52,17 @@ func TestLibScriptIsKeptByVersionAndGzipped(t *testing.T) {
 
 	if got := withClientAt("<head><title>x</title>", "p1", false, scriptPath+"?"+libScriptParam+"="+v); !strings.Contains(got, `src="/__lib/client.js?v=`+v+`"`) {
 		t.Fatalf("the board names the script without its version: %s", got)
+	}
+}
+
+// HRN guest links: the hub builds its libraries without the runtime's words, and the board script must still be code.
+func TestClientScriptOfBareLibraryNamesItsGlobals(t *testing.T) {
+	l := New(Config{LibraryDir: t.TempDir(), Passive: true})
+	src := l.clientScript()
+	if m := regexp.MustCompile(`\{\{[a-z]+\}\}|window\.[ \t]*[&|;).=]`).FindString(src); m != "" {
+		t.Fatalf("the board script of a library without texts has an empty global: %q", m)
+	}
+	if !strings.Contains(src, "window.DesignPages && document.getElementById('root')") {
+		t.Fatal("the pages global is not the default one")
 	}
 }

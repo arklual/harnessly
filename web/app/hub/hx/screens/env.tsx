@@ -4,13 +4,14 @@
 // One implementation for every width and every role: a member sees the same layers, only to read.
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { ApplyWhen, EnvEntryRow } from '../../../hub-api/env';
+import type { EnvEntryRow, EnvLayer } from '../../../hub-api/env';
 import { useOrg } from '../../org/context';
 import { useClosing } from '../../org/ui/closing';
-import { Titles } from '../shell';
+import { Head } from '../shell';
 import { Btn, closingAttr, Icon } from '../ui';
 import '../styles/env.css';
 import { reposOf, useActions } from './env/actions';
+import { useUrl } from './teams/url';
 import { AddHome, AddKind, AddLink } from './env/add';
 import { ApplyMenu } from './env/apply';
 import { Empty, isNotEnabled, LoadFailed, Search, Skeleton } from './env/bits';
@@ -20,10 +21,11 @@ import { ItemBody } from './env/item';
 import { type LayerActions, LayerCard, type LayerVM } from './env/layers';
 import { LogsBody } from './env/logs';
 import { MachineStrip } from './env/machine';
-import { GROUP_ORDER, KIND } from './env/model';
+import { ADD_KINDS, ADMIN_KINDS, GROUP_ORDER, isAddKind, KIND } from './env/model';
 import { ScopePicker } from './env/picker';
 import { AgentProposals } from './env/proposals';
 import { TestBody } from './env/sandbox';
+import { ApplyPanel, CatalogCards, ItemsTable, TabNav, type TabId } from './env/tabs';
 import { blocksOf, chainOf, firstTarget, keyOf, metaOf, same, type Target } from './env/scope';
 import { Sheet } from './env/sheet';
 import { OwnAdd } from './env/own';
@@ -65,6 +67,9 @@ const introText = (role: 'admin' | 'lead' | 'member'): { title: string; text: st
   };
 };
 
+const TAB_IDS: TabId[] = ['items', 'catalog', 'apply'];
+const LEAD = 'Что стоит на машинах агентов: одно место вместо настроек каждой машины';
+
 const SHEET_LABEL: Record<SheetMode['mode'], string> = {
   add: 'Добавить в окружение',
   edit: 'Пункт окружения',
@@ -86,10 +91,14 @@ const Screen = () => {
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
   const [sheet, setSheet] = useState<SheetMode | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  // «Добавить подписку или ключ» on «Модели и подписки» lands here with `?add=provider`: open that form once.
+  const [wantAdd, setWantAdd] = useState(() => new URLSearchParams(window.location.search).get('add'));
   const [intro, setIntro] = useState(readIntro);
   const introAnim = useClosing(intro, 300);
   const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
   const toast = useToast();
+  const url = useUrl([]);
+  const tab = TAB_IDS.find((t) => t === url.get('tab')) ?? 'items';
   const timers = useRef<number[]>([]);
   useEffect(() => {
     const list = timers.current;
@@ -108,7 +117,7 @@ const Screen = () => {
   if (data.error != null && layers === null) {
     return (
       <>
-        <Header />
+        <Head title="Окружение" lead={LEAD} />
         {isNotEnabled(data.error) ? (
           <Empty>Окружение в организации ещё не включено</Empty>
         ) : (
@@ -120,7 +129,7 @@ const Screen = () => {
   if (!layers || !target) {
     return (
       <>
-        <Header />
+        <Head title="Окружение" lead={LEAD} />
         <Skeleton />
       </>
     );
@@ -147,6 +156,13 @@ const Screen = () => {
     setSheetOpen(false);
     timers.current.push(window.setTimeout(() => setSheet(null), 220));
   };
+  if (wantAdd !== null) {
+    setWantAdd(null);
+    if (wantAdd === 'provider' && canEdit) {
+      setSheet({ mode: 'add', step: 'kind', kind: 'provider' });
+      setSheetOpen(true);
+    }
+  }
   const orgAdmin = layers.some((l) => l.layer === 'org' && !l.locked);
   const ctx: SheetCtx = {
     role,
@@ -213,83 +229,125 @@ const Screen = () => {
   });
 
   const text = introText(role);
+  const layerOf = (l: EnvLayer) => ({ layer: l.layer, scopeId: l.scopeId });
+  const allRows = chain.flatMap((l) => l.items);
+  const acts = (
+    <>
+      {canEdit && (
+        <Btn variant="primary" icon="plus" onClick={() => openSheet({ mode: 'add', step: 'home' })}>
+          Добавить
+        </Btn>
+      )}
+      {canEdit && <ApplyMenu onApply={(when) => actions.applyMachines(target, when)} />}
+    </>
+  );
+  const kinds = ADD_KINDS.filter((k) => !ADMIN_KINDS.includes(k) || orgAdmin);
   return (
     <>
-      <Header
-        introHidden={!intro}
-        onIntro={() => {
-          writeIntro(true);
-          setIntro(true);
-        }}
-        onLogs={() => openSheet({ mode: 'logs' })}
-        onTest={canEdit ? () => openSheet({ mode: 'test' }) : null}
-        onApply={canEdit ? (when) => actions.applyMachines(target, when) : null}
-        onAdd={canEdit ? () => openSheet({ mode: 'add', step: 'home' }) : null}
-      />
-      {introAnim.mounted && (
-        <div className="ev-intro-w" data-closing={closingAttr(introAnim.closing)} data-block="Что это">
-          <div>
-            <div className="ev-intro">
-              <span className="ev-intro__ic">
-                <Icon i="layers" />
-              </span>
-              <div className="ev-intro__t">
-                <b>{text.title}</b>
-                <p>{text.text}</p>
-                <div className="ev-kinds">
-                  {GROUP_ORDER.filter((k) => k !== 'doc').map((k) => (
-                    <span className="ev-kind" key={k}>
-                      <Icon i={KIND[k].icon} size="sm" />
-                      {KIND[k].one}
-                    </span>
-                  ))}
+      <Head title="Окружение" lead={LEAD} acts={acts} />
+      <TabNav tab={tab} onTab={(t) => url.put({ tab: t === 'items' ? null : t })} />
+      {tab === 'items' && (
+        <>
+          {orgAdmin && <AgentProposals onChanged={data.refresh} say={toast.say} fail={toast.fail} />}
+          <div className="hintbar">
+            <Icon i="layers" />
+            <span>
+              Слои складываются сверху вниз: <b>организация → команда → вложенная команда → человек</b>. На
+              машину попадает всё из её слоёв. Ниже слой может добавить своё, но не убрать то, что закреплено
+              выше.
+            </span>
+          </div>
+          <ItemsTable
+            chain={chain}
+            canRemove={(l, r) => !member && !l.locked && !r.locked && same(l, target)}
+            onRemove={(l, r) => void actions.remove(layerOf(l), r)}
+          />
+          <h2 className="hd-sech">Слои и пресеты</h2>
+          {introAnim.mounted && (
+            <div className="ev-intro-w" data-closing={closingAttr(introAnim.closing)} data-block="Что это">
+              <div>
+                <div className="ev-intro">
+                  <span className="ev-intro__ic">
+                    <Icon i="layers" />
+                  </span>
+                  <div className="ev-intro__t">
+                    <b>{text.title}</b>
+                    <p>{text.text}</p>
+                    <div className="ev-kinds">
+                      {GROUP_ORDER.filter((k) => k !== 'doc').map((k) => (
+                        <span className="ev-kind" key={k}>
+                          <Icon i={KIND[k].icon} size="sm" />
+                          {KIND[k].one}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <Btn
+                    variant="ghost"
+                    size="sm"
+                    shape="icon"
+                    aria-label="Скрыть"
+                    onClick={() => {
+                      writeIntro(false);
+                      setIntro(false);
+                    }}
+                  >
+                    <Icon i="x" />
+                  </Btn>
                 </div>
               </div>
-              <Btn
-                variant="ghost"
-                size="sm"
-                shape="icon"
-                aria-label="Скрыть"
-                onClick={() => {
-                  writeIntro(false);
-                  setIntro(false);
-                }}
-              >
-                <Icon i="x" />
-              </Btn>
             </div>
+          )}
+          <div className="ev-bar" data-block="Что настраиваете и поиск">
+            <ScopePicker
+              view={view}
+              role={role}
+              target={target}
+              onPick={ctx.setTarget}
+              variant="page"
+              label={member ? 'Ваша команда' : 'Настраиваете'}
+              disabled={member || (role !== 'admin' && view.layers.filter((l) => !l.locked).length <= 1)}
+            />
+            <Search
+              value={q}
+              onChange={setQ}
+              placeholder="Найти репозиторий, скилл, MCP"
+              label="Найти в окружении"
+            />
           </div>
-        </div>
+          <div className="ev-layers" data-block="Уровни">
+            {shownLayers.map(({ vm, blocks }) => (
+              <LayerCard key={keyOf(vm.layer)} vm={vm} rows={blocks} q={q} a={actionsOf(vm)} fresh={fresh} />
+            ))}
+          </div>
+          {member && data.own.can && <OwnAdd onAdd={(req) => actions.ownAdd(req, space)} />}
+          {shownLayers.length === 0 && (
+            <div className="ev-empty">Ничего не нашлось. Попробуйте другое слово или добавьте ссылкой</div>
+          )}
+        </>
       )}
-      {orgAdmin && <AgentProposals onChanged={data.refresh} say={toast.say} fail={toast.fail} />}
-      {member && (
-        <MachineStrip machines={data.machines} refresh={data.refresh} say={toast.say} fail={toast.fail} />
+      {tab === 'catalog' && (
+        <CatalogCards
+          items={catalog.items}
+          kinds={[...kinds]}
+          canAdd={canEdit}
+          onAdd={(k) =>
+            openSheet(isAddKind(k) ? { mode: 'add', step: 'kind', kind: k } : { mode: 'add', step: 'home' })
+          }
+        />
       )}
-      <div className="ev-bar" data-block="Что настраиваете и поиск">
-        <ScopePicker
-          view={view}
-          role={role}
-          target={target}
-          onPick={ctx.setTarget}
-          variant="page"
-          label={member ? 'Ваша команда' : 'Настраиваете'}
-          disabled={member || (role !== 'admin' && view.layers.filter((l) => !l.locked).length <= 1)}
-        />
-        <Search
-          value={q}
-          onChange={setQ}
-          placeholder="Найти репозиторий, скилл, MCP"
-          label="Найти в окружении"
-        />
-      </div>
-      <div className="ev-layers" data-block="Уровни">
-        {shownLayers.map(({ vm, blocks }) => (
-          <LayerCard key={keyOf(vm.layer)} vm={vm} rows={blocks} q={q} a={actionsOf(vm)} fresh={fresh} />
-        ))}
-      </div>
-      {member && data.own.can && <OwnAdd onAdd={(req) => actions.ownAdd(req, space)} />}
-      {shownLayers.length === 0 && (
-        <div className="ev-empty">Ничего не нашлось. Попробуйте другое слово или добавьте ссылкой</div>
+      {tab === 'apply' && (
+        <>
+          {member && (
+            <MachineStrip machines={data.machines} refresh={data.refresh} say={toast.say} fail={toast.fail} />
+          )}
+          <ApplyPanel
+            delivery={data.view?.delivery ?? null}
+            rows={allRows}
+            onLogs={() => openSheet({ mode: 'logs' })}
+            onTest={canEdit ? () => openSheet({ mode: 'test' }) : null}
+          />
+        </>
       )}
       {sheet && (
         <Sheet open={sheetOpen} label={SHEET_LABEL[sheet.mode]} onClose={closeSheet}>
@@ -310,66 +368,5 @@ const Screen = () => {
     </>
   );
 };
-
-const Header = ({
-  introHidden,
-  onIntro,
-  onLogs,
-  onTest,
-  onApply,
-  onAdd,
-}: {
-  introHidden?: boolean;
-  onIntro?: () => void;
-  onLogs?: () => void;
-  onTest?: (() => void) | null;
-  onApply?: ((when: ApplyWhen) => Promise<boolean>) | null;
-  onAdd?: (() => void) | null;
-}) => (
-  <div className="hb-head" data-block="Заголовок">
-    <Titles
-      title="Окружение"
-      end={
-        introHidden ? (
-          <span className="hx-tipped">
-            <Btn
-              className="ev-what"
-              variant="ghost"
-              size="sm"
-              shape="icon"
-              aria-label="Что это за раздел"
-              onClick={onIntro}
-            >
-              <Icon i="info" />
-            </Btn>
-            <span className="hx-tip pz-tip" data-align="start">
-              Что это за раздел
-            </span>
-          </span>
-        ) : undefined
-      }
-    />
-    <div className="hb-tools ev-tools">
-      {onLogs && (
-        <Btn variant="ghost" size="sm" onClick={onLogs} aria-label="Логи">
-          <Icon i="file-text" size="sm" />
-          <span className="ev-tl">Логи</span>
-        </Btn>
-      )}
-      {onTest && (
-        <Btn size="sm" onClick={onTest} aria-label="Проверить в песочнице">
-          <Icon i="shield-check" size="sm" />
-          <span className="ev-tl">Проверить</span>
-        </Btn>
-      )}
-      {onApply && <ApplyMenu onApply={onApply} />}
-      {onAdd && (
-        <Btn variant="primary" size="sm" icon="plus" onClick={onAdd}>
-          Добавить
-        </Btn>
-      )}
-    </div>
-  </div>
-);
 
 export default Screen;

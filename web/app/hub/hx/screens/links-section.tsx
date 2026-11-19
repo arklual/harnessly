@@ -95,40 +95,52 @@ export const LinksSection = () => {
   };
 
   return (
-    <div className="hx-set__group">
-      <div className="hx-set__group-title">Ссылки в чате</div>
+    <>
+      <h2 className="hd-sech" data-sec="links">
+        Ссылки в чатах
+        <span className="mut2 sm">Адреса, которые агенты превращают в ссылки в чатах.</span>
+      </h2>
       {form !== null && (
-        <div className="hx-set__card">
-          {FIELDS.map((f) => (
-            <label
-              key={f.key}
-              className="hx-set__row hx-set__row--field"
-              data-busy={busy ? 'true' : undefined}
-            >
-              <span className="hx-set__row-text">
-                <span className="hx-set__row-label">{f.label}</span>
-                <span className="hx-set__row-hint">{f.hint}</span>
-              </span>
-              <input
-                className="hx-set__input hx-set__row-input"
-                value={form[f.key]}
-                maxLength={300}
-                placeholder={f.placeholder}
-                spellCheck={false}
-                autoComplete="off"
-                onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-              />
-            </label>
-          ))}
-          <div className="hx-set__row hx-set__row--actions">
-            <Btn variant="primary" size="sm" busy={busy} disabled={!dirty} onClick={save}>
+        <>
+          <div className="t-card viz-card dash-tile hd-card flat">
+            {FIELDS.map((f) => (
+              <label key={f.key} className="set" data-busy={busy ? 'true' : undefined}>
+                <div>
+                  <div className="hd-t">{f.label}</div>
+                  <div className="hd-d">{f.hint}</div>
+                </div>
+                <div>
+                  <input
+                    className="inp"
+                    style={{ width: 280 }}
+                    value={form[f.key]}
+                    maxLength={300}
+                    placeholder={f.placeholder}
+                    spellCheck={false}
+                    autoComplete="off"
+                    onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                  />
+                </div>
+              </label>
+            ))}
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <Btn className="hd-btn" variant="primary" size="sm" busy={busy} disabled={!dirty} onClick={save}>
               Сохранить
             </Btn>
           </div>
-        </div>
+        </>
       )}
-      {loaded && 'error' in loaded && <div className="hx-set__foot">{loaded.error}</div>}
-      {failed && <div className="hx-set__foot">{failed}</div>}
-    </div>
+      {loaded && 'error' in loaded && (
+        <p className="mut sm" style={{ marginTop: 8 }}>
+          {loaded.error}
+        </p>
+      )}
+      {failed && (
+        <p className="mut sm" style={{ marginTop: 8 }}>
+          {failed}
+        </p>
+      )}
+    </>
   );
 };

@@ -205,3 +205,120 @@ func TestAWidgetScriptThatNeverConnectsIsConnectedFirst(t *testing.T) {
 		t.Fatalf("a script that connects is kept as written: %q", js)
 	}
 }
+
+// a widget an agent makes is for the chat it was made in, unless it asks for every chat; the person's page
+// reads which from the view's widget block.
+func TestAWidgetBelongsToTheChatItWasMadeIn(t *testing.T) {
+	reg := &fakeReg{installed: map[string]apps.Installed{}}
+	s := &Service{Reg: reg, Root: t.TempDir(), Host: "0.16.999", Now: func() time.Time { return time.Unix(1_800_000_000, 0) }}
+	chatOf := func(name string) string {
+		raw, err := os.ReadFile(filepath.Join(s.Root, name, apps.ManifestPath))
+		if err != nil {
+			t.Fatal(err)
+		}
+		m, probs := apps.ParseManifest(raw)
+		if len(probs.Errors()) > 0 {
+			t.Fatalf("%v", probs)
+		}
+		return m.Views[0].Widget.Chat
+	}
+	made := func(name, scope, chat string) {
+		t.Helper()
+		sp, err := Place(Spec{Name: name, Title: name, Sources: []string{"limits"}, Scope: scope}, chat)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.Create(sp); err != nil {
+			t.Fatal(err)
+		}
+	}
+	made("render-progress", "", "tab-aaa111")
+	made("limits-forecast", ScopeGlobal, "tab-aaa111")
+	made("from-terminal", "", "")
+	if got := chatOf("render-progress"); got != "tab-aaa111" {
+		t.Fatalf("the default is the chat it was made in: %q", got)
+	}
+	if got := chatOf("limits-forecast"); got != "" {
+		t.Fatalf("a global widget has no chat: %q", got)
+	}
+	if got := chatOf("from-terminal"); got != "" {
+		t.Fatalf("a caller with no chat makes it for every chat: %q", got)
+	}
+	// Pinned to every chat, and back to this chat.
+	g := ScopeGlobal
+	p, err := PlacePatch(Patch{Scope: &g}, "tab-bbb222")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Update("render-progress", p); err != nil {
+		t.Fatal(err)
+	}
+	if got := chatOf("render-progress"); got != "" {
+		t.Fatalf("global after the update: %q", got)
+	}
+	c := ScopeChat
+	p, _ = PlacePatch(Patch{Scope: &c}, "tab-bbb222")
+	if _, err := s.Update("render-progress", p); err != nil {
+		t.Fatal(err)
+	}
+	if got := chatOf("render-progress"); got != "tab-bbb222" {
+		t.Fatalf("the caller's chat after the update: %q", got)
+	}
+	if _, err := Place(Spec{Scope: "everyone"}, "tab-x"); err == nil {
+		t.Fatal("a scope that is none is taken")
+	}
+	list, _ := s.List()
+	for _, w := range list {
+		if w.Name == "render-progress" && (w.Scope != ScopeChat || w.Chat != "tab-bbb222") {
+			t.Fatalf("list: %+v", w)
+		}
+	}
+}
+
+// an update of the markup or the style leaves the frame's shell as it was (the page keeps the frame and hands
+// the new markup to it); a new script, or a script that connects itself, starts the frame anew.
+func TestAnUpdateOfTheMarkupKeepsTheShell(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	shellOf := func(sp Spec) string {
+		m, files, err := Package(sp, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sp.JS == "" || !strings.Contains(sp.JS, "harnessly.connect") {
+			if !strings.Contains(files["ui/index.html"], `data-rev="`+ContentOf(sp).Rev+`"`) {
+				t.Fatalf("the markup has no revision: %s", files["ui/index.html"])
+			}
+		}
+		return m.Views[0].Widget.Shell
+	}
+	a := Spec{Name: "w", Title: "w", HTML: "<b>10%</b>", CSS: "b{color:red}", JS: "draw()"}
+	b := a
+	b.HTML, b.CSS = "<b>60%</b>", "b{color:blue}"
+	if shellOf(a) == "" || shellOf(a) != shellOf(b) {
+		t.Fatalf("the shell moved with the markup: %q %q", shellOf(a), shellOf(b))
+	}
+	if ContentOf(a).Rev == ContentOf(b).Rev {
+		t.Fatal("the revision does not follow the markup")
+	}
+	c := a
+	c.JS = "draw2()"
+	if shellOf(a) == shellOf(c) {
+		t.Fatal("a new script keeps the shell")
+	}
+	own := a
+	own.JS = "window.harnessly.connect().then(draw)"
+	if shellOf(own) != "" {
+		t.Fatal("a script that connects itself cannot be patched")
+	}
+	s := &Service{Reg: &fakeReg{installed: map[string]apps.Installed{}}, Root: t.TempDir(), Host: "0.16.999", Now: func() time.Time { return now }}
+	if _, err := s.Create(a); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Content(ID("w"))
+	if err != nil || got.HTML != "<b>10%</b>" || !strings.Contains(got.CSS, "b{color:red}") || got.Rev != ContentOf(a).Rev {
+		t.Fatalf("%+v %v", got, err)
+	}
+	if _, err := s.Content("acme.other"); err == nil {
+		t.Fatal("an app that is no widget has content")
+	}
+}

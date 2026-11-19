@@ -33,6 +33,7 @@ var codexKey = map[wire.AgentOptionKey]codexAt{
 	wire.OptApproval:    {nil, "approval_policy"},
 	wire.OptSearch:      {nil, "web_search"},
 	wire.OptHistory:     {[]string{"history"}, "persistence"}, // "none" is off, "save-all" on
+	wire.OptMemories:    {[]string{"features"}, "memories"},   // unset reads as on: harnessly starts every chat with it (codex.MemoryArgs)
 }
 
 func tomlMap(text string) (map[string]any, error) {
@@ -91,6 +92,10 @@ func (s *Store) codexView(path string, raw []byte, m map[string]any) wire.AgentS
 		default:
 			values[key] = v
 		}
+	}
+	// harnessly starts every Codex chat with memories on unless the person's file says otherwise (codex.MemoryArgs).
+	if _, set := values[wire.OptMemories]; !set {
+		values[wire.OptMemories] = true
 	}
 	mcp := []wire.AgentMcp{}
 	servers, _ := m["mcp_servers"].(map[string]any)

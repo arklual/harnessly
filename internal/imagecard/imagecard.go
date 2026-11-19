@@ -14,12 +14,13 @@ const (
 	Failed  = "failed"
 )
 
-// IsGenerate and IsWait say whether a tool name (bare, or mcp__<server>__<tool>) is the harnessly picture tool.
+// IsGenerate and IsWait say whether a tool name (bare, or mcp__<server>__<tool>) is the harnessly picture tool or its video
+// twin (generate_video, wait_video): a clip is a card of the same kind, its file a video.
 func IsGenerate(tool string) bool {
-	return tool == "generate_images" || strings.HasSuffix(tool, "__generate_images")
+	return tool == "generate_images" || strings.HasSuffix(tool, "__generate_images") || tool == "generate_video" || strings.HasSuffix(tool, "__generate_video")
 }
 func IsWait(tool string) bool {
-	return tool == "wait_images" || strings.HasSuffix(tool, "__wait_images")
+	return tool == "wait_images" || strings.HasSuffix(tool, "__wait_images") || tool == "wait_video" || strings.HasSuffix(tool, "__wait_video")
 }
 
 // Report is the parsed answer of a picture tool.

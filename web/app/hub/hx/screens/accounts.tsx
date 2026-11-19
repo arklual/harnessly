@@ -1,4 +1,4 @@
-// «Аккаунты»: the subscriptions and API keys the organization's agents work on — who pays, who used each
+// «Модели и подписки»: the subscriptions and API keys the organization's agents work on — who pays, who used each
 // this month and what it cost at list prices. An account the hub only found on a machine waits on top until an
 // administrator says what it is; the card and its form live in the address (`?a=<id>`, `&dlg=register`).
 import { type CSSProperties, type FormEvent, useState } from 'react';
@@ -8,9 +8,7 @@ import type { Account, AccountFunding, AccountKind, RegisterAccount } from '../.
 import { orgErrorText } from '../../org/api/errors';
 import { useOrg } from '../../org/context';
 import { useLoad } from '../../org/hooks';
-import { ListBar, NoMatch, useListView, type SortKey } from '../sort-bar';
-import { searchRows, sortRows } from '../sort';
-import { Titles } from '../shell';
+import { Head } from '../shell';
 import { Btn, Drawer, Icon, initial } from '../ui';
 import { inRubles, shownOfUsd } from '../../org/money';
 import { fromUsdExact } from '../../org/screens/overview/format';
@@ -18,7 +16,7 @@ import { plural, rub, usd } from './overview/fmt';
 import { useUrl } from './teams/url';
 import '../styles/accounts.css';
 
-const CARDS = ['a', 'dlg'] as const;
+const CARDS = ['a', 'dlg', 'f'] as const;
 
 const PROVIDER: Record<string, string> = { anthropic: 'Anthropic', openai: 'OpenAI' };
 const KIND: Record<AccountKind, string> = {
@@ -50,13 +48,6 @@ const subOf = (a: Account, tenantName: (id: string | null) => string): string =>
   [providerName(a.provider), planName(a) || null, KIND[a.kind], tenantName(a.tenantId)]
     .filter(Boolean)
     .join(' · ');
-
-/** A found account has only the hub's technical label: name it by the provider and whom it was seen with. */
-const titleOf = (a: Account): string => {
-  if (!a.discovered) return a.label;
-  const who = a.owner?.name ?? a.people[0]?.name;
-  return `${providerName(a.provider)}${who ? ` у ${who}` : ''}: не зарегистрирован`;
-};
 
 const peopleLine = (a: Account): string => {
   if (a.people.length === 0) return 'никто в этом месяце';
@@ -91,52 +82,6 @@ const Seg = <T,>({
         {o.label}
       </button>
     ))}
-  </div>
-);
-
-// ── The list ────────────────────────────────────────────────────────────────────────────────────────────────────────
-
-const Row = ({ a, sub, onOpen }: { a: Account; sub: string; onOpen: () => void }) => (
-  <button
-    type="button"
-    className="pt-row ac-row"
-    data-found={a.discovered ? '1' : undefined}
-    onClick={onOpen}
-  >
-    <span className="pt-name">
-      <span className="hb-ic">
-        <Icon i={a.discovered ? 'circle-alert' : a.kind === 'api_key' ? 'key-round' : 'coins'} size="sm" />
-      </span>
-      <span className="mt-name__t">
-        <b title={a.discovered ? a.label : undefined}>{titleOf(a)}</b>
-        <small>{sub}</small>
-      </span>
-    </span>
-    <span className="ac-pay">{a.discovered ? 'не указано' : FUNDING[a.funding]}</span>
-    <span className="ac-who">{peopleLine(a)}</span>
-    <span
-      className="ac-num"
-      title={a.kind === 'subscription' && a.feeUsd > 0 ? `${usd(a.feeUsd)} в месяц` : undefined}
-    >
-      {a.kind === 'subscription' && a.feeUsd > 0 ? `${fromUsdExact(a.feeUsd)}/мес` : '—'}
-    </span>
-    <span className="ac-num">
-      <b>{rub(a.monthRub)}</b>
-    </span>
-    <span className="ac-go">
-      {a.discovered ? <span className="ac-cta">Зарегистрировать</span> : <Icon i="chevron-right" size="sm" />}
-    </span>
-  </button>
-);
-
-const Head = () => (
-  <div className="pt-row ac-row mt-head">
-    <span>Аккаунт</span>
-    <span>Кто платит</span>
-    <span>Кто пользуется</span>
-    <span>Абонентская</span>
-    <span>В месяце по прайсу</span>
-    <span />
   </div>
 );
 
@@ -228,11 +173,14 @@ const Card = ({
 const Form = ({
   a,
   tenants,
+  funding0,
   onDone,
   onCancel,
 }: {
   a: Account;
   tenants: { id: string; name: string }[];
+  /** The fixbox's choice: «сделать подпиской организации» or «разрешить как личную». */
+  funding0?: AccountFunding;
   onDone: (saved: Account | null) => void;
   onCancel: () => void;
 }) => {
@@ -241,7 +189,7 @@ const Form = ({
   const [label, setLabel] = useState(a.discovered ? '' : a.label);
   const [plan, setPlan] = useState(a.plan);
   const [kind, setKind] = useState<AccountKind>(a.kind);
-  const [funding, setFunding] = useState<AccountFunding>(a.discovered ? 'org' : a.funding);
+  const [funding, setFunding] = useState<AccountFunding>(funding0 ?? (a.discovered ? 'org' : a.funding));
   const [fee, setFee] = useState(a.feeUsd > 0 ? String(a.feeUsd) : '');
   const sole = a.people.length === 1 ? a.people[0]!.userId : null;
   const [owner, setOwner] = useState<string | null>(a.owner?.userId ?? sole);
@@ -445,24 +393,86 @@ const Form = ({
 // ── The screen ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
 const Skeleton = () => (
-  <div className="mt" aria-busy="true">
-    {Array.from({ length: 4 }, (_, i) => (
-      <div key={i} className="pt-row ac-row">
-        <span className="hx-sk" style={{ height: 32 }} />
-      </div>
-    ))}
+  <div className="t-card viz-card dash-tile hd-card flat" aria-busy="true">
+    <table className="tbl">
+      <tbody>
+        {Array.from({ length: 4 }, (_, i) => (
+          <tr key={i}>
+            <td colSpan={6}>
+              <span className="hx-sk" style={{ display: 'block', height: 28 }} />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   </div>
 );
 
-const ACC_SORTS: SortKey[] = [
-  { id: 'spend', label: 'По расходу' },
-  { id: 'name', label: 'По имени', first: 'asc' },
-  { id: 'fee', label: 'По абонентской' },
-];
+const KIND_PILL: Record<AccountKind, string> = {
+  subscription: 'Подписка',
+  api_key: 'Ключ API',
+  prepaid: 'Предоплата',
+};
+
+/** The mockup's meter: the account's share of the biggest spend this month. */
+const Meter = ({ pct }: { pct: number }) => (
+  <span
+    className="hd-meter"
+    data-t="acc"
+    style={{ '--w': `${Math.max(2, Math.min(100, pct)).toFixed(1)}%` } as CSSProperties}
+  >
+    <i />
+  </span>
+);
+
+/** «Найдена подписка, которой нет в хабе»: an account seen on a machine that nobody registered yet. */
+const FoundBox = ({
+  a,
+  canManage,
+  onPick,
+}: {
+  a: Account;
+  canManage: boolean;
+  onPick: (f: AccountFunding | null) => void;
+}) => {
+  const who = a.owner?.name ?? a.people[0]?.name;
+  const what = a.kind === 'subscription' ? 'личной подписке' : 'своём ключе';
+  return (
+    <div className="fixbox" style={{ marginBottom: 16 }}>
+      <div className="row sp" style={{ flexWrap: 'wrap', gap: 10 }}>
+        <div>
+          <b>
+            Найдена {a.kind === 'subscription' ? 'подписка' : 'ключ'}, которой нет в хабе:{' '}
+            {a.label.split(' · ').pop()}
+          </b>
+          <div className="mut sm">
+            {who ? `${who} работает на ${what} ${providerName(a.provider)}. ` : ''}Расход по ней не виден в
+            бюджете команды.
+          </div>
+        </div>
+        <div className="row">
+          {canManage ? (
+            <>
+              <Btn className="hd-btn" variant="primary" size="sm" onClick={() => onPick('org')}>
+                Сделать подпиской организации
+              </Btn>
+              <Btn className="hd-btn" variant="outline" size="sm" onClick={() => onPick('personal')}>
+                Разрешить как личную
+              </Btn>
+            </>
+          ) : (
+            <Btn className="hd-btn" variant="outline" size="sm" onClick={() => onPick(null)}>
+              Подробнее
+            </Btn>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const Screen = () => {
   const { shell, base } = useOrg();
-  const view = useListView(ACC_SORTS, { key: null, dir: 'desc' });
   const { data, error, reload } = useLoad((api) => api.accounts(), []);
   const url = useUrl(CARDS);
   const [saved, setSaved] = useState<Record<string, Account>>({});
@@ -472,21 +482,9 @@ const Screen = () => {
     id === null ? 'Вся организация' : (shell.tenants.find((t) => t.id === id)?.name ?? 'тенант');
 
   const list = (data?.accounts ?? []).map((a) => saved[a.id] ?? a);
-  const sorted = sortRows(list, view.sort, {
-    spend: (a) => a.monthRub,
-    name: (a) => titleOf(a),
-    fee: (a) => (a.kind === 'subscription' ? a.feeUsd : 0),
-  });
-  const matched = searchRows(sorted, view.q, (a) => [
-    titleOf(a),
-    a.label,
-    providerName(a.provider),
-    a.plan,
-    ...a.people.map((x) => x.name),
-  ]);
-  const ordered = [...matched].sort((x, y) => Number(y.discovered) - Number(x.discovered));
-  const found = ordered.filter((a) => a.discovered);
-  const known = ordered.filter((a) => !a.discovered);
+  const found = list.filter((a) => a.discovered);
+  const known = list.filter((a) => !a.discovered).sort((x, y) => y.monthRub - x.monthRub);
+  const top = Math.max(1, ...known.map((a) => a.monthRub));
 
   const openId = url.get('a');
   const opened = openId ? list.find((a) => a.id === openId) : undefined;
@@ -494,22 +492,27 @@ const Screen = () => {
   if (opened && opened !== kept) setKept(opened);
   const shown = opened ?? kept;
   const editing = !!shown && canManage && (url.get('dlg') === 'register' || shown.discovered);
-
-  const totalRub = list.reduce((n, a) => n + a.monthRub, 0);
-  const feesUsd = list.reduce((n, a) => n + (a.kind === 'subscription' && !a.discovered ? a.feeUsd : 0), 0);
+  const f = url.get('f');
+  const funding0: AccountFunding | undefined = f === 'org' || f === 'personal' ? f : undefined;
 
   return (
     <>
-      <div className="hb-head ac-head">
-        <Titles
-          title="Аккаунты"
-          lead={
-            data
-              ? `${list.length} ${plural(list.length, 'аккаунт', 'аккаунта', 'аккаунтов')} · ${rub(totalRub)} по прайсу в этом месяце${feesUsd > 0 ? ` · абонентская ${fromUsdExact(feesUsd)} в месяц` : ''}`
-              : 'Подписки и ключи, на которых работают агенты'
-          }
-        />
-      </div>
+      <Head
+        title="Модели и подписки"
+        lead="На чём работают агенты: подписки Claude и Codex, ключи API и свой шлюз моделей"
+        acts={
+          canManage ? (
+            <Btn
+              className="hd-btn"
+              variant="primary"
+              icon="plus"
+              onClick={() => navigate(`${base}/env?add=provider`)}
+            >
+              Добавить подписку или ключ
+            </Btn>
+          ) : null
+        }
+      />
       {notice && (
         <p className="ac-notice" role="status">
           <Icon i="check" size="sm" />
@@ -518,7 +521,7 @@ const Screen = () => {
       )}
       {error && !data ? (
         <p className="an-err" role="alert">
-          <b>Аккаунты не загрузились</b>
+          <b>Подписки не загрузились</b>
           <span>{orgErrorText(error)}</span>
           <Btn size="sm" icon="rotate-cw" onClick={reload}>
             Повторить
@@ -527,54 +530,101 @@ const Screen = () => {
       ) : !data ? (
         <Skeleton />
       ) : list.length === 0 ? (
-        <p className="ov-empty">
-          Аккаунтов пока нет: они появятся, когда агенты на машинах организации начнут работать.
-        </p>
-      ) : (
-        <div className="ac-stack">
-          <ListBar keys={ACC_SORTS} view={view} placeholder="Найти аккаунт или человека" />
-          {ordered.length === 0 && <NoMatch view={view} />}
-          {found.length > 0 && (
-            <section className="ac-group" aria-label="Ждут регистрации">
-              <h3 className="ac-group__t">
-                Найдены на машинах <span className="at-title__count">{found.length}</span>
-                <small>
-                  Скажите, что это за аккаунт и кто за него платит — тогда расход попадёт в бюджет
-                </small>
-              </h3>
-              <div className="mt">
-                {found.map((a) => (
-                  <Row
-                    key={a.id}
-                    a={a}
-                    sub={subOf(a, tenantName)}
-                    onOpen={() => url.open({ a: a.id, dlg: canManage ? 'register' : null })}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-          <section className="ac-group" aria-label="Аккаунты организации">
-            {found.length > 0 && <h3 className="ac-group__t">Аккаунты организации</h3>}
-            {known.length === 0 ? (
-              ordered.length === 0 ? null : (
-                <p className="ov-empty">Зарегистрированных аккаунтов пока нет.</p>
-              )
-            ) : (
-              <div className="mt">
-                <Head />
-                {known.map((a) => (
-                  <Row
-                    key={a.id}
-                    a={a}
-                    sub={subOf(a, tenantName)}
-                    onOpen={() => url.open({ a: a.id, dlg: null })}
-                  />
-                ))}
-              </div>
+        <div className="t-card viz-card dash-tile hd-card">
+          <div className="hd-empty">
+            <span className="hd-empty__ic">
+              <Icon i="key-round" />
+            </span>
+            <b>Ни одной подписки</b>
+            <span>
+              Без подписки агенты на машинах не смогут работать. Добавьте подписку Claude или Codex, или ключ
+              API шлюза моделей.
+            </span>
+            {canManage && (
+              <Btn className="hd-btn" variant="primary" onClick={() => navigate(`${base}/env?add=provider`)}>
+                Добавить подписку
+              </Btn>
             )}
-          </section>
+          </div>
         </div>
+      ) : (
+        <>
+          {found.map((a) => (
+            <FoundBox
+              key={a.id}
+              a={a}
+              canManage={canManage}
+              onPick={(fd) => url.open({ a: a.id, dlg: canManage ? 'register' : null, f: fd })}
+            />
+          ))}
+          {known.length > 0 && (
+            <div className="t-card viz-card dash-tile hd-card flat">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Подписка или ключ</th>
+                    <th>Вид</th>
+                    <th>Расход за месяц</th>
+                    <th>Кто платит</th>
+                    <th>Кто на ней</th>
+                    <th className="num">Платёж</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {known.map((a) => (
+                    <tr
+                      key={a.id}
+                      className="click"
+                      tabIndex={0}
+                      onClick={() => url.open({ a: a.id, dlg: null, f: null })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') url.open({ a: a.id, dlg: null, f: null });
+                      }}
+                    >
+                      <td>
+                        <div className="nm">{a.label}</div>
+                        <div className="mut2 sm">
+                          {[providerName(a.provider), planName(a) || null].filter(Boolean).join(' · ')}
+                        </div>
+                      </td>
+                      <td>
+                        <span className="pill">{KIND_PILL[a.kind]}</span>
+                      </td>
+                      <td style={{ width: '20%' }}>
+                        <Meter pct={(a.monthRub / top) * 100} />
+                        <div className="mut2 sm" style={{ marginTop: 4 }}>
+                          {rub(a.monthRub)} по прайсу
+                        </div>
+                      </td>
+                      <td>
+                        <span className="mut sm">{FUNDING[a.funding]}</span>
+                      </td>
+                      <td>
+                        <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
+                          {a.people.length === 0 ? (
+                            <span className="pill">{tenantName(a.tenantId).toLowerCase()}</span>
+                          ) : (
+                            <>
+                              {a.people.slice(0, 2).map((p) => (
+                                <span key={p.userId} className="pill">
+                                  {p.name}
+                                </span>
+                              ))}
+                              {a.people.length > 2 && <span className="pill">ещё {a.people.length - 2}</span>}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                      <td className="num">
+                        {a.kind === 'subscription' && a.feeUsd > 0 ? `${fromUsdExact(a.feeUsd)}/мес` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
       <Drawer
         open={!!opened}
@@ -600,6 +650,7 @@ const Screen = () => {
               key={`${shown.id}:form`}
               a={shown}
               tenants={shell.tenants}
+              funding0={funding0}
               onCancel={shown.discovered ? url.close : () => url.put({ dlg: null })}
               onDone={(next) => {
                 if (next) setSaved((m) => ({ ...m, [next.id]: next }));

@@ -119,8 +119,12 @@ func (s *Service) Dispatch(ctx context.Context) bool {
 		return false
 	}
 	fctx := context.WithoutCancel(ctx)
+	prompt, model := s.buildPrompt(rule, run), rule.Model
+	if rule.Routine != nil {
+		prompt, model = s.buildRoutinePrompt(rule, run), s.routineModel(rule)
+	}
 	raw, err := s.links.Do(ctx, machine, startOp, map[string]any{
-		"workspaceId": nil, "prompt": s.buildPrompt(rule, run), "model": rule.Model, "cwd": nil,
+		"workspaceId": nil, "prompt": prompt, "model": model, "cwd": nil,
 		"runId": run.ID, "resultToken": token, "env": map[string]string{s.cfg.AutomationsTokenEnv: token},
 	}, startFor)
 	if err != nil {

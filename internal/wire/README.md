@@ -827,3 +827,10 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
     (`generate_images`, `wait_images`, Codex's image tool), oldest first, at most 24. The page shows them under the
     answer, so a folded turn still shows what it drew; the steps keep their cards for the unfolded view. A page that
     does not know the field drops it.
+74. **The machine's apps changed.** An app installed, updated or removed, a widget an agent made, changed or
+    removed (`harnessly widget`, `widget_create|update|remove`) is told to the open pages on the machine channel as a
+    `machine_status` that also carries `appsAt` (unix ms): the page reads the machine's installed apps again, so the
+    widget shows, changes or goes with no reload. The rest of that event is the machine as it is (the same reach,
+    runtime, agents and health), a burst of writes within 120 ms goes out once. Only a page that names the cap
+    (`?caps=appssync` on the socket) gets the field: any other page gets the same event without it, which it takes as
+    the status it already holds, so an open tab of an older build neither breaks nor reads again.

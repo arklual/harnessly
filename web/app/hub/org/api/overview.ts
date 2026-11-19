@@ -3,7 +3,7 @@
 // contracts (docs/hub/orgs.md has none of these yet): spend/limits → limits.md, subscriptions/signals → analytics.md.
 import type { Section } from '../types';
 
-export type OverviewPeriod = 'week' | 'month';
+export type OverviewPeriod = 'day' | 'week' | 'month';
 
 /** The head tiles. `bars` is the last days, oldest first, the last one is today. */
 export interface OverviewTiles {

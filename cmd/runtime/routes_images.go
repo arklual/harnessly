@@ -136,7 +136,7 @@ func pictureReadable(d deps, access *files.Access) func(string) bool {
 		if err != nil {
 			return false
 		}
-		return saveFolderOK(access, real, d.WorkspaceRoot, sharedProjects, imagesDir(d), codexImagesDir(d), files.NodeTempDir(), "/tmp")
+		return saveFolderOK(access, real, d.WorkspaceRoot, sharedProjects, imagesDir(d), mediaDir(d), codexImagesDir(d), files.NodeTempDir(), "/tmp")
 	}
 }
 

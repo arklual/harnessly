@@ -176,21 +176,31 @@ func (r *Runtime) Start(ctx context.Context) error {
 		}
 		ops, err := s.loadOps()
 		errs = append(errs, err)
+		ps, err := s.loadProjects()
+		errs = append(errs, err)
+		fs, err := s.loadFavorites()
+		errs = append(errs, err)
+		ds, err := s.loadDrafts()
+		errs = append(errs, err)
+		// Each under its own lock: the projects feed and the API read them as soon as the runtime is built, before
+		// Start ends.
 		now := r.d.Clock.Now()
+		r.opsMu.Lock()
 		for k, op := range ops {
 			if now.Sub(time.UnixMilli(op.At)) < OpsKept {
 				r.ops[k] = op
 			}
 		}
-		ps, err := s.loadProjects()
-		errs = append(errs, err)
+		r.opsMu.Unlock()
+		r.mu.Lock()
 		r.projects = ps
-		fs, err := s.loadFavorites()
-		errs = append(errs, err)
+		r.mu.Unlock()
+		r.favMu.Lock()
 		r.favs = fs
-		ds, err := s.loadDrafts()
-		errs = append(errs, err)
+		r.favMu.Unlock()
+		r.draftMu.Lock()
 		r.drafts = ds
+		r.draftMu.Unlock()
 	}
 	if !r.inline {
 		if s := r.d.Store; s != nil {
@@ -1777,8 +1787,10 @@ func (r *Runtime) create(m wire.ConversationCreateCmd, person string) wire.CmdRe
 		return wire.Refused(wire.RefuseUnsupported)
 	}
 	// A folder kept from an earlier chat may be gone: the launch would fail with the message held in a paused queue.
-	if r.d.FolderGone != nil && cwd != "" && r.d.FolderGone(cwd) {
-		return wire.Refused(wire.RefuseNotFound)
+	if r.d.FolderGone != nil && cwd != "" {
+		if code := r.d.FolderGone(cwd); code != "" {
+			return wire.Refused(code)
+		}
 	}
 	model, code := r.onProfile(m.Provider, m.Model, m.Profile)
 	if code != "" {

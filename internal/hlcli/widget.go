@@ -42,10 +42,11 @@ const widgetUsage = `harnessly widget — a widget in the feed of this chat
 harnessly widget — a widget under the chat's right column (the person's computers, every chat)
 
   harnessly widget create <name> --title T [--sources limits,machine,subagents] [--smart "request"] [--every MIN]
-                          [--size s|m|l] [--refresh SEC] [--icon NAME] [--html @file] [--css @file] [--js @file]
+                          [--scope chat|global] [--size s|m|l] [--refresh SEC] [--icon NAME] [--html @file] [--css @file] [--js @file]
       a small card the person keeps under the right column; it joins their widgets by itself.
       --sources  the host's data it is given: limits (5 h and week left), machine (CPU, memory, disk),
                  subagents (delegated chats at work)
+      --scope    chat (default): shown in this chat, and where the person pins it; global: in every chat
       --smart    a request a model answers over those data in a few short lines, every --every minutes (5..1440,
                  default 30) and at once on the card's button
       --html/--css/--js  your own page (optional): hl.context.data = {sources, smart}, hl.on('context', fn);
@@ -147,6 +148,11 @@ func (c *cli) sideWidgetSave(op string, args []string) error {
 		switch key {
 		case "title", "icon", "smart", "size", "html", "css":
 			fields[key] = val
+		case "scope":
+			if val != "chat" && val != "global" {
+				return usageErr("--scope is chat or global")
+			}
+			fields[key] = val
 		case "js", "script":
 			fields["js"] = val
 		case "every", "refresh":
@@ -170,11 +176,13 @@ func (c *cli) sideWidgetSave(op string, args []string) error {
 	if h, _ := fields["html"].(string); strings.Contains(strings.ToLower(h), "<script") {
 		return usageErr("put the script in --js, not in the markup: the widget's page takes no inline script")
 	}
+	// The chat this terminal runs: a widget is made for it unless --scope global.
+	session := c.session()
 	if op == "create" {
 		fields["name"] = name
-		return c.sideWidgetPost(map[string]any{"op": "create", "spec": fields})
+		return c.sideWidgetPost(map[string]any{"op": "create", "spec": fields, "session": session})
 	}
-	return c.sideWidgetPost(map[string]any{"op": "update", "name": name, "patch": fields})
+	return c.sideWidgetPost(map[string]any{"op": "update", "name": name, "patch": fields, "session": session})
 }
 
 func (c *cli) sideWidgetPost(body map[string]any) error {

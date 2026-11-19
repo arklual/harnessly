@@ -1,0 +1,36 @@
+id: hub-moex-quote
+title: Котировка с Мосбиржи — через хаб подключений, найти тул поиском, не тащить всё в контекст
+tags: [connections, hub]
+timeout_s: 300
+# The stand has Moscow Exchange ISS connected (an API, no key) and a few other connections. The agent should
+# find it through harnessly-hub (search_tools or connections), call api_request, and answer with the number — not curl
+# the exchange by hand, and not read every connection's tools.
+setup:
+  connections: [moex, arxiv, openalex, cbr]
+covers:
+  - 'internal/mcpconn/hub.go'
+  - 'internal/mcpconn/keyed.go'
+  - 'internal/mcpconn/catalog_api.go'
+  - 'cmd/runtime/safe_prompt.go'
+  - 'cmd/runtime/mcp_agents.go'
+prompt: сколько сейчас стоит акция Сбера на Мосбирже?
+expect:
+  - name: looked the connection up through the hub
+    called: harnessly-hub\.(search_tools|connections)
+  - name: asked the exchange through the hub
+    called: harnessly-hub\.api_request
+    args: {connection: '(?i).*moex.*', path: '(?i).*SBER.*'}
+  - name: did not go around the hub
+    not_called: Bash
+    args: {command: '(?i)(?s).*(curl|wget|python|requests).*(iss\.moex|moex\.com).*'}
+  - name: got there in a few steps
+    max_calls: 10
+  - name: answered with a price
+    text: '(?i)(\d+[.,]\d+|\d{2,4})\s*(₽|руб|rub)'
+variants:
+  - id: v1
+    kind: english
+    text: "What's Sberbank's share price on the Moscow Exchange right now?"
+  - id: v2
+    kind: short
+    text: "курс SBER на мосбирже"

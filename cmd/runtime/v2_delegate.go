@@ -24,14 +24,17 @@ import (
 	"github.com/ly-solutions/harnessly/internal/delivery"
 	"github.com/ly-solutions/harnessly/internal/design"
 	"github.com/ly-solutions/harnessly/internal/fileplace"
+	"github.com/ly-solutions/harnessly/internal/hubproto"
 	"github.com/ly-solutions/harnessly/internal/imagegen"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/looks"
 	"github.com/ly-solutions/harnessly/internal/mcpserver"
+	"github.com/ly-solutions/harnessly/internal/mediagen"
 	"github.com/ly-solutions/harnessly/internal/paneauto"
 	"github.com/ly-solutions/harnessly/internal/panel"
 	"github.com/ly-solutions/harnessly/internal/proc"
 	"github.com/ly-solutions/harnessly/internal/providers"
+	"github.com/ly-solutions/harnessly/internal/routinetools"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -204,6 +207,7 @@ func (v *v2Live) serveDelegation(done <-chan struct{}) {
 		t := delegation.Tools{S: v.delegation, Caller: id, Why: why}
 		hand := delivery.Tools{Access: access}
 		pics := imagegen.Tools{S: imageJobs(v.d), Caller: id, Why: why, Allowed: func(p string) bool { return saveFolderOK(access, p, v.d.WorkspaceRoot, sharedProjects) }, Readable: pictureReadable(v.d, access)}
+		clips := mediagen.Tools{S: mediaJobs(v.d), Caller: id, Why: why, Allowed: pics.Allowed, Readable: pics.Readable}
 		hand.Handed = func(info delivery.Info) {
 			keepDelivered(info)
 			if id != "" {
@@ -214,7 +218,9 @@ func (v *v2Live) serveDelegation(done <-chan struct{}) {
 			t.Provider = rec.Provider
 			hand.Cwd = rec.Cwd
 			pics.Cwd, pics.Codex = rec.Cwd, rec.Provider == wire.ProviderCodex
+			clips.Cwd, clips.Codex = pics.Cwd, pics.Codex
 		}
+		pics.Media = clips
 		place := fileplace.Tools{Store: v.selections, Access: access, Chat: id, Why: why, Show: v.showFilePlace}
 		if rec, ok := v.rt.Record(id); ok {
 			place.Cwd = rec.Cwd
@@ -226,10 +232,10 @@ func (v *v2Live) serveDelegation(done <-chan struct{}) {
 		}
 		// The agent of a chat with apps stays in its wall: a chat it started or wrote to would run outside.
 		// The widgets under the right column: a sandboxed view with no permission, so a walled agent makes them too.
-		widgets := sidewidget.Tools{S: sideWidgetService(v.d)}
+		widgets := sidewidget.Tools{S: sideWidgetService(v.d), Chat: id}
 		look := looks.Tools{Inbox: lookInbox, Caller: id}
 		if _, walled := v.d.CLI.AgentOf(r); walled {
-			return toolsets{hand, pics, place, browse, notices, widgets, look}
+			return toolsets{hand, pics, clips, place, browse, notices, widgets, look}
 		}
 		// Only a chat that works in a video project carries the video's tools.
 		video := design.VideoTools{L: designAPI(v.d).L}
@@ -240,7 +246,15 @@ func (v *v2Live) serveDelegation(done <-chan struct{}) {
 		if rec, ok := v.rt.Record(id); ok {
 			browser.Cwd = rec.Cwd
 		}
-		return toolsets{t, hand, pics, video, design.KitTools{L: video.L}, place, browser, browse, notices, widgets, look}
+		routines := routinetools.Tools{Chat: id, Hub: func(ctx context.Context, c hubproto.RoutinesCall) (int, []byte, error) {
+			return agent.CallLocal(nil, v.d.DataDir, os.Getenv("RUNTIME_AGENT_TOKEN_HEADER"), agent.RoutinesRoute, c, routinesTimeout)
+		}}
+		// So does a chat that works in a 3D scene project.
+		scene := design.SceneTools{L: video.L}
+		if rec, ok := v.rt.Record(id); ok {
+			scene.Project = scene.L.SceneProjectOf(rec.Cwd)
+		}
+		return toolsets{t, hand, pics, clips, video, scene, design.KitTools{L: video.L}, place, browser, browse, notices, widgets, look, routines}
 	}
 	set := previewOf(v.d)
 	set.agentTools.Store(&tools)

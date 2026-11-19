@@ -480,6 +480,7 @@ HTML page «Машина не на связи» with status 502.
 | `POST /agent/register` | `RegisterRequest` | 201 `RegisterResponse` (200 when the machine kept its id, below); 410 `expired`, 400, 429 |
 | `GET /agent/v1` | WebSocket upgrade with the signed `Authorization` header | 101; 401 bad signature/unknown key/old time/replayed nonce; 403 revoked (`forbidden` with `details.reason: "revoked"`; only this, or the close code 4010, stops the agent dialing: a 403 without it, as a proxy may answer, is retried with the usual backoff); 426 agent older than `HUB_MIN_AGENT_VERSION` |
 | `POST /agent/peers/send`, `POST /agent/peers/directory` | signed like the dial, under `harnessly-agent-peers-v1` | messages between machines, [peers.md](peers.md); 404 unless `HUB_PEERS=on` |
+| `GET /agent/jobs/builders`, `GET\|POST /agent/jobs`, `GET /agent/jobs/{id}`, `POST …/cancel`, `POST …/finish`, `PUT\|GET …/input`, `PUT\|GET …/out?path=` | signed like the dial, under `harnessly-agent-jobs-v1` | the pool of builders and the heavy jobs, [builders.md](builders.md); 404 with `HUB_BUILDERS=off` |
 | `DELETE /agent/v1` | the machine removes itself: an `Authorization` header made like the dial's, signed under the domain `harnessly-agent-unlink-v1` (a dial's signature does not do) | 204 (revoked as `DELETE /api/machines/{id}` does: link closed with 4010, `machineRemoved` event); 401 bad signature/unknown key/old time/replayed nonce; 403 already revoked |
 
 ```ts
@@ -589,6 +590,10 @@ Protocol 2 error strings start with a code and a colon. Codes and the hub's HTTP
 | `env.set` | `{ rev, hash, items: EnvItem[] }` | `EnvState` `{ rev, hash, applied: { itemId, status: 'ok' \| 'error' \| 'pending', message? }[] }` — the machine's whole environment list, [environment.md](environment.md#machines); only when `hello.features` has `environment`. A wrong `hash` is refused |
 | `peers.deliver` | `{ sender, message }` | `PeerResult` — a message from an agent of another machine for a chat of this one, [peers.md](peers.md); `policy_denied` with the policy's `peers` off |
 | `peers.directory` | `{ sender }` | `{ chats }` — the chats of this machine that sender may write to, [peers.md](peers.md) |
+| `job.caps` | `{}` | `{ caps, slots, tools }` — what this machine can run as a builder, [builders.md](builders.md); `policy_denied` without `AGENT_HUB_JOBS=on` |
+| `job.start` | `{ jobId, argv, env?, timeoutSec, input, outputs }` | `{}` — runs a heavy job in a folder of its own; `busy` with no free slot, `policy_denied` for a tool not in the machine's list |
+| `job.poll` | `{ jobIds }` (at most 50) | `{ jobs: { id: { status, exitCode?, error?, log?, outputs? } } }`; a job the agent does not know is missing |
+| `job.cancel` | `{ jobId }` | `{}` — kills the job's process group |
 | `tunnel.open` | v1, unchanged; target `runtime` only for the hub (passes the policy's route filter) | v1 |
 
 The v1 operations (`transcripts.*`, `state.*`, `conversations.start`, `docs.*`, `design.*`, `eval.*`, `status.send`)
@@ -974,6 +979,7 @@ requests already carry the base path and pass the route filter unchanged, `X-For
 | `HUB_PROXY_JWT_HEADER` | `X-Forwarded-Access-Token` | the header the proxy passes the token in (`Authorization` takes `Bearer <token>`) |
 | `HUB_PROXY_JWT_EMAIL_CLAIM` | `email` | the claim that holds the person's email |
 | `HUB_PEERS` | `off` | `on`: the hub carries messages between the agents of its machines ([peers.md](peers.md)); `off`: `/agent/peers/*` answer 404 |
+| `HUB_BUILDERS` | `on` | `off`: no pool of builder machines and no heavy jobs: `/agent/jobs/*`, `/api/spaces/{id}/builders`, `/api/spaces/{id}/jobs` and `PUT /api/machines/{id}/builder` answer 404 ([builders.md](builders.md)) |
 | `HUB_MIN_AGENT_VERSION` | | refuse older agents (426 / 4012) |
 | `HUB_TERMS_URL` | | shown under the sign-up |
 | `HUB_WEB_DIR` | | serve the UI from this folder instead of the embedded files (development) |
@@ -992,6 +998,7 @@ Secrets (`*_SECRET`, `HUB_SMTP_URL`, `HUB_DATABASE_URL`, `HUB_SECRET_KEY`) may a
 | `AGENT_ENV_DIR` | `$AGENT_DATA_DIR/agent-env` | |
 | `AGENT_RUNTIME_PEERS` | `<runtime base>/api/peers` | the runtime's inbox and directory of messages between machines ([peers.md](peers.md)) |
 | `AGENT_HUB_PEERS` | | `on` lets an observe link take part in messages between machines |
+| `AGENT_HUB_JOBS` | | `on`: this machine runs the heavy jobs the hub places on it as a builder (feature `job.run`); `AGENT_JOBS_TOOLS`, `AGENT_JOBS_CAPS`, `AGENT_JOBS_SLOTS` set the tools, labels and slots ([builders.md](builders.md)) |
 | `AGENT_HUB_DESIGN` | | `on` lets an observe link keep the designs' access and open tunnels to their guest read only ([design-access.md](design-access.md)) |
 | `AGENT_HUB_HISTORY` | | `on` lets an observe link hand the machine's chats to the hub, beside the cluster's copy ([history.md](history.md)) |
 | `AGENT_HUB_EVAL` | | `on` lets the hub run evaluation tasks on this machine in a sandbox, paid from the owner's subscription (Linux with bubblewrap; [eval.md](eval.md)) |

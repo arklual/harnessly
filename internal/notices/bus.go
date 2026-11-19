@@ -10,6 +10,7 @@ const (
 	EventNew      = "new"      // an item arrived
 	EventRead     = "read"     // keys were read or taken away, on some device of the person
 	EventSettings = "settings" // the switches changed
+	EventSlot     = "slot"     // a machine's smart notice moved: the page reads its open questions again
 )
 
 // Event is what a person's devices are told.

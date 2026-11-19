@@ -11,8 +11,13 @@ One package, `internal/notices`, with one storage interface (`notices.Store`) an
   switch `hub-notices` ([rollout-switches.md](rollout-switches.md)). The person is the hub user, so every machine and
   every device of the person sees one set. Off: the hub passes the requests to the machine.
 - **runtime**: a SQLite file `notices.db` in the data folder, or the Postgres of `RUNTIME_STORE_DB` when that names one.
-  Always on: a runtime with no hub keeps its notices through a restart. The person is named by the page (the `person`
-  query parameter), as the page names it for its cache.
+  Always on: a runtime with no hub keeps its notices through a restart. The person is the one the session was signed
+  for: the email of a session the hub opened, `local` for the machine's own login. The `person` query parameter the
+  page still sends is not read, so one person cannot read another's notices.
+
+The hub's replicas pass the notices to each other (`internal/hub/events` relay, Postgres `LISTEN/NOTIFY`): a notice, a
+read or a switch saved on one replica reaches the person's streams open on the others. An event too long for the
+relay goes without its document, and the replica that hears it reads the document from the database.
 
 ## The page's routes (`<platform>` = `/api/<name>`)
 
@@ -34,6 +39,15 @@ marks it answered, dismissed or expired as it ends; what a restart left open is 
 call that waited for it is gone with the process). `GET <platform>/notices/stream` tells the page when the slot changed,
 so the page does not poll `/notices` every second and a half while the stream lives; it asks every 30 s as a
 fallback and at the old pace while the stream is down.
+
+The machine's agent forwards the slot to the hub: the runtime sends the whole list of open questions over the replica
+socket (`{"k":"slot"}`) when the socket opens and after each move (gathered for 250 ms); the agent passes it on as the
+event `noticeslot` (`hubproto.NoticeSlot`) only when it changed, and again to a link that subscribes. The hub keeps the
+questions that wait for an answer (not a status or a progress) in its database under the person `slot:<machine id>` and
+says `slot` on that person's stream. Once a machine's agent has sent its slot (a mark in `notice_settings` for that
+person), the hub, with the switch on, answers the page's `<platform>/notices/stream` itself, whichever replica the page
+is on; a machine with an older agent keeps its own stream. The page still reads the list and answers on the machine,
+where the question waits.
 
 ## The page
 

@@ -62,6 +62,12 @@ func (p *Prober) client() *http.Client {
 // Headers are the headers a request to a provider of that kind carries.
 func Headers(api API, key string) http.Header {
 	h := http.Header{"Accept": {"application/json"}}
+	if api == APIHiggsfield {
+		if key != "" {
+			h.Set("Authorization", "Key "+key)
+		}
+		return h
+	}
 	if api == APIAnthropic {
 		h.Set("anthropic-version", "2023-06-01")
 		if key != "" {
@@ -108,13 +114,18 @@ func passed(models []Model, status int, ms int64) Check {
 }
 
 func (p *Prober) do(ctx context.Context, method, url string, h http.Header, body []byte) (int, []byte, error) {
+	status, raw, _, err := p.doHeader(ctx, method, url, h, body)
+	return status, raw, err
+}
+
+func (p *Prober) doHeader(ctx context.Context, method, url string, h http.Header, body []byte) (int, []byte, http.Header, error) {
 	var rd io.Reader
 	if body != nil {
 		rd = bytes.NewReader(body)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, url, rd)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, nil, err
 	}
 	req.Header = h.Clone()
 	if body != nil {
@@ -122,11 +133,11 @@ func (p *Prober) do(ctx context.Context, method, url string, h http.Header, body
 	}
 	res, err := p.client().Do(req)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, nil, err
 	}
 	defer res.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(res.Body, 4<<20))
-	return res.StatusCode, raw, nil
+	return res.StatusCode, raw, res.Header, nil
 }
 
 // Check asks the provider at base for its models with key, and says how it went.
@@ -135,6 +146,9 @@ func (p *Prober) Check(ctx context.Context, base string, api API, key string) Ch
 	defer cancel()
 	start := time.Now()
 	ms := func() int64 { return time.Since(start).Milliseconds() }
+	if api == APIHiggsfield {
+		return p.checkHiggsfield(ctx, base, key, start)
+	}
 	h := Headers(api, key)
 	status, raw, err := p.do(ctx, http.MethodGet, Endpoint(base, api, "models"), h, nil)
 	if err != nil {

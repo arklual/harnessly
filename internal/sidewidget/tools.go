@@ -27,12 +27,16 @@ const Instruction = "Widgets of the right column: on a computer the person keeps
 	"subagents: the host's data it is given), `smart` (a request a model answers over those data every `every` minutes, at least 5, " +
 	"and at once on the card's button) and/or your own `html`/`css`/`js` (a sandboxed page: hl.context.data has {sources, smart}, " +
 	"hl.on('context', fn) brings new data; no network, no secrets, no chats). It appears in the person's stack by itself. Change it " +
-	"with widget_update, list with widget_list, remove with widget_remove. A built-in widget is not made: tell the person to add it " +
-	"from «+ Виджет» under the right column."
+	"with widget_update, list with widget_list, remove with widget_remove. A widget is made for the chat you are in (scope chat, the default): " +
+	"the person pins it to other chats or to all of them; scope global is for what is theirs in every chat. A built-in widget is not made: tell the person to add it " +
+	"from «+ Виджет» under the right column. When the person waits for something long (a render, a build, a deploy, a download), " +
+	"offer a progress widget yourself, as the workspace prompt says: read the memory note side-widget-offers.md first, ask once with notice_ask."
 
 // Tools are the widgets' MCP tools.
 type Tools struct {
 	S *Service
+	// Chat is the calling agent's chat: the widget it makes is for that chat.
+	Chat string
 }
 
 var _ mcpserver.Toolset = Tools{}
@@ -52,6 +56,7 @@ func specProps() *jsvalue.Object {
 		"every", num("How often, in minutes, the smart request is asked again (5 to 1440, default 30)."),
 		"size", str("The card's height: s (96 px, default), m (160) or l (240)."),
 		"refresh", num("How often, in seconds, the data are given again while the card is on screen (30 at least; 0: once)."),
+		"scope", jsvalue.NewObject("type", "string", "enum", []any{ScopeChat, ScopeGlobal}, "description", "chat (default): the widget shows in this chat, and in the ones the person pins it to; global: in every chat (only for what is the person's everywhere, like the limits)."),
 		"html", str("Your own markup of the body (optional): without it the card shows the smart answer, or the data."),
 		"css", str("Your own style (optional); the host's tokens --t-* and classes .hl-* are there."),
 		"js", str("Your own classic script (optional): window.harnessly.connect().then(hl => …), hl.context.data = {sources, smart}, hl.on('context', fn)."),
@@ -113,6 +118,10 @@ func (t Tools) Call(_ context.Context, name string, args *jsvalue.Object) *jsval
 		if err := json.Unmarshal(raw, &sp); err != nil {
 			return mcpserver.TextResult("refused: "+err.Error(), true)
 		}
+		sp, err := Place(sp, t.Chat)
+		if err != nil {
+			return mcpserver.TextResult("refused: "+err.Error(), true)
+		}
 		if _, err := t.S.Create(sp); err != nil {
 			return mcpserver.TextResult("refused: "+err.Error(), true)
 		}
@@ -125,7 +134,11 @@ func (t Tools) Call(_ context.Context, name string, args *jsvalue.Object) *jsval
 		if err := json.Unmarshal(raw, &b); err != nil {
 			return mcpserver.TextResult("refused: "+err.Error(), true)
 		}
-		if _, err := t.S.Update(b.Name, b.Patch); err != nil {
+		patch, err := PlacePatch(b.Patch, t.Chat)
+		if err != nil {
+			return mcpserver.TextResult("refused: "+err.Error(), true)
+		}
+		if _, err := t.S.Update(b.Name, patch); err != nil {
 			return mcpserver.TextResult("refused: "+err.Error(), true)
 		}
 		return mcpserver.TextResult("widget "+b.Name+" changed", false)

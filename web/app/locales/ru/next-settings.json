@@ -135,6 +135,8 @@
   "next.settings.opt.codex.search": "Веб-поиск",
   "next.settings.opt.codex.history": "Сохранять историю",
   "next.settings.opt.codex.history.hint": "Чтобы продолжать прошлые сессии",
+  "next.settings.opt.codex.memories": "Память между чатами",
+  "next.settings.opt.codex.memories.hint": "Codex запоминает ваши ответы и привычки и помнит их в следующих чатах; по умолчанию включена",
   "next.settings.choice.model.unset": "По умолчанию",
   "next.settings.choice.fallbackModel.unset": "Ждать основную",
   "next.settings.choice.effort.low": "Низкая",
@@ -677,5 +679,12 @@
   "next.settings.general.feed.preview": "Превью у документов и макетов",
   "next.settings.general.feed.preview.hint": "Картинка документа, доски или макета в его карточке",
   "next.settings.general.feed.bigShots": "Скриншоты крупно",
-  "next.settings.general.feed.bigShots.hint": "Первый крупно, остальные сеткой"
+  "next.settings.general.feed.bigShots.hint": "Первый крупно, остальные сеткой",
+  "next.settings.general.folders": "Папки проектов",
+  "next.settings.general.folders.rows": "Сколько чатов показывать за раз",
+  "next.settings.general.folders.rows.hint": "Сколько чатов папка показывает до «Дальше».",
+  "next.settings.general.folders.peek": "Живые чаты в закрытой папке",
+  "next.settings.general.folders.peek.hint": "Чат в работе или ждущий вашего просмотра, открытый сегодня, виден под закрытой папкой.",
+  "next.settings.general.folders.suggest": "Предлагать папку для чата",
+  "next.settings.general.folders.suggest.hint": "Через несколько промптов приложение предложит положить чат без папки в подходящую."
 }

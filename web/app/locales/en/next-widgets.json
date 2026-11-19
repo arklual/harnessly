@@ -7,6 +7,8 @@
   "next.widgets.fold": "Fold",
   "next.widgets.unfold": "Unfold",
   "next.widgets.remove": "Remove",
+  "next.widgets.scope.here": "This chat only",
+  "next.widgets.scope.all": "Show in every chat",
   "next.widgets.full": "There are twelve widgets already — remove one",
   "next.widgets.smart.now": "Ask now",
   "next.widgets.limits.title": "Limits",

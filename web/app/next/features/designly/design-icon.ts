@@ -7,6 +7,7 @@ export const DESIGN_KIND_ICON = {
   site: 'app-window',
   slides: 'presentation',
   video: 'clapperboard',
+  scene3d: 'box',
   ds: 'palette',
 } as const satisfies Record<DesignKind, string>;
 

@@ -10,7 +10,7 @@ const LATER = new Set(['term.css', 'charts.css', 'guest.css']);
 describe('the order of the interface styles', () => {
   it('lists every stylesheet of the interface once', () => {
     const listed = [
-      ...readFileSync(join(__dirname, 'order.ts'), 'utf8').matchAll(/styles\/([a-z-]+\.css)'/g),
+      ...readFileSync(join(__dirname, 'order.ts'), 'utf8').matchAll(/styles\/([a-z0-9-]+\.css)'/g),
     ].map((m) => m[1]);
     const sheets = readdirSync(__dirname).filter((name) => name.endsWith('.css') && !LATER.has(name));
     expect(new Set(listed).size).toBe(listed.length);

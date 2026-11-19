@@ -47,6 +47,15 @@ describe('routes', () => {
     expect(routePath({ kind: ROUTE.efficiency })).toBe('/efficiency');
   });
 
+  it('reads the routines screen, one routine open and its run unfolded', () => {
+    expect(parseRoute('/routines')).toEqual({ kind: ROUTE.routines });
+    expect(parseRoute('/routines/r1abc')).toEqual({ kind: ROUTE.routines, id: 'r1abc' });
+    expect(parseRoute('/routines/r1abc?run=x9')).toEqual({ kind: ROUTE.routines, id: 'r1abc', run: 'x9' });
+    expect(routePath({ kind: ROUTE.routines, id: 'r1abc', run: 'x9' })).toBe('/routines/r1abc?run=x9');
+    expect(routePath({ kind: ROUTE.routines })).toBe('/routines');
+    expect(parseRoute('/routines/a/b')).toEqual(HOME);
+  });
+
   it('reads the tasks and MR screen, once «Apps», with or without the closing slash and writes it back the same', () => {
     expect(parseRoute('/tasks')).toEqual({ kind: ROUTE.tasks });
     expect(parseRoute('/tasks/?tab=gitlab')).toEqual({ kind: ROUTE.tasks });

@@ -4,6 +4,9 @@
 // model's short answer. A widget an agent made (`harnessly widget create`) joins the stack once by itself.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadApps } from '@/next/features/apps/api';
+import { readCachedSide, writeCachedSide } from '@/next/features/widgets/cache';
+import { useWidgetContent, type IWidgetContent } from '@/next/features/widgets/content';
+import { appStamp } from '@/next/features/app-views/app-updates';
 import AppFrame from '@/next/features/app-views/app-frame';
 import { useInstalledApps, type IAppView, type IInstalledApp } from '@/next/features/app-views/api';
 import { SlotBoundary } from '@/next/features/app-views/ui-slot';
@@ -23,17 +26,22 @@ import {
   MAX_NOTE,
   WIDGET_KIND,
   clockText,
+  chatsOf,
   shownWidgets,
   smartEveryMs,
   timerLeft,
   withAdded,
+  withAllChats,
   withFolded,
   withMoved,
   withNewApps,
   withNote,
+  withOnlyChat,
+  withPinnedChat,
   withRemoved,
   withTimer,
   type ISideWidget,
+  type IWidgetPlace,
   type TBuiltinWidget,
 } from '@/next/features/widgets/model';
 import SideWidgets, { type IGalleryEntry, type IWidgetLook } from '@/next/features/widgets/side-widgets';
@@ -61,6 +69,9 @@ const isBuiltin = (kind: string): kind is TBuiltinWidget =>
 /** The app's views a side widget can be. */
 const sideViews = (apps: readonly IInstalledApp[]): { app: IInstalledApp; view: IAppView }[] =>
   apps.flatMap((app) => app.views.filter((v) => v.targets.includes('side')).map((view) => ({ app, view })));
+
+/** What a card shows while its app is not known yet (nothing kept, the machine still answering): a bar, not a blank. */
+const WidgetSkeleton = () => <div className="hx-wg__wait" data-tall="true" aria-hidden="true" />;
 
 // ── harnessly's own widgets ──
 
@@ -327,10 +338,26 @@ interface IAppWidgetProps {
   data: Record<string, unknown>;
 }
 
+/** The card's last content, drawn at once while its frame comes up: a frame with no script, nothing of the page. */
+const KeptCard = ({ content }: { content: IWidgetContent }) => (
+  <iframe
+    className="hx-wga__kept"
+    title=""
+    aria-hidden="true"
+    tabIndex={-1}
+    sandbox=""
+    srcDoc={`<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:transparent;font:13px/18px system-ui,sans-serif;color:#888}${content.css}</style><body style="padding:4px 8px 8px">${content.html}`}
+  />
+);
+
 const AppWidgetBody = ({ machine, app, view, viewPort, smart, data }: IAppWidgetProps) => {
   const [reload, setReload] = useState(0);
+  // A widget an agent made: its markup is handed to the live frame when it changed, and the last one is drawn at once.
+  const mine = app.id.startsWith('local.widget-') && !!view.widget?.shell;
+  const { kept, live } = useWidgetContent(machine, app.id, appStamp(app), mine);
   const full = useMemo(
     () => ({
+      ...(live ? { content: live } : {}),
       sources: data,
       ...(smart
         ? {
@@ -342,7 +369,7 @@ const AppWidgetBody = ({ machine, app, view, viewPort, smart, data }: IAppWidget
           }
         : {}),
     }),
-    [data, smart],
+    [data, smart, live],
   );
   return (
     <div className="hx-wga" data-size={view.widget?.size ?? 's'}>
@@ -356,6 +383,7 @@ const AppWidgetBody = ({ machine, app, view, viewPort, smart, data }: IAppWidget
           conversation={null}
           data={full}
           reloadToken={reload}
+          skeleton={kept ? <KeptCard content={kept} /> : undefined}
         />
       </SlotBoundary>
     </div>
@@ -434,12 +462,27 @@ const AppWidget = ({
 
 export interface ISideWidgetsBindingProps {
   machine: MachineId;
+  /** The chat on screen: a widget made for a chat shows in it and in the chats it is pinned to. */
+  chat?: string | null;
   onOpenChat: (id: string) => void;
 }
 
-const SideWidgetsBinding = ({ machine, onOpenChat }: ISideWidgetsBindingProps) => {
-  const state = useWidgets();
+/**
+ * The machine's apps with a widget: the live list, and until it comes the last one kept in this browser, so the stack
+ * is drawn at once when a chat opens. Null with nothing kept yet (the cards are placeholders then).
+ */
+export const useWidgetApps = (machine: MachineId): { apps: IInstalledApp[]; viewPort: number } | null => {
   const { list } = useInstalledApps(machine);
+  const [kept] = useState(() => readCachedSide(machine));
+  useEffect(() => {
+    if (list) writeCachedSide(machine, list.apps, list.viewPort);
+  }, [machine, list]);
+  return list ? { apps: list.apps, viewPort: list.viewPort } : kept;
+};
+
+const SideWidgetsBinding = ({ machine, chat = null, onOpenChat }: ISideWidgetsBindingProps) => {
+  const state = useWidgets();
+  const list = useWidgetApps(machine);
   const found = useMemo(() => (list ? sideViews(list.apps) : null), [list]);
   // A widget an agent made joins the stack once by itself.
   useEffect(() => {
@@ -455,13 +498,21 @@ const SideWidgetsBinding = ({ machine, onOpenChat }: ISideWidgetsBindingProps) =
     (w: ISideWidget) => found?.find((f) => f.app.id === w.app && f.view.id === w.view) ?? null,
     [found],
   );
+  const place = useMemo<IWidgetPlace>(
+    () => ({
+      chat,
+      madeFor: (app, view) => found?.find((f) => f.app.id === app && f.view.id === view)?.view.widget?.chat,
+    }),
+    [chat, found],
+  );
   const widgets = useMemo(
     () =>
       shownWidgets(
         state,
         found ? (app, view) => found.some((f) => f.app.id === app && f.view.id === view) : null,
+        place,
       ),
-    [state, found],
+    [state, found, place],
   );
 
   const lookOf = useCallback(
@@ -493,7 +544,7 @@ const SideWidgetsBinding = ({ machine, onOpenChat }: ISideWidgetsBindingProps) =
           return <ClockBody widget={w} />;
         case WIDGET_KIND.app: {
           const f = appOf(w);
-          if (!f || !list) return null;
+          if (!f || !list) return <WidgetSkeleton />;
           return (
             <AppWidget machine={machine} app={f.app} view={f.view} viewPort={list.viewPort} widget={w} />
           );
@@ -531,15 +582,23 @@ const SideWidgetsBinding = ({ machine, onOpenChat }: ISideWidgetsBindingProps) =
       onAdd: () => add(() => updateWidgets((s) => withAdded(s, kind))),
     })),
     ...(found ?? [])
-      .filter((f) => !state.items.some((x) => x.app === f.app.id && x.view === f.view.id))
-      .map((f) => ({
-        key: `app:${f.app.id}/${f.view.id}`,
-        title: f.view.label ?? f.view.title ?? f.app.name,
-        hint: f.app.description,
-        icon: f.view.icon ?? f.app.icon ?? 'layout-grid',
-        onAdd: () =>
-          add(() => updateWidgets((s) => withAdded(s, WIDGET_KIND.app, { app: f.app.id, view: f.view.id }))),
-      })),
+      .filter((f) => !widgets.some((x) => x.app === f.app.id && x.view === f.view.id))
+      .map((f) => {
+        const saved = state.items.find((x) => x.app === f.app.id && x.view === f.view.id);
+        return {
+          key: `app:${f.app.id}/${f.view.id}`,
+          title: f.view.label ?? f.view.title ?? f.app.name,
+          hint: f.app.description,
+          icon: f.view.icon ?? f.app.icon ?? 'layout-grid',
+          // One in the stack but for other chats is pinned to this one too.
+          onAdd: () =>
+            add(() =>
+              saved && chat
+                ? updateWidgets((s) => withPinnedChat(s, saved.id, chat, place))
+                : updateWidgets((s) => withAdded(s, WIDGET_KIND.app, { app: f.app.id, view: f.view.id })),
+            ),
+        };
+      }),
   ];
 
   return (
@@ -552,6 +611,13 @@ const SideWidgetsBinding = ({ machine, onOpenChat }: ISideWidgetsBindingProps) =
       onMove={(id, at, after) => updateWidgets((s) => withMoved(s, id, at, after))}
       onFold={(id, folded) => updateWidgets((s) => withFolded(s, id, folded))}
       onRemove={(id) => updateWidgets((s) => withRemoved(s, id))}
+      scopeOf={(w) => (chatsOf(w, place) === 'all' ? 'all' : 'chats')}
+      onScope={
+        chat
+          ? (id, scope) =>
+              updateWidgets((s) => (scope === 'all' ? withAllChats(s, id) : withOnlyChat(s, id, chat)))
+          : undefined
+      }
     />
   );
 };

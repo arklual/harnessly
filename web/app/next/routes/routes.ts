@@ -18,6 +18,7 @@ export const ROUTE = {
   stats: 'stats',
   efficiency: 'efficiency',
   tasks: 'tasks',
+  routines: 'routines',
   apps: 'apps',
   app: 'app',
   appAbout: 'appAbout',
@@ -91,6 +92,8 @@ export type TRoute =
   | { kind: typeof ROUTE.stats }
   | { kind: typeof ROUTE.efficiency }
   | { kind: typeof ROUTE.tasks }
+  /** «Регулярные задачи»: `/routines`, `/routines/:id` one open, `?run=` its run unfolded. */
+  | { kind: typeof ROUTE.routines; id?: string; run?: string }
   /** The installed apps: `/apps`. */
   | { kind: typeof ROUTE.apps }
   /** An app opened as the main thing: `/apps/:id`, `?chat=` the chat it works in (its column shows it), `?o=` one of
@@ -131,6 +134,7 @@ const MANAGE_RE = /^\/manage\/?$/;
 const STATS_RE = /^\/stats\/?$/;
 const EFFICIENCY_RE = /^\/efficiency\/?$/;
 const TASKS_RE = /^\/tasks\/?$/;
+const ROUTINES_RE = /^\/routines(?:\/([A-Za-z0-9_-]{1,80}))?\/?$/;
 const APPS_RE = /^\/apps\/?$/;
 const REVIEW_RE = /^\/review\/?$/;
 const APP_ABOUT_RE = /^\/apps\/([a-z0-9][a-z0-9-]{0,39}\.[a-z0-9][a-z0-9-]{0,39})\/about\/?$/;
@@ -190,6 +194,11 @@ export const parseRoute = (path: string): TRoute => {
   if (STATS_RE.test(pathname)) return { kind: ROUTE.stats };
   if (EFFICIENCY_RE.test(pathname)) return { kind: ROUTE.efficiency };
   if (TASKS_RE.test(pathname)) return { kind: ROUTE.tasks };
+  const routines = ROUTINES_RE.exec(pathname);
+  if (routines) {
+    const run = queryParam(path, 'run');
+    return { kind: ROUTE.routines, ...(routines[1] ? { id: routines[1] } : {}), ...(run ? { run } : {}) };
+  }
   if (APPS_RE.test(pathname)) return { kind: ROUTE.apps };
   if (REVIEW_RE.test(pathname)) {
     const url = queryParam(path, 'url');
@@ -326,6 +335,10 @@ export const routePath = (route: TRoute): string => {
       return '/efficiency';
     case ROUTE.tasks:
       return '/tasks';
+    case ROUTE.routines: {
+      const base = route.id ? `/routines/${route.id}` : '/routines';
+      return route.run ? `${base}?run=${encodeURIComponent(route.run)}` : base;
+    }
     case ROUTE.apps:
       return '/apps';
     case ROUTE.appAbout:

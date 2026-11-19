@@ -23,6 +23,8 @@ const SCREENS: Record<Section, ReturnType<typeof lazy>> = {
   tools: lazy(() => import('./screens/tools')),
   settings: lazy(() => import('./screens/settings')),
   extensions: lazy(() => import('./screens/extensions')),
+  map: lazy(() => import('./screens/map')),
+  profile: lazy(() => import('./screens/profile')),
 };
 
 const Screen = () => {

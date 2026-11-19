@@ -1,0 +1,41 @@
+id: routine-create
+title: «Каждое утро присылай дайджест…» — регулярная задача через routine_create, а не свой cron или /loop
+tags: [routines]
+timeout_s: 300
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/hlcli/routine.go'
+  - 'internal/routinetools/**'
+prompt: каждый будний день в 9 утра собирай мне дайджест — что изменилось за сутки в моих задачах и MR — и клади в файл digest/дата.md новой версией, а в телеграм присылай коротко
+expect:
+  - name: made a routine through the hub
+    any_of:
+      - called: harnessly\.routine_create
+        args: {cron: '0 9 \* \* 1-5'}
+      - called: Bash
+        args: {command: 'harnessly routine create\b(?s:.*)--cron[ =]"?0 9 \* \* 1-5'}
+  - name: sends the result to telegram and a file
+    any_of:
+      - called: harnessly\.routine_create
+        args: {channels: 'telegram(?s:.*)file|file(?s:.*)telegram'}
+      - called: Bash
+        args: {command: 'harnessly routine create\b(?s:.*)--to[ =]\S*(telegram\S*file|file\S*telegram)'}
+  - name: no cron of its own
+    not_called: CronCreate
+  - name: no crontab or loop
+    not_called: Bash
+    args: {command: '(crontab|/loop|systemd-run --on-calendar)'}
+variants:
+  - id: v1
+    kind: short
+    text: "дайджест моих задач и MR по будням в 9 — в файл digest/дата.md и коротко в телеграм"
+  - id: v2
+    kind: english
+    text: "every weekday at 9am build me a digest of what changed in my tasks and MRs, save it to digest/<date>.md as a new version and send a short note to telegram"
+  - id: v3
+    kind: typos
+    text: "каждый будни в 9 утра сабирай дайжест что изменилсь в задачах и мр, клади в файл digest/дата.md и в телегу коротко"
+  - id: v4
+    kind: indirect
+    text: "хочу, чтобы по утрам в рабочие дни у меня сам появлялся файл digest/дата.md со сводкой по задачам и MR, и чтобы в телеге приходило пару строк"

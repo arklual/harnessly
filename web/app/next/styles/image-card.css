@@ -146,6 +146,16 @@
   transform: none;
 }
 
+/* A clip of a media provider: it plays in its tile, the controls are the browser's */
+.hx-img[data-clip] .hx-img__pic {
+  background: var(--hx-bg-stage);
+  object-fit: contain;
+}
+.hx-imgs__meta {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
 .hx-imgs__err {
   margin: 0;
   color: var(--hx-fg-2);

@@ -219,7 +219,10 @@ export const useSmartSearch = ({
       ctl.abort();
     };
   }, [open, machine, words]);
-  const indexedDesigns = indexed !== null && indexed.key === `${machine}|${words}` ? indexed.designs : [];
+  const indexedDesigns = useMemo(
+    () => (indexed !== null && indexed.key === `${machine}|${words}` ? indexed.designs : []),
+    [indexed, machine, words],
+  );
   const ask = words !== '' && (isQuestion(words) || asked === words);
   const terms = useMemo(() => termsOf(words, ask), [words, ask]);
   const me = useMe();

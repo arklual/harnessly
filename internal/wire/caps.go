@@ -25,6 +25,8 @@ const (
 	CapMsgStatus Cap = "msgstatus"
 	// CapLinks: the page reads the output kinds task and commit (README 72).
 	CapLinks Cap = "links"
+	// CapAppsSync: the page reads MachineStatusEv.AppsAt, the push of a change of the machine's installed apps.
+	CapAppsSync Cap = "appssync"
 )
 
 // Caps is what a page reads.
@@ -34,6 +36,7 @@ type Caps struct {
 	Profiles   bool
 	MsgStatus  bool
 	Links      bool
+	AppsSync   bool
 }
 
 // CapsOf reads the caps a page named in its request's address; an unknown one is ignored.
@@ -44,16 +47,16 @@ func CapsOf(r *http.Request) Caps {
 	}
 	return Caps{Delegation: slices.Contains(names, string(CapDelegation)), Workflows: slices.Contains(names, string(CapWorkflows)),
 		Profiles: slices.Contains(names, string(CapProfiles)), MsgStatus: slices.Contains(names, string(CapMsgStatus)),
-		Links: slices.Contains(names, string(CapLinks))}
+		Links: slices.Contains(names, string(CapLinks)), AppsSync: slices.Contains(names, string(CapAppsSync))}
 }
 
 // AllCaps reads every optional part.
-var AllCaps = Caps{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true}
+var AllCaps = Caps{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true, AppsSync: true}
 
 // olderCaps is every Caps short of AllCaps that a page may have: the forms an event can go out in besides its own.
 // Each cap came with a build of the page that read the ones before it.
 var olderCaps = []Caps{{}, {Delegation: true}, {Delegation: true, Workflows: true}, {Delegation: true, Workflows: true, Profiles: true},
-	{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true}}
+	{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true}, {Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true}}
 
 // eventFor is e as a page with caps gets it, and whether it differs from e.
 func eventFor(e Event, caps Caps) (Event, bool) {
@@ -82,6 +85,12 @@ func eventFor(e Event, caps Caps) (Event, bool) {
 	if !caps.Links {
 		if old, ok := withoutLinks(e); ok {
 			e, changed = old, true
+		}
+	}
+	if !caps.AppsSync {
+		if st, ok := e.(MachineStatusEv); ok && st.AppsAt != 0 {
+			st.AppsAt = 0
+			e, changed = st, true
 		}
 	}
 	return e, changed

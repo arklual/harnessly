@@ -262,9 +262,12 @@ export interface AnalyticsChartProps {
   mode: ChartMode;
   /** The tenant's teams in their order: a team keeps its colour on every card. */
   teamOrder: readonly string[];
+  /** Given: the pinned change is the screen's (the list of changes pins it too); absent: the chart keeps its own. */
+  marker?: string | null;
+  onMarker?: (id: string | null) => void;
 }
 
-const AnalyticsChart = ({ chart, kpi, mode, teamOrder }: AnalyticsChartProps) => {
+const AnalyticsChart = ({ chart, kpi, mode, teamOrder, marker, onMarker }: AnalyticsChartProps) => {
   const b = useMemo(() => build(chart, kpi, mode, teamOrder), [chart, kpi, mode, teamOrder]);
   const options = useMemo(() => ({ ...OPTIONS, unit: b.unit }), [b.unit]);
   return (
@@ -279,6 +282,7 @@ const AnalyticsChart = ({ chart, kpi, mode, teamOrder }: AnalyticsChartProps) =>
       markerLabel={(x) => x.label}
       renderTooltip={b.tooltip}
       renderEffect={b.effect}
+      {...(marker !== undefined ? { selectedMarker: marker, onSelectedMarkerChange: onMarker } : {})}
       navigator
       zoomControls
       size="l"

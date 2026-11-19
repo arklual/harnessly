@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/designrec"
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/filestore"
@@ -27,13 +28,20 @@ import (
 func libraryRecords(d deps) []filestore.Record {
 	lib := designAPI(d).L
 	st := (&v2Designly{file: filepath.Join(d.DataDir, "v2", "designly.json")}).state()
+	// A document of a type an app adds is recorded with that type (kind-docs.json): the hub lists the apps' documents by
+	// it under hub-apps-catalog, and without it they were sites to the hub.
+	appDocs := apps.Open(d.DataDir).DocKinds()
 	arts := lib.ListArtifacts()
 	out := make([]filestore.Record, 0, len(arts))
 	for _, a := range arts {
 		if a == nil || a.ID == "" {
 			continue
 		}
-		r := filestore.Record{ID: a.ID, Title: a.Title, Kind: string(kindOf(st, lib, a.ID)), At: a.UpdatedAt}
+		kind, ok := appDocs[a.ID]
+		if !ok {
+			kind = string(kindOf(st, lib, a.ID))
+		}
+		r := filestore.Record{ID: a.ID, Title: a.Title, Kind: kind, At: a.UpdatedAt}
 		if a.Cover != nil {
 			r.Preview = *a.Cover
 			if len(r.Preview) > 512 {

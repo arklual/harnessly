@@ -78,6 +78,7 @@ import {
 import VersionsPanel from '@/next/features/designly/versions/versions-panel';
 import { usePresentFlag } from '@/next/ui/presence';
 import DesignlyVideo from '@/next/bindings/designly-video';
+import DesignlyScene3d from '@/next/bindings/designly-scene3d';
 import SinopiaStage from '@/next/features/app-views/sinopia/sinopia-stage';
 import { useSinopia, type IPickedBlock } from '@/next/features/app-views/sinopia/use-sinopia';
 import type { ISelectedNode } from '@/next/features/app-views/sinopia/types';
@@ -160,6 +161,9 @@ export interface IDesignlySiteProps {
   toolPane?: { open: boolean; onToggle: () => void } | null;
   /** Where a link, a file or a card of the design's chat opens: the pane beside the design, as a chat's open there. */
   open?: TChatOpeners;
+  /** A board to show at once (one the chat's turn wrote): its tab, or a new one; pageAt asks again. */
+  page?: string | null;
+  pageAt?: number;
 }
 
 /** The design in the right pane: the chat it sits beside edits it; the way back is to the library. */
@@ -198,6 +202,8 @@ const DesignlySiteInner = ({
   toolPane = null,
   open,
   pane,
+  page: askedPage = null,
+  pageAt = 0,
 }: IBodyProps) => {
   // The library the home has just read starts the design: its page is asked for at once, the library is read anew behind.
   const [start] = useState(() => {
@@ -704,6 +710,26 @@ const DesignlySiteInner = ({
     }
   };
 
+  // A board asked for (the card of a turn that wrote it): its tab comes forward, or a new one opens on it. Asked again
+  // (another card, the same board clicked again) it comes forward again; the person's own tab switches stand meanwhile.
+  const askedSeen = useRef(0);
+  useEffect(() => {
+    if (!askedPage || pageAt === 0 || askedSeen.current === pageAt || !project) return;
+    askedSeen.current = pageAt;
+    seeded.current = true;
+    const have = tabs.find((x) => x.hist[x.hi] === askedPage);
+    refreshSlot(askedPage);
+    if (have) {
+      setTab(have.id);
+      return;
+    }
+    const added = newTab(askedPage);
+    setTabs((list) => [...list, added]);
+    setTab(added.id);
+    // refreshSlot and the tab setters are this render's; only a new ask (pageAt) or the project's arrival matter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askedPage, pageAt, project]);
+
   const copyLink = () => {
     navigator.clipboard
       ?.writeText(shareUrl)
@@ -1141,6 +1167,21 @@ const DesignlySiteInner = ({
       onOpenDrawer,
       fallback: site,
     };
+    if (project.design.kind === 'scene3d')
+      return (
+        <DesignlyScene3d
+          machine={machine}
+          id={id}
+          title={project.design.title}
+          viewing={viewing}
+          mode={modeButton}
+          access={shareButton}
+          pane={host.pane}
+          maxed={maxed}
+          onToggleMax={onToggleMax}
+          onOpenDrawer={onOpenDrawer}
+        />
+      );
     if (project.design.kind === 'video') return <DesignlyVideo {...host} />;
     if (project.design.kind === 'slides')
       return <DesignlyDeck {...host} onPick={onPick} onStale={() => setAttempt((n) => n + 1)} />;
@@ -1253,16 +1294,27 @@ const DesignlySite = (props: IDesignlySiteProps) => <DesignlySiteBody {...props}
 export interface IDesignlyPaneSiteProps {
   machine: MachineId;
   id: string;
+  page?: string | null;
+  pageAt?: number;
   /** The chat the pane is beside: it edits the design, its field gets the notes. */
   conv: ConvId;
   onBack: () => void;
 }
 
 /** A design opened in the right pane: the full viewer, with the chat on its left as the one that edits it. */
-export const DesignlyPaneSite = ({ machine, id, conv, onBack }: IDesignlyPaneSiteProps) => (
+export const DesignlyPaneSite = ({
+  machine,
+  id,
+  conv,
+  onBack,
+  page = null,
+  pageAt = 0,
+}: IDesignlyPaneSiteProps) => (
   <DesignlySiteBody
     machine={machine}
     id={id}
+    page={page}
+    pageAt={pageAt}
     chat={conv}
     maxed={false}
     onToggleMax={() => undefined}

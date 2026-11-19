@@ -30,6 +30,9 @@ export interface HeroProps {
   /** The kpi the shown chart belongs to (it can be the previous one while the next is on its way). */
   shownKpi: Kpi | null;
   teamOrder: readonly string[];
+  /** The change pinned on the chart, with its week before and after. */
+  marker?: string | null;
+  onMarker?: (id: string | null) => void;
 }
 
 export const Hero = ({
@@ -43,13 +46,15 @@ export const Hero = ({
   onMode,
   shownKpi,
   teamOrder,
+  marker,
+  onMarker,
 }: HeroProps) => {
   // A person of no team role has no daily series yet: that is a note, not a failure.
   const personal = error instanceof OrgApiError && error.code === 'not_ready';
   const failed = error != null && !fresh && !personal;
   const picture = chart !== null && shownKpi !== null;
   return (
-    <section className="dash-hero anx-hero">
+    <section className="dash-hero anx-hero" data-hx-part="chart">
       <div className="dash-hero__chart">
         <div className="anx-head">
           <div className="anx-k anx-what">
@@ -81,7 +86,14 @@ export const Hero = ({
         >
           {picture && (
             <Suspense fallback={null}>
-              <Chart chart={chart} kpi={shownKpi} mode={mode} teamOrder={teamOrder} />
+              <Chart
+                chart={chart}
+                kpi={shownKpi}
+                mode={mode}
+                teamOrder={teamOrder}
+                marker={marker}
+                onMarker={onMarker}
+              />
             </Suspense>
           )}
         </div>

@@ -18,15 +18,18 @@ export const fixed1 = (n: number): string =>
 // ── The period ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 export const PERIODS: { value: OverviewPeriod; label: string }[] = [
+  { value: 'day', label: 'Сегодня' },
   { value: 'week', label: 'Неделя' },
   { value: 'month', label: 'Месяц' },
 ];
 
 /** «октябрь» for the month, «неделя» for the week. */
-export const periodWord = (p: OverviewPeriod): string => (p === 'week' ? 'неделя' : monthWord());
+export const periodWord = (p: OverviewPeriod): string =>
+  p === 'day' ? 'сегодня' : p === 'week' ? 'неделя' : monthWord();
 
 /** «за неделю» / «за ноябрь». */
-export const forPeriod = (p: OverviewPeriod): string => (p === 'week' ? 'за неделю' : `за ${monthWord()}`);
+export const forPeriod = (p: OverviewPeriod): string =>
+  p === 'day' ? 'за сегодня' : p === 'week' ? 'за неделю' : `за ${monthWord()}`;
 
 // ── The donut ───────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -214,11 +217,11 @@ export const chatCost = (usdAmount: number): string => fromUsdExact(usdAmount);
 /** «Тенант Продукт · октябрь», «Команда Фронт · неделя», «Только твоя работа · октябрь». */
 export const overviewLead = (
   role: 'admin' | 'lead' | 'member',
-  scope: { tenantName: string | null; teamName: string | null },
+  scope: { tenantName: string | null; teamName: string | null; orgName?: string },
   period: OverviewPeriod,
 ): string => {
   const p = periodWord(period);
   if (role === 'member') return `Только твоя работа · ${p}`;
   if (role === 'lead') return scope.teamName ? `Команда ${scope.teamName} · ${p}` : `Твоя команда · ${p}`;
-  return scope.tenantName ? `Тенант ${scope.tenantName} · ${p}` : `Вся организация · ${p}`;
+  return `${scope.tenantName ?? scope.orgName ?? 'Вся организация'} · что происходит и что сделать`;
 };

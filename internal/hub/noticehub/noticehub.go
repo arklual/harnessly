@@ -30,6 +30,8 @@ type Service struct {
 	OnFor func(ctx context.Context, email, machineID string) bool
 	// UserID finds the hub user of an email; not found is "" and false.
 	UserID func(ctx context.Context, email string) (string, bool)
+
+	slot slotState
 }
 
 // Ring puts a news of the hub into the bell of the person with this email: kind `access`, no chat, a link to
@@ -63,6 +65,19 @@ func (s *Service) RingMention(ctx context.Context, userID, email, key, title, te
 	return s.put(ctx, userID, "at-sign", key, title, text, link)
 }
 
+// RingAs is RingMention with the icon named: a news of the hub for a person it already found (a routine's result,
+// HRN-1653), shown where the switch is on for any of their machines.
+func (s *Service) RingAs(ctx context.Context, userID, email, icon, key, title, text, link string) bool {
+	if s == nil || s.Notices == nil || s.OnFor == nil {
+		return false
+	}
+	email = strings.ToLower(strings.TrimSpace(email))
+	if userID == "" || email == "" || key == "" || !s.OnFor(ctx, email, "") {
+		return false
+	}
+	return s.put(ctx, userID, icon, key, title, text, link)
+}
+
 // put adds the notice of kind `access` to the person's hub notices; the same key never twice.
 func (s *Service) put(ctx context.Context, id, icon, key, title, text, link string) bool {
 	now := time.Now()
@@ -87,8 +102,14 @@ func New(db notices.DB, on func(r *http.Request, email, machineID string) bool) 
 // ServeMachine answers the notifications routes of a machine the person may open.
 func (s *Service) ServeMachine(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine) bool {
 	p := strings.TrimPrefix(r.URL.EscapedPath(), "/m/"+m.ID)
+	if s.Notices == nil {
+		return false
+	}
+	if s.serveSlotStream(w, r, p, u, m) {
+		return true
+	}
 	mt := path.FindStringSubmatch(p)
-	if mt == nil || s.Notices == nil {
+	if mt == nil {
 		return false
 	}
 	if s.On == nil || !s.On(r, strings.ToLower(strings.TrimSpace(u.Email)), m.ID) {

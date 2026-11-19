@@ -13,6 +13,8 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,7 +46,8 @@ import (
 
 const (
 	// mcpCallMax bounds a page route's calls to a server (a probe, a check, a sign-in).
-	mcpCallMax = 45 * time.Second
+	// mcpCallMax bounds a page's request: a local server's first start downloads its package.
+	mcpCallMax = 170 * time.Second
 	// mcpProxyBodyMax bounds a request the proxy buffers: JSON-RPC messages are small, and a buffered body can be sent
 	// again after a refreshed sign-in.
 	mcpProxyBodyMax = 4 << 20
@@ -247,7 +250,7 @@ func mcpRoutesOf(d deps, ms *mcpconn.Service, transport http.RoundTripper) []gat
 				list(w, true)
 			case http.MethodPost:
 				var in mcpconn.AddInput
-				if !readSecretBody(r, &in) || strings.TrimSpace(in.URL) == "" {
+				if !readSecretBody(r, &in) || strings.TrimSpace(in.URL) == "" && strings.TrimSpace(in.CatalogID) == "" {
 					badBody(w)
 					return
 				}
@@ -392,6 +395,29 @@ func mcpRoutesOf(d deps, ms *mcpconn.Service, transport http.RoundTripper) []gat
 			}
 			agent.Log("info", "mcp: header set", agent.F{K: "id", V: id}, agent.F{K: "state", V: string(srv.State)})
 			connJSON(w, http.StatusOK, map[string]any{"server": srv})
+		case "env":
+			// The keys of a local server or an API, by variable name; an empty one keeps its key.
+			if r.Method != http.MethodPut {
+				notAllowed(w)
+				return
+			}
+			var b struct {
+				Env map[string]string `json:"env"`
+			}
+			if !readSecretBody(r, &b) {
+				badBody(w)
+				return
+			}
+			ctx, cancel := ctxOf(r)
+			defer cancel()
+			srv, err := ms.SetEnv(ctx, id, b.Env)
+			if err != nil {
+				agent.Log("info", "mcp: keys refused", agent.F{K: "id", V: id}, agent.F{K: "reason", V: mcpconn.Reason(err)})
+				mcpRefusal(w, err, nil)
+				return
+			}
+			agent.Log("info", "mcp: keys set", agent.F{K: "id", V: id}, agent.F{K: "state", V: string(srv.State)})
+			connJSON(w, http.StatusOK, map[string]any{"server": srv})
 		case "check":
 			if r.Method != http.MethodPost {
 				notAllowed(w)
@@ -424,7 +450,18 @@ func mcpRoutesOf(d deps, ms *mcpconn.Service, transport http.RoundTripper) []gat
 	}
 
 	px := &mcpProxy{d: d, ms: ms, client: mcpProxyClient(transport)}
+	hub := &mcpconn.Hub{S: ms, Results: filepath.Join(os.TempDir(), "harnessly-mcp-results")}
 	return []gate.Route{
+		{Match: func(r *http.Request) bool { return pathIs(r, mcpHubPath) || pathIs(r, "/agents"+mcpHubPath) },
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if d.CLI == nil || !d.CLI.OK(r) {
+					px.refuse(w, http.StatusForbidden, "Forbidden")
+					return
+				}
+				ctx, cancel := context.WithTimeout(r.Context(), mcpCallMax)
+				defer cancel()
+				hub.ServeHTTP(w, r.WithContext(ctx))
+			})},
 		{Match: func(r *http.Request) bool { _, ok := under(r, base); return pathIs(r, base) || ok }, Handler: http.HandlerFunc(page)},
 		{Match: func(r *http.Request) bool { return pathIs(r, cliBase) }, Handler: http.HandlerFunc(cli)},
 		{Match: func(r *http.Request) bool { _, ok := under(r, proxyBase); return ok }, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -576,6 +613,10 @@ func (p *mcpProxy) serve(w http.ResponseWriter, r *http.Request, rest string) {
 	}
 	if !srv.Enabled {
 		p.refuse(w, http.StatusNotFound, "off")
+		return
+	}
+	if srv.Transport == mcpconn.Stdio {
+		p.serveLocal(w, r, id, sub)
 		return
 	}
 	target, err := url.Parse(srv.URL)
@@ -751,4 +792,43 @@ func copySSERewritingEndpoint(w io.Writer, rc *http.ResponseController, src io.R
 			return
 		}
 	}
+}
+
+// serveLocal answers an agent's request to a local server: a POST is handed to the process, there is no
+// stream (a GET is 405, which streamable HTTP clients take for "no stream") and nothing to end.
+func (p *mcpProxy) serveLocal(w http.ResponseWriter, r *http.Request, id, sub string) {
+	if sub != "" {
+		p.refuse(w, http.StatusNotFound, "not-found")
+		return
+	}
+	switch r.Method {
+	case http.MethodPost:
+	case http.MethodDelete:
+		w.WriteHeader(http.StatusOK)
+		return
+	default:
+		w.Header().Set("Allow", "POST, DELETE")
+		p.refuse(w, http.StatusMethodNotAllowed, "no-stream")
+		return
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, mcpProxyBodyMax+1))
+	if err != nil || len(body) > mcpProxyBodyMax {
+		p.refuse(w, http.StatusBadRequest, "bad-request")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), mcpCallMax)
+	defer cancel()
+	out, err := p.ms.ServeLocal(ctx, id, body)
+	if err != nil {
+		agent.Log("info", "mcp proxy: the local server did not answer", agent.F{K: "id", V: id}, agent.F{K: "reason", V: mcpconn.Reason(err)})
+		p.authRefusal(w, id, err)
+		return
+	}
+	if out == nil {
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(out)
 }

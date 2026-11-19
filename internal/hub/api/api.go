@@ -5,6 +5,7 @@ package api
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"github.com/ly-solutions/harnessly/internal/apptoken"
 	"github.com/ly-solutions/harnessly/internal/filestore"
@@ -39,6 +40,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/hubsafe"
 	"github.com/ly-solutions/harnessly/internal/hub/ingest"
+	"github.com/ly-solutions/harnessly/internal/hub/jobs"
 	"github.com/ly-solutions/harnessly/internal/hub/leader"
 	"github.com/ly-solutions/harnessly/internal/hub/limits"
 	"github.com/ly-solutions/harnessly/internal/hub/link"
@@ -173,7 +175,9 @@ type Hub struct {
 	SSH      *sshinstall.Service
 	Dialer   *link.Dialer
 	Registry *link.Registry
-	Events   *events.Broker
+	// Jobs is the pool of builders and the queue of heavy jobs; nil with HUB_BUILDERS=off.
+	Jobs   *jobs.Service
+	Events *events.Broker
 	// OrgEvents is the bus of the organizations' live stream (GET /api/orgs/{org}/events).
 	OrgEvents *events.MemoryBus
 	// Fleet is the bus of the workspace page's live channel (GET /api/v2/machines/events).
@@ -453,7 +457,10 @@ func New(o Options) (*Hub, error) {
 		}
 		return nil
 	}})
-	h.Automations = automations.New(automations.Deps{Config: cfg, DB: db, Auth: h.Auth, Log: log, Now: o.Now, Links: h.Registry, Gate: h.Switches})
+	h.Automations = automations.New(automations.Deps{Config: cfg, DB: db, Auth: h.Auth, Log: log, Now: o.Now, Links: h.Registry, Gate: h.Switches,
+		Bell: func(ctx context.Context, userID, email, icon, key, title, text, link string) bool {
+			return h.Notices.RingAs(ctx, userID, email, icon, key, title, text, link)
+		}})
 	var historySink machines.HistorySink
 	if cfg.History {
 		h.History = history.New(history.Deps{DB: db, Reg: h.Registry, Log: log, Now: o.Now})
@@ -486,9 +493,12 @@ func New(o Options) (*Hub, error) {
 	h.Machines = machines.New(machines.Deps{
 		Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Limiter: o.Limiter, Log: log, Now: o.Now,
 		OnRevoked: func(machineID string) { px.Forget(machineID) }, Usage: usageSink, Budget: budgetSink, Env: envSink,
-		Provider: prov, Features: machineFeatures, Publisher: o.Publisher, Design: h.Design, Projects: &projreg.Service{DB: db, Log: log, Now: o.Now}, Docs: h.Docs, Proposals: h.Env, TbotJoin: h.TbotJoin, Automations: h.Automations,
+		Provider: prov, Features: machineFeatures, Publisher: o.Publisher, Design: h.Design, Projects: &projreg.Service{DB: db, Log: log, Now: o.Now}, NoticeSlot: hubNoticeSlot{h}, Docs: h.Docs, Proposals: h.Env, TbotJoin: h.TbotJoin, Automations: h.Automations,
 		History: historySink, Switches: h.Switches, Notice: noticeOf(o.Mailer),
 	})
+	if cfg.Builders {
+		h.Jobs = jobs.New(jobs.Deps{DB: db, Link: registryLink{h.Registry}, Offers: h.Machines.Offers, Dir: filepath.Join(cfg.DataDir, "jobs"), Log: log, Now: o.Now})
+	}
 	h.Analytics.UseMachines(h.Machines)
 	h.Analytics.UseEvents(h.OrgEvents)
 	if h.lead != nil {
@@ -508,6 +518,12 @@ func New(o Options) (*Hub, error) {
 	h.Notices.UserID = func(ctx context.Context, email string) (string, bool) {
 		u, err := db.S().UserByEmail(ctx, email)
 		return u.ID, err == nil && u.DisabledAt == nil && u.ID != ""
+	}
+	if h.relay != nil {
+		// A notice read on a device whose stream is on one replica goes from the person's devices on the others.
+		var deliver func(string, json.RawMessage)
+		send := h.relay.Notices(func(person string, data json.RawMessage) { deliver(person, data) })
+		deliver = h.Notices.Relay(send)
 	}
 	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now, Design: noticehub.Chain{h.Notices, h.Design}, Features: h.Features, Workspace: o.Workspace, History: cfg.History, VoiceTakes: cfg.VoiceTakes, Fleet: h.Fleet, Switches: h.Switches, SlotKey: slotKey, Rollout: h.Rollout.ServeState})
 	// A person whose sessions were all ended at once holds nothing open: neither the live streams of their spaces nor
@@ -618,6 +634,9 @@ func New(o Options) (*Hub, error) {
 	h.Analytics.Mount(mux)
 	h.Env.Mount(mux)
 	h.Machines.Mount(mux)
+	if h.Jobs != nil {
+		(&jobs.Routes{S: h.Jobs, Guard: tenant.Guard{Auth: h.Auth, Spaces: h.Spaces, Machines: h.Machines}, Admit: h.Dialer.AdmitJobs}).Mount(mux, h.Spaces.Sub())
+	}
 	h.TbotJoin.Mount(mux)
 	h.Docs.Mount(mux)
 	h.Efficiency.Mount(mux)
@@ -674,6 +693,9 @@ func New(o Options) (*Hub, error) {
 	}
 	if h.History != nil {
 		mux.Handle("POST "+hubproto.HistoryReadPath, httpx.Handler(h.agentHistoryRead))
+	}
+	if h.Automations != nil && h.Automations.Enabled() {
+		mux.Handle("POST "+hubproto.RoutinesPath, httpx.Handler(h.agentRoutines))
 	}
 	notFound := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { httpx.WriteError(w, r, httpx.ErrNotFound) })
 	if appsView != nil {
@@ -947,6 +969,9 @@ func (h *Hub) Run(ctx context.Context) {
 	if h.Machines != nil {
 		evalLink.Offers = h.Machines.Offers
 	}
+	if h.Jobs != nil {
+		safego.Go("jobs", func() { h.lead.Lead(ctx, "jobs", h.Jobs.Run) })
+	}
 	evalSched := eval.New(eval.Deps{DB: h.db, Gate: h.Switches, Link: evalLink, Log: h.log})
 	safego.Go("eval", func() { h.lead.Lead(ctx, "eval", evalSched.Run) })
 	if p := mrsource.New(h.cfg.MRSourceURL, h.cfg.MRSourceGroups, h.cfg.MRSourceToken, h.db.S(), h.log); p != nil {
@@ -1123,3 +1148,21 @@ var (
 	_ proxy.Anchor     = noticehub.Chain{}
 	_ proxy.KeyedFiles = noticehub.Chain{}
 )
+
+// registryLink lets the jobs service reach the machines over the hub's links.
+type registryLink struct{ r *link.Registry }
+
+func (l registryLink) Online(machineID string) bool { return l.r.Get(machineID) != nil }
+
+func (l registryLink) Do(ctx context.Context, machineID, op string, params any, timeout time.Duration) (json.RawMessage, error) {
+	return l.r.Do(ctx, machineID, op, params, timeout)
+}
+
+// hubNoticeSlot hands the machines' smart notice to the hub's notices, made after the machines.
+type hubNoticeSlot struct{ h *Hub }
+
+func (n hubNoticeSlot) Slot(ctx context.Context, m store.Machine, raw json.RawMessage) {
+	if n.h.Notices != nil {
+		n.h.Notices.Slot(ctx, m, raw)
+	}
+}

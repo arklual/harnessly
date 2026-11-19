@@ -122,7 +122,18 @@ func (d *v2Designly) state() designlyState {
 // (a teammate's runtime listed a colleague's deck as a site and opened its slide as a plain page). A video is a
 // deck folder with meta/video.json, so it is told first.
 func kindOf(st designlyState, lib *design.Library, id string) wire.DesignKind {
+	if lib.IsScene3D(id) {
+		return wire.DesignScene3D
+	}
 	return kindFrom(st, id, lib.IsVideo(id), lib.IsDeck(id))
+}
+
+// kindOfPart is the kind of a listed project from the part of its folder already read: a 3D scene first.
+func kindOfPart(st designlyState, id string, part designlyProject) wire.DesignKind {
+	if part.scene3d {
+		return wire.DesignScene3D
+	}
+	return kindFrom(st, id, part.video, part.deck)
 }
 
 // kindFrom is kindOf with what the project's folder says already read.
@@ -560,7 +571,7 @@ func (d *v2Designly) Library(ctx context.Context) (wire.DesignLibrary, error) {
 			appKind = &ext
 		}
 		part := d.disk.project(lib, a.ID, readDesignlyProject)
-		item := wire.DesignArtifact{ID: a.ID, Title: a.Title, UpdatedAt: wire.Ms(a.UpdatedAt), Kind: kindFrom(st, a.ID, part.video, part.deck), Pinned: st.Pinned[a.ID],
+		item := wire.DesignArtifact{ID: a.ID, Title: a.Title, UpdatedAt: wire.Ms(a.UpdatedAt), Kind: kindOfPart(st, a.ID, part), Pinned: st.Pinned[a.ID],
 			ProjectPath: a.ProjectPath, Boards: []wire.DesignBoard{}, Convs: []string{}, Role: wire.DesignRole(lib.RoleOf(a.ID, me, now)),
 			AppKind: appKind}
 		if a.Cover != nil && *a.Cover != "" {

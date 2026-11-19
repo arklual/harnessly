@@ -59,10 +59,26 @@ OTHER AGENTS (this machine and the fleet's other machines)
                                     or exits 1 with "refused: <reason> — <why>". The other agent reads it as a
                                     <peer-message> with your machine, owner and chat, and answers by building the same command from its ref.
 
+BUILDERS (heavy jobs on the hub's builder machines, docs/hub/builders.md)
+  harnessly builders                the pool: name, busy/total slots, labels (blender, gpu, ffmpeg…), ready or why not
+  harnessly job run --need LABELS [--builder NAME|auto] [--in DIR] [--out GLOB]… [--dest DIR] [--timeout 20m] -- CMD ARGS…
+                                    a heavy command (a render, a build) on a builder: DIR goes there, CMD runs in it, the
+                                    files matching --out come back into --dest (default DIR). Without an online builder it
+                                    runs here on the heavy slots as a draft (10 minutes at most) and says why.
+  harnessly job list | status ID | cancel ID
+
 YOUR MEMORY ON ALL YOUR MACHINES (opt-in, docs/hub/memory-sync.md)
   harnessly memory [status]         the last sync of your Claude Code memory through the hub, conflicts and errors
   harnessly memory sync [--cwd DIR | --all]  sync the project in DIR (the current folder) or every project synced before;
                                     a conflict keeps both versions (<name>.conflict-<version>.md beside the note)
+
+YOUR ROUTINES: RECURRING AGENT TASKS (docs/hub/routines.md)
+  harnessly routine [list]          your routines: on|paused, schedule, next start, last runs (+ ok, . quiet, x failed)
+  harnessly routine create --name N --cron "0 9 * * 1-5" --words "по будням в 9:00" --prompt TEXT|- [flags]
+                                    a task the hub runs on one of your machines on that schedule; the run's agent
+                                    reports a summary and artifacts, the hub checks them and tells you (harnessly help routine)
+  harnessly routine set|pause|resume|run|runs|forget|delete ID
+                                    change, pause, run now, its history, clear its memory, delete
 
 INSTALLING A RELEASE
   harnessly upgrade plan|apply|rollback
@@ -569,6 +585,26 @@ voice-guard is the voice mode's PreToolUse hook: while the person talks to this 
 outside (a push, a merge, a message to people, a task made, a publication, a deletion, a payment) is asked about
 first; with --agent codex it is refused with words telling the agent to ask «Делаем?». Prints nothing otherwise.
 `,
+	"builders": `harnessly builders [--json]
+
+Lists the hub's builder machines: where heavy jobs (Blender renders, builds) go instead of the machine the chats sit on.
+Each row: name, running/slots, labels, ready or why not (offline; or AGENT_HUB_JOBS=on is missing on that machine), how many
+jobs wait for it by name, id. With no builder the list says so, and "harnessly job run" falls back to this machine's slots.
+`,
+	"job": `harnessly job run --need LABELS [--builder NAME|auto] [--in DIR] [--out GLOB]… [--dest DIR] [--timeout 20m] [--env K=V]… -- CMD ARGS…
+harnessly job list | status ID | cancel ID
+
+  harnessly job run --need blender --in ./scene --out 'out/*.png' --timeout 30m -- blender -b scene.blend -o out/f_ -f 1
+  harnessly job run --need blender,gpu --builder render-1 --in ./scene --out 'out/**' -- blender -b -P render.py
+
+The command is a program name without a path (the builder's owner lists the tools it runs) and its arguments, no shell.
+--in is packed (without .git and node_modules), sent to the builder and unpacked as the command's folder; the files that
+match --out come back into --dest (default: --in), keeping their paths. "--builder auto" or none lets the hub choose; a
+name pins the job to that builder (it waits when the builder is busy). The first lines say where the job went and why; the
+exit code is the command's. With no online builder that fits, the job runs here on the machine's heavy slots as a draft,
+within 10 minutes, with HARNESSLY_JOB_LOCAL=1 in its environment (a render script can lower its samples), and the line says
+why. --json prints {job, files, exitCode, ok}.
+`,
 	"peers": `harnessly peers [list] | harnessly peers send REF TEXT...
 
   harnessly peers
@@ -579,6 +615,36 @@ REF is <machine>/<conversation id> as the list prints it (a bare conversation id
 as <peer-message person=… machine=… chat=… ref=…>…</peer-message>: build the answer yourself from its ref, as
 "harnessly peers send <ref> …"; the envelope carries no command to copy. The
 other side decides who may write to it (Settings → Machines → «Связь между агентами»); a refusal says why.
+`,
+	"routine": `harnessly routine [list] | show ID | create FLAGS | set ID FLAGS | pause ID | resume ID | run ID | runs ID | forget ID | delete ID
+
+  harnessly routine create --name "Дайджест дня" --cron "0 9 * * 1-5" --words "по будням в 9:00" \
+    --prompt "Собери, что изменилось за сутки в моих задачах и MR: Итог, Ждут меня, Риски" \
+    --to notice,telegram,file --file digest/{date}.md --check contains:Риски --check file --check fresh
+  harnessly routine create --name "Убрать флаг" --cron "0 12 25 11 *" --once --autonomy draft --prompt -
+  harnessly routine set ID --when failure --to telegram       only tell me when it fails
+  harnessly routine run ID                                    run it now, outside the schedule
+  harnessly routine runs ID                                   its runs: ok, quiet (nothing new) or failed, with the summary
+
+A routine is run by the hub on one of your machines (the main one, or the best free one), in a new chat, with no one
+watching: its agent works alone and ends with a report — outcome ok, quiet (nothing new since the memory) or failed, a
+summary, the full text, artifacts and the memory for the next run. The hub checks the report (--check) and decides.
+
+Flags:
+  --name N            the name, unique among your routines
+  --prompt TEXT|-     what to do; "-" reads it from stdin
+  --cron EXPR         five fields, minute hour day month weekday (0 9 * * 1-5); --tz ZONE (Europe/Moscow)
+  --words TEXT        the schedule as the person said it, shown instead of the cron
+  --model M           sonnet (the default for routines), haiku, opus; "default" follows the hub's setting
+  --when POLICY       when the person hears: changed (default: ok or failed, not quiet), always, failure, never
+  --to CHANNELS       besides the run's chat: notice (the bell), telegram, messenger, mail, file, doc
+  --file PATH         the file the result goes to as a new version every run ({date} is today, YYYY-MM-DD)
+  --check KIND[:V]    contains:TEXT, regex:EXPR, artifact[:KIND], file, fresh (today's date in the result)
+  --autonomy LEVEL    read (default: read only), draft (drafts, MRs, nothing sent), act (changes, never merges or deploys)
+  --once, --until YYYY-MM-DD   run one time, or stop after that day
+  --budget USD        the run's spending cap the agent is told to keep
+  --chat ID           the chat the routine was made in (shown as «Открыть чат задачи»)
+  --off / --on        make it paused / running
 `,
 	"memory": `harnessly memory [status] | harnessly memory sync [--cwd DIR | --all]
 

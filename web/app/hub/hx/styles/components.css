@@ -2926,3 +2926,47 @@ input.hx-tbrowser__url:focus { text-align: left; color: var(--hx-fg-1); box-shad
 /* «Рабочее пространство» above the person: the way back from the hub to the agents */
 .hx-wsnav { flex: none; margin-bottom: var(--hx-space-2); }
 .hx-wsnav .hx-nav__label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+
+/* The parts of a screen under its sidebar item. */
+.hx-nav__group:has(> .hx-nav__fold) { position: relative; }
+.hx-nav__group:has(> .hx-nav__fold) > .hx-nav__item { padding-right: 32px; }
+.hx-nav__fold { position: absolute; top: 5px; right: 4px; width: 24px; height: 24px; display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--hx-fg-3); cursor: pointer; transition: background var(--hx-dur-sm), color var(--hx-dur-sm); }
+.hx-nav__fold:hover { background: var(--hx-shell-hover); color: var(--hx-fg-1); }
+.hx-nav__fold .hx-icon { transition: transform 260ms var(--hx-ease-out); }
+.hx-nav__group[aria-expanded="true"] > .hx-nav__fold .hx-icon { transform: rotate(90deg); }
+.hx-nav__subs { display: flex; flex-direction: column; gap: 1px; margin: 2px 0 4px 21px; padding-left: 10px; border-left: 1px solid var(--hx-border, rgba(127,127,127,.18)); animation: hx-subs-in 220ms var(--hx-ease-out); }
+.hx-nav__sub { height: 28px; display: flex; align-items: center; padding: 0 var(--hx-space-2); border: 0; border-radius: var(--hx-radius-sm); background: transparent; color: var(--hx-fg-2); font-size: var(--hx-text-sm); text-align: left; cursor: pointer; transition: background var(--hx-dur-sm), color var(--hx-dur-sm); }
+.hx-nav__sub:hover { background: var(--hx-shell-hover); color: var(--hx-fg-1); }
+.hx-nav__sub[aria-current="page"] { color: var(--hx-fg-1); background: var(--hx-shell-active); }
+@keyframes hx-subs-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .hx-nav__subs { animation: none; } }
+.anc[data-pick] { cursor: pointer; border-radius: var(--hx-radius-sm); transition: background var(--hx-dur-sm); }
+.anc[data-pick]:hover { background: var(--hx-shell-hover); }
+.anc[data-pick]:focus-visible { outline: 2px solid var(--hx-accent, #8968f4); outline-offset: 2px; }
+.anc[data-on] { background: var(--hx-shell-active); }
+
+/* «Билдеры» of the machines screen. */
+.hx-part-mark { display: block; height: 0; scroll-margin-top: 16px; }
+.hx-bp { margin-top: var(--hx-space-4); padding: var(--hx-space-4); display: flex; flex-direction: column; gap: var(--hx-space-3); scroll-margin-top: 16px; }
+.hx-bp__h { display: flex; flex-direction: column; gap: 2px; }
+.hx-bp__h b { font-size: var(--hx-text-lg); font-weight: var(--hx-weight-semibold); }
+.hx-bp__h span, .hx-bp__empty { color: var(--hx-fg-2); font-size: var(--hx-text-sm); margin: 0; }
+.hx-bp__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.hx-bp__row { display: grid; grid-template-columns: 10px minmax(140px, 1.2fr) 2fr minmax(120px, 160px); align-items: center; gap: var(--hx-space-3); padding: 10px 4px; border-top: 1px solid var(--hx-border, rgba(127,127,127,.15)); }
+.hx-bp__row:first-child { border-top: 0; }
+.hx-bp__dot { width: 8px; height: 8px; border-radius: 50%; background: #2fbf6c; }
+.hx-bp__row[data-st="busy"] .hx-bp__dot { background: #f5a524; }
+.hx-bp__row[data-st="warn"] .hx-bp__dot { background: #f5a524; }
+.hx-bp__row[data-st="off"] .hx-bp__dot { background: var(--hx-fg-3); }
+.hx-bp__name { display: flex; flex-direction: column; min-width: 0; }
+.hx-bp__name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hx-bp__name small, .hx-bp__caps small, .hx-bp__load small { color: var(--hx-fg-3); font-size: var(--hx-text-xs, 12px); }
+.hx-bp__caps { display: flex; flex-wrap: wrap; gap: 4px; }
+.hx-bp__caps i { font-style: normal; font-size: var(--hx-text-xs, 12px); padding: 1px 7px; border-radius: 999px; background: var(--hx-shell-hover); color: var(--hx-fg-2); }
+.hx-bp__load { display: flex; flex-direction: column; gap: 4px; }
+.hx-bp__bar { height: 6px; border-radius: 3px; background: var(--hx-shell-hover); overflow: hidden; }
+.hx-bp__bar i { display: block; height: 100%; border-radius: 3px; background: #8968f4; transition: width 400ms var(--hx-ease-out); }
+@media (max-width: 720px) {
+  .hx-bp__row { grid-template-columns: 10px 1fr; }
+  .hx-bp__caps, .hx-bp__load { grid-column: 2; }
+}

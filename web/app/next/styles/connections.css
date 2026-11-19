@@ -681,6 +681,21 @@ html[data-theme='dark'] .hx-conn-glyph[data-mcp='posthog'] {
   white-space: nowrap;
 }
 
+/* The keys of a local server or an API: one field each, a hint under it, links to where they are made */
+.hx-mcp-env {
+  display: grid;
+  gap: 10px;
+}
+.hx-mcp-env__hint {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-mcp-env__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
 /* A token: the header it goes in, and the token */
 .hx-mcp-head {
   display: grid;

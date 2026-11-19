@@ -778,6 +778,9 @@ func cachedChromeProbe(ctx context.Context, path, data string) (provision.Inspec
 	return info, err
 }
 
+// agentBrowserConfig is how the check reads the browser setup: the environment, here so a test can say what the machine has.
+var agentBrowserConfig = provision.FromEnv
+
 func checkAgentBrowser(ctx context.Context, data string) machineCheck {
 	check := machineCheck{ID: "agent_browser", Title: "Agent browser", OK: true}
 	if strings.EqualFold(os.Getenv("RUNTIME_BROWSER"), "off") {
@@ -788,7 +791,7 @@ func checkAgentBrowser(ctx context.Context, data string) machineCheck {
 		check.Detail = "External CDP browser; display and sandbox are managed externally"
 		return check
 	}
-	cfg := provision.FromEnv(data)
+	cfg := agentBrowserConfig(data)
 	path, snap, err := provision.Find(cfg)
 	if err == nil && path == "" && snap != "" {
 		path = snap

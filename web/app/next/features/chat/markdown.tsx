@@ -7,7 +7,9 @@ import renderTree, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import HtmlBlock from '@/next/features/chat/html-block';
 import { AnswerText } from '@/next/features/chat/mockup-to-design';
-import { cardKindOf, LoneLink } from '@/next/features/chat/link-card';
+import { cardKindOf, cardSlugOf, LoneLink } from '@/next/features/chat/link-card';
+import { useLinkCardMeta } from '@/next/features/chat/link-card-meta';
+import { isBareAddress, slugWords } from '@/next/features/chat/link-name';
 import { AppLinkParagraph } from '@/next/features/app-views/link-card';
 import MermaidBlock from '@/next/features/chat/mermaid-block';
 import { changeLinkLabel, chatIdOfHref, docOfCode, splitRefs } from '@/next/features/chat/refs';
@@ -116,9 +118,24 @@ const InlineCode = ({ children }: { children?: ReactNode }) => {
   return <code className="hx-md__code">{children}</code>;
 };
 
+// A bare address of our document or board: the chip says its name (the hub's card), and the slug as words until that
+// arrives. It opens as any link of the chip does.
+const NamedLink = ({ href, slug }: { href: string; slug: string }) => {
+  const meta = useLinkCardMeta(slug);
+  return <RefChip kind="link" label={href} href={href} text={meta?.title ?? slugWords(slug)} />;
+};
+
+// A path in the text is a chip with the file's name; the whole path is its hint.
+const PathRef = ({ kind, label }: { kind: RefKind; label: string }) =>
+  kind === 'file' ? (
+    <RefChip kind={kind} label={label} text={fileNameOf(label)} hint={label} />
+  ) : (
+    <RefChip kind={kind} label={label} />
+  );
+
 const components = {
   [REF_TAG]: (props: { 'data-kind'?: RefKind; 'data-label'?: string }) => (
-    <RefChip kind={props['data-kind'] ?? 'file'} label={props['data-label'] ?? ''} />
+    <PathRef kind={props['data-kind'] ?? 'file'} label={props['data-label'] ?? ''} />
   ),
   // A link to a merge request, a pull request or a commit is its chip, which opens it with the diff in the pane.
   a: ({ href, children }) => {
@@ -144,6 +161,8 @@ const components = {
           text={text && text !== href ? text : change}
         />
       );
+    const slug = href && isBareAddress(text, href) ? cardSlugOf(href) : null;
+    if (href && slug) return <NamedLink href={href} slug={slug} />;
     return <RefChip kind="link" label={href ?? ''} href={href ?? null} text={text || href || ''} />;
   },
   pre: ({ node }) => {

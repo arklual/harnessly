@@ -32,7 +32,10 @@ type Seal struct {
 // and the scripts and settings other chats and the tmux server run, which the agent must not be able to change.
 var (
 	dataReadonly = []string{"port", "bin", "agent-skills", "status-hook.sh", "statusline.sh", "codex-hook.sh", "codex-launcher.js",
-		"hooks.json", "launch-prompts", "prompt-handoff", "providers", "uploads", "images", "fs-uploads", "design-library-root"}
+		"hooks.json", "launch-prompts", "prompt-handoff", "providers", "uploads", "images", "fs-uploads", "design-library-root",
+		// The files a person attaches to a message (a screenshot) in the current interface: the message names their path
+		// here, so the agent of a chat with apps must read them like any other.
+		"v2/uploads"}
 	// Sinopia's projects, the chat's own folder when it works in one.
 	dataWritable = []string{"design"}
 	// Under each workspace's folder only what a launch names.

@@ -18,6 +18,10 @@ import {
   withNote,
   withRemoved,
   withTimer,
+  withAllChats,
+  withOnlyChat,
+  withPinnedChat,
+  type IWidgetPlace,
 } from '@/next/features/widgets/model';
 
 describe('the widgets under the right column (HRN-1510)', () => {
@@ -76,7 +80,8 @@ describe('the widgets an agent makes (HRN-1511)', () => {
     const removed = withRemoved(s ?? NO_WIDGETS, 'app:local.widget-weather/side');
     expect(withNewApps(removed, found)).toBeNull();
     expect(shownWidgets(s ?? NO_WIDGETS, () => false)).toEqual([]);
-    expect(shownWidgets(s ?? NO_WIDGETS, null)).toEqual([]);
+    // The apps not known yet (nothing kept, the machine still answering): the cards are drawn as placeholders.
+    expect(shownWidgets(s ?? NO_WIDGETS, null).map((x) => x.kind)).toEqual(['app']);
   });
 
   it('asks the model no more often than every five minutes', () => {
@@ -92,5 +97,50 @@ describe('the widgets an agent makes (HRN-1511)', () => {
     expect(timerLeft(0, 5)).toBe(0);
     expect(clockText(65)).toBe('1:05');
     expect(clockText(3723)).toBe('1:02:03');
+  });
+});
+
+describe('the widgets of a chat (HRN-1664)', () => {
+  const made: Record<string, string> = { 'local.widget-render-progress/side': 'tab-a' };
+  const at = (chat: string | null): IWidgetPlace => ({
+    chat,
+    madeFor: (app, view) => made[`${app}/${view}`],
+  });
+  const two = () => {
+    let s = withAdded(NO_WIDGETS, WIDGET_KIND.limits) ?? NO_WIDGETS;
+    s = withAdded(s, WIDGET_KIND.app, { app: 'local.widget-render-progress', view: 'side' }) ?? s;
+    return s;
+  };
+  const ids = (s: ReturnType<typeof two>, chat: string | null) =>
+    shownWidgets(s, () => true, at(chat)).map((x) => x.id);
+
+  it('shows a widget made for a chat in that chat only, and the global ones everywhere', () => {
+    const s = two();
+    expect(ids(s, 'tab-a')).toEqual(['limits', 'app:local.widget-render-progress/side']);
+    expect(ids(s, 'tab-b')).toEqual(['limits']);
+    expect(ids(s, null)).toEqual(['limits']);
+  });
+
+  it('lets the person pin it to this chat too, to every chat, or only to one', () => {
+    const id = 'app:local.widget-render-progress/side';
+    let s = withPinnedChat(two(), id, 'tab-b', at('tab-b'));
+    expect(ids(s, 'tab-b')).toEqual(['limits', id]);
+    expect(ids(s, 'tab-a')).toEqual(['limits', id]);
+    expect(ids(s, 'tab-c')).toEqual(['limits']);
+    s = withAllChats(s, id);
+    expect(ids(s, 'tab-c')).toEqual(['limits', id]);
+    s = withOnlyChat(s, 'limits', 'tab-c');
+    expect(ids(s, 'tab-c')).toEqual(['limits', id]);
+    expect(ids(s, 'tab-a')).toEqual([id]);
+    // A pin on a widget that already shows everywhere changes nothing.
+    expect(withPinnedChat(s, id, 'tab-z', at('tab-z'))).toBe(s);
+  });
+
+  it('keeps the pins through a save and read, and drops a broken one', () => {
+    const s = withOnlyChat(two(), 'limits', 'tab-a');
+    expect(parseWidgets(serializeWidgets(s)).items[0]?.chats).toEqual(['tab-a']);
+    expect(parseWidgets(serializeWidgets(withAllChats(s, 'limits'))).items[0]?.chats).toBe('all');
+    const broken = JSON.stringify({ items: [{ id: 'limits', kind: 'limits', chats: [1, ''] }], seen: [] });
+    expect(parseWidgets(broken).items[0]?.chats).toBeUndefined();
   });
 });

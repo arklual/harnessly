@@ -3,6 +3,7 @@ package convo
 import (
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/timescale"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -154,5 +155,6 @@ func (r *Runtime) idleWindows() (setting, floor time.Duration) {
 			floor = p
 		}
 	}
-	return setting, floor
+	// On a compressed schedule (an eval stand) the windows are logical: an hour of idling passes sooner.
+	return timescale.Real(setting), timescale.Real(floor)
 }

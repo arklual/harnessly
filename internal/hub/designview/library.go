@@ -300,6 +300,8 @@ func (v *View) listProject(ctx context.Context, room Room, spaceID, id string, e
 	}
 	item := designaccess.LibraryItem{ID: id, Title: a.Title, UpdatedAt: newest, Kind: "site", Boards: []designaccess.LibraryBoard{}}
 	switch {
+	case lib.IsScene3D(id):
+		item.Kind = "scene3d"
 	case lib.IsVideo(id):
 		item.Kind = "video"
 	case lib.IsDeck(id):

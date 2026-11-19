@@ -28,6 +28,7 @@ type Written struct {
 var EditRoutes = map[string]bool{
 	"deck": true, "deck/settings": true, "deck/notes": true, "deck/patch": true, "deck/comments": true, "deck/pdf": true,
 	"video": true, "video/settings": true, "video/scene": true, "video/overlay": true, "video/comments": true,
+	"scene3d/comments": true,
 }
 
 // servedSegment: a first segment of a path the public route answers. The names that begin with two underscores are the

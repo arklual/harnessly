@@ -96,6 +96,8 @@ var (
 	titleFlagRe = regexp.MustCompile(`(?:--title|\s-t)[=\s]+(?:"([^"]+)"|'([^']+)'|(\S+))`)
 	// The folder of a design of the library: …/design-artifacts/<id>/….
 	designPathRe = regexp.MustCompile(`/design-artifacts/([a-z0-9][a-z0-9-]{0,62})/`)
+	// designBoardRe is a board of a design: a .dc.html file right in its project folder.
+	designBoardRe = regexp.MustCompile(`/design-artifacts/[a-z0-9][a-z0-9-]{0,62}/project/([^/]+\.dc\.html)$`)
 )
 
 // IsDeliverTool: the MCP tool deliver_file, under whatever name its server is given.
@@ -263,7 +265,11 @@ func Wrote(p string, created bool) (wire.TurnOutput, bool) {
 	}
 	if m := designPathRe.FindStringSubmatch(p); m != nil {
 		// A page written into a design changes it: the design is made by the library, not by a write.
-		return wire.TurnOutput{Kind: wire.OutputDesign, Op: wire.OutputChanged, Ref: m[1], Title: m[1]}, true
+		out := wire.TurnOutput{Kind: wire.OutputDesign, Op: wire.OutputChanged, Ref: m[1], Title: m[1]}
+		if b := designBoardRe.FindStringSubmatch(p); b != nil {
+			out.Pages = []string{b[1]}
+		}
+		return out, true
 	}
 	if isDoc(p) {
 		return wire.TurnOutput{Kind: wire.OutputDoc, Op: op, Ref: p, Title: strings.TrimSuffix(path.Base(p), path.Ext(p))}, true

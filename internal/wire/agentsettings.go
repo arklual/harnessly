@@ -36,23 +36,26 @@ const (
 	OptProjectMcp     AgentOptionKey = "projectMcp"
 	OptCompactWindow  AgentOptionKey = "compactWindow"
 	OptMemory         AgentOptionKey = "memory"
-	OptKeepDays       AgentOptionKey = "keepDays"
-	OptHooks          AgentOptionKey = "hooks"
-	OptCoauthor       AgentOptionKey = "coauthor"
-	OptUpdates        AgentOptionKey = "updates"
-	OptSummary        AgentOptionKey = "summary"
-	OptFast           AgentOptionKey = "fast"
-	OptSandboxMode    AgentOptionKey = "sandboxMode"
-	OptNetwork        AgentOptionKey = "network"
-	OptApproval       AgentOptionKey = "approval"
-	OptSearch         AgentOptionKey = "search"
-	OptHistory        AgentOptionKey = "history"
+	// OptMemories is Codex's `features.memories`: what it learns in a chat is kept for the next ones. On by default in
+	// every harnessly chat: an unset key reads as on, and the person's own value wins.
+	OptMemories    AgentOptionKey = "memories"
+	OptKeepDays    AgentOptionKey = "keepDays"
+	OptHooks       AgentOptionKey = "hooks"
+	OptCoauthor    AgentOptionKey = "coauthor"
+	OptUpdates     AgentOptionKey = "updates"
+	OptSummary     AgentOptionKey = "summary"
+	OptFast        AgentOptionKey = "fast"
+	OptSandboxMode AgentOptionKey = "sandboxMode"
+	OptNetwork     AgentOptionKey = "network"
+	OptApproval    AgentOptionKey = "approval"
+	OptSearch      AgentOptionKey = "search"
+	OptHistory     AgentOptionKey = "history"
 	// OptUltracode is Claude Code's `ultracode` key: new sessions start in ultracode (2.1.310+).
 	OptUltracode AgentOptionKey = "ultracode"
 )
 
 // AgentOptionKeys is every AgentOptionKey, in the schema's order.
-var AgentOptionKeys = []AgentOptionKey{OptModel, OptEffort, OptBaseURL, OptFallbackModel, OptThinking, OptOutputStyle, OptPermissionMode, OptSandbox, OptProjectMcp, OptCompactWindow, OptMemory, OptKeepDays, OptHooks, OptCoauthor, OptUpdates, OptSummary, OptFast, OptSandboxMode, OptNetwork, OptApproval, OptSearch, OptHistory, OptUltracode}
+var AgentOptionKeys = []AgentOptionKey{OptModel, OptEffort, OptBaseURL, OptFallbackModel, OptThinking, OptOutputStyle, OptPermissionMode, OptSandbox, OptProjectMcp, OptCompactWindow, OptMemory, OptKeepDays, OptHooks, OptCoauthor, OptUpdates, OptSummary, OptFast, OptSandboxMode, OptNetwork, OptApproval, OptSearch, OptHistory, OptMemories, OptUltracode}
 
 // AgentOptionKind is the type of an option's value.
 type AgentOptionKind string
@@ -112,6 +115,7 @@ var (
 		{Key: OptApproval, Kind: OptKindEnum, Enum: []string{"untrusted", "on-failure", "on-request", "never"}},
 		{Key: OptSearch, Kind: OptKindEnum, Enum: []string{"disabled", "cached", "live"}},
 		{Key: OptHistory, Kind: OptKindBool},
+		{Key: OptMemories, Kind: OptKindBool},
 	}
 )
 

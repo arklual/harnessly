@@ -584,7 +584,7 @@
         "createdAt": {"type": "integer", "minimum": 0}
       }
     },
-    "DesignKind": {"enum": ["site", "slides", "ds", "video"]},
+    "DesignKind": {"enum": ["site", "slides", "ds", "video", "scene3d"]},
     "DesignlyCreate": {
       "type": "object",
       "required": ["title", "brief", "kind", "provider", "model", "effort", "designSystem"],
@@ -1084,7 +1084,7 @@
       "enum": [
         "model", "effort", "baseUrl", "fallbackModel", "thinking", "outputStyle", "permissionMode", "sandbox",
         "projectMcp", "compactWindow", "memory", "keepDays", "hooks", "coauthor", "updates", "summary", "fast",
-        "sandboxMode", "network", "approval", "search", "history", "ultracode"
+        "sandboxMode", "network", "approval", "search", "history", "memories", "ultracode"
       ]
     },
     "AgentOptionValue": {"oneOf": [{"type": "string", "minLength": 1, "maxLength": 500}, {"type": "boolean"}, {"type": "integer", "minimum": 1}, {"type": "null"}]},
@@ -2406,7 +2406,8 @@
             "reach": {"$ref": "#/$defs/Reach"},
             "runtime": {"oneOf": [{"$ref": "#/$defs/MachineRuntime"}, {"type": "null"}]},
             "agents": {"type": "array", "items": {"$ref": "#/$defs/MachineAgent"}},
-            "health": {"$ref": "#/$defs/MachineHealth"}
+            "health": {"$ref": "#/$defs/MachineHealth"},
+            "appsAt": {"type": "integer", "minimum": 1}
           }
         },
         {

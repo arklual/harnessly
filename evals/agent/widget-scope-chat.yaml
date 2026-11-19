@@ -1,0 +1,31 @@
+id: widget-scope-chat
+title: Виджет под задачу этого чата (прогресс рендера) — агент делает его для этого чата, а не для всех (HRN-1664)
+tags: [widgets]
+agents: [claude]
+timeout_s: 300
+covers:
+  - 'cmd/runtime/agent_skills*.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+  - 'internal/hlcli/widget.go'
+  - 'internal/sidewidget/**'
+prompt: >-
+  Сделай мне справа виджет с прогрессом рендера в этом чате: рендер сцены, сейчас 40 процентов из ста.
+expect:
+  - name: made the widget
+    any_of:
+      - called: harnessly\.widget_create
+      - called: Bash
+        args: {command: 'harnessly widget create\b'}
+  - name: did not make it for every chat
+    not_called: harnessly\.widget_create
+    args: {scope: 'global'}
+  - name: did not make it for every chat by the command
+    not_called: Bash
+    args: {command: 'harnessly widget create\b(?s:.*)--scope[ =]global'}
+variants:
+  - id: v1
+    kind: short
+    text: "виджет справа: прогресс рендера, 40%"
+  - id: v2
+    kind: english
+    text: "Put a widget on the right that shows this chat's render progress (40% of 100 done now)."

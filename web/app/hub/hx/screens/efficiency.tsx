@@ -225,10 +225,12 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
 
   return (
     <>
-      <div className="hb-head">
+      <div className="hb-head hd-head">
         <Titles
           title="Эффективность"
-          lead={d ? `${d.scopeLabel} · за ${nowLabel}: сколько стоит смёржённый MR и почему` : 'Считаем'}
+          lead={
+            d ? `Цена MR, что чинить первым и что сдвинулось · ${d.scopeLabel} · дни по Москве` : 'Считаем'
+          }
         />
         <PeriodControls weeks={frame.weeks} change={frame.lastChange} state={picker} onChange={setPicker} />
       </div>
@@ -243,6 +245,57 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
         ) : (
           <div className="an-stage">
             <div className="mx ef">
+              <div className="two">
+                <div className="t-card viz-card dash-tile hd-card efx-hero">
+                  <div className="efx-lead">
+                    За {nowName.title.toLowerCase()} — <b>{money(d.summary.spendUsd)}</b> в ценах API,{' '}
+                    {d.summary.sessions} {plural(d.summary.sessions, 'сессия', 'сессии', 'сессий')},{' '}
+                    {d.summary.mrs} {plural(d.summary.mrs, 'смёрженный MR', 'смёрженных MR', 'смёрженных MR')}
+                    {enough && price ? (
+                      <>
+                        : <b>{formatKpi('usd', price.value)} за MR</b>.
+                      </>
+                    ) : (
+                      '.'
+                    )}
+                  </div>
+                  {wastePct !== null && d.waste && (
+                    <div className="mut" style={{ marginTop: 6 }}>
+                      Без результата ушло {wastePct}% — {money(d.waste.wasteUsd)} из {money(d.waste.totalUsd)}
+                      .
+                    </div>
+                  )}
+                  <div className="mut2 sm" style={{ marginTop: 10 }}>
+                    {nowLabel} против {prevLabel} · {d.scopeLabel}
+                  </div>
+                </div>
+                {d.waste && staff && (
+                  <div className="t-card viz-card dash-tile hd-card">
+                    <div className="ch">
+                      <h3>Что чинить первым</h3>
+                      <div className="hd-r">
+                        <span className="mut2 sm">по потерям в неделю</span>
+                      </div>
+                    </div>
+                    {levers.length === 0 ? (
+                      <p className="mut">Заметных потерь нет, чинить нечего.</p>
+                    ) : (
+                      <ol className="efx-fix">
+                        {levers.slice(0, 3).map((w, i) => (
+                          <li key={w.id} className="efx-fixi" style={{ cursor: 'default' }}>
+                            <span className="efx-n">{i + 1}</span>
+                            <div>
+                              <b>{w.title}</b>
+                              <div className="mut sm">{w.text}</div>
+                            </div>
+                            <span className="mut2 sm num">≈ {money(w.week)} в неделю</span>
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </div>
+                )}
+              </div>
               <section className="ef-main t-card" aria-label="Главный показатель">
                 <div className="ef-tabs" role="tablist" aria-label="Главный показатель">
                   {(
@@ -357,28 +410,6 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
                 </div>
               </section>
 
-              {d.waste && staff && (
-                <Card
-                  title="Что включить"
-                  lead="Оценка в неделю по потерям периода. Общей суммы нет: рычаги пересекаются"
-                >
-                  {levers.length === 0 ? (
-                    <p className="an-empty">Заметных потерь нет, включать нечего</p>
-                  ) : (
-                    <ol className="ef-levers">
-                      {levers.map((w) => (
-                        <li key={w.id} className="ef-lever">
-                          <span className="ef-lever__t">
-                            <b>{w.title}</b>
-                            <span>{w.text}</span>
-                          </span>
-                          <span className="ef-lever__v">≈ {money(w.week)} в неделю</span>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                </Card>
-              )}
               <Changes changes={d.changes} />
               {staff && d.peers && <PeersCard peers={d.peers} teamOrder={teamOrder} />}
               <p className="ef-foot">
@@ -404,7 +435,7 @@ const Screen = () => {
   if (frame.data) return <Body key={base} frame={frame.data} />;
   return (
     <>
-      <div className="hb-head">
+      <div className="hb-head hd-head">
         <Titles title="Эффективность" lead="Считаем" />
       </div>
       <div className="dash hb-dash anx">

@@ -57,6 +57,12 @@ type Rule struct {
 	Enabled   bool   `json:"enabled"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
+	// Routine makes the rule a recurring task (routines.go): set, its runs report an outcome and need no approval.
+	Routine *Routine `json:"routine,omitempty"`
+	// State is the memory a routine's agent left for its next run; FailStreak counts failed runs in a row.
+	State        string `json:"state,omitempty"`
+	FailStreak   int    `json:"failStreak,omitempty"`
+	PausedReason string `json:"pausedReason,omitempty"`
 }
 
 // Run states.
@@ -67,6 +73,8 @@ const (
 	StatusApproved         = "approved"
 	StatusRejected         = "rejected"
 	StatusFailed           = "failed"
+	// StatusDone is a routine's run that reported: its outcome says how it went.
+	StatusDone = "done"
 )
 
 // Run is one event a rule took and what came of it.
@@ -85,6 +93,9 @@ type Run struct {
 	CreatedAt      string          `json:"createdAt"`
 	DispatchedAt   string          `json:"dispatchedAt,omitempty"`
 	FinishedAt     string          `json:"finishedAt,omitempty"`
+	// Outcome and Result are a routine's: ok, quiet or failed, and what its agent reported (RoutineResult).
+	Outcome string          `json:"outcome,omitempty"`
+	Result  json.RawMessage `json:"result,omitempty"`
 }
 
 func iso(ms int64) string { return time.UnixMilli(ms).UTC().Format(time.RFC3339) }
@@ -98,7 +109,7 @@ func isoNull(ms *int64) string {
 
 type rowScanner interface{ Scan(...any) error }
 
-const ruleCols = `id, owner_id, name, trigger, prompt_template, model, limits, machine_id, enabled, created_at, updated_at`
+const ruleCols = `id, owner_id, name, trigger, prompt_template, model, limits, machine_id, enabled, created_at, updated_at, routine, state, fail_streak, paused_reason`
 
 func scanRule(sc rowScanner) (Rule, error) {
 	var r Rule
@@ -106,8 +117,27 @@ func scanRule(sc rowScanner) (Rule, error) {
 	var machine *string
 	var enabled int
 	var created, updated int64
-	if err := sc.Scan(&r.ID, &r.OwnerID, &r.Name, &trig, &r.PromptTemplate, &r.Model, &lim, &machine, &enabled, &created, &updated); err != nil {
+	var routine, state, paused *string
+	var streak *int
+	if err := sc.Scan(&r.ID, &r.OwnerID, &r.Name, &trig, &r.PromptTemplate, &r.Model, &lim, &machine, &enabled, &created, &updated,
+		&routine, &state, &streak, &paused); err != nil {
 		return Rule{}, err
+	}
+	if routine != nil && *routine != "" {
+		var rt Routine
+		if err := json.Unmarshal([]byte(*routine), &rt); err != nil {
+			return Rule{}, err
+		}
+		r.Routine = &rt
+	}
+	if state != nil {
+		r.State = *state
+	}
+	if streak != nil {
+		r.FailStreak = *streak
+	}
+	if paused != nil {
+		r.PausedReason = *paused
 	}
 	if err := json.Unmarshal([]byte(trig), &r.Trigger); err != nil {
 		return Rule{}, err
@@ -122,16 +152,22 @@ func scanRule(sc rowScanner) (Rule, error) {
 	return r, nil
 }
 
-const runCols = `id, rule_id, fingerprint, status, event_payload, conversation_id, machine_id, bug_issue_id, mr_url, summary, error, created_at, dispatched_at, finished_at`
+const runCols = `id, rule_id, fingerprint, status, event_payload, conversation_id, machine_id, bug_issue_id, mr_url, summary, error, created_at, dispatched_at, finished_at, outcome, result`
 
 func scanRun(sc rowScanner) (Run, error) {
 	var r Run
 	var payload string
-	var conv, machine, bug, mr, sum, errText *string
+	var conv, machine, bug, mr, sum, errText, outcome, result *string
 	var created int64
 	var disp, fin *int64
-	if err := sc.Scan(&r.ID, &r.RuleID, &r.Fingerprint, &r.Status, &payload, &conv, &machine, &bug, &mr, &sum, &errText, &created, &disp, &fin); err != nil {
+	if err := sc.Scan(&r.ID, &r.RuleID, &r.Fingerprint, &r.Status, &payload, &conv, &machine, &bug, &mr, &sum, &errText, &created, &disp, &fin, &outcome, &result); err != nil {
 		return Run{}, err
+	}
+	if outcome != nil {
+		r.Outcome = *outcome
+	}
+	if result != nil && *result != "" {
+		r.Result = json.RawMessage(*result)
 	}
 	r.EventPayload = json.RawMessage(payload)
 	for _, p := range []struct {
@@ -144,6 +180,15 @@ func scanRun(sc rowScanner) (Run, error) {
 	}
 	r.CreatedAt, r.DispatchedAt, r.FinishedAt = iso(created), isoNull(disp), isoNull(fin)
 	return r, nil
+}
+
+// routineJSON is the routine column: NULL for an ordinary rule.
+func routineJSON(r *Routine) any {
+	if r == nil {
+		return nil
+	}
+	b, _ := json.Marshal(r)
+	return string(b)
 }
 
 func nullable(s string) any {
@@ -166,9 +211,10 @@ func (s *Service) addRule(ctx context.Context, r Rule) (Rule, bool, error) {
 	r.ID, r.CreatedAt, r.UpdatedAt = store.NewID(), now.UTC().Format(time.RFC3339), now.UTC().Format(time.RFC3339)
 	trig, _ := json.Marshal(r.Trigger)
 	lim, _ := json.Marshal(r.Limits)
-	res, err := s.db.Exec(ctx, `INSERT INTO automation_rules (`+ruleCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	res, err := s.db.Exec(ctx, `INSERT INTO automation_rules (`+ruleCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (owner_id, name) DO NOTHING`,
-		r.ID, r.OwnerID, r.Name, string(trig), r.PromptTemplate, r.Model, string(lim), nullable(r.MachineID), b2i(r.Enabled), store.Ms(now), store.Ms(now))
+		r.ID, r.OwnerID, r.Name, string(trig), r.PromptTemplate, r.Model, string(lim), nullable(r.MachineID), b2i(r.Enabled), store.Ms(now), store.Ms(now),
+		routineJSON(r.Routine), nullable(r.State), r.FailStreak, nullable(r.PausedReason))
 	if err != nil {
 		return Rule{}, false, err
 	}
@@ -178,6 +224,11 @@ func (s *Service) addRule(ctx context.Context, r Rule) (Rule, bool, error) {
 
 func (s *Service) ruleOf(ctx context.Context, id, owner string) (Rule, error) {
 	return scanRule(s.db.QueryRow(ctx, `SELECT `+ruleCols+` FROM automation_rules WHERE id = ? AND owner_id = ?`, id, owner))
+}
+
+// ruleOfRun is the rule a run belongs to.
+func (s *Service) ruleOfRun(ctx context.Context, runID string) (Rule, error) {
+	return scanRule(s.db.QueryRow(ctx, `SELECT `+prefixCols("ar.", ruleCols)+` FROM automation_rules ar JOIN automation_runs r ON r.rule_id = ar.id WHERE r.id = ?`, runID))
 }
 
 func (s *Service) ruleByID(ctx context.Context, id string) (Rule, error) {
@@ -220,9 +271,11 @@ func (s *Service) rules(ctx context.Context, owner string, enabledOnly bool) ([]
 func (s *Service) saveRule(ctx context.Context, r Rule) error {
 	trig, _ := json.Marshal(r.Trigger)
 	lim, _ := json.Marshal(r.Limits)
-	_, err := s.db.Exec(ctx, `UPDATE automation_rules SET name = ?, trigger = ?, prompt_template = ?, model = ?, limits = ?, machine_id = ?, enabled = ?, updated_at = ?
+	_, err := s.db.Exec(ctx, `UPDATE automation_rules SET name = ?, trigger = ?, prompt_template = ?, model = ?, limits = ?, machine_id = ?, enabled = ?, updated_at = ?,
+		routine = ?, state = ?, fail_streak = ?, paused_reason = ?
 		WHERE id = ? AND owner_id = ?`,
-		r.Name, string(trig), r.PromptTemplate, r.Model, string(lim), nullable(r.MachineID), b2i(r.Enabled), store.Ms(s.now()), r.ID, r.OwnerID)
+		r.Name, string(trig), r.PromptTemplate, r.Model, string(lim), nullable(r.MachineID), b2i(r.Enabled), store.Ms(s.now()),
+		routineJSON(r.Routine), nullable(r.State), r.FailStreak, nullable(r.PausedReason), r.ID, r.OwnerID)
 	return err
 }
 

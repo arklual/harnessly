@@ -160,6 +160,8 @@ type Server struct {
 
 	// Work is the chats' work the replica socket hands the agent ({"k":"work"}); nil sends none.
 	Work WorkFeed
+	// Slot is the smart notice's open questions the replica socket hands the agent ({"k":"slot"}); nil sends none.
+	Slot WorkFeed
 }
 
 // The heartbeat (§2): the page pings every 15 s and calls a socket stale after 20 s without a frame; the runtime

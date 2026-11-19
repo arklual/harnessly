@@ -1,0 +1,26 @@
+id: heavy-render-on-builders
+title: Тяжёлый рендер агент отдаёт билдерам хаба командой `harnessly job run`, а не гоняет Blender в чате
+tags: [builders, heavy, hub]
+timeout_s: 420
+# renders and builds went to the machine the people's chats sit on and slowed them down. The pool of builders is
+# reached with `harnessly job run --need blender --in DIR --out GLOB -- CMD`; with no hub (a stand is in none) the command
+# runs here on the heavy slots as a draft and says why. Here the agent has a mocked `blender` and a scene; it must go
+# through `harnessly job run` and the frame must come back where the mask said.
+setup:
+  workspace: [fixtures/builders]
+  run: sh mock/install.sh
+covers:
+  - 'internal/hlcli/builders.go'
+  - 'internal/hlcli/help.go'
+prompt: >-
+  Нужен черновой кадр сцены scene.py: отрендери один кадр Blender в out/frame.png. Это тяжёлая задача, а на этой машине
+  сидят чаты людей, поэтому считай её на билдерах хаба (команда harnessly для этого есть, смотри harnessly --help).
+expect:
+  - name: sent the render through harnessly job run
+    called: Bash
+    args: {command: '(?s).*harnessly job run\b.*blender.*'}
+  - name: the frame is in the workspace
+    check: test -s out/frame.png
+  - name: did not start blender by hand
+    not_called: Bash
+    args: {command: '(?s)^\s*blender\b.*'}

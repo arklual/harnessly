@@ -10,6 +10,7 @@ import type * as AppMainPageModule from '@/next/bindings/app-main';
 import type * as ReviewAppPageModule from '@/next/bindings/review-app';
 import type * as AppAboutPageModule from '@/next/bindings/app-page';
 import type * as AppDocPageModule from '@/next/bindings/app-doc';
+import type * as RoutinesPageModule from '@/next/features/routines/routines-page';
 import type * as AppsListPageModule from '@/next/bindings/apps-list';
 import type * as HelpPageModule from '@/next/bindings/help';
 import type * as AppsScreenModule from '@/next/bindings/apps';
@@ -48,6 +49,9 @@ export const AppAboutPage: Later<typeof AppAboutPageModule> = later(() => import
 export const AppDocPage: Later<typeof AppDocPageModule> = later(() => import('@/next/bindings/app-doc'));
 export const AppsListPage: Later<typeof AppsListPageModule> = later(
   () => import('@/next/bindings/apps-list'),
+);
+export const RoutinesPage: Later<typeof RoutinesPageModule> = later(
+  () => import('@/next/features/routines/routines-page'),
 );
 export const HelpPage: Later<typeof HelpPageModule> = later(() => import('@/next/bindings/help'));
 export const AppsScreen: Later<typeof AppsScreenModule> = later(() => import('@/next/bindings/apps'));

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agentstate"
+	"github.com/ly-solutions/harnessly/internal/timescale"
 	"github.com/ly-solutions/harnessly/internal/typist"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -194,7 +195,7 @@ func (c *conv) notIdle(now time.Time) string {
 		return "queue"
 	case c.rec.PendingModel != nil:
 		return "model change"
-	case c.rec.BgAgents > 0 || c.bgWake > ms(now) || c.bgCrons > 0:
+	case c.rec.BgAgents > 0 || c.bgWake > ms(timescale.At(now)) || c.bgCrons > 0:
 		return "background"
 	}
 	for _, t := range c.bg {
@@ -511,7 +512,7 @@ func (r *Runtime) reaper() {
 		select {
 		case <-r.stop:
 			return
-		case <-r.d.Clock.After(ReapEvery):
+		case <-r.d.Clock.After(timescale.Real(ReapEvery)):
 			r.Reap()
 			r.Unload()
 		}

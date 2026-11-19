@@ -1,5 +1,7 @@
 import { Menu } from '@base-ui/react/menu';
 import { openLookEditor } from '@/next/features/looks/store';
+import { peekedChats, useFolderPrefs } from '@/next/features/sidebar/folder-prefs';
+import ProjectHead from '@/next/features/sidebar/project-head';
 import { useKeyHint } from '@/next/features/keys/keys-help';
 import Logo from '@/next/ui/logo';
 import { useKeptItems } from '@/next/core/kept';
@@ -1135,6 +1137,8 @@ const Sidebar = ({
     },
   });
 
+  const folderPrefs = useFolderPrefs();
+
   const projectOpen = (id: string, chatsOfProject: readonly ISidebarChat[]) =>
     projectChoice.get(id) ?? chatsOfProject.some((chat) => chat.id === currentId);
 
@@ -1143,7 +1147,9 @@ const Sidebar = ({
 
   // A folder's first chats, then «Дальше» for the rest; opened once, it shows them all.
   const renderFolder = (id: string, list: readonly ISidebarChat[]) => {
-    const { shown, hidden } = longFolders.has(id) ? { shown: list, hidden: 0 } : folderRows(list, currentId);
+    const { shown, hidden } = longFolders.has(id)
+      ? { shown: list, hidden: 0 }
+      : folderRows(list, currentId, folderPrefs.rows);
     return (
       <>
         {renderRows(shown, ROW_VARIANT.kid)}
@@ -1471,58 +1477,22 @@ const Sidebar = ({
                   data-i={Math.min(i, 24)}
                   aria-expanded={open}
                 >
-                  <div
-                    className="hx-item hx-project"
-                    data-drop="project"
-                    data-drop-id={project.id}
-                    data-drop-box="parent"
-                  >
-                    <button
-                      type="button"
-                      className="hx-project__open"
-                      aria-expanded={open}
-                      data-tip={project.name}
-                      onClick={() => toggleProject(project.id, open)}
-                    >
-                      <span className="hx-project__mark" aria-hidden="true">
-                        <Icon name={open ? 'folder-open' : 'folder'} className="hx-project__icon" />
-                        <span className="hx-mono">{project.name.slice(0, 1).toUpperCase()}</span>
-                      </span>
-                      <span className="hx-item__title">{project.name}</span>
-                      <Icon name="chevron-right" size="sm" className="hx-nav__chev" />
-                    </button>
-                    <button
-                      type="button"
-                      className="hx-nav__add hx-project__add"
-                      aria-label={t('next.sidebar.projectLook', { project: project.name })}
-                      title={t('next.sidebar.projectLook', { project: project.name })}
-                      onClick={() => openLookEditor({ k: 'folder', id: project.id })}
-                    >
-                      <Icon name="palette" size="sm" />
-                    </button>
-                    {actions.onProjectSettings && (
-                      <button
-                        type="button"
-                        className="hx-nav__add hx-project__add"
-                        aria-label={t('next.sidebar.projectSettings', { project: project.name })}
-                        title={t('next.sidebar.projectSettings', { project: project.name })}
-                        onClick={() => actions.onProjectSettings?.(project.id)}
-                      >
-                        <Icon name="settings" size="sm" />
-                      </button>
-                    )}
-                    {actions.onNewChatIn && (
-                      <button
-                        type="button"
-                        className="hx-nav__add hx-project__add"
-                        aria-label={t('next.sidebar.newChatIn', { project: project.name })}
-                        title={t('next.sidebar.newChatIn', { project: project.name })}
-                        onClick={() => actions.onNewChatIn?.(project.id)}
-                      >
-                        <Icon name="plus" size="sm" />
-                      </button>
-                    )}
-                  </div>
+                  <ProjectHead
+                    id={project.id}
+                    name={project.name}
+                    open={open}
+                    onToggle={() => toggleProject(project.id, open)}
+                    onNewChat={actions.onNewChatIn ? () => actions.onNewChatIn?.(project.id) : undefined}
+                    onLook={() => openLookEditor({ k: 'folder', id: project.id })}
+                    onSettings={
+                      actions.onProjectSettings ? () => actions.onProjectSettings?.(project.id) : undefined
+                    }
+                  />
+                  {!open && folderPrefs.peek && (
+                    <div className="hx-nav__peek">
+                      {renderRows(peekedChats(inProject, now, currentId), ROW_VARIANT.kid)}
+                    </div>
+                  )}
                   <div className="hx-nav__kids" inert={!open}>
                     <div>
                       {renderFolder(project.id, inProject)}

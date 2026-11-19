@@ -58,6 +58,8 @@ func (c *cli) design(args []string) error {
 		return c.designMoment(args[1:])
 	case "video":
 		return c.designVideo(args[1:])
+	case "scene3d":
+		return c.designScene3D(args[1:])
 	case "list", "state", "logs", "panel", "claim", "release", "who", "history", "restore":
 		return c.designOps(args[0], args[1:])
 	case "delete", "remove", "rm":

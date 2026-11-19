@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
@@ -25,11 +26,9 @@ func TestAppsCatalogFromTheHubKeepsAccess(t *testing.T) {
 	if done, err := r.svc.registerCreated(ctx, r.owner, "note-1", r.ownerU.Email); err != nil || !done {
 		t.Fatalf("registerCreated: %v %v", done, err)
 	}
-	if err := r.svc.write(ctx, r.owner, func(tx *txn) error {
-		_, err := tx.q.Exec(tx.ctx, `UPDATE design_projects SET title = ?, kind = ? WHERE machine_id = ? AND project_id = ?`, "Мои заметки", "notes.doc", tx.key("note-1"), "note-1")
-		return err
-	}); err != nil {
-		t.Fatal(err)
+	// The kind arrives the way a machine writes it: its record of the project, with the app's type.
+	if ok, err := r.svc.RecordMeta(ctx, r.owner, "note-1", Meta{Title: "Мои заметки", Kind: "notes.doc", At: 1000}, MetaByMachine); err != nil || !ok {
+		t.Fatalf("RecordMeta: %v %v", ok, err)
 	}
 	on := false
 	r.svc.UseAppsCatalog(fakeKinds{}, func(context.Context, string, string) bool { return on })
@@ -52,7 +51,7 @@ func TestAppsCatalogFromTheHubKeepsAccess(t *testing.T) {
 		_, out := ask(u, m, "/docs")
 		return string(out["docs"])
 	}
-	if got := docs(r.mateU, r.mate); got == "[]" || got == "" {
+	if got := docs(r.mateU, r.mate); !strings.Contains(got, `"kind":"notes.doc"`) {
 		t.Fatalf("a mate sees no document of the open machine: %q", got)
 	}
 	r.svc.opens = func(_ context.Context, userID string, m store.Machine) bool {

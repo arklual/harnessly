@@ -298,7 +298,7 @@ export const overviewMock = (ctx: MockCtx): OverviewApi => ({
   },
   overview: async (_tenant, period) => {
     const now = Date.now();
-    const k = period === 'week' ? 0.24 : 1;
+    const k = period === 'day' ? 0.04 : period === 'week' ? 0.24 : 1;
     const data: OverviewData = {
       estimated: false,
       tiles: {

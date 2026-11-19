@@ -26,7 +26,7 @@ export const ApplyMenu = ({ onApply }: { onApply: (when: ApplyWhen) => Promise<b
         disabled={busy}
         onClick={pop.toggle}
       >
-        <Icon i="rotate-cw" size="sm" />
+        <Icon i="play" size="sm" />
         <span className="ev-tl">Применить на машинах</span>
       </button>
       {pop.mounted && (

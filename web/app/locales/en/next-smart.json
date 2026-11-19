@@ -1,6 +1,7 @@
 {
   "next.extProviders.title": "By API",
   "next.extProviders.key.safe": "The key goes to the machine's safe",
+  "next.extProviders.key.pair": "Video and pictures: the key ID and the secret as id:secret",
   "next.extProviders.offer": "For summaries and suggestions",
   "next.extProviders.offer.chats": "For chats, summaries and suggestions",
   "next.extProviders.offer.custom": "Any server with an API like OpenAI's or Anthropic's",

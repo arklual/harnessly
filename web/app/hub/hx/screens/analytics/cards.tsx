@@ -1,7 +1,7 @@
 // The four cards under the chart: what changed in the environment and what it did, what needs attention, where the
 // money goes for nothing, the teams side by side. A bubble on hover tells where a number comes from; the bubbles are
 // drawn by CSS, nothing here re-renders while the pointer moves.
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 
 import type { Change, DetailRow, Peers, Signal, Waste } from '../../../org/api/analytics';
 import { goSignal } from '../../go';
@@ -32,15 +32,22 @@ export const Card = ({
   count,
   lead,
   className,
+  part,
   children,
 }: {
   title: string;
   count?: number;
   lead?: string;
   className?: string;
+  /** The block the sidebar scrolls to. */
+  part?: string;
   children: ReactNode;
 }) => (
-  <div className={`t-card viz-card dash-tile dash-span-12${className ? ` ${className}` : ''}`} role="region">
+  <div
+    className={`t-card viz-card dash-tile dash-span-12${className ? ` ${className}` : ''}`}
+    role="region"
+    data-hx-part={part}
+  >
     <header className="viz-card__header">
       <div className="viz-card__heading">
         <div className="viz-card__title-row">
@@ -91,17 +98,52 @@ const Bubble = ({
 const KIND_ICON = { tool: 'plug', model: 'cpu', plugins: 'layers' } as const;
 const dayMonth = (at: string): string => `${at.slice(8, 10)}.${at.slice(5, 7)}`;
 
-export const Changes = ({ changes }: { changes: readonly Change[] }) => (
+export const Changes = ({
+  changes,
+  selected,
+  onPick,
+}: {
+  changes: readonly Change[];
+  /** The change shown on the big chart, with its week before and after. */
+  selected?: string | null;
+  /** Absent: the rows only read. */
+  onPick?: (id: string) => void;
+}) => (
   <Card
     title="Изменения и их эффект"
-    lead="Что меняли в окружении и как сдвинулись метрики: неделя до против недели после"
+    lead={
+      onPick
+        ? 'Что меняли в окружении и как сдвинулись метрики: неделя до против недели после. Нажмите на изменение — график покажет его до и после'
+        : 'Что меняли в окружении и как сдвинулись метрики: неделя до против недели после'
+    }
+    part="changes"
   >
     {changes.length === 0 ? (
       <p className="an-empty">За этот период в окружении ничего не меняли</p>
     ) : (
       <ol className="ancs">
         {changes.map((c, n) => (
-          <li key={c.id} className="anc" data-tone={changeTone(c.effects)} style={idx(n)}>
+          <li
+            key={c.id}
+            className="anc"
+            data-tone={changeTone(c.effects)}
+            data-pick={onPick ? '1' : undefined}
+            data-on={selected === c.id ? '1' : undefined}
+            style={idx(n)}
+            {...(onPick
+              ? {
+                  role: 'button',
+                  tabIndex: 0,
+                  'aria-pressed': selected === c.id,
+                  onClick: () => onPick(c.id),
+                  onKeyDown: (e: KeyboardEvent<HTMLLIElement>) => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    e.preventDefault();
+                    onPick(c.id);
+                  },
+                }
+              : {})}
+          >
             <span className="anc__rail">
               <span className="anc__ic">
                 <Icon i={KIND_ICON[c.kind]} size="sm" />

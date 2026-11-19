@@ -17,6 +17,8 @@ import type { MachineId } from '@/next/protocol/v2';
 const TIMEOUT_MS = 10_000;
 /** A probe, a connect and a check reach the server itself (and its sign-in discovery): they get more time. */
 const PROBE_TIMEOUT_MS = 30_000;
+/** The first start of a local server downloads it (npx, uvx): the machine may take up to ~150 s to answer. */
+const START_TIMEOUT_MS = 170_000;
 
 /** The reasons the runtime refuses with ({error}); anything else is shown by its code. */
 export const MCP_REASONS = [
@@ -28,25 +30,38 @@ export const MCP_REASONS = [
   'oauth-failed',
 ] as const;
 
-export const MCP_AUTH = { oauth: 'oauth', header: 'header', none: 'none' } as const;
+export const MCP_AUTH = { oauth: 'oauth', header: 'header', env: 'env', none: 'none' } as const;
 export type TMcpAuth = (typeof MCP_AUTH)[keyof typeof MCP_AUTH];
 
 /** The catalog's groups in the order the page shows them (mcpconn.Kinds). */
 export const MCP_KINDS = [
   'mail',
   'calendar',
+  'chat',
+  'social',
   'meetings',
   'tasks',
   'docs',
+  'files',
+  'design',
+  'media',
+  'search',
+  'research',
+  'seo',
   'code',
+  'cloud',
   'monitoring',
   'support',
+  'crm',
   'payments',
+  'finance',
   'sites',
+  'utility',
 ] as const;
 export type TMcpKind = (typeof MCP_KINDS)[number];
 
-export const MCP_TRANSPORT = { http: 'http', sse: 'sse' } as const;
+/** «stdio» is a local server the runtime starts (npx, uvx); «api» is a plain HTTP API agents reach through the hub. */
+export const MCP_TRANSPORT = { http: 'http', sse: 'sse', stdio: 'stdio', api: 'api' } as const;
 export type TMcpTransport = (typeof MCP_TRANSPORT)[keyof typeof MCP_TRANSPORT];
 
 /** How the server answered last. */
@@ -63,6 +78,18 @@ export const DEFAULT_HEADER = 'Authorization';
 export interface IMcpTool {
   name: string;
   description: string;
+}
+
+/** One key a local server or an API takes: what to ask the person for (never a value). */
+export interface IMcpEnvField {
+  name: string;
+  label: string;
+  /** Typed in a masked field. */
+  secret: boolean;
+  optional: boolean;
+  hint: string;
+  /** What the field holds when left alone; empty when there is none. */
+  default: string;
 }
 
 export interface IMcpServer {
@@ -82,6 +109,11 @@ export interface IMcpServer {
   tools: readonly IMcpTool[];
   /** Signs in with OAuth but lets no new app register: it takes a typed token here. */
   oauthUnavailable: boolean;
+  /** The keys a local server or an API takes (specs only); empty for the others. */
+  env: readonly IMcpEnvField[];
+  /** Why a local server does not start, in short English («uvx is not installed on this machine»); empty when fine. */
+  problem: string;
+  guide: string;
 }
 
 export interface IMcpCatalogEntry {
@@ -100,6 +132,12 @@ export interface IMcpCatalogEntry {
   docsUrl: string;
   blurb: string;
   blurbRu: string;
+  /** The keys a local server or an API takes; empty for the others. */
+  env: readonly IMcpEnvField[];
+  /** «npx» or «uvx» for a local server, else empty. */
+  runtime: string;
+  /** A line on where to get the keys, when the entry has one. */
+  guide: string;
 }
 
 export interface IMcpProbe {
@@ -118,7 +156,7 @@ export interface IMcpList {
 }
 
 const auth = (v: unknown): TMcpAuth => {
-  if (v === MCP_AUTH.oauth || v === MCP_AUTH.header || v === MCP_AUTH.none) return v;
+  if (v === MCP_AUTH.oauth || v === MCP_AUTH.header || v === MCP_AUTH.env || v === MCP_AUTH.none) return v;
   throw new Error('connections: mcp auth');
 };
 const kind = (v: unknown): TMcpKind => {
@@ -129,9 +167,27 @@ const kind = (v: unknown): TMcpKind => {
 /** An omitted transport is streamable HTTP. */
 const transport = (v: unknown): TMcpTransport => {
   if (v === undefined || v === null || v === MCP_TRANSPORT.http) return MCP_TRANSPORT.http;
-  if (v === MCP_TRANSPORT.sse) return v;
+  if (v === MCP_TRANSPORT.sse || v === MCP_TRANSPORT.stdio || v === MCP_TRANSPORT.api) return v;
   throw new Error('connections: mcp transport');
 };
+
+const readEnvField = (v: unknown): IMcpEnvField => {
+  const o = obj(v, 'mcp env field');
+  const name = str(o.name, 'env.name');
+  const label = optStr(o.label, 'env.label');
+  return {
+    name,
+    label: label === '' ? name : label,
+    secret: o.secret === true,
+    optional: o.optional === true,
+    hint: optStr(o.hint, 'env.hint'),
+    default: optStr(o.default, 'env.default'),
+  };
+};
+
+/** The keys, tolerant of a runtime that does not send them. */
+const readEnv = (v: unknown): readonly IMcpEnvField[] =>
+  v === undefined || v === null ? [] : list(v, 'env', readEnvField);
 
 const readTool = (v: unknown): IMcpTool => {
   const o = obj(v, 'mcp tool');
@@ -154,6 +210,9 @@ export const readMcpServer = (v: unknown): IMcpServer => {
     me: optStr(o.me, 'me'),
     tools: list(o.tools, 'tools', readTool),
     oauthUnavailable: o.oauthUnavailable === true,
+    env: readEnv(o.env),
+    problem: optStr(o.problem, 'problem'),
+    guide: optStr(o.guide, 'guide'),
   };
 };
 
@@ -163,7 +222,8 @@ export const readMcpCatalogEntry = (v: unknown): IMcpCatalogEntry => {
     id: str(o.id, 'id'),
     name: str(o.name, 'name'),
     kind: kind(o.kind),
-    url: str(o.url, 'url'),
+    // A local server has no address: its url is empty.
+    url: optStr(o.url, 'url'),
     transport: transport(o.transport),
     auth: auth(o.auth),
     headerName: optStr(o.headerName, 'headerName'),
@@ -172,6 +232,9 @@ export const readMcpCatalogEntry = (v: unknown): IMcpCatalogEntry => {
     docsUrl: optStr(o.docsUrl, 'docsUrl'),
     blurb: optStr(o.blurb, 'blurb'),
     blurbRu: optStr(o.blurbRu, 'blurbRu'),
+    env: readEnv(o.env),
+    runtime: optStr(o.runtime, 'runtime'),
+    guide: optStr(o.guide, 'guide'),
   };
 };
 
@@ -247,7 +310,17 @@ export interface IMcpAddInput {
   catalogId: string;
   transport: TMcpTransport | null;
   header: IMcpHeader | null;
+  /** The keys of a local server or an API by variable name; null for the others. */
+  env?: Readonly<Record<string, string>> | null;
 }
+
+/** A local server or an API (no sign-in of its own, only keys). */
+export const isKeyedTransport = (transport: TMcpTransport): boolean =>
+  transport === MCP_TRANSPORT.stdio || transport === MCP_TRANSPORT.api;
+
+const startsServer = (input: IMcpAddInput): boolean =>
+  (input.env !== undefined && input.env !== null) ||
+  (input.transport !== null && isKeyedTransport(input.transport));
 
 /** Keeps the server; one that signs in with OAuth is kept in state «signin» until the person does. */
 export const addMcp = (machine: MachineId, input: IMcpAddInput): Promise<TConnOutcome<IMcpAdded>> =>
@@ -255,14 +328,17 @@ export const addMcp = (machine: MachineId, input: IMcpAddInput): Promise<TConnOu
     'POST',
     path(machine, '/mcp'),
     {
-      url: input.url,
+      // A local server has no address: the machine knows it by its catalog id.
+      ...(input.url === '' ? {} : { url: input.url }),
       ...(input.name === '' ? {} : { name: input.name }),
       ...(input.catalogId === '' ? {} : { catalogId: input.catalogId }),
       ...(input.transport === null ? {} : { transport: input.transport }),
       ...(input.header === null ? {} : { header: input.header }),
+      ...(input.env === undefined || input.env === null ? {} : { env: input.env }),
     },
     readAdded,
-    PROBE_TIMEOUT_MS,
+    // A local server is downloaded and started before the machine answers.
+    startsServer(input) ? START_TIMEOUT_MS : PROBE_TIMEOUT_MS,
   );
 
 /**
@@ -283,6 +359,14 @@ export const setMcpHeader = (
   header: IMcpHeader,
 ): Promise<TConnOutcome<IMcpServer>> =>
   sendBody('PUT', path(machine, one(id, '/header')), header, readOne, PROBE_TIMEOUT_MS);
+
+/** New keys for a local server or an API; a key left empty stays as it is. */
+export const setMcpEnv = (
+  machine: MachineId,
+  id: string,
+  env: Readonly<Record<string, string>>,
+): Promise<TConnOutcome<IMcpServer>> =>
+  sendBody('PUT', path(machine, one(id, '/env')), { env }, readOne, START_TIMEOUT_MS);
 
 /** Asks the server again (initialize and tools/list through its sign-in): its state and tools as they are now. */
 export const checkMcp = (machine: MachineId, id: string): Promise<TConnOutcome<IMcpServer>> =>

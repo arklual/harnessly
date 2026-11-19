@@ -170,6 +170,8 @@ export interface Tile {
   value: string;
   bars?: number[];
   strip?: { w: number; color?: string }[];
+  /** The tile leads to a filter of the list. */
+  onPick?: () => void;
 }
 
 const GREEN = '#24ae56';
@@ -278,6 +280,15 @@ export const orgTiles = (s: MachinesSummary, groups: readonly MachineGroup[]): T
       strip: [{ w: s.offline, color: RED }, { w: Math.max(0, s.total - s.offline) }],
     },
   ];
+};
+
+/** The lead of the organization's screen: «Акме · 10 машин: 9 личных и 1 общих». */
+export const orgLead = (org: string, total: number, machines: readonly OrgMachine[]): string => {
+  const personal = machines.filter((m) => m.kind === 'personal').length;
+  const shared = machines.length - personal;
+  const split =
+    machines.length === total && machines.length > 0 ? `: ${personal} личных и ${shared} общих` : '';
+  return `${org} · ${total} ${machineWord(total)}${split}`;
 };
 
 /** The lead of a tenant's screen: «Тенант Продукт · 8 машин: 6 личных и 2 общие». */
@@ -614,3 +625,140 @@ export const cleanName = (raw: string): string | null => {
 /** Whether the machine's workspace can be opened now: it is on and reachable. */
 export const canOpen = (m: OrgMachine): boolean =>
   m.opensRuntime !== false && (m.state === 'online' || m.state === 'idle');
+
+// ── «Нужен шаг», the chips of the list and the tiles of the organization (the board, `pMachines`) ───────────────────
+
+export type StepFilter = 'all' | 'step' | 'ready' | 'mine';
+
+/** A machine that needs a step from a person: not reachable, switched off, or with an outdated runner. */
+export const needsStep = (m: OrgMachine): boolean => rowSt(m) === 'off' || m.runnerOutdated;
+
+export const isMine = (m: OrgMachine, userId: string): boolean =>
+  m.mine === true || (m.ownerId != null && m.ownerId === userId);
+
+export interface StepCounts {
+  all: number;
+  step: number;
+  ready: number;
+  mine: number;
+}
+
+export const stepCounts = (groups: readonly MachineGroup[], userId: string, total?: number): StepCounts => {
+  const ms = groups.flatMap((g) => g.machines);
+  const step = ms.filter(needsStep).length;
+  return {
+    all: Math.max(total ?? 0, ms.length),
+    step,
+    ready: ms.length - step,
+    mine: ms.filter((m) => isMine(m, userId)).length,
+  };
+};
+
+const regroup = (g: MachineGroup, machines: OrgMachine[]): MachineGroup => ({
+  ...g,
+  machines,
+  total: machines.length,
+  online: machines.filter((m) => rowSt(m) === 'on').length,
+  idle: machines.filter((m) => rowSt(m) === 'idle').length,
+  offline: machines.filter((m) => rowSt(m) === 'off').length,
+  tenantSlug: null,
+});
+
+/** The groups with only the machines the chip lets through; the empty ones go, the counters follow the rows. */
+export const filterByStep = (
+  groups: readonly MachineGroup[],
+  f: StepFilter,
+  userId: string,
+): MachineGroup[] => {
+  if (f === 'all') return [...groups];
+  const keep = (m: OrgMachine) =>
+    f === 'step' ? needsStep(m) : f === 'ready' ? !needsStep(m) : isMine(m, userId);
+  return groups.flatMap((g) => {
+    const ms = g.machines.filter(keep);
+    return ms.length > 0 ? [regroup(g, ms)] : [];
+  });
+};
+
+export interface MachineSignal {
+  id: string;
+  machineId: string;
+  tone: 'risk' | 'warn';
+  title: string;
+  detail: string;
+  action: string;
+}
+
+/** What the card «Нужен шаг» lists: one line per machine that is down, switched off or has an old runner. */
+export const machineSignals = (groups: readonly MachineGroup[], now: number): MachineSignal[] => {
+  const out: MachineSignal[] = [];
+  for (const m of groups.flatMap((g) => g.machines)) {
+    const who = m.kind === 'personal' && m.ownerName ? `Владелец — ${m.ownerName}. ` : '';
+    if (m.state === 'disabled') {
+      out.push({
+        id: `off-${m.id}`,
+        machineId: m.id,
+        tone: 'risk',
+        title: `${m.name} отключена`,
+        detail: `${who}Машина выключена в хабе, чаты на ней недоступны.`,
+        action: 'Включить',
+      });
+    } else if (m.state === 'offline') {
+      const t = ago(m.since, now);
+      out.push({
+        id: `down-${m.id}`,
+        machineId: m.id,
+        tone: 'risk',
+        title: `${m.name} не на связи${t ? ` ${t}` : ''}`,
+        detail: `${who}Чаты на ней недоступны.`,
+        action: 'Проверить связь',
+      });
+    } else if (m.runnerOutdated) {
+      out.push({
+        id: `old-${m.id}`,
+        machineId: m.id,
+        tone: 'warn',
+        title: `На ${m.name} устарел раннер`,
+        detail: `Версия ${m.runnerVersion}. Обновить можно из карточки машины.`,
+        action: 'Обновить раннер',
+      });
+    }
+  }
+  return out.sort((a, b) => (a.tone === b.tone ? 0 : a.tone === 'risk' ? -1 : 1));
+};
+
+/** The four tiles of the organization as the board draws them: the 3rd is the load, the 4th the machines to look at. */
+export const machinesTiles = (s: MachinesSummary, steps: number): Tile[] => {
+  const today = s.chatsToday == null ? '—' : num(s.chatsToday);
+  const load =
+    s.cpuMean == null
+      ? '—'
+      : `в среднем ${s.cpuMean}%${s.hottest ? ` · ${s.hottest.name} под ${s.hottest.pct}%` : ''}`;
+  return [
+    {
+      icon: 'server',
+      tone: GREEN,
+      label: 'На связи',
+      value: `${num(s.online)} из ${num(s.total)}${steps > 0 ? ` · ${num(steps)} ${plural(steps, 'требует', 'требуют', 'требуют')} шага` : ' · все готовы'}`,
+      bars: s.onlineSeries,
+    },
+    {
+      icon: 'messages-square',
+      tone: VIOLET,
+      label: 'Чаты сейчас',
+      value: `${num(s.chatsNow)} ${plural(s.chatsNow, 'идёт', 'идут', 'идут')} · ${today} за сегодня`,
+      bars: s.chatsSeries,
+    },
+    { icon: 'gauge', tone: TEAL, label: 'Нагрузка', value: load, bars: s.loadSeries },
+    {
+      icon: 'triangle-alert',
+      tone: AMBER,
+      label: 'Требует внимания',
+      value: steps > 0 ? `${num(steps)} ${machineWord(steps)} · по одной кнопке на каждую` : 'всё в порядке',
+      strip: [
+        { w: Math.max(0, s.total - s.idleWeek - s.offline), color: GREEN },
+        { w: s.idleWeek, color: AMBER },
+        { w: s.offline, color: RED },
+      ],
+    },
+  ];
+};

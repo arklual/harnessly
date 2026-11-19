@@ -106,6 +106,8 @@ func extProviderMessage(reason string) string {
 		return locale.Pick("This variable is set by the launch itself and cannot be changed here.", "Эту переменную задаёт сам запуск, здесь её менять нельзя.")
 	case extproviders.ReasonSubscriptionToken:
 		return locale.Pick("This is the token of a Claude subscription. A machine has one sign-in by a subscription, in Settings → Claude Code; a provider takes a key of the API.", "Это токен подписки Claude. Вход по подписке на машине один — в настройках Claude Code; провайдеру нужен ключ API.")
+	case extproviders.ReasonBadMediaKey:
+		return locale.Pick("A Higgsfield key is two parts, the key ID and the secret, written as id:secret (console.higgsfield.ai).", "Ключ Higgsfield состоит из двух частей — ID и secret, пишутся через двоеточие: id:secret (console.higgsfield.ai).")
 	case extproviders.ReasonBadURL:
 		return locale.Pick("The address must start with https:// or http:// and name a host.", "Адрес должен начинаться с https:// или http:// и содержать имя сервера.")
 	case extproviders.ReasonBadAPI:

@@ -13,6 +13,7 @@ import {
   lastDays,
   pickFree,
   QUICK,
+  QUICK_SEG,
   quickOn,
   setFreeDay,
   pickPreset,
@@ -28,9 +29,11 @@ export interface PeriodControlsProps {
   change: ChangeRef | null;
   state: PickerState;
   onChange: (next: PickerState) => void;
+  /** The board's head: the 7/30/90 segment and one button for the weeks and the comparison. */
+  compact?: boolean;
 }
 
-export const PeriodControls = ({ weeks, change, state, onChange }: PeriodControlsProps) => {
+export const PeriodControls = ({ weeks, change, state, onChange, compact }: PeriodControlsProps) => {
   const live = useLive();
   const root = useRef<HTMLDivElement>(null);
   const pop = usePop(root);
@@ -41,6 +44,17 @@ export const PeriodControls = ({ weeks, change, state, onChange }: PeriodControl
   useEffect(() => {
     if (pop.mounted && strip.current) strip.current.scrollLeft = strip.current.scrollWidth;
   }, [pop.mounted]);
+  const quick = compact ? QUICK_SEG : QUICK;
+  const quickNow = (): string | null => {
+    const f = state.free;
+    if (!f) return null;
+    return (
+      quick.find((q) => {
+        const a = lastDays(q.days).a;
+        return a.from === f.a.from && a.to === f.a.to;
+      })?.id ?? null
+    );
+  };
   const now = periodNameOf(weeks, state);
   const prev = compareNameOf(weeks, state);
 
@@ -57,12 +71,12 @@ export const PeriodControls = ({ weeks, change, state, onChange }: PeriodControl
     <div className="hb-tools">
       {live && (
         <div className="hx-set__seg an-quick" role="group" aria-label="Быстрый период">
-          {QUICK.map((q) => (
+          {quick.map((q) => (
             <button
               key={q.id}
               type="button"
               className="hx-set__seg-item"
-              aria-pressed={quickOn(state) === q.id}
+              aria-pressed={(compact ? quickNow() : quickOn(state)) === q.id}
               onClick={() => onChange(pickFree(state, lastDays(q.days), true))}
             >
               {q.label}
@@ -71,49 +85,67 @@ export const PeriodControls = ({ weeks, change, state, onChange }: PeriodControl
         </div>
       )}
       <div className="anx-per" ref={root}>
-        <div className="anx-per__row">
-          <label className="anx-per__f">
-            <span className="anx-per__cap">Период</span>
-            <button
-              type="button"
-              className="an-period anx-per__btn"
-              data-set
-              data-k="a"
-              title="Период, который смотрим: недели целиком, с понедельника по воскресенье"
-              aria-haspopup="dialog"
-              aria-expanded={pop.open && state.edit === 'a'}
-              onClick={() => openTab('a')}
-            >
-              <span className="anx-per__dot" data-k="a" />
-              <span className="an-period__label">
-                <b>{now.title}</b>
-                <span className="anx-per__d">{now.dates}</span>
-              </span>
-              <Icon i="chevron-down" size="sm" />
-            </button>
-          </label>
-          <span className="anx-per__vs">против</span>
-          <label className="anx-per__f">
-            <span className="anx-per__cap">Сравнить с</span>
-            <button
-              type="button"
-              className="an-period anx-per__btn"
-              data-set
-              data-k="b"
-              title="С чем сравниваем: по умолчанию столько же недель сразу перед периодом"
-              aria-haspopup="dialog"
-              aria-expanded={pop.open && state.edit === 'b'}
-              onClick={() => openTab('b')}
-            >
-              <span className="anx-per__dot" data-k="b" />
-              <span className="an-period__label">
-                <b>{prev.title}</b>
-                <span className="anx-per__d">{prev.dates}</span>
-              </span>
-              <Icon i="chevron-down" size="sm" />
-            </button>
-          </label>
-        </div>
+        {compact ? (
+          <button
+            type="button"
+            className="an-period anx-per__btn"
+            data-set
+            data-k="a"
+            title={`Период и сравнение: ${now.title}, ${now.dates} против ${prev.title}, ${prev.dates}`}
+            aria-haspopup="dialog"
+            aria-expanded={pop.open}
+            onClick={() => openTab('a')}
+          >
+            <span className="an-period__label">
+              <b>{now.dates}</b>
+            </span>
+            <Icon i="chevron-down" size="sm" />
+          </button>
+        ) : (
+          <div className="anx-per__row">
+            <label className="anx-per__f">
+              <span className="anx-per__cap">Период</span>
+              <button
+                type="button"
+                className="an-period anx-per__btn"
+                data-set
+                data-k="a"
+                title="Период, который смотрим: недели целиком, с понедельника по воскресенье"
+                aria-haspopup="dialog"
+                aria-expanded={pop.open && state.edit === 'a'}
+                onClick={() => openTab('a')}
+              >
+                <span className="anx-per__dot" data-k="a" />
+                <span className="an-period__label">
+                  <b>{now.title}</b>
+                  <span className="anx-per__d">{now.dates}</span>
+                </span>
+                <Icon i="chevron-down" size="sm" />
+              </button>
+            </label>
+            <span className="anx-per__vs">против</span>
+            <label className="anx-per__f">
+              <span className="anx-per__cap">Сравнить с</span>
+              <button
+                type="button"
+                className="an-period anx-per__btn"
+                data-set
+                data-k="b"
+                title="С чем сравниваем: по умолчанию столько же недель сразу перед периодом"
+                aria-haspopup="dialog"
+                aria-expanded={pop.open && state.edit === 'b'}
+                onClick={() => openTab('b')}
+              >
+                <span className="anx-per__dot" data-k="b" />
+                <span className="an-period__label">
+                  <b>{prev.title}</b>
+                  <span className="anx-per__d">{prev.dates}</span>
+                </span>
+                <Icon i="chevron-down" size="sm" />
+              </button>
+            </label>
+          </div>
+        )}
         {pop.mounted && (
           <div
             className="anx-wp"

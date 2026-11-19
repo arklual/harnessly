@@ -1120,7 +1120,11 @@ const PaneBody = (props: IPaneBodyProps) => {
           machine={conv.machineId}
           conv={conv.id}
           design={tab.design}
-          onOpen={(design) => setTabs((list) => list.map((x) => (x.id === tab.id ? { ...tab, design } : x)))}
+          page={tab.page ?? null}
+          pageAt={tab.pageAt ?? 0}
+          onOpen={(design) =>
+            setTabs((list) => list.map((x) => (x.id === tab.id ? { ...tab, design, page: null } : x)))
+          }
         />
       )}
       {tab?.kind === 'app' && (
@@ -1766,16 +1770,18 @@ export const useRightPane = (
   };
 
   // A design the turn changed opens in the pane's Designly tab, on the design itself.
-  const openDesign = (design: string) => {
+  // A page named (a board the turn wrote) opens the design on that board, not on its first page.
+  const openDesign = (design: string, page: string | null = null) => {
     if (!conv) return;
     setOpen(true);
+    const at = Date.now();
     setState((s) => {
       const have = s.tabs.find((x) => x.kind === 'designly');
       if (have) {
-        const tabs = s.tabs.map((x) => (x.id === have.id ? { ...have, design } : x));
+        const tabs = s.tabs.map((x) => (x.id === have.id ? { ...have, design, page, pageAt: at } : x));
         return { ...s, tabs, active: have.id };
       }
-      const added: TTab = { id: nextId(), kind: 'designly', design };
+      const added: TTab = { id: nextId(), kind: 'designly', design, page, pageAt: at };
       return { ...s, tabs: [...s.tabs, added], active: added.id };
     });
   };
@@ -1788,8 +1794,8 @@ export const useRightPane = (
   });
   // A card of what a turn made opens where its kind lives: a design in Designly, a document of the repository in the
   // Files, a page, a merge request or a stand where the runtime says (the catalogue's tab, GitLab, the browser).
-  const openOutput = (output: TurnOutput) => {
-    if (output.kind === 'design') openDesign(output.ref);
+  const openOutput = (output: TurnOutput, page?: string) => {
+    if (output.kind === 'design') openDesign(output.ref, page ?? output.pages?.at(-1) ?? null);
     else if (output.kind === 'doc' || output.kind === 'delivery') openFile(output.ref);
     else openRef(output.ref);
   };
