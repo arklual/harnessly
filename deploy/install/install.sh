@@ -716,7 +716,7 @@ register_machine() {
 	printf '%s\n' "$TOKEN" | as_service sh -c 'umask 077 && set -C && cat > "$1"' sh "$CODE_FILE" ||
 		die "could not write the registration code into $DATA_DIR" "не удалось записать код регистрации в $DATA_DIR"
 	# shellcheck disable=SC2086 # $_force is a flag
-	as_service env HOME="$SVC_HOME" AGENT_DATA_DIR="$(rp "$DATA_DIR")" AGENT_MACHINE_FILE="$(rp "$MACHINE_FILE")" AGENT_POLICY_FILE="$(rp "$POLICY")" \
+	as_service env HOME="$SVC_HOME" HARNESSLY_AGENT_NO_START=1 AGENT_DATA_DIR="$(rp "$DATA_DIR")" AGENT_MACHINE_FILE="$(rp "$MACHINE_FILE")" AGENT_POLICY_FILE="$(rp "$POLICY")" \
 		"$(rp "$BIN_DIR")/harnessly-agent" register --hub "$HUB_URL" --code-file "$CODE_FILE" --profile "$PROFILE" --via command \
 		${NAME:+--name "$NAME"} $_force || die "the hub did not accept the registration (see above); get a new command in the hub" \
 		"хаб не принял регистрацию (см. выше); возьмите в хабе новую команду"
@@ -1573,7 +1573,7 @@ install_container() {
 		eng volume create "$VOLUME" >/dev/null
 		# shellcheck disable=SC2086 # _force is a flag
 		# shellcheck disable=SC2086 # NETARGS is a list of options
-		eng run --rm $NETARGS --hostname "$_host" -v "$VOLUME:/home/agent" -v "$TMP/code:/run/harnessly-register-code:ro,z" \
+		eng run --rm $NETARGS -e HARNESSLY_AGENT_NO_START=1 --hostname "$_host" -v "$VOLUME:/home/agent" -v "$TMP/code:/run/harnessly-register-code:ro,z" \
 			--entrypoint harnessly-agent "$IMAGE" register --hub "$HUB_URL" --code-file /run/harnessly-register-code \
 			--profile container --via container $_force ${NAME:+--name "$NAME"} ||
 			die "the hub did not accept the registration (see above); get a new command in the hub" \

@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { type ApiError, eventsUrl, isApiError } from './api';
 import { useEnv } from './env';
-import { EVENT_TYPES, initialLive, parseSpaceEvent, reduceLive, type LiveState } from './live';
 
 /** The time, ticking every `ms` while `active`. */
 export const useNow = (ms = 1000, active = true): number => {
@@ -34,70 +32,4 @@ export const useCopy = (): { copied: boolean; copy: (text: string) => void } => 
     [env],
   );
   return { copied, copy };
-};
-
-export interface Live {
-  state: LiveState;
-  /** Set when the machines could not be read; the stream keeps trying on its own. */
-  error: ApiError | null;
-  reload: () => void;
-  /** How many times the stream opened: more than once means it was ended and came back (a role changed). */
-  opened: number;
-  /** Puts a job or login that came from a POST answer in the state before its first event arrives. */
-  push: (action: Parameters<typeof reduceLive>[1]) => void;
-}
-
-/**
- * A space's live data: fetches the machines, then follows the SSE stream. The stream has no replay, so every
- * (re)connect fetches again.
- */
-export const useSpaceLive = (spaceId: string): Live => {
-  const env = useEnv();
-  const [state, dispatch] = useReducer(reduceLive, initialLive);
-  const [error, setError] = useState<ApiError | null>(null);
-  const [opened, setOpened] = useState(0);
-
-  const load = useCallback(async () => {
-    try {
-      const { machines } = await env.api.machines.list(spaceId);
-      dispatch({ type: 'loaded', machines });
-      setError(null);
-    } catch (e) {
-      if (isApiError(e)) setError(e);
-    }
-  }, [env, spaceId]);
-
-  useEffect(() => {
-    let alive = true;
-    env.api.machines.list(spaceId).then(
-      ({ machines }) => {
-        if (!alive) return;
-        dispatch({ type: 'loaded', machines });
-        setError(null);
-      },
-      (e: unknown) => {
-        if (alive && isApiError(e)) setError(e);
-      },
-    );
-    const es = env.eventSource(eventsUrl(spaceId));
-    es.onopen = () => {
-      setOpened((n) => n + 1);
-      void load();
-    };
-    // The hub ends the stream of a person it removed from the space and refuses the next one: reading the machines
-    // again says whether the space is still theirs (lostSpace), without waiting for a reload.
-    es.onerror = () => void load();
-    for (const type of EVENT_TYPES) {
-      es.addEventListener(type, (m) => {
-        const event = parseSpaceEvent(type, m.data);
-        if (event) dispatch({ type: 'event', event });
-      });
-    }
-    return () => {
-      alive = false;
-      es.close();
-    };
-  }, [env, spaceId, load]);
-
-  return { state, error, reload: () => void load(), opened, push: dispatch };
 };

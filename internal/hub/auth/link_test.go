@@ -20,7 +20,7 @@ func TestUnverifiedIdentityIsNeverTheAdmin(t *testing.T) {
 
 	attacker := e.newClient()
 	cb, _ := e.oauth(attacker, f, "yandex", "?intent=signup", profile{sub: "ya-evil", email: "Boss@Example.com"}, nil)
-	if location(cb) != "/new" {
+	if location(cb) != "/" {
 		t.Fatalf("sign-up: %d %s", cb.StatusCode, location(cb))
 	}
 	u, err := e.db.S().UserByEmail(context.Background(), "boss@example.com")
@@ -60,7 +60,7 @@ func TestUnverifiedOIDCIsNotAdminEither(t *testing.T) {
 	f := newFakeIdP(t)
 	e := oauthEnv(t, f, withEnv("HUB_ADMIN_EMAILS", "boss@corp.example"))
 	c := e.newClient()
-	if cb, _ := e.oauth(c, f, "oidc-kc", "?intent=signup", profile{sub: "kc-1", email: "boss@corp.example", verified: false}, nil); location(cb) != "/new" {
+	if cb, _ := e.oauth(c, f, "oidc-kc", "?intent=signup", profile{sub: "kc-1", email: "boss@corp.example", verified: false}, nil); location(cb) != "/" {
 		t.Fatalf("sign-up: %s", location(cb))
 	}
 	var me struct{ User UserView }
@@ -69,7 +69,7 @@ func TestUnverifiedOIDCIsNotAdminEither(t *testing.T) {
 		t.Error("an unverified OpenID identity became the administrator")
 	}
 	c2 := e.newClient()
-	if cb, _ := e.oauth(c2, f, "oidc-kc", "?intent=signup", profile{sub: "kc-2", email: "boss2@corp.example", verified: true}, nil); location(cb) != "/new" {
+	if cb, _ := e.oauth(c2, f, "oidc-kc", "?intent=signup", profile{sub: "kc-2", email: "boss2@corp.example", verified: true}, nil); location(cb) != "/" {
 		t.Fatalf("sign-up of a verified one: %s", location(cb))
 	}
 }
@@ -79,7 +79,7 @@ func TestVerifiedProviderOnAnAdminAddressIsTheAdmin(t *testing.T) {
 	f := newFakeIdP(t)
 	e := oauthEnv(t, f, withEnv("HUB_ADMIN_EMAILS", "boss@example.com"))
 	c := e.newClient()
-	if cb, _ := e.oauth(c, f, "github", "?intent=signup", profile{email: "boss@example.com", verified: true}, nil); location(cb) != "/new" {
+	if cb, _ := e.oauth(c, f, "github", "?intent=signup", profile{email: "boss@example.com", verified: true}, nil); location(cb) != "/" {
 		t.Fatalf("sign-up: %s", location(cb))
 	}
 	var me struct{ User UserView }
@@ -109,7 +109,7 @@ func TestTheFirstAccountMustProveItsEmail(t *testing.T) {
 			}
 			if mode == "open" {
 				cb, _ = e.oauth(e.newClient(), f, "yandex", "?intent=signup", profile{sub: "ya-2", email: "second@example.com"}, nil)
-				if location(cb) != "/new" {
+				if location(cb) != "/" {
 					t.Errorf("second account from Yandex ID: %s", location(cb))
 				}
 				if u, _ := e.db.S().UserByEmail(context.Background(), "second@example.com"); u.IsAdmin {
@@ -125,7 +125,7 @@ func TestTheFirstAccountMayBeUnverifiedWhenAdminsAreNamed(t *testing.T) {
 	f := newFakeIdP(t)
 	e := oauthEnv(t, f, withEnv("HUB_ADMIN_EMAILS", "boss@example.com"))
 	c := e.newClient()
-	if cb, _ := e.oauth(c, f, "yandex", "?intent=signup", profile{sub: "ya-1", email: "someone@yandex.ru"}, nil); location(cb) != "/new" {
+	if cb, _ := e.oauth(c, f, "yandex", "?intent=signup", profile{sub: "ya-1", email: "someone@yandex.ru"}, nil); location(cb) != "/" {
 		t.Fatalf("%s", location(cb))
 	}
 	var me struct{ User UserView }
@@ -222,7 +222,7 @@ func TestInviteModeNeedsAProvenAddressForAnEmailInvite(t *testing.T) {
 	}
 	// the person who proves the address is let in
 	cb, _ = e.oauth(e.newClient(), f, "github", "?intent=signup", profile{email: "invited@example.com", verified: true}, nil)
-	if location(cb) != "/new" {
+	if location(cb) != "/" {
 		t.Errorf("verified invited address: %s", location(cb))
 	}
 }

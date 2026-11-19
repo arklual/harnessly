@@ -70,6 +70,8 @@ export const signinRedirectError = (code: string | null): string | null => {
       return t('err.signupClosed');
     case 'provider_off':
       return t('err.providerOff');
+    case 'identity_taken':
+      return t('err.identityTaken');
     default:
       return t('auth.err.oauthFailed');
   }

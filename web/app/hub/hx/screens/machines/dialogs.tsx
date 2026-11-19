@@ -13,7 +13,7 @@ import type {
   RestartWhen,
 } from '../../../org/api/machines';
 import { useOrg } from '../../../org/context';
-import { movePlanLines } from '../../../org/screens/machines/format';
+import { movePlanLines } from '../../../org/format/machines';
 import { Btn, Dialog, Icon } from '../../ui';
 import { offItems, restartHint } from './calc';
 

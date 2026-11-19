@@ -11,7 +11,7 @@ import {
 } from 'react';
 
 import type { MachineDetail, ResourceQuote } from '../../../org/api/machines';
-import { plural } from '../../../org/screens/machines/format';
+import { plural } from '../../../org/format/machines';
 import { useOrg } from '../../../org/context';
 import { Btn } from '../../ui';
 import {

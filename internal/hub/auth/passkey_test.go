@@ -185,7 +185,7 @@ func TestPasskeyRegisterAndSignIn(t *testing.T) {
 	}
 	var in SignedIn
 	r.json(&in)
-	if in.User.Email != "pk@example.com" || in.IsNew || in.Next != "/new" {
+	if in.User.Email != "pk@example.com" || in.IsNew || in.Next != "/" {
 		t.Errorf("signed in: %+v", in)
 	}
 	if r := e.do(browser, "GET", "/api/me", nil); r.StatusCode != 200 {

@@ -4,7 +4,7 @@ import { type CSSProperties, useState } from 'react';
 import { useNow } from '../../../lib/hooks';
 import { useOrg } from '../../../org/context';
 import type { OrgMachine } from '../../../org/api/machines';
-import { plural } from '../../../org/screens/machines/format';
+import { plural } from '../../../org/format/machines';
 import { LoadRow } from '../../charts/spark';
 import { Btn, Drawer, Icon } from '../../ui';
 import { AccessSection } from './access';
@@ -183,18 +183,22 @@ export const MachineDrawer = ({
         <div className="fixbox">
           <b>Машина ждёт подтверждения</b>
           <div className="mut sm" style={{ margin: '6px 0 10px' }}>
-            Хаб открывает страницу машины на своём адресе, поэтому пускает только подтверждённые машины. Если
-            вы подключили её сами, подтвердите, что она ваша.
+            Хаб открывает страницу машины на своём адресе, поэтому пускает только подтверждённые машины.{' '}
+            {m.canAdmin
+              ? 'Если вы подключили её сами, подтвердите, что она ваша.'
+              : 'Подтвердить её может владелец тенанта: попросите его.'}
           </div>
-          <Btn
-            variant="primary"
-            size="sm"
-            icon="shield-check"
-            busy={ws.busyId === m.id}
-            onClick={() => void ws.trust(m.id).then(() => card.reload())}
-          >
-            Это моя машина — подтвердить
-          </Btn>
+          {m.canAdmin && (
+            <Btn
+              variant="primary"
+              size="sm"
+              icon="shield-check"
+              busy={ws.busyId === m.id}
+              onClick={() => void ws.trust(m.id).then(() => card.reload())}
+            >
+              Это моя машина — подтвердить
+            </Btn>
+          )}
         </div>
       ) : preparing && setup?.env ? (
         <div className="fixbox">
@@ -251,17 +255,21 @@ export const MachineDrawer = ({
             <div className="hxa__stack">
               <strong>Машина ждёт доверия</strong>
               <span>
-                Хаб открывает страницу машины на своём адресе, поэтому пускает только доверенные машины. Если
-                вы подключили её сами и это ваша машина, доверьтесь ей.
+                Хаб открывает страницу машины на своём адресе, поэтому пускает только доверенные машины.{' '}
+                {m.canAdmin
+                  ? 'Если вы подключили её сами и это ваша машина, доверьтесь ей: после этого откроются чаты.'
+                  : 'Довериться ей может владелец тенанта: попросите его, и чаты на машине откроются.'}
               </span>
-              <div className="hxa__actions">
-                <Btn variant="primary" size="sm" busy={ws.busyId === id} onClick={() => void ws.trust(id)}>
-                  Доверять машине
-                </Btn>
-                <Btn variant="ghost" size="sm" onClick={() => ws.clear()}>
-                  Закрыть
-                </Btn>
-              </div>
+              {m.canAdmin && (
+                <div className="hxa__actions">
+                  <Btn variant="primary" size="sm" busy={ws.busyId === id} onClick={() => void ws.trust(id)}>
+                    Доверять машине
+                  </Btn>
+                  <Btn variant="ghost" size="sm" onClick={() => ws.clear()}>
+                    Закрыть
+                  </Btn>
+                </div>
+              )}
             </div>
           </div>
         )}

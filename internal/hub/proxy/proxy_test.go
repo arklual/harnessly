@@ -351,7 +351,7 @@ func TestPathModeOpensOnlyMachinesAnAdministratorConnected(t *testing.T) {
 			t.Errorf("%s: fetch: %s", name, r)
 		}
 		r = p.Do("GET", "/m/"+theirs.MachineID+"/", nil, html...)
-		if r.Code != 403 || !strings.Contains(string(r.Body), "HUB_RUNTIME_DOMAIN") || !strings.Contains(r.Header.Get("Content-Type"), "text/html") {
+		if r.Code != 403 || !strings.Contains(string(r.Body), "доверенные машины") || !strings.Contains(r.Header.Get("Content-Type"), "text/html") {
 			t.Errorf("%s: navigation: %s", name, r)
 		}
 		r = p.Do("GET", "/api/machines/"+theirs.MachineID+"/open", nil)

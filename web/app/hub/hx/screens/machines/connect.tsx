@@ -503,7 +503,7 @@ export const ConnectPage = ({
               )}
               {setup.runtime === 'blocked' && (
                 <div className="mut sm">
-                  Этот хаб не предлагает подтверждать машины: нужен адрес для машин (HUB_RUNTIME_DOMAIN).
+                  Подтверждать машины на этом хабе выключено: открыть её сможет только администратор хаба.
                 </div>
               )}
             </Check>

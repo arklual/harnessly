@@ -1,7 +1,7 @@
 // A participant's machines: their own and, when there are any, the shared ones. «Открыть» leads to the machine's
 // runtime; the address comes from the hub when the button is pressed.
 import type { MachinesList, OrgMachine } from '../../../org/api/machines';
-import { plural } from '../../../org/screens/machines/format';
+import { plural } from '../../../org/format/machines';
 import { Btn, Icon } from '../../ui';
 import { hwLine } from './calc';
 import { useOpenMachine } from './open';

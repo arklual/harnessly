@@ -194,7 +194,7 @@ func TestGitHubSignUpAndBack(t *testing.T) {
 	f := newFakeIdP(t)
 	e := oauthEnv(t, f)
 	cb, authURL := e.oauth(e.client, f, "github", "?intent=signup", profile{email: "Octo@Example.com", verified: true, name: "Octo Cat"}, nil)
-	if cb.StatusCode != 302 || location(cb) != "/new" {
+	if cb.StatusCode != 302 || location(cb) != "/" {
 		t.Fatalf("callback: %d %s", cb.StatusCode, location(cb))
 	}
 	if !strings.HasPrefix(authURL.String(), f.srv.URL+"/login/oauth/authorize") || authURL.Query().Get("scope") != "read:user user:email" || authURL.Query().Get("client_id") != "gh-id" {
@@ -281,7 +281,7 @@ func TestYandexNeverJoinsByEmail(t *testing.T) {
 
 	// with a free address it makes an account
 	cb, _ = e.oauth(c, f, "yandex", "?intent=signup", profile{sub: "ya-2", email: "ivan@yandex.ru", name: "Иван"}, nil)
-	if cb.StatusCode != 302 || location(cb) != "/new" {
+	if cb.StatusCode != 302 || location(cb) != "/" {
 		t.Fatalf("new account: %d %s", cb.StatusCode, location(cb))
 	}
 	var out struct{ User UserView }
@@ -299,7 +299,7 @@ func TestPreHijackedAccountIsEmptiedByTheVerifiedOwner(t *testing.T) {
 	e.signIn("owner@example.com") // the first account is the administrator's, and has to prove its address
 	attacker := e.newClient()
 	cb, _ := e.oauth(attacker, f, "yandex", "?intent=signup", profile{sub: "ya-evil", email: "victim@example.com"}, nil)
-	if cb.StatusCode != 302 || location(cb) != "/new" {
+	if cb.StatusCode != 302 || location(cb) != "/" {
 		t.Fatalf("attacker sign-up: %d %s", cb.StatusCode, location(cb))
 	}
 	if r := e.do(attacker, "GET", "/api/me", nil); r.StatusCode != 200 {
@@ -331,7 +331,7 @@ func TestOAuthStateIsBoundToTheBrowserAndUsedOnce(t *testing.T) {
 
 	// another state than the one this browser started
 	cb, _ := e.oauth(e.client, f, "github", "", p, func(state, _ *string) { *state = "forged" })
-	if location(cb) == "/new" || !strings.Contains(location(cb), "error=") {
+	if location(cb) == "/" || !strings.Contains(location(cb), "error=") {
 		t.Errorf("forged state: %s", location(cb))
 	}
 	// the state of one browser in another (no cookie)
@@ -351,7 +351,7 @@ func TestOAuthStateIsBoundToTheBrowserAndUsedOnce(t *testing.T) {
 	}
 	// the victim's own callback still works, once
 	cb = e.do(victim, "GET", "/api/auth/oauth/github/callback?code=c1&state="+loc.Query().Get("state"), nil)
-	if location(cb) != "/new" {
+	if location(cb) != "/" {
 		t.Fatalf("honest callback: %s", location(cb))
 	}
 	cb = e.do(victim, "GET", "/api/auth/oauth/github/callback?code=c1&state="+loc.Query().Get("state"), nil)
@@ -406,7 +406,7 @@ func TestOIDC(t *testing.T) {
 	e := oauthEnv(t, f)
 	// verified email: signs up, with PKCE and a nonce in the request
 	cb, authURL := e.oauth(e.client, f, "oidc-kc", "?intent=signup", profile{sub: "kc-1", email: "dora@corp.example", verified: true, name: "Дора"}, nil)
-	if location(cb) != "/new" {
+	if location(cb) != "/" {
 		t.Fatalf("oidc sign-up: %d %s", cb.StatusCode, location(cb))
 	}
 	q := authURL.Query()
@@ -468,7 +468,7 @@ func TestLinkingWhileSignedIn(t *testing.T) {
 
 	// linking a provider whose email differs is fine: the person is signed in
 	cb, _ := e.oauth(e.client, f, "github", "?intent=link", profile{email: "other-address@example.com", verified: true}, nil)
-	if cb.StatusCode != 302 || location(cb) != "/settings" {
+	if cb.StatusCode != 302 || location(cb) != "/profile" {
 		t.Fatalf("link: %d %s", cb.StatusCode, location(cb))
 	}
 	var me struct {
@@ -484,7 +484,7 @@ func TestLinkingWhileSignedIn(t *testing.T) {
 	second := e.newClient()
 	e.signInWith(second, "second@example.com")
 	cb, _ = e.oauth(second, f, "github", "?intent=link", profile{email: "other-address@example.com", verified: true}, nil)
-	if location(cb) != "/settings?error=identity_taken" {
+	if location(cb) != "/profile?error=identity_taken" {
 		t.Errorf("taken identity: %s", location(cb))
 	}
 
@@ -608,7 +608,7 @@ func TestOAuthCookieIsHostPrefixedOnHTTPS(t *testing.T) {
 	}
 	// the refusal did not use the flow up: the state is only spent by the callback that carries the real cookie
 	cb := e.do(bare, "GET", callback, nil, "Cookie", "__Host-hl_oauth="+state)
-	if location(cb) != "/new" {
+	if location(cb) != "/" {
 		t.Fatalf("the honest callback: %d %s", cb.StatusCode, location(cb))
 	}
 	cleared := false
@@ -628,7 +628,7 @@ func TestOAuthCookieKeepsItsPlainNameWithoutHTTPS(t *testing.T) {
 		t.Errorf("names without https: %q %q", e.svc.oauthCookieName(), e.svc.RunCookieName())
 	}
 	cb, _ := e.oauth(e.client, f, "github", "", profile{email: "p@example.com", verified: true}, nil)
-	if location(cb) != "/new" {
+	if location(cb) != "/" {
 		t.Errorf("sign-in over http: %s", location(cb))
 	}
 }
@@ -647,7 +647,7 @@ func TestEmailSignInOff(t *testing.T) {
 		t.Error("a code was mailed with the email sign-in off")
 	}
 	cb, _ := e.oauth(e.client, f, "github", "?intent=signup", profile{email: "octo@example.com", verified: true, name: "Octo"}, nil)
-	if cb.StatusCode != 302 || location(cb) != "/new" {
+	if cb.StatusCode != 302 || location(cb) != "/" {
 		t.Fatalf("GitHub sign-in with the email one off: %d %s", cb.StatusCode, location(cb))
 	}
 }

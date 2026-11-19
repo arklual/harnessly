@@ -2,14 +2,7 @@
 // (shares, tones, tiles, the limit slider) and the optimistic patches an action applies before the hub answers.
 // Everything here is pure: the screens only draw what these functions return.
 import type { MemberRole, Person, TeamBlock, TeamsView } from '../../../org/api/teams';
-import {
-  kRub,
-  people as peopleText,
-  plural,
-  sharePct,
-  stopOf,
-  thousand,
-} from '../../../org/screens/teams/format';
+import { kRub, people as peopleText, plural, sharePct, stopOf, thousand } from '../../../org/format/teams';
 import { inRubles, shownSymbol } from '../../../org/money';
 import { initial } from '../../ui';
 

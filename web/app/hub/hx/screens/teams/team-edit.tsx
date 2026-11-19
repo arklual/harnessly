@@ -1,7 +1,7 @@
 // «Переименовать команду» and «Удалить команду» in one drawer: the name is saved on the spot, the deletion asks first.
 import { type FormEvent, useState } from 'react';
 
-import { people as peopleText } from '../../../org/screens/teams/format';
+import { people as peopleText } from '../../../org/format/teams';
 import { Btn, Drawer } from '../../ui';
 import { ConfirmDialog } from './confirm';
 import { deleteTeam, renameTeam } from './ops';

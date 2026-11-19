@@ -79,7 +79,7 @@ type oauthState struct {
 func (s *Service) redirectError(w http.ResponseWriter, r *http.Request, intent, code string) {
 	target := "/signin"
 	if intent == "link" {
-		target = "/settings"
+		target = "/profile"
 	}
 	http.Redirect(w, r, target+"?error="+url.QueryEscape(code), http.StatusFound)
 }
@@ -119,7 +119,7 @@ func (s *Service) oauthStart(w http.ResponseWriter, r *http.Request) {
 		}
 		st.UserID = pr.User.ID
 		if st.Next == "" {
-			st.Next = "/settings"
+			st.Next = "/profile"
 		}
 	}
 	cfg, err := p.config(s.httpCtx(ctx))

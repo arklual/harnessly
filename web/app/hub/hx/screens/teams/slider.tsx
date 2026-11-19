@@ -2,7 +2,7 @@
 // to the nearest stop that can still be picked.
 import { type CSSProperties, type KeyboardEvent, type PointerEvent, useRef } from 'react';
 
-import { kRub } from '../../../org/screens/teams/format';
+import { kRub } from '../../../org/format/teams';
 import { type Slider, snapStop, sliderUnit, stepStop } from './model';
 
 export const LimitSlider = ({

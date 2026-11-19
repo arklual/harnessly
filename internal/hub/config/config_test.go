@@ -807,7 +807,7 @@ func TestCloudNeedsIsolation(t *testing.T) {
 		t.Fatalf("the cloud with all three on: %v %v", err, c)
 	}
 	for name, value := range map[string][]string{
-		"HUB_ORGS":            {"", "off"},
+		"HUB_ORGS":            {"off"}, // unset is on: organizations are the default
 		"HUB_ACCESS_ENFORCE":  {"", "off", "warn"},
 		"HUB_RESOURCE_ACCESS": {"", "off"},
 	} {
@@ -826,13 +826,13 @@ func TestCloudNeedsIsolation(t *testing.T) {
 			}
 		}
 	}
-	// a self-hosted hub with none of them starts, with a warning for each
+	// a self-hosted hub with none of them set starts, with a warning for each but HUB_ORGS, on by default
 	c, err := load(EditionSelfHosted, func(m map[string]string) {
 		for k := range on {
 			delete(m, k)
 		}
 	})
-	if err != nil || len(c.Warnings) != 3 {
+	if err != nil || len(c.Warnings) != 2 {
 		t.Errorf("self-hosted with none: %v %v", err, c)
 	}
 }

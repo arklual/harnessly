@@ -3,8 +3,8 @@ import type { ChatEnd } from '../../../org/api/member';
 import type { OverviewPeriod } from '../../../org/api/overview';
 import { monthWord } from '../../../org/dates';
 import { inRubles, shownSymbol } from '../../../org/money';
-import { ago, fromUsdExact, rub, tokens, usd } from '../../../org/screens/overview/format';
-import { kRub, plural, thousand } from '../../../org/screens/teams/format';
+import { ago, fromUsdExact, rub, tokens, usd } from '../../../org/format/overview';
+import { kRub, plural, thousand } from '../../../org/format/teams';
 
 export { ago, kRub, plural, rub, thousand, tokens, usd };
 

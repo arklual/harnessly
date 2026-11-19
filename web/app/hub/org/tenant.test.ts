@@ -34,11 +34,11 @@ const lookup = (opts: {
 });
 
 describe('the old space address of a tenant', () => {
-  it('maps home, settings and the machines step; nothing else', () => {
+  it('maps home, settings and the setup steps; nothing else', () => {
     expect(sectionForSpaceRoute('/s/:slug')).toBe('overview');
     expect(sectionForSpaceRoute('/s/:slug/settings')).toBe('teams');
     expect(sectionForSpaceRoute('/s/:slug/setup/:step', 'machines')).toBe('machines');
-    expect(sectionForSpaceRoute('/s/:slug/setup/:step', 'agents')).toBeNull();
+    expect(sectionForSpaceRoute('/s/:slug/setup/:step', 'agents')).toBe('overview');
     expect(sectionForSpaceRoute('/s/:slug/sites/new')).toBeNull();
     expect(sectionForSpaceRoute('/s/:slug/sites/:name')).toBeNull();
   });
@@ -72,7 +72,6 @@ describe('the old space address of a tenant', () => {
     const l = lookup({ tenants: { acme: ['product'] } });
     expect(await orgTargetFor(config('off'), '/s/:slug', 'product', undefined, l)).toBeNull();
     expect(await orgTargetFor(config('on'), '/s/:slug/sites/new', 'product', undefined, l)).toBeNull();
-    expect(await orgTargetFor(config('on'), '/s/:slug/setup/:step', 'product', 'agents', l)).toBeNull();
     expect(
       await orgTargetFor(config('on'), '/s/:slug', 'product', undefined, lookup({ fail: true })),
     ).toBeNull();

@@ -78,7 +78,10 @@ type HubMachine struct {
 	ChatsRunning int              `json:"chatsRunning"`
 	People       []orgs.PersonRef `json:"people"`
 	Access       []AccessView     `json:"access"`
-	Problems     []string         `json:"problems"`
+	// Owner is the person whose own machine it is (who connected it, or whom it was handed to); null when the account is
+	// gone.
+	Owner    *orgs.PersonRef `json:"owner"`
+	Problems []string        `json:"problems"`
 	// OpensRuntime is false for a machine whose own policy keeps the hub out of its runtime (an observed machine run by
 	// a cluster of its own): the hub lists it, but «Открыть» has nowhere to lead.
 	OpensRuntime bool `json:"opensRuntime"`
@@ -202,6 +205,11 @@ func (s *Service) HubMachines(ctx context.Context, st store.Store, ms []store.Ma
 		if m.TeamID != "" {
 			id := m.TeamID
 			h.TeamID = &id
+		}
+		if m.CreatedBy != "" {
+			if name, ok := lb.user(m.CreatedBy); ok {
+				h.Owner = &orgs.PersonRef{UserID: m.CreatedBy, Name: name}
+			}
 		}
 		var last int64
 		seen := map[string]bool{}

@@ -2,40 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createOrgApi } from './api';
 import { liveOrgApi } from './api/live';
-import { navFor, sectionsOf } from './nav';
-
-describe('menu by role', () => {
-  const labels = (role: 'admin' | 'lead' | 'member') =>
-    navFor(role, 'Тенант', 'Фронт').flatMap((g) => g.items.map((i) => i.label));
-
-  it('gives the three roles different menus', () => {
-    expect(labels('admin')).toEqual([
-      'Обзор',
-      'Аналитика',
-      'Машины',
-      'Команды',
-      'Окружение',
-      'Аккаунты и секреты',
-      'Подключения',
-    ]);
-    expect(labels('lead')).toContain('Моя команда');
-    expect(labels('lead')).not.toContain('Подключения');
-    expect(labels('member')).toEqual(['Обзор', 'Аналитика', 'Окружение']);
-  });
-
-  it('leaves Окружение, Аккаунты и секреты, Подключения disabled', () => {
-    const disabled = navFor('admin', 'Тенант', null)
-      .flatMap((g) => g.items)
-      .filter((i) => !i.section)
-      .map((i) => i.label);
-    expect(disabled).toEqual(['Окружение', 'Аккаунты и секреты', 'Подключения']);
-  });
-
-  it('opens fewer sections to a participant', () => {
-    expect(sectionsOf('member')).toEqual(['overview', 'analytics']);
-    expect(sectionsOf('admin')).toContain('teams');
-  });
-});
 
 describe('the data layer switch', () => {
   it('serves the shell by role from mocks', async () => {

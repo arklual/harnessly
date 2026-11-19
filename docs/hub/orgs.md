@@ -28,8 +28,8 @@ A scope is written `kind:id` in query strings (`org:k3…`, `tenant:a7…`, `tea
 
 | Value | The endpoints below |
 | --- | --- |
+| `on` (default) | answer everyone, by the rights below |
 | `off` | answer 404 `not_found`, as if they did not exist |
-| `on` | answer everyone, by the rights below |
 
 ## Rights
 

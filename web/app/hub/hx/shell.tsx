@@ -16,7 +16,7 @@ import { useTheme } from '@kit';
 
 import { navigate, useLocation } from '../lib/router';
 import { useSession } from '../lib/session';
-import { useSignOut } from '../screens/home';
+import { useSignOut } from '../lib/sign-out';
 import { useOrg } from '../org/context';
 import { ROLE_LABEL } from '../org/types';
 import { fleetWorkspace, liveOn } from './flag';

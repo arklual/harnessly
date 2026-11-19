@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -23,6 +24,11 @@ func cliRig(t *testing.T) (home, data string) {
 	t.Setenv("AGENT_POLICY_FILE", filepath.Join(home, "policy.toml"))
 	return home, data
 }
+
+// started counts the agents register would have started: the test binary must not start itself.
+var started int
+
+func init() { startAfterRegister = func(cliPaths, io.Writer, io.Writer) { started++ } }
 
 func runCLI(t *testing.T, args ...string) (int, string, string) {
 	t.Helper()
@@ -61,9 +67,14 @@ func TestCLIRegisterStatusOffOn(t *testing.T) {
 	if err := os.WriteFile(codeFile, []byte("hx_fromfile\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	before := started
 	code, out, errText := runCLI(t, "register", "--hub", hub.srv.URL, "--code-file", codeFile, "--profile", "full", "--via", "local", "--name", "Ada box")
 	if code != 0 || !strings.Contains(out, "registered as abcdefghijklmnopqrst") || errText != "" {
 		t.Fatalf("%d %q %q", code, out, errText)
+	}
+	// A registration without a running agent leaves the machine connecting for ever: register starts one.
+	if started != before+1 {
+		t.Errorf("register started %d agents", started-before)
 	}
 	if got := hub.got[0]; got.Code != "hx_fromfile" || got.Profile != "full" || got.Via != "local" || got.Hostname != "Ada box" {
 		t.Errorf("%+v", got)

@@ -9,27 +9,15 @@ import { errorText } from './lib/errors';
 import { t } from './lib/i18n';
 import { Link, matchRoute, navigate, Redirect, useLocation } from './lib/router';
 import { SessionProvider, useSession } from './lib/session';
-import { AccessScreen } from './screens/access';
-import { AccountScreen } from './screens/account';
-import { AgentsScreen } from './screens/agents';
-import { hxOn } from './hx/flag';
-import { AuthScreen } from './screens/auth';
-import { BrowserScreen } from './screens/browser';
-import { ConnectScreen } from './screens/connect';
-import { DoneScreen } from './screens/done';
-import { HomeScreen } from './screens/home';
-import { InviteScreen } from './screens/invite';
-import { MachinesScreen } from './screens/machines';
-import { NetworkScreen } from './screens/network';
-import { SwitchesScreen } from './screens/switches';
-import { NewSpaceScreen } from './screens/new-space';
-import { NewSiteScreen, SiteScreen, useSitesOn } from './screens/sites';
-import { SpaceProvider, useSpace } from './screens/space';
-import { SpaceSettingsScreen } from './screens/space-settings';
-import { OrgStepScreen } from './org/screens/org-step';
+import { BrowserScreen } from './pages/browser';
+import { ConnectScreen } from './pages/connect';
+import { NetworkScreen } from './pages/network';
+import { SwitchesScreen } from './pages/switches';
+import { SitesPage } from './pages/sites';
 import { http } from './org/api/live/http';
-import { orgTargetFor, sectionForSpaceRoute } from './org/redirect';
-import { orgLanding, orgStepDue, orgStepOn } from './org/step';
+import { orgTargetFor } from './org/redirect';
+import { orgLanding, orgStepOn } from './org/step';
+import { ALL_SCOPE, type Section } from './org/types';
 import type { OrgList } from '../hub-api/orgs';
 import { OrgRoutes } from './org/routes';
 import { PlainPage } from './ui/frame';
@@ -42,6 +30,7 @@ const ROUTES = [
   '/invite/:token',
   '/new',
   '/settings',
+  '/profile',
   '/connect',
   '/network',
   '/switches',
@@ -53,6 +42,7 @@ const ROUTES = [
   '/o/:org',
   '/o/:org/:scope',
   '/o/:org/:scope/:section',
+  '/s/:slug/sites',
   '/s/:slug/sites/new',
   '/s/:slug/sites/:name',
   '/apps/:app',
@@ -65,14 +55,6 @@ const lastSpace = (): string | null => {
     return localStorage.getItem(LAST_SPACE);
   } catch {
     return null;
-  }
-};
-
-const rememberSpace = (slug: string) => {
-  try {
-    localStorage.setItem(LAST_SPACE, slug);
-  } catch {
-    // not remembered
   }
 };
 
@@ -110,7 +92,6 @@ const SessionFailed = ({ error, retry }: { error: ApiError; retry: () => void })
   </PlainPage>
 );
 
-/** `/`: signed out → sign-in; no space → the first one is made; else the last space, or where its setup stopped. */
 /** The organizations of the person, asked again twice when the hub does not answer: a slow hub is not «no organization». */
 const orgsWithRetry = async (alive: () => boolean): Promise<OrgList | null> => {
   for (let attempt = 0; ; attempt++) {
@@ -123,11 +104,15 @@ const orgsWithRetry = async (alive: () => boolean): Promise<OrgList | null> => {
   }
 };
 
-const Landing = () => {
-  const api = useApi();
+/**
+ * Where a signed-in person goes in the organization hub: `section` of the organization they opened last (`/` with no
+ * section), or making the first organization when they have none. The hub not answering is said, never taken for «none».
+ */
+const OrgLanding = ({ section, search = '' }: { section?: Section; search?: string }) => {
   const { me, config } = useSession();
   const [failed, setFailed] = useState(0);
   const [tries, setTries] = useState(0);
+  const off = !orgStepOn(config);
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -135,51 +120,29 @@ const Landing = () => {
         navigate('/signin', { replace: true });
         return;
       }
-      // A member of an organization lands in its hub; without HUB_ORGS=on the spaces as before.
-      let orgs: OrgList | null = null;
-      if (orgStepOn(config)) {
-        orgs = await orgsWithRetry(() => alive);
-        if (!alive) return;
-        // The hub did not answer: say so, never lead to «make an organization» as if there were none.
-        if (orgs === null) {
-          setFailed(tries + 1);
-          return;
-        }
-        const target = orgLanding(orgs);
-        if (target) {
-          navigate(target, { replace: true });
-          return;
-        }
-      }
-      if (me.spaces.length === 0) {
-        navigate('/new', { replace: true });
+      if (off) return;
+      const orgs = await orgsWithRetry(() => alive);
+      if (!alive) return;
+      if (orgs === null) {
+        setFailed(tries + 1);
         return;
       }
-      // The organization step comes once after the release, and can be put off.
-      if (orgStepDue(config, me, orgs)) {
-        navigate('/org/new', { replace: true });
-        return;
-      }
-      const remembered = lastSpace();
-      const ref = me.spaces.find((s) => s.slug === remembered) ?? me.spaces[0];
-      if (!ref) return;
-      try {
-        const { space } = await api.spaces.bySlug(ref.slug);
-        if (!alive) return;
-        navigate(
-          space.role === 'owner' && space.onboardingStep !== 'done'
-            ? `/s/${space.slug}/setup/${space.onboardingStep}`
-            : `/s/${space.slug}`,
-          { replace: true },
-        );
-      } catch {
-        if (alive) navigate(`/s/${ref.slug}`, { replace: true });
-      }
+      const target = orgLanding(orgs);
+      navigate(target ? (section ? `${target}/${ALL_SCOPE}/${section}${search}` : target) : '/org/new', {
+        replace: true,
+      });
     })();
     return () => {
       alive = false;
     };
-  }, [api, me, config, tries]);
+  }, [me, off, section, search, tries]);
+  if (off) {
+    return (
+      <PlainPage>
+        <EmptyState title={t('landing.orgsOffTitle')}>{t('landing.orgsOff')}</EmptyState>
+      </PlainPage>
+    );
+  }
   if (failed > tries) {
     return (
       <PlainPage>
@@ -193,6 +156,20 @@ const Landing = () => {
     );
   }
   return <Loading />;
+};
+
+/** An old space address (`/s/<slug>`, its settings and setup) leads to the tenant in its organization, else to `/`. */
+const SpaceRedirect = ({ route, slug, step }: { route: string; slug: string; step: string | undefined }) => {
+  const { config } = useSession();
+  const [to, setTo] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void orgTargetFor(config, route, slug, step).then((t) => alive && setTo(t ?? '/'));
+    return () => {
+      alive = false;
+    };
+  }, [config, route, slug, step]);
+  return to ? <Redirect to={to} /> : <Loading />;
 };
 
 /**
@@ -253,111 +230,29 @@ const AppRedirect = ({ app, search }: { app: string; search: string }) => {
   );
 };
 
-const SETUP = {
-  machines: <MachinesScreen />,
-  agents: <AgentsScreen />,
-  access: <AccessScreen />,
-  done: <DoneScreen />,
-} as const;
-
-const SpaceRoutes = ({
-  sub,
-  step,
-  site,
-}: {
-  sub: 'home' | 'settings' | 'setup' | 'site-new' | 'site';
-  step: string | undefined;
-  site?: string;
-}) => {
-  const { space, owner } = useSpace();
-  const sitesOn = useSitesOn();
-  useEffect(() => rememberSpace(space.slug), [space.slug]);
-  if (sub === 'site-new' || sub === 'site') {
-    if (!sitesOn) return <NotFound />;
-    return sub === 'site-new' ? <NewSiteScreen /> : <SiteScreen key={site} name={site ?? ''} />;
-  }
-  if (sub === 'settings') return <SpaceSettingsScreen />;
-  if (sub === 'home') return <HomeScreen />;
-  const screen = step && step in SETUP ? SETUP[step as keyof typeof SETUP] : null;
-  if (!screen) return <NotFound />;
-  // Setting a space up is the owners' work.
-  if (!owner) return <Redirect to={`/s/${space.slug}`} />;
-  return screen;
-};
-
-/** The old address of a tenant of an organization leads to the organization hub; any other space opens as before. */
-const SpaceEntry = ({
-  route,
-  slug,
-  step,
-  children,
-}: {
-  route: string;
-  slug: string;
-  step: string | undefined;
-  children: ReactNode;
-}) => {
-  const { config } = useSession();
-  const key = `${route}|${slug}|${step ?? ''}`;
-  // Only the routes with a place in the organization hub need the question, and only where organizations are on.
-  const asks = sectionForSpaceRoute(route, step) !== null && orgStepOn(config);
-  const [answer, setAnswer] = useState<{ key: string; to: string | null } | null>(null);
-  useEffect(() => {
-    if (!asks) return;
-    let alive = true;
-    void orgTargetFor(config, route, slug, step).then((to) => alive && setAnswer({ key, to }));
-    return () => {
-      alive = false;
-    };
-  }, [asks, config, route, slug, step, key]);
-  if (!asks) return <>{children}</>;
-  if (answer?.key !== key) return <Loading />;
-  return answer.to ? <Redirect to={answer.to} /> : <>{children}</>;
-};
-
 const HxAuth = lazy(() => import('./hx/auth').then((m) => ({ default: m.HxAuth })));
 const HxInvite = lazy(() => import('./hx/auth').then((m) => ({ default: m.HxInvite })));
 const HxOrgNew = lazy(() => import('./hx/auth').then((m) => ({ default: m.HxOrgNew })));
 
+const lazyPage = (node: ReactNode) => <Suspense fallback={<Loading />}>{node}</Suspense>;
+
 const Routes = () => {
   const { path, search } = useLocation();
-  const { me, config } = useSession();
+  const { me } = useSession();
   const match = matchRoute(ROUTES, path);
-  // Before sign-in there is no organization: the instance's own flag picks the kit.
-  const hx = hxOn(config.features, search);
 
   if (!match) return <NotFound />;
   const { route, params } = match;
-  if (route === '/') return <Landing />;
-  if (hx && (route === '/signin' || route === '/signup')) {
-    return (
-      <Suspense fallback={null}>
-        <HxAuth mode={route === '/signin' ? 'signin' : 'signup'} />
-      </Suspense>
-    );
+  if (route === '/') return <OrgLanding />;
+  if (route === '/signin' || route === '/signup') {
+    return lazyPage(<HxAuth mode={route === '/signin' ? 'signin' : 'signup'} />);
   }
-  if (hx && route === '/invite/:token') {
-    return (
-      <Suspense fallback={null}>
-        <HxInvite token={params.token ?? ''} />
-      </Suspense>
-    );
-  }
-  if (route === '/signin') return <AuthScreen mode="signin" />;
-  if (route === '/signup') return <AuthScreen mode="signup" />;
-  if (route === '/invite/:token') return <InviteScreen token={params.token ?? ''} />;
+  if (route === '/invite/:token') return lazyPage(<HxInvite token={params.token ?? ''} />);
   if (!me) return <Redirect to={`/signin?next=${encodeURIComponent(path + search)}`} />;
-  if (route === '/new') return <NewSpaceScreen />;
-  if (route === '/org/new') {
-    return hx ? (
-      <Suspense fallback={null}>
-        <HxOrgNew />
-      </Suspense>
-    ) : (
-      <OrgStepScreen />
-    );
-  }
-  if (route === '/settings') return <AccountScreen />;
+  if (route === '/org/new') return lazyPage(<HxOrgNew />);
+  // The first space is made with the first organization.
+  if (route === '/new') return <Redirect to="/" />;
+  if (route === '/settings' || route === '/profile') return <OrgLanding section="profile" search={search} />;
   if (route === '/connect') return <ConnectScreen />;
   if (route === '/network') return <NetworkScreen />;
   if (route === '/switches') return <SwitchesScreen />;
@@ -367,20 +262,17 @@ const Routes = () => {
     return <OrgRoutes org={params.org ?? ''} scope={params.scope} section={params.section} />;
   }
   const slug = params.slug ?? '';
-  const SUB = {
-    '/s/:slug': 'home',
-    '/s/:slug/settings': 'settings',
-    '/s/:slug/sites/new': 'site-new',
-    '/s/:slug/sites/:name': 'site',
-  } as const;
-  const sub = route in SUB ? SUB[route as keyof typeof SUB] : 'setup';
-  return (
-    <SpaceEntry route={route} slug={slug} step={params.step}>
-      <SpaceProvider slug={slug}>
-        <SpaceRoutes sub={sub} step={params.step} site={params.name} />
-      </SpaceProvider>
-    </SpaceEntry>
-  );
+  if (route === '/s/:slug/sites' || route === '/s/:slug/sites/new' || route === '/s/:slug/sites/:name') {
+    return (
+      <SitesPage
+        key={slug}
+        slug={slug}
+        page={route === '/s/:slug/sites' ? 'list' : route === '/s/:slug/sites/new' ? 'new' : 'site'}
+        name={params.name}
+      />
+    );
+  }
+  return <SpaceRedirect route={route} slug={slug} step={params.step} />;
 };
 
 export const App = () => (

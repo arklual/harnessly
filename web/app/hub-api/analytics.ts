@@ -385,6 +385,7 @@ export type HubMachine = {
   chatsRunning: number;
   people: PersonRef[]; // who used it in the last 30 days
   access: { kind: 'user' | 'team'; id: string; label: string }[]; // empty: everyone in its tenant
+  owner?: PersonRef | null; // whose own machine it is (who connected it or whom it was handed to); absent: an older hub
   problems: MachineProblem[];
   opensRuntime?: boolean; // false: the hub only observes the machine and cannot open its runtime (absent: an older hub)
   canSeeDebug?: boolean; // the viewer may read its openings for debugging (GET /api/machines/{id}/debug); absent: an older hub

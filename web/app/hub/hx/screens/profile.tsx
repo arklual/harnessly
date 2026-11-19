@@ -7,7 +7,7 @@ import { setThemeMode, useTheme, type ThemeMode } from '@kit';
 
 import { isApiError, oauthStartUrl } from '../../lib/api';
 import { useApi, useEnv } from '../../lib/env';
-import { errorText } from '../../lib/errors';
+import { errorText, signinRedirectError } from '../../lib/errors';
 import { hhmm } from '../../lib/format';
 import { currentLang, t, type Lang } from '../../lib/i18n';
 import { navigate } from '../../lib/router';
@@ -15,7 +15,7 @@ import { useMe, useSession } from '../../lib/session';
 import type { AppToken } from '../../lib/types';
 import { OrgApiError, orgErrorText } from '../../org/api/errors';
 import { useOrg } from '../../org/context';
-import { useSignOut } from '../../screens/home';
+import { useSignOut } from '../../lib/sign-out';
 import { Head } from '../shell';
 import { Btn, initial } from '../ui';
 import { useUrl } from './teams/url';
@@ -102,7 +102,8 @@ const Screen = () => {
   const [name, setName] = useState(me.user.name);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // A service linked from here comes back with `?error=<code>` when it could not be linked.
+  const [error, setError] = useState<string | null>(() => signinRedirectError(url.get('error')));
   const [passkeyName, setPasskeyName] = useState(t('account.passkey.defaultName'));
 
   const run = async (key: string, job: () => Promise<unknown>) => {
@@ -228,7 +229,10 @@ const Screen = () => {
                 {t('account.unlink')}
               </Btn>
             ) : (
-              <Btn size="sm" onClick={() => env.assign(oauthStartUrl(p, 'link', '/settings'))}>
+              <Btn
+                size="sm"
+                onClick={() => env.assign(oauthStartUrl(p, 'link', `${location.pathname}?tab=${tab}`))}
+              >
                 Подключить
               </Btn>
             )}

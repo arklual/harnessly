@@ -6,7 +6,6 @@ import { agentOf, FakeHub, fakeEnv, machineOf, READY, type Scenario } from './fa
 const online = (over: Parameters<typeof machineOf>[0] = {}) => machineOf({ name: 'build-01', ...over });
 
 const readyAgents = [agentOf('claude', READY), agentOf('codex', READY), agentOf('gemini')];
-const half = [agentOf('claude', { ...READY, login: 'logged_out' }), agentOf('codex'), agentOf('gemini')];
 
 interface Entry {
   title: string;
@@ -77,125 +76,10 @@ export const SCENARIOS: Record<string, Entry> = {
     path: '/invite/zzz',
     scenario: { signedIn: false, spaces: [] },
   },
-  new: {
-    title: 'Название пространства и приглашения',
-    path: '/new',
-    scenario: { signedIn: true, spaces: [] },
-  },
-  'machines-empty': {
-    title: 'Машины, пока нет ни одной',
-    path: '/s/acme/setup/machines',
-    scenario: { signedIn: true, spaces: [SPACE('machines', [])] },
-  },
-  'machines-cloud': {
-    title: 'Машины, облачная редакция',
-    path: '/s/acme/setup/machines',
-    scenario: {
-      signedIn: true,
-      spaces: [SPACE('machines', [])],
-      config: {
-        edition: 'cloud',
-        connect: {
-          local: { available: false },
-          command: true,
-          ssh: { available: false, publicKey: null },
-          teleport: false,
-        },
-      },
-    },
-  },
   switches: {
     title: 'Переключатели выката (администратор)',
     path: '/switches',
     scenario: { signedIn: true, admin: true, spaces: [SPACE('machines', [online()])] },
-  },
-  'machines-one': {
-    title: 'Машины, одна подключена',
-    path: '/s/acme/setup/machines',
-    scenario: { signedIn: true, spaces: [SPACE('machines', [online()])] },
-  },
-  'agents-none': {
-    title: 'Агенты, ничего не стоит',
-    path: '/s/acme/setup/agents',
-    scenario: {
-      signedIn: true,
-      spaces: [
-        SPACE('agents', [online({ agents: [agentOf('claude'), agentOf('codex'), agentOf('gemini')] })]),
-      ],
-    },
-  },
-  'agents-half': {
-    title: 'Агенты, Claude стоит, но не вошёл',
-    path: '/s/acme/setup/agents',
-    scenario: { signedIn: true, spaces: [SPACE('agents', [online({ agents: half })])] },
-  },
-  'agents-blocked': {
-    title: 'Агенты, серверы провайдера недоступны',
-    path: '/s/acme/setup/agents',
-    scenario: {
-      signedIn: true,
-      blocked: ['claude'],
-      spaces: [
-        SPACE('agents', [online({ agents: [agentOf('claude'), agentOf('codex'), agentOf('gemini')] })]),
-      ],
-    },
-  },
-  'agents-two': {
-    title: 'Агенты, две машины',
-    path: '/s/acme/setup/agents',
-    scenario: {
-      signedIn: true,
-      spaces: [
-        SPACE('agents', [online({ agents: readyAgents }), online({ name: 'ci-runner', agents: half })]),
-      ],
-    },
-  },
-  access: {
-    title: 'Доступы',
-    path: '/s/acme/setup/access',
-    scenario: { signedIn: true, spaces: [SPACE('access', [online({ agents: readyAgents })])] },
-  },
-  done: {
-    title: 'Всё готово',
-    path: '/s/acme/setup/done',
-    scenario: {
-      signedIn: true,
-      spaces: [SPACE('done', [online({ agents: readyAgents, env: ['GITHUB_TOKEN', 'GH_TOKEN'] })])],
-    },
-  },
-  home: {
-    title: 'Пространство, владелец',
-    path: '/s/acme',
-    scenario: {
-      signedIn: true,
-      spaces: [
-        SPACE('done', [
-          online({ agents: readyAgents }),
-          online({ name: 'ci-runner', status: 'offline', agents: half }),
-        ]),
-      ],
-    },
-  },
-  'home-member': {
-    title: 'Пространство, участник',
-    path: '/s/acme',
-    scenario: { signedIn: true, spaces: [SPACE('done', [online({ agents: readyAgents })], 'member')] },
-  },
-  'home-empty': {
-    title: 'Пространство без машин',
-    path: '/s/acme',
-    scenario: { signedIn: true, spaces: [SPACE('done', [])] },
-  },
-  settings: {
-    title: 'Настройки пространства',
-    path: '/s/acme/settings',
-    scenario: { signedIn: true, spaces: [SPACE('done', [online({ agents: readyAgents })])] },
-  },
-  account: { title: 'Аккаунт', path: '/settings', scenario: { signedIn: true, spaces: [SPACE('done', [])] } },
-  slow: {
-    title: 'Медленные ответы (состояния загрузки)',
-    path: '/s/acme',
-    scenario: { signedIn: true, latency: 2500, spaces: [SPACE('done', [online({ agents: readyAgents })])] },
   },
   org: {
     title: 'Организация: хаб на моках (?as=admin|lead|member)',

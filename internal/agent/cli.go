@@ -46,8 +46,18 @@ func systemEnvFiles(home string) []string {
 // cliEnvKeys are the variables an agent.env may supply to the commands.
 var cliEnvKeys = map[string]bool{"AGENT_DATA_DIR": true, "AGENT_MACHINE_FILE": true, "AGENT_POLICY_FILE": true}
 
+// runEnvKeys are the variables an agent.env supplies to an agent started by hand, outside the unit that reads the file:
+// the folders and the ports the installer chose.
+var runEnvKeys = map[string]bool{"AGENT_DATA_DIR": true, "AGENT_MACHINE_FILE": true, "AGENT_POLICY_FILE": true,
+	"AGENT_PORT": true, "RUNTIME_PORT": true, "FILES_PORT": true}
+
 // loadAgentEnv sets, from the first agent.env that exists, the folder variables the environment does not have.
 func loadAgentEnv(files []string, lookup func(string) (string, bool), set func(k, v string)) {
+	loadEnvKeys(files, cliEnvKeys, lookup, set)
+}
+
+// loadEnvKeys sets, from the first agent.env that exists, those of keys the environment does not have.
+func loadEnvKeys(files []string, keys map[string]bool, lookup func(string) (string, bool), set func(k, v string)) {
 	for _, f := range files {
 		raw, err := os.ReadFile(f)
 		if err != nil {
@@ -57,7 +67,7 @@ func loadAgentEnv(files []string, lookup func(string) (string, bool), set func(k
 			line = strings.TrimSpace(line)
 			k, v, ok := strings.Cut(line, "=")
 			k = strings.TrimSpace(k)
-			if !ok || !cliEnvKeys[k] {
+			if !ok || !keys[k] {
 				continue
 			}
 			v = strings.TrimSpace(v)
@@ -153,6 +163,7 @@ func cmdRegister(args []string, paths cliPaths, stdout, stderr io.Writer) int {
 	force := fs.Bool("force", false, "register again over an existing registration")
 	reuse := fs.Bool("reuse", false, "keep a valid registration with this hub as it is, and register only when there is none")
 	machineFile := fs.String("machine-file", paths.machineFile, "where machine.json goes")
+	noStart := fs.Bool("no-start", env("HARNESSLY_AGENT_NO_START", "") != "", "only register: do not start the agent (the installer starts its unit itself)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -167,6 +178,11 @@ func cmdRegister(args []string, paths cliPaths, stdout, stderr io.Writer) int {
 	if *reuse {
 		if m, ok := Reusable(*machineFile, *hub, hubproto.Profile(*profile)); ok {
 			fmt.Fprintf(stdout, "already registered as %s with %s (%s): kept, nothing sent to the hub\n", m.MachineID, m.HubURL, m.Profile)
+			if !*noStart {
+				if _, up := statusLine(paths, time.Now()); !up && !listening(agentPort()) {
+					startAfterRegister(paths, stdout, stderr)
+				}
+			}
 			return 0
 		}
 		*force = true // another hub or profile, or no file: a new registration replaces what is there
@@ -195,6 +211,9 @@ func cmdRegister(args []string, paths cliPaths, stdout, stderr io.Writer) int {
 		return 1
 	}
 	fmt.Fprintf(stdout, "registered as %s with %s (%s); keys are in %s\n", m.MachineID, m.HubURL, m.Profile, *machineFile)
+	if !*noStart && *machineFile == paths.machineFile {
+		startAfterRegister(paths, stdout, stderr)
+	}
 	return 0
 }
 
@@ -311,7 +330,14 @@ func statusLine(paths cliPaths, now time.Time) (string, bool) {
 	}
 	st, err := ReadLinkState(LinkStatePath(paths.dataDir))
 	if err != nil || !st.Fresh(now) || st.MachineID != m.MachineID {
-		return fmt.Sprintf("registered as %s with %s, but the agent is not running", m.MachineID, m.HubURL), false
+		how := startCommand(paths.dataDir)
+		if scope, ok := unitScope(paths.home); ok {
+			how = "systemctl " + scope + " restart " + agentUnit
+			if scope == "" {
+				how = "sudo systemctl restart " + agentUnit
+			}
+		}
+		return fmt.Sprintf("registered as %s with %s, but the agent is not running; start it with: %s", m.MachineID, m.HubURL, how), false
 	}
 	if st.Linked {
 		return fmt.Sprintf("linked to %s as %s", m.HubURL, m.MachineID), true

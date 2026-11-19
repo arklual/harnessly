@@ -10,8 +10,8 @@ import type {
   ResourcePlan,
   RestartWhat,
 } from '../../../org/api/machines';
-import { ago, BUSY_TEXT, plural } from '../../../org/screens/machines/format';
-import { fromUsd } from '../../../org/screens/overview/format';
+import { ago, BUSY_TEXT, plural } from '../../../org/format/machines';
+import { fromUsd } from '../../../org/format/overview';
 import { HOT_PCT, isHot } from '../../charts/geometry';
 
 export type RowSt = 'on' | 'idle' | 'off';

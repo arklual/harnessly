@@ -3,7 +3,7 @@
 import { type CSSProperties, useState } from 'react';
 
 import type { MemberRole, Person, TeamBlock, TeamsView } from '../../../org/api/teams';
-import { kRub, needsText, people as peopleText } from '../../../org/screens/teams/format';
+import { kRub, needsText, people as peopleText } from '../../../org/format/teams';
 import { useOrg } from '../../../org/context';
 import { navigate } from '../../../lib/router';
 import { Btn, Drawer, initial } from '../../ui';

@@ -1,13 +1,11 @@
 // The building blocks of the screens, in the look of the mockup. They hold no data of their own.
-import { type ReactNode, useId, useState } from 'react';
+import { type ReactNode } from 'react';
 
-import { Button, cx, Spinner } from '@kit';
+import { Button } from '@kit';
 
 import { useCopy } from '../lib/hooks';
-import type { ApiError } from '../lib/api';
-import { errorText } from '../lib/errors';
 import { t } from '../lib/i18n';
-import { Check, CircleCheck, CircleQuestionMark, Copy, ExternalLink, Info, TriangleAlert } from './icons';
+import { Check, CircleCheck, Copy, Info, TriangleAlert } from './icons';
 
 export const Label = ({ children, required }: { children: ReactNode; required?: boolean }) => (
   <span className="hub-label">
@@ -23,31 +21,6 @@ export const Label = ({ children, required }: { children: ReactNode; required?: 
 export const Note = ({ children }: { children: ReactNode }) => <p className="hub-note">{children}</p>;
 
 export const Or = ({ children }: { children: ReactNode }) => <div className="hub-or">{children}</div>;
-
-export const LinkButton = ({
-  children,
-  onClick,
-  disabled,
-  danger,
-  icon,
-}: {
-  children: ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-  danger?: boolean;
-  icon?: ReactNode;
-}) => (
-  <button
-    type="button"
-    className="hub-link"
-    onClick={onClick}
-    disabled={disabled}
-    data-danger={danger || undefined}
-  >
-    {icon}
-    {children}
-  </button>
-);
 
 export type MsgTone = 'danger' | 'warn' | 'success' | 'info';
 
@@ -78,13 +51,6 @@ export const Msg = ({
 );
 
 export const Card = ({ children }: { children: ReactNode }) => <div className="hub-card">{children}</div>;
-
-export const StepLine = ({ n, children }: { n: number; children: ReactNode }) => (
-  <div className="hub-stepline">
-    <b>{n}</b>
-    <span>{children}</span>
-  </div>
-);
 
 /** A command or a key in a mono box with a copy button that turns into a check for a moment. */
 export const CopyBox = ({
@@ -126,58 +92,11 @@ export const CodeLine = ({ text }: { text: string }) => (
   </div>
 );
 
-/** A command with an «open» button instead of «copy». */
-export const LinkBox = ({ url, onOpen, label }: { url: string; onOpen: () => void; label: string }) => (
-  <div className="hub-cmd" data-wrap>
-    <code>{url}</code>
-    <Button
-      appearance="ghost"
-      size="xs"
-      className="k-btn--icon"
-      aria-label={label}
-      title={label}
-      onClick={onOpen}
-    >
-      <ExternalLink size={16} />
-    </Button>
-  </div>
-);
-
 export const Waiting = ({ children }: { children: ReactNode }) => (
   <span className="hub-wait" role="status">
     <span className="hub-pulse" />
     {children}
   </span>
-);
-
-export type CheckState = 'wait' | 'run' | 'ok' | 'fail';
-
-export interface CheckRow {
-  id: string;
-  label: string;
-  state: CheckState;
-  detail?: string | null;
-}
-
-const CHECK_ICON: Record<CheckState, ReactNode> = {
-  wait: <CircleCheck size={16} />,
-  run: <Spinner size="s" />,
-  ok: <CircleCheck size={16} />,
-  fail: <TriangleAlert size={16} />,
-};
-
-export const Checks = ({ rows }: { rows: CheckRow[] }) => (
-  <ul className="hub-checks">
-    {rows.map((r) => (
-      <li key={r.id} className="hub-check" data-st={r.state}>
-        {CHECK_ICON[r.state]}
-        <span>
-          {r.label}
-          {r.detail && <span className="hub-check__d">{r.detail}</span>}
-        </span>
-      </li>
-    ))}
-  </ul>
 );
 
 /** A row of mutually exclusive choices drawn as one pill (not a native select). */
@@ -213,102 +132,6 @@ export const Pill = ({ children, tone }: { children: ReactNode; tone?: 'muted' |
   </span>
 );
 
-export interface Tip {
-  title: string;
-  lines: string[];
-}
-
-/** The «?» of an option and the hint it opens above the row (on hover, focus or a tap). */
-const TipButton = ({ tip, open, onToggle }: { tip: Tip; open: boolean; onToggle: () => void }) => {
-  const id = useId();
-  return (
-    <>
-      <button
-        type="button"
-        className="hub-help"
-        aria-label={t('common.whenToChoose')}
-        aria-expanded={open}
-        aria-describedby={id}
-        onClick={onToggle}
-      >
-        <CircleQuestionMark size={16} />
-      </button>
-      <span className="hub-pop" role="tooltip" id={id}>
-        <b>{tip.title}</b>
-        {tip.lines.map((l) => (
-          <span key={l} className="hub-pop__i">
-            {l}
-          </span>
-        ))}
-      </span>
-    </>
-  );
-};
-
-export interface WayProps {
-  icon: ReactNode;
-  title: string;
-  sub: string;
-  on: boolean;
-  off?: boolean;
-  tag?: string;
-  tip?: Tip;
-  hero?: boolean;
-  onPick: () => void;
-}
-
-/** One way to connect a machine: the big card or a row of the list. */
-export const Way = ({ icon, title, sub, on, off, tag, tip, hero, onPick }: WayProps) => {
-  const [tipOpen, setTipOpen] = useState(false);
-  return (
-    <div className="hub-optw" data-open={tipOpen || undefined}>
-      <button
-        type="button"
-        className={hero ? 'hub-hero' : 'hub-opt'}
-        aria-pressed={on}
-        aria-disabled={off || undefined}
-        onClick={() => {
-          if (!off) onPick();
-        }}
-      >
-        <span className="hub-ic">{icon}</span>
-        <span className="hub-t">
-          {hero ? <b>{title}</b> : <span className="hub-t__n">{title}</span>}
-          <span>{sub}</span>
-        </span>
-        {off ? <Pill tone="muted">{t('common.unavailable')}</Pill> : tag && <Pill>{tag}</Pill>}
-      </button>
-      {tip && <TipButton tip={tip} open={tipOpen} onToggle={() => setTipOpen((v) => !v)} />}
-    </div>
-  );
-};
-
-/** A choice with an icon, a name and a line under it (the isolation profiles). */
-export const Choice = ({
-  icon,
-  title,
-  sub,
-  on,
-  tag,
-  onPick,
-}: {
-  icon: ReactNode;
-  title: string;
-  sub: string;
-  on: boolean;
-  tag?: string;
-  onPick: () => void;
-}) => (
-  <button type="button" className={cx('hub-opt', 'hub-opt--plain')} aria-pressed={on} onClick={onPick}>
-    <span className="hub-ic">{icon}</span>
-    <span className="hub-t">
-      <span className="hub-t__n">{title}</span>
-      <span>{sub}</span>
-    </span>
-    {tag && <Pill>{tag}</Pill>}
-  </button>
-);
-
 export const Sure = ({
   on,
   onToggle,
@@ -333,28 +156,3 @@ export const ListSkeleton = ({ rows = 2 }: { rows?: number }) => (
     ))}
   </div>
 );
-
-/** What a list shows until its first answer: skeleton rows, or the failure with a retry when it did not come. */
-export const Pending = ({
-  error,
-  onRetry,
-  rows,
-}: {
-  error: ApiError | null;
-  onRetry: () => void;
-  rows: number;
-}) => {
-  if (!error) return <ListSkeleton rows={rows} />;
-  return (
-    <Msg
-      tone="danger"
-      action={
-        <button type="button" className="hub-link" onClick={onRetry}>
-          {t('common.retry')}
-        </button>
-      }
-    >
-      {errorText(error)}
-    </Msg>
-  );
-};

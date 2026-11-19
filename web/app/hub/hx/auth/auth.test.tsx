@@ -6,7 +6,7 @@ import type { Config } from '../../lib/types';
 
 const state = vi.hoisted(() => ({ flow: {} as Record<string, unknown>, peek: vi.fn(), me: null as unknown }));
 
-vi.mock('../../screens/auth-flow', () => ({ useAuthFlow: () => state.flow }));
+vi.mock('./flow', () => ({ useAuthFlow: () => state.flow }));
 vi.mock('../../lib/env', () => ({ useApi: () => ({ invites: { peek: state.peek, accept: vi.fn() } }) }));
 vi.mock('../../lib/session', () => ({ useSession: () => ({ me: state.me, reload: vi.fn() }) }));
 vi.mock('@kit', () => ({ useTheme: () => ({ resolved: 'light', setMode: vi.fn() }) }));

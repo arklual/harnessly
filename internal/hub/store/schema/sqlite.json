@@ -7957,6 +7957,13 @@
       ],
       "indexes": [
         {
+          "name": "usage_calls_machine_ts",
+          "columns": [
+            "machine_id",
+            "ts"
+          ]
+        },
+        {
           "name": "usage_calls_session",
           "columns": [
             "org_key",

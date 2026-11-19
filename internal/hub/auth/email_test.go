@@ -37,7 +37,7 @@ func TestEmailSignInAndOut(t *testing.T) {
 	}
 	var in SignedIn
 	res.json(&in)
-	if !in.IsNew || in.Next != "/new" || in.User.Email != "ann@example.com" || !in.User.IsAdmin {
+	if !in.IsNew || in.Next != "/" || in.User.Email != "ann@example.com" || !in.User.IsAdmin {
 		t.Errorf("signed in: %+v", in)
 	}
 	var cookie *http.Cookie

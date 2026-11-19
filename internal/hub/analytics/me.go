@@ -3,11 +3,13 @@
 package analytics
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"slices"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -546,18 +548,22 @@ func kSessionsOf(ctx context.Context, st store.Store, loc *time.Location, ss []s
 		ks[i] = kSession{UserID: x.UserID, Start: x.StartedAt, End: end, M: metricsOf(x.Metrics), PaidMicros: m.paid, ListMicros: m.list,
 			NoMoney: orgMoney && x.Funding != store.FundingOrg}
 	}
+	// startedIn finds a period's sessions by their start.
+	slices.SortStableFunc(ks, func(a, b kSession) int { return cmp.Compare(a.Start, b.Start) })
 	return ks, nil
 }
 
-// startedIn is the sessions started in [a, b).
+// startedIn is the sessions started in [a, b) of ks sorted by start (kSessionsOf): two binary searches, no copy. The
+// screens ask it for every day of every spark of every KPI, a few hundred times an answer, once per change on the
+// effects screen; a scan of all the sessions each time made that screen take seconds.
 func startedIn(ks []kSession, a, b time.Time) []kSession {
-	var out []kSession
-	for _, k := range ks {
-		if k.Start >= a.UnixMilli() && k.Start < b.UnixMilli() {
-			out = append(out, k)
-		}
+	lo, hi := a.UnixMilli(), b.UnixMilli()
+	i := sort.Search(len(ks), func(i int) bool { return ks[i].Start >= lo })
+	j := i + sort.Search(len(ks)-i, func(j int) bool { return ks[i+j].Start >= hi })
+	if i >= j {
+		return nil
 	}
-	return out
+	return ks[i:j:j]
 }
 
 // kpisFrom is the KPI of sp against cmp, the noise from the noiseWeeks weeks before sp.

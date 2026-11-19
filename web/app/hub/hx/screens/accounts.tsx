@@ -11,7 +11,7 @@ import { useLoad } from '../../org/hooks';
 import { Head } from '../shell';
 import { Btn, Drawer, Icon, initial } from '../ui';
 import { inRubles, shownOfUsd } from '../../org/money';
-import { fromUsdExact } from '../../org/screens/overview/format';
+import { fromUsdExact } from '../../org/format/overview';
 import { plural, rub, usd } from './overview/fmt';
 import { useUrl } from './teams/url';
 import '../styles/accounts.css';

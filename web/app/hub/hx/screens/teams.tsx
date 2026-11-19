@@ -9,7 +9,7 @@ import { Redirect } from '../../lib/router';
 import { useOrg } from '../../org/context';
 import type { TenantInvite } from '../../org/api/tenant';
 import { orgErrorText } from '../../org/api/errors';
-import { people as peopleText, kRub } from '../../org/screens/teams/format';
+import { people as peopleText, kRub } from '../../org/format/teams';
 import { Btn, Icon, initial } from '../ui';
 import { Head } from '../shell';
 import { InviteSheet, NewTeamSheet } from './teams/extra';

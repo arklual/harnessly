@@ -7,7 +7,6 @@ import { createOrgApi } from '../../org/api';
 import { orgErrorText } from '../../org/api/errors';
 import type { LooseSpace } from '../../org/api/onboarding';
 import { dataMode, mockRole } from '../../org/mode';
-import { deferOrgStep } from '../../org/step';
 import { Btn, Icon } from '../ui';
 import { AuthFrame, Note } from './frame';
 
@@ -63,16 +62,12 @@ export const HxOrgNew = () => {
         spaceIds: [...picked],
         ...(picked.size === 0 ? { tenantName: tenantClean } : {}),
       });
-      navigate(`/o/${slug}/all/overview`);
+      // A new organization has no machine yet: the first step is to connect one.
+      navigate(picked.size === 0 ? `/o/${slug}/all/machines?add=machine` : `/o/${slug}/all/overview`);
     } catch (e) {
       setError(orgErrorText(e));
       setBusy(false);
     }
-  };
-
-  const later = () => {
-    deferOrgStep();
-    navigate('/', { replace: true });
   };
 
   return (
@@ -146,9 +141,6 @@ export const HxOrgNew = () => {
         <div className="hxa__actions">
           <Btn type="submit" variant="primary" size="lg" busy={busy} disabled={!canCreate}>
             Создать организацию
-          </Btn>
-          <Btn type="button" variant="ghost" size="lg" onClick={later} disabled={busy}>
-            Позже
           </Btn>
         </div>
       </form>

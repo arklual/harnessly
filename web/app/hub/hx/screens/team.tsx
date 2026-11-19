@@ -8,7 +8,7 @@ import { useNow } from '../../lib/hooks';
 import { navigate, Redirect } from '../../lib/router';
 import { useOrg } from '../../org/context';
 import type { MemberRole, Person, TeamBlock, TeamsView } from '../../org/api/teams';
-import { kRub, needsText } from '../../org/screens/teams/format';
+import { kRub, needsText } from '../../org/format/teams';
 import { Btn, Icon, initial, usePop } from '../ui';
 import { Head } from '../shell';
 import { InviteSheet } from './teams/extra';

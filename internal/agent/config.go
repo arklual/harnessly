@@ -125,6 +125,10 @@ func envInt(name string, fallback int) (int, error) {
 	return n, nil
 }
 
+// DefaultAgentPort is the agent's port when neither the environment nor an agent.env names one: the installer's first
+// choice (deploy/install/install.sh, pick_ports).
+const DefaultAgentPort = 18023
+
 // LoadConfig reads the environment.
 func LoadConfig() (Config, error) {
 	home := env("HOME", "")
@@ -136,12 +140,16 @@ func LoadConfig() (Config, error) {
 		home = h
 	}
 	c := Config{Home: home}
+	// Started by hand (a container without systemd, a tmux pane), the agent finds the ports and folders the installer
+	// wrote for its unit; with none, the installer's own first choice.
+	loadEnvKeys(systemEnvFiles(home), runEnvKeys, func(k string) (string, bool) { v, ok := os.LookupEnv(k); return v, ok && v != "" },
+		func(k, v string) { _ = os.Setenv(k, v) })
 	var err error
-	if c.Port, err = envInt("AGENT_PORT", 0); err != nil {
+	if c.Port, err = envInt("AGENT_PORT", DefaultAgentPort); err != nil {
 		return c, err
 	}
-	if c.Port == 0 {
-		return c, fmt.Errorf("AGENT_PORT is not set")
+	if c.Port <= 0 {
+		return c, fmt.Errorf("AGENT_PORT must be a port number, not %d", c.Port)
 	}
 	scanMs, err := envInt("AGENT_SCAN_MS", 30_000)
 	if err != nil {

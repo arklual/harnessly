@@ -45,7 +45,7 @@ import type {
   Week,
 } from '../analytics';
 import { monthPeriod, type LimitHistory, type LimitWindow } from '../analytics';
-import { formatValue } from '../../screens/analytics/format';
+import { formatValue } from '../../format/analytics';
 import { spentOf } from '../../money';
 import { contractGet, http, orgPath } from './http';
 import { signalGo } from './signal-go';

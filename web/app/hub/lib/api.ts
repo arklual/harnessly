@@ -4,26 +4,17 @@
 import type { NetworkPolicy } from './network';
 import type { RolloutSwitch, SwitchKey, SwitchPut } from './switches';
 import type {
-  AgentStatus,
   AppToken,
-  CLIStatus,
   DeviceRequest,
   Config,
-  Envelope,
   Invite,
-  KeyCheck,
   Machine,
   MachineCode,
   Me,
   Member,
   OnboardingStep,
   Passkey,
-  PreflightReport,
   Profile,
-  Provider,
-  ProviderCheck,
-  ProxyScope,
-  ProxySummary,
   Role,
   SignedIn,
   Site,
@@ -33,7 +24,6 @@ import type {
   SpaceApp,
   SpaceRef,
   User,
-  Login,
 } from './types';
 
 export type ApiErrorCode =
@@ -271,11 +261,6 @@ export const createApi = (fetcher: Fetcher = (input, init) => fetch(input, init)
     },
 
     spaces: {
-      create: (name: string) => post<{ space: Space }>('/api/spaces', { name }),
-      /** A tenant made in the organization in one step; the same requestId again returns the same tenant. */
-      createInOrg: (org: string, name: string, requestId: string) =>
-        post<{ space: Space }>(`/api/orgs/${enc(org)}/tenants`, { name, requestId }),
-      get: (id: string) => get<{ space: Space }>(`/api/spaces/${enc(id)}`),
       bySlug: (slug: string) => get<{ space: Space }>(`/api/spaces/by-slug/${enc(slug)}`),
       update: (id: string, patchBody: { name?: string; onboardingStep?: OnboardingStep }) =>
         patch<{ space: Space }>(`/api/spaces/${enc(id)}`, patchBody),
@@ -321,74 +306,11 @@ export const createApi = (fetcher: Fetcher = (input, init) => fetch(input, init)
         }),
       claimLocal: (spaceId: string) =>
         post<{ machine: Machine }>(`/api/spaces/${enc(spaceId)}/machines/local`),
-      ssh: (
-        spaceId: string,
-        req: {
-          host: string;
-          port: number;
-          user: string;
-          profile: Profile;
-          confirmFull: boolean;
-          hostKeyFingerprint?: string;
-        },
-      ) =>
-        post<{ jobId: string }>(`/api/spaces/${enc(spaceId)}/machines/ssh`, {
-          host: req.host,
-          port: req.port,
-          user: req.user,
-          profile: req.profile,
-          ...(req.confirmFull ? { confirmFull: true } : {}),
-          ...(req.hostKeyFingerprint ? { hostKeyFingerprint: req.hostKeyFingerprint } : {}),
-        }),
-      sshKey: (spaceId: string) => get<{ publicKey: string }>(`/api/spaces/${enc(spaceId)}/machines/ssh`),
-      get: (id: string) => get<{ machine: Machine }>(`/api/machines/${enc(id)}`),
-      rename: (id: string, name: string) => patch<{ machine: Machine }>(`/api/machines/${enc(id)}`, { name }),
-      remove: (id: string) => del(`/api/machines/${enc(id)}`),
       // path: an address under the machine's page to open (`/m/<id>/…`), else its start.
       open: (id: string, path?: string) =>
         get<{ url: string }>(
           `/api/machines/${enc(id)}/open${path ? `?${new URLSearchParams({ path }).toString()}` : ''}`,
         ),
-      preflight: (id: string) => post<{ preflight: PreflightReport }>(`/api/machines/${enc(id)}/preflight`),
-    },
-
-    agents: {
-      list: (id: string, refresh = false) =>
-        get<{ agents: AgentStatus[]; clis?: CLIStatus[] }>(`/api/machines/${enc(id)}/agents`, {
-          refresh: refresh ? 1 : undefined,
-        }),
-      install: (id: string, provider: Provider, from?: 'provider') =>
-        post<{ jobId: string }>(`/api/machines/${enc(id)}/agents/${provider}/install`, from ? { from } : {}),
-      check: (id: string, provider: Provider, proxyUrl?: string) =>
-        post<{ check: ProviderCheck }>(
-          `/api/machines/${enc(id)}/agents/${provider}/check`,
-          proxyUrl ? { proxyUrl } : {},
-        ),
-      login: (id: string, provider: string, method: 'link' | 'console') =>
-        post<{ login: Login }>(`/api/machines/${enc(id)}/agents/${enc(provider)}/login`, { method }),
-      loginCode: (id: string, loginId: string, code: string) =>
-        post<void>(`/api/machines/${enc(id)}/logins/${enc(loginId)}/code`, { code }),
-      loginCancel: (id: string, loginId: string) => del(`/api/machines/${enc(id)}/logins/${enc(loginId)}`),
-      deliverKey: (id: string, provider: Provider, envelope: Envelope) =>
-        post<{ check: KeyCheck }>(`/api/machines/${enc(id)}/agents/${provider}/key`, { envelope }),
-      verifyKey: (id: string, provider: Provider) =>
-        post<{ check: KeyCheck }>(`/api/machines/${enc(id)}/agents/${provider}/key/verify`),
-    },
-
-    proxy: {
-      get: (id: string) => get<{ proxy: ProxySummary }>(`/api/machines/${enc(id)}/proxy`),
-      set: (id: string, scope: ProxyScope, url: string) =>
-        put<{ proxy: ProxySummary }>(`/api/machines/${enc(id)}/proxy`, { scope, url }),
-      clear: (id: string, scope: ProxyScope) =>
-        del<{ proxy: ProxySummary }>(`/api/machines/${enc(id)}/proxy`, { scope }),
-    },
-
-    env: {
-      deliver: (id: string, name: string, envelope: Envelope) =>
-        post<{ env: string[] }>(`/api/machines/${enc(id)}/env`, { name, envelope }),
-      remove: (id: string, name: string) =>
-        del<{ env: string[] }>(`/api/machines/${enc(id)}/env/${enc(name)}`),
-      gitKey: (id: string) => post<{ publicKey: string }>(`/api/machines/${enc(id)}/gitkey`),
     },
   };
 };
@@ -403,4 +325,3 @@ export const oauthStartUrl = (
 ): string => withQuery(`/api/auth/oauth/${enc(provider)}/start`, { intent, next });
 
 /** The URL of a space's event stream. */
-export const eventsUrl = (spaceId: string): string => `/api/spaces/${enc(spaceId)}/events`;

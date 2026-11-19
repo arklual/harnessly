@@ -52,7 +52,10 @@ export const orgMachineOf = (raw: HubMachine, view: OrgView): OrgMachine => {
   const x = raw as unknown as WireExtras;
   const rent = rentOf(x.cloud);
   const hw = x.hardware ?? null;
-  const owner = m.access.length === 1 && m.access[0]?.kind === 'user' ? m.access[0] : null;
+  // Only its owner may use it: a personal machine. Who the owner is the hub says itself (a machine handed over keeps
+  // its access list, so the list alone would call it shared and ownerless).
+  const only = m.access.length === 1 && m.access[0]?.kind === 'user' ? m.access[0] : null;
+  const owner = m.owner ? { id: m.owner.userId, label: m.owner.name } : only;
   const tenant = view.tenants.find((t) => t.id === m.tenantId);
   const team = view.teams.find((t) => t.id === m.teamId);
   const state = stateOf(m);
@@ -65,7 +68,7 @@ export const orgMachineOf = (raw: HubMachine, view: OrgView): OrgMachine => {
     ownerName: owner?.label ?? null,
     ownerId: owner?.id ?? null,
     purpose: null,
-    kind: owner ? 'personal' : 'shared',
+    kind: only ? 'personal' : 'shared',
     tenantId: m.tenantId,
     tenantSlug: tenant?.slug ?? '',
     tenantName: tenant?.name ?? '',

@@ -44,8 +44,11 @@ func (s *Service) trust(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) e
 	p := t.Person
 	ctx := r.Context()
 	m := *t.Machine
-	if s.cfg.SubdomainMode() || !s.cfg.MachineTrust {
-		return httpx.Conflict("trust_unavailable", "На этом хабе доверять машине не нужно или нельзя: у неё свой адрес (HUB_RUNTIME_DOMAIN) либо доверие выключено (HUB_MACHINE_TRUST)")
+	if s.cfg.SubdomainMode() {
+		return httpx.Conflict("trust_unavailable", "Доверять машине не нужно: у машин этого хаба свой адрес, и их страницы открываются отдельно от хаба")
+	}
+	if !s.cfg.MachineTrust {
+		return httpx.Conflict("trust_unavailable", "Доверие машинам на этом хабе выключено: машины открываются, только если их подключил администратор хаба")
 	}
 	if r.Method == http.MethodDelete {
 		if err := s.db.S().UntrustMachine(ctx, m.ID); err != nil {

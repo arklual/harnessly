@@ -186,7 +186,9 @@ func New(t *testing.T, opts ...Option) *Stack {
 	// HUB_SMTP_URL stands for the stack's own mailer (s.Mail takes the place of the SMTP server): a hub on https or in the
 	// cloud edition does not start without one.
 	env := map[string]string{"HUB_PUBLIC_URL": s.URL, "HUB_DATA_DIR": t.TempDir(), "HUB_PASSKEY": "off", "HUB_DIST_DIR": s.DistDir,
-		"HUB_SMTP_URL": "smtp://mail.hubtest.invalid:587", "HUB_RATES_URL": "off", "HUB_ANALYTICS_CACHE": "0"}
+		"HUB_SMTP_URL": "smtp://mail.hubtest.invalid:587", "HUB_RATES_URL": "off", "HUB_ANALYTICS_CACHE": "0",
+		// The tests were written against a hub without organizations; the ones about organizations switch them on.
+		"HUB_ORGS": "off"}
 	// HUB_TEST_STORE_S3_BUCKET puts the contents of every stack's store into that bucket of the S3-compatible service the
 	// rigs already know (HUB_TEST_S3_ENDPOINT and its keys), each stack under a prefix of its own: the tests of reading
 	// with the machine off then run against a bucket, as the deployment does, not against a folder.

@@ -6,7 +6,7 @@ import { orgErrorText } from '../../../org/api/errors';
 import type { AuditEntry, TeamsView } from '../../../org/api/teams';
 import type { TenantDeletePlan, TenantMember, TenantRole } from '../../../org/api/tenant';
 import { useOrg } from '../../../org/context';
-import { ago, BLOCKER, describe, kRub, needsText, REMOVES } from '../../../org/screens/teams/format';
+import { ago, BLOCKER, describe, kRub, needsText, REMOVES } from '../../../org/format/teams';
 import type { TenantRef } from '../../../org/types';
 import { Btn, Drawer, Icon, initial } from '../../ui';
 import { ConfirmDialog } from './confirm';

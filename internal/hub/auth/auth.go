@@ -312,11 +312,8 @@ func (s *Service) nextFor(ctx context.Context, u store.User, asked string) strin
 	if n := SafeNext(asked); n != "" {
 		return n
 	}
-	spaces, err := s.db.S().SpacesByUser(ctx, u.ID)
-	if err != nil || len(spaces) == 0 {
-		return "/new"
-	}
-	return "/s/" + spaces[len(spaces)-1].Slug
+	// The hub's own landing picks the organization, or leads to making the first one.
+	return "/"
 }
 
 // SafeNext returns next when it is a path on this site, else "". A redirect target taken from a request must never

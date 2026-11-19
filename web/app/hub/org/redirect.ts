@@ -10,7 +10,8 @@ import type { Section } from './types';
 export const sectionForSpaceRoute = (route: string, step?: string): Section | null => {
   if (route === '/s/:slug') return 'overview';
   if (route === '/s/:slug/settings') return 'teams';
-  if (route === '/s/:slug/setup/:step' && step === 'machines') return 'machines';
+  // Setting a space up is connecting its machines now: the agents and access steps are on the organization's screens.
+  if (route === '/s/:slug/setup/:step') return step === 'machines' ? 'machines' : 'overview';
   return null;
 };
 

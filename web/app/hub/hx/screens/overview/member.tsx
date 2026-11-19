@@ -7,7 +7,7 @@ import type { OverviewPeriod } from '../../../org/api/overview';
 import { navigate } from '../../../lib/router';
 import { useAction } from '../../../org/hooks';
 import { monthWord } from '../../../org/dates';
-import { resetText } from '../../../org/screens/overview/format';
+import { resetText } from '../../../org/format/overview';
 import { Icon } from '../../ui';
 import { limitView, splitRows } from './calc';
 import {

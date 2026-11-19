@@ -888,7 +888,7 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 			bad("HUB_METRICS_LISTEN must be a listener of its own, not HUB_LISTEN or HUB_REPLICA_LISTEN: /metrics is served without sign-in")
 		}
 	}
-	switch c.Orgs = strings.ToLower(def("HUB_ORGS", OrgsOff)); c.Orgs {
+	switch c.Orgs = strings.ToLower(def("HUB_ORGS", OrgsOn)); c.Orgs {
 	case OrgsOff, OrgsOn:
 	case "shadow":
 		bad("HUB_ORGS=shadow is no longer a value: set on (organizations for everyone) or off")

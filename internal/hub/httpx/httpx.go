@@ -61,7 +61,7 @@ var (
 // ErrMachineUntrusted is a machine that may not run on the hub's own origin: a hub without HUB_RUNTIME_DOMAIN opens only
 // the machines its administrators connected.
 var ErrMachineUntrusted = New(http.StatusForbidden, "machine_untrusted",
-	"Хаб работает без отдельного адреса для машин (HUB_RUNTIME_DOMAIN), поэтому открывает только машины, подключённые его администратором. Администратору нужно задать HUB_RUNTIME_DOMAIN или (при HUB_MACHINE_TRUST=on) владелец пространства может довериться этой машине")
+	"Машине пока не доверяют: её страница открывается на адресе хаба, поэтому хаб пускает только доверенные машины. Владелец тенанта может довериться ей в карточке машины")
 
 // Invalid is a 400 invalid_request about one field.
 func Invalid(field, message string) *Error {

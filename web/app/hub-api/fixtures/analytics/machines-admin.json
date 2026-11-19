@@ -29,6 +29,10 @@
         }
       ],
       "access": [],
+      "owner": {
+        "userId": "u2borisaaaaaaaaaaaaa",
+        "name": "Борис"
+      },
       "problems": ["offline"],
       "opensRuntime": true,
       "canSeeDebug": true,
@@ -58,6 +62,7 @@
       "chatsRunning": 0,
       "people": [],
       "access": [],
+      "owner": null,
       "problems": ["disabled"],
       "opensRuntime": true,
       "canSeeDebug": true,
@@ -97,6 +102,7 @@
           "label": "Платформа"
         }
       ],
+      "owner": null,
       "problems": [],
       "opensRuntime": true,
       "canSeeDebug": true,
@@ -189,6 +195,7 @@
           "label": "Глеб"
         }
       ],
+      "owner": null,
       "problems": [],
       "opensRuntime": true,
       "canSeeDebug": true,

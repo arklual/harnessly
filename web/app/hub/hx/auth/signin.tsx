@@ -1,9 +1,9 @@
-// /signin and /signup on the new hub's kit. The logic is the old screen's (screens/auth-flow.ts); the buttons come from
+// /signin and /signup on the new hub's kit. The logic is in flow.ts; the buttons come from
 // /api/config: passkey, GitHub, Яндекс, every OpenID provider and, always, e-mail.
 import { clock } from '../../lib/format';
 import { t } from '../../lib/i18n';
 import { Link } from '../../lib/router';
-import { useAuthFlow } from '../../screens/auth-flow';
+import { useAuthFlow } from './flow';
 import { Btn, Icon } from '../ui';
 import { AuthFrame, Note, Or, Problem } from './frame';
 import { HxOtp } from './otp';
