@@ -72,9 +72,10 @@ const pickerAgent = (agent: MachineAgent): IPickerAgent => ({
   provider: agent.provider,
   ...NAMES[agent.provider],
   ...(agent.provider === 'antigravity' ? { short: `Antigravity · ${t('next.agents.experimental')}` } : {}),
-  models: agent.provider === 'antigravity'
-    ? agent.models.map((model) => ({ ...model, fast: false, ultracode: false }))
-    : agent.models,
+  models:
+    agent.provider === 'antigravity'
+      ? agent.models.map((model) => ({ ...model, fast: false, ultracode: false }))
+      : agent.models,
   canSwitch: agent.provider !== 'antigravity' && agent.canSwitchModel,
   ...(agent.defaultPermission ? { defaultPermission: agent.defaultPermission } : {}),
   available: agent.status === 'ready' && agent.models.length > 0,
@@ -111,7 +112,7 @@ export const modelLine = (agent: IPickerAgent, model: string | null): string => 
 
 /** The groups of the agent's profiles that have a key and models, after Claude and Codex. */
 const profileAgents = (agent: MachineAgent): IPickerAgent[] =>
-  (agent.provider === 'antigravity' ? [] : agent.profiles ?? [])
+  (agent.provider === 'antigravity' ? [] : (agent.profiles ?? []))
     .filter((p) => p.configured && p.models.length > 0)
     .map((p) => ({
       provider: agent.provider,
@@ -141,10 +142,11 @@ export const removedKeyOf = (
 };
 
 /** What signs an agent in on the machine, typed in a terminal there. */
-export const LOGIN_COMMANDS = { claude: 'claude auth login', codex: 'codex login', antigravity: 'agy acp --login' } as const satisfies Record<
-  Provider,
-  string
->;
+export const LOGIN_COMMANDS = {
+  claude: 'claude auth login',
+  codex: 'codex login',
+  antigravity: 'agy acp --login',
+} as const satisfies Record<Provider, string>;
 
 /** No agent of the machine can start a chat, and at least one is installed but signed out: the person has to sign in
  *  (a chat started now would wait for an agent that never answers). */
@@ -163,7 +165,10 @@ export const pickerAgentOf = (
   provider: Provider,
   profile: string | null = null,
 ): IPickerAgent | null => {
-  if (profile !== null) return provider === 'antigravity' ? null : pickerAgents(agents).find((a) => a.profile === profile) ?? null;
+  if (profile !== null)
+    return provider === 'antigravity'
+      ? null
+      : (pickerAgents(agents).find((a) => a.profile === profile) ?? null);
   const agent = agents.find((a) => a.provider === provider);
   return agent ? pickerAgent(agent) : null;
 };

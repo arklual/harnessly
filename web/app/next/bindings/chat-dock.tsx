@@ -673,7 +673,11 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         }
         slash={slash}
         attachments={uploads.attachments}
-        onFiles={provider === 'antigravity' ? () => toast(t('next.agents.noNativeAttachments'), { tone: 'info' }) : uploads.onFiles}
+        onFiles={
+          provider === 'antigravity'
+            ? () => toast(t('next.agents.noNativeAttachments'), { tone: 'info' })
+            : uploads.onFiles
+        }
         onRemoveAttachment={uploads.onRemove}
         onRetryAttachment={uploads.onRetry}
         refs={refChips}

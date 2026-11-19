@@ -27,7 +27,12 @@ export const chainVersions = (
     const path = job.paths[job.paths.length - 1];
     if (path === undefined || known.has(path)) continue;
     known.add(path);
-    out.push({ ...(job.provider ? { provider: job.provider } : {}), id: path, src: srcOf(path), clear: job.mode === CUT_MODE ? true : undefined });
+    out.push({
+      ...(job.provider ? { provider: job.provider } : {}),
+      id: path,
+      src: srcOf(path),
+      clear: job.mode === CUT_MODE ? true : undefined,
+    });
   }
   return out;
 };

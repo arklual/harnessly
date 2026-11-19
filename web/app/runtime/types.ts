@@ -1,6 +1,7 @@
 // Shapes the runtime's API answers with (only the fields this page reads).
 
-export type PanelType = 'terminal' | 'claude-code' | 'codex-cli' | 'antigravity-cli' | 'agent-sessions' | 'web-browser' | 'diff';
+export type PanelType =
+  'terminal' | 'claude-code' | 'codex-cli' | 'antigravity-cli' | 'agent-sessions' | 'web-browser' | 'diff';
 export type AgentPanel = 'claude-code' | 'codex-cli' | 'antigravity-cli';
 export type Provider = 'claude' | 'codex' | 'antigravity';
 
