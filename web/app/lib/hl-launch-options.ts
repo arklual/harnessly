@@ -120,7 +120,7 @@ export const CLAUDE_LAUNCH_MODELS = [
   },
 ] as const satisfies readonly ILaunchModel[];
 
-export const PROVIDER_TITLES = { claude: 'Claude', codex: 'Codex' } as const satisfies Record<
+export const PROVIDER_TITLES = { claude: 'Claude', codex: 'Codex', antigravity: 'Antigravity' } as const satisfies Record<
   TAgentProvider,
   string
 >;

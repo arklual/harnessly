@@ -223,7 +223,18 @@ func (c *cli) run(args []string) error {
 		return c.migrate(rest)
 	case "doctor":
 		return c.doctor(rest)
+	case "antigravity":
+		return c.antigravityPrepare(rest)
+	case "antigravity-mcp":
+		if len(rest) != 0 {
+			return usageErr("antigravity-mcp takes no arguments")
+		}
+		return c.antigravityMCP()
 	case "hook":
+		if len(rest) == 2 && rest[0] == "antigravity" {
+			c.antigravityHook(rest[1])
+			return nil
+		}
 		return c.hook(rest)
 	case "upgrade":
 		return c.upgrade(rest)
@@ -665,7 +676,7 @@ func orDash(s string) string {
 	return s
 }
 
-var panelTypes = []string{"terminal", "claude-code", "codex-cli", "agent-sessions", "web-browser", "diff"}
+var panelTypes = []string{"terminal", "claude-code", "codex-cli", "antigravity-cli", "agent-sessions", "web-browser", "diff"}
 
 func (c *cli) tabCreate(args []string) error {
 	notify, test := false, false
@@ -788,6 +799,8 @@ func canonicalPanelType(s string) string {
 		return "claude-code"
 	case "codex", "codex-cli":
 		return "codex-cli"
+	case "antigravity", "antigravity-cli", "agy":
+		return "antigravity-cli"
 	case "browser":
 		return "web-browser"
 	case "shell":

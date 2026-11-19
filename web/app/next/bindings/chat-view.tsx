@@ -323,7 +323,7 @@ const ChatView = ({
 
   // Going on from an earlier message: any of the person's messages but the first of the transcript (nothing before it
   // to go on from), while the machine can.
-  const canRewind = !!record && !!machineView?.features.includes('rewind');
+  const canRewind = !!record && record.provider !== 'antigravity' && !!machineView?.features.includes('rewind');
   const firstTurn = before === null ? (items ?? []).find((item) => item.kind === 'turn')?.key : undefined;
   const agentBusy = BUSY.has(agentState?.k ?? 'unknown');
   const rewindActions = useMemo<IRewindActions | null>(

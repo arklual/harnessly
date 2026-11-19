@@ -278,6 +278,7 @@ const accountLimitsOf = (limits: MachineLimits, profile: string): ProfileLimits 
 
 /** What the owner of a chat's quota has left on the machine; null when the machine does not say. */
 export const limitsOfOwner = (limits: MachineLimits, owner: LimitsOwner): ProviderLimits | null => {
+  if (owner.provider === 'antigravity') return null;
   if (owner.profile === null) return limits[owner.provider];
   if (owner.profile.startsWith(ACCOUNT_PROFILE)) return accountLimitsOf(limits, owner.profile);
   return profileLimitsOf(limits, owner.profile);
@@ -538,7 +539,7 @@ export interface OtherLimits {
   limits: ProviderLimits;
 }
 
-const AGENTS: readonly Provider[] = ['claude', 'codex'];
+const AGENTS = ['claude', 'codex'] as const satisfies readonly Provider[];
 
 /** Every subscription of the machine that has something to show, but the owner's own. Providers added by API are
  *  left to Settings: a chat does not run on them. */

@@ -3,6 +3,7 @@
 // machine, a Sinopia design) while the picture waits blurred. The new version appears among the thumbnails only when
 // the host has it. A run belongs to the picture, not to the window (run-store.ts): closing does not stop it.
 import { useEffect, useState, type ReactNode } from 'react';
+import type { ImageProvider } from '@/next/features/image-edit/host';
 import { EditDock, VersionStrip, type IFailure } from '@/next/features/image-edit/edit-dock';
 import {
   EDIT_MODE,
@@ -164,6 +165,7 @@ const Editor = ({
     setState(s);
   }
   const patch = (change: Partial<ISession>) => setState((now) => ({ ...now, ...change }));
+  const [provider, setProvider] = useState<ImageProvider>(runOf(original.id)?.edit.provider ?? original.provider ?? 'codex');
   const [focusField, setFocusField] = useState(0);
   const run = useRun(original.id);
   const running = run?.state === RUN_STATE.running;
@@ -237,7 +239,8 @@ const Editor = ({
   }, [s.fresh]);
 
   const start = (edit: IImageEdit) => {
-    startRun(original.id, host, edit);
+    if ((edit.provider ?? provider) === 'antigravity' && edit.mode === EDIT_MODE.cut) return;
+    startRun(original.id, host, { ...edit, provider: edit.provider ?? provider });
     patch({ tool: null, marks: NO_MARKS, text: '' });
   };
   const pickTool = (tool: TTool) => {
@@ -276,7 +279,7 @@ const Editor = ({
   const ratio =
     sizing !== undefined ? ratioOfFormat(sizing) : s.natural === null ? undefined : s.natural.w / s.natural.h;
   const failure: IFailure | null =
-    run?.state === RUN_STATE.failed ? { why: run.error, onRetry: () => retryRun(original.id) } : null;
+    run?.state === RUN_STATE.failed ? { why: run.error, provider: run.edit.provider ?? 'codex', onRetry: () => retryRun(original.id) } : null;
 
   const shown: IImageViewItem | null = item === null ? null : { ...item, src: selected.src };
   const overlay = kind !== undefined && !running && (
@@ -329,6 +332,8 @@ const Editor = ({
         ) : (
           <EditDock
             switcher={switcher}
+            provider={running ? run.edit.provider ?? provider : provider}
+            onProvider={setProvider}
             tool={s.tool}
             onTool={pickTool}
             running={running}

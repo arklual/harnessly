@@ -96,8 +96,9 @@ type Deps struct {
 	// ResumeLine is the line that resumes a session in the tab of the tmux session.
 	ResumeLine func(provider, sessionID, session string) (string, error)
 	// ClaudeProjects holds Claude's transcripts, one folder per working folder; CodexSessions holds Codex's.
-	ClaudeProjects string
-	CodexSessions  string
+	ClaudeProjects  string
+	CodexSessions   string
+	AntigravityRoot string
 	// MoreRoots are every folder of each kind the agents of this account were seen to write to (CLAUDE_CONFIG_DIR and
 	// CODEX_HOME of a running agent), ClaudeProjects and CodexSessions among them; nil: those two only.
 	MoreRoots func() (claudeProjects, codexSessions []string)
@@ -552,7 +553,7 @@ func (s *Server) allowedPath(p string) bool {
 		return false
 	}
 	claudeRoots, codexRoots := s.roots()
-	return under(abs, claudeRoots) || under(abs, codexRoots)
+	return under(abs, claudeRoots) || under(abs, codexRoots) || s.isAntigravityPath(abs)
 }
 
 // roots are the folders of each agent's transcripts.
@@ -580,7 +581,7 @@ func (s *Server) isCodexPath(p string) bool {
 
 // resolveJSONLPath is a session's transcript: Codex by its id; Claude in the pane's project folder, else wherever it is.
 func (s *Server) resolveJSONLPath(session, id string, p *Provider) string {
-	if p.ID == agents.Codex {
+	if p.ID == agents.Codex || p.ID == "antigravity" {
 		return p.FindSession(id)
 	}
 	if cwd := s.d.Tmux.SessionCwd(session); cwd != "" {

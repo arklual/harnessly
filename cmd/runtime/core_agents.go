@@ -15,6 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agentnet"
 	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents/antigravity"
 	"github.com/ly-solutions/harnessly/internal/agents/claude"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/catalog"
@@ -31,9 +32,14 @@ import (
 // coreAgents is what the core's routes need of the agent CLIs: whether they can run, the lines that start and resume
 // them, and starting a conversation the platform's way: here with the launch slice on, else by the old runtime.
 type coreAgents struct {
-	checker *preflight.Checker
-	options catalog.LaunchConfig
-	claude  claude.LaunchConfig
+	checker                        *preflight.Checker
+	options                        catalog.LaunchConfig
+	claude                         claude.LaunchConfig
+	antigravity                    antigravity.LaunchConfig
+	nativeStarts                   nativeAntigravityStarts
+	nativeConversation             func(sessionID string) string
+	nativeToken                    func(generation string) (string, error)
+	nativeDataDir, nativeCLIHeader string
 	// codexLauncher is the Codex launcher script; the old runtime writes it, the line only names it.
 	codexLauncher string
 	// launcherScript writes the launcher when it is missing; nil leaves it to the old runtime.
@@ -158,16 +164,20 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 	if input != nil {
 		inputSocket = input.socket
 	}
-	return &coreAgents{
-		codexInput: input,
-		profiles:   profiles,
-		alwaysApps: alwaysApps(apps.Open(c.DataDir)),
-		gpt:        gpt,
-		router:     router,
-		checker:    preflight.Shared(c.Home),
-		envDir:     c.EnvDir,
-		claudeAuth: claudeAuthOf(c.Home, c.EnvDir),
-		options:    options,
+	a := &coreAgents{
+		antigravity:     antigravity.LaunchConfig{Launcher: nativeAntigravityBinary(c.Home), Settings: `{"toolPermission":"request-review"}`},
+		nativeToken:     nativeAntigravityTokenIssuer(c.DataDir),
+		nativeDataDir:   c.DataDir,
+		nativeCLIHeader: firstOf(c.TokenHeaders),
+		codexInput:      input,
+		profiles:        profiles,
+		alwaysApps:      alwaysApps(apps.Open(c.DataDir)),
+		gpt:             gpt,
+		router:          router,
+		checker:         preflight.Shared(c.Home),
+		envDir:          c.EnvDir,
+		claudeAuth:      claudeAuthOf(c.Home, c.EnvDir),
+		options:         options,
 		claude: claude.LaunchConfig{
 			HooksPath:     filepath.Join(c.DataDir, "hooks.json"),
 			MCPConfigPath: filepath.Join(c.DataDir, "preview-mcp.json"),
@@ -203,6 +213,8 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 			InputSocket:      inputSocket,
 		},
 	}
+	a.options.AntigravityOptions = a.antigravityOptions
+	return a
 }
 
 // pluginDirOnce is the skills plugin's folder while it exists (it is written after the runtime starts, and by then the
@@ -366,6 +378,18 @@ func availability(r preflight.Result, panelType string) *layoutapi.Unavailable {
 		}
 		return &layoutapi.Unavailable{Code: "agent-not-installed", ProviderID: agents.Claude, ProviderDisplayName: "Claude Code",
 			PanelType: agents.ClaudePanel, SuggestedCommand: "claude"}
+	case agents.Antigravity:
+		if !nativeAntigravityEnabled() {
+			return &layoutapi.Unavailable{Code: "agent-setup-required", ProviderID: agents.Antigravity, ProviderDisplayName: "Antigravity (experimental)", PanelType: agents.AntigravityPanel}
+		}
+		if r.Antigravity.Installed && r.Antigravity.LoggedIn {
+			return nil
+		}
+		code := "agent-not-installed"
+		if r.Antigravity.Installed {
+			code = "agent-login-required"
+		}
+		return &layoutapi.Unavailable{Code: code, ProviderID: agents.Antigravity, ProviderDisplayName: "Antigravity", PanelType: agents.AntigravityPanel}
 	case agents.Codex:
 		if r.Codex.Installed {
 			return nil
@@ -380,7 +404,7 @@ var (
 	claudeEfforts = []string{"low", "medium", "high", "xhigh", "max", "ultracode"}
 	effortLabels  = map[string]string{"minimal": "Minimal", "low": "Low", "medium": "Medium", "high": "High",
 		"xhigh": "Extra high", "max": "Max", "ultra": "Ultra", "ultracode": "Ultracode"}
-	providerTitles = map[string]string{agents.Claude: "Claude", agents.Codex: "Codex"}
+	providerTitles = map[string]string{agents.Claude: "Claude", agents.Codex: "Codex", agents.Antigravity: "Antigravity"}
 )
 
 // effortNone is the label of "none", the one effort whose label is not the same in every language.
@@ -511,10 +535,15 @@ func (a *coreAgents) envSource(provider string) string {
 func (a *coreAgents) LaunchLine(provider, workspaceID string, launch *agents.Launch) (string, error) {
 	var line string
 	var err error
-	if provider == agents.Codex {
+	switch provider {
+	case agents.Codex:
 		line, err = a.codexLine(workspaceID, "", launch)
-	} else {
+	case agents.Antigravity:
+		line, err = a.antigravityLine(workspaceID, "", launch, nil)
+	case agents.Claude:
 		line, err = a.claude.LaunchCommand(workspaceID, launch, nil)
+	default:
+		return "", errors.New("unknown agent provider")
 	}
 	if err != nil {
 		return "", err
@@ -525,14 +554,23 @@ func (a *coreAgents) LaunchLine(provider, workspaceID string, launch *agents.Lau
 // resumeLine is the line that resumes a conversation, bare: the starter puts the variables of a start and the env files
 // in front of it itself.
 func (a *coreAgents) resumeLine(provider, sessionID, workspaceID string, launch *agents.Launch) (string, error) {
-	if provider == agents.Codex {
+	switch provider {
+	case agents.Codex:
 		return a.codexLine(workspaceID, sessionID, launch)
+	case agents.Antigravity:
+		return a.antigravityLine(workspaceID, sessionID, launch, nil)
+	case agents.Claude:
+		return a.claude.ResumeCommand(sessionID, workspaceID, launch)
+	default:
+		return "", errors.New("unknown agent provider")
 	}
-	return a.claude.ResumeCommand(sessionID, workspaceID, launch)
 }
 
 // ForkLine is the line that starts the agent on a fork of a session: Codex's `fork`, Claude's `--fork-session`.
 func (a *coreAgents) ForkLine(provider, sessionID, workspaceID string, launch *agents.Launch) (string, error) {
+	if provider != agents.Claude && provider != agents.Codex {
+		return "", errors.New("fork is not supported by this agent provider")
+	}
 	if provider == agents.Codex {
 		cfg, err := a.codexLauncherConfig(launch)
 		if err != nil {
@@ -562,10 +600,16 @@ func (a *coreAgents) launching() bool { return a.launchOn != nil && a.launchOn()
 type lines struct{ a *coreAgents }
 
 func (l lines) Launch(provider, workspaceID string, launch *agents.Launch, promptFiles []string) (string, error) {
-	if provider == agents.Codex {
+	switch provider {
+	case agents.Codex:
 		return l.a.codexLine(workspaceID, "", launch)
+	case agents.Antigravity:
+		return l.a.antigravityLine(workspaceID, "", launch, promptFiles)
+	case agents.Claude:
+		return l.a.claude.LaunchCommand(workspaceID, launch, promptFiles)
+	default:
+		return "", errors.New("unknown agent provider")
 	}
-	return l.a.claude.LaunchCommand(workspaceID, launch, promptFiles)
 }
 
 func (l lines) Resume(provider, sessionID, workspaceID string, launch *agents.Launch) (string, error) {

@@ -551,7 +551,7 @@ const HomeComposer = ({
             attach={attach}
             apps={plainTalk ? null : plusApps}
             attachments={uploads.attachments}
-            onFiles={uploads.onFiles}
+            onFiles={choice?.provider === 'antigravity' ? () => toast(t('next.agents.noNativeAttachments'), { tone: 'info' }) : uploads.onFiles}
             onRemoveAttachment={uploads.onRemove}
             onRetryAttachment={uploads.onRetry}
             tools={<VoiceStart machine={machine} busy={creating} onStart={startTalk} />}

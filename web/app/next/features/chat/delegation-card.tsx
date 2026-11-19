@@ -19,7 +19,7 @@ import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
 import '@/next/styles/delegation.css';
 
-const AGENT_NAME = { claude: 'Claude Code', codex: 'Codex' } as const;
+const AGENT_NAME = { claude: 'Claude Code', codex: 'Codex', antigravity: 'Antigravity' } as const;
 
 /** How the state reads: the tone of its dot and words. */
 const STATE_TONE: Record<TChildState, 'run' | 'ok' | 'warn' | 'fail' | 'off'> = {

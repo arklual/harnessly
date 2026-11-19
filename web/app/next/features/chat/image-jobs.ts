@@ -1,6 +1,7 @@
 // The picture card's data: what the machine says of a harnessly picture job while it is being drawn
 // (GET <platform>/images?conv=…), and what the card shows from it and from the entry (see image-card.tsx). Codex's own
 // image tool has no job: its pictures arrive in the entry itself.
+import type { ImageProvider } from '@/next/features/image-edit/host';
 import { platformPath, runtimePath } from '@/next/core/net/machine';
 import type { ConvId, ImageGen, MachineId } from '@/next/protocol/v2';
 
@@ -8,6 +9,7 @@ export const JOB_STATES = ['running', 'done', 'failed'] as const;
 export type JobState = (typeof JOB_STATES)[number];
 
 export interface IImageJob {
+  provider?: ImageProvider;
   id: string;
   prompt: string;
   count: number;
@@ -51,6 +53,7 @@ const decodeJob = (v: unknown): IImageJob | null => {
     error: typeof error === 'string' ? error : null,
     startedAt,
   };
+  if (v.provider === 'codex' || v.provider === 'antigravity') job.provider = v.provider;
   if (typeof v.source === 'string' && v.source !== '') job.source = v.source;
   if (typeof v.mode === 'string' && v.mode !== '') job.mode = v.mode;
   return job;

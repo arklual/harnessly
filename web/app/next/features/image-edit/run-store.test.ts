@@ -64,6 +64,18 @@ describe('run store', () => {
     expect(start).toHaveBeenLastCalledWith(edit);
   });
 
+  it('keeps the selected Antigravity provider on a retry', async () => {
+    const start = vi.fn<IImageEditHost['start']>()
+      .mockRejectedValueOnce(new Error('busy'))
+      .mockResolvedValueOnce('job-2');
+    const chosen: IImageEdit = { ...edit, provider: 'antigravity' };
+    startRun(from.id, host({ start }), chosen);
+    await vi.advanceTimersByTimeAsync(0);
+    retryRun(from.id);
+    expect(start).toHaveBeenNthCalledWith(1, chosen);
+    expect(start).toHaveBeenNthCalledWith(2, chosen);
+  });
+
   it('a failed job keeps the server reason', async () => {
     const read = vi
       .fn<IImageEditHost['read']>()

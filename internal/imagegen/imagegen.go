@@ -1,4 +1,4 @@
-// Package imagegen makes pictures with Codex: a job runs `codex exec`, whose built-in image tool draws them, and
+// Package imagegen makes pictures with agent CLIs (Codex by default): a Codex job runs `codex exec` and
 // watches the folder Codex saves each picture to (~/.codex/generated_images/<thread>/), so every picture is known the
 // moment it is drawn, not when the run ends. Codex's --json stream says nothing of pictures; the folder does.
 //
@@ -58,11 +58,20 @@ const (
 	Portrait  Shape = "portrait"
 )
 
+// Provider selects the CLI that draws the pictures. Antigravity is experimental.
+type Provider string
+
+const (
+	Codex       Provider = "codex"
+	Antigravity Provider = "antigravity"
+)
+
 // Request is what to draw.
 type Request struct {
-	Prompt string `json:"prompt"`
-	Count  int    `json:"count"`
-	Shape  Shape  `json:"shape,omitempty"`
+	Provider Provider `json:"provider,omitempty"`
+	Prompt   string   `json:"prompt"`
+	Count    int      `json:"count"`
+	Shape    Shape    `json:"shape,omitempty"`
 	// Transparent asks for a transparent background.
 	Transparent bool `json:"transparent,omitempty"`
 	// Conv is the chat that asked ("" for none); Owner says who else did (e.g. "design:<id>").
@@ -94,12 +103,13 @@ type Image struct {
 
 // Snapshot is a job as it is now.
 type Snapshot struct {
-	ID     string `json:"id"`
-	Prompt string `json:"prompt"`
-	Count  int    `json:"count"`
-	Shape  Shape  `json:"shape,omitempty"`
-	Conv   string `json:"conv,omitempty"`
-	Owner  string `json:"owner,omitempty"`
+	Provider Provider `json:"provider,omitempty"`
+	ID       string   `json:"id"`
+	Prompt   string   `json:"prompt"`
+	Count    int      `json:"count"`
+	Shape    Shape    `json:"shape,omitempty"`
+	Conv     string   `json:"conv,omitempty"`
+	Owner    string   `json:"owner,omitempty"`
 	// Source and Mode: the picture this job changes, and how; absent for a new picture.
 	Source    string  `json:"source,omitempty"`
 	Mode      Mode    `json:"mode,omitempty"`
@@ -120,6 +130,14 @@ type Service struct {
 	Env func() []string
 	// Binary is the codex binary; "" for "codex".
 	Binary string
+	// DefaultProvider is used when a request omits provider; empty means Codex.
+	DefaultProvider Provider
+	// AntigravityBinary is the official agy executable (empty: agy on PATH).
+	AntigravityBinary string
+	// AntigravityHome is its application data directory (empty: ~/.gemini/antigravity-cli).
+	AntigravityHome string
+	// AntigravityEnv is separate from Codex's Env; nil inherits this process's environment.
+	AntigravityEnv func() []string
 	// Changed is told a job's new state; nil for nothing.
 	Changed func(Snapshot)
 
@@ -143,6 +161,16 @@ var (
 
 // Normalize checks and fills a request.
 func Normalize(r Request) (Request, error) {
+	switch r.Provider {
+	case "":
+		r.Provider = Codex
+	case Codex, Antigravity:
+	default:
+		return r, fmt.Errorf("%w: provider is codex or antigravity", ErrBadRequest)
+	}
+	if r.Provider == Antigravity && (r.Transparent || r.Mode == ModeCut) {
+		return r, fmt.Errorf("%w: Antigravity does not support transparent output; use provider codex", ErrBadRequest)
+	}
 	r.Prompt = strings.TrimSpace(r.Prompt)
 	r, err := normalizeEdit(r)
 	if err != nil {
@@ -168,13 +196,16 @@ func Normalize(r Request) (Request, error) {
 
 // Start begins a job and gives its first snapshot.
 func (s *Service) Start(r Request) (Snapshot, error) {
+	if r.Provider == "" {
+		r.Provider = s.DefaultProvider
+	}
 	r, err := Normalize(r)
 	if err != nil {
 		return Snapshot{}, err
 	}
 	id := newID()
 	j := &job{done: make(chan struct{}), snap: Snapshot{
-		ID: id, Prompt: r.Prompt, Count: r.Count, Shape: r.Shape, Conv: r.Conv, Owner: r.Owner, Source: r.Source, Mode: r.Mode, State: Running,
+		Provider: r.Provider, ID: id, Prompt: r.Prompt, Count: r.Count, Shape: r.Shape, Conv: r.Conv, Owner: r.Owner, Source: r.Source, Mode: r.Mode, State: Running,
 		Images: []Image{}, StartedAt: time.Now().UnixMilli(),
 	}}
 	s.mu.Lock()
@@ -353,6 +384,14 @@ func (s *Service) run(j *job, r Request) {
 		return
 	}
 	defer os.RemoveAll(work)
+	if r.Provider == Antigravity {
+		if err := s.runAntigravity(ctx, r, work, s.antigravityCollector(j, r, out)); err != nil {
+			fail(err.Error())
+		} else {
+			s.update(j, func(sn *Snapshot) { sn.State, sn.EndedAt = Done, time.Now().UnixMilli() })
+		}
+		return
+	}
 	bin := s.Binary
 	if bin == "" {
 		bin = "codex"
@@ -407,24 +446,7 @@ func (s *Service) run(j *job, r Request) {
 			if err := copyFile(f, dst); err != nil {
 				continue
 			}
-			if wrong := finishEdit(r, dst); wrong != "" {
-				os.Remove(dst)
-				s.update(j, func(sn *Snapshot) { sn.Error = wrong })
-				continue
-			}
-			f = dst
-			im := Image{N: n, Path: dst}
-			if r.CopyTo != "" {
-				name := r.Name
-				if name == "" {
-					name = "image-" + j.snap.ID[:6]
-				}
-				c := filepath.Join(r.CopyTo, fmt.Sprintf("%s-%d%s", name, n, filepath.Ext(f)))
-				if dir, ok := saveDir(r.CopyTo, r.SaveOK); ok && copyFile(f, filepath.Join(dir, filepath.Base(c))) == nil {
-					im.Copy = filepath.Join(dir, filepath.Base(c))
-				}
-			}
-			s.update(j, func(sn *Snapshot) { sn.Images = append(sn.Images, im) })
+			s.addPicture(j, r, dst, n)
 		}
 	}
 	exited := make(chan error, 1)

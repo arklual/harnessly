@@ -19,8 +19,9 @@ const entriesPage = 256
 // before a byte offset, as the timeline scrolls back. The cluster answers it from its copy of the transcript first;
 // the machine is asked when that copy has no such lines.
 type EntriesRoute struct {
-	Paths subagents.Paths
-	Codex transcript.CodexOptions
+	Paths           subagents.Paths
+	Codex           transcript.CodexOptions
+	AntigravityRoot string
 	// Authorized is the old API's check: a page session or the cli-token.
 	Authorized func(*http.Request) bool
 }
@@ -71,7 +72,7 @@ func (e *EntriesRoute) Answer(r *http.Request) (int, any, http.Header) {
 	if path == "" {
 		return nodejson.Answer(r, http.StatusBadRequest, map[string]string{"error": "jsonlPath parameter required"}, nil)
 	}
-	if !e.Paths.Allowed(path) {
+	if !e.Paths.Allowed(path) && !nativeAntigravityPath(e.AntigravityRoot, path) {
 		return nodejson.Answer(r, http.StatusForbidden, map[string]string{"error": "Path not allowed"}, nil)
 	}
 	before := jscompat.ParseInt(q.Get("beforeByte"), 10)
@@ -88,7 +89,9 @@ func (e *EntriesRoute) Answer(r *http.Request) (int, any, http.Header) {
 	}
 	codex := e.Paths.Codex(path)
 	var page transcript.Chunk
-	if codex {
+	if nativeAntigravityPath(e.AntigravityRoot, path) {
+		page = transcript.ReadAntigravityBefore(path, offset(before), limit)
+	} else if codex {
 		page = transcript.ReadCodexBefore(path, offset(before), limit, until, e.Codex)
 	} else {
 		page = transcript.ReadBefore(path, offset(before), limit)

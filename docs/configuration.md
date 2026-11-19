@@ -122,6 +122,73 @@ and the kill switch are in [hub/machine.md](hub/machine.md).
 | `RUNTIME_CODEXBAR_BIN` | the codexbar binary the core polls for Claude's usage limits (unset: none) |
 | `CLAUDE_CONFIG_DIR`, `CODEX_HOME` | the agent CLIs' own folders, `~/.claude` and `~/.codex` by default |
 
+### Image generation
+
+`generate_images` and the platform images API share the same asynchronous job service. Codex remains the default.
+The optional `provider` argument accepts `codex` or `antigravity`; it selects the generator, independently of which
+agent prepared the brief. `wait_images` and the existing chat cards work with either provider.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `RUNTIME_IMAGE_PROVIDER` | `codex` | provider used when a request omits `provider`; `antigravity` selects the experimental official Antigravity ACP integration |
+| `RUNTIME_ANTIGRAVITY_BIN` | `agy` | path to the official Antigravity CLI, resolved on the runtime's `PATH`; use an absolute path when it differs from the interactive shell |
+
+For Antigravity, install the official CLI and run `agy acp --login` as the **same Unix user and HOME as the runtime**.
+Harnessly launches `agy acp --sandbox --disable-telemetry`, reusing that login. Tool permission requests are denied.
+It does not extract browser cookies, copy OAuth credentials, impersonate a first-party client, or automatically fall
+back to a different paid provider on failure.
+The Antigravity process inherits the runtime environment, not the Codex-only agent environment.
+
+The integration delegates once to the native `image-generator` subagent and keeps ACP alive after the parent turn
+ends. Only finished, decodable images in that ACP session's artifact directory are imported into the normal job
+store; arbitrary file paths in model replies are ignored. Native JPEG output is preserved. References (`source`),
+counts, framing, progressive chat cards and permission-checked `save_to` use the existing job flow. Transparency and
+background-cut requests are refused for Antigravity; select `provider: "codex"` for those. Missing CLI/login, ACP
+errors and timeouts are reported by the job. Partial output is kept with a warning, not silently regenerated.
+
+This provider is **experimental**: the CLI's native image-generation capability may vary by version/account.
+Successful authentication or generation does not establish permission under a subscription's terms. Google's
+[Antigravity FAQ](https://antigravity.google/docs/faq) says wrapping the CLI in third-party agents/applications is not
+supported under consumer plans; review the current terms before enabling it. Changing the environment variables
+requires restarting the runtime. No additional public/S3 reference hosting is required for this local-file path.
+
+### Native Antigravity chats (experimental)
+
+Antigravity is a third native CLI provider (`antigravity`, panel `antigravity-cli`, executable `agy`), distinct from a
+Claude/Codex backend profile. Image generation above is independent of enabling ordinary Antigravity chats.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `RUNTIME_ANTIGRAVITY_NATIVE` | off | only `on` advertises/enables ordinary native chats, after native hook, input and MCP setup has been verified |
+| `RUNTIME_ANTIGRAVITY_BIN` | `~/.local/bin/agy` when present, otherwise `agy` on PATH | explicit official-compatible executable used for native launches; image generation also honors this variable |
+
+Use an updated **CLI and runtime**. `harnessly antigravity prepare` creates a fresh deployment-owned official plugin
+containing `plugin.json`, `hooks.json`, and a credential-free stdio `mcp_config.json`. It does not install anything or
+edit a project's `.agents` directory. Its output gives the explicit `agy plugin install '<directory>'` command;
+installation changes the official CLI's user configuration and is a separate opt-in step. Uninstall with
+`agy plugin uninstall harnessly-native`. Keep the prepared host executable available at its recorded absolute path.
+Native first-run setup must also be completed in the terminal. Managed launches explicitly request the native
+`toolPermission: "request-review"` session policy. Native permission/question dialogs are initially handled in the
+native terminal, not through Claude-style web approval key sequences; Harnessly never auto-approves them.
+
+Models come from the bounded, cached `agy models` probe. A successful model listing alone does **not** prove that a
+text request is eligible or that hooks/MCP are installed. Verify a real native request before enabling the feature.
+Harnessly does not patch binaries, install an unlocker, alter proxies, or bypass regional checks during setup/launch.
+An explicitly configured alternate executable is the deployment's responsibility, not an automatic fallback.
+
+Managed launches receive a unique generation and private, launch-scoped CLI credential file (never a token in argv,
+plugin JSON, or logs). Authenticated hooks bind only the same tab, process generation, workspace and native UUID;
+nested sessions and stale launches cannot replace that binding. Transcript paths accept exactly `transcript.jsonl`
+or `transcript_full.jsonl` under that UUID's native brain folder. A native `PreInvocation` is a model step, **not** a
+new-user-prompt acknowledgement; actual `USER_INPUT` records confirm delivery. `Stop` closes the turn only with
+`fullyIdle=true`. The input adapter recognizes the native frame and rechecks live ownership before paste/Enter;
+unknown screens, foreign input, permission dialogs and a shell block automated delivery.
+
+The normal v2 picker and delegation use `antigravity` after enablement. Initially unsupported: fork/rewind, steering,
+native terminal attachments, fast/ultracode, backend profiles, live model switching, and apps requiring an enforced
+pre-tool wall. These requests are refused server-side as well as hidden/disabled in the UI. Codex and Claude retain
+their existing defaults and launch paths. The official consumer-plan support caveat in the image section applies here too.
+
 ### Prompt delivery
 
 | Variable | Meaning |

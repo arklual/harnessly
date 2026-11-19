@@ -8,6 +8,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents/antigravity"
 	"github.com/ly-solutions/harnessly/internal/agents/claude"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/gate"
@@ -55,8 +56,23 @@ func (c *core) newTimeline(cfg timelineConfig) *timeline.Server {
 	claudeDet.Installed = func() bool { return checks.Runtime().Claude.Installed }
 	codexDet := codex.NewDetector(home)
 	codexDet.Installed = func() bool { return checks.Runtime().Codex.Installed }
+	antigravityDet := newNativeAntigravityDetector(home)
 	projects := claudeDet.ProjectsDir()
 	providers := map[string]*timeline.Provider{
+		agents.AntigravityPanel: {
+			ID: "antigravity", DisplayName: "Antigravity",
+			Detect:            func(children []int) (agents.SessionInfo, error) { return antigravityDet.Detect(children, false), nil },
+			Running:           antigravityDet.IsRunning,
+			ParsePaneTitle:    antigravity.ParsePaneTitle,
+			SessionIDFromPath: antigravity.SessionIDFromPath,
+			ValidSessionID:    agents.IsUUID,
+			FindSession: func(id string) string {
+				if m, ok := antigravityDet.FindSession(id); ok {
+					return m.JSONLPath
+				}
+				return ""
+			},
+		},
 		agents.ClaudePanel: {
 			ID: agents.Claude, DisplayName: "Claude Code",
 			Detect:         claudeDet.Detect,
@@ -88,14 +104,15 @@ func (c *core) newTimeline(cfg timelineConfig) *timeline.Server {
 		},
 	}
 	return timeline.New(timeline.Deps{
-		Tmux:           timelineTmux{c.cfg.Tmux},
-		Procs:          proc.System(),
-		Providers:      providers,
-		Keeper:         c.timelineKeeper,
-		Layout:         timelineLayout{c},
-		ResumeLine:     c.timelineResumeLine,
-		ClaudeProjects: projects,
-		CodexSessions:  codexDet.SessionsRoot(),
+		Tmux:            timelineTmux{c.cfg.Tmux},
+		Procs:           proc.System(),
+		Providers:       providers,
+		Keeper:          c.timelineKeeper,
+		Layout:          timelineLayout{c},
+		ResumeLine:      c.timelineResumeLine,
+		ClaudeProjects:  projects,
+		CodexSessions:   codexDet.SessionsRoot(),
+		AntigravityRoot: antigravityDet.SessionsRoot(),
 		// A Claude or Codex started with CLAUDE_CONFIG_DIR or CODEX_HOME of its own writes elsewhere.
 		MoreRoots: func() (claudeProjects, codexSessions []string) {
 			return claudeDet.ProjectsDirs(), codexDet.SessionsRoots()

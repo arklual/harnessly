@@ -51,6 +51,8 @@ type LaunchOptions struct {
 
 // LaunchConfig is where launch options come from.
 type LaunchConfig struct {
+	// AntigravityOptions supplies options from the cached native CLI probe.
+	AntigravityOptions  func() LaunchOptions
 	ClaudeDir, CodexDir string
 	// RuntimeConfig is the runtime's config file, DefaultsKey its key holding the remembered choice per agent CLI.
 	RuntimeConfig, DefaultsKey string
@@ -289,7 +291,7 @@ func (c LaunchConfig) Launch(provider string) LaunchOptions {
 			def = Choice{Model: stringOrNil(s["model"]), Effort: knownEffortOrNil(s["effortLevel"])}
 		}
 		out = LaunchOptions{Provider: "claude", Source: "static", Models: withClaudeOffered(claudeModels(), c.ClaudeDir), CliDefault: def}
-	} else {
+	} else if provider == "codex" {
 		models, state := readParsed(filepath.Join(c.CodexDir, "models_cache.json"), parseCodexModels)
 		switch {
 		case state == fileMissing:
@@ -309,8 +311,35 @@ func (c LaunchConfig) Launch(provider string) LaunchOptions {
 			out.Source, out.FetchedAt, out.Models = "static", nil, codexBuiltinModels()
 		}
 	}
+	if provider == "antigravity" {
+		out = LaunchOptions{Provider: provider, Source: "cli", Models: []Model{}}
+		if c.AntigravityOptions != nil {
+			options := c.AntigravityOptions()
+			warnings = append(warnings, options.Warnings...)
+			seen := map[string]bool{}
+			for _, m := range options.Models {
+				if m.ID == "" || seen[m.ID] {
+					continue
+				}
+				seen[m.ID] = true
+				m.Efforts, m.DefaultEffort = []string{}, nil
+				out.Models = append(out.Models, m)
+			}
+		}
+		if len(out.Models) == 0 {
+			warnings = append(warnings, "Antigravity models are unavailable: run agy models after signing in")
+		}
+	} else if !IsProvider(provider) {
+		out = LaunchOptions{Provider: provider, Source: "unavailable", Models: []Model{}}
+		warnings = append(warnings, "Unknown agent provider")
+	}
 	out.Warnings = warnings
-	out.Saved = c.saved(provider)
+	if IsProvider(provider) {
+		out.Saved = c.saved(provider)
+	}
+	if provider == "antigravity" && out.Saved != nil {
+		out.Saved.Effort = nil
+	}
 	return out
 }
 

@@ -12,14 +12,15 @@ import (
 // v2Sessions are the sessions the agent CLIs keep on the machine that no conversation of the runtime holds: what "continue
 // a session from the terminal" offers. The listers keep what they read of each transcript, so a second look is cheap.
 type v2Sessions struct {
-	claude *sessions.ClaudeLister
-	codex  *sessions.CodexLister
+	claude      *sessions.ClaudeLister
+	codex       *sessions.CodexLister
+	antigravity *sessions.AntigravityLister
 	// held are the sessions the conversations hold, by the agent's session id.
 	held func() map[string]string
 }
 
 func newV2Sessions(home string, held func() map[string]string) *v2Sessions {
-	return &v2Sessions{claude: sessions.NewClaudeLister(home), codex: sessions.NewCodexLister(home), held: held}
+	return &v2Sessions{claude: sessions.NewClaudeLister(home), codex: sessions.NewCodexLister(home), antigravity: sessions.NewAntigravityLister(home), held: held}
 }
 
 // leftOut says which session ids are not offered: the ones a conversation holds and the forks answering side questions.
@@ -45,6 +46,11 @@ func (s *v2Sessions) List(ctx context.Context) ([]wire.AgentSession, error) {
 	for _, r := range s.codex.Recent(skip, wire.SessionsMax) {
 		out = append(out, wireSession(wire.ProviderCodex, r))
 	}
+	if s.antigravity != nil {
+		for _, r := range s.antigravity.Recent(skip, wire.SessionsMax) {
+			out = append(out, wireSession(wire.Provider("antigravity"), r))
+		}
+	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].UpdatedAt > out[j].UpdatedAt })
 	if len(out) > wire.SessionsMax {
 		out = out[:wire.SessionsMax]
@@ -65,6 +71,10 @@ func (s *v2Sessions) Find(p wire.Provider, id string) (convo.AgentSession, bool)
 		r, ok = s.claude.Find(id)
 	case wire.ProviderCodex:
 		r, ok = s.codex.Find(id)
+	case wire.Provider("antigravity"):
+		if s.antigravity != nil {
+			r, ok = s.antigravity.Find(id)
+		}
 	}
 	if !ok {
 		return convo.AgentSession{}, false

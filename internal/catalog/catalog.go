@@ -61,7 +61,7 @@ func New(cfg Config, encode func(any) []byte) *Commands {
 }
 
 // IsProvider says whether an agent CLI is known.
-func IsProvider(p string) bool { return p == "claude" || p == "codex" }
+func IsProvider(p string) bool { return p == "claude" || p == "codex" || p == "antigravity" }
 
 func (c *Commands) root() string {
 	root, _ := filepath.Abs(c.cfg.WorkspaceRoot)
@@ -98,7 +98,13 @@ func (c *Commands) watched(provider, cwd, root string) []string {
 	if provider == "claude" {
 		return append(claudeWatched(c.cfg.ClaudeDir, cwd, root), c.cfg.QuickPromptsFile)
 	}
-	return codexWatched(c.cfg.CodexDir)
+	if provider == "codex" {
+		return codexWatched(c.cfg.CodexDir)
+	}
+	if provider == "antigravity" {
+		return []string{c.cfg.QuickPromptsFile}
+	}
+	return nil
 }
 
 func signature(paths []string) string {
@@ -122,8 +128,15 @@ func (c *Commands) Get(provider, cwd, root string) Result {
 	var b *builder
 	if provider == "claude" {
 		b = scanClaude(c.cfg.ClaudeDir, cwd, root, quickPrompts(c.cfg.QuickPromptsFile))
-	} else {
+	} else if provider == "codex" {
 		b = scanCodex(c.cfg.CodexDir)
+	} else {
+		b = newBuilder()
+		if provider == "antigravity" {
+			addQuickPrompts(b, quickPrompts(c.cfg.QuickPromptsFile))
+		} else {
+			b.warn("Unknown agent provider")
+		}
 	}
 	cat := Catalog{
 		Provider:    provider,

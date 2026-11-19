@@ -362,6 +362,8 @@ func WithInitialPrompt(provider, command, prompt, promptFile string) string {
 		return command + " -- " + arg
 	case Codex:
 		return command + " --prompt " + arg
+	case Antigravity:
+		return command + " --prompt-interactive " + arg
 	}
 	return command
 }
@@ -481,6 +483,9 @@ var trailingNewlines = regexp.MustCompile(`[\r\n]+$`)
 // by the platform's launch line plus these arguments. False when the text is not such a command.
 func BareAgentArgs(content, panelType string) (string, bool) {
 	binary := ProviderOfPanel(panelType)
+	if binary == Antigravity {
+		binary = "agy"
+	}
 	if binary == "" {
 		return "", false
 	}

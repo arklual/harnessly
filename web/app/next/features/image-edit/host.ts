@@ -2,6 +2,11 @@
 // changes them through `<platform>/images`, a Sinopia design keeps them in the project and writes the chosen one into
 // the board. The editor knows neither.
 
+export const IMAGE_PROVIDERS = ['codex', 'antigravity'] as const;
+export type ImageProvider = (typeof IMAGE_PROVIDERS)[number];
+export const imageProviderName = (provider: ImageProvider): string =>
+  provider === 'antigravity' ? 'Antigravity' : 'Codex';
+
 export const EDIT_MODE = {
   text: 'text',
   mark: 'mark',
@@ -17,6 +22,8 @@ export type TEditFormat = (typeof EDIT_FORMATS)[number];
 
 /** One state of a picture: the original or the result of a change. */
 export interface IImageVersion {
+  /** The generator reported by the job; absent for original or older pictures. */
+  provider?: ImageProvider;
   /** What the host names this version by when it is changed further (a file path, an asset of the project). */
   id: string;
   /** Where the bytes are, for an <img>. */
@@ -26,6 +33,8 @@ export interface IImageVersion {
 }
 
 export interface IImageEdit {
+  /** Absent on older saved runs: Codex. */
+  provider?: ImageProvider;
   from: IImageVersion;
   mode: TEditMode;
   /** The person's words, '' when the mode needs none. */

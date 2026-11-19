@@ -272,7 +272,7 @@ func envList(entries []EnvEntry) []agents.EnvVar {
 // shell is checked before a tab or workspace is made: the environment, then the launch line, then the prompt. An error
 // is a failure the old runtime answered with a bare 500.
 func (s *Starter) Start(o Options) (Result, error) {
-	if o.Provider != agents.Claude && o.Provider != agents.Codex {
+	if o.Provider != agents.Claude && o.Provider != agents.Codex && o.Provider != agents.Antigravity {
 		return fail(400, msgUnknownAgent.String()), nil
 	}
 	if s.cfg.Admit != nil {
@@ -331,9 +331,12 @@ func (s *Starter) Start(o Options) (Result, error) {
 	}
 	// A launch with apps names its chat (the tab's id) in the apps' grant, so the tab's id is chosen before the line.
 	tabID := ""
-	if launch != nil && len(launch.Apps) > 0 {
+	if o.Provider == agents.Antigravity || (launch != nil && len(launch.Apps) > 0) {
 		tabID = s.cfg.Store.NewTabID()
-		l := *launch
+		l := agents.Launch{}
+		if launch != nil {
+			l = *launch
+		}
 		l.Conversation = tabID
 		launch = &l
 	}

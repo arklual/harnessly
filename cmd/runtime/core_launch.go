@@ -114,6 +114,19 @@ func (c *core) newLauncher() {
 			return svc.SubmitText(session, text)
 		}}
 	if c.agents != nil {
+		c.agents.nativeConversation = func(id string) string {
+			found := ""
+			for _, item := range c.store.WorkspaceTabs() {
+				st := item.Tab.Object("agentState")
+				if st != nil && st.String("providerId") == agents.Antigravity && st.String("sessionId") == id {
+					if found != "" {
+						return ""
+					}
+					found = item.Tab.String("id")
+				}
+			}
+			return found
+		}
 		c.agents.starter = c.launcher
 		c.agents.resume = func() int { return c.launcher.AutoResume(c.resumeConfig()) }
 	}
@@ -154,10 +167,16 @@ func (c *core) resumeConfig() launch.ResumeConfig {
 			return true, false
 		}
 		r := c.agents.runtime()
-		if provider == agents.Codex {
+		switch provider {
+		case agents.Codex:
 			return r.Codex.Installed, false
+		case agents.Antigravity:
+			return nativeAntigravityEnabled() && r.Antigravity.Installed, false
+		case agents.Claude:
+			return r.Claude.Installed, r.Claude.BinaryPath != nil
+		default:
+			return false, false
 		}
-		return r.Claude.Installed, r.Claude.BinaryPath != nil
 	}
 	rc := newResumeConfig(c.cfg.Home, c.cfg.Tmux, installed, sleep.ReadConfig(os.Getenv, c.cfg.Hooks.Sleep), time.Now)
 	rc.Owned = c.chatOwns
@@ -171,6 +190,9 @@ func newResumeConfig(home string, tm launch.ResumeTmux, installed func(string) (
 		Tmux:      tm,
 		Installed: installed,
 		LastActivity: func(provider, sid string) *float64 {
+			if provider == agents.Antigravity {
+				return antigravityLastActivity(home, sid)
+			}
 			if provider == agents.Codex {
 				m, ok := codexDet.FindSession(sid)
 				if !ok {

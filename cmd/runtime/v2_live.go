@@ -179,7 +179,7 @@ func newV2Live(d deps, c *core) *v2Live {
 		v.machine.claudeSettings = filepath.Join(env("CLAUDE_CONFIG_DIR", filepath.Join(d.Home, ".claude")), "settings.json")
 	}
 	v.hub = wire.NewHub(v.machine)
-	v.tm = &v2Tmux{tm: c.cfg.Tmux, term: c.cfg.Term, guard: chatGuard}
+	v.tm = &v2Tmux{tm: c.cfg.Tmux, term: c.cfg.Term, guard: chatGuard, nativeOwns: c.nativePaneOwner}
 	v.starter = &v2Launcher{v: v}
 	uploads := &wire.Uploads{Dir: filepath.Join(d.DataDir, "v2", "uploads"), Limits: wire.DefaultLimits}
 	ses := newV2Sessions(d.Home, func() map[string]string { return v.rt.AttachedSessions() })
