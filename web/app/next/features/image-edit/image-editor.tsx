@@ -165,7 +165,9 @@ const Editor = ({
     setState(s);
   }
   const patch = (change: Partial<ISession>) => setState((now) => ({ ...now, ...change }));
-  const [provider, setProvider] = useState<ImageProvider>(runOf(original.id)?.edit.provider ?? original.provider ?? 'codex');
+  const [provider, setProvider] = useState<ImageProvider>(
+    runOf(original.id)?.edit.provider ?? original.provider ?? 'codex',
+  );
   const [focusField, setFocusField] = useState(0);
   const run = useRun(original.id);
   const running = run?.state === RUN_STATE.running;
@@ -279,7 +281,9 @@ const Editor = ({
   const ratio =
     sizing !== undefined ? ratioOfFormat(sizing) : s.natural === null ? undefined : s.natural.w / s.natural.h;
   const failure: IFailure | null =
-    run?.state === RUN_STATE.failed ? { why: run.error, provider: run.edit.provider ?? 'codex', onRetry: () => retryRun(original.id) } : null;
+    run?.state === RUN_STATE.failed
+      ? { why: run.error, provider: run.edit.provider ?? 'codex', onRetry: () => retryRun(original.id) }
+      : null;
 
   const shown: IImageViewItem | null = item === null ? null : { ...item, src: selected.src };
   const overlay = kind !== undefined && !running && (
@@ -332,7 +336,7 @@ const Editor = ({
         ) : (
           <EditDock
             switcher={switcher}
-            provider={running ? run.edit.provider ?? provider : provider}
+            provider={running ? (run.edit.provider ?? provider) : provider}
             onProvider={setProvider}
             tool={s.tool}
             onTool={pickTool}

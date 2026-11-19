@@ -78,10 +78,14 @@ export const EditDock = (props: IEditDockProps) => {
           aria-label={t('next.imagegen.provider')}
           value={props.provider}
           disabled={running}
-          onChange={(event) => props.onProvider(event.target.value === 'antigravity' ? 'antigravity' : 'codex')}
+          onChange={(event) =>
+            props.onProvider(event.target.value === 'antigravity' ? 'antigravity' : 'codex')
+          }
         >
           {IMAGE_PROVIDERS.map((provider) => (
-            <option key={provider} value={provider}>{imageProviderName(provider)}</option>
+            <option key={provider} value={provider}>
+              {imageProviderName(provider)}
+            </option>
           ))}
         </select>
       </label>
@@ -147,7 +151,11 @@ export const EditDock = (props: IEditDockProps) => {
             aria-pressed={id === TOOL.cut ? undefined : tool === id}
             aria-label={t(`next.imageEdit.tool.${id}`)}
             disabled={running || (id === TOOL.cut && props.provider === 'antigravity')}
-            title={id === TOOL.cut && props.provider === 'antigravity' ? t('next.imageEdit.noTransparency') : undefined}
+            title={
+              id === TOOL.cut && props.provider === 'antigravity'
+                ? t('next.imageEdit.noTransparency')
+                : undefined
+            }
             onClick={() => props.onTool(id)}
           >
             <Icon name={icon} />
@@ -166,7 +174,8 @@ export const EditDock = (props: IEditDockProps) => {
               : t('next.imageEdit.failed', { why: props.failure.why })}
           </span>
           <button type="button" className="hx-ie__retry" onClick={props.failure.onRetry}>
-            {t('next.imageEdit.retry')}{props.failure.provider ? ` · ${imageProviderName(props.failure.provider)}` : ''}
+            {t('next.imageEdit.retry')}
+            {props.failure.provider ? ` · ${imageProviderName(props.failure.provider)}` : ''}
           </button>
         </p>
       )}

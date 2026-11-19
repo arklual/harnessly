@@ -43,10 +43,11 @@ export const subagentMeta = (entry: SubagentEntry): string =>
 export const providerOf = (...hints: (string | null)[]): Provider =>
   /antigravity|\bagy\b/i.test(hints.join(' '))
     ? 'antigravity'
-    : /codex|gpt/i.test(hints.join(' ')) ? 'codex' : 'claude';
+    : /codex|gpt/i.test(hints.join(' '))
+      ? 'codex'
+      : 'claude';
 
-export const subagentProvider = (entry: SubagentEntry): Provider =>
-  providerOf(entry.model, entry.agentType);
+export const subagentProvider = (entry: SubagentEntry): Provider => providerOf(entry.model, entry.agentType);
 
 const Report = ({ entry, open }: { entry: SubagentEntry; open: boolean }) => {
   const { mounted, state } = usePresentFlag(open, FOLD_MS);

@@ -378,7 +378,9 @@ export const SkillsPage = ({ machine, pages, pending }: ISkillsPageProps) => {
         filter={filter}
         list={list}
         busy={busyOf(waiting, prefix)}
-        onProvider={(value) => { if (value !== 'antigravity') setProvider(value); }}
+        onProvider={(value) => {
+          if (value !== 'antigravity') setProvider(value);
+        }}
         onTab={setTab}
         onFilter={setFilter}
         onToggle={toggle}

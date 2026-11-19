@@ -162,7 +162,13 @@ export const ImageGenPanel = ({ machine, target, apply, embedded = false }: IIma
     void startGen(
       machine,
       target.key,
-      { artifact: target.artifact, provider: run.provider ?? 'codex', prompt: run.prompt, count: run.count, shape: shapeOf(target.ratio) },
+      {
+        artifact: target.artifact,
+        provider: run.provider ?? 'codex',
+        prompt: run.prompt,
+        count: run.count,
+        shape: shapeOf(target.ratio),
+      },
       target.tpl,
       apply,
     );
@@ -207,9 +213,15 @@ export const ImageGenPanel = ({ machine, target, apply, embedded = false }: IIma
             }}
           />
           <div className="hx-imagegen__row">
-            <label>{t('next.imagegen.provider')}
-              <select aria-label={t('next.imagegen.provider')} value={provider}
-                onChange={(event) => setProvider(event.target.value === 'antigravity' ? 'antigravity' : 'codex')}>
+            <label>
+              {t('next.imagegen.provider')}
+              <select
+                aria-label={t('next.imagegen.provider')}
+                value={provider}
+                onChange={(event) =>
+                  setProvider(event.target.value === 'antigravity' ? 'antigravity' : 'codex')
+                }
+              >
                 <option value="codex">Codex</option>
                 <option value="antigravity">Antigravity</option>
               </select>

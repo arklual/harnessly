@@ -120,10 +120,11 @@ export const CLAUDE_LAUNCH_MODELS = [
   },
 ] as const satisfies readonly ILaunchModel[];
 
-export const PROVIDER_TITLES = { claude: 'Claude', codex: 'Codex', antigravity: 'Antigravity' } as const satisfies Record<
-  TAgentProvider,
-  string
->;
+export const PROVIDER_TITLES = {
+  claude: 'Claude',
+  codex: 'Codex',
+  antigravity: 'Antigravity',
+} as const satisfies Record<TAgentProvider, string>;
 
 /** Opens the model and effort chip: the welcome composer (no sessionName) or a session's context bar. */
 export const OPEN_LAUNCH_PICKER_EVENT = 'hl:open-launch-picker';

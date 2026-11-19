@@ -75,7 +75,19 @@ const withAuthor = <K extends Op>(op: K, body: Body<K>): Body<K> => {
 
 /** The native Antigravity CLI must not receive Claude-only controls or silently lose the person's choices. */
 export const unsupportedAntigravityCommand = (op: Op, body: Record<string, unknown>): boolean => {
-  if (['rewind', 'rewind.undo', 'conversation.fork', 'conversation.merge', 'model', 'conversation.apps', 'answer', 'decide'].includes(op)) return true;
+  if (
+    [
+      'rewind',
+      'rewind.undo',
+      'conversation.fork',
+      'conversation.merge',
+      'model',
+      'conversation.apps',
+      'answer',
+      'decide',
+    ].includes(op)
+  )
+    return true;
   if ((op === 'send' && body.mode === 'steer') || (op === 'promote' && body.to === 'steer')) return true;
   if (Array.isArray(body.attachmentIds) && body.attachmentIds.length > 0) return true;
   if (body.profile) return true;
@@ -95,10 +107,15 @@ export function runCommand<K extends Op>(
   const full = { ...withAuthor(op, body), opId } as Record<string, unknown>;
   const id = full.conversationId ?? full.id;
   const conversationId = typeof id === 'string' && id.startsWith('tab-') ? (id as ConvId) : null;
-  const provider = full.provider ?? (conversationId ? conversationsStore.get(conversationId)?.provider : null);
+  const provider =
+    full.provider ?? (conversationId ? conversationsStore.get(conversationId)?.provider : null);
   if (provider === 'antigravity' && unsupportedAntigravityCommand(op, full)) {
     const final = {
-      k: 'failed', op, machine, at: pageClock().now(), retryable: false,
+      k: 'failed',
+      op,
+      machine,
+      at: pageClock().now(),
+      retryable: false,
       failure: { r: 'refused', code: 'unsupported' },
     } as const;
     opsStore.set(opId, final);

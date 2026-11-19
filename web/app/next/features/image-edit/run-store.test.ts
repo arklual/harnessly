@@ -65,7 +65,8 @@ describe('run store', () => {
   });
 
   it('keeps the selected Antigravity provider on a retry', async () => {
-    const start = vi.fn<IImageEditHost['start']>()
+    const start = vi
+      .fn<IImageEditHost['start']>()
       .mockRejectedValueOnce(new Error('busy'))
       .mockResolvedValueOnce('job-2');
     const chosen: IImageEdit = { ...edit, provider: 'antigravity' };

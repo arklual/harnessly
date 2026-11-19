@@ -54,11 +54,18 @@ const ManagedChatLogin = ({ machine, provider, onRetry }: IChatLoginProps) => {
   );
 };
 
-const ChatLogin = (props: IChatLoginProps) => props.provider === 'antigravity' ? (
-  <div role="status">
-    <p>{t('next.picker.loginRequired', { agent: 'Antigravity', command: LOGIN_COMMANDS.antigravity })}</p>
-    {props.onRetry && <button type="button" onClick={() => void props.onRetry?.()}>{t('next.imagegen.retry')}</button>}
-  </div>
-) : <ManagedChatLogin {...props} />;
+const ChatLogin = (props: IChatLoginProps) =>
+  props.provider === 'antigravity' ? (
+    <div role="status">
+      <p>{t('next.picker.loginRequired', { agent: 'Antigravity', command: LOGIN_COMMANDS.antigravity })}</p>
+      {props.onRetry && (
+        <button type="button" onClick={() => void props.onRetry?.()}>
+          {t('next.imagegen.retry')}
+        </button>
+      )}
+    </div>
+  ) : (
+    <ManagedChatLogin {...props} />
+  );
 
 export default ChatLogin;

@@ -162,13 +162,21 @@ describe('the picker names a model by how it runs (HRN-1434)', () => {
 
 describe('Antigravity native agent', () => {
   const native: MachineAgent = {
-    provider: 'antigravity', version: '1.0', status: 'ready', canSwitchModel: false,
+    provider: 'antigravity',
+    version: '1.0',
+    status: 'ready',
+    canSwitchModel: false,
     models: [{ id: 'machine-model', label: 'Machine model', hint: '', efforts: [], defaultEffort: null }],
   };
 
   it('offers only the models reported by the machine, marked experimental', () => {
     const [picked] = pickerAgents([native]);
-    expect(picked).toMatchObject({ provider: 'antigravity', name: 'Antigravity', canSwitch: false, available: true });
+    expect(picked).toMatchObject({
+      provider: 'antigravity',
+      name: 'Antigravity',
+      canSwitch: false,
+      available: true,
+    });
     expect(picked.short).toContain('experimental');
     expect(picked.models.map((m) => m.id)).toEqual(['machine-model']);
     expect(pickerAgents([{ ...native, models: [] }])[0].available).toBe(false);
@@ -178,11 +186,14 @@ describe('Antigravity native agent', () => {
   });
 
   it('does not offer Claude controls or profile groups even if advertised accidentally', () => {
-    const picked = pickerAgents([{
-      ...native, canSwitchModel: true,
-      models: native.models.map((model) => ({ ...model, fast: true, ultracode: true })),
-      profiles: [{ id: 'test', label: 'Test', vendor: 'gpt', configured: true, models: native.models }],
-    }]);
+    const picked = pickerAgents([
+      {
+        ...native,
+        canSwitchModel: true,
+        models: native.models.map((model) => ({ ...model, fast: true, ultracode: true })),
+        profiles: [{ id: 'test', label: 'Test', vendor: 'gpt', configured: true, models: native.models }],
+      },
+    ]);
     expect(picked).toHaveLength(1);
     expect(picked[0].canSwitch).toBe(false);
     expect(picked[0].models[0]).toMatchObject({ fast: false, ultracode: false });

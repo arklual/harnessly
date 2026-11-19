@@ -401,7 +401,7 @@ const SettingsScene = ({ state, check, login, page }: ISettingsSceneProps) => {
           <AgentAccount
             settings={settings}
             credentials={credentials(page === 'codex' ? codexKey : { configured: false, tail: null })}
-            limits={page === 'antigravity' ? null : LIMITS?.[page] ?? null}
+            limits={page === 'antigravity' ? null : (LIMITS?.[page] ?? null)}
             spend={null}
           />
           <AgentConnection
