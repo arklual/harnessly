@@ -48,7 +48,7 @@ func (l *AntigravityLister) Find(id string) (Recent, bool) {
 	r := Recent{SessionID: id, Path: path, UpdatedAt: st.ModTime()}
 	before := int64(-1)
 	for {
-		c := transcript.ReadAntigravityBefore(path, before, 256)
+		c := transcript.ReadAntigravityBefore(path, before, 256, l.Root)
 		for _, e := range c.Entries {
 			if e.String("type") == "user-message" {
 				r.Turns++

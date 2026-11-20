@@ -16,7 +16,7 @@ func TestAntigravityIndexedSource(t *testing.T) {
 		t.Fatal(err)
 	}
 	ix := transcriptindex.New(transcriptindex.Options{Fresh: -1})
-	s := &AntigravitySource{Path: path, Index: ix}
+	s := &AntigravitySource{Root: filepath.Dir(path), Path: path, Index: ix}
 	defer s.Close()
 	s.Tail(100)
 	line := `{"source":"MODEL","type":"PLANNER_RESPONSE","content":"hello","status":"DONE"}` + "\n"
@@ -41,7 +41,7 @@ func TestAntigravitySourcePartialAndTruncation(t *testing.T) {
 		}
 	}
 	write(user + reply[:20])
-	s := &AntigravitySource{Path: path}
+	s := &AntigravitySource{Root: filepath.Dir(path), Path: path}
 	if c := s.Tail(100); len(c.Entries) != 1 {
 		t.Fatal(c)
 	}

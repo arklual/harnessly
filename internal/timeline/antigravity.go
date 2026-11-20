@@ -1,7 +1,7 @@
 package timeline
 
 import (
-	"os"
+	"io"
 	"path/filepath"
 	"strings"
 
@@ -47,15 +47,28 @@ func (s *Server) isAntigravityPath(path string) bool {
 	return nativeAntigravityPath(s.d.AntigravityRoot, path)
 }
 
-func antigravityIncremental(path string, offset int64) transcript.Incremental {
-	st, err := os.Stat(path)
+func antigravityIncremental(root, path string, offset int64) transcript.Incremental {
+	f, err := transcript.OpenAntigravity(path, root)
+	if err != nil {
+		return transcript.Incremental{NewOffset: offset}
+	}
+	defer f.Close()
+	st, err := f.Stat()
 	if err != nil {
 		return transcript.Incremental{NewOffset: offset}
 	}
 	if st.Size() < offset {
 		offset = 0
 	}
-	raw, err := readAt(path, offset, st.Size()-offset)
+	if offset < 0 {
+		offset = 0
+	}
+	raw := make([]byte, st.Size()-offset)
+	n, err := f.ReadAt(raw, offset)
+	raw = raw[:n]
+	if err == io.EOF {
+		err = nil
+	}
 	if err != nil {
 		return transcript.Incremental{NewOffset: offset}
 	}

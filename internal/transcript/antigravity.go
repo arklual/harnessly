@@ -2,8 +2,11 @@ package transcript
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -116,12 +119,19 @@ func ParseAntigravityAppended(buf []byte, offset int64) Incremental {
 }
 
 // ReadAntigravityTail reads backwards in bounded windows until max entries are available.
-func ReadAntigravityTail(path string, max int) Chunk { return ReadAntigravityBefore(path, -1, max) }
+func ReadAntigravityTail(path string, max int, roots ...string) Chunk {
+	return ReadAntigravityBefore(path, -1, max, roots...)
+}
 
 // ReadAntigravityBefore reads entries whose physical lines precede before (-1 means EOF).
-func ReadAntigravityBefore(path string, before int64, max int) Chunk {
+func ReadAntigravityBefore(path string, before int64, max int, roots ...string) Chunk {
 	empty := Chunk{Entries: []*jsvalue.Object{}}
-	st, err := os.Stat(path)
+	f, err := OpenAntigravity(path, roots...)
+	if err != nil {
+		return empty
+	}
+	defer f.Close()
+	st, err := f.Stat()
 	if err != nil {
 		return empty
 	}
@@ -138,7 +148,23 @@ func ReadAntigravityBefore(path string, before int64, max int) Chunk {
 		if from < 0 {
 			from = 0
 		}
-		text, _, start, err := readChunk(path, from, end)
+		buf := make([]byte, end-from)
+		n, err := f.ReadAt(buf, from)
+		if err == io.EOF {
+			err = nil
+		}
+		buf = buf[:n]
+		start := from
+		if from > 0 {
+			if i := strings.IndexByte(string(buf), '\n'); i >= 0 {
+				start += int64(i + 1)
+				buf = buf[i+1:]
+			} else {
+				start = end
+				buf = nil
+			}
+		}
+		text := claudeDecode(buf)
 		if err != nil {
 			return empty
 		}
@@ -174,4 +200,53 @@ func antigravityEntryOffset(id string, fallback int64) int64 {
 		return fallback
 	}
 	return n
+}
+
+// OpenAntigravity confines every lookup (including symlinks) to a trusted root.
+// Without an explicit root, native sessions live under the configured user home.
+// Explicit roots support callers with a configured brain directory and parser fixtures.
+func OpenAntigravity(path string, roots ...string) (*os.File, error) {
+	root := ""
+	if len(roots) > 0 {
+		root = roots[0]
+	} else {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, err
+		}
+		root = filepath.Join(home, ".gemini", "antigravity-cli", "brain")
+	}
+	if root == "" {
+		return nil, fmt.Errorf("empty Antigravity root")
+	}
+	base, err := filepath.Abs(root)
+	if err != nil {
+		return nil, err
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+	rel, err := filepath.Rel(base, abs)
+	if err != nil || !filepath.IsLocal(rel) {
+		return nil, fmt.Errorf("Antigravity path outside root")
+	}
+	dir, err := os.OpenRoot(base)
+	if err != nil {
+		return nil, err
+	}
+	defer dir.Close()
+	f, err := dir.Open(rel)
+	if err != nil {
+		return nil, err
+	}
+	st, err := f.Stat()
+	if err != nil || !st.Mode().IsRegular() {
+		_ = f.Close()
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("Antigravity transcript is not a regular file")
+	}
+	return f, nil
 }

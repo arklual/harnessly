@@ -325,7 +325,7 @@ func TestCLITabRoutes(t *testing.T) {
 	r.want(r.do("t", "POST", "/api/cli/tabs", `{}`), 400, `{"error":"workspaceId is required"}`)
 	r.want(r.do("t", "POST", "/api/cli/tabs", `{"workspaceId":"ws-none"}`), 404, `{"error":"Workspace not found"}`)
 	r.want(r.do("t", "POST", "/api/cli/tabs", `{"workspaceId":"`+ws+`","panelType":"x"}`), 400,
-		`{"error":"Invalid panelType","validPanelTypes":["terminal","claude-code","codex-cli","agent-sessions","web-browser","diff"]}`)
+		`{"error":"Invalid panelType","validPanelTypes":["terminal","claude-code","codex-cli","antigravity-cli","agent-sessions","web-browser","diff"]}`)
 	r.want(r.do("t", "POST", "/api/cli/tabs", `{"workspaceId":"`+ws+`","prompt":"hi"}`), 400, `{"error":"prompt, model and effort need a claude-code or codex-cli tab"}`)
 	r.want(r.do("t", "POST", "/api/cli/tabs", `{"workspaceId":"`+ws+`","panelType":"claude-code","model":"bad"}`), 400, `{"error":"Недопустимое имя модели"}`)
 	r.agents.start = StartResult{Status: 409, Body: []byte(`{"error":"busy"}`)}

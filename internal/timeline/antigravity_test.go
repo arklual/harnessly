@@ -35,11 +35,11 @@ func TestNativeAntigravityPathAndIncremental(t *testing.T) {
 	if nativeAntigravityPath("", path) || nativeAntigravityPath(root, backup) {
 		t.Fatal("unconfigured/arbitrary backup accepted")
 	}
-	inc := antigravityIncremental(path, 0)
+	inc := antigravityIncremental(root, path, 0)
 	if len(inc.NewEntries) != 1 || inc.NewOffset != int64(len(line)) {
 		t.Fatal(inc)
 	}
-	if next := antigravityIncremental(path, inc.NewOffset); len(next.NewEntries) != 0 {
+	if next := antigravityIncremental(root, path, inc.NewOffset); len(next.NewEntries) != 0 {
 		t.Fatal(next)
 	}
 	outside := filepath.Join(t.TempDir(), "transcript.jsonl")
@@ -54,5 +54,8 @@ func TestNativeAntigravityPathAndIncremental(t *testing.T) {
 	}
 	if nativeAntigravityPath(root, path) {
 		t.Fatal("symlink escape accepted")
+	}
+	if inc := antigravityIncremental(root, path, 0); len(inc.NewEntries) != 0 {
+		t.Fatal("incremental symlink escape", inc)
 	}
 }

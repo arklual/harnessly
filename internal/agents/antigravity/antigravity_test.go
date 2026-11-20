@@ -169,6 +169,7 @@ func TestModelsBounded(t *testing.T) {
 
 func TestNativeSnapshotDoesNotFinishOnStepDone(t *testing.T) {
 	home := t.TempDir()
+	t.Setenv("HOME", home)
 	path := TranscriptPath(home, testID)
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		t.Fatal(err)
