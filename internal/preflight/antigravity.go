@@ -41,6 +41,21 @@ func parseAntigravityModels(out string) []AntigravityModel {
 	return models
 }
 
+// SetAntigravityBinary selects the launcher's binary for native probes. Empty uses
+// agy on the login PATH, then ~/.local/bin; an explicit binary never falls back.
+// Shared Checkers drop both cached answers only when the selection changes.
+func (c *Checker) SetAntigravityBinary(binary string) {
+	c.antigravityMu.Lock()
+	defer c.antigravityMu.Unlock()
+	if c.antigravityBinary == binary {
+		return
+	}
+	c.antigravityBinary, c.antigravity = binary, nil
+	c.mu.Lock()
+	c.result, c.inflight = nil, nil
+	c.mu.Unlock()
+}
+
 // AntigravityStatus shares the runtime's minute-cached, bounded native CLI probe.
 func (c *Checker) AntigravityStatus() Antigravity { return c.antigravityStatus(c.shellPath()) }
 
@@ -55,8 +70,12 @@ func (c *Checker) antigravityStatus(path string) Antigravity {
 		return clone(*c.antigravity)
 	}
 	r := Antigravity{Models: []AntigravityModel{}}
-	bin, err := lookPath("agy", path)
-	if err != nil {
+	name := c.antigravityBinary
+	if name == "" {
+		name = "agy"
+	}
+	bin, err := lookPath(name, path)
+	if err != nil && c.antigravityBinary == "" {
 		// The official installer uses this directory even when the login PATH omits it.
 		dir := filepath.Join(c.Home, ".local", "bin")
 		bin, err = lookPath("agy", dir)
@@ -66,13 +85,13 @@ func (c *Checker) antigravityStatus(path string) Antigravity {
 	}
 	if err == nil {
 		r.BinaryPath = &bin
-		out, versionErr := c.cliVersion("agy", path)
+		out, versionErr := c.cliVersion(bin, path)
 		r.Installed, r.Version = versionErr == nil, Version(out)
 		if errors.Is(versionErr, errTimedOut) {
 			r.Uncertain = true
 		}
 		if r.Installed {
-			out, probeErr := run("agy", c.withPath(path), path, "models")
+			out, probeErr := run(bin, c.withPath(path), path, "models")
 			if probeErr == nil {
 				r.Models = parseAntigravityModels(out)
 				r.LoggedIn = len(r.Models) > 0

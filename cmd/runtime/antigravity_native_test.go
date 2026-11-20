@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -10,6 +11,64 @@ import (
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
+
+func TestAntigravityPreflightUsesLaunchBinary(t *testing.T) {
+	for _, tc := range []struct {
+		name                     string
+		override, missing, local bool
+		version, model           string
+	}{
+		{"custom override", true, false, true, "2.0.0", "custom-model"},
+		{"missing override", true, true, true, "", ""},
+		{"official local install", false, false, true, "3.0.0", "local-model"},
+		{"default PATH", false, false, false, "1.0.0", "path-model"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			home, dir := t.TempDir(), t.TempDir()
+			writeCLI := func(binary, version, model string) {
+				t.Helper()
+				body := "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf 'agy " + version + "'; else printf '" + model + "\\tModel\\n'; fi\n"
+				if err := os.WriteFile(binary, []byte(body), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			writeCLI(filepath.Join(dir, "agy"), "1.0.0", "path-model")
+			binary := ""
+			if tc.local {
+				local := filepath.Join(home, ".local", "bin")
+				if err := os.MkdirAll(local, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				binary = filepath.Join(local, "agy")
+				writeCLI(binary, "3.0.0", "local-model")
+			}
+			t.Setenv("RUNTIME_ANTIGRAVITY_BIN", "")
+			if tc.override {
+				binary = filepath.Join(t.TempDir(), "custom agy")
+				if !tc.missing {
+					writeCLI(binary, "2.0.0", "custom-model")
+				}
+				t.Setenv("RUNTIME_ANTIGRAVITY_BIN", binary)
+			}
+			a := newCoreAgents(coreAgentsConfig{DataDir: t.TempDir(), Home: home})
+			if a.antigravity.Launcher != binary {
+				t.Fatalf("launch binary: %q, want %q", a.antigravity.Launcher, binary)
+			}
+			a.checker.Env, a.checker.Shell = []string{"PATH=" + dir}, "/nonexistent/login-shell"
+			r := a.runtime().Antigravity
+			options := a.antigravityOptions()
+			if tc.missing {
+				if r.Installed || r.LoggedIn || len(options.Models) != 0 {
+					t.Fatalf("missing override fell back: %+v / %+v", r, options)
+				}
+				return
+			}
+			if !r.Installed || !r.LoggedIn || r.Version == nil || *r.Version != tc.version || len(options.Models) != 1 || options.Models[0].ID != tc.model {
+				t.Fatalf("preflight/catalog binary differs from launch: %+v / %+v", r, options)
+			}
+		})
+	}
+}
 
 func TestAntigravityLaunchBinding(t *testing.T) {
 	const first = "11111111-2222-4333-8444-555555555555"

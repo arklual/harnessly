@@ -213,6 +213,7 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 			InputSocket:      inputSocket,
 		},
 	}
+	a.checker.SetAntigravityBinary(a.antigravity.Launcher)
 	a.options.AntigravityOptions = a.antigravityOptions
 	return a
 }

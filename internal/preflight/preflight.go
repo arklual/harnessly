@@ -99,9 +99,10 @@ type Checker struct {
 	codexAt    time.Time
 	codexStamp string
 
-	antigravityMu sync.Mutex
-	antigravity   *Antigravity
-	antigravityAt time.Time
+	antigravityMu     sync.Mutex
+	antigravityBinary string
+	antigravity       *Antigravity
+	antigravityAt     time.Time
 
 	claudeMu    sync.Mutex
 	claude      *Claude
@@ -179,6 +180,12 @@ func (c *Checker) Runtime() Result {
 		c.mu.Unlock()
 		r := c.check()
 		c.mu.Lock()
+		if c.inflight != done {
+			// A configuration change invalidated this check while it ran.
+			c.mu.Unlock()
+			close(done)
+			continue
+		}
 		c.result, c.at, c.inflight = &r, time.Now(), nil
 		c.mu.Unlock()
 		close(done)
