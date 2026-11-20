@@ -59,6 +59,7 @@ import { usePresence } from '@/next/ui/presence';
 import { DictationMirror, RecordingTime, RecordingWave } from '@/next/features/composer/recording';
 import { FIELD_FLOOR, useVoiceField } from '@/next/features/voice-live/field';
 import VoiceHead, { HEAD, headOf } from '@/next/features/voice-live/voice-head';
+import VoiceQuick, { QUICK_KIND } from '@/next/features/voice-quick/voice-quick';
 import { chordOf, isMac } from '@/next/features/keys/chord';
 import { KEY_SCOPE } from '@/next/features/keys/commands';
 import { useKeyHint } from '@/next/features/keys/keys-help';
@@ -844,13 +845,20 @@ const Composer = (props: IComposerProps) => {
             {/* Dictation (the mic) always stays; the live voice is its own button beside it (the wave). Only during a
                 call the call's own mic (mute) stands here instead, so the field never shows two mics. */}
             {props.onMic && !voice && (
-              <RoundButton
-                className="hx-dictate-btn"
-                icon="mic"
-                label={t('next.composer.voice')}
-                keys={dictateHint ? [dictateHint] : undefined}
-                onClick={onMicClick}
-              />
+              <VoiceQuick kind={QUICK_KIND.dictate}>
+                {({ note, ref, ...gestures }) => (
+                  <RoundButton
+                    {...gestures}
+                    ref={ref}
+                    className="hx-dictate-btn"
+                    icon="mic"
+                    label={t('next.composer.voice')}
+                    note={note}
+                    keys={dictateHint ? [dictateHint] : undefined}
+                    onClick={onMicClick}
+                  />
+                )}
+              </VoiceQuick>
             )}
             {/* While the agent works the field shows one button: stop with an empty field, the arrow with a message
                 (↵ into the queue, ⌃↵ straight into its turn). */}

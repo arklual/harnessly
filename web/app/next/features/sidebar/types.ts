@@ -27,6 +27,8 @@ export interface ISidebarChat {
   status: TChatStatus;
   /** For `background`: what the agent waits for, in words («Ждёт: 2 сабагента, команда npm test»); for `limited`: «Ждёт сброса лимита до 18:00»; else absent. */
   waitsFor?: string;
+  /** `perm` on a menu of the agent's own screen (a dialog): it waits for a choice, not a permission to allow. */
+  dialog?: boolean;
   pinned: boolean;
   /** An agent made the chat to check something: the sidebar and the search leave it out unless the person shows test chats. */
   test?: boolean;

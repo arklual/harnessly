@@ -163,3 +163,12 @@ Models that are not Anthropic's run in Claude Code through the setup's agent env
 `ANTHROPIC_AUTH_TOKEN` and the `ANTHROPIC_DEFAULT_*_MODEL` names, with `--models sonnet` (the runtime launches only the
 models of its catalog; the setup maps sonnet to the provider's model). Keep such a setup file private (0600) and out of
 the repository.
+
+## Blender scenes
+
+`blender-scene-*` check that a scene the agent saves with the blender-lab skill shows up in Sinopia without the person asking.
+`fixtures/blender-lab/mock/blender` is a stand-in for headless Blender (a fake `bpy` that accepts any call and writes the
+.blend and the PNGs), so a run costs only the agent. `mock/variant` is the setup under test: `before` (the skill as it was),
+`text` (the step in the skill's workflow, run by hand), `wrap` (the `blender` wrapper that runs `design scene3d add` after
+a save), `both` (the committed default). Measured with the runtime without the `scene3d` paragraph of the workspace prompt, as
+production had it: before 5/36 (dev), 0/9 (held out); text only 16/18 and 8/9; both 18/18 and 9/9.

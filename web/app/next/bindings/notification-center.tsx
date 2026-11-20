@@ -15,7 +15,7 @@ import WaitRow, { type TWaitDetail } from '@/next/features/notifications/wait-ro
 import { chatStatusOf, statusLookOf } from '@/next/features/sidebar/status';
 import { CHAT_STATUS, type ISidebarChat } from '@/next/features/sidebar/types';
 import { t } from '@/next/i18n';
-import type { Conversation } from '@/next/protocol/v2';
+import type { Conversation, Permission, PermissionScope } from '@/next/protocol/v2';
 import { openGates, useGates } from '@/next/stores/conversation';
 import { convsLoadedStore, useConversationList } from '@/next/stores/conversations';
 import { SOURCE, originOf } from '@/next/stores/conversation-merge';
@@ -87,15 +87,22 @@ export const logSourceOf = (
 export interface IWaitBindingProps {
   conv: Conversation;
   item: INotification;
-  open: boolean;
-  onToggle: () => void;
   onOpenChat: () => void;
 }
 
-/** One waiting row: the chat's channel while it is on screen, its question or permission, the answer from here. */
-export const WaitBinding = ({ conv, item, open, onToggle, onOpenChat }: IWaitBindingProps) => {
+/** What the person sees of a plan or a question's first words, from the gate the page already holds. */
+const planOption = (permission: Permission, scope: PermissionScope): string | null =>
+  permission.options.find((option) => option.scope === scope)?.id ?? null;
+
+/**
+ * One waiting row: the chat's channel while the row is on screen (so the gate's words are there when the eye comes,
+ * not asked for at a press), its question, permission, menu or plan, and the answer from here. The kind of the wait is
+ * said once, by the item's own text (`label`).
+ */
+export const WaitBinding = ({ conv, item, onOpenChat }: IWaitBindingProps) => {
   const status = chatStatusOf(conv, true);
-  const needsGate = status === CHAT_STATUS.question || status === CHAT_STATUS.perm;
+  const needsGate =
+    status === CHAT_STATUS.question || status === CHAT_STATUS.perm || status === CHAT_STATUS.plan;
   useConversationChannel(needsGate ? conv.machineId : null, needsGate ? conv.id : null);
   const gates = useGates(needsGate ? conv.id : null);
   const gate = useMemo(() => openGates(gates), [gates]);
@@ -103,18 +110,31 @@ export const WaitBinding = ({ conv, item, open, onToggle, onOpenChat }: IWaitBin
   const permission = gate.permissions[0] ?? null;
 
   const detail = useMemo((): TWaitDetail => {
-    if (status === CHAT_STATUS.plan) return { k: 'plain', text: t('next.nc.waitsPlan') };
     if (status === CHAT_STATUS.question) {
       if (!question) return { k: 'loading' };
       const [only, ...more] = question.items;
       // Several questions or a choice of several are answered in the chat, where they have room.
-      if (!only) return { k: 'plain', text: t('next.nc.waitsAnswer') };
+      if (!only) return { k: 'plain', text: '' };
       if (more.length > 0 || only.multi)
         return { k: 'plain', text: only.question || t('next.nc.manyQuestions') };
       return { k: 'question', text: only.question, options: only.options.map((o) => o.label) };
     }
     if (!permission) return { k: 'loading' };
-    if (permission.kind !== 'tool') return { k: 'plain', text: t('next.nc.waitsPlan') };
+    if (permission.kind === 'plan') {
+      const approve = planOption(permission, 'plan-ask') ?? planOption(permission, 'plan-auto');
+      return { k: 'plan', md: permission.planMd ?? '', approve, revise: planOption(permission, 'revise') };
+    }
+    const words = permission.planMd ?? '';
+    if (permission.kind === 'dialog') {
+      // A menu the machine cannot match gets no buttons: the card does not offer what would do nothing.
+      const refused = permission.state.k === 'open' && permission.state.refused !== undefined;
+      if (refused || permission.options.length === 0) return { k: 'plain', text: words };
+      return {
+        k: 'choice',
+        text: words,
+        options: permission.options.map((option) => ({ id: option.id, label: option.label })),
+      };
+    }
     // Only a command shown in full is allowed here; anything else is decided in the chat, with all it says.
     if (!permission.command) return { k: 'plain', text: permission.tool ?? t('next.nc.waitsPermission') };
     return { k: 'permission', command: permission.command };
@@ -147,16 +167,24 @@ export const WaitBinding = ({ conv, item, open, onToggle, onOpenChat }: IWaitBin
     await settled(decidePermission(conv.machineId, conv.id, permission.id, option.id));
     remember(t(allow ? 'next.nc.history.allowed' : 'next.nc.history.denied'), allow ? 'check' : 'ban');
   };
+  // One option of a menu or a plan: the same decision the chat's card sends (the option's own id).
+  const onPick = async (optionId: string) => {
+    if (!permission) return;
+    const option = permission.options.find((o) => o.id === optionId);
+    if (!option) return;
+    await settled(decidePermission(conv.machineId, conv.id, permission.id, option.id));
+    remember(t('next.nc.history.answer', { text: option.label }), option.scope === 'deny' ? 'ban' : 'check');
+  };
 
   return (
     <WaitRow
       detail={detail}
-      open={open}
-      onToggle={onToggle}
+      label={item.text}
       onOpenChat={onOpenChat}
       onChoose={question ? onChoose : undefined}
       onText={question ? onText : undefined}
       onDecide={permission ? onDecide : undefined}
+      onPick={permission ? onPick : undefined}
     />
   );
 };
@@ -292,19 +320,10 @@ export const useNotificationCenter = ({
   }, [items, onRead]);
 
   const renderWait = useCallback(
-    (item: INotification, open: boolean, toggle: () => void) => {
+    (item: INotification) => {
       const conv = item.chatId ? byId.get(item.chatId) : undefined;
       if (!conv) return null;
-      return (
-        <WaitBinding
-          key={item.id}
-          conv={conv}
-          item={item}
-          open={open}
-          onToggle={toggle}
-          onOpenChat={() => onOpenChat(conv.id)}
-        />
-      );
+      return <WaitBinding key={item.id} conv={conv} item={item} onOpenChat={() => onOpenChat(conv.id)} />;
     },
     [byId, onOpenChat],
   );

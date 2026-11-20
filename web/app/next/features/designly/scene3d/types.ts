@@ -9,6 +9,8 @@ export interface IScene3dObject {
   p?: string;
   tris?: number;
   hidden?: boolean;
+  /** When the object is on: [frame, 1|0] from the first sampled frame, one entry where it changes. */
+  vis?: [number, number][];
 }
 
 export interface IScene3dCamera {
@@ -36,6 +38,8 @@ export interface IScene3dStats {
   missingImages?: string[];
   unappliedScale?: string[];
   offCamera?: string[];
+  /** Objects the saved frame shows as nothing and that appear later; the model carries them whole. */
+  emptyAtSave?: string[];
 }
 
 export interface IScene3dMeta {

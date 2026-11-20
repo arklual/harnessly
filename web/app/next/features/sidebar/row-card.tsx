@@ -7,7 +7,7 @@
 // away from the card) moves the card to that row.
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { chatStatusOf, STATUS_LOOK, statusNoteOf } from '@/next/features/sidebar/status';
+import { chatStatusOf, statusLookOf, statusNoteOf } from '@/next/features/sidebar/status';
 import { CHAT_STATUS } from '@/next/features/sidebar/types';
 import { formatAgo } from '@/next/i18n/format';
 import { t } from '@/next/i18n';
@@ -89,7 +89,7 @@ const RowCard = ({ target, boxRef, onEnter, onLeave }: ICardProps) => {
   if (!value || !record || !host) return null;
 
   const status = chatStatusOf(record, true);
-  const look = status === CHAT_STATUS.none ? null : STATUS_LOOK[status];
+  const look = status === CHAT_STATUS.none ? null : statusLookOf(status, record.gate);
   const waitsFor = statusNoteOf(record, status, value.now);
   const text = record.recap?.text ?? record.lastTurn?.snippet ?? '';
   const at = record.recap

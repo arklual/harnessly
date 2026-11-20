@@ -1046,6 +1046,7 @@ const CHECK_KEYS = {
   [CHECK.textures]: 'next.scene3d.checkTextures',
   [CHECK.scale]: 'next.scene3d.checkScale',
   [CHECK.offCamera]: 'next.scene3d.checkOffCamera',
+  [CHECK.emptyAtSave]: 'next.scene3d.checkEmptyAtSave',
 } as const;
 
 const MODE_KEYS = {

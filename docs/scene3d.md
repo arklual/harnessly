@@ -61,3 +61,11 @@ after) and closes a pin with `scene_comments` `resolve`, with both frames. It ca
 
 The checks of the scene (polygons, lost textures, scale not applied, objects no camera sees) are in the *Checks* tab, and the
 plan of a final render names the ones that matter before money is spent.
+
+## What the saved frame hides
+
+The model is the .blend as it was saved, one frame. An object whose `hide_render`/`hide_viewport` is keyed on later, a curve that
+grows by its `bevel_factor_*`, a ring scaled up from zero would be empty there. The export mutes those keys and writes the
+objects whole; `meta.json` gets `objects[].vis` (`[frame, 1|0]`, where visibility changes), which the viewer applies per frame,
+and `stats.emptyAtSave` (what the saved frame shows as nothing), which the checks panel names. The skill advises animating
+appearance by `scale`. Test: `TestScene3DExportShowsWhatTheSavedFrameHides` (real Blender, skipped without one).

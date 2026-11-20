@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
 import Router from '@/platform/router';
 import TabStrip, { PACE, type IStripTab, type TPace } from '@/next/features/shell/tab-strip';
-import { STATUS_LOOK } from '@/next/features/sidebar/status';
+import { statusLookOf } from '@/next/features/sidebar/status';
 import { CHAT_STATUS } from '@/next/features/sidebar/types';
 import type { ITabChat } from '@/next/bindings/shell-model';
 import {
@@ -87,7 +87,7 @@ export const stripTabOf = (tab: ITab, chats: ReadonlyMap<string, ITabChat>): ISt
   if (route.kind === ROUTE.chat) {
     const chat = chats.get(route.id);
     const status = chat?.status ?? CHAT_STATUS.none;
-    const look = status === CHAT_STATUS.none ? null : STATUS_LOOK[status];
+    const look = status === CHAT_STATUS.none ? null : statusLookOf(status, chat);
     return {
       id: tab.id,
       title: chatTabTitle(chat, tab),
@@ -105,7 +105,7 @@ export const stripTabOf = (tab: ITab, chats: ReadonlyMap<string, ITabChat>): ISt
   if (route.kind === ROUTE.site && route.chat && route.edit) {
     const chat = chats.get(route.chat);
     const status = chat?.status ?? CHAT_STATUS.none;
-    const look = status === CHAT_STATUS.none ? null : STATUS_LOOK[status];
+    const look = status === CHAT_STATUS.none ? null : statusLookOf(status, chat);
     return {
       id: tab.id,
       title: chatTabTitle(chat, tab),

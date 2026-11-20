@@ -17,6 +17,114 @@ sc = bpy.context.scene
 objs = list(sc.objects)
 dg = bpy.context.evaluated_depsgraph_get()
 
+# --- what the saved frame does not show (HRN-1716). A scene is saved at one frame, and the glTF is that frame: an object whose
+# hide_render is keyed on later, a curve that grows by its bevel factors, a ring scaled up from zero is empty there, and the viewer
+# would show a scene without its letters and threads. The export shows such an object in full (the glTF carries the scale and
+# the transform animation by itself); when it is visible goes to the viewer as a track of its own, meta "vis".
+saved_frame = sc.frame_current
+vis_of = lambda o: not (o.hide_render or o.hide_viewport)
+anim = [o for o in sc.objects if (o.animation_data and (o.animation_data.action or o.animation_data.drivers))
+        or (o.type == "CURVE" and o.data.animation_data and o.data.animation_data.action)]
+vis_track = {}  # name -> [[frame, 1|0], ...] from the first sampled frame, one entry where it changes
+reveal = []  # objects shown in full for the export
+empty_at_save = []  # what the saved frame shows as nothing: hidden, or scaled to zero, and not later
+if anim:
+    import time as _t
+
+    _t0 = _t.time()
+    _step = max(1, math.ceil((sc.frame_end - sc.frame_start + 1) / 24))
+    _fs = set(range(sc.frame_start, sc.frame_end + 1, _step)) | {sc.frame_end, saved_frame}
+    _fs |= {m.frame for m in sc.timeline_markers if sc.frame_start <= m.frame <= sc.frame_end}
+    _cache = {}
+
+    def _state(f):
+        if f not in _cache:
+            sc.frame_set(f)
+            _cache[f] = ({o.name: vis_of(o) for o in anim}, {o.name: max(o.matrix_world.to_scale()) > 1e-4 for o in anim})
+        return _cache[f]
+
+    for f in sorted(_fs):
+        if _t.time() - _t0 > 60:
+            break
+        _state(f)
+    _extra = [0]
+
+    def _bisect(a, b):
+        # between two sampled frames that differ, the frame it changes on: halving, within a budget
+        if b - a <= 1 or _extra[0] > 80 or _t.time() - _t0 > 80:
+            return
+        if _state(a)[0] == _state(b)[0]:
+            return
+        m = (a + b) // 2
+        _extra[0] += 1
+        _state(m)
+        _bisect(a, m)
+        _bisect(m, b)
+
+    _done = sorted(_cache)
+    for a, b in zip(_done, _done[1:]):
+        _bisect(a, b)
+    _done = sorted(_cache)
+    for o in anim:
+        seq = [(f, _cache[f][0][o.name]) for f in _done]
+        if all(v == seq[0][1] for _, v in seq):
+            continue
+        track = [[seq[0][0], int(seq[0][1])]]
+        for f, v in seq[1:]:
+            if int(v) != track[-1][1]:
+                track.append([f, int(v)])
+        vis_track[o.name] = track
+    for o in anim:
+        grows = o.type == "CURVE" and o.data.animation_data and o.data.animation_data.action
+        if o.name in vis_track or grows:
+            reveal.append(o)
+        if saved_frame in _cache:
+            hid = not _cache[saved_frame][0][o.name]
+            flat = not _cache[saved_frame][1][o.name] and any(_cache[f][1][o.name] for f in _done)
+            if (o.name in vis_track and hid) or flat:
+                empty_at_save.append(o.name)
+    sc.frame_set(saved_frame)
+
+
+def fcurves_of(ad):
+    """The F-curves of an ID's animation, whichever way this Blender keeps them (Blender 5: slots, layers, strips, channelbags)."""
+    act = ad.action if ad else None
+    if not act:
+        return
+    try:
+        yield from act.fcurves
+        return
+    except AttributeError:
+        pass
+    slot = getattr(ad, "action_slot", None)
+    for layer in act.layers:
+        for strip in layer.strips:
+            cb = strip.channelbag(slot) if slot else None
+            if cb:
+                yield from cb.fcurves
+
+
+def show_in_full():
+    """Visibility keys and the bevel keys of a growing curve are muted and the values set whole: the glTF exporter re-evaluates
+    the animation on its own, and what it reads is the object as it is then."""
+    for o in reveal:
+        if o.name in vis_track:
+            for fc in fcurves_of(o.animation_data):
+                if fc.data_path in ("hide_render", "hide_viewport"):
+                    fc.mute = True
+            o.hide_render = False
+            o.hide_viewport = False
+        if o.type == "CURVE" and o.data.animation_data and o.data.animation_data.action:
+            for fc in fcurves_of(o.data.animation_data):
+                if fc.data_path in ("bevel_factor_start", "bevel_factor_end"):
+                    fc.mute = True
+            o.data.bevel_factor_start = 0.0
+            o.data.bevel_factor_end = 1.0
+    bpy.context.view_layer.update()
+
+
+show_in_full()
+
 
 def poly_tris(me):
     return sum(max(1, len(p.vertices) - 2) for p in me.polygons)
@@ -61,6 +169,7 @@ if total > tri_budget:
             d = min((pos - c).length for c in cams_at)
             near[o.name] = min(near.get(o.name, 1e9), d)
     sc.frame_set(sc.frame_start)
+    show_in_full()
     dg.update()
     weight = {o.name: tris[o.name] / (1.0 + (near.get(o.name, 1e9) / 8.0) ** 2) for o in meshes_all}
     wsum = sum(weight.values()) or 1.0
@@ -275,6 +384,9 @@ try:
 except Exception as e:
     print("HL_TRACK_FAIL", e)
 
+sc.frame_set(saved_frame)
+show_in_full()
+
 meta = {
     "version": 1,
     "fps": sc.render.fps / (sc.render.fps_base or 1),
@@ -284,7 +396,8 @@ meta = {
     "camera": sc.camera.name if sc.camera else "",
     "objects": [
         {"n": o.name, "t": o.type, "p": o.parent.name if o.parent else "", "tris": tris[o.name],
-         **({"hidden": True} if o.hide_render else {})}
+         **({"hidden": True} if o.hide_render and o.name not in vis_track else {}),
+         **({"vis": vis_track[o.name]} if o.name in vis_track else {})}
         for o in objs
     ],
     "cameras": [
@@ -298,7 +411,7 @@ meta = {
     "stats": {
         "tris": total, "trisOut": max(out_total, 0), "objects": len(objs),
         "animated": sum(1 for o in objs if o.animation_data and o.animation_data.action),
-        "missingImages": missing[:50], "unappliedScale": unapplied[:50], "offCamera": off[:50],
+        "missingImages": missing[:50], "emptyAtSave": empty_at_save[:50], "unappliedScale": unapplied[:50], "offCamera": off[:50],
     },
 }
 with open(out_meta, "w") as f:

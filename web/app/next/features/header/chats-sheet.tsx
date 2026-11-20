@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import Sheet from '@/next/ui/sheet';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
-import { STATUS_LOOK } from '@/next/features/sidebar/status';
+import { statusLookOf } from '@/next/features/sidebar/status';
 import { CHAT_STATUS, type ISidebarChat } from '@/next/features/sidebar/types';
 
 /** How many recent chats the sheet lists before a search narrows them. */
@@ -86,7 +86,7 @@ const ChatsSheet = ({ open, onClose, chats, currentId, onOpen }: IChatsSheetProp
         <ul className="hx-chats-sheet__list" aria-label={t('next.header.chats')}>
           {list.map((chat) => {
             const current = chat.id === currentId;
-            const look = chat.status === CHAT_STATUS.none ? null : STATUS_LOOK[chat.status];
+            const look = chat.status === CHAT_STATUS.none ? null : statusLookOf(chat.status, chat);
             return (
               <li key={chat.id}>
                 <button

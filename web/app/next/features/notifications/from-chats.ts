@@ -4,7 +4,7 @@ import {
   type INotification,
   type TNotificationKind,
 } from '@/next/features/notifications/notification-center';
-import { STATUS_LOOK } from '@/next/features/sidebar/status';
+import { statusLookOf } from '@/next/features/sidebar/status';
 import { CHAT_STATUS, type ISidebarChat, type TChatStatus } from '@/next/features/sidebar/types';
 
 const KIND_OF: Partial<Record<TChatStatus, TNotificationKind>> = {
@@ -29,7 +29,7 @@ export const notificationsFromChats = (
       if (!kind || chat.status === CHAT_STATUS.none) return [];
       // A delegated chat is heard only when it waits for the person.
       if (chat.parentId !== undefined && kind !== NOTIFICATION_KIND.waiting) return [];
-      const look = STATUS_LOOK[chat.status];
+      const look = statusLookOf(chat.status, chat);
       return [
         {
           id: `${chat.id}:${chat.status}`,

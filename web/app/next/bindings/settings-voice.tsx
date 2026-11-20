@@ -1,6 +1,6 @@
 // Settings → «Голосовой ввод»: the machine's dictation (state, model) and this browser's microphone and language.
 import { useEffect, useState } from 'react';
-import VoiceSection, { type IMicrophone, type IRemoteForm } from '@/next/features/settings/voice-section';
+import VoiceSection, { type IRemoteForm } from '@/next/features/settings/voice-section';
 import {
   loadVoiceEngine,
   saveVoiceEngine,
@@ -8,6 +8,7 @@ import {
   type IVoiceEngine,
   type TVoiceModel,
 } from '@/next/features/settings/voice-api';
+import { useMicrophones } from '@/next/features/voice-quick/microphones';
 import { useSpeechKeys } from '@/next/bindings/settings-speech';
 import { t } from '@/next/i18n';
 import {
@@ -27,32 +28,6 @@ const PREPARING_POLL_MS = 2_000;
 /** The words for a change of the dictation's settings that did not go through. */
 const refusalText = (res: Exclude<PatchResult, { r: 'accepted' }>): string =>
   res.r === 'refused' ? t(`next.refuse.${res.code}`) : t('next.failure.network');
-
-/** The browser's microphones; their names come only after the page was allowed a microphone once. */
-const useMicrophones = (): IMicrophone[] | null => {
-  const [list, setList] = useState<IMicrophone[] | null>(null);
-  useEffect(() => {
-    const media = navigator.mediaDevices;
-    if (!media?.enumerateDevices) return;
-    let live = true;
-    const read = () =>
-      void media.enumerateDevices().then(
-        (devices) => {
-          if (!live) return;
-          const inputs = devices.filter((d) => d.kind === 'audioinput' && d.deviceId && d.label);
-          setList(inputs.length ? inputs.map((d) => ({ id: d.deviceId, label: d.label })) : null);
-        },
-        () => undefined,
-      );
-    read();
-    media.addEventListener?.('devicechange', read);
-    return () => {
-      live = false;
-      media.removeEventListener?.('devicechange', read);
-    };
-  }, []);
-  return list;
-};
 
 export const VoicePage = ({ machine }: { machine: MachineId }) => {
   const prefs = useVoicePrefs();

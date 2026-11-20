@@ -1,0 +1,190 @@
+/* The quick voice settings (features/voice-quick): a small panel over the mic and the wave of the field, a bottom sheet
+   on the phone. The panel enters with the popovers' shared fade and rise (ui.css .hx-pop-pos). */
+
+/* The buttons that open it by a right click or a long press: no system callout, no text selection under the finger. */
+.hx-round[data-quick] {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Above the voice conversation, which stands over the field. */
+.hx-pop-pos:has(> .hx-vq) {
+  z-index: 8996;
+}
+.hx-vq {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+  width: min(300px, calc(100vw - 2 * var(--hx-space-4)));
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-lg);
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  box-shadow: var(--hx-shadow-overlay);
+  font-size: var(--hx-text-sm);
+  outline: 0;
+}
+.hx-vq.hx-sheet--pop {
+  width: auto;
+  padding: 6px var(--hx-space-3) var(--hx-space-3);
+  border: 0;
+  box-shadow: none;
+}
+.hx-vq .hx-sheet__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+}
+.hx-vq__select[data-wait] {
+  border-color: transparent;
+  background: var(--hx-bg-hover);
+}
+.hx-vq__head {
+  margin: 0;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+  letter-spacing: 0.02em;
+}
+.hx-vq__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-1);
+  min-width: 0;
+}
+.hx-vq__label {
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-vq__select,
+.hx-vq__allow {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 var(--hx-space-3);
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-app);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  text-overflow: ellipsis;
+  transition:
+    border-color var(--hx-dur-xs) ease,
+    box-shadow var(--hx-dur-xs) ease,
+    background var(--hx-dur-xs) ease;
+}
+.hx-vq__allow {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  cursor: pointer;
+}
+.hx-vq__allow:hover:not(:disabled) {
+  background: var(--hx-bg-hover);
+}
+.hx-vq__allow:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.hx-vq__select:focus-visible,
+.hx-vq__allow:focus-visible,
+.hx-vq__all:focus-visible {
+  border-color: var(--hx-accent);
+  box-shadow: 0 0 0 3px var(--hx-focus);
+  outline: 0;
+}
+.hx-vq__select:disabled {
+  opacity: 0.6;
+}
+.hx-vq__note {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  line-height: 1.4;
+}
+
+/* The live level of the picked microphone: written by useMicLevel into --level (0..1) while the panel is open. */
+.hx-vq__meter {
+  --level: 0;
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-active);
+}
+.hx-vq__meter > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--hx-accent);
+  transform: scaleX(var(--level));
+  transform-origin: left center;
+  transition: transform 60ms linear;
+}
+
+.hx-vq__switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hx-space-3);
+  min-height: 28px;
+}
+.hx-vq__switch .hx-switch:disabled {
+  opacity: 0.6;
+}
+.hx-vq__switch .hx-switch:focus-visible {
+  box-shadow: 0 0 0 3px var(--hx-focus);
+  outline: 0;
+}
+
+/* The way on to the section of the settings with the rest. */
+.hx-vq__all {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  width: 100%;
+  min-height: 34px;
+  margin-top: calc(var(--hx-space-1) * -1);
+  padding: 0 var(--hx-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--hx-radius-md);
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.hx-vq__all > span {
+  flex: 1 1 auto;
+}
+.hx-vq__all:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+
+@media (max-width: 900px) {
+  .hx-vq__select,
+  .hx-vq__allow,
+  .hx-vq__all {
+    min-height: 44px;
+    font-size: 15px;
+  }
+  .hx-vq__switch {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-pop-pos > .hx-vq {
+    transition: none;
+  }
+  .hx-vq__meter > i,
+  .hx-vq__select,
+  .hx-vq__allow {
+    transition: none;
+  }
+}

@@ -29,9 +29,9 @@ const ID = "0001-data-to-hub"
 // Error codes (docs/migrations/0001-data-to-hub.md says the cause and the fix of each).
 const (
 	CodeRead    = "MIG-READ"
-	CodeGone    = "MIG-GONE"
+	CodeGone    = hubproto.MigrationCodeGone
 	CodeHash    = "MIG-HASH"
-	CodeTooBig  = "MIG-TOO-BIG"
+	CodeTooBig  = hubproto.MigrationCodeTooBig
 	CodePut     = "MIG-PUT"
 	CodeVerify  = "MIG-VERIFY"
 	CodeSession = "MIG-SESSION"
@@ -346,10 +346,14 @@ func (m *Mover) take(items []Item) {
 			r.Sha256 = it.Sha256
 		}
 	}
+	// An object that left the disk before it was moved stays in the journal as skipped with its reason, so the hub does
+	// not wait for it; one that comes back is moved (due, back).
 	for k, r := range m.st.Records {
-		if !in[k] && r.State != hubproto.MigrationVerified {
-			delete(m.st.Records, k)
+		if in[k] || r.State == hubproto.MigrationVerified || r.State == hubproto.MigrationSkipped && r.Code == CodeGone {
+			continue
 		}
+		r.State, r.Code, r.Error = hubproto.MigrationSkipped, CodeGone, "it is not on the disk any more"
+		r.Dirty, r.Retry, r.At = true, false, now
 	}
 }
 

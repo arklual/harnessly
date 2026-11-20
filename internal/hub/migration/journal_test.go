@@ -159,3 +159,20 @@ func TestABadReportIsRefused(t *testing.T) {
 		t.Error("an unknown ask was taken")
 	}
 }
+
+// A machine with nothing of its own to move is done, and an object an older runtime failed as gone from its
+// disk (it skips such objects now, and forgets one that left) does not hold the move open.
+func TestAnEmptyMoveIsOverAndAnOldGoneFailureIsSkipped(t *testing.T) {
+	j := openJournal(t)
+	report(t, j, "m0", 0)
+	if st := status(t, j, "m0"); st.FinishedAt == "" {
+		t.Fatalf("status = %+v, want an empty move over", st)
+	}
+	gone := obj("handoff", "drafts/a/", hubproto.MigrationFailed)
+	gone.Code, gone.Error = hubproto.MigrationCodeGone, "not on the disk any more"
+	report(t, j, "m1", 2, obj("files", "f1", hubproto.MigrationVerified), gone)
+	report(t, j, "m1", 1)
+	if st := status(t, j, "m1"); st.Failed != 0 || st.Skipped != 1 || st.FinishedAt == "" {
+		t.Fatalf("status = %+v, want the gone draft skipped and the move over", st)
+	}
+}

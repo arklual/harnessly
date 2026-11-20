@@ -11,6 +11,7 @@ import {
   pathTo,
   threeToBlender,
   timeOf,
+  visibleAt,
   treeOf,
 } from '@/next/features/designly/scene3d/scene-model';
 import type { IScene3dMeta } from '@/next/features/designly/scene3d/types';
@@ -141,5 +142,32 @@ describe('baked tracks', () => {
     expect(bakeSpan(rows, -4)?.k).toBe(0);
     expect(bakeSpan(rows, 99)).toEqual({ a: [25, 40], b: [25, 40], k: 0 });
     expect(bakeSpan([], 3)).toBeNull();
+  });
+});
+
+describe('visibility tracks', () => {
+  const vis = [
+    [1, 0],
+    [88, 1],
+    [140, 0],
+  ];
+  it('is the last entry at or before the frame', () => {
+    expect(visibleAt(vis, 1)).toBe(false);
+    expect(visibleAt(vis, 87)).toBe(false);
+    expect(visibleAt(vis, 88)).toBe(true);
+    expect(visibleAt(vis, 139)).toBe(true);
+    expect(visibleAt(vis, 200)).toBe(false);
+  });
+  it('holds the first entry before it, and an empty track is on', () => {
+    expect(visibleAt([[10, 1]], 3)).toBe(true);
+    expect(visibleAt([], 3)).toBe(true);
+  });
+  it('reports the objects the saved frame shows as nothing', () => {
+    const c = checksOf({ ...meta, stats: { ...meta.stats, emptyAtSave: ['h', 'ring'] } });
+    expect(c.find((x) => x.code === 'emptyAtSave')).toEqual({
+      code: 'emptyAtSave',
+      names: ['h', 'ring'],
+      count: 2,
+    });
   });
 });

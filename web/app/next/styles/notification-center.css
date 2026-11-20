@@ -415,21 +415,70 @@
 .hx-nc__cmd {
   pointer-events: auto;
 }
+/* What waits, compact: the kind of the wait said once, what exactly is asked in a line or two, one main
+   button, the others quiet, «Открыть чат» a quiet link at the end. */
+.hx-nc__wait {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+.hx-nc__kind {
+  color: var(--nc-fg3);
+  font-size: var(--hx-text-xs);
+  line-height: 16px;
+}
+.hx-nc__essence {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--nc-fg2);
+  font-size: var(--hx-text-sm);
+  line-height: 18px;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+.hx-nc__essence--plan {
+  -webkit-line-clamp: 3;
+}
+.hx-nc__plan {
+  max-height: 240px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  color: var(--nc-fg);
+  font-size: var(--hx-text-sm);
+  line-height: 1.45;
+}
+.hx-nc__more {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--nc-fg3);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  cursor: pointer;
+}
+.hx-nc__more:hover {
+  color: var(--nc-fg);
+}
 .hx-nc__acts {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 2px;
 }
 .hx-nc__btn {
-  height: 30px;
+  height: 28px;
   padding: 0 14px;
   border: 0;
   border-radius: 999px;
-  background: #fff;
-  color: #000;
+  background: var(--nc-fg);
+  color: var(--nc-bg);
   font: inherit;
-  font-size: var(--hx-text-sm);
+  font-size: var(--hx-text-xs);
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -451,9 +500,24 @@
 .hx-nc__btn[data-busy] {
   opacity: 0.7;
 }
+.hx-nc__link {
+  margin-left: auto;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--nc-fg3);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  cursor: pointer;
+  transition: color 140ms var(--hx-ease-out);
+}
+.hx-nc__link:hover {
+  color: var(--nc-fg);
+  text-decoration: underline;
+}
 .hx-nc__cmd-text {
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -463,23 +527,16 @@
   border: 0;
   text-align: left;
   cursor: pointer;
-  margin-top: 6px;
-  padding: 8px 10px;
-  border-radius: 12px;
+  padding: 6px 10px;
+  border-radius: 10px;
   background: var(--nc-fill);
   font-family: var(--hx-font-mono, ui-monospace, monospace);
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--nc-fg);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   user-select: text;
-}
-.hx-nc__wait {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 6px;
 }
 /* Opened: the whole command, scrolled inside when it is long. */
 .hx-nc__cmd[data-full] {
@@ -490,53 +547,30 @@
   display: block;
   overflow: visible;
 }
-.hx-nc__cmd-hint {
-  margin-top: 4px;
-  font-size: var(--hx-text-xs);
-  color: var(--nc-fg3);
-}
-/* The open question comes in from below out of a light blur, line after line. */
-.hx-nc__wait > * {
-  animation: hx-nc-reveal 320ms var(--hx-ease-out) backwards;
-}
-.hx-nc__wait > :nth-child(2) {
-  animation-delay: 30ms;
-}
-.hx-nc__wait > :nth-child(3) {
-  animation-delay: 60ms;
-}
-.hx-nc__wait > :nth-child(4) {
-  animation-delay: 90ms;
-}
-.hx-nc__wait > :nth-child(n + 5) {
-  animation-delay: 120ms;
-}
-@keyframes hx-nc-reveal {
-  from {
-    opacity: 0;
-    translate: 0 6px;
-    filter: blur(3px);
-  }
-}
 .hx-nc__q {
-  margin: 0 0 4px;
-  font-size: 15px;
-  line-height: 1.45;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: var(--hx-text-sm);
+  line-height: 18px;
   color: var(--nc-fg);
   overflow-wrap: anywhere;
+  white-space: pre-line;
 }
 .hx-nc__opt {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 38px;
-  padding: 8px 12px;
+  gap: 8px;
+  min-height: 32px;
+  padding: 5px 10px;
   border: 0;
-  border-radius: 13px;
+  border-radius: 10px;
   background: var(--nc-fill);
   color: var(--nc-fg);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--hx-text-sm);
   text-align: left;
   cursor: pointer;
   transition:
@@ -566,15 +600,15 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 38px;
+  height: 32px;
   margin: 0;
-  padding: 0 4px 0 12px;
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.05);
+  padding: 0 3px 0 10px;
+  border-radius: 10px;
+  background: transparent;
   box-shadow: inset 0 0 0 1px var(--nc-line);
 }
 .hx-nc__field:focus-within {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0 0 0 1px var(--nc-fg3);
 }
 .hx-nc__field input {
   flex: 1;
@@ -584,21 +618,21 @@
   background: transparent;
   color: var(--nc-fg);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--hx-text-sm);
 }
 .hx-nc__field input::placeholder {
   color: var(--nc-fg3);
 }
 .hx-nc__send {
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   border: 0;
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: #fff;
-  color: #000;
+  background: var(--nc-fg);
+  color: var(--nc-bg);
   cursor: pointer;
   transition:
     opacity 140ms var(--hx-ease-out),

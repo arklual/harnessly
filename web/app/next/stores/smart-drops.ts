@@ -48,6 +48,7 @@ const same = (a: readonly IDrop[], b: readonly IDrop[]) =>
       d.item.key === b[i]?.item.key &&
       d.item.title === b[i]?.item.title &&
       d.item.text === b[i]?.item.text &&
+      d.item.summary === b[i]?.item.summary &&
       d.item.until === b[i]?.item.until &&
       d.what === b[i]?.what,
   );

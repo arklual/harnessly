@@ -7,7 +7,7 @@ import { SIDE } from '@/next/ui/hover-intent';
 import { t } from '@/next/i18n';
 import { PENDING, type TPending } from '@/next/ui/use-pending-list';
 import ChatMenu, { type IChatMenuProps } from '@/next/features/sidebar/chat-menu';
-import { STATUS_LOOK } from '@/next/features/sidebar/status';
+import { statusLookOf } from '@/next/features/sidebar/status';
 import { CHAT_STATUS, type ISidebarChat } from '@/next/features/sidebar/types';
 import { useVoiceLookOf, VOICE_LOOK, type TVoiceLook } from '@/next/features/voice-live/field';
 import MiniWave from '@/next/features/voice-live/mini-wave';
@@ -180,7 +180,7 @@ const ChatRow = ({
   const [menuAt, setMenuAt] = useState<IMenuPoint | null>(null);
   /** The title is cut short in the row: the pointer on it shows it whole, over the row. */
   const [cut, setCut] = useState(false);
-  const look = chat.status === CHAT_STATUS.none ? null : STATUS_LOOK[chat.status];
+  const look = chat.status === CHAT_STATUS.none ? null : statusLookOf(chat.status, chat);
   const busy = pending !== undefined;
   const label = pending === PENDING.slow ? t('next.chatRow.slow') : (chat.waitsFor ?? look?.label);
   const { copyLink, openInNewTab, terminal, stopTerminal, fork, continueIn, moveVm } = handlers;

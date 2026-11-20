@@ -313,13 +313,11 @@ const Gallery = () => {
               ? { reason: 'Машина не ответила за 12 секунд', onRetry: () => setItems(SAMPLE) }
               : null
           }
-          renderWait={(item, isOpen, toggle) => {
+          renderWait={(item) => {
             const detail = extra[item.id] ?? DETAILS[item.id] ?? { k: 'loading' };
             return (
               <WaitRow
                 detail={detail}
-                open={isOpen}
-                onToggle={toggle}
                 onOpenChat={() => setOpen(false)}
                 onChoose={async (index) => {
                   await later(null);

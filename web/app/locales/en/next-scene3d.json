@@ -6,6 +6,7 @@
   "next.scene3d.camFree": "Free view",
   "next.scene3d.camera": "Camera",
   "next.scene3d.cancel": "Cancel",
+  "next.scene3d.checkEmptyAtSave": "Empty in the saved frame, shown whole here: {n} objects",
   "next.scene3d.checkOffCamera": "{n} objects no camera sees",
   "next.scene3d.checkScale": "Scale not applied on {n} objects",
   "next.scene3d.checkTextures": "Textures not found: {n}",

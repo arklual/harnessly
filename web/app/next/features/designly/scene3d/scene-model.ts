@@ -81,7 +81,13 @@ export const pathTo = (objects: readonly IScene3dObject[], name: string): string
 /** The name Blender gave an object, the glTF's node name: dots are kept; a name three.js made unique has a «_1» tail. */
 export const sceneName = (n: string): string => n;
 
-export const CHECK = { tris: 'tris', textures: 'textures', scale: 'scale', offCamera: 'offCamera' } as const;
+export const CHECK = {
+  tris: 'tris',
+  textures: 'textures',
+  scale: 'scale',
+  offCamera: 'offCamera',
+  emptyAtSave: 'emptyAtSave',
+} as const;
 export type TCheck = (typeof CHECK)[keyof typeof CHECK];
 export interface ISceneCheck {
   code: TCheck;
@@ -101,6 +107,7 @@ export const checksOf = (meta: IScene3dMeta, triLimit = 2_000_000): ISceneCheck[
   put(CHECK.textures, meta.stats.missingImages);
   put(CHECK.scale, meta.stats.unappliedScale);
   put(CHECK.offCamera, meta.stats.offCamera);
+  put(CHECK.emptyAtSave, meta.stats.emptyAtSave);
   return out;
 };
 
@@ -111,6 +118,16 @@ export const markersOf = (meta: IScene3dMeta): IScene3dMarker[] =>
 /** The horizontal field of view for a vertical one at an aspect (degrees), for the viewer's camera. */
 export const hFov = (vfov: number, aspect: number): number =>
   (2 * Math.atan(Math.tan((vfov * Math.PI) / 360) * aspect) * 180) / Math.PI;
+
+/** Whether an object with a visibility track is on at a frame: the last entry at or before it; before the first, the first. */
+export const visibleAt = (vis: readonly (readonly number[])[], frame: number): boolean => {
+  let on = (vis[0]?.[1] ?? 1) !== 0;
+  for (const e of vis) {
+    if ((e[0] ?? 0) > frame) break;
+    on = (e[1] ?? 1) !== 0;
+  }
+  return on;
+};
 
 /** The two samples a frame lies between in a baked track and how far along (0..1) it is; before the first and after the last the
  *  nearest one holds. */

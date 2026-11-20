@@ -43,6 +43,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   bakeSpan,
+  visibleAt,
   blenderToThree,
   canvasFov,
   poseAt,
@@ -392,8 +393,20 @@ export class SceneViewer {
     this.frame = Math.floor(this.pos);
     this.mixer?.setTime(Math.min(timeOf(this.meta, this.pos), this.clipSeconds || Infinity));
     this.applyBake(this.pos);
+    this.applyVisibility(this.frame);
     this.refreshSelection();
     this.draw();
+  }
+
+  /** An object whose hide_render is keyed in time is in the model whole and is on only in the frames Blender shows it. */
+  private applyVisibility(frame: number): void {
+    for (const o of this.meta.objects) {
+      if (!o.vis) continue;
+      const on = visibleAt(o.vis, frame);
+      this.nodes.get(o.n)?.traverse((n) => {
+        if (!(n as PerspectiveCamera).isCamera) n.visible = on;
+      });
+    }
   }
 
   /** Sets the nodes the actions do not move: wheels turned by drivers, objects held by constraints. Blender's axes become

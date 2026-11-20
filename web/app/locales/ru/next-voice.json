@@ -1,4 +1,12 @@
 {
   "next.voice.listening": "Говорите — слова появятся здесь",
-  "next.voice.preparing": "Голосовой ввод готовится (скачиваем модель)…"
+  "next.voice.preparing": "Голосовой ввод готовится (скачиваем модель)…",
+  "next.voice.quick.all": "Все настройки голоса",
+  "next.voice.quick.allow": "Разрешить доступ",
+  "next.voice.quick.denied": "Браузер не дал доступ к микрофону",
+  "next.voice.quick.dictateTitle": "Настройки диктовки",
+  "next.voice.quick.level": "Уровень сигнала микрофона",
+  "next.voice.quick.liveTitle": "Настройки голосового режима",
+  "next.voice.quick.nextCall": "Новый микрофон — со следующего звонка",
+  "next.voice.quick.tip": "Правый клик — настройки"
 }

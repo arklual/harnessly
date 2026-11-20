@@ -75,6 +75,7 @@ import '@/next/styles/side-chat.css';
 import '@/next/styles/widgets.css';
 import '@/next/styles/chatgpt.css';
 import '@/next/styles/voice-live.css';
+import '@/next/styles/voice-quick.css';
 import '@/next/styles/voice-style.css';
 import '@/next/styles/voice-head.css';
 import '@/next/styles/voice-mood.css';

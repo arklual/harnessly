@@ -43,6 +43,13 @@ export interface INotice {
   link?: string;
 }
 
+/** How long news of a chat (a finished turn, a failure, a limit) stays in the column when nobody reads it, ms. */
+export const NEWS_LIFE_MS = 10 * 60_000;
+const NEWS: ReadonlySet<TNoticeKind> = new Set([NOTICE_KIND.done, NOTICE_KIND.failed, NOTICE_KIND.limit]);
+
+/** Whether a notice is news of a chat: it tells what happened, it does not wait for an answer. */
+export const isNews = (n: INotice): boolean => NEWS.has(n.kind);
+
 /** The chat of the sample notice Settings → Notifications shows: it has no chat to open. */
 export const SAMPLE_CHAT = 'notice-sample';
 
@@ -77,6 +84,18 @@ export const parseNotices = (raw: string | null): readonly INotice[] => {
     return [];
   }
 };
+
+/**
+ * The news that has stood long enough: it goes by itself, so the column never keeps yesterday's answers. A notice that
+ * came from another device carries that device's clock: one far ahead of this page's counts as old too, or it would
+ * never go. The sample of Settings is no news of a chat and stays for its own page to take away.
+ */
+export const expiredNews = (list: readonly INotice[], now: number): ReadonlySet<string> =>
+  new Set(
+    list
+      .filter((n) => isNews(n) && n.chatId !== SAMPLE_CHAT && Math.abs(now - n.at) > NEWS_LIFE_MS)
+      .map((n) => n.key),
+  );
 
 /** The list with `notice` on top: it replaces its chat's notice; the same event twice changes nothing. */
 export const withNotice = (list: readonly INotice[], notice: INotice): readonly INotice[] => {

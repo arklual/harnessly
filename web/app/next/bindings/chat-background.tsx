@@ -14,23 +14,22 @@ import CodeAsks, { CODE_EXIT_MS, CODE_SENT, type TCodeSent } from '@/next/featur
 import { useRailRoom } from '@/next/features/background/rail-room';
 import type { IHeaderBackground } from '@/next/features/header/chat-header';
 import { machineApi } from '@/next/core/net/machine';
-import type { BackgroundTask, ConvId, Conversation, MachineId, Shot, TurnOutput } from '@/next/protocol/v2';
+import type { BackgroundTask, ConvId, MachineId, Shot, TurnOutput } from '@/next/protocol/v2';
 import { useBackground, useShots } from '@/next/stores/conversation';
 import { useConversation } from '@/next/stores/conversations';
 import { usePresentFlag } from '@/next/ui/presence';
 import { LEAVE_MS } from '@/next/features/notifications/motion';
 import { toast } from '@/next/ui/toast';
 import { usePhone } from '@/next/ui/use-media';
+import NoteAnswer, { NEWS_KINDS } from '@/next/bindings/note-answer';
 import NoticeStack from '@/next/features/smart-notice/stack';
 import { SMART_KIND } from '@/next/features/smart-notice/smart-notice';
-import { NOTIFICATION_KIND } from '@/next/features/notifications/kinds';
 import MachineDrop from '@/next/bindings/machine-drop';
 import SideWidgetsBinding from '@/next/bindings/side-widgets';
 import ChatDocs from '@/next/bindings/chat-docs';
-import { WaitBinding } from '@/next/bindings/notification-center';
 import { askDropBack, dismissDrops, useDrops, type IDrop } from '@/next/stores/smart-drops';
-import { useConversationList } from '@/next/stores/conversations';
 import type { IFolderSuggest } from '@/next/features/folder-suggest/use-folder-suggestion';
+import { dropNotices, isNews } from '@/next/stores/notices';
 import { t } from '@/next/i18n';
 
 /** What is answered right in its card: a question's options, a permission's buttons (the rest opens its chat or the
@@ -40,7 +39,19 @@ const SIDE_EXIT_MS = 200;
 
 const NO_FOLDER: IFolderSuggest = { pending: false, node: null };
 
-const IN_PLACE: ReadonlySet<string> = new Set([SMART_KIND.question, SMART_KIND.permission]);
+const IN_PLACE: ReadonlySet<string> = new Set([
+  SMART_KIND.question,
+  SMART_KIND.permission,
+  SMART_KIND.plan,
+  ...NEWS_KINDS,
+]);
+
+/** Takes cards off the stack: what waits stays in the centre, the news of a chat is read and goes from the store too. */
+const dismissNotes = (keys: readonly string[]): void => {
+  dismissDrops(keys);
+  const gone = new Set(keys);
+  dropNotices((n) => gone.has(n.key) && isNews(n));
+};
 
 export const useChatBackground = (
   conv: ConvId | null,
@@ -73,33 +84,13 @@ export const useChatBackground = (
   // The last card answered elsewhere flies off before the stack (and the column it keeps) goes.
   const dropsMounted = usePresentFlag(drops.length > 0, LEAVE_MS).mounted;
   const machineMounted = usePresentFlag(machineDrops.length > 0, LEAVE_MS).mounted;
-  const convs = useConversationList(null);
-  const byId = useMemo(() => new Map<string, Conversation>((convs ?? []).map((c) => [c.id, c])), [convs]);
+  // Stable: each card reads its own chat (note-answer.tsx), so an update of any chat draws no card of the stack again.
   const renderAnswer = useCallback(
-    (drop: IDrop, open: boolean, toggle: () => void) => {
-      const { item } = drop;
-      const chat = item.chatId ? byId.get(item.chatId) : undefined;
-      if (!chat || !IN_PLACE.has(item.kind)) return null;
-      return (
-        <WaitBinding
-          conv={chat}
-          item={{
-            id: item.key,
-            kind: NOTIFICATION_KIND.waiting,
-            icon: item.icon,
-            title: item.title,
-            text: item.text,
-            at: item.at,
-            unread: true,
-            chatId: item.chatId,
-          }}
-          open={open}
-          onToggle={toggle}
-          onOpenChat={() => onOpenChat(chat.id)}
-        />
-      );
-    },
-    [byId, onOpenChat],
+    (drop: IDrop) =>
+      drop.item.chatId && IN_PLACE.has(drop.item.kind) ? (
+        <NoteAnswer key={drop.item.key} item={drop.item} onOpenChat={onOpenChat} />
+      ) : null,
+    [onOpenChat],
   );
   // The machine's card says what is wrong right where it stands: no flight into the smart notice for the details.
   const renderMachine = useCallback(
@@ -229,11 +220,11 @@ export const useChatBackground = (
               <NoticeStack
                 drops={drops}
                 now={now}
-                label={t('next.smart.drops.title')}
+                label={t('next.notes.title')}
                 icon="bell"
                 onBack={askDropBack}
                 onOpenChat={onOpenChat}
-                onDismiss={dismissDrops}
+                onDismiss={dismissNotes}
                 renderAnswer={renderAnswer}
                 inPlace={(drop) => IN_PLACE.has(drop.item.kind)}
               />

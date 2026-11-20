@@ -1,4 +1,12 @@
 {
   "next.voice.listening": "Speak — your words will appear here",
-  "next.voice.preparing": "Voice input is getting ready (downloading the model)…"
+  "next.voice.preparing": "Voice input is getting ready (downloading the model)…",
+  "next.voice.quick.all": "All voice settings",
+  "next.voice.quick.allow": "Allow access",
+  "next.voice.quick.denied": "The browser did not give access to the microphone",
+  "next.voice.quick.dictateTitle": "Dictation settings",
+  "next.voice.quick.level": "Microphone level",
+  "next.voice.quick.liveTitle": "Voice mode settings",
+  "next.voice.quick.nextCall": "A new microphone is used from the next call",
+  "next.voice.quick.tip": "Right-click for settings"
 }

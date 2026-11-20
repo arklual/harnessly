@@ -154,11 +154,18 @@ const Card = memo(
     }, [leaving, away]);
     const toggle = () => onToggle(key);
     const back = () => onBack(key, el.current?.getBoundingClientRect() ?? null, snap(el.current));
-    const answer = more.mounted && renderAnswer ? renderAnswer(drop, open, toggle) : null;
     const machine = item.kind === SMART_KIND.machine;
-    // A card with nothing to answer in place (a plan, a dialog of the agent, an app's ask) leads to its chat at a press.
-    const direct =
-      inPlace !== undefined && !inPlace(drop) && item.chatId !== null && onOpenChat !== undefined;
+    // A wait of a chat (a permission, a question, a menu, a plan) shows what it asks and the answer right in the card,
+    // from the first draw and with no fold: the row leads to the chat, the body answers, and the kind of the
+    // wait is said once, by the body. Any other card opens in place as before.
+    const gate = renderAnswer !== undefined && inPlace?.(drop) === true;
+    const answer = gate
+      ? renderAnswer(drop, true, toggle)
+      : more.mounted && renderAnswer
+        ? renderAnswer(drop, open, toggle)
+        : null;
+    // Where the stack knows what is answered in place (the column's), a card's row leads to its chat at a press.
+    const direct = inPlace !== undefined && !machine && item.chatId !== null && onOpenChat !== undefined;
     return (
       <li
         ref={el}
@@ -166,6 +173,7 @@ const Card = memo(
         data-flip={key}
         data-drop-key={key}
         data-kind={item.kind}
+        data-gate={gate || undefined}
         data-open={open || undefined}
         data-leaving={flown ? 'flown' : leaving || gone || undefined}
         data-arriving={arrival.arriving || undefined}
@@ -185,7 +193,7 @@ const Card = memo(
                 <b className="hx-ns__title">{item.title}</b>
                 <span className="hx-ns__when">{formatAgo(item.at, now)}</span>
               </span>
-              <span className="hx-ns__text">{item.text}</span>
+              {!(gate && answer !== null) && <span className="hx-ns__text">{item.text}</span>}
             </span>
           </button>
           <button
@@ -198,6 +206,11 @@ const Card = memo(
             <Icon name="x" size="sm" />
           </button>
         </div>
+        {gate && answer !== null && (
+          <div className="hx-ns__body" data-no-swipe>
+            {answer}
+          </div>
+        )}
         <div
           className="hx-ns__fold"
           data-state={more.mounted && more.state === PRESENCE.closing ? 'closing' : undefined}
@@ -207,7 +220,7 @@ const Card = memo(
               <div className="hx-ns__more">
                 {what !== null && what !== item.text && <p className="hx-ns__what">{what}</p>}
                 {item.summary && <p className="hx-ns__what">{item.summary}</p>}
-                {answer}
+                {!gate && answer}
                 <div className="hx-ns__acts">
                   {answer === null && (
                     <button type="button" className="hx-ns__btn" data-main onClick={back}>

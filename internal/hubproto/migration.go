@@ -36,6 +36,13 @@ const (
 	MigrationSkipped = "skipped"
 )
 
+// Codes of an object the runtime cannot move and skips with its reason: it left the disk, or it is bigger than
+// the store takes. It is moved once the cause is gone.
+const (
+	MigrationCodeGone   = "MIG-GONE"
+	MigrationCodeTooBig = "MIG-TOO-BIG"
+)
+
 // MigrationObject is one object of a machine's data and how its move went.
 type MigrationObject struct {
 	// Kind is the store collection it goes to (uploads, files, handoff, design).

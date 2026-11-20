@@ -29,6 +29,7 @@ import { useSteadyNotices } from '@/next/features/notifications/machine-steady';
 import { hub } from '@/next/core/realtime/hub';
 import { chatStatusOf, statusNoteOf } from '@/next/features/sidebar/status';
 import {
+  CHAT_STATUS,
   MACHINE_HEALTH,
   MACHINE_TONE,
   type IChatActions,
@@ -359,14 +360,18 @@ export const chatUrl = (id: string) =>
 
 /** A chat's status and what it waits for: the one reading of a conversation that the sidebar's row, the tab over the
  *  window and the header all draw, so no two of them say different things about the same chat. */
-export const chatLookOf = (c: Conversation, online: boolean): Pick<ISidebarChat, 'status' | 'waitsFor'> => {
+export const chatLookOf = (
+  c: Conversation,
+  online: boolean,
+): Pick<ISidebarChat, 'status' | 'waitsFor' | 'dialog'> => {
   const status = chatStatusOf(c, online);
   const waitsFor = statusNoteOf(c, status);
-  return waitsFor ? { status, waitsFor } : { status };
+  const dialog = status === CHAT_STATUS.perm && c.gate?.dialog === true;
+  return { status, ...(waitsFor ? { waitsFor } : {}), ...(dialog ? { dialog } : {}) };
 };
 
 /** What a tab over the window shows of its chat, and what its tidying reads (features/shell/tab-tidy). */
-export type ITabChat = Pick<ISidebarChat, 'id' | 'title' | 'status' | 'waitsFor'> & {
+export type ITabChat = Pick<ISidebarChat, 'id' | 'title' | 'status' | 'waitsFor' | 'dialog'> & {
   /** No message of the person's and nothing on its way: the chat was opened and left as it came. */
   empty?: boolean;
   lastActivityAt?: number;

@@ -173,6 +173,26 @@ describe('the chat uploads in the hub', () => {
     });
   });
 
+  it('shows a picture it has just put from its own copy, not from the hub that has not got it yet', async () => {
+    const made = vi.fn(() => 'blob:local-1');
+    vi.stubGlobal(
+      'URL',
+      Object.assign(class extends URL {}, { createObjectURL: made, revokeObjectURL: vi.fn() }),
+    );
+    const picture = { ...ref, id: '/home/u/.harnessly/uploads/up_LOCALPIC.png' };
+    const doc = {
+      ...ref,
+      id: '/home/u/.harnessly/uploads/up_LOCALDOC.pdf',
+      kind: 'file',
+      mime: 'application/pdf',
+    };
+    await mirrorUpload('m-1' as never, new Blob(['abc']), picture as never);
+    await mirrorUpload('m-1' as never, new Blob(['abc']), doc as never);
+    expect(uploadSrc('m-1' as never, picture)).toBe('blob:local-1');
+    expect(uploadSrc('m-1' as never, doc)).toBe('/api/acme/uploads/files/up_LOCALDOC?machine=m-1');
+    expect(made).toHaveBeenCalledTimes(1);
+  });
+
   it('puts nothing anywhere but under a hub, and nothing that is not a machine upload', async () => {
     expect(
       await mirrorUpload('m-1' as never, new Blob(['abc']), {

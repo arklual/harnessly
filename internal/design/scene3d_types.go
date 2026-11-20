@@ -31,7 +31,7 @@ const (
 	Scene3DCacheMax      = 1 << 30   // bytes of drafts kept per scene before the oldest are dropped
 	scene3dPoolMaxBlend  = 200 << 20 // a .blend over this is not sent to a builder
 	scene3dMaxJobs       = 1         // drafts rendered at once by this runtime
-	scene3dExportVersion = 3         // moves with scene3d_export.py: a new exporter makes new models
+	scene3dExportVersion = 4         // moves with scene3d_export.py: a new exporter makes new models
 	scene3dMaxShot       = 400 << 10
 )
 
@@ -51,6 +51,9 @@ type Scene3DObject struct {
 	P      string `json:"p,omitempty"`
 	Tris   int    `json:"tris,omitempty"`
 	Hidden bool   `json:"hidden,omitempty"`
+	// Vis is when the object is on: [frame, 1|0] from the first sampled frame, one entry where it changes (hide_render keyed in time).
+	// The glTF carries the object whole; the viewer turns it on and off by this.
+	Vis [][2]int `json:"vis,omitempty"`
 }
 
 // Scene3DCamera is a camera of the scene. Fov is the vertical field of view in degrees at the render's aspect.
@@ -81,6 +84,9 @@ type Scene3DStats struct {
 	MissingImages  []string `json:"missingImages,omitempty"`
 	UnappliedScale []string `json:"unappliedScale,omitempty"`
 	OffCamera      []string `json:"offCamera,omitempty"`
+	// EmptyAtSave are objects the saved frame shows as nothing (hidden, scaled to zero, a curve not grown yet) that appear later: the
+	// glTF is exported with them whole, and the viewer says so.
+	EmptyAtSave []string `json:"emptyAtSave,omitempty"`
 }
 
 // Scene3DMeta is <hash>/meta.json: what the exporter read from the .blend.

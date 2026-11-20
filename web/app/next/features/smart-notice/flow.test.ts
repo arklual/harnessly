@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { arrivalToFront } from '@/next/features/smart-notice/flow';
+import { NEWS_CLOCK, arrivalToFront, liveNews, tickNews } from '@/next/features/smart-notice/flow';
 import { SMART_KIND, type ISmartItem, type TSmartKind } from '@/next/features/smart-notice/smart-notice';
 
 const item = (key: string, kind: TSmartKind): ISmartItem => ({
@@ -30,5 +30,27 @@ describe('arrivalToFront', () => {
     const q = item('q', SMART_KIND.question);
     expect(arrivalToFront([q], null)).toBe(q);
     expect(arrivalToFront([], null)).toBeNull();
+  });
+});
+
+describe('tickNews', () => {
+  const NOW = 1_000_000;
+  const LIFE = 7000;
+
+  it('gives news its life from when it came', () => {
+    const clock = tickNews(NEWS_CLOCK, [{ key: 'a', at: NOW - 1000 }], false, NOW, LIFE);
+    expect(liveNews(clock, NOW + LIFE - 1001).has('a')).toBe(true);
+    expect(liveNews(clock, NOW + LIFE).has('a')).toBe(false);
+  });
+
+  it('does not keep news that came from a clock far ahead of this one (a sync from another device)', () => {
+    // «at» ten minutes ahead of this page: it used to live for ten minutes and seven seconds.
+    const clock = tickNews(NEWS_CLOCK, [{ key: 'a', at: NOW + 600_000 }], false, NOW, LIFE);
+    expect(liveNews(clock, NOW + LIFE + 1).has('a')).toBe(false);
+  });
+
+  it('shows no news that was old when this page first saw it', () => {
+    const clock = tickNews(NEWS_CLOCK, [{ key: 'a', at: NOW - 60_000 }], false, NOW, LIFE);
+    expect(liveNews(clock, NOW).has('a')).toBe(false);
   });
 });

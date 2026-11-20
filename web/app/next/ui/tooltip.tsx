@@ -23,6 +23,8 @@ const EXIT_MS = 140;
 interface ITooltipProps {
   label: string;
   keys?: string[];
+  /** A quieter second part after the label: how else the control can be used («Right click — settings»). */
+  note?: string;
   /** The preferred side; the hint flips when there is no room there. */
   side?: TSide;
   /** No hint now (a menu is open over the control, a drag is on): an open one leaves. */
@@ -54,7 +56,7 @@ const assign = <T,>(ref: Ref<T> | undefined, value: T | null) => {
   else if (ref) ref.current = value;
 };
 
-const Tooltip = ({ label, keys, side = SIDE.top, disabled = false, children }: ITooltipProps) => {
+const Tooltip = ({ label, keys, note, side = SIDE.top, disabled = false, children }: ITooltipProps) => {
   const container = usePortalContainer();
   const { open, getTrigger, setTrigger, triggerProps } = useHoverIntent({
     openDelay: HOVER.tipDelay,
@@ -106,6 +108,7 @@ const Tooltip = ({ label, keys, side = SIDE.top, disabled = false, children }: I
           <div ref={posRef} className="hx-tip-pos">
             <div ref={tipRef} id={id} className="hx-tip" role="tooltip" data-state={state}>
               {label}
+              {note && <span className="hx-tip__note">{note}</span>}
               {keys?.map((key) => (
                 <kbd key={key}>{key}</kbd>
               ))}

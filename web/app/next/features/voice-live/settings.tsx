@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import {
   loadVoiceState,
   saveVoiceSettings,
+  settingsOf,
   VOICE_ROUTE,
   VOICE_TALK,
   type IVoiceSettings,
@@ -33,18 +34,7 @@ const VoiceLiveSettings = ({ machine }: { machine: MachineId }) => {
   }, [machine]);
 
   if (!state) return null;
-  const kept: IVoiceSettings = {
-    subscription: state.subscription,
-    voice: state.voice,
-    model: state.model,
-    talk: state.talk,
-    head: state.head,
-    noBarge: !state.barge,
-    about: state.about,
-    notes: state.notes,
-    delivery: state.delivery,
-    effort: state.effort,
-  };
+  const kept = settingsOf(state);
   const save = (change: Partial<IVoiceSettings>) => {
     setBusy(true);
     saveVoiceSettings(machine, { ...kept, ...change }).then(

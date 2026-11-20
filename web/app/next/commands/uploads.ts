@@ -18,6 +18,24 @@ import {
 // An upload's id, or the file of one an agent was given (<uploads>/<id>.<ext>): what GET /api/v2/uploads/{id} serves.
 const UPLOAD_ID = /(?:^|\/)(up_[A-Z2-7]+)(?:\.[a-z0-9]{1,8})?$/;
 
+/**
+ * A picture this page has just put on the machine, shown from the page's own copy: the composer and the
+ * message draw it at once, while its copy is still on the way to the hub (hashing and the PUTs take seconds, minutes
+ * for a big file). Read from the hub then, it is not there yet and comes from the machine. Kept for the page's life,
+ * the last LOCAL_COPIES_MAX of them.
+ */
+const localCopies = new Map<string, string>();
+const LOCAL_COPIES_MAX = 100;
+
+const keepLocalCopy = (id: string, file: Blob) => {
+  if (localCopies.has(id) || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return;
+  localCopies.set(id, URL.createObjectURL(file));
+  if (localCopies.size <= LOCAL_COPIES_MAX) return;
+  const [oldest, url] = localCopies.entries().next().value as [string, string];
+  localCopies.delete(oldest);
+  URL.revokeObjectURL(url);
+};
+
 /** Where the picture of an attachment is on its machine; null for one the runtime did not take as an upload. */
 export const uploadSrc = (m: MachineId, item: { id: string; mime?: string }): string | null => {
   // A picture pasted into the agent's own terminal lives in the transcript itself.
@@ -31,7 +49,7 @@ export const uploadSrc = (m: MachineId, item: { id: string; mime?: string }): st
   if (!id) return null;
   // under a hub the upload is read from the hub's store (it sends the machine's copy on for older ones).
   if (appConfig().centralUploads)
-    return `${gatewayPath(`/uploads/files/${id}`)}?machine=${encodeURIComponent(m)}`;
+    return localCopies.get(id) ?? `${gatewayPath(`/uploads/files/${id}`)}?machine=${encodeURIComponent(m)}`;
   return machineApi(m).http(`/uploads/${id}`);
 };
 
@@ -56,6 +74,7 @@ export async function mirrorUpload(m: MachineId, file: Blob, ref: AttachmentRef)
     !crypto.subtle
   )
     return false;
+  if (ref.kind === 'image') keepLocalCopy(id, file);
   try {
     const sha = hex(await crypto.subtle.digest('SHA-256', await file.arrayBuffer()));
     const q = `?machine=${encodeURIComponent(m)}`;

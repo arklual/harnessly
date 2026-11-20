@@ -1,0 +1,24 @@
+id: blender-scene-reveal-in-time
+title: Блендер «reveal-in-time» — появление объектов во времени делается масштабом, а не ключами hide_render, которых не видно во вьюере Sinopia (HRN-1716)
+tags: [design, scene3d, blender-lab]
+set: dev
+agents: [claude]
+timeout_s: 600
+# the agent built and saved a scene three times and never ran `design scene3d add`; the person had to ask why the
+# 3D view was not open. `blender` here is a mock of headless Blender (fixtures/blender-lab/mock), the skill is the real one;
+# `mock/variant` picks the setup under test (before, text, wrap, both).
+setup:
+  workspace: [fixtures/blender-lab]
+  run: sh mock/install.sh
+covers:
+  - 'cmd/runtime/agent_skills.go'
+  - 'internal/hlcli/design_scene3d.go'
+  - 'skills/upstream/agent-skills/plugins/harnessly/**'
+prompt: 'Сделай в блендере заставку на 5 секунд: сначала пустая сцена, потом на 2-й секунде появляется буква H, на 3-й — подпись под ней, на 4-й вокруг загорается кольцо.'
+expect:
+  - name: the scene was saved as a .blend
+    check: ls blender-lab/out/*.blend >/dev/null 2>&1
+  - name: the scene is open in the right pane as a Sinopia document
+    pane: {tab: design}
+  - name: objects appear by scale, not by keyed hide_render / hide_viewport
+    check: '! grep -qE "hide_render|hide_viewport" blender-lab/scenes/*.py'

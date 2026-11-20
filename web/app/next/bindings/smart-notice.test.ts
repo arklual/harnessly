@@ -3,13 +3,16 @@ import { describe, expect, it } from 'vitest';
 import {
   itemsOfCodes,
   itemsOfMachines,
+  itemsOfNews,
+  itemsOfNotices,
   machineDetail,
   noticeQuiet,
   onePerChat,
   orderItems,
 } from '@/next/bindings/smart-notice';
 import { SMART_KIND, type ISmartItem } from '@/next/features/smart-notice/smart-notice';
-import type { MachineProc, MachineStats } from '@/next/protocol/v2';
+import type { Conversation, MachineProc, MachineStats } from '@/next/protocol/v2';
+import type { INotice } from '@/next/stores/notices';
 
 const item = (
   key: string,
@@ -251,5 +254,42 @@ describe('noticeQuiet', () => {
   });
   it('keeps the plate away while an app has the whole window', () => {
     expect(noticeQuiet(true, false)).toBe(true);
+  });
+});
+
+describe('the news of a chat', () => {
+  const notice = (key: string, kind: INotice['kind']): INotice => ({
+    key,
+    chatId: 'c1',
+    kind,
+    icon: 'circle-check',
+    title: 'Chat',
+    text: 'The answer starts here',
+    at: 5,
+  });
+
+  it('stands in the column, not on the plate over the feed', () => {
+    const list = [
+      notice('c1:t1:done', 'done'),
+      notice('c1:t1:failed', 'failed'),
+      notice('c1:t:limit', 'limit'),
+    ];
+    expect(itemsOfNotices(list, new Map<string, Conversation>(), new Set(list.map((n) => n.key)))).toEqual(
+      [],
+    );
+    expect(itemsOfNews(list).map((i) => i.kind)).toEqual(['done', 'failed', 'limit']);
+  });
+
+  it('is told by what the agent said, with its recap', () => {
+    const [one] = itemsOfNews([{ ...notice('k', 'done'), summary: 'Did a thing\nThen another' } as INotice]);
+    expect(one).toMatchObject({
+      chatId: 'c1',
+      text: 'The answer starts here',
+      summary: 'Did a thing\nThen another',
+    });
+  });
+
+  it('leaves out what waits and what only asks for a page', () => {
+    expect(itemsOfNews([notice('w', 'waiting'), notice('a', 'access')])).toEqual([]);
   });
 });

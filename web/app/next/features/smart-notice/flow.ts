@@ -97,7 +97,10 @@ export const tickNews = (
   for (const item of news) {
     const had = deadlines.get(item.key);
     // Come while held: its time starts when the hold ends (the shift above), as if it came then.
-    next.set(item.key, had ?? (pausedAt !== null ? Math.max(item.at, pausedAt) : item.at) + lifeMs);
+    // A notice synced from another device carries that device's clock: one ahead of this page's must not stay for
+    // minutes, so its time starts no later than now.
+    const from = pausedAt !== null ? Math.max(item.at, pausedAt) : item.at;
+    next.set(item.key, had ?? Math.min(from, now) + lifeMs);
   }
   if (pausedAt === clock.pausedAt && sameDeadlines(next, clock.deadlines)) return clock;
   return { deadlines: next, pausedAt };

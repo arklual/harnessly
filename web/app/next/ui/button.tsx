@@ -49,6 +49,8 @@ interface IRoundButtonProps extends TNativeButton {
   label: string;
   /** Keys that do the same, shown in the tooltip (e.g. ['⌃', '↵']). */
   keys?: string[];
+  /** What else the button answers to, said quietly in the tooltip (a right click that opens its settings). */
+  note?: string;
   variant?: 'default' | 'accent' | 'ghost';
   size?: 'sm' | 'md';
   iconSize?: 'sm' | 'md';
@@ -60,6 +62,7 @@ export const RoundButton = ({
   icon,
   label,
   keys,
+  note,
   variant = 'default',
   size = 'md',
   iconSize = 'md',
@@ -68,7 +71,7 @@ export const RoundButton = ({
   ref,
   ...rest
 }: IRoundButtonProps) => (
-  <Tooltip label={label} keys={keys}>
+  <Tooltip label={label} keys={keys} note={note} disabled={rest['aria-expanded'] === true}>
     <button
       {...rest}
       ref={ref}

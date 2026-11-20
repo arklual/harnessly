@@ -6,6 +6,7 @@
   "next.scene3d.camFree": "Свободный вид",
   "next.scene3d.camera": "Камера",
   "next.scene3d.cancel": "Отмена",
+  "next.scene3d.checkEmptyAtSave": "В сохранённом кадре пустые, здесь показаны целиком: объектов {n}",
   "next.scene3d.checkOffCamera": "Объектов, которых не видит ни одна камера: {n}",
   "next.scene3d.checkScale": "Масштаб не применён у объектов: {n}",
   "next.scene3d.checkTextures": "Не найдены текстуры: {n}",

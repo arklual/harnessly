@@ -59,7 +59,16 @@ import type { Conversation, MachineId, MachineProcKind, MachineStats } from '@/n
 import { openGates, useGates } from '@/next/stores/conversation';
 import { useConversationList } from '@/next/stores/conversations';
 import { addHistory, setHistoryPerson } from '@/next/stores/notice-history';
-import { SAMPLE_CHAT, setNotify, useNotify, type INotice } from '@/next/stores/notices';
+import {
+  SAMPLE_CHAT,
+  dropNotices,
+  expiredNews,
+  isNews,
+  noticesSnapshot,
+  setNotify,
+  useNotify,
+  type INotice,
+} from '@/next/stores/notices';
 import {
   landDrop,
   markArriving,
@@ -253,8 +262,33 @@ export const itemsOfNotices = (
       const gate = convs.get(n.chatId)?.gate;
       return gate ? [{ ...base, kind: GATE_KIND[gate.kind] }] : [];
     }
+    // The news of a chat (a finished turn, a failure, a limit) is a card of the column's stack, not a plate over the
+    // feed: see itemsOfNews. What is left on the plate is an access request and the like.
+    if (isNews(n)) return [];
     return live.has(n.key) ? [{ ...base, kind: NOTICE_KIND_OF[n.kind] }] : [];
   });
+
+/**
+ * The news of the chats the person is not looking at, as cards for the column: a finished turn, a failure, a limit.
+ * One per chat (the store keeps the newest), each with the start of the answer; it goes when the chat is read, when the
+ * person takes it away, or by itself (NEWS_LIFE_MS).
+ */
+export const itemsOfNews = (notices: readonly INotice[]): ISmartItem[] =>
+  notices
+    .filter((n) => isNews(n) && n.chatId !== SAMPLE_CHAT)
+    .map((n): ISmartItem => {
+      return {
+        key: n.key,
+        kind: NOTICE_KIND_OF[n.kind as Exclude<INotice['kind'], 'waiting'>],
+        chatId: n.chatId,
+        icon: n.icon,
+        title: n.title,
+        text: n.text,
+        at: n.at,
+        until: null,
+        summary: summaryOf(n),
+      };
+    });
 
 /** The machine's codes as items; `skew` is the machine's clock minus this page's. */
 export const itemsOfCodes = (asks: readonly ICodeAsk[], skew: number): ISmartItem[] =>
@@ -608,7 +642,22 @@ const SmartNoticeHost = ({
         })),
     [all, hidden, currentId, codes.asks],
   );
-  useEffect(() => setDrops(drops), [drops]);
+  // The news of the chats out of sight stands in the column beside what waits, whatever the plate did.
+  const newsDrops = useMemo(
+    (): IDrop[] =>
+      settings.cards
+        ? itemsOfNews(outOfSight(notices, currentId, visible)).map((item) => ({ item, what: null }))
+        : [],
+    [settings.cards, notices, currentId, visible],
+  );
+  // What nobody read goes by itself after a while.
+  const minute = Math.floor(now / 30_000);
+  useEffect(() => {
+    const gone = expiredNews(noticesSnapshot(), Date.now());
+    if (gone.size > 0) dropNotices((n) => gone.has(n.key));
+  }, [minute, notices]);
+  const everyDrop = useMemo(() => [...drops, ...newsDrops], [drops, newsDrops]);
+  useEffect(() => setDrops(everyDrop), [everyDrop]);
   useEffect(() => () => setDrops([]), []);
 
   // A drop pressed: the card grows out of it, open (adjusted while rendering, as React advises).

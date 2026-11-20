@@ -66,6 +66,20 @@ export interface IVoiceSettings {
   effort: string;
 }
 
+/** What the machine keeps now, as the whole body a save sends back (a change goes in over it). */
+export const settingsOf = (state: IVoiceState): IVoiceSettings => ({
+  subscription: state.subscription,
+  voice: state.voice,
+  model: state.model,
+  talk: state.talk,
+  head: state.head,
+  noBarge: !state.barge,
+  about: state.about,
+  notes: state.notes,
+  delivery: state.delivery,
+  effort: state.effort,
+});
+
 export const VOICE_MODE = { agent: 'agent', chat: 'chat', digest: 'digest' } as const;
 export type TVoiceMode = (typeof VOICE_MODE)[keyof typeof VOICE_MODE];
 

@@ -34,6 +34,7 @@ import {
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { useVoiceMascot } from '@/next/stores/me';
 import { goTo, ROUTE } from '@/next/routes/routes';
+import VoiceQuick, { QUICK_KIND } from '@/next/features/voice-quick/voice-quick';
 import { RoundButton } from '@/next/ui/button';
 import { toast } from '@/next/ui/toast';
 import { dropEcho } from '@/next/features/voice-live/echo';
@@ -411,14 +412,21 @@ const VoiceLive = ({
           onClick={toggleMute}
         />
       )}
-      <RoundButton
-        icon="audio-lines"
-        className="hx-voice-btn"
-        label={t(buttonLabel)}
-        keys={on ? ['Esc'] : ['⌥', 'Space']}
-        aria-pressed={on}
-        onClick={() => (on ? end() : void begin())}
-      />
+      <VoiceQuick kind={QUICK_KIND.live} machine={machine} inCall={on}>
+        {({ note, ref, ...gestures }) => (
+          <RoundButton
+            {...gestures}
+            ref={ref}
+            icon="audio-lines"
+            className="hx-voice-btn"
+            label={t(buttonLabel)}
+            note={note}
+            keys={on ? ['Esc'] : ['⌥', 'Space']}
+            aria-pressed={on}
+            onClick={() => (on ? end() : void begin())}
+          />
+        )}
+      </VoiceQuick>
     </span>
   );
 };

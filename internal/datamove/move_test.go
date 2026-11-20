@@ -514,3 +514,30 @@ func TestAnOlderJournalsGoneFailureIsSkipped(t *testing.T) {
 		t.Fatalf("status = %+v, want the old failure skipped", s)
 	}
 }
+
+// An object that left the inventory before it was moved is told to the hub as skipped with its reason, not forgotten:
+// the hub's row of it would wait for ever and hold the move open.
+func TestAnObjectThatLeftTheInventoryIsSkippedInTheHub(t *testing.T) {
+	data, transcripts := oldInstall(t)
+	st := &fakeStore{blobs: map[string][]byte{}}
+	j := &fakeJournal{}
+	m := newMover(data, transcripts, st, j)
+	m.pass(context.Background())
+	k := key(KindUploads, "up_1")
+	m.mu.Lock()
+	r := m.st.Records[k]
+	r.State, r.Code, r.Error = hubproto.MigrationFailed, CodeRead, "permission denied"
+	m.mu.Unlock()
+	for _, name := range []string{"up_1", "up_1.json"} {
+		if err := os.Remove(filepath.Join(data, "v2", "uploads", name)); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
+	m.pass(context.Background())
+	if o := j.last(KindUploads, "up_1"); o == nil || o.State != hubproto.MigrationSkipped || o.Code != CodeGone {
+		t.Fatalf("the hub was told %+v of the upload that left", o)
+	}
+	if s := m.Status(); s.Failed != 0 || !s.MigrationDone() {
+		t.Fatalf("status = %+v, want the move done", s)
+	}
+}

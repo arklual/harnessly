@@ -27,6 +27,15 @@ const str = (v: unknown, d = ''): string => (typeof v === 'string' ? v : d);
 const num = (v: unknown, d = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
+/** A visibility track: [frame, 1|0] pairs, in the file's order. */
+const visOf = (v: unknown): [number, number][] =>
+  arr(v).flatMap((e) => {
+    const r = arr(e);
+    return r.length === 2 && typeof r[0] === 'number' && typeof r[1] === 'number'
+      ? [[r[0], r[1]] as [number, number]]
+      : [];
+  });
+
 const vec = (v: unknown): TVec3 | null => {
   const a = arr(v);
   if (a.length !== 3 || a.some((x) => typeof x !== 'number' || !Number.isFinite(x))) return null;
@@ -198,6 +207,7 @@ const readMeta = (v: unknown): IScene3dMeta | null => {
               ...(x.p ? { p: str(x.p) } : {}),
               tris: num(x.tris),
               ...(x.hidden === true ? { hidden: true } : {}),
+              ...(visOf(x.vis).length > 0 ? { vis: visOf(x.vis) } : {}),
             },
           ]
         : [];
@@ -238,6 +248,7 @@ const readMeta = (v: unknown): IScene3dMeta | null => {
       missingImages: arr(stats.missingImages).map((x) => str(x)),
       unappliedScale: arr(stats.unappliedScale).map((x) => str(x)),
       offCamera: arr(stats.offCamera).map((x) => str(x)),
+      emptyAtSave: arr(stats.emptyAtSave).map((x) => str(x)),
     },
   };
 };

@@ -26,6 +26,7 @@ import {
   type IMachineSound,
 } from '@/next/features/voice-live/machine-sound';
 import type { MachineId } from '@/next/protocol/v2';
+import { voicePrefs } from '@/next/stores/voice';
 
 export const CALL = {
   idle: 'idle',
@@ -393,9 +394,15 @@ export const useVoiceCall = ({
       const audio = new Audio();
       audio.autoplay = true;
       try {
-        mic = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        });
+        // The microphone picked in the quick settings or the section (stores/voice); a device gone falls back to the system's.
+        const sound = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+        const { deviceId } = voicePrefs();
+        mic = await navigator.mediaDevices
+          .getUserMedia({ audio: deviceId ? { ...sound, deviceId: { exact: deviceId } } : sound })
+          .catch((failure: unknown) => {
+            if (!deviceId) throw failure;
+            return navigator.mediaDevices.getUserMedia({ audio: sound });
+          });
         let events: { open: () => boolean; send: (s: string) => void } = {
           open: () => false,
           send: () => undefined,

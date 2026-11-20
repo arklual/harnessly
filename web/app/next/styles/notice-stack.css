@@ -482,6 +482,26 @@
   outline-offset: 2px;
 }
 
+/* A wait of a chat: the row is the name and the time, under it the body of wait-row.tsx — what is asked and
+   the answer — drawn from the first, with no fold. */
+.hx-ns__card[data-gate] .hx-ns__hit {
+  min-height: 0;
+  padding-bottom: 4px;
+  align-items: flex-start;
+}
+.hx-ns__card[data-gate] .hx-ns__lines {
+  justify-content: center;
+  min-height: 32px;
+}
+.hx-ns__body {
+  padding: 0 12px 8px 52px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hx-ns__body {
+    animation: hx-ns-fade 200ms var(--hx-ease-out) backwards;
+  }
+}
+
 /* The answer in place (features/notifications/wait-row.tsx) in the card's palette. */
 .hx-ns .hx-nc__gist {
   color: var(--ns-fg2);

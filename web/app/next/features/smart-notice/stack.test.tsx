@@ -307,4 +307,28 @@ describe('a card that opens by itself', () => {
     });
     expect(card.hasAttribute('data-open')).toBe(true);
   });
+
+  it('draws what a wait asks in the card from the first, with no second «Open chat» and no repeated line', () => {
+    const onOpenChat = vi.fn();
+    const { container } = render(
+      <NoticeStack
+        drops={[drop('a', 'c1', 'Landing')]}
+        now={NOW}
+        label="Waiting"
+        onBack={vi.fn()}
+        onDismiss={vi.fn()}
+        onOpenChat={onOpenChat}
+        renderAnswer={() => <div data-testid="body">what is asked</div>}
+        inPlace={() => true}
+      />,
+    );
+    expect(screen.getByTestId('body')).toBeTruthy();
+    // The kind of the wait is the body's to say: the row has the name and the time only.
+    expect(container.querySelector('.hx-ns__text')).toBeNull();
+    // No fold with its own buttons: «Answer» and a second «Open chat» are gone.
+    expect(container.querySelector('.hx-ns__acts')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Open chat' })).toBeNull();
+    fireEvent.click(container.querySelector('.hx-ns__hit') as HTMLElement);
+    expect(onOpenChat).toHaveBeenCalledWith('c1');
+  });
 });

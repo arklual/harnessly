@@ -111,9 +111,21 @@ const WHEEL_IDLE_MS = 140;
 /** Where a pull may go: sideways and up (the notices stand at the top everywhere). */
 const allowed = (x: number, y: number) => ({ x, y: y > 0 ? 0 : y });
 
+/** The pull is written once a frame, however many moves the pointer sends in between (the vars are not inherited: ui.css). */
+const frames = new WeakMap<HTMLElement, { at: { x: number; y: number }; frame: number }>();
 const place = (el: HTMLElement, at: { x: number; y: number }) => {
-  el.style.setProperty('--hx-toast-dx', `${at.x}px`);
-  el.style.setProperty('--hx-toast-dy', `${at.y}px`);
+  const held = frames.get(el);
+  if (held) {
+    held.at = at;
+    if (held.frame !== 0) return;
+  }
+  const next = held ?? { at, frame: 0 };
+  frames.set(el, next);
+  next.frame = requestAnimationFrame(() => {
+    next.frame = 0;
+    el.style.setProperty('--hx-toast-dx', `${next.at.x}px`);
+    el.style.setProperty('--hx-toast-dy', `${next.at.y}px`);
+  });
 };
 
 /** Far or fast enough, the notice flies out the way it was pulled; otherwise it springs back. */
@@ -130,6 +142,9 @@ const release = (el: HTMLElement, id: number, at: { x: number; y: number }, ms: 
     dismiss(id);
     return;
   }
+  const held = frames.get(el);
+  if (held && held.frame !== 0) cancelAnimationFrame(held.frame);
+  frames.delete(el);
   el.style.removeProperty('--hx-toast-dx');
   el.style.removeProperty('--hx-toast-dy');
 };

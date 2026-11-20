@@ -3,6 +3,7 @@
 // now. useSwipe: a row follows a finger, a mouse or two fingers on a trackpad sideways; let go past a third of its
 // width (or flicked) it flies off and is taken away, short of that it springs back.
 import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
+import { releaseSpeed, softSpeed, swipeVerdict } from '@/next/ui/gesture-rules';
 
 /** The spring of styles/notification-center.css (response 0.45 s, bounce 0.18), as long as it takes to settle. */
 export const SPRING_MS = 580;
@@ -56,8 +57,6 @@ export const useFlip = (container: RefObject<HTMLElement | null>, active: boolea
 };
 
 const SLOP_PX = 8;
-const HIDE_SHARE = 0.33;
-const FLICK = 0.5;
 const WHEEL_IDLE_MS = 140;
 
 /**
@@ -123,9 +122,7 @@ export const useSwipe = (target: RefObject<HTMLElement | null>, enabled: boolean
       window.setTimeout(() => gone.current(), reducedMotion() ? 0 : LEAVE_MS);
     };
     const settle = (shift: number, v: number) => {
-      const far = Math.abs(shift) > el.offsetWidth * HIDE_SHARE;
-      const flicked = Math.abs(v) > FLICK && Math.abs(shift) > SLOP_PX * 3;
-      if (far || flicked) fly(Math.sign(shift) || -1);
+      if (swipeVerdict(shift, width || el.offsetWidth, v, SLOP_PX) === 'fly') fly(Math.sign(shift) || -1);
       else back();
     };
 
@@ -151,7 +148,7 @@ export const useSwipe = (target: RefObject<HTMLElement | null>, enabled: boolean
         el.setPointerCapture(e.pointerId);
       }
       const dt = Math.max(1, e.timeStamp - last.t);
-      speed = (e.clientX - last.x) / dt;
+      speed = softSpeed(speed, (e.clientX - last.x) / dt);
       last = { x: e.clientX, t: e.timeStamp };
       dx = mx;
       set(dx);
@@ -165,7 +162,7 @@ export const useSwipe = (target: RefObject<HTMLElement | null>, enabled: boolean
       window.setTimeout(() => {
         swallow = false;
       }, 0);
-      settle(dx, speed);
+      settle(dx, releaseSpeed(speed, last.t, e.timeStamp));
     };
     // A drag that moved the row is not a click on it.
     const onClick = (e: MouseEvent) => {

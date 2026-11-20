@@ -245,6 +245,11 @@
     transform: translateY(-4px) scale(0.98);
   }
 }
+.hx-tip__note {
+  margin-left: 8px;
+  opacity: 0.68;
+  font-weight: var(--hx-weight-regular);
+}
 .hx-tip kbd {
   min-width: 20px;
   height: 20px;
@@ -610,6 +615,30 @@
     transform: none !important;
     width: 100% !important;
   }
+}
+
+/* What a drag writes while a finger leads: registered as not inherited, so a move restyles the one element it
+   is written on and not everything the sheet or the notice holds — the right column's sheet holds a whole island, the
+   stack and the widgets. */
+@property --hx-sheet-dy {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+@property --pane-dy {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+@property --hx-toast-dx {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+@property --hx-toast-dy {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
 }
 
 /* ── Toasts ──────────────────────────────────────────── */

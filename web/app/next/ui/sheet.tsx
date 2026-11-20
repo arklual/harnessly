@@ -11,16 +11,11 @@ import { useEffect, useEffectEvent, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { usePortalContainer } from '@/next/ui/portal';
 import { usePresentFlag, type TPresenceState } from '@/next/ui/presence';
+import { releaseSpeed, sheetCloses, softSpeed } from '@/next/ui/gesture-rules';
 
 export const SHEET_EXIT_MS = 280;
-/** A flick down faster than this closes the sheet whatever the distance, px/ms. */
-const CLOSE_VELOCITY = 0.5;
-/** A slow drag closes it past this share of its height. */
-const CLOSE_SHARE = 1 / 3;
 /** How far the finger goes before the move counts as a drag (or as a scroll sideways), px. */
 const SLOP_PX = 6;
-/** A flick shorter than this is a tap that wobbled, px. */
-const MIN_FLICK_PX = 24;
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -56,7 +51,16 @@ export const useSheetDrag = (
     let velocity = 0;
     let last = { y: 0, t: 0 };
 
+    // The offset is written once a frame, however many moves the finger sends in between; an offset that changes an
+    // inherited property would restyle the whole sheet, so --hx-sheet-dy is registered as not inherited (ui.css).
+    let frame = 0;
+    const paint = () => {
+      frame = 0;
+      sheet.style.setProperty('--hx-sheet-dy', `${dy}px`);
+    };
     const reset = () => {
+      if (frame !== 0) cancelAnimationFrame(frame);
+      frame = 0;
       start = null;
       dragging = false;
       delete sheet.dataset.drag;
@@ -88,17 +92,20 @@ export const useSheetDrag = (
       }
       if (event.cancelable) event.preventDefault();
       const dt = event.timeStamp - last.t;
-      if (dt > 0) velocity = (touch.clientY - last.y) / dt;
+      if (dt > 0) velocity = softSpeed(velocity, (touch.clientY - last.y) / dt);
       last = { y: touch.clientY, t: event.timeStamp };
       dy = Math.max(0, down - SLOP_PX);
-      sheet.style.setProperty('--hx-sheet-dy', `${dy}px`);
+      if (frame === 0) frame = requestAnimationFrame(paint);
     };
-    const up = () => {
+    const up = (event: TouchEvent) => {
       if (!start) return;
       const was = dragging;
+      const height = sheet.offsetHeight;
+      const speed = releaseSpeed(velocity, last.t, event.timeStamp);
       reset();
       if (!was) return;
-      if (dy > sheet.offsetHeight * CLOSE_SHARE || (velocity > CLOSE_VELOCITY && dy > MIN_FLICK_PX)) close();
+      // A cancelled touch (the system took the finger) comes back; only a lift decides.
+      if (event.type === 'touchend' && sheetCloses(dy, height, speed)) close();
     };
     sheet.addEventListener('touchstart', down, { passive: true });
     sheet.addEventListener('touchmove', move, { passive: false });

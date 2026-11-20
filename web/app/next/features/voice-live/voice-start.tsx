@@ -4,6 +4,7 @@ import { t } from '@/next/i18n';
 import { useVoiceState, voiceOffered } from '@/next/features/voice-live/use-voice-state';
 import type { MachineId } from '@/next/protocol/v2';
 import { goTo, ROUTE } from '@/next/routes/routes';
+import VoiceQuick, { QUICK_KIND } from '@/next/features/voice-quick/voice-quick';
 import { RoundButton } from '@/next/ui/button';
 import '@/next/styles/voice-live.css';
 
@@ -24,26 +25,40 @@ const VoiceStart = ({ machine, onStart, busy = false }: IVoiceStartProps) => {
     const label = voiceOffered(state) ? 'next.chatgpt.voice.noLogin' : 'next.chatgpt.voice.offHint';
     return (
       <span className="hx-voice-holder">
-        <RoundButton
-          icon="audio-lines"
-          className="hx-voice-btn"
-          data-off=""
-          aria-disabled="true"
-          label={t(label)}
-          onClick={() => goTo({ kind: ROUTE.settings, section: 'accounts' })}
-        />
+        <VoiceQuick kind={QUICK_KIND.live} machine={machine}>
+          {({ note, ref, ...gestures }) => (
+            <RoundButton
+              {...gestures}
+              ref={ref}
+              icon="audio-lines"
+              className="hx-voice-btn"
+              data-off=""
+              aria-disabled="true"
+              label={t(label)}
+              note={note}
+              onClick={() => goTo({ kind: ROUTE.settings, section: 'accounts' })}
+            />
+          )}
+        </VoiceQuick>
       </span>
     );
   }
   return (
     <span className="hx-voice-holder">
-      <RoundButton
-        icon="audio-lines"
-        className="hx-voice-btn"
-        label={t('next.chatgpt.voice.newChat')}
-        disabled={busy}
-        onClick={onStart}
-      />
+      <VoiceQuick kind={QUICK_KIND.live} machine={machine}>
+        {({ note, ref, ...gestures }) => (
+          <RoundButton
+            {...gestures}
+            ref={ref}
+            icon="audio-lines"
+            className="hx-voice-btn"
+            label={t('next.chatgpt.voice.newChat')}
+            note={note}
+            disabled={busy}
+            onClick={onStart}
+          />
+        )}
+      </VoiceQuick>
     </span>
   );
 };

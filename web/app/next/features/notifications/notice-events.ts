@@ -49,7 +49,7 @@ export const noticeEventOf = (conv: Conversation, machineOnline: boolean): INoti
       key: `${conv.id}:${turn.id}:done`,
       kind: NOTICE_KIND.done,
       icon: 'circle-check',
-      text: clipWords(turn.snippet) || look.label,
+      text: clipWords(turn.snippet) || clipWords(conv.recap?.text ?? '') || look.label,
     };
   if (status === CHAT_STATUS.failed && turn.failure === 'rate-limit')
     return {

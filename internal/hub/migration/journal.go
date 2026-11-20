@@ -243,6 +243,15 @@ func sha256Hex(s string) bool {
 
 // finish marks the run over when every object of the inventory is verified or skipped, and not over otherwise.
 func finish(ctx context.Context, q store.Q, machineID, migration string, now int64) error {
+	// A runtime before HRN-1137 reported an object gone from its disk or too big for the store as failed, and
+	// forgot it once it left the inventory: the row never changed again and held the run open. Such objects are
+	// skipped with their reason now, by the runtime itself; the old rows are read the same way.
+	if _, err := q.Exec(ctx, `UPDATE migration_objects SET state = ?, changed_at = ?
+		WHERE machine_id = ? AND migration = ? AND state = ? AND code IN (?, ?)`,
+		hubproto.MigrationSkipped, now, machineID, migration, hubproto.MigrationFailed,
+		hubproto.MigrationCodeGone, hubproto.MigrationCodeTooBig); err != nil {
+		return err
+	}
 	c, err := counts(ctx, q, machineID, migration)
 	if err != nil {
 		return err
@@ -251,7 +260,8 @@ func finish(ctx context.Context, q store.Q, machineID, migration string, now int
 	if err := q.QueryRow(ctx, `SELECT total FROM migration_runs WHERE machine_id = ? AND migration = ?`, machineID, migration).Scan(&total); err != nil {
 		return err
 	}
-	if total > 0 && c.verified+c.skipped >= total && c.failed == 0 && c.pending == 0 {
+	// A machine with nothing of its own to move (total 0) is done as well.
+	if c.verified+c.skipped >= total && c.failed == 0 && c.pending == 0 {
 		_, err = q.Exec(ctx, `UPDATE migration_runs SET finished_at = COALESCE(finished_at, ?) WHERE machine_id = ? AND migration = ?`,
 			now, machineID, migration)
 		return err

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_NOTIFY,
   MAX_NOTICES,
+  NEWS_LIFE_MS,
+  expiredNews,
   parseNotices,
   parseNotify,
   withNotice,
@@ -84,5 +86,42 @@ describe('the switches', () => {
   it('bring back the smart notice turned off before its switch was taken away', () => {
     expect(parseNotify(JSON.stringify({ v: 2, cards: false })).cards).toBe(true);
     expect(parseNotify(JSON.stringify({ cards: false })).cards).toBe(true);
+  });
+});
+
+describe('news that nobody read', () => {
+  const NOW = 10_000_000;
+  const news = (key: string, kind: INotice['kind'], at: number): INotice => ({
+    ...notice(key),
+    key,
+    kind,
+    at,
+  });
+
+  it('goes by itself after a while, and what waits does not', () => {
+    const list = [
+      news('fresh', 'done', NOW - 1000),
+      news('old', 'done', NOW - NEWS_LIFE_MS - 1),
+      news('oldfail', 'failed', NOW - NEWS_LIFE_MS - 1),
+      news('waiting', 'waiting', NOW - NEWS_LIFE_MS * 3),
+    ];
+    expect([...expiredNews(list, NOW)].sort()).toEqual(['old', 'oldfail']);
+  });
+
+  it('goes too when it carries the clock of another device far ahead of this page', () => {
+    expect(expiredNews([news('ahead', 'done', NOW + NEWS_LIFE_MS + 1)], NOW).has('ahead')).toBe(true);
+    expect(expiredNews([news('near', 'done', NOW + 5000)], NOW).has('near')).toBe(false);
+  });
+
+  it('leaves the sample of the settings alone', () => {
+    const sample = { ...news('s', 'done', NOW - NEWS_LIFE_MS * 2), chatId: 'notice-sample' };
+    expect(expiredNews([sample], NOW).size).toBe(0);
+  });
+
+  it('is one card per chat: a second finished turn replaces the first', () => {
+    let list = withNotice([], news('a:t1:done', 'done', 1));
+    list = withNotice(list, { ...news('a:t2:done', 'done', 2), chatId: 'a' });
+    expect(list.filter((n) => n.chatId === 'a')).toHaveLength(1);
+    expect(list[0]?.key).toBe('a:t2:done');
   });
 });
