@@ -74,6 +74,18 @@ curl -sS -X POST "http://127.0.0.1:$%s/automations/report" \
 `, rule.Name, rule.Trigger.Source, rendered, tokenEnv, port, run.ID, tokenEnv)
 }
 
+// runsFolder is the mark of a run's chat (wire.ChatFrom): the routines' and the triggers' chats stand in one folder of
+// the person's sidebar, «Регулярные», each named after its rule. A runtime that does not know the
+// mark starts the chat without it.
+const (
+	runsFolderApp   = "routines"
+	runsFolderLabel = "Регулярные"
+)
+
+func runFrom(rule Rule) map[string]string {
+	return map[string]string{"app": runsFolderApp, "label": runsFolderLabel, "title": rule.Name}
+}
+
 // errNoMachine says a rule has no machine to run on just now.
 var errNoMachine = errors.New("no machine")
 
@@ -126,6 +138,7 @@ func (s *Service) Dispatch(ctx context.Context) bool {
 	raw, err := s.links.Do(ctx, machine, startOp, map[string]any{
 		"workspaceId": nil, "prompt": prompt, "model": model, "cwd": nil,
 		"runId": run.ID, "resultToken": token, "env": map[string]string{s.cfg.AutomationsTokenEnv: token},
+		"from": runFrom(rule),
 	}, startFor)
 	if err != nil {
 		if errors.Is(err, httpx.ErrMachineOffline) {

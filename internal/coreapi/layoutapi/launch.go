@@ -239,10 +239,21 @@ func (a *api) automationStart(c *call) {
 	}
 	ws, _ := c.str("workspaceId")
 	conv := a.start(c, launch.Options{Provider: agents.Claude, WorkspaceID: ws, Prompt: &prompt, Launch: choice, Cwd: cwd, Env: env,
-		Meta: jsvalue.NewObject("mode", "automation")})
+		Meta: automationMeta(appFrom(c))})
 	if conv != nil {
 		c.reply(201, jsvalue.NewObject("conversationId", conv.String("id")))
 	}
+}
+
+// automationMeta is an automation chat's metadata: its mode, and the hub's mark of the run when it sent one,
+// so the chat stands in the routines' folder of the sidebar under its rule's name. The prompt is the hub's own and is
+// not wrapped, and no app is turned on: the folder is not an app's.
+func automationMeta(from *wire.ChatFrom) *jsvalue.Object {
+	meta := jsvalue.NewObject("mode", "automation")
+	if from != nil {
+		meta.Set("from", jsvalue.NewObject("app", from.App, "label", from.Label, "title", from.Title))
+	}
+	return meta
 }
 
 // POST <platform>/docs/deliver: a person's comment for the conversation its document is bound to.

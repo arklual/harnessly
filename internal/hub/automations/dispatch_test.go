@@ -93,6 +93,22 @@ func TestRunWaitsInTheQueueWhileItsMachineIsOff(t *testing.T) {
 	}
 }
 
+// A run's chat is marked for the routines' folder of the sidebar and named after its rule: a trigger's
+// run as a routine's.
+func TestRunChatStandsInTheRoutinesFolder(t *testing.T) {
+	s, links, _ := dispatcher(t)
+	queued(t, s, "Разбор алертов", "m1", "f1")
+	links.online["m1"] = true
+	if !s.Dispatch(context.Background()) {
+		t.Fatal("nothing was started")
+	}
+	params, _ := links.params[0].(map[string]any)
+	from, _ := params["from"].(map[string]string)
+	if from["app"] != "routines" || from["label"] != "Регулярные" || from["title"] != "Разбор алертов" {
+		t.Fatalf("the run's mark: %#v", params["from"])
+	}
+}
+
 // A run that waits for its machine does not hold up the run of a machine that is connected.
 func TestWaitingRunDoesNotHoldUpAnotherMachines(t *testing.T) {
 	s, links, clock := dispatcher(t)

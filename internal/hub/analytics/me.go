@@ -545,12 +545,24 @@ func kSessionsOf(ctx context.Context, st store.Store, loc *time.Location, ss []s
 			end = *x.EndedAt
 		}
 		m := money[store.SessionRef{OrgKey: x.OrgKey, Provider: x.Provider, SessionKey: x.SessionKey}]
-		ks[i] = kSession{UserID: x.UserID, Start: x.StartedAt, End: end, M: metricsOf(x.Metrics), PaidMicros: m.paid, ListMicros: m.list,
+		ks[i] = kSession{UserID: x.UserID, TeamID: x.TeamID, Start: x.StartedAt, End: end, M: kMetricsOf(x.Metrics), PaidMicros: m.paid, ListMicros: m.list,
 			NoMoney: orgMoney && x.Funding != store.FundingOrg}
 	}
 	// startedIn finds a period's sessions by their start.
 	slices.SortStableFunc(ks, func(a, b kSession) int { return cmp.Compare(a.Start, b.Start) })
 	return ks, nil
+}
+
+// ofTeam is the sessions of ks of the team, in their order. Money is the same counted over the team's sessions or all
+// of them (a payer splits an account's month by everyone's list), so a split by team reuses what the whole was made of.
+func ofTeam(ks []kSession, team string) []kSession {
+	var out []kSession
+	for _, k := range ks {
+		if k.TeamID == team {
+			out = append(out, k)
+		}
+	}
+	return out
 }
 
 // startedIn is the sessions started in [a, b) of ks sorted by start (kSessionsOf): two binary searches, no copy. The
@@ -568,12 +580,22 @@ func startedIn(ks []kSession, a, b time.Time) []kSession {
 
 // kpisFrom is the KPI of sp against cmp, the noise from the noiseWeeks weeks before sp.
 func kpisFrom(ks []kSession, sp, cmp span) []KpiValue {
+	return computeKPIs(startedIn(ks, sp.from, sp.to), sp.days(), startedIn(ks, cmp.from, cmp.to), cmp.days(), noiseWeeksOf(ks, sp))
+}
+
+// kpiFrom is the KPI d of kpisFrom: a marker of a chart needs only its own.
+func kpiFrom(d kpiDef, ks []kSession, sp, cmp span) KpiValue {
+	return computeKPI(d, startedIn(ks, sp.from, sp.to), sp.days(), startedIn(ks, cmp.from, cmp.to), cmp.days(), noiseWeeksOf(ks, sp))
+}
+
+// noiseWeeksOf is the sessions of each of the noiseWeeks weeks before sp.
+func noiseWeeksOf(ks []kSession, sp span) [][]kSession {
 	weeks := make([][]kSession, noiseWeeks)
 	for i := range weeks {
 		end := sp.from.AddDate(0, 0, -7*i)
 		weeks[i] = startedIn(ks, end.AddDate(0, 0, -7), end)
 	}
-	return computeKPIs(startedIn(ks, sp.from, sp.to), sp.days(), startedIn(ks, cmp.from, cmp.to), cmp.days(), weeks)
+	return weeks
 }
 
 // sparkOf is the values of d by bucket, null where a bucket has too few sessions.

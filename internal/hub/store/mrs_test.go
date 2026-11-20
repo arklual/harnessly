@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -150,5 +151,81 @@ func exerciseMRSurvival(t *testing.T, db *DB) {
 	// Mature: !1 (revert came after 14 days), !2 (reverted in 10 days), !4. !3 is too young. Survived: !1 and !4.
 	if m["mrsMerged"] != 4 || m["mrsMature"] != 3 || m["mrsSurvived"] != 2 {
 		t.Errorf("survival %v", m)
+	}
+}
+
+func TestMergedMRsManySQLite(t *testing.T)   { exerciseMergedMRsMany(t, openTest(t)) }
+func TestMergedMRsManyPostgres(t *testing.T) { exerciseMergedMRsMany(t, openPostgres(t)) }
+
+// exerciseMergedMRsMany checks that a read of more sessions than sessionChunk, which takes the organization's links in
+// one query, counts every session as a read of it alone does.
+func exerciseMergedMRsMany(t *testing.T, db *DB) {
+	ctx := context.Background()
+	s := db.S()
+	u := &User{Email: "many@example.com"}
+	if err := s.CreateUser(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	const org, n = "org1", sessionChunk + 101
+	put := func(key string, start int64) {
+		t.Helper()
+		if _, err := s.PutSession(ctx, AgentSession{OrgKey: org, Provider: "claude", SessionKey: key, UserID: u.ID,
+			Funding: FundingPersonal, Origin: "live", Attribution: "x", StartedAt: start, Metrics: `{"mrs":1}`, Seq: 1, UpdatedAt: start}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	link := func(key, mr string) {
+		t.Helper()
+		if err := s.ReplaceSessionMRs(ctx, org, "claude", key, key, []string{mr}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Two sessions in a row mention one request, the earlier owns it; a session before the read mentions the first.
+	var merged []MergedMR
+	for i := range n {
+		key, start := fmt.Sprintf("s%04d", i), int64(1000+i*10)
+		put(key, start)
+		mr := fmt.Sprintf("h/b/!%d", i/2)
+		link(key, mr)
+		if i%2 == 0 {
+			merged = append(merged, MergedMR{Key: mr, MergedAt: 1e6, CreatedAt: start + 5})
+		}
+	}
+	put("before", 1)
+	link("before", "h/b/!0")
+	if err := s.UpsertMergedMRs(ctx, merged); err != nil {
+		t.Fatal(err)
+	}
+	read := func(from, to int64) map[string]map[string]float64 {
+		t.Helper()
+		got, err := s.UserSessions(ctx, SessionFilter{UserID: u.ID, From: from, To: to})
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := map[string]map[string]float64{}
+		for _, x := range got {
+			m := map[string]float64{}
+			_ = json.Unmarshal([]byte(x.Metrics), &m)
+			out[x.SessionKey] = m
+		}
+		return out
+	}
+	all := read(1000, 1e6)
+	if len(all) != n {
+		t.Fatalf("read %d sessions", len(all))
+	}
+	for i := range n {
+		key := fmt.Sprintf("s%04d", i)
+		alone := read(int64(1000+i*10), int64(1000+i*10+1))[key]
+		if all[key]["mrsMerged"] != alone["mrsMerged"] || all[key]["firstMrMs"] != alone["firstMrMs"] {
+			t.Fatalf("%s: with the others %v, alone %v", key, all[key], alone)
+		}
+		want := 0.0
+		if i%2 == 0 && i > 0 {
+			want = 1
+		}
+		if all[key]["mrsMerged"] != want {
+			t.Fatalf("%s mrsMerged %v, want %v", key, all[key]["mrsMerged"], want)
+		}
 	}
 }

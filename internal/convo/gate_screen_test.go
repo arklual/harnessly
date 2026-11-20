@@ -173,6 +173,10 @@ func TestCutPermissionOpensACard(t *testing.T) {
 	if len(ps) != 1 || ps[0].Kind != wire.PermDialog || len(ps[0].Options) != 0 || ps[0].State.Refused == nil {
 		t.Fatalf("a cut menu is no button to press: %+v", ps)
 	}
+	// The lists read the kind off the chat's record: a menu of the screen is a choice to make, not a permission.
+	if g := r.rec().Gate; g == nil || g.Kind != wire.GatePermission || !g.Dialog {
+		t.Fatalf("the record's gate says a dialog: %+v", g)
+	}
 	// The whole dialog comes into view: the card of the permission takes over, with its options.
 	r.pane.screen = " Do you want to proceed?\n ❯ 1. Yes\n   2. No\n\n Esc to cancel\n"
 	r.tick(time.Second)

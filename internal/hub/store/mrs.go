@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"strings"
 	"time"
@@ -153,24 +154,17 @@ func (s Store) withMergedMRs(ctx context.Context, in []AgentSession) ([]AgentSes
 	for org, idx := range byOrg {
 		mine := map[sk]map[string]int64{} // session -> mr key -> created_at
 		keys := map[string]bool{}
-		for from := 0; from < len(idx); from += mrChunk {
-			part := idx[from:min(from+mrChunk, len(idx))]
-			ph, args := placeholders(len(part)), []any{org}
-			for _, i := range part {
-				args = append(args, in[i].SessionKey)
-			}
-			rows, err := s.q.Query(ctx, `SELECT m.provider, m.owner_key, m.mr_key, g.created_at, g.merged_at, g.title, g.project FROM agent_session_mrs m
-				JOIN merged_mrs g ON g.mr_key = m.mr_key WHERE m.org_key = ? AND m.owner_key IN (`+ph+`)`, args...)
-			if err != nil {
-				return nil, err
-			}
+		// read takes the links of rows, of the sessions of want when it is not nil.
+		read := func(rows *sql.Rows, want map[string]bool) error {
 			for rows.Next() {
 				var p, o, k string
 				var c, at int64
 				var title, project string
 				if err := rows.Scan(&p, &o, &k, &c, &at, &title, &project); err != nil {
-					rows.Close()
-					return nil, err
+					return err
+				}
+				if want != nil && !want[o] {
+					continue
 				}
 				id := sk{org, p, o}
 				if mine[id] == nil {
@@ -180,11 +174,43 @@ func (s Store) withMergedMRs(ctx context.Context, in []AgentSession) ([]AgentSes
 				keys[k] = true
 				info[k] = mergedInfo{mergedAt: at, title: title, project: project}
 			}
-			if err := rows.Err(); err != nil {
+			return rows.Err()
+		}
+		const mergedOf = `SELECT m.provider, m.owner_key, m.mr_key, g.created_at, g.merged_at, g.title, g.project FROM agent_session_mrs m
+				JOIN merged_mrs g ON g.mr_key = m.mr_key WHERE m.org_key = ?`
+		if len(idx) > sessionChunk {
+			// A screen of months reads thousands of sessions: one query for the organization's links, those of other
+			// sessions skipped here, instead of one per mrChunk sessions (seconds over the network).
+			want := make(map[string]bool, len(idx))
+			for _, i := range idx {
+				want[in[i].SessionKey] = true
+			}
+			rows, err := s.q.Query(ctx, mergedOf, org)
+			if err != nil {
+				return nil, err
+			}
+			if err := read(rows, want); err != nil {
 				rows.Close()
 				return nil, err
 			}
 			rows.Close()
+		} else {
+			for from := 0; from < len(idx); from += mrChunk {
+				part := idx[from:min(from+mrChunk, len(idx))]
+				ph, args := placeholders(len(part)), []any{org}
+				for _, i := range part {
+					args = append(args, in[i].SessionKey)
+				}
+				rows, err := s.q.Query(ctx, mergedOf+` AND m.owner_key IN (`+ph+`)`, args...)
+				if err != nil {
+					return nil, err
+				}
+				if err := read(rows, nil); err != nil {
+					rows.Close()
+					return nil, err
+				}
+				rows.Close()
+			}
 		}
 		// Who owns each request: the earliest-started main session of the organization that mentioned it.
 		winner := map[string]sk{}
@@ -193,35 +219,47 @@ func (s Store) withMergedMRs(ctx context.Context, in []AgentSession) ([]AgentSes
 		for k := range keys {
 			list = append(list, k)
 		}
-		for from := 0; from < len(list); from += mrChunk {
-			part := list[from:min(from+mrChunk, len(list))]
-			ph, args := placeholders(len(part)), []any{org}
-			for _, k := range part {
-				args = append(args, k)
-			}
-			rows, err := s.q.Query(ctx, `SELECT DISTINCT m.mr_key, a.provider, a.session_key, a.started_at FROM agent_session_mrs m
+		const ownersOf = `SELECT DISTINCT m.mr_key, a.provider, a.session_key, a.started_at FROM agent_session_mrs m
 				JOIN agent_sessions a ON a.org_key = m.org_key AND a.provider = m.provider AND a.session_key = m.owner_key
-				WHERE m.org_key = ? AND a.parent_key = '' AND m.mr_key IN (`+ph+`)`, args...)
+				WHERE m.org_key = ? AND a.parent_key = ''`
+		owners := func(q string, args ...any) error {
+			rows, err := s.q.Query(ctx, q, args...)
 			if err != nil {
-				return nil, err
+				return err
 			}
+			defer rows.Close()
 			for rows.Next() {
 				var k, p, sess string
 				var at int64
 				if err := rows.Scan(&k, &p, &sess, &at); err != nil {
-					rows.Close()
-					return nil, err
+					return err
+				}
+				if !keys[k] {
+					continue
 				}
 				cur, ok := winner[k]
 				if !ok || at < started[k] || (at == started[k] && (p < cur.provider || (p == cur.provider && sess < cur.key))) {
 					winner[k], started[k] = sk{org, p, sess}, at
 				}
 			}
-			if err := rows.Err(); err != nil {
-				rows.Close()
+			return rows.Err()
+		}
+		if len(list) > sessionChunk {
+			// The same for the owners of many requests: the organization's, those of other requests skipped.
+			if err := owners(ownersOf, org); err != nil {
 				return nil, err
 			}
-			rows.Close()
+		} else {
+			for from := 0; from < len(list); from += mrChunk {
+				part := list[from:min(from+mrChunk, len(list))]
+				ph, args := placeholders(len(part)), []any{org}
+				for _, k := range part {
+					args = append(args, k)
+				}
+				if err := owners(ownersOf+` AND m.mr_key IN (`+ph+`)`, args...); err != nil {
+					return nil, err
+				}
+			}
 		}
 		for _, i := range idx {
 			x := in[i]
@@ -251,6 +289,11 @@ func (s Store) withMergedMRs(ctx context.Context, in []AgentSession) ([]AgentSes
 // setMRMetrics sets mrsMerged and firstMrMs (dropped when negative) in a metrics object, leaving it as it is when they
 // already say so.
 func setMRMetrics(raw string, merged float64, first int64, mature, ok float64) string {
+	// Most sessions merged nothing and say nothing of it: nothing to change, and no need to read them.
+	if merged == 0 && first < 0 && mature == 0 && ok == 0 && !strings.Contains(raw, `"mrsMerged"`) && !strings.Contains(raw, `"firstMrMs"`) &&
+		!strings.Contains(raw, `"mrsMature"`) && !strings.Contains(raw, `"mrsSurvived"`) {
+		return raw
+	}
 	m := map[string]any{}
 	if raw != "" {
 		if err := json.Unmarshal([]byte(raw), &m); err != nil {

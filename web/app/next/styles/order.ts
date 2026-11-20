@@ -119,6 +119,7 @@ import '@/next/styles/smart-notice.css';
 import '@/next/styles/notice-stack.css';
 import '@/next/styles/notification-center.css';
 import '@/next/styles/folder-suggest.css';
+import '@/next/styles/column.css';
 import '@/next/styles/whats-new.css';
 import '@/next/styles/learn.css';
 import '@/next/styles/routines.css';

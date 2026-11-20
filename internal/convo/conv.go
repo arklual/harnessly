@@ -641,7 +641,7 @@ func (c *conv) effects(effects []agentstate.Effect, before wire.AgentState, now 
 		case agentstate.RequestPermission:
 			if g := c.gates[e.ID]; g != nil && g.p != nil {
 				c.emit(wire.PermissionRequestedEv{Permission: *g.p})
-				c.setGate(&wire.GateRef{Kind: wire.GatePermission, ID: e.ID})
+				c.setGate(&wire.GateRef{Kind: wire.GatePermission, ID: e.ID, Dialog: g.p.Kind == wire.PermDialog})
 			}
 		case agentstate.ProposePlan:
 			if g := c.gates[e.ID]; g != nil && g.p != nil {

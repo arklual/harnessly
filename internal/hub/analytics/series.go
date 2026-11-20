@@ -163,17 +163,7 @@ func (s *Service) kpiSeries(w http.ResponseWriter, r *http.Request, p *auth.Prin
 			return cmp.Or(cmp.Compare(a.Name, b.Name), cmp.Compare(a.ID, b.ID))
 		})
 		for _, t := range teams {
-			var mine []store.AgentSession
-			for _, v := range ss {
-				if v.TeamID == t.ID {
-					mine = append(mine, v)
-				}
-			}
-			tk, err := kSessionsOf(ctx, st, x.loc, mine, true)
-			if err != nil {
-				return err
-			}
-			out.Splits = append(out.Splits, SeriesSplit{Key: t.ID, Label: t.Name, Points: seriesOf(d, tk, bs)})
+			out.Splits = append(out.Splits, SeriesSplit{Key: t.ID, Label: t.Name, Points: seriesOf(d, ofTeam(ks, t.ID), bs)})
 		}
 	}
 	if out.Markers, err = markersOf(ctx, st, x.loc, x.org.ID, changeScopes(chain), cs, d, ks); err != nil {
@@ -202,13 +192,8 @@ func markersOf(ctx context.Context, st store.Store, loc *time.Location, orgID st
 	}
 	for _, c := range cs {
 		before, after := effectSpans(c.At, loc)
-		var v *string
-		for _, k := range kpisFrom(ks, after, before) {
-			if k.Kpi == d.id {
-				verdict := k.Verdict
-				v = &verdict
-			}
-		}
+		verdict := kpiFrom(d, ks, after, before).Verdict
+		v := &verdict
 		bf, _ := before.ms()
 		_, af := after.ms()
 		for _, o := range around {

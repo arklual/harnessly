@@ -57,7 +57,7 @@ import { useReadWhileVisible } from '@/next/bindings/read-while-visible';
 import { connectionStore } from '@/next/stores/connection';
 import { useAll } from '@/next/core/store';
 import { hub } from '@/next/core/realtime/hub';
-import FolderSuggestion from '@/next/features/folder-suggest/folder-suggestion';
+import useFolderSuggestion from '@/next/features/folder-suggest/use-folder-suggestion';
 import ChatHeader, { type IChatHeaderProps } from '@/next/features/header/chat-header';
 import type { IHeaderGoal } from '@/next/features/header/goal-dialog';
 import { settled } from '@/next/bindings/outcome';
@@ -966,13 +966,6 @@ const Shell = ({ owner }: IShellProps) => {
   const term = useAgentTerminal(route.kind === ROUTE.chat ? (record ?? null) : (designRecord ?? null));
   // The pane is made further down; the column's «Документы» opens through it once it is there.
   const openOutputRef = useRef<((output: TurnOutput) => void) | null>(null);
-  const bg = useChatBackground(
-    stageId && isConvId(stageId) ? stageId : null,
-    chatMachine,
-    now,
-    openChat,
-    (output) => openOutputRef.current?.(output),
-  );
   const present = stageId !== null && chatMachine !== null;
   // The last chats opened stay mounted, hidden (<Activity>): back to one of them, its feed and field are already drawn
   // and only show again.
@@ -1088,6 +1081,23 @@ const Shell = ({ owner }: IShellProps) => {
   const chat = useMemo(
     () => (currentId === null ? null : (model.chats?.find((item) => item.id === currentId) ?? null)),
     [currentId, model.chats],
+  );
+  // The folder's offer for the open chat is a notice of the chat's right column: the hook gives the card and whether it is there.
+  const folderSuggest = useFolderSuggestion({
+    chat,
+    machine: record?.machineId ?? null,
+    projects: model.projects,
+    chats: shownChats,
+    onMove: (id, projectId) => model.actions.onMove?.(id, projectId) ?? Promise.resolve(),
+    enabled: route.kind === ROUTE.chat,
+  });
+  const bg = useChatBackground(
+    stageId && isConvId(stageId) ? stageId : null,
+    chatMachine,
+    now,
+    openChat,
+    (output) => openOutputRef.current?.(output),
+    folderSuggest,
   );
   const parentChat = useMemo(
     () => (chat?.parentId ? (model.chats?.find((item) => item.id === chat.parentId) ?? null) : null),
@@ -1836,15 +1846,6 @@ const Shell = ({ owner }: IShellProps) => {
             chats={{ list: shownChats, onOpen: openChat }}
           />
         )}
-      {route.kind === ROUTE.chat && (
-        <FolderSuggestion
-          chat={chat}
-          machine={record?.machineId ?? null}
-          projects={model.projects}
-          chats={shownChats}
-          onMove={(id, projectId) => model.actions.onMove?.(id, projectId) ?? Promise.resolve()}
-        />
-      )}
       {/* The chat read to its end and pulled further: the next active chat, as in Telegram (HRN-1491). */}
       <NextChatPull
         enabled={phone && route.kind === ROUTE.chat}

@@ -673,7 +673,7 @@ func (s *Service) tilesOf(ctx context.Context, st store.Store, x *orgScope, sp s
 		if v.UserID != "" {
 			people[v.UserID] = true
 		}
-		t.mrs += metricsOf(v.Metrics)["mrsMerged"]
+		t.mrs += kMetricsOf(v.Metrics)[mMrsMerged]
 		if v.Funding == store.FundingOrg {
 			org = append(org, v)
 		}
@@ -694,7 +694,7 @@ func (s *Service) tilesOf(ctx context.Context, st store.Store, x *orgScope, sp s
 	var mrs float64
 	for _, v := range org {
 		list += money[store.SessionRef{OrgKey: v.OrgKey, Provider: v.Provider, SessionKey: v.SessionKey}].list
-		mrs += metricsOf(v.Metrics)["mrsMerged"]
+		mrs += kMetricsOf(v.Metrics)[mMrsMerged]
 	}
 	if mrs > 0 {
 		v := math.Round(float64(list)/1e6/mrs*100) / 100
@@ -811,26 +811,18 @@ func (s *Service) orgKPIs(w http.ResponseWriter, r *http.Request, p *auth.Princi
 		return err
 	}
 	out := KpisResponse{Scope: orgs.ScopeView{Kind: x.sc.Kind, ID: x.sc.ID}, Period: sp.period(), CmpPeriod: cmpSp.period()}
-	if out.Kpis, err = kpisOf(ctx, st, x.loc, ss, sp, cmpSp, true); err != nil {
+	ks, err := kSessionsOf(ctx, st, x.loc, ss, true)
+	if err != nil {
 		return err
 	}
+	out.Kpis = kpisOfK(ks, sp, cmpSp)
 	if q.Get("series") == "team" {
 		out.Series = []KpiSeries{}
 		teams := slices.SortedFunc(maps.Values(x.teams), func(a, b store.Team) int {
 			return cmp.Or(cmp.Compare(a.Name, b.Name), cmp.Compare(a.ID, b.ID))
 		})
 		for _, t := range teams {
-			var mine []store.AgentSession
-			for _, v := range ss {
-				if v.TeamID == t.ID {
-					mine = append(mine, v)
-				}
-			}
-			kv, err := kpisOf(ctx, st, x.loc, mine, sp, cmpSp, true)
-			if err != nil {
-				return err
-			}
-			out.Series = append(out.Series, KpiSeries{Key: t.ID, Label: t.Name, Kpis: kv})
+			out.Series = append(out.Series, KpiSeries{Key: t.ID, Label: t.Name, Kpis: kpisOfK(ofTeam(ks, t.ID), sp, cmpSp)})
 		}
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)

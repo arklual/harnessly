@@ -1619,7 +1619,11 @@
       "type": "object",
       "required": ["kind", "id"],
       "additionalProperties": false,
-      "properties": {"kind": {"$ref": "#/$defs/GateKind"}, "id": {"type": "string", "pattern": "^[qp]:.+$"}}
+      "properties": {
+        "kind": {"$ref": "#/$defs/GateKind"},
+        "id": {"type": "string", "pattern": "^[qp]:.+$"},
+        "dialog": {"type": "boolean"}
+      }
     },
     "Conversation": {
       "type": "object",

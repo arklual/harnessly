@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
 // The app that starts a chat for the person is on in it when the machine lets it, beside the apps the launch names,
@@ -29,5 +30,19 @@ func TestWithFromApp(t *testing.T) {
 	}
 	if again := withFromApp(got, "acme.inbox", yes); !reflect.DeepEqual(again.Apps, []string{"acme.docs", "acme.inbox"}) {
 		t.Fatalf("not twice: %+v", again)
+	}
+}
+
+// A hub run's chat keeps its mode and takes the hub's mark; without a mark it is an automation chat as before.
+func TestAutomationMeta(t *testing.T) {
+	plain := automationMeta(nil)
+	if plain.String("mode") != "automation" || plain.Object("from") != nil {
+		t.Fatalf("without a mark: %v", plain)
+	}
+	m := automationMeta((&wire.ChatFrom{App: "routines", Label: "Регулярные", Title: " Разбор алертов "}).Clean())
+	f := m.Object("from")
+	if m.String("mode") != "automation" || f == nil || f.String("app") != "routines" || f.String("label") != "Регулярные" ||
+		f.String("title") != "Разбор алертов" {
+		t.Fatalf("with the hub's mark: %v", m)
 	}
 }

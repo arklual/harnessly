@@ -34,6 +34,9 @@
 }
 .hx-wgs-wrap[data-pop] .hx-wgs__list {
   max-height: min(520px, calc(100dvh - 220px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
   gap: 0;
 }
 /* In the popover the cards are its sections, not cards in a card: no frame of their own, a hairline between them. */
@@ -65,10 +68,8 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: calc(100dvh - var(--hx-side-h, 0px) - 240px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
+  /* The column scrolls by itself (column.css), so the cards stand in full, however many they are; only the popover
+     (data-pop, below the button where the column has no room) keeps a list of its own that scrolls. */
 }
 .hx-wgs__list:empty {
   display: none;

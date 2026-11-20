@@ -48,7 +48,7 @@ func TestNoise(t *testing.T) {
 func many(n int, user string, m map[string]float64) []kSession {
 	out := make([]kSession, n)
 	for i := range out {
-		out[i] = kSession{UserID: user, Start: int64(i) * 100, End: int64(i)*100 + 50, M: m, PaidMicros: 1_000_000, ListMicros: 1_000_000}
+		out[i] = kSession{UserID: user, Start: int64(i) * 100, End: int64(i)*100 + 50, M: kMetricsFrom(m), PaidMicros: 1_000_000, ListMicros: 1_000_000}
 	}
 	return out
 }
@@ -108,11 +108,11 @@ func TestComputeKPIs(t *testing.T) {
 func TestParallelism(t *testing.T) {
 	// Two people; a runs two agents side by side over 100 ms, b one agent half of its 100 ms.
 	ss := []kSession{
-		{UserID: "a", Start: 0, End: 100, M: map[string]float64{"agentMs": 100}},
-		{UserID: "a", Start: 0, End: 100, M: map[string]float64{"agentMs": 100}},
-		{UserID: "b", Start: 0, End: 60, M: map[string]float64{"agentMs": 30}},
-		{UserID: "b", Start: 40, End: 100, M: map[string]float64{"agentMs": 20}},
-		{UserID: "b", Start: 200, End: 200, M: map[string]float64{}},
+		{UserID: "a", Start: 0, End: 100, M: kMetricsFrom(map[string]float64{"agentMs": 100})},
+		{UserID: "a", Start: 0, End: 100, M: kMetricsFrom(map[string]float64{"agentMs": 100})},
+		{UserID: "b", Start: 0, End: 60, M: kMetricsFrom(map[string]float64{"agentMs": 30})},
+		{UserID: "b", Start: 40, End: 100, M: kMetricsFrom(map[string]float64{"agentMs": 20})},
+		{UserID: "b", Start: 200, End: 200, M: kMetricsFrom(map[string]float64{})},
 	}
 	v := find(computeKPIs(ss, 7, nil, 7, nil), "parallelism")
 	if v.Value == nil || math.Abs(*v.Value-1.25) > 1e-12 {

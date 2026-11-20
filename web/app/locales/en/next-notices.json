@@ -134,6 +134,10 @@
   "next.notices.settings.key.none": "Not set",
   "next.notices.settings.summary": "Turn summary",
   "next.notices.settings.summary.hint": "2–4 lines on what was done. The cheapest model writes them; the cost is in the machine's spend",
+  "next.notes.count": {
+    "one": "{n} notice",
+    "other": "{n} notices"
+  },
   "next.smart.stack.collapse": "Show less",
   "next.smart.stack.clearAll": "Clear all",
   "next.smart.stack.more": "{n} more",

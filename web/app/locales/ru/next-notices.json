@@ -136,6 +136,12 @@
   "next.notices.settings.key.none": "Не задана",
   "next.notices.settings.summary": "Итог хода",
   "next.notices.settings.summary.hint": "2–4 строки о сделанном. Пишет самая дешёвая модель, расход — в тратах машины",
+  "next.notes.count": {
+    "one": "{n} уведомление",
+    "few": "{n} уведомления",
+    "many": "{n} уведомлений",
+    "other": "{n} уведомления"
+  },
   "next.smart.stack.collapse": "Свернуть",
   "next.smart.stack.clearAll": "Очистить всё",
   "next.smart.stack.more": "ещё {n}",

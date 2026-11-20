@@ -23,6 +23,18 @@ export const STATUS_LOOK: Record<Exclude<TChatStatus, 'none'>, IStatusLook> = {
   delegated: { icon: 'workflow', label: t('next.chatStatus.delegated') },
 };
 
+/**
+ * The look of a chat's status in a notice, by what kind of gate it stands on: a permission to allow, a question, a plan,
+ * or a menu of the agent's own screen (a dialog of Claude Code), which asks for a choice and not for a permission.
+ */
+export const statusLookOf = (
+  status: Exclude<TChatStatus, 'none'>,
+  gate: { dialog?: boolean } | null | undefined,
+): IStatusLook =>
+  status === CHAT_STATUS.perm && gate?.dialog
+    ? { icon: 'square-mouse-pointer', label: t('next.chatStatus.choice') }
+    : STATUS_LOOK[status];
+
 /** The statuses of a delegated chat that keep its parent waiting for it. */
 const KEEPS_PARENT_WAITING: ReadonlySet<TChatStatus> = new Set([
   CHAT_STATUS.thinking,
@@ -71,7 +83,7 @@ type TAgentState =
 
 export interface IStatusSource {
   state: TAgentState;
-  gate: { kind: 'question' | 'permission' | 'plan' } | null;
+  gate: { kind: 'question' | 'permission' | 'plan'; dialog?: boolean } | null;
   lastTurn: { status: 'live' | 'done' | 'interrupted' | 'failed'; endedAt: number | null } | null;
   seenAt: number;
   /** The chat is held on its agent's usage limit; absent when it is not. */

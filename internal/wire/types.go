@@ -693,6 +693,9 @@ type QueueSummary struct {
 type GateRef struct {
 	Kind GateKind `json:"kind"`
 	ID   string   `json:"id"`
+	// Dialog is set on a permission that is a menu of the agent's own screen (PermDialog), not a tool call to allow:
+	// the chat waits for a choice, not for a permission, and the lists say so.
+	Dialog bool `json:"dialog,omitempty"`
 }
 
 // AgentState is where a conversation's agent is. Only the fields of K are on the wire:

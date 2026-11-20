@@ -1,8 +1,10 @@
 // «Переместить в папку?»: after a few prompts of a chat that has no folder, the machine's model picks the
-// fitting one of the person's folders and the chat offers it in a small notice floating under the header (it lies over
-// the feed and shifts nothing): move, or leave it. The other folders are folded under it; a move ends in a short
-// «moved» line, and the notice leaves with the same soft exit it came with.
-import { useEffect, useRef, useState } from 'react';
+// fitting one of the person's folders and the chat offers it as a notice of its own in the right column: a
+// small card of the toasts' palette under the column's island, not a block of the feed. Move, or leave it. The other
+// folders are folded under it; a move ends in a short «moved» line, and the notice leaves with the same soft exit it
+// came with. The page reads it as a hook: the column draws the card (`node`) and the header's button wears a dot while
+// it is there (`pending`).
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Icon from '@/next/ui/icon';
 import { usePresence } from '@/next/ui/presence';
 import { t } from '@/next/i18n';
@@ -37,6 +39,14 @@ export interface IFolderSuggestionProps {
   projects: readonly ISidebarProject[] | null;
   chats: readonly ISidebarChat[] | null;
   onMove: (chatId: string, projectId: string) => Promise<void>;
+  /** Off where there is no chat page (the start page, a screen): nothing is asked, nothing shows. */
+  enabled?: boolean;
+}
+
+export interface IFolderSuggest {
+  /** The notice is there (asking, saying «moved» or leaving): the column has it to show. */
+  pending: boolean;
+  node: ReactNode;
 }
 
 /** The person's prompts of the chat that the page has, oldest first. */
@@ -50,7 +60,14 @@ const promptsOf = (conv: ConvId, rows: readonly { k: string; id: string }[]): st
   return out;
 };
 
-const FolderSuggestion = ({ chat, machine, projects, chats, onMove }: IFolderSuggestionProps) => {
+const useFolderSuggestion = ({
+  chat,
+  machine,
+  projects,
+  chats,
+  onMove,
+  enabled = true,
+}: IFolderSuggestionProps): IFolderSuggest => {
   const prefs = useFolderPrefs();
   const conv: ConvId | null = chat !== null && chat.id.startsWith('tab-') ? (chat.id as ConvId) : null;
   const rows = useFeedRows(conv);
@@ -61,6 +78,7 @@ const FolderSuggestion = ({ chat, machine, projects, chats, onMove }: IFolderSug
 
   const chatId = chat?.id ?? null;
   const eligible =
+    enabled &&
     prefs.suggest &&
     chat !== null &&
     conv !== null &&
@@ -112,7 +130,7 @@ const FolderSuggestion = ({ chat, machine, projects, chats, onMove }: IFolderSug
     return () => clearTimeout(timer);
   }, [donePhase]);
 
-  if (!shown) return null;
+  if (!shown) return { pending: false, node: null };
   const { project } = shown;
   const closing = state === 'closing';
   const move = (projectId: string) => {
@@ -130,83 +148,92 @@ const FolderSuggestion = ({ chat, machine, projects, chats, onMove }: IFolderSug
       setOpen(false);
     });
   };
-  if (shown.phase === 'done') {
-    return (
-      <div className="hx-foldersug" role="status" data-state={state} data-done>
-        <div className="hx-foldersug__card">
-          <div className="hx-foldersug__row hx-foldersug__row--done">
-            <Icon name="circle-check" size="sm" className="hx-foldersug__ok" />
-            <span className="hx-foldersug__txt">
-              {t('next.folderSuggest.done', { project: project.name })}
-            </span>
-          </div>
-        </div>
-      </div>
-    );
-  }
   const unfolded = open && !closing;
-  return (
-    <div className="hx-foldersug" role="status" data-state={state} data-open={unfolded || undefined}>
-      <div className="hx-foldersug__card">
-        <div className="hx-foldersug__row">
-          <Icon name="folder-input" size="sm" className="hx-foldersug__icon" />
-          <button
-            type="button"
-            className="hx-foldersug__head"
-            aria-expanded={unfolded}
-            aria-label={unfolded ? t('next.folderSuggest.fold') : t('next.folderSuggest.unfold')}
-            onClick={() => setOpen((now) => !now)}
-          >
-            <span className="hx-foldersug__txt">
-              {t('next.folderSuggest.ask', { project: project.name })}
-            </span>
-            <Icon name="chevron-down" size="sm" className="hx-foldersug__chev" />
-          </button>
-          <button
-            type="button"
-            className="hx-foldersug__yes"
-            disabled={busy || closing}
-            onClick={() => move(project.id)}
-          >
-            {t('next.folderSuggest.yes')}
-          </button>
-          <button
-            type="button"
-            className="hx-foldersug__no"
-            aria-label={t('next.folderSuggest.no')}
-            title={t('next.folderSuggest.no')}
-            onClick={() => {
-              keepAsked(chat?.id ?? shown.chat, { at: Number.MAX_SAFE_INTEGER, no: true });
-              setOffer(null);
-            }}
-          >
-            <Icon name="x" size="sm" />
-          </button>
-        </div>
-        {/* The other folders stay mounted and fold by height (a grid row 0fr to 1fr); inert while folded. */}
-        <div className="hx-foldersug__more" inert={!unfolded || undefined}>
-          <div className="hx-foldersug__clip">
-            <p className="hx-foldersug__why">{t('next.folderSuggest.why')}</p>
-            <div className="hx-foldersug__pick" role="group" aria-label={t('next.folderSuggest.other')}>
-              {(projects ?? []).map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className="hx-foldersug__chip"
-                  data-suggested={item.id === project.id || undefined}
-                  disabled={busy || closing}
-                  onClick={() => move(item.id)}
-                >
-                  <Icon name="folder" size="sm" />
-                  {item.name}
-                </button>
-              ))}
+  const done = shown.phase === 'done';
+  const node = (
+    <section
+      className="hx-foldersug"
+      role="status"
+      aria-label={t('next.folderSuggest.label')}
+      data-state={state}
+      data-open={unfolded || undefined}
+      data-done={done || undefined}
+    >
+      <div className="hx-foldersug__slot">
+        <div className="hx-foldersug__card">
+          {done ? (
+            <div className="hx-foldersug__row hx-foldersug__row--done">
+              <Icon name="circle-check" size="sm" className="hx-foldersug__ok" />
+              <span className="hx-foldersug__txt">
+                {t('next.folderSuggest.done', { project: project.name })}
+              </span>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="hx-foldersug__row">
+                <Icon name="folder-input" size="sm" className="hx-foldersug__icon" />
+                <span className="hx-foldersug__txt">
+                  {t('next.folderSuggest.ask', { project: project.name })}
+                </span>
+                <button
+                  type="button"
+                  className="hx-foldersug__no"
+                  aria-label={t('next.folderSuggest.no')}
+                  title={t('next.folderSuggest.no')}
+                  onClick={() => {
+                    keepAsked(chat?.id ?? shown.chat, { at: Number.MAX_SAFE_INTEGER, no: true });
+                    setOffer(null);
+                  }}
+                >
+                  <Icon name="x" size="sm" />
+                </button>
+              </div>
+              <div className="hx-foldersug__acts">
+                <button
+                  type="button"
+                  className="hx-foldersug__yes"
+                  disabled={busy || closing}
+                  onClick={() => move(project.id)}
+                >
+                  {t('next.folderSuggest.yes')}
+                </button>
+                <button
+                  type="button"
+                  className="hx-foldersug__other"
+                  aria-expanded={unfolded}
+                  onClick={() => setOpen((now) => !now)}
+                >
+                  {t('next.folderSuggest.otherFolder')}
+                  <Icon name="chevron-down" size="sm" className="hx-foldersug__chev" />
+                </button>
+              </div>
+              {/* The other folders stay mounted and fold by height (a grid row 0fr to 1fr); inert while folded. */}
+              <div className="hx-foldersug__more" inert={!unfolded || undefined}>
+                <div className="hx-foldersug__clip">
+                  <div className="hx-foldersug__pick" role="group" aria-label={t('next.folderSuggest.other')}>
+                    {(projects ?? []).map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className="hx-foldersug__chip"
+                        data-suggested={item.id === project.id || undefined}
+                        disabled={busy || closing}
+                        onClick={() => move(item.id)}
+                      >
+                        <Icon name="folder" size="sm" />
+                        {item.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
-    </div>
+    </section>
   );
+  return { pending: true, node };
 };
 
-export default FolderSuggestion;
+export default useFolderSuggestion;

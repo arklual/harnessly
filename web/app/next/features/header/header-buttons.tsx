@@ -10,6 +10,8 @@ export interface IHeaderBackground {
   recap: boolean;
   /** Something put away from the smart notice still waits: its drop is in the column. */
   waits?: boolean;
+  /** The folder's offer for this chat stands in the column: a dot on the button says so where the column is folded. */
+  folder?: boolean;
   /** Nothing in the column but the person's widgets: the button shows and hides them. */
   widgets?: boolean;
   /** The widgets stand as a column beside the chat (room enough), not a popover at the button: open is the layout's
@@ -27,6 +29,7 @@ export interface IHeaderToggle {
 /** What the column's button says on hover: what runs, that it has finished, that there is a recap, or only the pictures the agent looked at. */
 const backgroundTip = (background: IHeaderBackground): string => {
   if (background.waits) return t('next.smart.drops.title');
+  if (background.folder) return t('next.folderSuggest.label');
   if (background.running > 0) return t('next.header.backgroundRunning', { n: background.running });
   if (background.total > 0) return t('next.header.backgroundDone');
   if (background.recap) return t('next.header.recap');
@@ -83,7 +86,9 @@ export const BackgroundButton = ({ background }: { background: IHeaderBackground
       >
         <Icon name="layers" size="sm" />
         <span className="hx-bg-btn__n">{background.running > 0 ? background.running : ''}</span>
-        {background.waits && !background.open && <span className="hx-bg-btn__wait" aria-hidden="true" />}
+        {(background.waits || background.folder) && !background.open && (
+          <span className="hx-bg-btn__wait" aria-hidden="true" />
+        )}
         <span className="hx-tip" data-pos="below" data-align="end">
           {backgroundTip(background)}
         </span>

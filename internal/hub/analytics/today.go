@@ -206,7 +206,7 @@ func endOf(v store.AgentSession) int64 {
 
 // closedTask is whether a session is a closed task: it ended and made a merge request.
 func closedTask(v store.AgentSession) bool {
-	return v.EndedAt != nil && metricsOf(v.Metrics)["mrs"] >= 1
+	return v.EndedAt != nil && kMetricsOf(v.Metrics)[mMrs] >= 1
 }
 
 // today is the day of the scope for the overview.
@@ -336,7 +336,7 @@ func whoToday(ctx context.Context, st store.Store, x *orgScope, members []string
 
 // plainK is a session as the KPI that need no money see it.
 func plainK(v store.AgentSession) kSession {
-	return kSession{UserID: v.UserID, Start: v.StartedAt, End: endOf(v), M: metricsOf(v.Metrics)}
+	return kSession{UserID: v.UserID, Start: v.StartedAt, End: endOf(v), M: kMetricsOf(v.Metrics)}
 }
 
 // reachedOf is the completion KPI over sessions.

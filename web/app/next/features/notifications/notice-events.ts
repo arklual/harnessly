@@ -4,7 +4,7 @@
 // second window, a snapshot after a reconnect) is one notice, and a notice whose chat moved on can be told by its key.
 import { t } from '@/next/i18n';
 import type { Conversation } from '@/next/protocol/v2';
-import { STATUS_LOOK, chatStatusOf } from '@/next/features/sidebar/status';
+import { chatStatusOf, statusLookOf } from '@/next/features/sidebar/status';
 import { CHAT_STATUS } from '@/next/features/sidebar/types';
 import { NOTICE_KIND, type TNoticeKind } from '@/next/stores/notices';
 import { clipWords } from '@/next/features/smart-notice/clip-words';
@@ -24,7 +24,8 @@ export const noticeEventOf = (conv: Conversation, machineOnline: boolean): INoti
   if (status === CHAT_STATUS.none) return null;
   // A delegated chat works unheard: it reaches the person only when it waits for them; its ends go to its parent agent.
   if (conv.parentId !== undefined && !WAITING.has(status)) return null;
-  const look = STATUS_LOOK[status];
+  // «Waits for permission» only for a permission; a menu of the agent's own screen waits for a choice.
+  const look = statusLookOf(status, conv.gate);
   // Keyed by the gate that waits, not by when the state was stamped: a sync that stamps the same wait anew (another
   // copy of the record, a reconnect) is the same notice, not a new one that leaves and comes again.
   if (WAITING.has(status))

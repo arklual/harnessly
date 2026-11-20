@@ -18,6 +18,8 @@ import { openSubagent } from '@/next/features/subagents/open';
 import { toggleGroup, useGroupOpen } from '@/next/features/background/rail-folds';
 import RecapCard from '@/next/features/background/recap-card';
 import ShotsStrip from '@/next/features/background/shots-strip';
+import NotesPill from '@/next/features/background/notes-pill';
+import { useColumnScroll } from '@/next/features/background/column-scroll';
 import { useChatSwap, useSwapHeight, type IChatContent } from '@/next/features/background/chat-swap';
 import { effortLabel, shortModelName } from '@/next/features/composer/agents';
 import Icon from '@/next/ui/icon';
@@ -67,6 +69,12 @@ export interface IBackgroundPanelProps {
   codes?: ReactNode;
   /** What stands apart under the column, not in it (the machine in trouble): it follows the column's height. */
   below?: ReactNode;
+  /** The notices of this chat and of the others (the folder's offer, «Ждут ответа»), cards of their own, not blocks of
+   *  the island: under it on a computer, in the sheet on a phone. `count` is how many cards they are. */
+  notes?: ReactNode;
+  notesCount?: number;
+  /** The notices are on screen (the column is shown); off, they wait out of sight. */
+  notesShown?: boolean;
 }
 
 const OVER_WORD = {
@@ -295,6 +303,9 @@ const BackgroundPanel = forwardRef<HTMLElement, IBackgroundPanelProps>(
       onHide,
       codes,
       below,
+      notes,
+      notesCount = 0,
+      notesShown = true,
     },
     ref,
   ) => {
@@ -309,6 +320,9 @@ const BackgroundPanel = forwardRef<HTMLElement, IBackgroundPanelProps>(
     const { view, leaving } = useChatSwap(next);
     const [aside, setAside] = useState<HTMLElement | null>(null);
     const belowRef = useRef<HTMLDivElement | null>(null);
+    const [col, setCol] = useState<HTMLDivElement | null>(null);
+    const [notesEl, setNotesEl] = useState<HTMLDivElement | null>(null);
+    useColumnScroll(phone ? null : col);
     const setRef = useCallback(
       (node: HTMLElement | null) => {
         setAside(node);
@@ -318,7 +332,7 @@ const BackgroundPanel = forwardRef<HTMLElement, IBackgroundPanelProps>(
       [ref],
     );
     useSheetDrag(aside, () => onHide?.(), phone && shown && onHide !== undefined);
-    useBelow(aside, belowRef, shown && !phone, Boolean(below));
+    useBelow(aside, belowRef, shown && !phone, Boolean(below || notes));
     useSwapHeight(aside, view.chat);
     const blocks = (content: IChatContent, came: boolean) => {
       const { tasks, recap, shots, shotSrc } = content;
@@ -362,26 +376,43 @@ const BackgroundPanel = forwardRef<HTMLElement, IBackgroundPanelProps>(
       <Row key={task.id} task={task} now={now} stopping={stopping.has(task.id)} onStop={() => onStop(task)} />
     );
 
+    const noteCards = notes ? (
+      <div
+        ref={phone ? undefined : setNotesEl}
+        className="hx-notes"
+        data-shown={notesShown}
+        data-sheet={phone || undefined}
+      >
+        {notes}
+      </div>
+    ) : null;
     return (
       <>
         {onHide && <div className="hx-side__scrim" data-shown={shown} aria-hidden="true" onClick={onHide} />}
-        <aside ref={setRef} className="hx-side" data-shown={shown} aria-label={t('next.header.background')}>
-          <SheetGrip />
-          <ChatContent key={view.chat ?? ''} came={leaving !== null}>
-            {blocks(view, leaving !== null)}
-          </ChatContent>
-          {leaving && (
-            <ChatContent key={`leaving:${leaving.chat ?? ''}`} came={false} leaving>
-              {blocks(leaving, false)}
+        {/* On a computer the column is one scrolling box (column.css): the island, then the notices and what stands
+            under it. On a phone it is no box (display: contents): the sheet is the island and holds the notices. */}
+        <div ref={setCol} className="hx-col">
+          <aside ref={setRef} className="hx-side" data-shown={shown} aria-label={t('next.header.background')}>
+            <SheetGrip />
+            {phone && noteCards}
+            <ChatContent key={view.chat ?? ''} came={leaving !== null}>
+              {blocks(view, leaving !== null)}
             </ChatContent>
+            {leaving && (
+              <ChatContent key={`leaving:${leaving.chat ?? ''}`} came={false} leaving>
+                {blocks(leaving, false)}
+              </ChatContent>
+            )}
+            {codes}
+          </aside>
+          {(below || (!phone && noteCards)) && (
+            <div ref={belowRef} className="hx-side-below">
+              {!phone && noteCards}
+              {below}
+            </div>
           )}
-          {codes}
-        </aside>
-        {below && (
-          <div ref={belowRef} className="hx-side-below">
-            {below}
-          </div>
-        )}
+        </div>
+        {!phone && notes && notesShown && <NotesPill col={col} notes={notesEl} count={notesCount} />}
       </>
     );
   },

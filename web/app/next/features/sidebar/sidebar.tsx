@@ -118,6 +118,9 @@ import { countRender } from '@/next/core/perf-journal';
  *  person (a question, a permission, a plan), unless the person folded them. */
 const favGroupKey = (group: { id: string }): string => group.id;
 
+/** The hub marks the chats of the routines' and the triggers' runs with this app: one folder, «Регулярные». */
+const RUNS_FOLDER = 'routines';
+
 const KIDS_SHOWN_BY: ReadonlySet<TChatStatus> = new Set([
   CHAT_STATUS.question,
   CHAT_STATUS.perm,
@@ -1430,11 +1433,18 @@ const Sidebar = ({
                       type="button"
                       className="hx-project__open"
                       aria-expanded={open}
-                      data-tip={t('next.sidebar.appFolderTip', { app: label })}
+                      data-tip={
+                        app === RUNS_FOLDER
+                          ? t('next.sidebar.runsFolderTip')
+                          : t('next.sidebar.appFolderTip', { app: label })
+                      }
                       onClick={() => toggleProject(`app:${app}`, open)}
                     >
                       <span className="hx-project__mark" aria-hidden="true">
-                        <Icon name="app-window" className="hx-project__icon" />
+                        <Icon
+                          name={app === RUNS_FOLDER ? 'clock' : 'app-window'}
+                          className="hx-project__icon"
+                        />
                       </span>
                       <span className="hx-item__title">{label}</span>
                       <Icon name="chevron-right" size="sm" className="hx-nav__chev" />

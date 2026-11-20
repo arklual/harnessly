@@ -12,7 +12,7 @@ import { noticeEventOf } from '@/next/features/notifications/notice-events';
 import { notificationsFromMachines, type IMachineNotice } from '@/next/features/notifications/from-machines';
 import { NOTIFICATION_KIND, type INotification } from '@/next/features/notifications/notification-center';
 import WaitRow, { type TWaitDetail } from '@/next/features/notifications/wait-row';
-import { STATUS_LOOK, chatStatusOf } from '@/next/features/sidebar/status';
+import { chatStatusOf, statusLookOf } from '@/next/features/sidebar/status';
 import { CHAT_STATUS, type ISidebarChat } from '@/next/features/sidebar/types';
 import { t } from '@/next/i18n';
 import type { Conversation } from '@/next/protocol/v2';
@@ -213,13 +213,14 @@ export const useNotificationCenter = ({
       const status = chat.status;
       if (!waits(status)) return [];
       const conv = byId.get(chat.id);
+      const look = statusLookOf(status, conv?.gate);
       return [
         {
           id: `wait:${chat.id}:${status}`,
           kind: NOTIFICATION_KIND.waiting,
-          icon: STATUS_LOOK[status].icon,
+          icon: look.icon,
           title: chat.title || t('next.notifications.untitled'),
-          text: STATUS_LOOK[status].label,
+          text: look.label,
           at: conv?.state.since ?? chat.lastActivityAt,
           unread: true,
           chatId: chat.id,

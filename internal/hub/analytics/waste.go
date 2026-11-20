@@ -160,21 +160,21 @@ func (s *Service) waste(w http.ResponseWriter, r *http.Request, p *auth.Principa
 		if list <= 0 {
 			continue
 		}
-		m := metricsOf(v.Metrics)
+		m := kMetricsOf(v.Metrics)
 		var in float64
 		for _, k := range input {
 			in += m[k]
 		}
-		if m["toolCalls"] > 0 {
-			add(WasteRetriesAfterError, list*frac(m["toolErrors"], m["toolCalls"]))
+		if m[mToolCalls] > 0 {
+			add(WasteRetriesAfterError, list*frac(m[mToolErrors], m[mToolCalls]))
 		}
-		if v.EndedAt != nil && m["turns"] >= abandonedTurns && m["mrs"] == 0 {
+		if v.EndedAt != nil && m[mTurns] >= abandonedTurns && m[mMrs] == 0 {
 			add(WasteAbandonedSessions, list)
 		}
 		add(WasteLongContext, math.Min(list, long[refs[i]]))
-		if m["skillsListed"] > 0 && m["skillsLoaded"] < m["skillsListed"] && in > 0 {
-			unused := (m["skillsListed"] - m["skillsLoaded"]) / m["skillsListed"]
-			add(WasteExtraSkills, list*frac(m["firstCtx"]*unused*m["turns"], in))
+		if m[mSkillsListed] > 0 && m[mSkillsLoaded] < m[mSkillsListed] && in > 0 {
+			unused := (m[mSkillsListed] - m[mSkillsLoaded]) / m[mSkillsListed]
+			add(WasteExtraSkills, list*frac(m[mFirstCtx]*unused*m[mTurns], in))
 		}
 	}
 	for _, k := range wasteKinds {

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { pinLocale } from '@/next/i18n';
 import {
   chatStatusOf,
+  statusLookOf,
   statusNoteOf,
   waitsForOf,
   withDelegationWait,
@@ -167,5 +168,17 @@ describe('withDelegationWait', () => {
     expect(withDelegationWait(busy)[0]?.status).toBe(CHAT_STATUS.question);
     const quiet = [row('a', CHAT_STATUS.none), row('b', CHAT_STATUS.done, 'a')];
     expect(withDelegationWait(quiet)).toBe(quiet);
+  });
+});
+
+describe('statusLookOf', () => {
+  it('says a permission for a tool call and a choice for a menu of the agent screen', () => {
+    const perm = statusLookOf(CHAT_STATUS.perm, { dialog: false });
+    const menu = statusLookOf(CHAT_STATUS.perm, { dialog: true });
+    expect(menu.label).not.toBe(perm.label);
+    expect(menu.icon).not.toBe(perm.icon);
+    // Only a permission is told apart: a question and a plan keep their own words.
+    expect(statusLookOf(CHAT_STATUS.question, { dialog: true }).label).not.toBe(menu.label);
+    expect(statusLookOf(CHAT_STATUS.perm, null)).toEqual(perm);
   });
 });

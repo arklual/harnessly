@@ -14,6 +14,7 @@
   "next.sidebar.appChats": "Чаты, начатые приложениями",
   "next.sidebar.appSection": "От приложений",
   "next.sidebar.appFolderTip": "Эти чаты начало приложение «{app}». Перетащите чат в недавние или в проект, чтобы вести его самому.",
+  "next.sidebar.runsFolderTip": "Чаты запусков регулярных задач и триггеров. Перетащите чат в недавние или в проект, чтобы вести его самому.",
   "next.sidebar.foldList": "Свернуть список",
   "next.sidebar.unfoldList": "Развернуть список",
   "next.sidebar.favorites": "Избранное"

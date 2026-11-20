@@ -34,6 +34,8 @@ export interface INoticeStackProps {
   now: number;
   /** The heading: «Ждут ответа», «Машина». */
   label: string;
+  /** The heading's icon, as the other blocks of the column have (the island's titles); none for a heading that is hidden. */
+  icon?: string;
   /** «Ответить» or «Подробнее» where the answer is not in the card: the smart notice takes it back, open. */
   onBack: TStackBack;
   onOpenChat?: (chatId: string) => void;
@@ -41,6 +43,8 @@ export interface INoticeStackProps {
   /** The answer in place (a question's options, a permission's buttons; a machine's cause and what weighs on it);
    *  null where there is none. */
   renderAnswer?: (drop: IDrop, open: boolean, toggle: () => void) => ReactNode;
+  /** Whether a card is answered in place (and so opens in place on a press); a card that is not opens its chat. */
+  inPlace?: (drop: IDrop) => boolean;
 }
 
 interface IShown {
@@ -109,6 +113,7 @@ interface ICardProps {
   /** Its flight off is over (a swipe, «Убрать»): it goes from the stack at once. */
   onFlown: (key: string) => void;
   renderAnswer?: INoticeStackProps['renderAnswer'];
+  inPlace?: INoticeStackProps['inPlace'];
 }
 
 /** A drop the notice flies into: hidden until the flight lands, then shown as it is, without an entrance of its own. */
@@ -132,6 +137,7 @@ const Card = memo(
     onOpenChat,
     onFlown,
     renderAnswer,
+    inPlace,
   }: ICardProps) => {
     const el = useRef<HTMLLIElement | null>(null);
     const [leaving, setLeaving] = useState(false);
@@ -150,6 +156,9 @@ const Card = memo(
     const back = () => onBack(key, el.current?.getBoundingClientRect() ?? null, snap(el.current));
     const answer = more.mounted && renderAnswer ? renderAnswer(drop, open, toggle) : null;
     const machine = item.kind === SMART_KIND.machine;
+    // A card with nothing to answer in place (a plan, a dialog of the agent, an app's ask) leads to its chat at a press.
+    const direct =
+      inPlace !== undefined && !inPlace(drop) && item.chatId !== null && onOpenChat !== undefined;
     return (
       <li
         ref={el}
@@ -164,7 +173,12 @@ const Card = memo(
         data-i={Math.min(index, STAGGER_STEPS)}
       >
         <div className="hx-ns__line">
-          <button type="button" className="hx-ns__hit" aria-expanded={open} onClick={toggle}>
+          <button
+            type="button"
+            className="hx-ns__hit"
+            aria-expanded={direct ? undefined : open}
+            onClick={direct ? () => onOpenChat?.(item.chatId as string) : toggle}
+          >
             <Chip item={item} now={now} sent={false} />
             <span className="hx-ns__lines">
               <span className="hx-ns__t1">
@@ -236,10 +250,12 @@ const NoticeStack = ({
   drops,
   now,
   label,
+  icon,
   onBack,
   onOpenChat,
   onDismiss,
   renderAnswer,
+  inPlace,
 }: INoticeStackProps) => {
   // Taken off by the person: flown already, so it is drawn gone at once, then leaves the list without a second flight.
   const [flown, setFlown] = useState<ReadonlySet<string>>(NO_KEYS);
@@ -342,6 +358,7 @@ const NoticeStack = ({
               onOpenChat={onOpenChat}
               onFlown={onFlown}
               renderAnswer={renderAnswer}
+              inPlace={inPlace}
             />
           ))}
         </ul>
@@ -358,6 +375,7 @@ const NoticeStack = ({
       onFocus={mine}
     >
       <div className="hx-ns__head">
+        {icon && <Icon name={icon} size="sm" className="hx-ns__hicon" />}
         <span className="hx-ns__label">{label}</span>
         {live.length > 1 && <span className="hx-ns__count">{live.length}</span>}
         <span className="hx-ns__tools">
@@ -366,7 +384,8 @@ const NoticeStack = ({
               {t('next.smart.stack.collapse')}
             </button>
           )}
-          {(expanded || !pile) && (
+          {/* «Очистить всё» is for a group: one card has its own «Убрать». */}
+          {live.length > 1 && (
             <button
               type="button"
               className="hx-ns__link"

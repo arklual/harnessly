@@ -30,12 +30,15 @@ import ChatDocs from '@/next/bindings/chat-docs';
 import { WaitBinding } from '@/next/bindings/notification-center';
 import { askDropBack, dismissDrops, useDrops, type IDrop } from '@/next/stores/smart-drops';
 import { useConversationList } from '@/next/stores/conversations';
+import type { IFolderSuggest } from '@/next/features/folder-suggest/use-folder-suggestion';
 import { t } from '@/next/i18n';
 
 /** What is answered right in its card: a question's options, a permission's buttons (the rest opens its chat or the
  *  smart notice). */
 /** The column's own exit (styles/background.css, .hx-side). */
 const SIDE_EXIT_MS = 200;
+
+const NO_FOLDER: IFolderSuggest = { pending: false, node: null };
 
 const IN_PLACE: ReadonlySet<string> = new Set([SMART_KIND.question, SMART_KIND.permission]);
 
@@ -46,6 +49,8 @@ export const useChatBackground = (
   onOpenChat: (id: string) => void,
   /** Opens a thing of the chat in the pane: a row of «Документы». */
   onOpenOutput?: (output: TurnOutput) => void,
+  /** The folder's offer for this chat (features/folder-suggest): a notice of the column's own. */
+  folder: IFolderSuggest = NO_FOLDER,
 ): { header: IHeaderBackground | null; panel: React.ReactNode; show: () => void } => {
   const tasks = useBackground(conv);
   const recap = useConversation(conv)?.recap ?? null;
@@ -102,7 +107,11 @@ export const useChatBackground = (
     [],
   );
   const phone = usePhone();
-  const has = tasks.length > 0 || recap !== null || (shots?.length ?? 0) > 0 || codesMounted || dropsMounted;
+  // The island holds what is about the chat itself; the notices (the folder's offer, what waits in other chats) are
+  // cards of their own beside it, and either one gives the column its reason to show.
+  const islandHas = tasks.length > 0 || recap !== null || (shots?.length ?? 0) > 0 || codesMounted;
+  const notesHas = dropsMounted || folder.pending;
+  const has = islandHas || notesHas;
   // The pane opening takes back a column the person had opened (a fold they made stays); this runs in render, once per change.
   const [paneWas, setPaneWas] = useState(pane);
   if (pane !== paneWas) {
@@ -183,6 +192,7 @@ export const useChatBackground = (
           total: tasks.length,
           recap: recap !== null,
           waits: drops.length > 0,
+          folder: folder.pending,
           widgets: !has,
           docked: !has && room,
           open,
@@ -208,7 +218,28 @@ export const useChatBackground = (
         recap={recap}
         shots={shots}
         shotSrc={shotSrc}
-        shown={shown}
+        // On a phone the sheet is the island and holds the notices; on a computer the island has its own reason.
+        shown={phone ? shown : shown && islandHas}
+        notesShown={shown}
+        notesCount={drops.length + (folder.pending ? 1 : 0)}
+        notes={
+          notesHas ? (
+            <>
+              {folder.node}
+              <NoticeStack
+                drops={drops}
+                now={now}
+                label={t('next.smart.drops.title')}
+                icon="bell"
+                onBack={askDropBack}
+                onOpenChat={onOpenChat}
+                onDismiss={dismissDrops}
+                renderAnswer={renderAnswer}
+                inPlace={(drop) => IN_PLACE.has(drop.item.kind)}
+              />
+            </>
+          ) : null
+        }
         now={now}
         stopping={stopping}
         onStop={onStop}
@@ -237,15 +268,6 @@ export const useChatBackground = (
         }
         codes={
           <>
-            <NoticeStack
-              drops={drops}
-              now={now}
-              label={t('next.smart.drops.title')}
-              onBack={askDropBack}
-              onOpenChat={onOpenChat}
-              onDismiss={dismissDrops}
-              renderAnswer={renderAnswer}
-            />
             <CodeAsks
               asks={codes}
               now={now}

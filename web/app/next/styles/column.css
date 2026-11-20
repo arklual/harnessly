@@ -1,0 +1,210 @@
+/* The chat's right column as one box that scrolls by itself. On a computer .hx-col stands full height under
+   the header, over the feed's right edge, and holds what the column has: the island (.hx-side: the recap, the pictures,
+   the commands), then under it the notices (.hx-notes: the folder's offer, «Ждут ответа») and the person's widgets
+   (.hx-side-below). The island and the stack under it keep their place by absolute position as before (the stack follows
+   the island's height by a transform, background-panel.tsx); the box only gives them a scroll that does not leak into
+   the feed (overscroll-behavior: contain). The box itself takes no pointer (the feed under its empty parts stays
+   usable); the wheel still scrolls it from what stands in it.
+   Its edges fade (a mask) only where there is more to scroll that way (column-scroll.ts sets data-up / data-down), and
+   the scrollbar is a thin line that shows while it scrolls.
+   On a phone it is no box (display: contents): the island is the sheet and carries the notices inside it. */
+@property --hx-col-ft {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+@property --hx-col-fb {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+.hx-col {
+  display: contents;
+}
+
+@media (min-width: 901px) {
+  .hx-col {
+    display: block;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 6;
+    width: 376px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    pointer-events: none;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 var(--hx-col-ft),
+      #000 calc(100% - var(--hx-col-fb)),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 var(--hx-col-ft),
+      #000 calc(100% - var(--hx-col-fb)),
+      transparent 100%
+    );
+    transition:
+      --hx-col-ft 200ms var(--hx-ease-out),
+      --hx-col-fb 200ms var(--hx-ease-out);
+  }
+  .hx-col[data-up] {
+    --hx-col-ft: 28px;
+  }
+  .hx-col[data-down] {
+    --hx-col-fb: 36px;
+  }
+  .hx-col[data-scrolling] {
+    scrollbar-color: var(--hx-fg-4, rgba(128, 128, 140, 0.5)) transparent;
+  }
+  .hx-stage[data-pane='true'] .hx-col {
+    right: calc(var(--pane-w) + 12px);
+  }
+  /* What stands in the box: 16px from its right edge, as the island stood from the stage's. */
+  .hx-col > .hx-side,
+  .hx-stage[data-pane='true'] .hx-col > .hx-side {
+    right: 16px;
+    max-height: none;
+  }
+  .hx-col > .hx-side-below,
+  .hx-stage[data-pane='true'] .hx-col > .hx-side-below {
+    right: 16px;
+    padding-bottom: 32px;
+    pointer-events: auto;
+  }
+}
+
+/* The notices: cards of their own in the toasts' palette, each opens by height as it comes. */
+.hx-notes {
+  display: flex;
+  flex-direction: column;
+  scroll-margin-top: 12px;
+}
+.hx-notes[data-shown='false'] {
+  display: none;
+}
+.hx-notes > * + * {
+  margin-top: 8px;
+}
+.hx-notes:not(:empty) + * {
+  margin-top: 8px;
+}
+.hx-notes .hx-ns {
+  --ns-r: 18px;
+  margin: 0;
+}
+/* The heading of «Ждут ответа» is a title of the column's blocks: its icon and a stronger weight, «Очистить всё» a
+   quiet text on the same line. It shows here (the machine's stack hides its own, notice-stack.css). */
+.hx-notes .hx-ns__head {
+  display: flex;
+  gap: 7px;
+  min-height: 28px;
+  padding: 0 4px 6px 8px;
+}
+.hx-ns__hicon {
+  flex: none;
+  color: var(--hx-fg-2);
+}
+.hx-notes .hx-ns__label {
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-semibold);
+  letter-spacing: 0;
+  line-height: 18px;
+}
+.hx-notes .hx-ns__link {
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: none;
+  color: var(--hx-fg-3);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-notes .hx-ns__link:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-notes .hx-ns__hit {
+  min-height: 56px;
+  padding: 10px 12px 10px 10px;
+  gap: 10px;
+}
+.hx-notes .hx-ns__card,
+.hx-notes .hx-ns__face {
+  box-shadow: var(--hx-toast-shadow);
+}
+.hx-notes .hx-ns__hit:hover {
+  background: var(--hx-toast-fill);
+}
+/* On a phone the notices stand in the sheet, over the island's own ground: a hairline instead of a shadow. */
+.hx-notes[data-sheet] {
+  margin: 4px 0 8px;
+}
+.hx-notes[data-sheet] :is(.hx-foldersug__card, .hx-ns__card, .hx-ns__face) {
+  box-shadow: 0 0 0 1px var(--hx-border-strong);
+}
+
+/* «2 уведомления ⌄»: stays at the top of the column while the notices are scrolled out of sight. */
+.hx-notes-pill {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--hx-toast-bg);
+  box-shadow: var(--hx-toast-shadow);
+  color: var(--hx-toast-fg);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-6px) scale(0.97);
+  transform-origin: 100% 0;
+  transition:
+    opacity 200ms var(--hx-ease-out),
+    transform 240ms var(--hx-ease-out),
+    visibility 0s linear 240ms;
+}
+.hx-notes-pill > .hx-icon {
+  color: var(--hx-toast-fg2);
+}
+.hx-notes-pill[data-shown] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  transition-delay: 0s;
+}
+.hx-notes-pill:focus-visible {
+  outline: 2px solid var(--hx-toast-focus);
+  outline-offset: 2px;
+}
+.hx-stage[data-pane='true'] .hx-notes-pill {
+  right: calc(var(--pane-w) + 28px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-col {
+    transition-duration: 1ms;
+  }
+  .hx-notes-pill {
+    transform: none;
+    transition-duration: 1ms;
+  }
+}

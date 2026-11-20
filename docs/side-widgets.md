@@ -11,6 +11,7 @@ buttons or under «Приложения». Epic HRN-1509 (HRN-1510 widgets, HRN-
   «Машина» (CPU, memory, disk), «Подчаты» (the delegated chats at work), «Выкат» (the person's merge requests and their
   pipelines, when GitLab is connected), «Заметка», «Часы» (the time and a timer of 5, 15 or 25 minutes), then the
   widgets agents made.
+- The whole right column scrolls by itself, under the header and apart from the feed (`overscroll-behavior: contain`): a thin scrollbar while it moves, the edges fade only where there is more to scroll. The notices (the folder's offer, «Ждут ответа») stand under the island as cards of their own; scrolled out of sight they leave a small «2 уведомления» pill at the top. A card added by «+ Виджет» is scrolled to.
 - A card's name folds it; its «⋯» folds or removes it; a card is carried by hand to another place.
 - The list, the order, what is folded, a note's text and a running timer are the person's: they are kept in their
   settings (`prefs["hx-widgets"]`, the synced choices of HRN-1493), so every computer shows the same.

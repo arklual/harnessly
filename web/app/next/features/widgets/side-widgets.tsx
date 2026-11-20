@@ -223,8 +223,27 @@ const SideWidgets = ({
   onScope,
 }: ISideWidgetsProps) => {
   const listRef = useRef<HTMLDivElement>(null);
-  const [root, setRoot] = useState<HTMLDivElement | null>(null);
-  useEffect(() => setRoot(listRef.current), []);
+  const [root, setRoot] = useState<HTMLElement | null>(null);
+  // The cards are on screen as far as the column that scrolls them shows them (the popover's list scrolls itself).
+  useEffect(() => setRoot(listRef.current?.closest<HTMLElement>('.hx-col') ?? listRef.current), []);
+  // «+ Виджет»: the column scrolls to the card that came, if it is out of view; the first draw is no addition.
+  const known = useRef<ReadonlySet<string> | null>(null);
+  useEffect(() => {
+    const ids = new Set(widgets.map((w) => w.id));
+    const before = known.current;
+    known.current = ids;
+    if (before === null) return;
+    const fresh = widgets.filter((w) => !before.has(w.id)).pop();
+    if (!fresh) return;
+    const quiet = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // After the card's own entrance has begun, so its place is known.
+    const timer = window.setTimeout(() => {
+      listRef.current
+        ?.querySelector(`[data-drag-id="${CSS.escape(fresh.id)}"]`)
+        ?.scrollIntoView({ block: 'nearest', behavior: quiet ? 'auto' : 'smooth' });
+    }, 60);
+    return () => window.clearTimeout(timer);
+  }, [widgets]);
   useDrag<TDrag, TDrag, { id: string; at: string; after: boolean }>({
     listRef,
     dragKinds: DRAGS,

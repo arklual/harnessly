@@ -1439,7 +1439,7 @@ export interface Conversation {
   seenAt: Ms; // read up to; unread when lastTurn.endedAt > seenAt — not an agent state
   lastTurn: TurnSummary | null;
   queue: { count: number; paused: QueuePause | null };
-  gate: { kind: GateKind; id: string } | null; // the open gate; its details are in the conv channel
+  gate: { kind: GateKind; id: string; dialog?: boolean } | null; // the open gate; its details are in the conv channel; dialog: a permission that is a menu of the agent's screen (a choice, not a permission to allow)
   goal?: Goal; // the agent's /goal; absent when it has none
   launch?: Launch; // set on a chat started with others by one prompt on several models
   apps?: string[]; // the installed apps turned on in this chat; absent when none is on
@@ -3068,7 +3068,7 @@ const conversation: Decoder<Conversation> = object(
     seenAt: ms,
     lastTurn: nullable(turnSummary),
     queue: object({ count: int, paused: nullable(queuePause) }),
-    gate: nullable(object({ kind: oneOf(GATE_KINDS), id: gateId })),
+    gate: nullable(object({ kind: oneOf(GATE_KINDS), id: gateId }, { dialog: bool })),
     rev: seq,
   },
   {
