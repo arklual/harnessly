@@ -160,7 +160,7 @@ func (s *Server) subscribeToFile(c *client, path, sessionID, session string, p *
 	var res transcript.Chunk
 	switch {
 	case s.isAntigravityPath(path):
-		res = transcript.ReadAntigravityTail(path, maxInitEntries)
+		res = transcript.ReadAntigravityTail(path, maxInitEntries, s.d.AntigravityRoot)
 	case fw.codex != nil && isNew:
 		res = fw.codex.ParseTail(maxInitEntries)
 	case fw.codex != nil:
@@ -390,7 +390,7 @@ func appendMessage(entries []*jsvalue.Object) []byte {
 func (s *Server) pushTranscriptChange(fw *fileWatcher) []*jsvalue.Object {
 	var inc transcript.Incremental
 	if s.isAntigravityPath(fw.path) {
-		inc = antigravityIncremental(fw.path, fw.offset)
+		inc = antigravityIncremental(s.d.AntigravityRoot, fw.path, fw.offset)
 	} else if fw.codex != nil {
 		inc = fw.codex.ParseIncremental()
 	} else {

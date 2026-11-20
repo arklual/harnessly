@@ -47,8 +47,8 @@ func TestAntigravityPaging(t *testing.T) {
 		t.Fatal(err)
 	}
 	all := ParseAntigravityContent(content)
-	tail := ReadAntigravityTail(path, 1)
-	before := ReadAntigravityBefore(path, tail.StartByteOffset, 100)
+	tail := ReadAntigravityTail(path, 1, filepath.Dir(path))
+	before := ReadAntigravityBefore(path, tail.StartByteOffset, 100, filepath.Dir(path))
 	got := append(before.Entries, tail.Entries...)
 	if len(got) != len(all) {
 		t.Fatalf("paged %d all %d", len(got), len(all))
@@ -66,5 +66,53 @@ func TestAntigravityPaging(t *testing.T) {
 		if e.String("id") != all[i+1].String("id") {
 			t.Fatal("unstable incremental ids")
 		}
+	}
+}
+
+func TestAntigravityRootConfinement(t *testing.T) {
+	root := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "outside.jsonl")
+	if err := os.WriteFile(outside, []byte(agUser), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{outside, filepath.Join(root, "..", filepath.Base(outside))} {
+		if f, err := OpenAntigravity(path, root); err == nil {
+			f.Close()
+			t.Fatal("outside path accepted", path)
+		}
+	}
+	link := filepath.Join(root, "transcript.jsonl")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Fatal(err)
+	}
+	if c := ReadAntigravityTail(link, 100, root); len(c.Entries) != 0 {
+		t.Fatal("symlink escape read")
+	}
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(link, []byte(agReply), 0600); err != nil {
+		t.Fatal(err)
+	}
+	f, err := OpenAntigravity(link, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, link); err != nil {
+		t.Fatal(err)
+	}
+	buf := make([]byte, len(agReply))
+	if _, err := f.ReadAt(buf, 0); err != nil || string(buf) != agReply {
+		t.Fatal("opened descriptor changed", err)
+	}
+	if c := ReadAntigravityBefore(link, -1, 100, root); len(c.Entries) != 0 {
+		t.Fatal("replacement symlink read")
+	}
+	if c := ReadAntigravityTail(outside, 100, ""); len(c.Entries) != 0 {
+		t.Fatal("empty root accepted")
 	}
 }

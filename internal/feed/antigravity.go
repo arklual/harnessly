@@ -1,9 +1,6 @@
 package feed
 
 import (
-	"os"
-	"runtime"
-
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/transcript"
 	"github.com/ly-solutions/harnessly/internal/transcriptindex"
@@ -13,48 +10,31 @@ import (
 // AntigravitySource reads the native brain/<uuid>/.system_generated/logs/transcript.jsonl.
 // DONE belongs to one native step, never to the conversation's turn.
 type AntigravitySource struct {
+	Root   string
 	Path   string
 	Index  *transcriptindex.Index
 	offset int64
-	q      *transcriptindex.Queue
 }
 
 func (s *AntigravitySource) Tail(max int) transcript.Chunk {
-	c := transcript.ReadAntigravityTail(s.Path, max)
+	c := transcript.ReadAntigravityTail(s.Path, max, s.roots()...)
 	s.Seat(c.FileSize)
 	return c
 }
 func (s *AntigravitySource) Before(before int64, max int) transcript.Chunk {
-	return transcript.ReadAntigravityBefore(s.Path, before, max)
+	return transcript.ReadAntigravityBefore(s.Path, before, max, s.roots()...)
 }
 func (s *AntigravitySource) AtRest() bool { return true }
-func (s *AntigravitySource) Seat(offset int64) {
-	s.offset = offset
-	if s.Index == nil {
-		return
+func (s *AntigravitySource) roots() []string {
+	if s.Root != "" {
+		return []string{s.Root}
 	}
-	if s.q == nil {
-		s.q = s.Index.Queue(s.Path, "feed", 0)
-		runtime.AddCleanup(s, func(q *transcriptindex.Queue) { q.Close() }, s.q)
-	}
-	s.q.Seat(offset)
+	return nil
 }
-func (s *AntigravitySource) Close() {
-	if s.q != nil {
-		s.q.Close()
-		s.q = nil
-	}
-}
+func (s *AntigravitySource) Seat(offset int64) { s.offset = offset }
+func (s *AntigravitySource) Close()            {}
 func (s *AntigravitySource) Since() transcript.Incremental {
-	if s.q != nil {
-		data, from, partial, state := s.q.Take()
-		if state == transcriptindex.Fresh && (len(data) == 0 || from == s.offset) && !partial {
-			inc := transcript.ParseAntigravityAppended(data, s.offset)
-			s.Seat(inc.NewOffset)
-			return inc
-		}
-	}
-	f, err := os.Open(s.Path)
+	f, err := transcript.OpenAntigravity(s.Path, s.roots()...)
 	if err != nil {
 		return transcript.Incremental{NewEntries: []*jsvalue.Object{}, NewOffset: s.offset}
 	}

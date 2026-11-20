@@ -90,7 +90,7 @@ func (e *EntriesRoute) Answer(r *http.Request) (int, any, http.Header) {
 	codex := e.Paths.Codex(path)
 	var page transcript.Chunk
 	if nativeAntigravityPath(e.AntigravityRoot, path) {
-		page = transcript.ReadAntigravityBefore(path, offset(before), limit)
+		page = transcript.ReadAntigravityBefore(path, offset(before), limit, e.AntigravityRoot)
 	} else if codex {
 		page = transcript.ReadCodexBefore(path, offset(before), limit, until, e.Codex)
 	} else {
