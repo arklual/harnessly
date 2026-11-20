@@ -113,7 +113,7 @@ func (s *Service) runAntigravity(ctx context.Context, r Request, work string, co
 	}()
 	waited := make(chan error, 1)
 	go func() { <-readDone; waited <- cmd.Wait() }()
-	defer func() { cancel(); _ = stdin.Close(); _ = stdout.Close(); <-waited }()
+	defer func() { cancel(); _ = stdin.Close(); _ = stdout.Close(); _ = <-waited }()
 	send := func(v any) error { return json.NewEncoder(stdin).Encode(v) }
 	request := func(id int, method string, params any) error {
 		return send(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params})
