@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	validPanelTypes = []string{"terminal", "claude-code", "codex-cli", "agent-sessions", "web-browser", "diff"}
+	validPanelTypes = []string{"terminal", "claude-code", "codex-cli", "antigravity-cli", "agent-sessions", "web-browser", "diff"}
 	agentSessionRe  = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,128}$`)
 )
 

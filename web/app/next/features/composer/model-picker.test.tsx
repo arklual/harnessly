@@ -2,7 +2,12 @@
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ModelPicker from '@/next/features/composer/model-picker';
-import { withModel, type IModelChoice, type IPickerAgent } from '@/next/features/composer/agents';
+import {
+  catalogNote,
+  withModel,
+  type IModelChoice,
+  type IPickerAgent,
+} from '@/next/features/composer/agents';
 import type { AgentModel, Effort } from '@/next/protocol/v2';
 
 // The wide window: the picker is a popover over the field, not the phone's sheet.
@@ -333,5 +338,44 @@ describe('the limit on the pill (HRN-1496)', () => {
     const view = render(<ModelPicker value={choice()} agents={[agent]} locked onChange={vi.fn()} />);
     act(() => view.container.querySelector<HTMLButtonElement>('.hx-model')?.click());
     expect(view.container.querySelector('.hx-picker__limits')).toBeNull();
+  });
+});
+
+describe('scope of the permission mode and the catalog of the models (GitHub #124)', () => {
+  const codex: IPickerAgent = {
+    ...agent,
+    provider: 'codex',
+    name: 'Codex',
+    short: 'Codex',
+    defaultPermission: 'bypass',
+    catalog: { source: 'static', fetchedAt: null, warnings: ['no cache'] },
+  };
+  it('labels a running session apart from the machine default', () => {
+    const view = render(
+      <ModelPicker value={choice({ provider: 'codex' })} agents={[codex]} locked onChange={vi.fn()} />,
+    );
+    act(() => view.container.querySelector<HTMLButtonElement>('.hx-model')?.click());
+    expect(view.getByText(/This session: Auto/)).toBeTruthy();
+    cleanup();
+    const fresh = render(
+      <ModelPicker
+        value={choice({ provider: 'codex' })}
+        agents={[codex]}
+        locked={false}
+        onChange={vi.fn()}
+      />,
+    );
+    act(() => fresh.container.querySelector<HTMLButtonElement>('.hx-model')?.click());
+    expect(fresh.getByText(/Machine default: Auto/)).toBeTruthy();
+  });
+  it('says the list is the built-in fallback, or a cache with its date', () => {
+    expect(catalogNote(codex)).toContain('Built-in model list');
+    expect(
+      catalogNote({
+        ...codex,
+        catalog: { source: 'models-cache', fetchedAt: '2026-11-01T10:00:00Z', warnings: [] },
+      }),
+    ).toContain('cache');
+    expect(catalogNote(agent)).toBeNull();
   });
 });

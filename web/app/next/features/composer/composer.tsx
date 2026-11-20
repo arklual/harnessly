@@ -178,6 +178,8 @@ export interface IComposerProps {
   recording: Recording | null;
   /** Voice input; without it the microphone is not offered. `at`: the caret in the field, where the words go. */
   onMic?: (at?: number) => void;
+  /** Why dictation is unavailable on this machine (the runtime said so): shown by a muted mic that explains it on a click. */
+  micOff?: string;
   /** Where the dictation wants the caret: after the words it put in. */
   caret?: number | null;
   /** What is left of the agent's subscription, by the pill; no chip until the machine has answered. */
@@ -844,6 +846,15 @@ const Composer = (props: IComposerProps) => {
             {props.tools}
             {/* Dictation (the mic) always stays; the live voice is its own button beside it (the wave). Only during a
                 call the call's own mic (mute) stands here instead, so the field never shows two mics. */}
+            {!props.onMic && props.micOff && !voice && (
+              <RoundButton
+                className="hx-dictate-btn"
+                icon="mic-off"
+                label={props.micOff}
+                aria-disabled="true"
+                onClick={() => toast(props.micOff ?? '', { tone: 'error' })}
+              />
+            )}
             {props.onMic && !voice && (
               <VoiceQuick kind={QUICK_KIND.dictate}>
                 {({ note, ref, ...gestures }) => (

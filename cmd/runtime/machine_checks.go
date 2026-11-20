@@ -638,7 +638,8 @@ func newMachineProbe(d deps, self *selfupdate.Updater) machineProbe {
 			}
 			return u.Status()
 		},
-		UpdateCLIs: func(ctx context.Context) { agentCLIs(d).Run(ctx) },
+		UpdateCLIs:     func(ctx context.Context) { agentCLIs(d).Run(ctx) },
+		PreviewOrigins: standalonePreviewOrigins, PreviewDNS: previewOriginChecks,
 		AppsBoundary: func() (bool, error) {
 			root := apps.Open(d.DataDir).Root
 			if _, err := os.Stat(root); err != nil {
@@ -734,7 +735,11 @@ func machineCheckRoutes(d deps, self *selfupdate.Updater) []gate.Route {
 				}
 				ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 				defer cancel()
-				peerJSON(w, http.StatusOK, previewCheckReport(ctx, probe.PreviewOrigins()))
+				var origins []string
+				if probe.PreviewOrigins != nil {
+					origins = probe.PreviewOrigins()
+				}
+				peerJSON(w, http.StatusOK, previewCheckReport(ctx, origins))
 			}),
 		},
 	}

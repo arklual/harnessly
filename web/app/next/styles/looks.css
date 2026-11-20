@@ -550,3 +550,14 @@ html[data-look-density='cozy'] .hx-msg {
 .hx-fx[data-layer='back'] {
   z-index: -1;
 }
+/* On a touch screen the front frame goes under the feed too. iOS Safari hands a finger that lands on a frame to that frame
+   even with pointer-events: none, so a frame over the feed took every swipe and nothing scrolled. Under the feed it
+   still draws, behind the messages; the stage isolates so it stays above the page's own background. */
+@media (hover: none) and (pointer: coarse) {
+  .hx-stage:has(> .hx-fx) {
+    isolation: isolate;
+  }
+  .hx-fx[data-layer='front'] {
+    z-index: -1;
+  }
+}

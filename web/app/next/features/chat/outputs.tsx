@@ -288,9 +288,29 @@ const PICTURE_EXT = /\.(?:png|jpe?g|gif|webp|svg)$/i;
 export const isPictureFile = (output: Pick<TurnOutput, 'ref' | 'name' | 'mime'>): boolean =>
   output.mime?.startsWith('image/') === true || PICTURE_EXT.test(output.name ?? output.ref);
 
+const FINAL_FILE = /\.(?:html?|zip)$/i;
+
+/**
+ * The turn's final HTML or ZIP as a file to save, for a turn that opened a design (GitHub #125): when the design's
+ * preview does not come up the person still has the result. It is the last such file the turn created, and only once
+ * the turn is over; the earlier ones are its intermediate files and stay out, as does a file the agent handed over
+ * itself (that card is already there). Null otherwise.
+ */
+export const finalFileOf = (item: TurnItem): TurnOutput | null => {
+  const { outputs = [], files, status } = item.turn;
+  if (status === 'live' || !outputs.some((o) => o.kind === 'design')) return null;
+  const last = files.findLast((f) => f.op === 'created' && FINAL_FILE.test(f.path));
+  if (!last || outputs.some((o) => o.kind === 'delivery' && o.ref === last.path)) return null;
+  const name = last.path.slice(last.path.lastIndexOf('/') + 1);
+  return { kind: 'delivery', op: 'created', title: name, ref: last.path, name };
+};
+
 /** The files the turn handed to the person: each is a card of one line, with the way to save it. */
-export const deliveriesOf = (item: TurnItem, context: IOutputsContext): TurnOutput[] =>
-  context.shown.delivery ? (item.turn.outputs ?? []).filter((o) => o.kind === 'delivery') : [];
+export const deliveriesOf = (item: TurnItem, context: IOutputsContext): TurnOutput[] => {
+  if (!context.shown.delivery) return [];
+  const final = finalFileOf(item);
+  return [...(item.turn.outputs ?? []).filter((o) => o.kind === 'delivery'), ...(final ? [final] : [])];
+};
 
 /** The pictures a finished turn drew, shown under its answer: the folded work would hide their cards. */
 export const drawnOf = (item: TurnItem): readonly string[] =>

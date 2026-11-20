@@ -164,7 +164,7 @@ export const useVoice = (
   current?: () => string,
   scope: string | null = null,
 ) => {
-  useMachine(machine);
+  const view = useMachine(machine);
   const [recording, setRecording] = useState<Recording | null>(null);
   const [recognized, setRecognized] = useState(0);
   /** Where the caret goes after the dictated words; the field puts it there while it listens. */
@@ -542,6 +542,11 @@ export const useVoice = (
     onMic:
       machine && hasFeature(machine, 'voice') && canRecord()
         ? (at?: number) => void start(machine, at)
+        : undefined,
+    /** Why the machine has no dictation, when it says so; the composer shows it where the mic would be (GitHub #122). */
+    micOff:
+      machine && view && !hasFeature(machine, 'voice') && canRecord() && view.machine.runtime?.voiceOff
+        ? `${t('next.voice.off.title', { name: view.machine.name })}. ${t(`next.voice.off.${view.machine.runtime.voiceOff}`)}`
         : undefined,
     onCancelRecording: cancel,
     onFinishRecording: finish,

@@ -87,6 +87,7 @@ func newSafeBackend(getenv func(string) string, local *secrets.Store, dir, dataD
 		remote := secrets.NewRemote(agent.LocalSafe{DataDir: dataDir, TokenHeader: getenv("RUNTIME_AGENT_TOKEN_HEADER")}, agent.SafeOwnFolder, dir)
 		remote.RefPrefixes = []string{"*"}
 		info.Refs = true
+		local.SetShared(remote) // an app's secrets reach every machine of the person (HRN-1717)
 		return &secrets.Safe{Local: local, Primary: remote, Refs: remote, Where: secrets.WhereVault}, info
 	case safeModeExec:
 		kv, err := execkv.New(getenv("RUNTIME_SECRETS_EXEC"))
@@ -103,6 +104,7 @@ func newSafeBackend(getenv func(string) string, local *secrets.Store, dir, dataD
 		remote := secrets.NewRemote(kv, info.Prefix, dir)
 		remote.RefPrefixes = vaultkv.SplitPrefixes(getenv("RUNTIME_SECRETS_REF_PREFIXES"))
 		info.Refs = len(remote.RefPrefixes) > 0
+		local.SetShared(remote) // an app's secrets reach every machine of the person (HRN-1717)
 		return &secrets.Safe{Local: local, Primary: remote, Refs: remote, Where: secrets.WhereVault}, info
 	case safeModeVault:
 	default:
@@ -128,5 +130,6 @@ func newSafeBackend(getenv func(string) string, local *secrets.Store, dir, dataD
 	remote := secrets.NewRemote(client, info.Prefix, dir)
 	remote.RefPrefixes = vaultkv.SplitPrefixes(getenv("RUNTIME_SECRETS_REF_PREFIXES"))
 	info.Refs = len(remote.RefPrefixes) > 0
+	local.SetShared(remote) // an app's secrets reach every machine of the person (HRN-1717)
 	return &secrets.Safe{Local: local, Primary: remote, Refs: remote, Where: secrets.WhereVault}, info
 }

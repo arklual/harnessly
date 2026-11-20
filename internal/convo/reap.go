@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"hash/fnv"
+	"os"
 	"path/filepath"
+
+	"github.com/ly-solutions/harnessly/internal/agents/antigravity"
 	"slices"
 	"strings"
 	"time"
@@ -244,6 +247,15 @@ func commandShell(p Proc) bool {
 
 // isAgent: the process is the agent CLI of the provider — its own binary, or the node that runs its script.
 func isAgent(p Proc, provider wire.Provider) bool {
+	if provider == wire.ProviderAntigravity {
+		if binary := os.Getenv("RUNTIME_ANTIGRAVITY_BIN"); filepath.IsAbs(binary) && len(p.Argv) > 0 && p.Argv[0] == binary {
+			return true
+		}
+		return antigravity.MatchesProcess(p.Comm, p.Argv)
+	}
+	if provider != wire.ProviderClaude && provider != wire.ProviderCodex {
+		return false
+	}
 	name := "claude"
 	if provider == wire.ProviderCodex {
 		name = "codex"
@@ -264,7 +276,7 @@ func toolShell(p Proc, provider wire.Provider) bool {
 	if !commandShell(p) {
 		return false
 	}
-	if provider == wire.ProviderCodex {
+	if provider == wire.ProviderCodex || provider == wire.ProviderAntigravity {
 		return true
 	}
 	line := strings.Join(p.Argv, " ")

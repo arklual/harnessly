@@ -79,7 +79,7 @@ func extViewOf(a apps.Installed, safe *secrets.Store, st *apps.Storage, host str
 
 func appExtRoutes(d deps, reg *apps.Registry, guests *apps.Guests, version string) []gate.Route {
 	base := platformAPI + "/extensions"
-	safe := safeFor(d).store.Local // an app's secrets stay in the file
+	safe := safeFor(d).store.Local // an app's secrets: the file, mirrored to the shared safe (HRN-1717)
 	st := apps.OpenStorage(d.DataDir)
 	fail := func(w http.ResponseWriter, err error) {
 		agent.Log("warn", "extensions: "+err.Error())

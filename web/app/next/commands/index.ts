@@ -7,6 +7,7 @@ import { uuidv7 } from '@/next/core/ids';
 import { hub } from '@/next/core/realtime/hub';
 import { forgetIfUnknown, newView, settleSubmit } from '@/next/commands/messages';
 import { runCommand, type Body, type OpHandle } from '@/next/commands/run';
+import { attachmentWireId } from '@/next/commands/uploads';
 import { machinesStore } from '@/next/stores/machines';
 import { putLocal, setConversationOf } from '@/next/stores/messages';
 import type {
@@ -265,7 +266,7 @@ export function createConversation(
           first: {
             clientId: firstClientId,
             text: req.first.text,
-            attachmentIds: (req.first.attachments ?? []).map((a) => a.id),
+            attachmentIds: (req.first.attachments ?? []).map(attachmentWireId),
             ...(req.first.refs && req.first.refs.length > 0 ? { refs: req.first.refs } : {}),
           },
         }

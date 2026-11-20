@@ -44,6 +44,16 @@ describe('pickDesignConv', () => {
     expect(pickDesignConv({ arrived: null, bound, list, answered: false })).toEqual(conv('tab-gone'));
     expect(pickDesignConv({ arrived: null, bound, list, answered: true })).toEqual(NONE);
   });
+
+  it('does not replace an explicitly linked chat the machine does not have by a blank composer (GitHub #121)', () => {
+    expect(pickDesignConv({ arrived: 'tab-other', bound: null, list, answered: true })).toEqual({
+      k: DESIGN_CONV.away,
+      id: 'tab-other',
+    });
+    expect(pickDesignConv({ arrived: 'tab-other', bound: null, list, answered: false })).toEqual(
+      conv('tab-other'),
+    );
+  });
 });
 
 describe('designChats', () => {

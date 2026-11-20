@@ -5,6 +5,7 @@ import type {
   MachineGroup,
   MachinesList,
   MachinesSummary,
+  MachineSetup,
   Money,
   OrgMachine,
   ResourcePlan,
@@ -762,3 +763,80 @@ export const machinesTiles = (s: MachinesSummary, steps: number): Tile[] => {
     },
   ];
 };
+
+export type ReadyTone = 'ok' | 'warn' | 'bad' | 'unknown';
+
+export interface ReadyRow {
+  key: string;
+  label: string;
+  tone: ReadyTone;
+  text: string;
+}
+
+const PROVIDER_NAME = { claude: 'Claude Code', codex: 'Codex' } as const;
+
+/**
+ * The card's readiness as separate states (GitHub #120): the agent's link to the hub, the machine's page (its workspace)
+ * as the hub last opened it, access and trust, and each provider's CLI. The link alone never says the machine is ready:
+ * what the hub has not seen is marked unknown instead of ok.
+ */
+export const readiness = (
+  m: OrgMachine,
+  setup: MachineSetup | null,
+  opened: { text: string; untrusted?: boolean } | null,
+  now: number,
+): ReadyRow[] => {
+  const rows: ReadyRow[] = [];
+  const off = m.state === 'offline' || m.state === 'disabled';
+  const since = ago(m.since, now);
+  rows.push({
+    key: 'link',
+    label: 'Связь с агентом',
+    tone: off ? 'bad' : 'ok',
+    text:
+      m.state === 'disabled' ? 'отключена в хабе' : off ? `нет связи${since ? ` ${since}` : ''}` : 'на связи',
+  });
+  const trust = setup?.runtime ?? null;
+  rows.push({
+    key: 'access',
+    label: 'Доверие и доступ',
+    tone: trust === 'ready' ? 'ok' : trust === null ? 'unknown' : 'warn',
+    text:
+      trust === 'ready'
+        ? m.ownerName
+          ? `подтверждена, владелец — ${m.ownerName}`
+          : 'подтверждена, общая машина'
+        : trust === 'needs_trust'
+          ? 'не подтверждена: хаб не откроет её страницу, поэтому в личное пространство она не попадает'
+          : trust === 'blocked'
+            ? 'страница машины закрыта правилами доступа'
+            : 'не известно',
+  });
+  rows.push({
+    key: 'workspace',
+    label: 'Страница машины',
+    tone: off ? 'unknown' : opened ? (opened.untrusted ? 'warn' : 'bad') : 'unknown',
+    text: opened
+      ? `последняя попытка открыть не удалась: ${opened.text}`
+      : off
+        ? 'не известно: нет связи, данные могли устареть'
+        : 'ещё не проверялась в этом сеансе: статус выше говорит только о связи агента',
+  });
+  for (const a of setup?.agents ?? []) {
+    const name = PROVIDER_NAME[a.provider];
+    const bad = !a.installed ? 'не поставлен' : a.login === 'out' ? 'вход не выполнен' : null;
+    rows.push({
+      key: `provider-${a.provider}`,
+      label: name,
+      tone: bad ? 'bad' : a.login === 'in' ? 'ok' : 'unknown',
+      text: bad ?? (a.login === 'in' ? 'готов к чатам' : 'вход не известен: данные при подключении агента'),
+    });
+  }
+  return rows;
+};
+
+/** The headline over the rows: the link is not the readiness, so it says so while a provider or the page is not ok. */
+export const readyHeadline = (rows: readonly ReadyRow[]): string =>
+  rows.every((r) => r.tone !== 'bad' && r.tone !== 'warn')
+    ? 'Готова к чатам'
+    : 'Агент на связи, готовность не полная';

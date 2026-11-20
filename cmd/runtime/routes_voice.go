@@ -9,6 +9,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/voice"
+	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
 // The voice slice ("voice"): dictation over /api/voice (ffmpeg to the machine's recognition service) and the in-tab
@@ -41,6 +42,14 @@ func newVoice(dataDir string) *voice.Server {
 	srv := voice.New(voice.Config{Socket: voiceSocket(dataDir), FFmpeg: os.Getenv("RUNTIME_VOICE_FFMPEG_BIN"), Log: voiceLog, Credentials: voiceCredentials(dataDir)})
 	noteVoiceDecoder(srv)
 	return srv
+}
+
+// voiceOffReason is why a machine without dictation has none: no ffmpeg, or no recognition engine to talk to.
+func voiceOffReason(s *voice.Server) string {
+	if !s.Decodes() {
+		return wire.VoiceOffFFmpeg
+	}
+	return wire.VoiceOffEngine
 }
 
 func voiceRoutes(d deps) []gate.Route {

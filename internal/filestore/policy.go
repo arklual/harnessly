@@ -110,12 +110,15 @@ const (
 	// KindResume is a person's chat resume snapshots: one room per person, each file sealed on the machine
 	// with the person's key, so a chat continues on another of their machines while the one it ran on is off.
 	KindResume = "resume"
+	// KindAppSet is the set of apps a person has installed: one room per person, whatever space the machine is
+	// in, so every VM of the person installs, updates and removes the same apps. Records and packed packages, no secrets.
+	KindAppSet = "appset"
 )
 
 // (KindSystems, KindVideos and KindDecks, the entity records, are in records.go.)
 
 // Kinds are the collection kinds a hub serves, in a stable order.
-var Kinds = []string{KindDesign, KindUploads, KindFiles, KindHandoff, KindApps, KindKits, KindProfile, KindResume, KindSystems, KindVideos, KindDecks, KindProjects, KindCovers, KindThumbs}
+var Kinds = []string{KindDesign, KindUploads, KindFiles, KindHandoff, KindApps, KindKits, KindProfile, KindResume, KindAppSet, KindSystems, KindVideos, KindDecks, KindProjects, KindCovers, KindThumbs}
 
 // KnownKind tells whether a collection kind is one the hub serves.
 func KnownKind(kind string) bool {

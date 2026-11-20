@@ -97,8 +97,9 @@ export async function mirrorUpload(m: MachineId, file: Blob, ref: AttachmentRef)
 }
 
 /**
- * An attachment put into the hub while its machine was off: `hub:<sha256>`. The message waits in the outbox,
- * and when the machine is back it takes its copy from the hub (takeKept) before the message goes.
+ * An attachment put into the hub's store, not on a machine: `hub:<sha256>` (HRN-879 for a machine that is off; GitHub
+ * #112 for every chat under a hub). The message names it (attachmentWireId) and the machine that runs the chat takes
+ * its copy from the hub before the message is read.
  */
 const KEPT = /^hub:([0-9a-f]{64})$/;
 export const keptSha = (id: string): string | null => KEPT.exec(id)?.[1] ?? null;
@@ -143,41 +144,22 @@ export async function keepInHub(
 }
 
 /**
- * The attachments as the machine knows them: one kept in the hub is read from there (the hub gives it only to the
- * person who put it) and uploaded to the machine as any other file, which names it in the hub too. null when that
- * cannot be done now: the message waits and goes again.
+ * What a message names an attachment by. One kept in the hub goes as `hub:<sha256>?n=<name>&t=<type>`: the message
+ * carries only ids, and the machine that runs the chat takes the file from the hub's store (it may be another machine
+ * than the one the page is on) and needs the name and the type to make a file of it. Any other id goes as it is.
  */
-/** Whether any attachment is kept in the hub: only then does a message wait for takeKept before it goes. */
-export function anyKept(attachments: readonly AttachmentRef[]): boolean {
-  return attachments.some((a) => keptSha(a.id));
+export function attachmentWireId(a: Pick<AttachmentRef, 'id' | 'name' | 'mime'>): string {
+  const sha = keptSha(a.id);
+  if (!sha) return a.id;
+  const q = new URLSearchParams();
+  if (a.name) q.set('n', a.name);
+  if (a.mime) q.set('t', a.mime);
+  const query = q.toString();
+  return query ? `${a.id}?${query}` : a.id;
 }
 
-export async function takeKept(
-  m: MachineId,
-  attachments: readonly AttachmentRef[],
-): Promise<AttachmentRef[] | null> {
-  const out: AttachmentRef[] = [];
-  for (const a of attachments) {
-    const sha = keptSha(a.id);
-    if (!sha) {
-      out.push(a);
-      continue;
-    }
-    try {
-      const res = await fetch(`${gatewayPath(`/uploads/blobs/${sha}`)}?machine=${encodeURIComponent(m)}`, {
-        credentials: 'same-origin',
-      });
-      if (!res.ok) return null;
-      const file = new File([await res.blob()], a.name, { type: a.mime });
-      const sent = await uploadFile(m, file, () => undefined);
-      if (!sent.ok) return null;
-      out.push(sent.ref);
-    } catch {
-      return null;
-    }
-  }
-  return out;
-}
+/** The largest file a chat attachment goes into the hub's store with: the store's own limit for a file. */
+export const HUB_ATTACH_MAX_BYTES = 50 * 1024 * 1024;
 
 export const UPLOAD_FAILURE = {
   network: 'network',

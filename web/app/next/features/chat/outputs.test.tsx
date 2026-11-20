@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Outputs, {
+  finalFileOf,
   mergeStands,
   OutputsContext,
   SHOWN_BY_DEFAULT,
@@ -300,5 +301,37 @@ describe('mergeStands (HRN-1623)', () => {
     expect(merged.map((m) => m.output.ref)).toEqual([root, other]);
     expect(merged[0]!.link.more).toEqual([page]);
     expect(merged[1]!.link.more).toEqual([]);
+  });
+});
+
+describe('the final file of a turn with a design (GitHub #125)', () => {
+  const withFiles = (files: { path: string; op: 'created' | 'edited' | 'read' }[], outputs = [design]) => {
+    const it = item(outputs);
+    it.turn.files = files;
+    return it;
+  };
+  it('offers the last created HTML or ZIP, not the intermediate ones', () => {
+    const turn = withFiles([
+      { path: '/w/draft.html', op: 'created' },
+      { path: '/w/site.zip', op: 'created' },
+      { path: '/w/notes.md', op: 'created' },
+    ]);
+    expect(finalFileOf(turn)?.ref).toBe('/w/site.zip');
+    expect(finalFileOf(withFiles([{ path: '/w/old.html', op: 'edited' }]))).toBeNull();
+  });
+  it('is only for a turn that opened a design, and not twice for a file already handed over', () => {
+    expect(finalFileOf(withFiles([{ path: '/w/a.html', op: 'created' }], [page]))).toBeNull();
+    const handed: TurnOutput = { kind: 'delivery', op: 'created', title: 'a', ref: '/w/a.html' };
+    expect(finalFileOf(withFiles([{ path: '/w/a.html', op: 'created' }], [design, handed]))).toBeNull();
+  });
+  it('draws a save link on the card, whatever the preview does', () => {
+    const turn = withFiles([{ path: '/w/a.html', op: 'created' }]);
+    render(
+      <OutputsContext value={{ shown: SHOWN_BY_DEFAULT, downloadUrl: (path) => `/dl?path=${path}` }}>
+        <Outputs item={turn} />
+      </OutputsContext>,
+    );
+    const save = screen.getByRole('link', { name: /next.delivered.save|Скачать|Download/ });
+    expect(save.getAttribute('href')).toBe('/dl?path=/w/a.html');
   });
 });

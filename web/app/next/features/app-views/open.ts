@@ -6,7 +6,7 @@ type TListener = (target: string) => void;
 
 const listeners = new Set<TListener>();
 
-/** Opens `<app id>[/<view>]` in the pane; false for a target that is not one. */
+/** Opens `<app id>[/<view>[/<object>]]` in the pane; false for a target that is not one. */
 export const openAppTab = (target: string): boolean => {
   const named = target.startsWith('app:') ? target.slice(4) : target;
   if (parseAppTarget(named) === null) return false;

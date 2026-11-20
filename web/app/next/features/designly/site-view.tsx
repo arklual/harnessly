@@ -339,6 +339,8 @@ export interface ISiteStage {
   /** On a phone in «Чат»: the site is opened over the chat. */
   sview: boolean;
   onSview: (open: boolean) => void;
+  /** GitHub #123: closes the design and leaves the same chat across the full width; undefined without a chat. */
+  onToChat?: () => void;
   /** Words from the page's tools (a console line, a request) go into the field. */
   onAttach: (words: string) => void;
   /**
@@ -1646,6 +1648,17 @@ const SiteView = ({
                   }}
                 >
                   <Icon name={stage.mode === 'chat' ? 'maximize-2' : 'message-square'} />
+                </button>
+              )}
+              {stage?.onToChat && !guest && (
+                <button
+                  type="button"
+                  className="hx-head-btn hx-site__chat-only"
+                  aria-label={t('next.site.chatOnly')}
+                  onClick={stage.onToChat}
+                >
+                  <Icon name="x" size="sm" />
+                  <span>{t('next.site.chatOnly')}</span>
                 </button>
               )}
               {toolPane && !guest && (

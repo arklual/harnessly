@@ -443,3 +443,46 @@ func (r *Remote) refAllowed(path string) bool {
 	}
 	return false
 }
+
+var _ AppShared = (*Remote)(nil)
+
+// ReadApp reads an app's secret (app/<id>/<name>) the server keeps; not-found when it keeps none.
+func (r *Remote) ReadApp(full string) (string, error) {
+	if !ValidAppName(full) {
+		return "", refuse(ReasonBadName, nil)
+	}
+	ctx, cancel := ctxCall()
+	defer cancel()
+	data, err := r.KV.Read(ctx, r.path(full))
+	if err != nil {
+		return "", err
+	}
+	v, ok := valueOf(data, ValueKey)
+	if !ok || v == "" {
+		return "", refuse(ReasonNotFound, nil)
+	}
+	return v, nil
+}
+
+// WriteApp keeps an app's secret on the server; the person's list never shows it (it is not a plain name).
+func (r *Remote) WriteApp(full, value string) error {
+	if !ValidAppName(full) {
+		return refuse(ReasonBadName, nil)
+	}
+	if value == "" {
+		return refuse(ReasonEmpty, nil)
+	}
+	ctx, cancel := ctxCall()
+	defer cancel()
+	return r.KV.Write(ctx, r.path(full), map[string]string{ValueKey: value})
+}
+
+// DeleteApp forgets an app's secret on the server.
+func (r *Remote) DeleteApp(full string) error {
+	if !ValidAppName(full) {
+		return refuse(ReasonBadName, nil)
+	}
+	ctx, cancel := ctxCall()
+	defer cancel()
+	return r.KV.Delete(ctx, r.path(full))
+}

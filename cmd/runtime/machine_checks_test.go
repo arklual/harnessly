@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agentbrowser/provision"
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/extproviders"
+	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/voice/engine"
 )
@@ -350,5 +352,51 @@ func TestLaunchEnvUndeclared(t *testing.T) {
 	}
 	if !found {
 		t.Error("the check is not in the list")
+	}
+}
+
+// harnessly doctor preview on a standalone runtime in path mode with no public origins answers a report with the mode
+// and an empty list, not a nil-function panic that the CLI saw as EOF (GitHub #126).
+func TestPreviewCheckRouteWithoutOrigins(t *testing.T) {
+	home := t.TempDir()
+	if err := os.WriteFile(filepath.Join(home, "cli-token"), []byte("person"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("RUNTIME_PREVIEW_MODE", "path")
+	t.Setenv("RUNTIME_PREVIEW_PUBLIC_ORIGINS", "")
+	t.Setenv("RUNTIME_PREVIEW_DOMAIN", "")
+	t.Setenv("RUNTIME_VOICE_ENGINE", "off")
+	saved := standaloneSlots
+	standaloneSlots = &previewSlots{}
+	t.Cleanup(func() { standaloneSlots = saved })
+	d := deps{Home: home, DataDir: home, Tools: preflight.New(home),
+		CLI:       &gate.CLIToken{DataDir: home, Headers: []string{"x-cli-token"}},
+		SessionOK: func(*http.Request) bool { return false }}
+	call := func(routes []gate.Route) previewCheck {
+		t.Helper()
+		r := httptest.NewRequest(http.MethodGet, "/api/cli/preview/check", nil)
+		r.Header.Set("x-cli-token", "person")
+		w := httptest.NewRecorder()
+		for _, rt := range routes {
+			if rt.Match(r) {
+				rt.Handler.ServeHTTP(w, r)
+				break
+			}
+		}
+		var out previewCheck
+		if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &out) != nil {
+			t.Fatalf("%d %s", w.Code, w.Body)
+		}
+		return out
+	}
+	routes := machineCheckRoutes(d, nil)
+	if got := call(routes); got.Mode != "path" || got.Origins == nil || len(got.Origins) != 0 || got.Source != "" {
+		t.Fatalf("%+v", got)
+	}
+	// The same with no callback at all, as a probe built without one has it.
+	probe := newMachineProbe(d, nil)
+	probe.PreviewOrigins = nil
+	if probe.previewCheck(context.Background()) != nil {
+		t.Fatal("no origins, yet a preview_dns check")
 	}
 }

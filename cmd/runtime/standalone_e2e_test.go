@@ -378,7 +378,7 @@ func TestStandaloneMachineEndToEnd(t *testing.T) {
 	}
 	tab, session := openClaude("finish")
 	waitFor("claude started with the hooks", 30*time.Second, func() bool {
-		return strings.Contains(read(filepath.Join(home, "claude-calls.log")), "--settings "+filepath.Join(data, "hooks.json"))
+		return standaloneClaudeHookStarts(read(filepath.Join(home, "claude-calls.log")), data) >= 1
 	})
 	// The safe is on, so the prompt file is the workspace prompt with the safe's block after it.
 	if m := regexp.MustCompile(`--append-system-prompt-file (\S+)`).FindStringSubmatch(read(filepath.Join(home, "claude-calls.log"))); m == nil ||

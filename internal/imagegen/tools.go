@@ -50,7 +50,7 @@ func (Tools) Instructions() string {
 		"your only way to draw. Do not write code (python, PIL, SVG, canvas) to draw it and do not ask first unless the brief is empty. " +
 		"The chat shows the pictures as they are drawn; do not deliver them as files or paste their paths unless the person asks for a file " +
 		"(then deliver_file). Ask for several variants with count; save_to copies them into a folder of the project; to change an existing " +
-		"picture, pass it as source."
+		"picture, pass it as source. The generator is Codex by default; pass provider=antigravity only when the person names Antigravity (experimental, no transparent background)."
 }
 
 func (Tools) Tools() []any {
@@ -58,7 +58,7 @@ func (Tools) Tools() []any {
 		jsvalue.NewObject(
 			"name", ToolGenerate,
 			"description", "Draw raster pictures (photos, illustrations, posters, icons, logos, covers) from a brief with Codex's built-in "+
-				"image model (gpt-image). This is the way to answer «нарисуй / сгенерируй / сделай картинку, фото, плакат, иконку»: call it in the "+
+				"image model (gpt-image), or select provider=antigravity for the experimental official Antigravity CLI (no transparent output). This is the way to answer «нарисуй / сгенерируй / сделай картинку, фото, плакат, иконку»: call it in the "+
 				"first turn, not code that draws (python, PIL, SVG). The person sees the pictures in the "+
 				"chat while they are drawn (a blurred card per picture, then the picture). count asks for that many distinct variants "+
 				"(1–8). Waits for the pictures and answers with their file paths; if they take longer than the call may wait, the answer "+
@@ -67,6 +67,7 @@ func (Tools) Tools() []any {
 			"inputSchema", jsvalue.NewObject(
 				"type", "object",
 				"properties", jsvalue.NewObject(
+					"provider", jsvalue.NewObject("type", "string", "enum", []any{"codex", "antigravity"}, "description", "Image provider. Omit for the runtime default (normally codex). antigravity is experimental, uses the official agy ACP login and cannot produce transparent backgrounds."),
 					"prompt", jsvalue.NewObject("type", "string", "description", "The brief: what to draw and how."),
 					"count", jsvalue.NewObject("type", "integer", "minimum", 1, "maximum", MaxCount, "description", "How many variants (default 1)."),
 					"shape", jsvalue.NewObject("type", "string", "enum", []any{"square", "landscape", "portrait"}, "description", "The frame (default: the model's choice)."),
@@ -126,7 +127,8 @@ func (t Tools) Call(ctx context.Context, name string, args *jsvalue.Object) *jsv
 		}
 	}
 	req := Request{
-		Prompt: str(args, "prompt"), Count: num(args, "count"), Shape: Shape(str(args, "shape")),
+		Provider: Provider(str(args, "provider")),
+		Prompt:   str(args, "prompt"), Count: num(args, "count"), Shape: Shape(str(args, "shape")),
 		Transparent: flag(args, "transparent"), Conv: t.Caller, Name: str(args, "name"),
 	}
 	if from := strings.TrimSpace(str(args, "source")); from != "" {

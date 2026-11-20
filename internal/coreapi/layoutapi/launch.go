@@ -120,7 +120,7 @@ func (a *api) conversations(c *call) {
 	case "POST":
 		pv, _ := c.field("provider")
 		provider, _ := pv.(string)
-		if provider != agents.Claude && provider != agents.Codex {
+		if provider != agents.Claude && provider != agents.Codex && provider != agents.Antigravity {
 			c.fail(400, msgUnknownAgent.String())
 			return
 		}

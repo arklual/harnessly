@@ -98,6 +98,18 @@ describe('Composer dictation', () => {
   });
 });
 
+describe('Composer dictation off (GitHub #122)', () => {
+  it('shows a muted mic that carries the machine-specific reason instead of hiding it', () => {
+    const why = 'Dictation is off on box. ffmpeg was not found on this machine.';
+    render(<Composer {...props({ micOff: why })} />);
+    expect(screen.getByRole('button', { name: why })).toBeTruthy();
+  });
+  it('shows no explanation while dictation works', () => {
+    render(<Composer {...props({ onMic: vi.fn(), micOff: 'x' })} />);
+    expect(screen.queryByRole('button', { name: 'x' })).toBeNull();
+  });
+});
+
 describe('Composer shortcuts (features/keys)', () => {
   const press = (init: KeyboardEventInit) => fireEvent.keyDown(window, init);
 

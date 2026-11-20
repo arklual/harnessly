@@ -214,7 +214,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
     read,
     field,
   } = useDraftParts(conv);
-  const uploads = useUploads(machine, conv, files);
+  const uploads = useUploads(machine, conv, files, true);
   const stash = useFieldStash(conv);
   const quotes = useQuotes(conv);
   // The annotations of the feed's words: numbered chips of their own, the bar «Аннотирование · N» over the field.
@@ -426,6 +426,10 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   );
   const onSubmit = useCallback(
     (sendMode: TSendMode) => {
+      if (provider === 'antigravity' && working && sendMode === 'now') {
+        toast(t('next.agents.noSteering'), { tone: 'info' });
+        return;
+      }
       if (question) {
         if (!cardSend.current?.()) toast(t('next.ask.useCard'), { tone: 'info' });
         return;
@@ -669,7 +673,11 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         }
         slash={slash}
         attachments={uploads.attachments}
-        onFiles={uploads.onFiles}
+        onFiles={
+          provider === 'antigravity'
+            ? () => toast(t('next.agents.noNativeAttachments'), { tone: 'info' })
+            : uploads.onFiles
+        }
         onRemoveAttachment={uploads.onRemove}
         onRetryAttachment={uploads.onRetry}
         refs={refChips}

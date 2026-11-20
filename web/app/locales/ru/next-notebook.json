@@ -1,0 +1,22 @@
+{
+  "next.notebook.label": "Jupyter Notebook",
+  "next.notebook.run": "Запустить",
+  "next.notebook.runAll": "Запустить всё",
+  "next.notebook.interrupt": "Прервать",
+  "next.notebook.restart": "Перезапустить ядро",
+  "next.notebook.shutdown": "Выключить ядро",
+  "next.notebook.state.stopped": "Ядро выключено",
+  "next.notebook.state.idle": "Python · готово",
+  "next.notebook.state.busy": "Python · выполняется",
+  "next.notebook.trustNotice": "Открытие файла не запускает код. Выполнение использует Python на этой машине с доступом к файлам, как в терминале. Разрешайте запуск только для ноутбуков, которым доверяете. Результаты сохраняются обычной кнопкой «Сохранить».",
+  "next.notebook.allow": "Разрешить выполнение",
+  "next.notebook.pythonOnly": "Пока поддерживается только ядро Python 3. Этот ноутбук использует другое ядро: сохранённые ячейки и результаты доступны для просмотра и редактирования.",
+  "next.notebook.empty": "В ноутбуке пока нет ячеек.",
+  "next.notebook.cell": "Ячейка {n}",
+  "next.notebook.source": "Код ячейки {n}",
+  "next.notebook.raw": "Текст",
+  "next.notebook.outputImage": "Результат ячейки",
+  "next.notebook.outputHtml": "HTML-результат ячейки",
+  "next.notebook.unsupportedOutput": "Этот формат результата не поддерживается. Он сохранён в файле.",
+  "next.notebook.outputTruncated": "Показаны первые 200 результатов. Остальные сохранены в файле."
+}

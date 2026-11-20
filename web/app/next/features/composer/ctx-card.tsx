@@ -2,6 +2,7 @@
 // It opens on hover and stays while the pointer travels to it (ui/use-hover-intent.ts); a click pins it, a
 // tap toggles it on touch. The card is always in the page and only shown: it leaves with the same animation it came.
 import type { ReactNode } from 'react';
+import { useOnePopover } from '@/next/ui/one-popover';
 import { useFitInViewport, useHoverIntent } from '@/next/ui/use-hover-intent';
 
 export interface ICtxCardProps {
@@ -30,7 +31,8 @@ const CtxCard = ({
   wide,
   children,
 }: ICtxCardProps) => {
-  const { open, setTrigger, setFloating, getFloating, triggerProps, floatingProps } = useHoverIntent();
+  const { open, setTrigger, setFloating, getFloating, triggerProps, floatingProps, close } = useHoverIntent();
+  useOnePopover(open, close);
   useFitInViewport(getFloating, open);
   return (
     <div className="hx-ctx" data-tone={tone} data-open={open} data-wide={wide || undefined}>

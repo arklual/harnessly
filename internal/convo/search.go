@@ -90,6 +90,8 @@ func (d *Deps) source(rec wire.Conversation) feed.Source {
 		return d.Source(rec)
 	case rec.Provider == wire.ProviderCodex:
 		return &feed.CodexSource{Path: rec.TranscriptPath}
+	case rec.Provider == wire.ProviderAntigravity:
+		return &feed.AntigravitySource{Path: rec.TranscriptPath}
 	default:
 		return &feed.ClaudeSource{Path: rec.TranscriptPath}
 	}

@@ -55,6 +55,21 @@
 .hx-wgs-wrap[data-pop] .hx-wgs__foot {
   padding: 2px 0 0;
 }
+/* No widget yet: the popover is only «+ Виджет», so it is the button alone, without a 288 px frame around it. */
+.hx-wgs-wrap[data-pop]:has(.hx-wgs__list:empty) {
+  width: auto;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.hx-wgs-wrap[data-pop]:has(.hx-wgs__list:empty) .hx-wgs__foot {
+  padding: 0;
+}
+.hx-wgs-wrap[data-pop]:has(.hx-wgs__list:empty) .hx-wg-add {
+  opacity: 1;
+  background: var(--hx-bg-raised);
+  box-shadow: 0 0 0 1px var(--hx-border);
+}
 .hx-side-below > * + .hx-wgs-wrap {
   margin-top: 8px;
 }

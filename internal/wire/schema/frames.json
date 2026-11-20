@@ -10,7 +10,7 @@
     {"$ref": "#/$defs/HttpExchange"}
   ],
   "$defs": {
-    "Provider": {"enum": ["claude", "codex"]},
+    "Provider": {"enum": ["claude", "codex", "antigravity"]},
     "Feature": {
       "enum": [
         "queue", "steer", "questions", "permissions", "background", "model", "voice", "files", "checkpoints",

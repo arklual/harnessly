@@ -386,15 +386,16 @@ func TestViewSessions(t *testing.T) {
 func TestFrameURL(t *testing.T) {
 	m := &Manifest{Network: &Network{Frames: []string{"app.acme.test", "*.cdn.acme.test"}}}
 	for entry, ok := range map[string]bool{
-		"https://app.acme.test/view":      true,
-		"https://x.cdn.acme.test/":        true,
-		"https://evil.test/":              false,
-		"https://app.acme.test@evil.test": false,
-		"https://user:pw@app.acme.test/":  false,
-		"http://app.acme.test/":           false,
-		"javascript:alert(1)":             false,
-		"data:text/html,<script>":         false,
-		"https:///x":                      false,
+		"https://app.acme.test/view":          true,
+		"https://app.acme.test/view/{object}": true,
+		"https://x.cdn.acme.test/":            true,
+		"https://evil.test/":                  false,
+		"https://app.acme.test@evil.test":     false,
+		"https://user:pw@app.acme.test/":      false,
+		"http://app.acme.test/":               false,
+		"javascript:alert(1)":                 false,
+		"data:text/html,<script>":             false,
+		"https:///x":                          false,
 	} {
 		if _, got := m.FrameURL(entry); got != ok {
 			t.Errorf("%s: %v, want %v", entry, got, ok)

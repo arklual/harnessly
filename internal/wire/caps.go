@@ -27,16 +27,24 @@ const (
 	CapLinks Cap = "links"
 	// CapAppsSync: the page reads MachineStatusEv.AppsAt, the push of a change of the machine's installed apps.
 	CapAppsSync Cap = "appssync"
+	// CapMachineInfo: the page reads why a machine has no dictation (RuntimeInfo.VoiceOff) and where an agent's model
+	// list came from (MachineAgent.ModelCatalog), GitHub #122 and #124.
+	CapMachineInfo Cap = "machineinfo"
+	// CapAntigravity: the page knows the provider antigravity (GitHub #115): a conversation, an agent of the machine,
+	// a session or the origin of a handoff may name it. Any other page gets the machine and the lists without it.
+	CapAntigravity Cap = "antigravity"
 )
 
 // Caps is what a page reads.
 type Caps struct {
-	Delegation bool
-	Workflows  bool
-	Profiles   bool
-	MsgStatus  bool
-	Links      bool
-	AppsSync   bool
+	Delegation  bool
+	Workflows   bool
+	Profiles    bool
+	MsgStatus   bool
+	Links       bool
+	AppsSync    bool
+	MachineInfo bool
+	Antigravity bool
 }
 
 // CapsOf reads the caps a page named in its request's address; an unknown one is ignored.
@@ -47,16 +55,19 @@ func CapsOf(r *http.Request) Caps {
 	}
 	return Caps{Delegation: slices.Contains(names, string(CapDelegation)), Workflows: slices.Contains(names, string(CapWorkflows)),
 		Profiles: slices.Contains(names, string(CapProfiles)), MsgStatus: slices.Contains(names, string(CapMsgStatus)),
-		Links: slices.Contains(names, string(CapLinks)), AppsSync: slices.Contains(names, string(CapAppsSync))}
+		Links: slices.Contains(names, string(CapLinks)), AppsSync: slices.Contains(names, string(CapAppsSync)),
+		MachineInfo: slices.Contains(names, string(CapMachineInfo)), Antigravity: slices.Contains(names, string(CapAntigravity))}
 }
 
 // AllCaps reads every optional part.
-var AllCaps = Caps{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true, AppsSync: true}
+var AllCaps = Caps{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true, AppsSync: true, MachineInfo: true, Antigravity: true}
 
 // olderCaps is every Caps short of AllCaps that a page may have: the forms an event can go out in besides its own.
 // Each cap came with a build of the page that read the ones before it.
 var olderCaps = []Caps{{}, {Delegation: true}, {Delegation: true, Workflows: true}, {Delegation: true, Workflows: true, Profiles: true},
-	{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true}, {Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true}}
+	{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true}, {Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true},
+	{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true, AppsSync: true},
+	{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true, AppsSync: true, MachineInfo: true}}
 
 // eventFor is e as a page with caps gets it, and whether it differs from e.
 func eventFor(e Event, caps Caps) (Event, bool) {
@@ -93,7 +104,97 @@ func eventFor(e Event, caps Caps) (Event, bool) {
 			e, changed = st, true
 		}
 	}
+	if !caps.MachineInfo {
+		if st, ok := e.(MachineStatusEv); ok {
+			rt, rtCut := runtimeWithoutInfo(st.Runtime)
+			agents, agentsCut := agentsWithoutInfo(st.Agents)
+			if rtCut || agentsCut {
+				st.Runtime, st.Agents = rt, agents
+				e, changed = st, true
+			}
+		}
+	}
+	if !caps.Antigravity {
+		if old, ok := withoutAntigravity(e); ok {
+			e, changed = old, true
+		}
+	}
 	return e, changed
+}
+
+// withoutAntigravity is e as a page that does not know the provider antigravity gets it. Such a page never learned of
+// an antigravity conversation: its upsert is a removal of an id it does not hold (the seq stays without a gap).
+func withoutAntigravity(e Event) (Event, bool) {
+	switch e := e.(type) {
+	case ConversationUpsertEv:
+		if e.Conv.Provider == ProviderAntigravity {
+			return ConversationRemovedEv{ID: e.Conv.ID}, true
+		}
+		if conv, changed := convWithoutAntigravity(e.Conv); changed {
+			return ConversationUpsertEv{Conv: conv}, true
+		}
+	case MachineStatusEv:
+		if agents, cut := agentsWithoutAntigravity(e.Agents); cut {
+			e.Agents = agents
+			return e, true
+		}
+	}
+	return e, false
+}
+
+// convWithoutAntigravity is c without the origin that names antigravity.
+func convWithoutAntigravity(c Conversation) (Conversation, bool) {
+	if c.Origin != nil && c.Origin.FromProvider == ProviderAntigravity {
+		c.Origin = nil
+		return c, true
+	}
+	return c, false
+}
+
+func agentsWithoutAntigravity(as []MachineAgent) ([]MachineAgent, bool) {
+	isAg := func(a MachineAgent) bool { return a.Provider == ProviderAntigravity }
+	if !slices.ContainsFunc(as, isAg) {
+		return as, false
+	}
+	return slices.DeleteFunc(slices.Clone(as), isAg), true
+}
+
+// SessionsFor is the agent sessions as a page with caps reads them.
+func SessionsFor(list []AgentSession, caps Caps) []AgentSession {
+	if caps.Antigravity {
+		return list
+	}
+	return slices.DeleteFunc(slices.Clone(list), func(s AgentSession) bool { return s.Provider == ProviderAntigravity })
+}
+
+// runtimeWithoutInfo is r as a page without CapMachineInfo reads it; r itself is never changed.
+func runtimeWithoutInfo(r *RuntimeInfo) (*RuntimeInfo, bool) {
+	if r == nil || r.VoiceOff == "" {
+		return r, false
+	}
+	c := *r
+	c.VoiceOff = ""
+	return &c, true
+}
+
+// agentsWithoutInfo is as as a page without CapMachineInfo reads them; as itself is never changed.
+func agentsWithoutInfo(as []MachineAgent) ([]MachineAgent, bool) {
+	if !slices.ContainsFunc(as, func(a MachineAgent) bool { return a.ModelCatalog != nil }) {
+		return as, false
+	}
+	out := slices.Clone(as)
+	for i := range out {
+		out[i].ModelCatalog = nil
+	}
+	return out, true
+}
+
+// machineWithoutInfo is m as a page without CapMachineInfo reads it.
+func machineWithoutInfo(m Machine) (Machine, bool) {
+	rt, rtCut := runtimeWithoutInfo(m.Runtime)
+	agents, agentsCut := agentsWithoutInfo(m.Agents)
+	m.Runtime, m.Agents = rt, agents
+	return m, rtCut || agentsCut
 }
 
 // turnWithoutLinks is t without the outputs a page without CapLinks does not read; t's own slice is not changed.
@@ -319,6 +420,33 @@ func snapshotFor(f SnapshotFrame, caps Caps) SnapshotFrame {
 			}
 		}
 	}
+	if !caps.MachineInfo && f.Machine != nil {
+		if mm, cut := machineWithoutInfo(f.Machine.Machine); cut {
+			m := *f.Machine
+			m.Machine = mm
+			f.Machine = &m
+		}
+	}
+	if !caps.Antigravity {
+		if f.Convs != nil && slices.ContainsFunc(f.Convs.Conversations, func(c Conversation) bool {
+			_, changed := convWithoutAntigravity(c)
+			return changed || c.Provider == ProviderAntigravity
+		}) {
+			cs := *f.Convs
+			cs.Conversations = slices.DeleteFunc(slices.Clone(cs.Conversations), func(c Conversation) bool { return c.Provider == ProviderAntigravity })
+			for i := range cs.Conversations {
+				cs.Conversations[i], _ = convWithoutAntigravity(cs.Conversations[i])
+			}
+			f.Convs = &cs
+		}
+		if f.Machine != nil {
+			if agents, cut := agentsWithoutAntigravity(f.Machine.Machine.Agents); cut {
+				m := *f.Machine
+				m.Machine.Agents = agents
+				f.Machine = &m
+			}
+		}
+	}
 	if !caps.Links && f.Conv != nil {
 		if turns, cut := turnsWithoutLinks(f.Conv.Turns); cut {
 			cv := *f.Conv
@@ -346,6 +474,12 @@ func snapshotFor(f SnapshotFrame, caps Caps) SnapshotFrame {
 func MachineFor(m Machine, caps Caps) Machine {
 	if !caps.Profiles {
 		m.Agents, _ = agentsWithoutProfiles(m.Agents)
+	}
+	if !caps.MachineInfo {
+		m, _ = machineWithoutInfo(m)
+	}
+	if !caps.Antigravity {
+		m.Agents, _ = agentsWithoutAntigravity(m.Agents)
 	}
 	return m
 }

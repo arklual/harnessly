@@ -187,6 +187,19 @@ describe('v2 parser', () => {
   const refused = (frame: unknown) => expect(() => parseServerFrame(frame)).toThrow(ProtocolError);
 
   it('refuses an unknown frame', () => refused({ f: 'evt', t: 1 }));
+  it('reads a disk size past the safe integers as unknown, not as a broken frame (GitHub #119)', () => {
+    const load = {
+      at: 1,
+      cpu: 0.2,
+      memUsed: 1,
+      memTotal: 2,
+      diskFree: 2 ** 60,
+      diskTotal: 2 ** 64,
+      busyAgents: 0,
+    };
+    const f = parseServerFrame({ f: 'ev', ch: 'machine', seq: 1, e: { type: 'machine_load', load } });
+    expect(f).toMatchObject({ e: { load: { diskFree: 0, diskTotal: 0, memTotal: 2 } } });
+  });
   it('refuses a page frame from the runtime', () => refused({ f: 'ping', t: 1 }));
   it('refuses an unknown event', () =>
     refused({ f: 'ev', ch: 'convs', seq: 1, e: { type: 'conversation_moved', id: 'tab-a' } }));
@@ -565,7 +578,9 @@ describe('backend profiles', () => {
     expect(() => parsePage.login(bad)).toThrow(ProtocolError);
   });
   it('asks for the cap', () => {
-    expect(v2.CAPS_QUERY).toBe('caps=delegation,workflows,profiles,msgstatus,links,appssync');
+    expect(v2.CAPS_QUERY).toBe(
+      'caps=delegation,workflows,profiles,msgstatus,links,appssync,machineinfo,antigravity',
+    );
   });
 });
 

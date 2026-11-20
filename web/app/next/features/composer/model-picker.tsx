@@ -25,6 +25,7 @@ import {
   effortHint,
   effortLabel,
   unavailableNote,
+  catalogNote,
   modelLine,
   modelName,
   modelOf,
@@ -45,6 +46,7 @@ import { useNow } from '@/next/features/limits/limits-chip';
 import LimitsBrief from '@/next/features/limits/limits-brief';
 import { leftOf, windowShort, windowsOf, type LimitsView } from '@/next/features/limits/model';
 import Tooltip from '@/next/ui/tooltip';
+import { useOnePopover } from '@/next/ui/one-popover';
 import { usePresentFlag } from '@/next/ui/presence';
 import { useGlide } from '@/next/ui/use-glide';
 import type { IMachineChoice } from '@/next/features/sidebar/types';
@@ -238,6 +240,16 @@ const ModelPicker = ({
   const permissionWaits = permissionAsked !== null && permissionAsked !== permission ? permissionAsked : null;
   const permissionShown = permissionWaits ?? permission;
   const permissionHint = t('next.picker.permissionWaits');
+  // Which setting the segment is: a running chat keeps the mode it runs in, whatever the machine's default is now (#124).
+  const permissionScope = t(
+    locked
+      ? 'next.picker.permissionScope.session'
+      : value.permission
+        ? 'next.picker.permissionScope.chat'
+        : 'next.picker.permissionScope.machine',
+    { mode: t(`next.picker.permission.${permissionShown}`) },
+  );
+  const catalogLine = catalogNote(agent);
   // What a change sends keeps the asks of the other modes that still wait: a turn of one control does not take them back.
   const keep = {
     ...(fastWaits !== null ? { fast: fastWaits } : {}),
@@ -255,6 +267,7 @@ const ModelPicker = ({
     setOpen(false);
     window.setTimeout(() => setView(VIEW.effort), EXIT_MS);
   };
+  useOnePopover(open, close);
   const toggle = () => {
     if (open) {
       close();
@@ -506,6 +519,7 @@ const ModelPicker = ({
               {/* The depth's words are the slider's hint; a line stays only where there is no slider to hover. */}
               {(blocked || stops.length < 2) && <div className="hx-picker__hint">{hint()}</div>}
               <div className="hx-perm" data-frozen={frozen || undefined}>
+                <div className="hx-picker__hint">{permissionScope}</div>
                 <div
                   className="hx-perm__seg"
                   role="radiogroup"
@@ -524,7 +538,9 @@ const ModelPicker = ({
                       aria-checked={mode === permissionShown}
                       data-mode={mode}
                       title={t(`next.picker.permissionHint.${mode}`)}
-                      disabled={frozen}
+                      disabled={
+                        frozen || (value.provider === 'antigravity' && mode !== 'ask' && mode !== 'plan')
+                      }
                       onClick={() => {
                         if (mode !== permissionShown) onChange({ ...value, ...keep, permission: mode });
                       }}
@@ -762,6 +778,7 @@ const ModelPicker = ({
                 </div>
               </div>
               {multi && <div className="hx-picker__hint">{t('next.picker.multiHint')}</div>}
+              {catalogLine && <div className="hx-picker__hint">{catalogLine}</div>}
               {blocked && <div className="hx-picker__hint">{blocked}</div>}
             </div>
 

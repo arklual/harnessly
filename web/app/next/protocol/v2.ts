@@ -6,7 +6,7 @@
 
 // ---- closed lists, in the schema's order
 
-export const PROVIDERS = ['claude', 'codex'] as const;
+export const PROVIDERS = ['claude', 'codex', 'antigravity'] as const;
 export type Provider = (typeof PROVIDERS)[number];
 export const FEATURES = [
   'queue',
@@ -304,7 +304,16 @@ export const CLIENT_FRAME_KINDS = ['hello', 'sub', 'unsub', 'ping'] as const;
 /** The optional parts of the frames this page reads, named in its socket's address (?caps=…) and in the HTTP calls
  *  that carry them: the runtime sends them only to a page that names them, so a tab left on an older build never meets
  *  a field it refuses. Not in hello: a runtime older than the page refuses a field of hello it does not know. */
-export const CLIENT_CAPS = ['delegation', 'workflows', 'profiles', 'msgstatus', 'links', 'appssync'] as const;
+export const CLIENT_CAPS = [
+  'delegation',
+  'workflows',
+  'profiles',
+  'msgstatus',
+  'links',
+  'appssync',
+  'machineinfo',
+  'antigravity',
+] as const;
 /** CLIENT_CAPS as a query: `caps=…`. */
 export const CAPS_QUERY = `caps=${CLIENT_CAPS.join(',')}`;
 export type ClientFrameKind = (typeof CLIENT_FRAME_KINDS)[number];
@@ -479,6 +488,16 @@ export interface RuntimeInfo {
   version: string;
   proto: number;
   features: Feature[];
+  /** Why the machine has no dictation (no `voice` feature); absent where dictation is on or the runtime is older. */
+  voiceOff?: 'ffmpeg' | 'engine';
+}
+/** Source `models-cache`: the CLI's own cache; `static`: the list built into the runtime (no usable cache). */
+export interface ModelCatalog {
+  source: 'models-cache' | 'static';
+  /** When the CLI last refreshed its list (RFC 3339); null for the built-in one. */
+  fetchedAt: string | null;
+  /** The machine's reasons for a fallback. */
+  warnings: string[];
 }
 export interface MachineAgent {
   provider: Provider;
@@ -490,6 +509,8 @@ export interface MachineAgent {
   canSwitchModel: boolean;
   /** The permission mode a chat that names none starts in on this machine; absent where the machine does not say. */
   defaultPermission?: PermissionMode;
+  /** Where `models` came from on this machine (GitHub #124); absent where the runtime does not say. */
+  modelCatalog?: ModelCatalog;
   /** The vendor setups (Kimi, GLM, Grok) a conversation can start on through this CLI; absent where there are none,
    *  and for a page that does not name the `profiles` cap. Draw only the `configured` ones. */
   profiles?: ProfileOffer[];
@@ -1334,7 +1355,7 @@ export interface DirListing {
   /** The place of the workspace an absolute folder lies in: the crumbs go up to it. */
   root?: string;
 }
-/** GET /api/v2/conversations/{id}/file?path=: a UTF-8 text file of at most 1 MB, with the revision a save names. */
+/** GET /api/v2/conversations/{id}/file?path=: UTF-8 text up to 1 MB (16 MiB for notebooks), with its save revision. */
 export interface FileContent {
   path: string;
   content: string;
@@ -2332,6 +2353,11 @@ const seq: Decoder<number> = (v, p) => (int(v, p) >= 1 ? (v as number) : fail(p,
 const num: Decoder<number> = (v, p) =>
   typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : fail(p, 'not a number ≥ 0');
 const ms = int;
+/**
+ * An optional reading of the machine: a value outside the safe integers (a container's filesystem can report block
+ * counts that overflow) reads as 0, «unknown», instead of failing the frame and with it the socket (GitHub #119).
+ */
+const reading: Decoder<number> = (v) => (typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 ? v : 0);
 
 function constant<const V extends string | number | boolean>(c: V): Decoder<V> {
   return (v, p) => (v === c ? c : fail(p, `not ${JSON.stringify(c)}`));
@@ -2446,7 +2472,10 @@ const effort = oneOf(EFFORTS);
 const provider = oneOf(PROVIDERS);
 const feature = oneOf(FEATURES);
 
-const runtimeInfo: Decoder<RuntimeInfo> = object({ version: str, proto: int, features: array(feature) });
+const runtimeInfo: Decoder<RuntimeInfo> = object(
+  { version: str, proto: int, features: array(feature) },
+  { voiceOff: oneOf(['ffmpeg', 'engine'] as const) },
+);
 const agentModel: Decoder<AgentModel> = object(
   {
     id,
@@ -2476,7 +2505,15 @@ const machineAgent: Decoder<MachineAgent> = object(
     models: array(agentModel),
     canSwitchModel: bool,
   },
-  { defaultPermission: oneOf(PERMISSION_MODES), profiles: array(profileOffer) },
+  {
+    defaultPermission: oneOf(PERMISSION_MODES),
+    profiles: array(profileOffer),
+    modelCatalog: object({
+      source: oneOf(['models-cache', 'static'] as const),
+      fetchedAt: nullable(str),
+      warnings: array(str),
+    }),
+  },
 );
 const PROFILE_TAIL = /^….{4}$/u;
 const profileKey: Decoder<ProfileKey> = object({
@@ -2522,8 +2559,8 @@ const machineLoad: Decoder<MachineLoad> = object({
   cpu: num,
   memUsed: int,
   memTotal: int,
-  diskFree: int,
-  diskTotal: int,
+  diskFree: reading,
+  diskTotal: reading,
   busyAgents: int,
 });
 const machineHealth: Decoder<MachineHealth> = object(

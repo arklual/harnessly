@@ -5,6 +5,13 @@
 
 import { ROUTE, type TRoute } from '@/next/routes/routes';
 
+/**
+ * The machine an address names, if it names a real one. GitHub #121: `m=local` is the standalone runtime's id; the
+ * fleet workspace rejects it as a machine id, so it must not override the machine the chat or the shell knows.
+ */
+const namedMachine = (route: TRoute): string | null =>
+  route.kind === ROUTE.site && route.machine && route.machine !== 'local' ? route.machine : null;
+
 /** The chat a screen's address names, when the machine of the chat can decide where the screen is drawn. */
 export const screenChatOf = (route: TRoute): string | null =>
   (route.kind === ROUTE.site || route.kind === ROUTE.app || route.kind === ROUTE.review) && route.chat
@@ -21,7 +28,7 @@ export const CHAT_RECORD_WAIT_MS = 8_000;
  */
 export const screenWaits = (route: TRoute, chatMachine: string | null): boolean => {
   if (screenChatOf(route) === null || chatMachine) return false;
-  return !(route.kind === ROUTE.site && route.machine);
+  return namedMachine(route) === null;
 };
 
 /**
@@ -33,6 +40,7 @@ export const screenMachine = <M extends string>(
   chatMachine: string | null,
   active: M,
 ): M | string => {
-  if (route.kind === ROUTE.site && route.machine) return route.machine;
+  const named = namedMachine(route);
+  if (named !== null) return named;
   return screenChatOf(route) !== null && chatMachine ? chatMachine : active;
 };

@@ -375,6 +375,9 @@ func (s *Store) authorize(r *http.Request, coll string) (filestore.Access, error
 	if coll == filestore.KindResume {
 		return s.resumeAccess(r)
 	}
+	if coll == filestore.KindAppSet {
+		return s.appSetAccess(r)
+	}
 	m, err := s.sessionMachine(r)
 	if err != nil {
 		return filestore.Access{}, err

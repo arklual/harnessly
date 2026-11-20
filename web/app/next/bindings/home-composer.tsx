@@ -1,7 +1,7 @@
 // The start page's field: the first message creates a conversation on the active machine and opens it (spec §3,
 // conversation.create with `first`). The field is busy-free and the words stay in it until the machine has created
 // the chat; if it refuses, they are still there and the reason is on screen.
-import { anyKept, takeKept, uploadSrc } from '@/next/commands/uploads';
+import { uploadSrc } from '@/next/commands/uploads';
 import { AttachmentSrc } from '@/next/ui/attachment-thumb';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { uuidv7 } from '@/next/core/ids';
@@ -41,7 +41,7 @@ import {
   useMentions,
   withMentions,
 } from '@/next/stores/mentions';
-import { limitsOf } from '@/next/stores/machines';
+import { DEFAULT_LIMITS, limitsOf } from '@/next/stores/machines';
 import { useVoice } from '@/next/bindings/use-voice';
 import VoiceStart from '@/next/features/voice-live/voice-start';
 import { askVoiceStart } from '@/next/features/voice-live/field';
@@ -138,7 +138,7 @@ const HomeComposer = ({
   const [apps, setApps] = useState<string[]>([]);
   const mentions = useMentions(NEW_CHAT);
   const stash = useFieldStash(NEW_CHAT);
-  const uploads = useUploads(machine, NEW_CHAT, files);
+  const uploads = useUploads(machine, NEW_CHAT, files, true);
   const { notice: voiceNotice, insert, ...voice } = useVoice(machine, text, setText, read, NEW_CHAT);
   const takes = useTakesMenu(insert);
   const [creating, setCreating] = useState(false);
@@ -275,6 +275,12 @@ const HomeComposer = ({
       toast(t('next.newChat.connecting'), { tone: 'info' });
       return;
     }
+    // GitHub #117: the machine picked for the chat is off: the text and files stay, nothing goes to another machine.
+    const dest = machines?.choices.find((c) => c.id === machines.current);
+    if (dest?.off) {
+      toast(t('next.newChat.destOff', { machine: dest.name }), { tone: 'warning' });
+      return;
+    }
     if (queueWhenSilent && machine && onQueued) {
       queueFirst(machine, onQueued);
       return;
@@ -333,22 +339,10 @@ const HomeComposer = ({
       });
     }
 
-    // GitHub #112: a file attached while the machine was away is kept in the hub (hub:<sha>); the machine takes its copy
-    // before the first message goes, as a message of an open chat does. When it cannot, the draft stays and says so.
+    // GitHub #112: a file attached under a hub is in the hub's store (hub:<sha>); the machine that makes the chat
+    // takes its copy from there, so it does not matter which machine the chat lands on.
     function send(target: MachineId, place: NewConversation['where']) {
-      const ready = uploads.ready;
-      if (!anyKept(ready)) {
-        sendWith(target, place, ready);
-        return;
-      }
-      void takeKept(target, ready).then((got) => {
-        if (!got) {
-          setCreating(false);
-          toast(t('next.newChat.attachmentLost'), { tone: 'error' });
-          return;
-        }
-        sendWith(target, place, got);
-      });
+      sendWith(target, place, uploads.ready);
     }
 
     function sendWith(target: MachineId, place: NewConversation['where'], ready: readonly AttachmentRef[]) {
@@ -438,6 +432,7 @@ const HomeComposer = ({
     conversations,
     read,
     resolveProject,
+    machines,
     queueWhenSilent,
     onQueued,
     queueFirst,
@@ -551,13 +546,17 @@ const HomeComposer = ({
             attach={attach}
             apps={plainTalk ? null : plusApps}
             attachments={uploads.attachments}
-            onFiles={uploads.onFiles}
+            onFiles={
+              choice?.provider === 'antigravity'
+                ? () => toast(t('next.agents.noNativeAttachments'), { tone: 'info' })
+                : uploads.onFiles
+            }
             onRemoveAttachment={uploads.onRemove}
             onRetryAttachment={uploads.onRetry}
             tools={<VoiceStart machine={machine} busy={creating} onStart={startTalk} />}
             {...voice}
             limits={limits}
-            maxText={machine ? limitsOf(machine).maxText : 0}
+            maxText={(machine ? limitsOf(machine) : DEFAULT_LIMITS).maxText}
           />
         </div>
         {below}

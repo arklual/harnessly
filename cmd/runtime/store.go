@@ -179,6 +179,7 @@ func startAppsCenter(ctx context.Context, l *storelink.Link, dataDir string) fun
 			case <-time.After(30 * time.Second):
 			}
 		}
+		go runAppSet(run, l, dataDir)
 		apps.OpenStorage(dataDir).RunCenter(run, apps.HubLink{Client: l.Client(filestore.KindApps), Person: person,
 			Registry: apps.Open(dataDir), Host: env("AGENT_VERSION", agent.BuildVersion), Log: slog.Default()})
 	}()
@@ -294,4 +295,55 @@ func (l *limitedBuffer) Write(p []byte) (int, error) {
 	}
 	l.b = append(l.b, p...)
 	return len(p), nil
+}
+
+// appSetOn: the VM's apps are the person's set in the hub (docs/hub/apps-set.md). RUNTIME_APPS_SYNC=off keeps
+// the machine's apps to itself.
+func appSetOn() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("RUNTIME_APPS_SYNC"))) {
+	case "off", "false", "0", "no":
+		return false
+	}
+	return true
+}
+
+// appSetConsent: the rights the person agreed to on another VM are agreed on this one (RUNTIME_APPS_SYNC_CONSENT=off:
+// each VM asks).
+func appSetConsent() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("RUNTIME_APPS_SYNC_CONSENT"))) {
+	case "off", "false", "0", "no":
+		return false
+	}
+	return true
+}
+
+// runAppSet keeps the installed apps in step with the person's set in the hub's store; an older hub without the
+// collection is asked again every ten minutes.
+func runAppSet(ctx context.Context, l *storelink.Link, dataDir string) {
+	if !appSetOn() {
+		return
+	}
+	for l.MachineID() == "" {
+		if !sleepCtx(ctx, 30*time.Second) {
+			return
+		}
+	}
+	if err := l.Ready(ctx, 10*time.Minute); err != nil {
+		return
+	}
+	for told := false; ; {
+		if ok, err := l.Serves(ctx, filestore.KindAppSet); ok {
+			break
+		} else if !told {
+			slog.Info("apps: the hub's store has no apps set yet, the machine's apps stay its own", "err", err)
+			told = true
+		}
+		if !sleepCtx(ctx, 10*time.Minute) {
+			return
+		}
+	}
+	slog.Info("apps: the installed apps follow the person's set in the hub")
+	(&apps.AppSet{Reg: apps.Open(dataDir), Storage: apps.OpenStorage(dataDir), Room: l.Client(filestore.KindAppSet),
+		Machine: l.MachineID(), Host: env("AGENT_VERSION", agent.BuildVersion), CarryConsent: appSetConsent(),
+		Log: slog.Default()}).Run(ctx)
 }

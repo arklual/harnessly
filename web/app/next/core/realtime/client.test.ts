@@ -7,6 +7,7 @@ import {
   QUICK_RETRY_MS,
   STALE_MS,
   SUB_RETRY_MS,
+  UNREADABLE_FRAMES_PER_CHANNEL,
 } from '@/next/core/realtime/client';
 import { fixture, FakeRuntime, type FakeSocket } from '@/next/core/testing/fake-runtime';
 import { bootFake, settle, useFakeTime } from '@/next/core/testing/setup';
@@ -251,6 +252,46 @@ describe('RealtimeClient', () => {
     s.deliver({ f: 'error', ch: CH, code: 'not-found' });
     await vi.advanceTimersByTimeAsync(SUB_RETRY_MS[SUB_RETRY_MS.length - 1]);
     expect(subs(s).filter((f) => f.ch === CH).length).toBe(before + 1);
+  });
+
+  it('an unreadable frame of a chat asks for its snapshot whole instead of closing the socket (GitHub #118)', async () => {
+    const { rt, m } = await bootFake();
+    hub.openConversation(m, CONV);
+    await settle();
+    const s = lastSocket(rt);
+    const sockets = rt.opened.length;
+    const before = subs(s).filter((f) => f.ch === CH).length;
+    // A turn_finished with a live turn: the page's schema refuses it.
+    const bad = ev<Extract<ConvEvent, { type: 'turn_finished' }>>('ev.turn_finished');
+    rt.emit(CH, { ...bad, turn: { ...bad.turn, status: 'live' } } as unknown as ConvEvent);
+    await settle();
+    const again = subs(s).filter((f) => f.ch === CH);
+    expect(again).toHaveLength(before + 1);
+    // Whole, not a replay from before the frame that would bring it back.
+    expect(again.at(-1)).not.toHaveProperty('afterSeq');
+    expect(s.closed).toBe(false);
+    expect(rt.opened.length).toBe(sockets);
+    expect(conn(m).k).toBe('live');
+    rt.emit(CH, step(11));
+    expect(turnEntries()).toContain('x:30011#0');
+  });
+
+  it('starts the socket over when one channel keeps sending frames the page cannot read', async () => {
+    const { rt, m } = await bootFake();
+    hub.openConversation(m, CONV);
+    await settle();
+    const s = lastSocket(rt);
+    const bad = ev<Extract<ConvEvent, { type: 'turn_finished' }>>('ev.turn_finished');
+    for (let i = 0; i <= UNREADABLE_FRAMES_PER_CHANNEL; i += 1) {
+      s.deliver({
+        f: 'ev',
+        ch: CH,
+        seq: 1000 + i,
+        e: { ...bad, turn: { ...bad.turn, status: 'live' } },
+      } as never);
+    }
+    await settle();
+    expect(s.closed).toBe(true);
   });
 
   it('stops retrying on unauthorized', async () => {

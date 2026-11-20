@@ -3,11 +3,13 @@ package wire
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base32"
 	"encoding/json"
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -209,7 +211,7 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 		refuse(w, RefuseInternal)
 		return
 	}
-	out := AgentSessions(list)
+	out := AgentSessions(SessionsFor(list, CapsOf(r)))
 	if out == nil {
 		out = AgentSessions{}
 	}
@@ -259,6 +261,22 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request, parts []string) {
 			return
 		}
 		s.EntryOp(w, r, parts[0])
+		return
+	}
+	if len(parts) == 2 && parts[1] == "notebook" {
+		if !ValidConvID(parts[0]) {
+			refuse(w, RefuseBadRequest)
+			return
+		}
+		if r.Method != http.MethodGet && r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if s.Notebook == nil {
+			refuse(w, RefuseNotFound)
+			return
+		}
+		s.Notebook(w, r, parts[0])
 		return
 	}
 	saving := len(parts) == 2 && parts[1] == "file" && r.Method == http.MethodPut
@@ -481,6 +499,12 @@ func (s *Server) uploadFile(w http.ResponseWriter, r *http.Request, id string) {
 
 // Put stores one upload; size is the declared length, -1 when unknown.
 func (u *Uploads) Put(name, contentType string, size int64, body io.Reader) (AttachmentRef, RefuseCode) {
+	return u.PutAs(newUploadID(), name, contentType, size, body)
+}
+
+// PutAs is Put under an id the caller chose (an upload the machine takes from the hub keeps one id per file, see
+// HubUpload), so taking it again finds the file it took.
+func (u *Uploads) PutAs(id, name, contentType string, size int64, body io.Reader) (AttachmentRef, RefuseCode) {
 	name = filepath.Base(strings.TrimSpace(name))
 	if name == "" || name == "." || name == "/" || len(name) > 255 || !utf8.ValidString(name) {
 		return AttachmentRef{}, RefuseBadRequest
@@ -493,7 +517,7 @@ func (u *Uploads) Put(name, contentType string, size int64, body io.Reader) (Att
 		}
 		typ = mt
 	}
-	ref := AttachmentRef{ID: newUploadID(), Name: name, Kind: AttachmentFile, Mime: typ}
+	ref := AttachmentRef{ID: id, Name: name, Kind: AttachmentFile, Mime: typ}
 	limit := u.Limits.MaxFileBytes
 	if imageMimes[typ] {
 		ref.Kind, limit = AttachmentImage, u.Limits.MaxImageBytes
@@ -567,6 +591,43 @@ func (u *Uploads) Get(id string) (ref AttachmentRef, path string, ok bool) {
 		}
 	}
 	return ref, named, true
+}
+
+// HubUploadPrefix starts the id of an attachment the page put into the hub's store instead of a machine: the hub keeps
+// the bytes for every machine of the space, and the machine that runs the chat takes them when the message names them.
+const HubUploadPrefix = "hub:"
+
+// HubUpload is an attachment kept in the hub: the id is `hub:<sha256>` and may carry `?n=<name>&t=<mime type>`
+// (query-escaped), which is all the machine needs to make a file of it: the message carries only ids.
+type HubUpload struct{ Sha, Name, Mime string }
+
+var hubSha = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// ParseHubUpload reads the id of an attachment kept in the hub; false for any other id.
+func ParseHubUpload(id string) (HubUpload, bool) {
+	rest, ok := strings.CutPrefix(id, HubUploadPrefix)
+	if !ok {
+		return HubUpload{}, false
+	}
+	sha, query, _ := strings.Cut(rest, "?")
+	if !hubSha.MatchString(sha) {
+		return HubUpload{}, false
+	}
+	q, err := url.ParseQuery(query)
+	if err != nil {
+		return HubUpload{}, false
+	}
+	h := HubUpload{Sha: sha, Name: q.Get("n"), Mime: q.Get("t")}
+	if h.Name == "" {
+		h.Name = "attachment-" + sha[:8]
+	}
+	return h, true
+}
+
+// LocalID is the id the machine's copy of a hub upload has: the same file taken twice is one file here.
+func (h HubUpload) LocalID() string {
+	sum := sha256.Sum256([]byte(h.Sha + "\x00" + h.Name + "\x00" + h.Mime))
+	return "up_" + base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(sum[:10])
 }
 
 func newUploadID() string {

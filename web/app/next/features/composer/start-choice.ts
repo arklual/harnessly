@@ -31,7 +31,7 @@ export const readLastChoice = (): IModelChoice | null => {
     const raw: unknown = JSON.parse(localStorage.getItem(LAST_KEY) ?? 'null');
     if (typeof raw !== 'object' || raw === null) return null;
     const { provider, profile, model, effort, ultracode, fast, permission } = raw as Record<string, unknown>;
-    if (provider !== 'claude' && provider !== 'codex') return null;
+    if (provider !== 'claude' && provider !== 'codex' && provider !== 'antigravity') return null;
     return {
       provider,
       ...(typeof profile === 'string' ? { profile } : {}),
@@ -121,7 +121,7 @@ interface IStartInput {
   ready: readonly IPickerAgent[];
   picked: IModelChoice | null;
   /** Each agent's settings options, null while unread or unreadable. */
-  settings: Readonly<Record<Provider, readonly AgentOption[] | null>>;
+  settings: Readonly<Partial<Record<Provider, readonly AgentOption[] | null>>>;
   last: IModelChoice | null;
 }
 

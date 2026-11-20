@@ -6,6 +6,7 @@ import {
   type AgentModel,
   type Effort,
   type MachineAgent,
+  type ModelCatalog,
   type Model,
   type PermissionMode,
   type Provider,
@@ -30,6 +31,8 @@ export interface IPickerAgent {
   canSwitch: boolean;
   /** The permission mode a chat of it starts in when it names none (the machine's setting); absent: ask. */
   defaultPermission?: PermissionMode;
+  /** Where the model list came from on the machine (live cache or the built-in fallback); absent: not said. */
+  catalog?: ModelCatalog;
   /** Ready to run with known models; else its segment says why (not installed, not signed in). */
   available: boolean;
   status: AgentInstallStatus;
@@ -50,12 +53,28 @@ export interface IModelChoice {
   permission?: PermissionMode | null;
 }
 
+/** One line on where the machine's model list came from: its CLI's cache (and when), or the built-in fallback and why.
+ *  Null where the machine does not say, and for Claude Code's own aliases, which have no cache to be stale. */
+export const catalogNote = (agent: Pick<IPickerAgent, 'provider' | 'profile' | 'catalog'>): string | null => {
+  const c = agent.catalog;
+  if (!c || agent.profile) return null;
+  if (c.source === 'models-cache') {
+    const at = c.fetchedAt ? new Date(c.fetchedAt) : null;
+    return at && !Number.isNaN(at.getTime())
+      ? t('next.picker.catalog.cached', { when: at.toLocaleDateString() })
+      : t('next.picker.catalog.cachedUnknown');
+  }
+  if (agent.provider !== 'codex' && c.warnings.length === 0) return null;
+  return [t('next.picker.catalog.fallback'), ...c.warnings].join(' ');
+};
+
 export const effortLabel = (effort: Effort): string => t(`next.picker.effort.${effort}`);
 export const effortHint = (effort: Effort): string => t(`next.picker.effortHint.${effort}`);
 
 const NAMES: Record<Provider, { name: string; short: string }> = {
   claude: { name: 'Claude Code', short: 'Claude' },
   codex: { name: 'Codex', short: 'Codex' },
+  antigravity: { name: 'Antigravity', short: 'Antigravity' },
 };
 
 /** The profile a choice carries: nothing at all on Claude and Codex themselves. */
@@ -70,9 +89,14 @@ export const choiceAgentKey = (c: Pick<IModelChoice, 'provider' | 'profile'>): s
 const pickerAgent = (agent: MachineAgent): IPickerAgent => ({
   provider: agent.provider,
   ...NAMES[agent.provider],
-  models: agent.models,
-  canSwitch: agent.canSwitchModel,
+  ...(agent.provider === 'antigravity' ? { short: `Antigravity · ${t('next.agents.experimental')}` } : {}),
+  models:
+    agent.provider === 'antigravity'
+      ? agent.models.map((model) => ({ ...model, fast: false, ultracode: false }))
+      : agent.models,
+  canSwitch: agent.provider !== 'antigravity' && agent.canSwitchModel,
   ...(agent.defaultPermission ? { defaultPermission: agent.defaultPermission } : {}),
+  ...(agent.modelCatalog ? { catalog: agent.modelCatalog } : {}),
   available: agent.status === 'ready' && agent.models.length > 0,
   status: agent.status,
 });
@@ -107,7 +131,7 @@ export const modelLine = (agent: IPickerAgent, model: string | null): string => 
 
 /** The groups of the agent's profiles that have a key and models, after Claude and Codex. */
 const profileAgents = (agent: MachineAgent): IPickerAgent[] =>
-  (agent.profiles ?? [])
+  (agent.provider === 'antigravity' ? [] : (agent.profiles ?? []))
     .filter((p) => p.configured && p.models.length > 0)
     .map((p) => ({
       provider: agent.provider,
@@ -137,10 +161,11 @@ export const removedKeyOf = (
 };
 
 /** What signs an agent in on the machine, typed in a terminal there. */
-export const LOGIN_COMMANDS = { claude: 'claude auth login', codex: 'codex login' } as const satisfies Record<
-  Provider,
-  string
->;
+export const LOGIN_COMMANDS = {
+  claude: 'claude auth login',
+  codex: 'codex login',
+  antigravity: 'agy acp --login',
+} as const satisfies Record<Provider, string>;
 
 /** No agent of the machine can start a chat, and at least one is installed but signed out: the person has to sign in
  *  (a chat started now would wait for an agent that never answers). */
@@ -159,7 +184,10 @@ export const pickerAgentOf = (
   provider: Provider,
   profile: string | null = null,
 ): IPickerAgent | null => {
-  if (profile !== null) return pickerAgents(agents).find((a) => a.profile === profile) ?? null;
+  if (profile !== null)
+    return provider === 'antigravity'
+      ? null
+      : (pickerAgents(agents).find((a) => a.profile === profile) ?? null);
   const agent = agents.find((a) => a.provider === provider);
   return agent ? pickerAgent(agent) : null;
 };

@@ -39,7 +39,16 @@ type RuntimeInfo struct {
 	Version  string    `json:"version"`
 	Proto    int       `json:"proto"`
 	Features []Feature `json:"features"`
+	// VoiceOff says why the machine does not announce FeatureVoice: VoiceOffFFmpeg or VoiceOffEngine; empty when
+	// dictation is on (GitHub #122). Pages of an older build do not read it.
+	VoiceOff string `json:"voiceOff,omitempty"`
 }
+
+// The reasons of RuntimeInfo.VoiceOff.
+const (
+	VoiceOffFFmpeg = "ffmpeg" // ffmpeg was not found on the machine
+	VoiceOffEngine = "engine" // ffmpeg is there but the recognition service has no socket
+)
 
 // MachineAgent is one agent CLI on a machine: what it can be started with and whether a running one can change model.
 type MachineAgent struct {
@@ -57,6 +66,17 @@ type MachineAgent struct {
 	// Profiles are the vendor setups (Kimi, GLM, Grok) a conversation can start on through this CLI, each with its own
 	// models. Only a page that names the `profiles` cap gets them; absent where there are none.
 	Profiles []ProfileOffer `json:"profiles,omitempty"`
+	// ModelCatalog says where Models came from on this machine; absent where the machine does not say (GitHub #124).
+	ModelCatalog *ModelCatalog `json:"modelCatalog,omitempty"`
+}
+
+// ModelCatalog is where a machine's model list came from: Source "models-cache" (the CLI's own cache, read from its
+// file) or "static" (the list built into the runtime, because there is no usable cache). FetchedAt is when the CLI last
+// refreshed the cache (RFC 3339), nil for the built-in list. Warnings are the reasons the machine gives for a fallback.
+type ModelCatalog struct {
+	Source    string   `json:"source"`
+	FetchedAt *string  `json:"fetchedAt"`
+	Warnings  []string `json:"warnings"`
 }
 
 // AgentModel is one model of an agent CLI. Efforts are the reasoning efforts it takes, empty when it has no choice;
@@ -1712,6 +1732,19 @@ type TurnFailedEv struct {
 	Turn Turn `json:"turn"`
 }
 
+// TurnEndEv is the event that tells a turn's end: turn_failed for a failed turn, turn_finished for a done or an
+// interrupted one. A turn that has not ended (live) has no terminal event: the page refuses turn_finished with it, and a
+// replay of such a frame kept a tab reconnecting (GitHub #118). The snapshot carries that turn as it is.
+func TurnEndEv(t Turn) (Event, bool) {
+	switch t.Status {
+	case TurnFailed:
+		return TurnFailedEv{Turn: t}, true
+	case TurnDone, TurnInterrupted:
+		return TurnFinishedEv{Turn: t}, true
+	}
+	return nil, false
+}
+
 // QuotaExhaustedEv says the provider cannot accept another request on the current target. It is emitted once for the
 // failed turn; the conversation record carries the durable marker.
 type QuotaExhaustedEv struct {
@@ -2350,12 +2383,13 @@ func Refused(code RefuseCode) CmdResult { return CmdResult{R: ResultRefused, Cod
 type Provider string
 
 const (
-	ProviderClaude Provider = "claude"
-	ProviderCodex  Provider = "codex"
+	ProviderClaude      Provider = "claude"
+	ProviderCodex       Provider = "codex"
+	ProviderAntigravity Provider = "antigravity"
 )
 
 // Providers is every Provider, in the schema's order.
-var Providers = []Provider{ProviderClaude, ProviderCodex}
+var Providers = []Provider{ProviderClaude, ProviderCodex, ProviderAntigravity}
 
 // Feature is a capability a runtime announces in hello and welcome.
 type Feature string

@@ -27,7 +27,7 @@ import {
   waitsItsTurn,
 } from '@/next/commands/send-line';
 import { runCommand, type OpHandle } from '@/next/commands/run';
-import { anyKept, takeKept } from '@/next/commands/uploads';
+import { attachmentWireId } from '@/next/commands/uploads';
 import { connectionStore } from '@/next/stores/connection';
 import { limitsOf } from '@/next/stores/machines';
 import { conversationsStore } from '@/next/stores/conversations';
@@ -211,17 +211,7 @@ const isSendable = (m: MessageView): boolean => m.rev === 0 && m.state.k === 'su
 async function dispatch(clientId: ClientId): Promise<void> {
   const m = messagesStore.get(clientId);
   if (!m?.conversationId) return;
-  // what was attached while the machine was off is in the hub; the machine takes it before the message goes.
-  // A message without them goes in the same frame, as before.
-  const attachments = anyKept(m.attachments)
-    ? await takeKept(m.machineId, m.attachments)
-    : [...m.attachments];
-  if (!attachments) {
-    scheduleResend(clientId);
-    return;
-  }
-  // Taken back while its attachments were on their way.
-  if (messagesStore.get(clientId)?.cancelling) return;
+  // What is attached is on the machine, or in the hub's store, where the machine that runs the chat takes it from.
   unreached.delete(clientId);
   const handle = runCommand(
     m.machineId,
@@ -230,7 +220,7 @@ async function dispatch(clientId: ClientId): Promise<void> {
       clientId,
       conversationId: m.conversationId,
       text: m.text,
-      attachmentIds: attachments.map((a) => a.id),
+      attachmentIds: m.attachments.map(attachmentWireId),
       mode: m.mode,
       kind: m.kind,
       ...(m.refs && m.refs.length > 0 ? { refs: m.refs } : {}),

@@ -1519,3 +1519,14 @@ html[data-card-dragging='true'] {
     transform: translate(-50%, -6px);
   }
 }
+
+/* GitHub #123: the strip's labelled «chat only» action: the icon with its words, not a square button. */
+.hx-site__chat-only.hx-head-btn.hx-head-btn,
+.hx-strip .hx-head-btn.hx-site__chat-only {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  padding: 0 10px;
+  font-size: 12px;
+}

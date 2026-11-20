@@ -210,6 +210,9 @@ func (c *conv) setView(view json.RawMessage, now time.Time) wire.CmdResult {
 // brings it back with them; one at work keeps the apps it had until its terminal stops. The record carries the list to
 // the page and to the launch.
 func (c *conv) setApps(ids []string, now time.Time) wire.CmdResult {
+	if c.rec.Provider == wire.ProviderAntigravity {
+		return wire.Refused(wire.RefuseUnsupported)
+	}
 	if len(ids) > 0 {
 		if c.d.AppsOK == nil {
 			return wire.Refused(wire.RefuseUnsupported)
@@ -257,6 +260,9 @@ func (c *conv) terminalOff() bool { return c.d.TerminalOff != nil && c.d.Termina
 var longTextName = locale.Pick("whole-message.md", "сообщение-целиком.md")
 
 func (c *conv) send(m wire.SendCmd, now time.Time) wire.CmdResult {
+	if c.rec.Provider == wire.ProviderAntigravity && (len(m.AttachmentIDs) > 0 || m.Mode == wire.ModeSteer) {
+		return wire.Refused(wire.RefuseUnsupported)
+	}
 	if c.terminalOff() && chatguard.BashMode(m.Text) {
 		// A bash-mode line is a shell command to the agent, run without asking: the terminal's work, not the chat's.
 		return wire.Refused(wire.RefuseForbidden)
@@ -455,6 +461,9 @@ func (c *conv) keys(g *gate, work func(p typist.Pane) error, ok func(now time.Ti
 }
 
 func (c *conv) answer(device string, m wire.AnswerCmd, now time.Time) wire.CmdResult {
+	if c.rec.Provider == wire.ProviderAntigravity {
+		return wire.Refused(wire.RefuseUnsupported)
+	}
 	g, code := c.gateFor(m.QuestionID)
 	if code != "" {
 		return wire.Refused(code)
@@ -527,6 +536,9 @@ func answerKeys(items []wire.QuestionItem, answers []wire.QuestionAnswer) ([]scr
 }
 
 func (c *conv) decide(device string, m wire.DecideCmd, now time.Time) wire.CmdResult {
+	if c.rec.Provider == wire.ProviderAntigravity {
+		return wire.Refused(wire.RefuseUnsupported)
+	}
 	g, code := c.gateFor(m.PermissionID)
 	if code != "" {
 		return wire.Refused(code)

@@ -43,7 +43,6 @@ const QuickPanel = ({ quick, label, children }: IQuickPanelProps) => {
         label={label}
         className="hx-vq hx-sheet--pop"
       >
-        <h2 className="hx-vq__head">{label}</h2>
         {children}
       </Sheet>
     );
@@ -52,8 +51,19 @@ const QuickPanel = ({ quick, label, children }: IQuickPanelProps) => {
     <Popover.Root
       open={quick.open}
       onOpenChange={(next, details) => {
+        // Esc in a list goes back to the settings; the next one closes.
+        if (!next && details.reason === 'escape-key' && quick.sub !== null) {
+          details.cancel();
+          quick.setSub(null);
+          return;
+        }
         // A press on the button itself is its own gesture (a second right click closes): the button toggles.
-        if (!next && details.event.target instanceof Node && quick.anchor?.contains(details.event.target)) {
+        if (
+          !next &&
+          details.reason === 'outside-press' &&
+          details.event.target instanceof Node &&
+          quick.anchor?.contains(details.event.target)
+        ) {
           details.cancel();
           return;
         }
@@ -78,7 +88,6 @@ const QuickPanel = ({ quick, label, children }: IQuickPanelProps) => {
             initialFocus={popup}
             finalFocus={() => quick.anchor ?? true}
           >
-            <h2 className="hx-vq__head">{label}</h2>
             {children}
           </Popover.Popup>
         </Popover.Positioner>

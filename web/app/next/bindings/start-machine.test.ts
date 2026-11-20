@@ -60,13 +60,14 @@ describe('the machine a new chat starts on', () => {
     expect(startMachineOf([codexOnly], null, 'claude')).toBe('a');
   });
 
-  it('keeps a machine picked in the pill, even one that does not answer, but not one that is off', () => {
+  it('keeps a machine picked in the pill, also one that does not answer or is off (GitHub #117)', () => {
     expect(startMachineOf([cand('top'), cand('picked', { answers: false })], 'picked', 'claude')).toBe(
       'picked',
     );
     expect(
       startMachineOf([cand('top'), cand('picked', { off: true, answers: false })], 'picked', 'claude'),
-    ).toBe('top');
+    ).toBe('picked');
+    expect(startMachineOf([cand('top'), cand('b')], 'gone', 'claude')).toBe('top');
   });
 
   it('does not start on a machine the person only administers unless it is on top', () => {

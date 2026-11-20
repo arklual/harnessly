@@ -47,8 +47,9 @@ func (s *Store) writeTabChange(wsID string, layout *jsvalue.Object, sessionName 
 type Provider string
 
 const (
-	Claude Provider = "claude"
-	Codex  Provider = "codex"
+	Claude      Provider = "claude"
+	Codex       Provider = "codex"
+	Antigravity Provider = "antigravity"
 )
 
 // The conversation fields: Claude's are also kept under the older top-level keys.
@@ -90,7 +91,7 @@ func (p Provider) ensureState(tab *jsvalue.Object) *jsvalue.Object {
 // differs from every value, null included.
 func (p Provider) read(tab *jsvalue.Object, field string) (v any, defined bool) {
 	st := p.state(tab)
-	if p == Codex {
+	if p != Claude {
 		if st == nil {
 			return nil, true
 		}
@@ -328,6 +329,8 @@ func ProviderOfPanel(panelType any) Provider {
 		return Claude
 	case "codex-cli":
 		return Codex
+	case "antigravity-cli":
+		return Antigravity
 	}
 	return ""
 }

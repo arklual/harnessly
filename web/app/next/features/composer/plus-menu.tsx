@@ -19,6 +19,7 @@ import { onMenuKeys } from '@/next/ui/context-menu';
 import Icon from '@/next/ui/icon';
 import Popover from '@/next/ui/popover';
 import Sheet from '@/next/ui/sheet';
+import { useOnePopover } from '@/next/ui/one-popover';
 import { usePhone } from '@/next/ui/use-media';
 import { useCoverField } from '@/next/stores/field-cover';
 import { t } from '@/next/i18n';
@@ -138,6 +139,7 @@ const PlusMenu = ({
     (node: HTMLInputElement | null) => setPickers((all) => ({ ...all, file: node })),
     [],
   );
+  useOnePopover(open, () => setOpen(false));
   const binders = { photo: bindPhoto, camera: bindCamera, file: bindFile };
   // Every opening starts at the menu; the picker that was open stays drawn while the panel leaves.
   const toggle = (next: boolean) => {

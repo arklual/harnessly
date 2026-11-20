@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BOARDS_APP, boardPlaceOf } from '@/next/features/pane/board-link';
-import { placeAppObject, type IPaneTabs } from '@/next/features/pane/pane-tabs';
+import { placeAppObject, placeRequest, type IPaneTabs } from '@/next/features/pane/pane-tabs';
 import type { IInstalledApp } from '@/next/features/app-views/api';
 
 const config = { boardsUrl: 'https://portal.example.com' };
@@ -64,6 +64,17 @@ describe('placeAppObject', () => {
   const empty: IPaneTabs = { tabs: [], active: '', unread: [] };
   let n = 0;
   const ctx = { busy: false, cwd: '/w/', nextId: () => `t${++n}` };
+
+  it('places an object carried by an app target', () => {
+    const placed = placeRequest(
+      empty,
+      { k: 'app', target: `${BOARDS_APP}/board/one`, reload: false },
+      { ...ctx, nextId: () => 'object-1' },
+    );
+    expect(placed.next.tabs).toEqual([
+      { id: 'object-1', kind: 'app', app: BOARDS_APP, view: 'board', object: 'one' },
+    ]);
+  });
 
   it('a new tab on the board, then the same tab on another board', () => {
     const first = placeAppObject(empty, BOARDS_APP, 'board', 'one', ctx);

@@ -1,8 +1,9 @@
 // Workspaces, panes and tabs as the runtime keeps them (GET /api/workspace, /api/layout).
 import type { TCliState } from '@/types/timeline';
 
-export type TPanelType = 'terminal' | 'claude-code' | 'codex-cli' | 'agent-sessions' | 'web-browser' | 'diff';
-export type TAgentProvider = 'claude' | 'codex';
+export type TPanelType =
+  'terminal' | 'claude-code' | 'codex-cli' | 'antigravity-cli' | 'agent-sessions' | 'web-browser' | 'diff';
+export type TAgentProvider = 'claude' | 'codex' | 'antigravity';
 
 export interface IWorkspace {
   id: string;

@@ -28,7 +28,7 @@ import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
 import { Skeleton } from '@/next/ui/skeleton';
 
 /** Where each CLI keeps the address its requests go to. */
-const BASE_URL_AT: Readonly<Record<Provider, string>> = {
+const BASE_URL_AT: Readonly<Partial<Record<Provider, string>>> = {
   claude: 'ANTHROPIC_BASE_URL',
   codex: 'openai_base_url',
 };
@@ -47,9 +47,9 @@ export const isProxyUrl = (value: string): boolean => {
 const WHERE = { direct: 'direct', proxy: 'proxy' } as const;
 
 export type AccountCard =
-  | { provider: Provider; k: 'loading' }
-  | { provider: Provider; k: 'failed'; text: string }
-  | { provider: Provider; k: 'ready'; settings: AgentSettings };
+  | { provider: Exclude<Provider, 'antigravity'>; k: 'loading' }
+  | { provider: Exclude<Provider, 'antigravity'>; k: 'failed'; text: string }
+  | { provider: Exclude<Provider, 'antigravity'>; k: 'ready'; settings: AgentSettings };
 
 /** What the card of an agent takes and does with its credentials. */
 export interface IAgentCredentials extends ICredentialActions {
@@ -76,7 +76,7 @@ export interface IAccountsSectionProps {
   /** The keys of the cloud recognition models. */
   speech: SpeechCards;
   /** Opens the agent's page, where it is signed in. */
-  onOpen: (provider: Provider) => void;
+  onOpen: (provider: AccountCard['provider']) => void;
   /** What is left of each account's subscription, as the machine says it; absent or null while it has not. */
   limits?: MachineLimits | null;
   /** What each account spent (the machine's report); absent or null while it has not said. */

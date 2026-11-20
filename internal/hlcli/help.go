@@ -304,7 +304,7 @@ OPTIONS (anywhere on the line)
   -w, --workspace ID    the workspace to act in (default: the one your own tab belongs to)
   --json                print the runtime's answer as JSON
 
-Hand a task to another agent as a nested chat: the MCP tool delegate_task, or "tab create -t claude-code|codex-cli
+Hand a task to another agent as a nested chat: the MCP tool delegate_task, or "tab create -t claude-code|codex-cli|antigravity-cli
 --prompt TEXT" - both make a chat under yours that the person sees, with the platform's hooks and state, that you can
 read and be woken by. Do not type a "claude ..." or "codex ..." command into a shell tab with "tab send": it starts
 without the hooks and its state is unreliable.
@@ -370,6 +370,19 @@ the icon beside it downloads the file. The right pane opens it by itself once.
 Deliver only a file the person asked to receive ("put it in a zip", "send me the docx"), not every file you wrote or
 changed: those stay in the Files tab and make no card. The file must lie inside the workspace (or /tmp).
 Run it again after you change the file, to hand over the new version.
+`,
+	"antigravity": `harnessly antigravity prepare [--json]
+
+Prepare a fresh official Antigravity plugin containing native lifecycle hooks and the host's stdio MCP bridge.
+No plugin is installed and no user or project configuration is modified. The result prints an explicit
+agy plugin install command; installation is a separate action. The updated harnessly executable must remain
+at its path while the plugin is installed. Native chats are experimental and require deployment setup;
+Antigravity image generation remains independently selectable.
+`,
+	"antigravity-mcp": `harnessly antigravity-mcp
+
+Internal stdio transport, only for a bound Harnessly Antigravity launch with a launch-scoped token file.
+Never put bearer tokens in the official MCP configuration or call this outside a managed launch.
 `,
 	"app": `harnessly app <subcommand> [--help]
 
@@ -494,10 +507,10 @@ and the setting changes only after they say yes: the command waits (--wait secon
   harnessly tab send <tab id> "also check the tests"
   harnessly tab close <tab id>
 
-The tab id is the first column of "tab list" and what "tab create" prints. Types: terminal, claude-code, codex-cli,
+The tab id is the first column of "tab list" and what "tab create" prints. Types: terminal, claude-code, codex-cli, antigravity-cli,
 agent-sessions, web-browser, diff (claude and codex are accepted for the agents).
 
-Handing work to an agent: "tab create -t claude-code|codex-cli --prompt TEXT" run in a chat's terminal starts the agent
+Handing work to an agent: "tab create -t claude-code|codex-cli|antigravity-cli --prompt TEXT" run in a chat's terminal starts the agent
 as a chat nested under that chat, exactly as the MCP tool delegate_task does. The person sees it under your chat, the
 agent has the platform's hooks and workspace prompt, and you get its answer back: with --notify the runtime wakes your
 chat with it when the agent finishes a turn; without it, read it with "tab result <id>" (the screen) or, over MCP,

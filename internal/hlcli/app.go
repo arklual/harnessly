@@ -308,7 +308,7 @@ func (c *cli) appInstall(args []string, dev bool) error {
 	if !c.json {
 		how := "installed"
 		if out.App.Dev {
-			how = "installed for development (the folder itself: a chat started after an edit gets it)"
+			how = "installed for development (the folder itself: a chat started after an edit gets it; this VM only, a dev install is not synced to the person's other VMs: harnessly app install makes it theirs everywhere)"
 		}
 		if out.WaitsConsent {
 			// The CLI is every agent's too: what an app may do is agreed to only by a click in the page.
@@ -317,6 +317,9 @@ func (c *cli) appInstall(args []string, dev bool) error {
 			return nil
 		}
 		c.out("%s %s %s\nturn it on in this chat: harnessly app enable %s\n", how, out.App.ID, out.App.Version, out.App.ID)
+		if !out.App.Dev {
+			c.out("with a hub, it is the person's on every VM of theirs: the others install it from the hub within minutes (settings, on/off and removal follow too)\n")
+		}
 		if out.ConsentPolicy {
 			c.out("its rights were given by the organization's rule «Не спрашивать разрешений», without asking the person\n")
 		}
@@ -342,7 +345,7 @@ func (c *cli) appList() error {
 	for _, a := range out.Apps {
 		dev := ""
 		if a.Dev {
-			dev = "\tdev " + a.Dir
+			dev = "\tdev " + a.Dir + " (this VM only)"
 		}
 		c.out("%s\t%s\t%s\t%s%s\n", a.ID, a.Version, a.Name, strings.Join(a.Targets, ","), dev)
 	}

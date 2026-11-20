@@ -285,10 +285,10 @@
    "status": 400,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"RAn_blXLpwM8nlr2Aybxx5byZJE\"",
-    "content-length": "124"
+    "etag": "\"cpXFkof6vDlgrBVqD1ym6C14LgE\"",
+    "content-length": "142"
    },
-   "answer": "{\"error\":\"Invalid panelType\",\"validPanelTypes\":[\"terminal\",\"claude-code\",\"codex-cli\",\"agent-sessions\",\"web-browser\",\"diff\"]}"
+   "answer": "{\"error\":\"Invalid panelType\",\"validPanelTypes\":[\"terminal\",\"claude-code\",\"codex-cli\",\"antigravity-cli\",\"agent-sessions\",\"web-browser\",\"diff\"]}"
   },
   {
    "method": "POST",

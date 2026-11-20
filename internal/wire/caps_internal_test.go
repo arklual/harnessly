@@ -183,7 +183,7 @@ func TestAnOlderPageGetsAStallAsAnUnconfirmedFailure(t *testing.T) {
 // reads again.
 func TestAppsAtGoesOnlyToAPageThatReadsIt(t *testing.T) {
 	ev := MachineStatusEv{Reach: ReachOnline, Agents: []MachineAgent{}, AppsAt: 1_792_656_000_000}
-	old, changed := eventFor(ev, Caps{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true})
+	old, changed := eventFor(ev, Caps{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true, MachineInfo: true})
 	if !changed || old.(MachineStatusEv).AppsAt != 0 || old.(MachineStatusEv).Reach != ReachOnline {
 		t.Fatalf("a page without the cap: %+v changed=%v", old, changed)
 	}
@@ -195,11 +195,72 @@ func TestAppsAtGoesOnlyToAPageThatReadsIt(t *testing.T) {
 	}
 	// Every older form of the page that has the caps before this one is in the hub's list.
 	last := olderCaps[len(olderCaps)-1]
-	if !last.Links || last.AppsSync {
+	if !last.MachineInfo || last.Antigravity {
 		t.Fatalf("the newest older form: %+v", last)
 	}
 	b, err := Marshal(EvFrame{Ch: ChannelMachine, Seq: 1, E: old})
 	if err != nil || strings.Contains(string(b), "appsAt") {
 		t.Fatalf("%s %v", b, err)
+	}
+}
+
+// GitHub #122, #124: why dictation is off and where the models came from reach only a page that reads them; an open tab
+// of an older build gets the same machine without them instead of a frame it refuses.
+func TestMachineInfoCap(t *testing.T) {
+	at := "2026-11-20T10:00:00Z"
+	rt := &RuntimeInfo{Version: "1", Proto: Proto, Features: []Feature{}, VoiceOff: VoiceOffFFmpeg}
+	agents := []MachineAgent{{Provider: "codex", ModelCatalog: &ModelCatalog{Source: "models-cache", FetchedAt: &at, Warnings: []string{}}}}
+	ev := MachineStatusEv{Reach: ReachOnline, Runtime: rt, Agents: agents}
+	older := AllCaps
+	older.MachineInfo = false
+	old, changed := eventFor(ev, older)
+	st := old.(MachineStatusEv)
+	if !changed || st.Runtime.VoiceOff != "" || st.Agents[0].ModelCatalog != nil {
+		t.Fatalf("a page without the cap: %+v changed=%v", st, changed)
+	}
+	if rt.VoiceOff == "" || agents[0].ModelCatalog == nil {
+		t.Fatal("the event's own values were changed")
+	}
+	if _, changed := eventFor(ev, AllCaps); changed {
+		t.Fatal("a page with the cap is given the event as it is")
+	}
+	m := MachineFor(Machine{Runtime: rt, Agents: agents}, older)
+	if m.Runtime.VoiceOff != "" || m.Agents[0].ModelCatalog != nil {
+		t.Fatalf("machine for an older page: %+v", m)
+	}
+	snap := snapshotFor(SnapshotFrame{Machine: &MachineSnapshot{Machine: Machine{Runtime: rt, Agents: agents}}}, older)
+	if snap.Machine.Machine.Runtime.VoiceOff != "" || snap.Machine.Machine.Agents[0].ModelCatalog != nil {
+		t.Fatalf("snapshot for an older page: %+v", snap.Machine.Machine)
+	}
+}
+
+// GitHub #115: the provider antigravity reaches only a page that names the cap; an older page never meets the value.
+func TestAntigravityCap(t *testing.T) {
+	older := AllCaps
+	older.Antigravity = false
+	up := ConversationUpsertEv{Conv: Conversation{ID: "c1", Provider: ProviderAntigravity}}
+	old, changed := eventFor(up, older)
+	if rm, ok := old.(ConversationRemovedEv); !changed || !ok || rm.ID != "c1" {
+		t.Fatalf("an upsert for an older page: %+v changed=%v", old, changed)
+	}
+	if _, changed := eventFor(up, AllCaps); changed {
+		t.Fatal("a page with the cap is given the event as it is")
+	}
+	st := MachineStatusEv{Reach: ReachOnline, Agents: []MachineAgent{{Provider: ProviderClaude}, {Provider: ProviderAntigravity}}}
+	old, changed = eventFor(st, older)
+	if got := old.(MachineStatusEv).Agents; !changed || len(got) != 1 || got[0].Provider != ProviderClaude || len(st.Agents) != 2 {
+		t.Fatalf("a status for an older page: %+v", got)
+	}
+	m := MachineFor(Machine{Agents: st.Agents}, older)
+	if len(m.Agents) != 1 {
+		t.Fatalf("machine for an older page: %+v", m.Agents)
+	}
+	snap := snapshotFor(SnapshotFrame{Convs: &ConvsSnapshot{Conversations: []Conversation{{ID: "a", Provider: ProviderAntigravity}, {ID: "b", Provider: ProviderCodex}}}}, older)
+	if len(snap.Convs.Conversations) != 1 || snap.Convs.Conversations[0].ID != "b" {
+		t.Fatalf("snapshot for an older page: %+v", snap.Convs.Conversations)
+	}
+	ss := SessionsFor([]AgentSession{{Provider: ProviderAntigravity}, {Provider: ProviderClaude}}, older)
+	if len(ss) != 1 || ss[0].Provider != ProviderClaude {
+		t.Fatalf("sessions for an older page: %+v", ss)
 	}
 }

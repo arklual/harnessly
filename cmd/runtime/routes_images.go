@@ -17,7 +17,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/imagegen"
 )
 
-// Pictures drawn by Codex (internal/imagegen): the jobs an agent's generate_images, a Sinopia design or the page
+// Pictures drawn by agent CLIs (internal/imagegen): the jobs an agent's generate_images, a Sinopia design or the page
 // start, and `<platform>/images` that lists, reads and starts them. The pictures themselves are files the viewer
 // shows (`<platform>/file-preview?path=`): the jobs' folder and Codex's own are among its roots.
 
@@ -43,11 +43,14 @@ func imageJobs(d deps) *imagegen.Service {
 	imageJobsOnce.Do(func() {
 		envDir := agentEnvDir(d.DataDir)
 		imageJobsSvc = &imagegen.Service{
-			Dir:       imagesDir(d),
-			CodexHome: env("CODEX_HOME", filepath.Join(d.Home, ".codex")),
-			// RUNTIME_IMAGEGEN_BIN replaces `codex` for pictures: an eval stand draws with a fake (docs/agent-evals.md).
-			Binary: os.Getenv("RUNTIME_IMAGEGEN_BIN"),
-			Env:    func() []string { return withAgentEnv(os.Environ(), envDir, agents.Codex) },
+			Dir:               imagesDir(d),
+			Binary:            os.Getenv("RUNTIME_IMAGEGEN_BIN"),
+			CodexHome:         env("CODEX_HOME", filepath.Join(d.Home, ".codex")),
+			Env:               func() []string { return withAgentEnv(os.Environ(), envDir, agents.Codex) },
+			DefaultProvider:   imagegen.Provider(env("RUNTIME_IMAGE_PROVIDER", "codex")),
+			AntigravityBinary: env("RUNTIME_ANTIGRAVITY_BIN", "agy"),
+			// ACP manages its own Google login; do not give it Codex's provider-specific environment.
+			AntigravityEnv: os.Environ,
 		}
 
 	})

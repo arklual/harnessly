@@ -1,0 +1,31 @@
+id: picture-provider-default
+title: «Нарисуй…» — генератор по умолчанию, Antigravity только по имени
+tags: [pictures]
+covers:
+  - 'internal/imagegen/tools.go'
+  - 'internal/imagegen/imagegen.go'
+  - 'internal/hlcli/antigravity_*.go'
+  - 'internal/hlcli/help.go'
+  - 'internal/hlcli/hlcli.go'
+prompt: нарисуй иконку для приложения с погодой
+expect:
+  - name: drew with the picture tool
+    called: harnessly\.generate_images
+  - name: kept the default generator
+    not_called: harnessly\.generate_images
+    args: {provider: '(?i)antigravity'}
+  - name: did not prepare the Antigravity plugin
+    not_called: Bash
+    args: {command: '(?i)antigravity|agy '}
+  - name: the picture reached the chat
+    images: 1
+variants:
+  - id: v1
+    kind: short
+    text: "иконка погоды, нарисуй"
+  - id: v2
+    kind: english
+    text: "draw an app icon for a weather app"
+  - id: v3
+    kind: formal
+    text: "Пожалуйста, сгенерируйте иконку для погодного приложения."

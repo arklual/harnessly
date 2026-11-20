@@ -20,6 +20,14 @@ describe('screen-machine: a chat does not depend on the machine active in the sh
     expect(screenMachine({ kind: ROUTE.kit, id: 'k', chat: 'tab-a' }, 'vm2', 'vm1')).toBe('vm1');
   });
 
+  it('does not let m=local override the real machine (GitHub #121)', () => {
+    const route = { kind: ROUTE.site, id: 'd', chat: 'tab-a', machine: 'local' } as const;
+    expect(screenMachine(route, 'vm2', 'vm1')).toBe('vm2');
+    expect(screenMachine(route, null, 'vm1')).toBe('vm1');
+    expect(screenWaits(route, null)).toBe(true);
+    expect(screenWaits(route, 'vm2')).toBe(false);
+  });
+
   it('names the chat of a design or app screen only', () => {
     expect(screenChatOf({ kind: ROUTE.site, id: 'd', chat: 'tab-a' })).toBe('tab-a');
     expect(screenChatOf({ kind: ROUTE.site, id: 'd' })).toBeNull();

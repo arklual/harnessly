@@ -74,6 +74,9 @@ var (
 
 // Read classifies a styled capture of an agent's pane.
 func Read(styled string, provider wire.Provider) Screen {
+	if provider == wire.ProviderAntigravity {
+		return readAntigravity(styled)
+	}
 	st := screen.Read(styled)
 	s := Screen{Readable: true, Plain: st.Plain, Busy: st.Busy, Panel: st.Panel, Input: st.Input, InputLine: st.InputLine,
 		styled: styled}

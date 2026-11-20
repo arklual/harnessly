@@ -210,7 +210,7 @@ func TestStandaloneAgentsStartWithNoProductEnv(t *testing.T) {
 		}
 	}
 	waitFor("both claudes to start with the hooks", 30*time.Second, func() bool {
-		return strings.Count(read(filepath.Join(home, "claude-calls.log")), "--settings "+filepath.Join(data, "hooks.json")) >= 2
+		return standaloneClaudeHookStarts(read(filepath.Join(home, "claude-calls.log")), data) >= 2
 	})
 
 	// Control keys: Ctrl-C ends a running command, so the next line runs at once; as text it would be typed.

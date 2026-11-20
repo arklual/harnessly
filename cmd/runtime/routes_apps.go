@@ -329,7 +329,7 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			}
 			v := viewOfApp(a, withDir)
 			if a.Manifest != nil && len(a.Manifest.Secrets) > 0 {
-				store := safeFor(d).store.Local // an app's secrets stay in the file
+				store := safeFor(d).store.Local // an app's secrets: the file, mirrored to the shared safe (HRN-1717)
 				v.Waiting = a.Manifest.WaitingFor(func(name string) bool { return store.HasApp(a.ID, name) })
 			}
 			v.WaitingConnections = waitingConnections(mcpFor(d), reg, a)
@@ -848,7 +848,7 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			in.App = &a
 			in.ViewLog, _ = reg.ViewLog(id, apps.ViewLogMax)
 			if a.Manifest != nil && len(a.Manifest.Secrets) > 0 {
-				store := safeFor(d).store.Local // an app's secrets stay in the file
+				store := safeFor(d).store.Local // an app's secrets: the file, mirrored to the shared safe (HRN-1717)
 				in.Waiting = a.Manifest.WaitingFor(func(name string) bool { return store.HasApp(a.ID, name) })
 			}
 		}

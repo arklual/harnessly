@@ -148,6 +148,7 @@ const placeApp = (state: IPaneTabs, target: string | null, ctx: IPlaceContext): 
   const named = parseAppTarget(target);
   // «open app» with no app, or with a name that is not one, only brings the pane out.
   if (named === null) return { next: state, effect: null, show: true };
+  if (named.object) return placeAppObject(state, named.app, named.view, named.object, ctx);
   const have = state.tabs.find(
     (x) => x.kind === 'app' && x.app === named.app && (named.view === null || x.view === named.view),
   );

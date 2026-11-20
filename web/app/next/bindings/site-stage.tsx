@@ -414,7 +414,24 @@ const DesignChat = ({ picked, designDraft, onOpenChat, onPickChat, open, ...rest
         />
       </ChatOpener.Provider>
     );
+  if (picked.k === DESIGN_CONV.away) return <AwayChat id={picked.id} />;
   return <NewDesignChat draftKey={designDraft} {...rest} />;
+};
+
+/** GitHub #121: the chat of the address is not on this machine; its state, and a way to open it where it is. */
+const AwayChat = ({ id }: { id: string }) => {
+  const conv = useConversation(id as ConvId);
+  return (
+    <div className="hx-notice" data-level="warn">
+      <Icon name="info" size="sm" />
+      <span>
+        {conv ? t('next.site.awayChat', { machine: conv.machineId }) : t('next.site.awayChatUnknown')}
+      </span>
+      <button type="button" className="hx-btn" onClick={() => goTo({ kind: ROUTE.chat, id })}>
+        {t('next.site.awayChatOpen')}
+      </button>
+    </div>
+  );
 };
 
 /** The leaving chat's fade before the next one, as .hx-site__conv[data-swap] in site.css. */
@@ -957,6 +974,7 @@ export const useSiteStage = ({
     onStyled: setGoneBlocks,
     sview,
     onSview: setSview,
+    onToChat: convId ? openChatPage : undefined,
     // A line of the page's tools lands in the field, after what is typed there; the field opens to show it.
     onAttach: (words) => {
       setText(text.trim() === '' ? words : `${text.trimEnd()}\n${words}`);

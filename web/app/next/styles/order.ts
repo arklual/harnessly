@@ -64,6 +64,7 @@ import '@/next/styles/pdf-view.css';
 import '@/next/styles/image-edit.css';
 import '@/next/styles/sheet-view.css';
 import '@/next/styles/docx-view.css';
+import '@/next/styles/notebook.css';
 import '@/next/styles/pptx-view.css';
 import '@/next/styles/video-timeline.css';
 import '@/next/styles/video-overlays.css';

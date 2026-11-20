@@ -9,7 +9,7 @@ import { LoadRow } from '../../charts/spark';
 import { Btn, Drawer, Icon } from '../../ui';
 import { AccessSection } from './access';
 import { BuilderSection } from './builder';
-import { canOpen, cardSub, cleanName, statusOf } from './calc';
+import { canOpen, cardSub, cleanName, readiness, readyHeadline, statusOf } from './calc';
 import { MachineDialogs } from './dialogs';
 import { DebugLog, DebugPanel } from './debug';
 import { type OpenMachine, useOpenMachine } from './open';
@@ -124,13 +124,19 @@ export const MachineDrawer = ({
           () => setReapply('fail'),
         );
     };
+    const opened = ws.error?.id === id && !ws.error.ownWork ? ws.error : null;
+    const ready = readiness(m, setup, opened, now);
+    const headline = readyHeadline(ready);
     const pill =
       st.st === 'busy'
         ? { cls: 'info', label: st.label }
         : st.st === 'on'
           ? m.runnerOutdated
             ? { cls: 'warn', label: 'Нужно обновить' }
-            : { cls: 'ok', label: 'Готова к чатам' }
+            : {
+                cls: headline === 'Готова к чатам' ? 'ok' : 'warn',
+                label: headline === 'Готова к чатам' ? headline : 'Агент на связи',
+              }
           : { cls: st.st === 'off' ? 'bad' : '', label: st.label };
     const chatsLine = m.chats
       ? `${m.chats} ${plural(m.chats, 'чат идёт', 'чата идут', 'чатов идут')} сейчас`
@@ -229,7 +235,7 @@ export const MachineDrawer = ({
         <div className="fixbox ok">
           <div className="row sp">
             <div>
-              <b>{st.label === 'Простаивает' ? 'Простаивает' : 'Готова к чатам'}</b>
+              <b>{st.label === 'Простаивает' ? 'Простаивает' : headline}</b>
               <div className="mut sm">{card.done ?? chatsLine}</div>
             </div>
             {canOpen(m) && (
@@ -327,6 +333,25 @@ export const MachineDrawer = ({
         </div>
         <div style={{ height: 14 }} />
         {fix}
+        <div className="sec">
+          <h4>Готовность по частям</h4>
+          <div className={CARD}>
+            {ready.map((r) => (
+              <div key={r.key} style={{ marginBottom: 8 }}>
+                <div className="row">
+                  <b>{r.label}</b>
+                  <span className={`pill ${r.tone === 'unknown' ? '' : r.tone}`}>
+                    <span className="hd-d" />
+                    {r.tone === 'ok' ? 'в порядке' : r.tone === 'unknown' ? 'не известно' : 'есть проблема'}
+                  </span>
+                </div>
+                <div className="mut sm" style={{ marginTop: 2 }}>
+                  {r.text}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
         {mlUrl && (
           <a className="md-ext" href={mlUrl} target="_blank" rel="noopener noreferrer">
             <span className="md-ext__ic">

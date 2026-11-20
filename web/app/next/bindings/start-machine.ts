@@ -39,7 +39,7 @@ export const startCandidateOf = (view: MachineView, link: Link, off: boolean): I
 });
 
 /**
- * The machine a new chat starts on: the one picked in the pill, unless it is off; else the first that answers now and
+ * The machine a new chat starts on: the one picked in the pill, even when it is off (the composer then holds the send); else the first that answers now and
  * has the agent of the last choice, else the first that answers and has an agent; with none answering, the first whose
  * agents are known, so the pill is drawn from them. A machine the person only administers is taken only on top.
  */
@@ -48,7 +48,9 @@ export const startMachineOf = (
   picked: MachineId | null,
   provider: Provider | null,
 ): MachineId | null => {
-  const chosen = candidates.find((c) => c.id === picked && !c.off);
+  // GitHub #117: a pick is the person's word, also while the machine is off: the draft stays addressed to it and the
+  // composer asks before the chat goes anywhere else.
+  const chosen = candidates.find((c) => c.id === picked);
   if (chosen) return chosen.id;
   const top = candidates[0]?.id;
   const allowed = candidates.filter((c) => c.id === top || c.mine);

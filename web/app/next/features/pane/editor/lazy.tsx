@@ -3,9 +3,12 @@
 import LazyView from '@/next/ui/lazy-view';
 import { t } from '@/next/i18n';
 import type { IFileEditorProps } from '@/next/features/pane/editor/file-editor';
+import type { NotebookRuntime } from '@/next/features/pane/notebook/notebook-api';
+import { isNotebook } from '@/next/features/pane/notebook/notebook-model';
 import '@/next/styles/editor.css';
 
 const loadEditor = () => import('@/next/features/pane/editor/file-editor');
+const loadNotebook = () => import('@/next/features/pane/notebook/notebook-view');
 
 const LINES_SHOWN = 200;
 
@@ -30,9 +33,9 @@ const Plain = ({ text }: { text: string }) => (
   </div>
 );
 
-const LazyFileEditor = (props: IFileEditorProps) => (
+const LazyFileEditor = (props: IFileEditorProps & { runtime?: NotebookRuntime }) => (
   <LazyView
-    load={loadEditor}
+    load={isNotebook(props.path) && !props.compare && !props.at ? loadNotebook : loadEditor}
     props={props}
     title={t('next.load.editor')}
     fallback={<Plain text={props.initial.text} />}

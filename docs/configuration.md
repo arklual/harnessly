@@ -7,7 +7,7 @@ it stays with the previous runtime.
 
 - [Machine agent](#machine-agent)
 - [Runtime](#runtime): [gate and process](#gate-and-process), [tmux, tabs and agents](#tmux-tabs-and-agents),
-  [prompt delivery](#prompt-delivery), [folders and files](#folders-and-files),
+  [prompt delivery](#prompt-delivery), [folders and files](#folders-and-files), [notebook execution](#notebook-execution),
   [links and external services](#links-and-external-services), [usage and statistics](#usage-and-statistics),
   [conversation snapshots](#conversation-snapshots), [machine and web push](#machine-and-web-push),
   [design library](#design-library), [preview proxy](#preview-proxy), [voice](#voice)
@@ -122,6 +122,73 @@ and the kill switch are in [hub/machine.md](hub/machine.md).
 | `RUNTIME_CODEXBAR_BIN` | the codexbar binary the core polls for Claude's usage limits (unset: none) |
 | `CLAUDE_CONFIG_DIR`, `CODEX_HOME` | the agent CLIs' own folders, `~/.claude` and `~/.codex` by default |
 
+### Image generation
+
+`generate_images` and the platform images API share the same asynchronous job service. Codex remains the default.
+The optional `provider` argument accepts `codex` or `antigravity`; it selects the generator, independently of which
+agent prepared the brief. `wait_images` and the existing chat cards work with either provider.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `RUNTIME_IMAGE_PROVIDER` | `codex` | provider used when a request omits `provider`; `antigravity` selects the experimental official Antigravity ACP integration |
+| `RUNTIME_ANTIGRAVITY_BIN` | `agy` | path to the official Antigravity CLI, resolved on the runtime's `PATH`; use an absolute path when it differs from the interactive shell |
+
+For Antigravity, install the official CLI and run `agy acp --login` as the **same Unix user and HOME as the runtime**.
+Harnessly launches `agy acp --sandbox --disable-telemetry`, reusing that login. Tool permission requests are denied.
+It does not extract browser cookies, copy OAuth credentials, impersonate a first-party client, or automatically fall
+back to a different paid provider on failure.
+The Antigravity process inherits the runtime environment, not the Codex-only agent environment.
+
+The integration delegates once to the native `image-generator` subagent and keeps ACP alive after the parent turn
+ends. Only finished, decodable images in that ACP session's artifact directory are imported into the normal job
+store; arbitrary file paths in model replies are ignored. Native JPEG output is preserved. References (`source`),
+counts, framing, progressive chat cards and permission-checked `save_to` use the existing job flow. Transparency and
+background-cut requests are refused for Antigravity; select `provider: "codex"` for those. Missing CLI/login, ACP
+errors and timeouts are reported by the job. Partial output is kept with a warning, not silently regenerated.
+
+This provider is **experimental**: the CLI's native image-generation capability may vary by version/account.
+Successful authentication or generation does not establish permission under a subscription's terms. Google's
+[Antigravity FAQ](https://antigravity.google/docs/faq) says wrapping the CLI in third-party agents/applications is not
+supported under consumer plans; review the current terms before enabling it. Changing the environment variables
+requires restarting the runtime. No additional public/S3 reference hosting is required for this local-file path.
+
+### Native Antigravity chats (experimental)
+
+Antigravity is a third native CLI provider (`antigravity`, panel `antigravity-cli`, executable `agy`), distinct from a
+Claude/Codex backend profile. Image generation above is independent of enabling ordinary Antigravity chats.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `RUNTIME_ANTIGRAVITY_NATIVE` | off | only `on` advertises/enables ordinary native chats, after native hook, input and MCP setup has been verified |
+| `RUNTIME_ANTIGRAVITY_BIN` | `~/.local/bin/agy` when present, otherwise `agy` on PATH | explicit official-compatible executable used for native launches; image generation also honors this variable |
+
+Use an updated **CLI and runtime**. `harnessly antigravity prepare` creates a fresh deployment-owned official plugin
+containing `plugin.json`, `hooks.json`, and a credential-free stdio `mcp_config.json`. It does not install anything or
+edit a project's `.agents` directory. Its output gives the explicit `agy plugin install '<directory>'` command;
+installation changes the official CLI's user configuration and is a separate opt-in step. Uninstall with
+`agy plugin uninstall harnessly-native`. Keep the prepared host executable available at its recorded absolute path.
+Native first-run setup must also be completed in the terminal. Managed launches explicitly request the native
+`toolPermission: "request-review"` session policy. Native permission/question dialogs are initially handled in the
+native terminal, not through Claude-style web approval key sequences; Harnessly never auto-approves them.
+
+Models come from the bounded, cached `agy models` probe. A successful model listing alone does **not** prove that a
+text request is eligible or that hooks/MCP are installed. Verify a real native request before enabling the feature.
+Harnessly does not patch binaries, install an unlocker, alter proxies, or bypass regional checks during setup/launch.
+An explicitly configured alternate executable is the deployment's responsibility, not an automatic fallback.
+
+Managed launches receive a unique generation and private, launch-scoped CLI credential file (never a token in argv,
+plugin JSON, or logs). Authenticated hooks bind only the same tab, process generation, workspace and native UUID;
+nested sessions and stale launches cannot replace that binding. Transcript paths accept exactly `transcript.jsonl`
+or `transcript_full.jsonl` under that UUID's native brain folder. A native `PreInvocation` is a model step, **not** a
+new-user-prompt acknowledgement; actual `USER_INPUT` records confirm delivery. `Stop` closes the turn only with
+`fullyIdle=true`. The input adapter recognizes the native frame and rechecks live ownership before paste/Enter;
+unknown screens, foreign input, permission dialogs and a shell block automated delivery.
+
+The normal v2 picker and delegation use `antigravity` after enablement. Initially unsupported: fork/rewind, steering,
+native terminal attachments, fast/ultracode, backend profiles, live model switching, and apps requiring an enforced
+pre-tool wall. These requests are refused server-side as well as hidden/disabled in the UI. Codex and Claude retain
+their existing defaults and launch paths. The official consumer-plan support caveat in the image section applies here too.
+
 ### Prompt delivery
 
 | Variable | Meaning |
@@ -146,6 +213,60 @@ and the kill switch are in [hub/machine.md](hub/machine.md).
 | `RUNTIME_DATA_DIR_LABEL` | how messages name the data folder (default `~/` and its path under the home) |
 | `RUNTIME_CHECKPOINT_NAMESPACE`, `RUNTIME_CHECKPOINT_TMP_TAG` | the turn checkpoints' git refs (`refs/<ns>/checkpoints/`, `refs/<ns>/saved/`) and author (`<ns>@localhost`), default `harnessly`; and the tag of the files a rewind stages (`<file>.<tag>-<hex>.tmp`, default `hs`) |
 | `RUNTIME_CHECKPOINT_POOL` | `on` keeps one object store per working folder (`checkpoints/pool-<folder>`), which the checkpoint repositories of its tabs borrow from through git alternates and hand their packed objects to once an hour; the repositories that exist are swept once after a start. Default `off`: a repository per tab with loose objects. A runtime without the setting still reads the repositories made with it |
+
+### Notebook execution
+
+See [Jupyter notebooks in the file pane](notebooks.md) for opening, editing, running and saving notebooks.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `RUNTIME_NOTEBOOK_PYTHON` | first executable `python3` in `/usr/local/bin`, `/usr/bin`, `/bin` | absolute path of the Python interpreter used for native `.ipynb` execution; one executable path, not a shell command. It must have `jupyter_client` and `ipykernel` installed. A virtualenv's `bin/python` is supported |
+
+These Python packages are optional. Opening a notebook or asking for its kernel state does not start Python or
+probe dependencies. An explicit execute/restart reports an actionable error if they are unavailable. For example:
+
+```sh
+python3 -m venv /path/to/notebook-env
+/path/to/notebook-env/bin/python -m pip install jupyter_client ipykernel
+# Set this in the runtime's service environment:
+RUNTIME_NOTEBOOK_PYTHON=/path/to/notebook-env/bin/python
+```
+
+Only the fixed Python 3 kernel is supported initially. Notebook kernelspec metadata and installed kernelspec launch
+commands are never executed. Both the embedded helper and the kernel start with Python's `-I` flag; Jupyter and
+IPython use private temporary configuration directories. The child environment is an allowlist (a fixed machine
+`PATH`, locale, `HOME`, `TZ`, and the private configuration directories), not the runtime's environment: runtime,
+connector, proxy-auth and agent tokens are not inherited.
+
+`GET /api/v2/conversations/{id}/notebook?path=…` returns `{state:"stopped"|"idle"|"busy", kernel?:"python3"}`.
+`POST` to the same route accepts `{action:"execute", code:"…"}` or `{action:"interrupt"|"restart"|"shutdown"}`.
+Execute returns nbformat outputs, `execution_count` and `status:"ok"|"error"`; Python exceptions are cell outputs,
+not HTTP failures. Other actions return state. Busy execution/restart and kernel-count limits return HTTP 409;
+code/output limits return 413; missing dependencies and execution timeouts return 503, with the ordinary file-route
+`{r:"refused", code, message}` envelope. Restart explicitly creates a fresh kernel, even when stopped; interrupt
+and shutdown of a stopped notebook are no-ops. The page adds `timeout=150` to execute requests so the hub proxy uses
+its existing long-request header budget instead of cutting off a running cell after 60 seconds; this hint does not
+raise the runtime's own startup/execution limits.
+
+A session is private to the authenticated identity, conversation and canonical notebook path. Variables survive
+cells. Execution is allowed only for an existing, readable nbformat 4 `.ipynb` file inside the canonical conversation
+folder, with a writable file and directory, and outside the existing credential-path denylist. Absolute paths inside
+that folder are accepted; viewer-accessible handovers or files in another workspace place are not execution access.
+The kernel's initial working directory is the notebook's directory. Execution does not persist notebook outputs or
+source: the page uses the existing revision-aware file save route.
+
+There are at most 16 kernels per runtime and 4 per identity, at most 256 KiB of UTF-8 code per execution, and at most
+4 MiB/1000 accumulated output objects. Kernel startup has a 30-second budget and each execution a 120-second budget.
+A concurrent execute/restart is refused rather than queued; interrupt and shutdown remain available during execution.
+Timeouts, disconnected executing requests and helper failures discard the kernel. Idle kernels expire after 30 minutes
+(with a minute's sweep interval); reading state does not keep them alive. Shutdown, conversation deletion and runtime
+stop tear down helpers and kernels, and no session is restored after a runtime restart.
+
+**Execution is not a security sandbox.** Explicitly run code has the runtime Unix account's filesystem and network
+access, can change its own working directory, and may read credentials from disk just as a local terminal can. The
+path checks and clean environment prevent unintended launch locations/token inheritance, not hostile Python code.
+Run only trusted cells. The machine agent treats notebook routes as terminal access: a hub connection with
+`terminal = false` cannot reach them.
 
 ### Links and external services
 

@@ -3,7 +3,12 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -16,9 +21,11 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/chatguard"
 	"github.com/ly-solutions/harnessly/internal/convo"
+	"github.com/ly-solutions/harnessly/internal/filestore"
 	"github.com/ly-solutions/harnessly/internal/machines"
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/safego"
+	"github.com/ly-solutions/harnessly/internal/storelink"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 	"github.com/ly-solutions/harnessly/internal/typist"
 	"github.com/ly-solutions/harnessly/internal/wire"
@@ -126,6 +133,8 @@ type v2Tmux struct {
 	tall tallCaptures
 	// guard says whether the terminal is off: then the pane takes no write while a shell is in its foreground.
 	guard *chatguard.Guard
+	// nativeOwns verifies the current generation, bound UUID and foreground process before native writes.
+	nativeOwns func(session string) bool
 
 	// probe answers the looks; nil means tm.
 	probe probeTmux
@@ -194,7 +203,11 @@ func (m *v2Tmux) Pane(session string) typist.Pane {
 	}
 	// While the terminal is off every write is checked against what is in the pane's foreground: text that reaches a
 	// bare shell runs as commands (see internal/chatguard).
-	return chatguard.Guarded(v2Pane{tm: m.tm, session: session, term: m.term, tall: &m.tall}, m.guard, func() string { return m.tm.PaneCurrentCommand(session) })
+	pane := chatguard.Guarded(v2Pane{tm: m.tm, session: session, term: m.term, tall: &m.tall}, m.guard, func() string { return m.tm.PaneCurrentCommand(session) })
+	if m.nativeOwns != nil && m.nativeOwns(session) {
+		return nativeOwnedPane{Pane: pane, alive: func() bool { return m.nativeOwns(session) }}
+	}
+	return pane
 }
 
 var _ convo.SessionForgetter = (*v2Tmux)(nil)
@@ -301,19 +314,100 @@ func (m *v2Tmux) ProbeAtStart(session string) convo.Probe {
 	return convo.Probe{Session: true, Foreground: true}
 }
 
-// v2Uploads finds the files the page uploaded.
-type v2Uploads struct{ up *wire.Uploads }
+// v2Uploads finds the files the page uploaded. A file the page put into the hub's store (wire.HubUpload) is not on any
+// machine yet: the machine that runs the chat takes it from the hub into its own uploads when the message names it, so
+// it does not matter which machine the hub placed the chat on.
+type v2Uploads struct {
+	up *wire.Uploads
+	// hub is the hub's uploads collection; nil (or a nil answer) for a machine with no hub's store.
+	hub func() hubBlobs
+}
+
+// hubBlobs reads contents of the hub's uploads collection by sha256 (filesync.Client).
+type hubBlobs interface {
+	GetBlob(ctx context.Context, sha string, w io.Writer) error
+}
+
+// hubUploadWait is how long taking one file from the hub may last.
+const hubUploadWait = 30 * time.Second
 
 func (u v2Uploads) Resolve(ids []string) ([]wire.AttachmentRef, []string, wire.RefuseCode) {
 	refs, paths := make([]wire.AttachmentRef, 0, len(ids)), make([]string, 0, len(ids))
 	for _, id := range ids {
 		ref, path, ok := u.up.Get(id)
+		if h, kept := wire.ParseHubUpload(id); kept {
+			ref, path, ok = u.take(h)
+		}
 		if !ok {
 			return nil, nil, wire.RefuseAttachmentMissing
 		}
 		refs, paths = append(refs, ref), append(paths, path)
 	}
 	return refs, paths, ""
+}
+
+// take is the machine's copy of a file kept in the hub: the one it has already, else the bytes from the hub, which must
+// hash to the name they were asked by.
+func (u v2Uploads) take(h wire.HubUpload) (wire.AttachmentRef, string, bool) {
+	id := h.LocalID()
+	if ref, path, ok := u.up.Get(id); ok {
+		return ref, path, true
+	}
+	var blobs hubBlobs
+	if u.hub != nil {
+		blobs = u.hub()
+	}
+	if blobs == nil {
+		return wire.AttachmentRef{}, "", false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), hubUploadWait)
+	defer cancel()
+	var buf bytes.Buffer
+	max := wire.DefaultLimits.MaxFileBytes
+	if max <= 0 {
+		max = filestore.MaxFileSize
+	}
+	if err := blobs.GetBlob(ctx, h.Sha, &cappedBuffer{buf: &buf, left: max}); err != nil {
+		agent.Log("warn", "v2: an attachment is not in the hub's store", agent.F{K: "sha", V: h.Sha}, agent.F{K: "error", V: err.Error()})
+		return wire.AttachmentRef{}, "", false
+	}
+	if sum := sha256.Sum256(buf.Bytes()); hex.EncodeToString(sum[:]) != h.Sha {
+		agent.Log("warn", "v2: an attachment from the hub's store does not hash to its name", agent.F{K: "sha", V: h.Sha})
+		return wire.AttachmentRef{}, "", false
+	}
+	typ := h.Mime
+	if typ == "" {
+		typ = http.DetectContentType(buf.Bytes())
+	}
+	ref, code := u.up.PutAs(id, h.Name, typ, int64(buf.Len()), bytes.NewReader(buf.Bytes()))
+	if code != "" {
+		return wire.AttachmentRef{}, "", false
+	}
+	return u.up.Get(ref.ID)
+}
+
+// cappedBuffer refuses what is past its room, so a file bigger than any upload is not read to its end.
+type cappedBuffer struct {
+	buf  *bytes.Buffer
+	left int64
+}
+
+func (l *cappedBuffer) Write(p []byte) (int, error) {
+	if int64(len(p)) > l.left {
+		return 0, errors.New("the file is bigger than an upload may be")
+	}
+	l.left -= int64(len(p))
+	return l.buf.Write(p)
+}
+
+// hubUploads is the hub's uploads collection of the runtime's link to the hub's store, read when it is used: the link
+// is opened after the conversations' runtime. nil with no hub.
+func hubUploads() hubBlobs {
+	l := linked.Load()
+	if l == nil || l.Kind() != storelink.KindHub {
+		return nil
+	}
+	return l.Client(filestore.KindUploads)
 }
 
 // Keep stores a text the runtime made a file of the message (a long message, see attach.IsLongText).
@@ -357,6 +451,8 @@ type liveMachine struct {
 	health  *machines.HealthMonitor
 	// offers are the profiles a provider's CLI can start a chat on; nil is a machine without profiles.
 	offers func(wire.Provider) []wire.ProfileOffer
+	// catalog says where a provider's model list came from (GitHub #124); nil: the machine does not say.
+	catalog func(wire.Provider) *wire.ModelCatalog
 	// codexConfig is Codex's config.toml, whose approval_policy is a Codex chat's default when the runtime skips nothing.
 	codexConfig string
 	// claudeSettings is Claude Code's settings.json, whose permissions.defaultMode "bypassPermissions" makes a Claude
@@ -468,9 +564,22 @@ func (m *liveMachine) readLoad() wire.MachineLoad {
 	}
 	var st syscall.Statfs_t
 	if syscall.Statfs(filepath.Clean(m.dataDir), &st) == nil {
-		l.DiskTotal, l.DiskFree = int64(st.Blocks)*int64(st.Bsize), int64(st.Bavail)*int64(st.Bsize)
+		l.DiskTotal, l.DiskFree = diskSizes(uint64(st.Blocks), uint64(st.Bavail), uint64(st.Bsize))
 	}
 	return l
+}
+
+// maxSafeInteger is JavaScript's Number.MAX_SAFE_INTEGER: a size past it the page cannot read as a whole number.
+const maxSafeInteger = 1<<53 - 1
+
+// diskSizes are the disk's total and free bytes from statfs, or 0, 0 («unknown») when the filesystem reports what no
+// disk has: a container's overlay can give block counts whose product overflows or passes the page's safe integers,
+// and such a frame closed a healthy chat socket (GitHub #119).
+func diskSizes(blocks, avail, bsize uint64) (total, free int64) {
+	if bsize == 0 || blocks == 0 || avail > blocks || blocks > maxSafeInteger/bsize {
+		return 0, 0
+	}
+	return int64(blocks * bsize), int64(avail * bsize)
 }
 
 // agentsNow is the agent CLIs as the preflight finds them, with the models each takes. Both change the model of a
@@ -498,7 +607,17 @@ func agentsNow(r preflight.Result, models func(wire.Provider) []wire.AgentModel)
 	case !r.Codex.LoggedIn:
 		codex.Status = wire.InstallLoginRequired
 	}
-	return []wire.MachineAgent{claude, codex}
+	result := []wire.MachineAgent{claude, codex}
+	if nativeAntigravityEnabled() {
+		native := wire.MachineAgent{Provider: wire.ProviderAntigravity, Version: r.Antigravity.Version, Status: wire.InstallReady, Models: list(wire.ProviderAntigravity), CanSwitchModel: false}
+		if !r.Antigravity.Installed {
+			native.Status = wire.InstallMissing
+		} else if !r.Antigravity.LoggedIn {
+			native.Status = wire.InstallLoginRequired
+		}
+		result = append(result, native)
+	}
+	return result
 }
 
 // refresh asks the preflight (a login shell, seconds on a loaded machine) and tells the sockets what changed.
@@ -506,7 +625,7 @@ func (m *liveMachine) refresh() {
 	if m.check == nil {
 		return
 	}
-	agents := m.withOffers(agentsNow(m.check(), m.models))
+	agents := m.withCatalog(m.withOffers(agentsNow(m.check(), m.models)))
 	if m.skip != nil {
 		skip := m.skip()
 		for i := range agents {
@@ -523,6 +642,17 @@ func (m *liveMachine) refresh() {
 			fn(ev)
 		}
 	}
+}
+
+// withCatalog adds where each agent's model list came from.
+func (m *liveMachine) withCatalog(agents []wire.MachineAgent) []wire.MachineAgent {
+	if m.catalog == nil {
+		return agents
+	}
+	for i := range agents {
+		agents[i].ModelCatalog = m.catalog(agents[i].Provider)
+	}
+	return agents
 }
 
 // withOffers adds the profiles each agent CLI offers.
@@ -635,6 +765,9 @@ var codexNeverAsksRE = regexp.MustCompile(`(?m)^\s*approval_policy\s*=\s*["']nev
 // does not decide: the launch names ask); a Codex chat runs on its config.toml, which asks unless its approval_policy
 // is "never" (read before its first table).
 func defaultPermissionOf(p wire.Provider, skip bool, codexConfig, claudeSettings string) wire.PermissionMode {
+	if p == wire.ProviderAntigravity {
+		return wire.PermissionAsk
+	}
 	if skip {
 		return wire.PermissionBypass
 	}

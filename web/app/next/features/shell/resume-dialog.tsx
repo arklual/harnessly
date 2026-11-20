@@ -1,4 +1,5 @@
 import { useRef, useState, type KeyboardEvent } from 'react';
+import type { Provider } from '@/next/protocol/v2';
 import { t } from '@/next/i18n';
 import Modal from '@/next/features/shell/modal';
 import { formatAgo } from '@/next/i18n/format';
@@ -7,7 +8,7 @@ import usePendingList from '@/next/ui/use-pending-list';
 
 export interface IResumeSession {
   id: string;
-  provider: 'claude' | 'codex';
+  provider: Provider;
   /** The first message: what the session was about. */
   first: string;
   last: string;
@@ -35,6 +36,7 @@ const TABS = [
   { id: 'all', label: t('next.resume.all') },
   { id: 'claude', label: 'Claude Code' },
   { id: 'codex', label: 'Codex' },
+  { id: 'antigravity', label: 'Antigravity' },
 ] as const;
 type TTab = (typeof TABS)[number]['id'];
 

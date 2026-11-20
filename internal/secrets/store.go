@@ -112,6 +112,9 @@ type Store struct {
 	Now     func() time.Time
 
 	mu sync.Mutex
+	// shared mirrors the app's secrets (app.go); nil keeps them here alone.
+	shared     AppShared
+	sharedMiss map[string]time.Time
 }
 
 // Open is the safe in dir (created on the first write) with its key in keyFile.

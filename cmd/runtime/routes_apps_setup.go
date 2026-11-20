@@ -65,7 +65,7 @@ type setupConnection struct {
 }
 
 func appSetupRoutes(d deps, reg *apps.Registry, storage *apps.Storage) []gate.Route {
-	store := safeFor(d).store.Local // an app's secrets stay in the file
+	store := safeFor(d).store.Local // an app's secrets: the file, mirrored to the shared safe (HRN-1717)
 	answer := func(app apps.Installed) (setupAnswer, error) {
 		values, err := storage.Settings(app.Manifest, app.ID)
 		if err != nil {
@@ -199,7 +199,7 @@ func appSetupRoutes(d deps, reg *apps.Registry, storage *apps.Storage) []gate.Ro
 // Only an agent's launch token passes, and only for an app on in that launch's chat (the grant the launch wrote). The
 // person's cli-token is refused: the proxy is for the agent's MCP client, which carries the launch's token.
 func appMCPProxyRoute(d deps, reg *apps.Registry) gate.Route {
-	store := safeFor(d).store.Local // an app's secrets stay in the file
+	store := safeFor(d).store.Local // an app's secrets: the file, mirrored to the shared safe (HRN-1717)
 	ms := mcpFor(d)
 	connProxy := &mcpProxy{d: d, ms: ms, client: mcpProxyClient(nil)}
 	tokens := appTokensOf(d)

@@ -7,6 +7,8 @@ export const DESIGN_CONV = {
   /** No chat yet: the first message makes one. */
   none: 'none',
   conv: 'conv',
+  /** The chat the address names is not on this machine: shown as itself, with a way to open it (GitHub #121). */
+  away: 'away',
 } as const;
 
 export interface IDesignConvRow {
@@ -21,7 +23,10 @@ export interface IDesignBinding {
   fresh: boolean;
 }
 
-export type TDesignConv = { k: typeof DESIGN_CONV.none } | { k: typeof DESIGN_CONV.conv; id: string };
+export type TDesignConv =
+  | { k: typeof DESIGN_CONV.none }
+  | { k: typeof DESIGN_CONV.conv; id: string }
+  | { k: typeof DESIGN_CONV.away; id: string };
 
 export interface IPickInput {
   /** The chat the person came from and has not changed since; null without one. */
@@ -40,7 +45,9 @@ export const pickDesignConv = ({ arrived, bound, list, answered }: IPickInput): 
   if (id === null) return { k: DESIGN_CONV.none };
   const fresh = arrived === null && bound?.fresh === true;
   const gone = answered && list !== null && !fresh && !list.some((c) => c.id === id);
-  return gone ? { k: DESIGN_CONV.none } : { k: DESIGN_CONV.conv, id };
+  if (!gone) return { k: DESIGN_CONV.conv, id };
+  // A chat the address names explicitly is not swapped for a blank composer: it may be on another machine.
+  return arrived !== null ? { k: DESIGN_CONV.away, id } : { k: DESIGN_CONV.none };
 };
 
 /** What one machine said of the design's chats: the ones started from it, then the ones that edited its files. */

@@ -377,6 +377,8 @@ func (c *conv) openFeed() {
 		src = c.d.Source(c.rec)
 	case c.rec.Provider == wire.ProviderCodex:
 		src = &feed.CodexSource{Path: c.rec.TranscriptPath, Index: c.d.Transcripts}
+	case c.rec.Provider == wire.ProviderAntigravity:
+		src = &feed.AntigravitySource{Path: c.rec.TranscriptPath, Index: c.d.Transcripts}
 	default:
 		src = &feed.ClaudeSource{Path: c.rec.TranscriptPath, Index: c.d.Transcripts}
 	}
@@ -683,10 +685,8 @@ func (c *conv) endTurn(id string, st wire.TurnStatus, failure *wire.TurnFailure,
 	}
 	if id != "" {
 		if t, ok := c.fd.EndTurn(id, st, failure, at); ok {
-			if t.Status == wire.TurnFailed {
-				c.emit(wire.TurnFailedEv{Turn: t})
-			} else {
-				c.emit(wire.TurnFinishedEv{Turn: t})
+			if ev, ok := wire.TurnEndEv(t); ok {
+				c.emit(ev)
 			}
 		}
 		c.change(c.box.TurnEnded(id, now), now)

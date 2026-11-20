@@ -165,6 +165,15 @@ func slotPublicOrigins(dataDir string) []string {
 	return list
 }
 
+// standalonePreviewOrigins are the public origins of this runtime's preview slots, nil without slots or public names
+// (path mode).
+func standalonePreviewOrigins() []string {
+	if standaloneSlots == nil {
+		return nil
+	}
+	return standaloneSlots.public
+}
+
 // previewOriginChecks resolves the slots' names with the system resolver against this machine's own addresses.
 func previewOriginChecks(ctx context.Context, origins []string) []preview.OriginCheck {
 	return preview.CheckOrigins(ctx, origins, preview.SystemLookup, preview.SelfAddresses(os.Getenv("RUNTIME_PREVIEW_SELF_IPS")))

@@ -415,7 +415,9 @@ func (f *Feed) apply(u *Update, s step) {
 	for _, id := range s.ended {
 		t := f.b.turns[f.b.byTurn[id]].rec
 		u.Ended = append(u.Ended, t)
-		u.Events = append(u.Events, wire.TurnFinishedEv{Turn: t})
+		if ev, ok := wire.TurnEndEv(t); ok {
+			u.Events = append(u.Events, ev)
+		}
 	}
 	for _, id := range s.started {
 		t := f.b.turns[f.b.byTurn[id]].rec
@@ -435,11 +437,8 @@ func (f *Feed) apply(u *Update, s step) {
 	}
 	// A turn that took lines after it ended has new counters and maybe an answer: its record goes out again.
 	for _, id := range s.regrown {
-		t := f.b.turns[f.b.byTurn[id]].rec
-		if t.Status == wire.TurnFailed {
-			u.Events = append(u.Events, wire.TurnFailedEv{Turn: t})
-		} else {
-			u.Events = append(u.Events, wire.TurnFinishedEv{Turn: t})
+		if ev, ok := wire.TurnEndEv(f.b.turns[f.b.byTurn[id]].rec); ok {
+			u.Events = append(u.Events, ev)
 		}
 	}
 	u.Signals = append(u.Signals, s.signals...)

@@ -195,7 +195,10 @@ func mcpError(text, what string) error {
 
 func (m *hfMCP) estimate(ctx context.Context, pl plan) (float64, float64, error) {
 	params := cloneMap(pl.body)
-	params["medias"] = standInMedias(pl)
+	// The MCP takes medias only as an array: a null (a request without frames) fails its validation as "params: Invalid input".
+	if medias := standInMedias(pl); len(medias) > 0 {
+		params["medias"] = medias
+	}
 	data, text, err := m.do(ctx, "estimate_"+string(pl.req.Kind)+"_cost", map[string]any{"params": params, "context": mcpContext}, "the price of the request")
 	if err != nil {
 		return 0, 0, err

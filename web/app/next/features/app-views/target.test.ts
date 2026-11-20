@@ -7,6 +7,21 @@ describe('app targets', () => {
     expect(parseAppTarget('object:x')).toBeNull();
   });
 
+  it('reads an object only after an app view and refuses extra path or query', () => {
+    expect(parseAppTarget('acme.thing/board/plan-x1')).toEqual({
+      app: 'acme.thing',
+      view: 'board',
+      object: 'plan-x1',
+    });
+    for (const target of [
+      'acme.thing/board/plan-x1/extra',
+      'acme.thing/board/plan-x1?allow_guest=true',
+      'acme.thing/board/../secret',
+      'acme.thing//plan-x1',
+    ])
+      expect(parseAppTarget(target), target).toBeNull();
+  });
+
   it('reads an object of the app, its home, and nothing else', () => {
     expect(objectTarget('object:plan-x1')).toBe('plan-x1');
     expect(objectTarget('object:')).toBeNull();

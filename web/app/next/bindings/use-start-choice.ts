@@ -73,6 +73,7 @@ export const useStartChoice = (machine: MachineId | null) => {
     picked,
     last,
     settings: {
+      antigravity: null,
       claude: claudeSettings.state.k === 'ready' ? claudeSettings.state.value.options : null,
       codex: codexSettings.state.k === 'ready' ? codexSettings.state.value.options : null,
     },

@@ -60,12 +60,15 @@ import type {
   AgentOptionValue,
   AgentSettings,
   MachineId,
-  Provider,
+  Provider as WireProvider,
 } from '@/next/protocol/v2';
 import { Button } from '@/next/ui/button';
 import usePendingList from '@/next/ui/use-pending-list';
 import { Skeleton } from '@/next/ui/skeleton';
 import Swap from '@/next/ui/swap';
+
+// Antigravity signs in with agy acp --login; it has no Claude/Codex settings page.
+type Provider = Exclude<WireProvider, 'antigravity'>;
 
 export type Pending = ReturnType<typeof usePendingList>;
 export const PROVIDER_LIST = ['claude', 'codex'] as const satisfies readonly Provider[];
@@ -375,7 +378,9 @@ export const SkillsPage = ({ machine, pages, pending }: ISkillsPageProps) => {
         filter={filter}
         list={list}
         busy={busyOf(waiting, prefix)}
-        onProvider={setProvider}
+        onProvider={(value) => {
+          if (value !== 'antigravity') setProvider(value);
+        }}
         onTab={setTab}
         onFilter={setFilter}
         onToggle={toggle}

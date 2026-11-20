@@ -834,3 +834,12 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
     runtime, agents and health), a burst of writes within 120 ms goes out once. Only a page that names the cap
     (`?caps=appssync` on the socket) gets the field: any other page gets the same event without it, which it takes as
     the status it already holds, so an open tab of an older build neither breaks nor reads again.
+75. **Why a machine has no dictation, where its models came from (GitHub #122, #124).** `RuntimeInfo.voiceOff`
+    (`ffmpeg`: no ffmpeg on the machine; `engine`: no recognition service) says why `voice` is not among the
+    features; `MachineAgent.modelCatalog` (`source` `models-cache` or `static`, `fetchedAt`, `warnings`) says where
+    the agent's model list came from. Only a page that names the cap (`?caps=machineinfo`) gets them: any other page
+    gets the same machine without them.
+76. **The provider antigravity (GitHub #115).** `Provider` may be `antigravity` (the Antigravity CLI): in a conversation,
+    an agent of the machine, an agent session or the origin of a handoff. Only a page that names the cap
+    (`?caps=antigravity`) gets them: any other page gets the machine without that agent, the lists without those
+    conversations and sessions, and the upsert of such a conversation as a removal of its id (as with a workflow).

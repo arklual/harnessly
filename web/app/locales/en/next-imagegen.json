@@ -1,4 +1,9 @@
 {
+  "next.agents.noSteering": "Antigravity does not support steering a running turn. Send a queued message instead.",
+  "next.agents.experimental": "experimental",
+  "next.agents.noNativeAttachments": "Antigravity does not support native file attachments yet. Send text instead.",
+  "next.imagegen.provider": "Image provider",
+  "next.imageEdit.noTransparency": "Antigravity does not support transparent backgrounds or background removal. Choose Codex to use these features.",
   "next.imageEdit.brush.medium": "Medium",
   "next.imageEdit.brush.thin": "Thin",
   "next.imageEdit.brush.wide": "Wide",

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   newUploadSession,
   UPLOAD_FAILURE,
+  HUB_ATTACH_MAX_BYTES,
   keepInHub,
   uploadFile,
   type IUploadSession,
@@ -111,7 +112,17 @@ export interface IUploads {
   reset: () => void;
 }
 
-export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles: AttachmentRef[]): IUploads {
+/**
+ * `toHub`: the field belongs to a chat, whose machine is the hub's to choose and may not be the one the page is on:
+ * under a hub a file goes into the hub's store, and the machine that runs the chat takes it from there. Without a hub,
+ * and for a file the store does not take, it goes to the machine.
+ */
+export function useUploads(
+  machine: MachineId | null,
+  key: DraftKey,
+  draftFiles: AttachmentRef[],
+  toHub = false,
+): IUploads {
   const [local, setLocal] = useState<ILocal[]>([]);
   const controllers = useRef(new Map<string, AbortController>());
   const sessions = useRef(new Map<string, IUploadSession>());
@@ -168,9 +179,12 @@ export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles:
       const mark = { at: performance.now(), sent: 0, speed: 0 };
       const session = rowSession(id);
       // a machine that is off gets the file later: it goes into the hub now, and the machine takes it from
-      // there when the message leaves the outbox.
-      const offline = appConfig().centralUploads && connectionStore.get(machine)?.k !== 'live';
-      const road = offline
+      // there when the message reaches it. A chat's file goes the same way whenever there is a hub.
+      const central = appConfig().centralUploads;
+      const intoHub =
+        central &&
+        (connectionStore.get(machine)?.k !== 'live' || (toHub && file.size <= HUB_ATTACH_MAX_BYTES));
+      const road = intoHub
         ? keepInHub(machine, file, (sent) => progressOf(id, sent, mark), abort.signal)
         : uploadFile(machine, file, (sent) => progressOf(id, sent, mark), abort.signal, session);
       void road.then((outcome) => {
@@ -190,7 +204,7 @@ export function useUploads(machine: MachineId | null, key: DraftKey, draftFiles:
         }
       });
     },
-    [machine, key, fail, progressOf, rowSession],
+    [machine, key, toHub, fail, progressOf, rowSession],
   );
 
   const start = useCallback(

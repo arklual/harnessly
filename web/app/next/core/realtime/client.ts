@@ -114,6 +114,23 @@ interface Sub {
   /** The runtime refused the channel this many times in a row; the sub goes again after a step of SUB_RETRY_MS. */
   refusals?: number;
   retry?: unknown;
+  /** Frames of this channel the page could not read on this connection; each one asked for its snapshot whole. */
+  unreadable?: number;
+}
+
+/**
+ * GitHub #118, #119. A frame of a held channel that this page cannot read (a turn_finished with a live turn, a disk size
+ * past the safe integers) no longer closes the socket: the channel alone is asked for its snapshot whole, so the other
+ * channels keep their frames and a replay does not bring the same frame back. Past this many on one connection the
+ * runtime and the page truly disagree, and the socket starts over as before.
+ */
+export const UNREADABLE_FRAMES_PER_CHANNEL = 3;
+
+/** The channel a frame that failed to decode was about, when it is an event or a snapshot of one. */
+function frameChannel(raw: unknown): Channel | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const { f, ch } = raw as { f?: unknown; ch?: unknown };
+  return (f === 'ev' || f === 'snapshot') && typeof ch === 'string' ? (ch as Channel) : null;
 }
 
 /**
@@ -306,9 +323,13 @@ export class RealtimeClient {
     batch(() => {
       for (const line of lines) {
         let frame: ServerFrame;
+        let raw: unknown;
         try {
-          frame = parseServerFrame(JSON.parse(line));
+          raw = JSON.parse(line);
+          frame = parseServerFrame(raw);
         } catch {
+          const ch = frameChannel(raw);
+          if (ch && this.recoverChannel(ch)) continue;
           // A frame outside the protocol: this page and the runtime disagree. Start over; the next socket may fit.
           this.endCause = 'proto';
           this.drop();
@@ -364,6 +385,7 @@ export class RealtimeClient {
       // cache kept. The runtime decides between a replay, a snapshot after afterEntryId, and a full one; a
       // conversation's replay ends with a snapshot "after" it that adds nothing, so the page knows it caught up.
       sub.resyncing = false;
+      sub.unreadable = 0;
       this.o.clock.clearTimeout(sub.retry);
       sub.retry = undefined;
       if (!sub.cursor) sub.cursor = this.o.sink.resumeOf(this.machine, ch).cursor;
@@ -400,6 +422,20 @@ export class RealtimeClient {
     this.o.sink.event(this.machine, ev);
     this.o.sink.noteCursor(this.machine, ev.ch, sub.cursor);
     this.settleWaiters((w) => w.ch === ev.ch && w.seq <= ev.seq, 'seen');
+  }
+
+  /** A frame of a held channel could not be read: its snapshot is asked for whole, a bounded number of times. */
+  private recoverChannel(ch: Channel): boolean {
+    const sub = this.subs.get(ch);
+    if (!sub || !this.epoch) return false;
+    const n = (sub.unreadable ?? 0) + 1;
+    if (n > UNREADABLE_FRAMES_PER_CHANNEL) return false;
+    sub.unreadable = n;
+    // No cursor: the events until the snapshot are dropped, and the sub goes without afterSeq, so no replay of the frame.
+    sub.cursor = null;
+    sub.resyncing = false;
+    this.sendSub(ch);
+    return true;
   }
 
   private sendSub(ch: Channel): void {

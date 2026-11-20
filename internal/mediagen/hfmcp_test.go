@@ -66,7 +66,17 @@ func (f *fakeMCP) Call(_ context.Context, tool string, args map[string]any) (jso
 	}
 	switch {
 	case strings.HasPrefix(tool, "estimate_"):
-		return text(`{"credits": `+jsonNum(f.credits)+`, "model": "x"}`, false), nil
+		// As the live MCP: medias must be an array when present (a null fails its validation), and the price comes
+		// back as {"cost": {"credits": …}}.
+		var wire struct {
+			Params map[string]json.RawMessage `json:"params"`
+		}
+		raw, _ := json.Marshal(args)
+		_ = json.Unmarshal(raw, &wire)
+		if m, ok := wire.Params["medias"]; ok && (len(m) == 0 || m[0] != '[') {
+			return text("Input validation error: Invalid arguments for tool "+tool+": params: Invalid input", true), nil
+		}
+		return structured(map[string]any{"cost": map[string]any{"credits": f.credits, "credits_exact": f.credits}}), nil
 	case tool == "media_upload":
 		return structured(map[string]any{"media_id": "11111111-2222-4333-8444-555555555555", "upload_url": f.cdn.URL + "/put"}), nil
 	case tool == "media_confirm":
@@ -90,8 +100,6 @@ func (f *fakeMCP) Call(_ context.Context, tool string, args map[string]any) (jso
 	}
 	return text("no such tool", true), nil
 }
-
-func jsonNum(f float64) string { raw, _ := json.Marshal(f); return string(raw) }
 
 func (f *fakeMCP) called() []string {
 	f.mu.Lock()

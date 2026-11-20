@@ -180,3 +180,16 @@ func TestClaudeAuthIsReadLikeAChatStarts(t *testing.T) {
 		t.Fatalf("a key in the env file: %q", got)
 	}
 }
+
+// GitHub #124: the machine says whether Codex's list is its cache or the built-in fallback, and why.
+func TestModelCatalogSourceOfTheMachine(t *testing.T) {
+	fallback := machineModels(t, `{}`, "").v2Catalog(wire.ProviderCodex)
+	if fallback == nil || fallback.Source != "static" || fallback.FetchedAt != nil || len(fallback.Warnings) == 0 {
+		t.Fatalf("fallback: %+v", fallback)
+	}
+	cache := `{"fetched_at":"2026-11-01T10:00:00Z","models":[{"slug":"gpt-5.6-sol","visibility":"list","supported_reasoning_levels":[{"effort":"high"}]}]}`
+	cached := machineModels(t, `{}`, cache).v2Catalog(wire.ProviderCodex)
+	if cached == nil || cached.Source != "models-cache" || cached.FetchedAt == nil || len(cached.Warnings) != 0 {
+		t.Fatalf("cached: %+v", cached)
+	}
+}

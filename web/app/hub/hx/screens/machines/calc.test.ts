@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import type { MachineGroup, MachinesList, MachinesSummary, OrgMachine } from '../../../org/api/machines';
+import type {
+  MachineGroup,
+  MachineSetup,
+  MachinesList,
+  MachinesSummary,
+  OrgMachine,
+} from '../../../org/api/machines';
 import {
   applyOverlay,
+  readiness,
+  readyHeadline,
   canOpen,
   cleanName,
   countByServers,
@@ -565,5 +573,32 @@ describe('a server and its seats', () => {
       mlCoreUrl: null,
     };
     expect(countByServers(list)).toBe(list);
+  });
+});
+
+describe('readiness (GitHub #120)', () => {
+  const m = { state: 'online', since: null, ownerName: null } as unknown as OrgMachine;
+  const setup = {
+    runtime: 'ready',
+    env: null,
+    accounts: [],
+    agents: [
+      { provider: 'claude', installed: true, version: '1', login: 'out' },
+      { provider: 'codex', installed: true, version: '1', login: 'unknown' },
+    ],
+  } as MachineSetup;
+  it('keeps the link, the page and the provider apart', () => {
+    const rows = readiness(m, setup, { text: '502' }, Date.now());
+    const by = Object.fromEntries(rows.map((r) => [r.key, r]));
+    expect(by.link?.tone).toBe('ok');
+    expect(by.workspace?.tone).toBe('bad');
+    expect(by['provider-claude']?.tone).toBe('bad');
+    expect(by['provider-codex']?.tone).toBe('unknown');
+    expect(readyHeadline(rows)).not.toBe('Готова к чатам');
+  });
+  it('marks what was not checked as unknown and explains trust', () => {
+    const rows = readiness(m, { ...setup, runtime: 'needs_trust', agents: [] }, null, Date.now());
+    expect(rows.find((r) => r.key === 'workspace')?.tone).toBe('unknown');
+    expect(rows.find((r) => r.key === 'access')?.text).toContain('не подтверждена');
   });
 });

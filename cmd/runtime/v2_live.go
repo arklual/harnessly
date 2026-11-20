@@ -35,6 +35,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/machine"
 	"github.com/ly-solutions/harnessly/internal/msgindex"
+	"github.com/ly-solutions/harnessly/internal/notebooks"
 	"github.com/ly-solutions/harnessly/internal/outbox"
 	"github.com/ly-solutions/harnessly/internal/paneauto"
 	"github.com/ly-solutions/harnessly/internal/preflight"
@@ -73,7 +74,8 @@ type v2Live struct {
 	tm         *v2Tmux
 	starter    *v2Launcher
 	terms      *v2Terminals // nil when the core has no terminal server
-	designly   *v2Designly  // nil when the core cannot start agents
+	notebooks  *notebooks.Manager
+	designly   *v2Designly // nil when the core cannot start agents
 	// delegation is the agents' delegation of chats to other agents (v2_delegate.go).
 	delegation *delegation.Service
 	// resume is the move service when the chats' resume snapshots are on (chat_resume.go), else nil.
@@ -149,9 +151,12 @@ func newV2Live(d deps, c *core) *v2Live {
 	// a socket set for the machine (RUNTIME_VOICE_SOCKET) counts before it is there; the service starts with
 	// the machine beside the runtime, and a runtime that looked first went the whole day without a microphone.
 	var dictation *voice.Server
+	voiceOff := ""
 	if dv := newVoice(d.DataDir); dv.Available() || (os.Getenv("RUNTIME_VOICE_SOCKET") != "" && dv.Decodes()) {
 		dictation = dv
 		features = append(features, wire.FeatureVoice)
+	} else {
+		voiceOff = voiceOffReason(dv)
 	}
 	v.profiles = &providers.Store{Dir: filepath.Join(d.DataDir, "providers"), Logins: profileLogins(d.Home)}
 	if c.agents != nil && c.agents.profiles != nil {
@@ -172,6 +177,8 @@ func newV2Live(d deps, c *core) *v2Live {
 	codexHub := &codexLoginFlows{store: codexLogins}
 	codexLoginHub.Store(codexHub)
 	v.machine = newLiveMachine(v2Machine, version, features, d.DataDir, func() int { return v.rt.Busy() }, c.preflight, c.v2Models)
+	v.machine.machine.Runtime.VoiceOff = voiceOff
+	v.machine.catalog = c.v2Catalog
 	v.machine.offers = profileOffers(v.profiles)
 	apps.Open(d.DataDir).OnChange(v.machine.appsChanged)
 	followExtProviders(d.DataDir, extSvc, v.profiles, v.machine.republishProfiles)
@@ -181,7 +188,7 @@ func newV2Live(d deps, c *core) *v2Live {
 		v.machine.claudeSettings = filepath.Join(env("CLAUDE_CONFIG_DIR", filepath.Join(d.Home, ".claude")), "settings.json")
 	}
 	v.hub = wire.NewHub(v.machine)
-	v.tm = &v2Tmux{tm: c.cfg.Tmux, term: c.cfg.Term, guard: chatGuard}
+	v.tm = &v2Tmux{tm: c.cfg.Tmux, term: c.cfg.Term, guard: chatGuard, nativeOwns: c.nativePaneOwner}
 	v.starter = &v2Launcher{v: v}
 	uploads := &wire.Uploads{Dir: filepath.Join(d.DataDir, "v2", "uploads"), Limits: wire.DefaultLimits}
 	ses := newV2Sessions(d.Home, func() map[string]string { return v.rt.AttachedSessions() })
@@ -217,7 +224,7 @@ func newV2Live(d deps, c *core) *v2Live {
 	notices := newChatNotices(c, &noticesRT)
 	var projects atomic.Pointer[projectsFeed]
 	v.rt = convo.New(convo.Deps{PersonOf: design.PersonIn, ProjectsChanged: func([]wire.Project) { projects.Load().changed() }, Notify: notices.notice, Moves: moveStore, Index: index, Digest: digest, ExportDir: filepath.Join(d.DataDir, "v2", "chat-exports"), AgentSession: ses.Find, SessionAccount: noteSessionAccount(d.DataDir, v.profiles), MachineID: v2Machine, Publisher: publisher, Machine: v.tm, Launcher: v.starter, Input: codexInputOf(c), Handoffs: handoffs,
-		Uploads: v2Uploads{uploads}, Refs: v2Refs{v}, Store: convo.NewStore(filepath.Join(d.DataDir, "v2")), Log: v2Log{}, Limits: wire.DefaultLimits, Models: v.machine.modelsOf, Background: v2Background{reader: c.bg, flows: &workflows.Reader{}}, Meta: &sessionmeta.Reader{Index: c.transcripts}, Transcripts: c.transcripts, Shots: &shots.Reader{Index: c.transcripts}, PictureRoots: []string{shots.ScratchRoot(), uploadsDir(d), uploads.Dir, imagesDir(d), mediaDir(d), codexImagesDir(d)}, Titler: titler.Title, Summarizer: turnSummarizer(d.DataDir, summarizer.Summarize), SummaryModel: func() *wire.NoticeSummaryModel { return runtimeSettings.RuntimeSettings().NoticeSummary }, Closer: v2Closer{v}, DefaultCwd: d.WorkspaceRoot, FolderGone: folderGone,
+		Uploads: v2Uploads{up: uploads, hub: hubUploads}, Refs: v2Refs{v}, Store: convo.NewStore(filepath.Join(d.DataDir, "v2")), Log: v2Log{}, Limits: wire.DefaultLimits, Models: v.machine.modelsOf, Background: v2Background{reader: c.bg, flows: &workflows.Reader{}}, Meta: &sessionmeta.Reader{Index: c.transcripts}, Transcripts: c.transcripts, Shots: &shots.Reader{Index: c.transcripts}, PictureRoots: []string{shots.ScratchRoot(), uploadsDir(d), uploads.Dir, imagesDir(d), mediaDir(d), codexImagesDir(d)}, Titler: titler.Title, Summarizer: turnSummarizer(d.DataDir, summarizer.Summarize), SummaryModel: func() *wire.NoticeSummaryModel { return runtimeSettings.RuntimeSettings().NoticeSummary }, Closer: v2Closer{v}, DefaultCwd: d.WorkspaceRoot, FolderGone: folderGone,
 		Terminals: terminals, IdleStop: func() time.Duration { return runtimeSettings.RuntimeSettings().IdleStop.After() },
 		IdleFloor: idleFloor, MemoryShort: memoryShort, PressureStop: pressureFloor, LegacyLife: !sessionOwnerOn(os.Getenv),
 		TerminalOff: chatGuard.Off,
@@ -287,6 +294,8 @@ func newV2Live(d deps, c *core) *v2Live {
 		}
 	}
 	v.srv.Files = v2f
+	v.notebooks = notebooks.New()
+	v.srv.Notebook = (&v2Notebooks{files: v2f, kernels: v.notebooks}).Serve
 	v.srv.Download = v2f.ServeDownload
 	v.srv.GitSide = v2f.ServeGitSide
 	v.srv.FindText = v2f.ServeSearch
@@ -438,6 +447,19 @@ func (c *core) v2Models(p wire.Provider) []wire.AgentModel {
 	return out
 }
 
+// v2Catalog is where the model list of a provider came from on this machine: the CLI's cache or the built-in list, with
+// the reasons for a fallback (the same facts GET /api/launch-options carries). GitHub #124.
+func (c *core) v2Catalog(p wire.Provider) *wire.ModelCatalog {
+	if c.agents == nil {
+		return nil
+	}
+	return catalogOf(c.agents.options.Launch(string(p)))
+}
+
+func catalogOf(o catalog.LaunchOptions) *wire.ModelCatalog {
+	return &wire.ModelCatalog{Source: o.Source, FetchedAt: o.FetchedAt, Warnings: append([]string{}, o.Warnings...)}
+}
+
 // v2ModelHint is the one line the page shows under a model: Codex's own description from its model cache; Claude Code
 // lists no descriptions for its aliases, so these say what the families are for.
 func v2ModelHint(p wire.Provider, m catalog.Model) string {
@@ -526,6 +548,9 @@ func (v *v2Live) start(ctx context.Context) {
 
 func (v *v2Live) stop() {
 	v.ready.Store(false)
+	if v.notebooks != nil {
+		v.notebooks.Close()
+	}
 	if v.cancel != nil {
 		v.cancel()
 	}
@@ -1100,6 +1125,9 @@ type v2Closer struct{ v *v2Live }
 var _ convo.Closer = v2Closer{}
 
 func (cl v2Closer) Close(conv wire.Conversation) error {
+	if cl.v.notebooks != nil {
+		cl.v.notebooks.CloseConversation(conv.ID)
+	}
 	core := cl.v.c
 	ws, pane, tab, ok := core.cfg.Tmux.ParseSessionName(conv.Session)
 	if !ok {

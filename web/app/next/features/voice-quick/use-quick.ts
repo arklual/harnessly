@@ -37,6 +37,9 @@ export interface IQuickButtonProps {
 export interface IQuick {
   open: boolean;
   setOpen: (open: boolean) => void;
+  /** The list shown in place of the settings (a choice opened with its row), null for the settings themselves. */
+  sub: string | null;
+  setSub: (sub: string | null) => void;
   /** The button the panel hangs on; it also gets the focus back. */
   anchor: HTMLElement | null;
   setAnchor: (el: HTMLElement | null) => void;
@@ -45,7 +48,8 @@ export interface IQuick {
 }
 
 export const useQuick = (): IQuick => {
-  const [open, setOpen] = useState(false);
+  const [open, setOpenNow] = useState(false);
+  const [sub, setSub] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const press = useRef<{ x: number; y: number; timer: ReturnType<typeof setTimeout> } | null>(null);
   const touched = useRef(false);
@@ -53,7 +57,15 @@ export const useQuick = (): IQuick => {
   const swallowTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const keyAt = useRef(0);
 
-  const toggle = useCallback(() => setOpen((was) => !was), []);
+  // Every opening starts at the settings, not at the list the last one ended in.
+  const setOpen = useCallback((next: boolean) => {
+    setOpenNow(next);
+    setSub(null);
+  }, []);
+  const toggle = useCallback(() => {
+    setOpenNow((was) => !was);
+    setSub(null);
+  }, []);
   const cancelPress = useCallback(() => {
     if (press.current) clearTimeout(press.current.timer);
     press.current = null;
@@ -116,5 +128,5 @@ export const useQuick = (): IQuick => {
     'aria-expanded': open,
     'data-quick': '',
   };
-  return { open, setOpen, anchor, setAnchor, props };
+  return { open, setOpen, sub, setSub, anchor, setAnchor, props };
 };

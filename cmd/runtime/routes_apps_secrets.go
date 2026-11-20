@@ -105,7 +105,7 @@ func appSecretRoutes(d deps, reg *apps.Registry, chats appChats, live appLive) [
 			}
 		} else {
 			created = !sf.store.Local.HasApp(sess.App, b.Name)
-			err = sf.store.Local.PutApp(sess.App, b.Name, b.Secret) // an app's secrets stay in the file
+			err = sf.store.Local.PutApp(sess.App, b.Name, b.Secret) // an app's secrets: the file, mirrored to the shared safe (HRN-1717)
 		}
 		journal(err == nil)
 		if err != nil {

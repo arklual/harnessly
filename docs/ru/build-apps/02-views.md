@@ -148,7 +148,7 @@ body { margin: 0; background: var(--t-bg); color: var(--t-text); font: 14px/1.45
 | `hl.chat.send(text)` | `chat.prompt` | Сообщение агенту до 20 000 символов, показывается с названием приложения в одну строку |
 | `hl.chat.read({last})` | `chat.read` | Последние сообщения в виде `{role, text}`: по умолчанию 20, не больше 200 |
 | `hl.chat.card(view, data)` | `chat.card` | Карточка в конце ленты. Хранится в этом браузере, не больше 20 на чат, данные до 20 000 символов |
-| `hl.pane.open(target)` | `pane.open` | `app:<id>[/<view>]` или `chat:<id>`, чтобы открыть беседу из `hl.agents.list()` (для этого нужно ещё и `agents.read`, иначе `permission_denied`) |
+| `hl.pane.open(target)` | `pane.open` | `app:<id>[/<view>[/<object>]]` или `chat:<id>`, чтобы открыть беседу из `hl.agents.list()` (для этого нужно ещё и `agents.read`, иначе `permission_denied`) |
 | `hl.agents.list()` | `agents.read` | Беседы человека на этой машине в виде `{id, title, status, provider, machine}`. `status`: `working`, `waiting` (ждёт вопрос, разрешение или план) или `free`. Без текста сообщений, промптов и путей. Событие `agents` приносит тот же список, когда он меняется |
 | `hl.tools.call('server.tool', args)` | нет | Инструмент вашего **удалённого https**-сервера. Возвращает сырой результат MCP: `isError` проверяйте сами. См. [Бэкенд](03-backend.md) |
 | `hl.storage.<scope>.get/getVersioned/set/delete/keys` | `storage` | Области ниже; `get` несуществующего ключа даёт `null`. `getVersioned(key)` отвечает `{value, version}`; `set(key, value, {ifVersion})` отвечает новой версией. См. [Версии](#версии) |

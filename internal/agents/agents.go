@@ -14,11 +14,13 @@ import (
 
 // Provider ids and panel types.
 const (
-	Claude = "claude"
-	Codex  = "codex"
+	Claude      = "claude"
+	Codex       = "codex"
+	Antigravity = "antigravity"
 
-	ClaudePanel = "claude-code"
-	CodexPanel  = "codex-cli"
+	ClaudePanel      = "claude-code"
+	CodexPanel       = "codex-cli"
+	AntigravityPanel = "antigravity-cli"
 )
 
 // DisplayName is how the platform names an agent CLI.
@@ -28,6 +30,8 @@ func DisplayName(provider string) string {
 		return "Claude Code"
 	case Codex:
 		return "Codex"
+	case Antigravity:
+		return "Antigravity"
 	}
 	return ""
 }
@@ -39,6 +43,8 @@ func PanelOf(provider string) string {
 		return ClaudePanel
 	case Codex:
 		return CodexPanel
+	case Antigravity:
+		return AntigravityPanel
 	}
 	return ""
 }
@@ -57,6 +63,8 @@ func ProviderOfPanel(panelType string) string {
 		return Claude
 	case CodexPanel:
 		return Codex
+	case AntigravityPanel:
+		return Antigravity
 	}
 	return ""
 }

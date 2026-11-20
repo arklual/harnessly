@@ -77,7 +77,9 @@ effect only for a request that comes with code, and `Inbox.Submit` checks the co
 
 ### The SDK the page gives a script
 
-The script runs in a transparent frame covering the chat's stage, with `pointer-events: none`. Its global is `hx`:
+The script runs in a transparent frame covering the chat's stage, with `pointer-events: none`. On a touch screen
+(`hover: none` and `pointer: coarse`) the front frame sits under the feed like the back one: iOS Safari gives a swipe
+that lands on a frame to the frame despite `pointer-events: none`, and the feed did not scroll. Its global is `hx`:
 
 - `hx.canvas`, `hx.ctx` (2d, already sized to the frame with the device pixel ratio), `hx.w`, `hx.h` (CSS pixels),
   `hx.dpr`.

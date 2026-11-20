@@ -137,7 +137,8 @@ const MachineBody = ({ machine }: { machine: MachineId }) => {
       label: t('next.widgets.machine.disk'),
       used: pct(load.diskTotal - load.diskFree, load.diskTotal),
     },
-  ];
+    // A disk the runtime could not measure (total 0) has no row rather than a false 0 %.
+  ].filter((r) => r.key !== 'disk' || load.diskTotal > 0);
   return (
     <div className="hx-wgl">
       {name && <span className="hx-wgl__name">{name}</span>}

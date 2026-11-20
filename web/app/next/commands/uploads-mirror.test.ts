@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const config = vi.hoisted(() => ({ centralUploads: true, platformApi: '/api/acme' }));
 vi.mock('@/platform/config', () => ({ appConfig: () => config, platformApi: () => config.platformApi }));
 
-import { keepInHub, mirrorUpload, takeKept, uploadSrc } from '@/next/commands/uploads';
+import { attachmentWireId, keepInHub, mirrorUpload, uploadSrc } from '@/next/commands/uploads';
 
 const ref = {
   id: '/home/u/.harnessly/uploads/up_ABCDEFGH.png',
@@ -205,7 +205,7 @@ describe('the chat uploads in the hub', () => {
     expect(calls).toEqual([]);
   });
 
-  it('keeps a file of a machine that is off in the hub, and gives the machine its copy when it is back', async () => {
+  it('keeps a file of a machine that is off in the hub, and the machine that runs the chat takes it from there', async () => {
     const file = Object.assign(new Blob(['abc'], { type: 'image/png' }), { name: 'a.png' });
     const kept = await keepInHub('m-1' as never, file, () => undefined);
     expect(kept).toEqual({
@@ -220,17 +220,12 @@ describe('the chat uploads in the hub', () => {
     ]);
   });
 
-  it('holds the message while the hub cannot give the file back', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response(null, { status: 502 })),
-    );
-    expect(
-      await takeKept('m-1' as never, [
-        { id: `hub:${SHA_OF_ABC}`, name: 'a.png', kind: 'image', mime: 'image/png' },
-      ]),
-    ).toBeNull();
+  it('names a file kept in the hub by its hash, name and type, so any machine can take it from the hub', () => {
+    const kept = { id: `hub:${SHA_OF_ABC}`, name: 'shot 1.png', kind: 'image', mime: 'image/png' } as const;
+    expect(attachmentWireId(kept)).toBe(`hub:${SHA_OF_ABC}?n=shot+1.png&t=image%2Fpng`);
+    expect(attachmentWireId({ ...kept, name: '', mime: '' })).toBe(`hub:${SHA_OF_ABC}`);
+    // a machine's own upload goes as it is
     const plain = { id: 'up_QRSTUVWXYZ234567', name: 'b.txt', kind: 'file', mime: 'text/plain' } as const;
-    expect(await takeKept('m-1' as never, [plain])).toEqual([plain]);
+    expect(attachmentWireId(plain)).toBe('up_QRSTUVWXYZ234567');
   });
 });
