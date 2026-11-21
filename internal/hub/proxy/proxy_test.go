@@ -120,6 +120,26 @@ func (f *fixture) runtime() http.Handler {
 		defer c.CloseNow()
 		_ = c.Write(r.Context(), websocket.MessageText, []byte("v2:"+r.URL.RawQuery))
 	})
+	// The conversation's socket: says hello and repeats what the page sends, so a test sees what got through.
+	mux.HandleFunc("/m/{id}/api/timeline", func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: []string{"*"}})
+		if err != nil {
+			return
+		}
+		defer c.CloseNow()
+		if c.Write(r.Context(), websocket.MessageText, []byte("hello")) != nil {
+			return
+		}
+		for {
+			_, data, err := c.Read(r.Context())
+			if err != nil {
+				return
+			}
+			if c.Write(r.Context(), websocket.MessageText, append([]byte("got:"), data...)) != nil {
+				return
+			}
+		}
+	})
 	mux.HandleFunc("/api/browser/ws", func(w http.ResponseWriter, r *http.Request) {
 		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: []string{"*"}})
 		if err != nil {

@@ -842,4 +842,9 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
 76. **The provider antigravity (GitHub #115).** `Provider` may be `antigravity` (the Antigravity CLI): in a conversation,
     an agent of the machine, an agent session or the origin of a handoff. Only a page that names the cap
     (`?caps=antigravity`) gets them: any other page gets the machine without that agent, the lists without those
-    conversations and sessions, and the upsert of such a conversation as a removal of its id (as with a workflow).
+    conversations and sessions, and the upsert of such a conversation as a removal of its id (as with a workflow); a
+    subscription to such a conversation is answered `not-found`.
+77. **The mode the agent runs in (GitHub #124).** `Conversation.runsIn` is the permission mode the chat's agent was
+    started in last: the chat's own (`model.permission`), else the machine's default of that start (Codex's
+    config.toml, Claude Code's settings). A default changed on the machine later leaves it as it is until the agent's
+    next start. Only a page that names the cap (`?caps=runsin`) gets it.

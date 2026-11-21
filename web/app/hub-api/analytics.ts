@@ -384,11 +384,13 @@ export type HubMachine = {
   lastActiveAt: string | null; // the last chat activity
   chatsRunning: number;
   people: PersonRef[]; // who used it in the last 30 days
-  access: { kind: 'user' | 'team'; id: string; label: string }[]; // empty: everyone in its tenant
+  // empty: everyone in its tenant; level: how far a line opens it (docs/hub/own-work.md, «Levels»), absent: an older hub
+  access: { kind: 'user' | 'team'; id: string; label: string; level?: 'view' | 'tasks' }[];
   owner?: PersonRef | null; // whose own machine it is (who connected it or whom it was handed to); absent: an older hub
   problems: MachineProblem[];
   opensRuntime?: boolean; // false: the hub only observes the machine and cannot open its runtime (absent: an older hub)
   canSeeDebug?: boolean; // the viewer may read its openings for debugging (GET /api/machines/{id}/debug); absent: an older hub
+  accessLevels?: boolean; // the viewer may open it to someone only to watch (level «view»); absent: an older hub
   // The rest is filled only for an organization with the `machine.resources` feature on (docs/hub/machines-resources.md);
   // with it off these are null, and activeOps is empty.
   cloud: MachineCloud | null; // null: the hub knows no server of the machine
@@ -403,7 +405,7 @@ export type MachinesResponse = { scope: Scope; currency: Currency; machines: Hub
 export type PatchMachineRequest = {
   name?: string;
   teamId?: string | null;
-  access?: { kind: 'user' | 'team'; id: string }[];
+  access?: { kind: 'user' | 'team'; id: string; level?: 'view' | 'tasks' }[];
 };
 // 'vm' is the old name of 'machine'. Without the `machine.resources` feature only runner/vm and now/after_chats work.
 export type RestartRequest = { what: 'runner' | 'machine' | 'vm'; when?: 'now' | 'drain' | 'after_chats' };

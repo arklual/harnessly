@@ -14,11 +14,30 @@ const (
 	AccessTeam = "team"
 )
 
+// Machine access levels (docs/hub/own-work.md, «Levels»): how far an entry opens the machine's work.
+const (
+	// AccessTasks lets the person write in the chats and start the agent, besides reading; the level of an entry kept
+	// without one.
+	AccessTasks = "tasks"
+	// AccessView lets the person read the chats and their results, and nothing else.
+	AccessView = "view"
+)
+
 // MachineAccessEntry is one person or team a machine is shared with.
 type MachineAccessEntry struct {
 	MachineID string
 	Kind      string
 	RefID     string
+	// Level is AccessTasks or AccessView; empty is AccessTasks.
+	Level string
+}
+
+// AccessLevel is the entry's level, AccessTasks when it has none.
+func (e MachineAccessEntry) AccessLevel() string {
+	if e.Level == AccessView {
+		return AccessView
+	}
+	return AccessTasks
 }
 
 // MachineAccess lists who the given machines are shared with; a machine without entries is open to its whole tenant.
@@ -30,17 +49,19 @@ func (s Store) MachineAccess(ctx context.Context, machineIDs []string) ([]Machin
 		for j, id := range part {
 			args[j] = id
 		}
-		rows, err := s.q.Query(ctx, `SELECT machine_id, kind, ref_id FROM machine_access WHERE machine_id IN (`+placeholders(len(part))+`)
+		rows, err := s.q.Query(ctx, `SELECT machine_id, kind, ref_id, level FROM machine_access WHERE machine_id IN (`+placeholders(len(part))+`)
 			ORDER BY machine_id, created_at, kind, ref_id`, args...)
 		if err != nil {
 			return nil, err
 		}
 		for rows.Next() {
 			var e MachineAccessEntry
-			if err := rows.Scan(&e.MachineID, &e.Kind, &e.RefID); err != nil {
+			var level sql.NullString
+			if err := rows.Scan(&e.MachineID, &e.Kind, &e.RefID, &level); err != nil {
 				rows.Close()
 				return nil, err
 			}
+			e.Level = MachineAccessEntry{Level: level.String}.AccessLevel()
 			out = append(out, e)
 		}
 		if err := rows.Err(); err != nil {
@@ -58,8 +79,13 @@ func (s Store) SetMachineAccess(ctx context.Context, machineID string, entries [
 		return err
 	}
 	for _, e := range entries {
-		if _, err := s.q.Exec(ctx, `INSERT INTO machine_access (machine_id, kind, ref_id, created_at) VALUES (?, ?, ?, ?)`,
-			machineID, e.Kind, e.RefID, Ms(at)); err != nil {
+		// Tasks is kept as NULL, the level every row had before there were levels.
+		var level any
+		if e.AccessLevel() == AccessView {
+			level = AccessView
+		}
+		if _, err := s.q.Exec(ctx, `INSERT INTO machine_access (machine_id, kind, ref_id, level, created_at) VALUES (?, ?, ?, ?, ?)`,
+			machineID, e.Kind, e.RefID, level, Ms(at)); err != nil {
 			return err
 		}
 	}

@@ -271,3 +271,83 @@ func TestOwnWorkDebugOpening(t *testing.T) {
 		t.Errorf("the opening outlived its half hour: %s", r)
 	}
 }
+
+// Levels (docs/hub/own-work.md): the owner opens the machine to a person only to watch. The person reads its pages and
+// the conversation as it comes, and writes nothing: no other method, no terminal, no message that starts the agent.
+func TestViewLevelReadsAndWritesNothing(t *testing.T) {
+	f := setup(t, orgsOn, hubtest.Env("HUB_ACCESS_ENFORCE", "on"))
+	watcher, other := f.s.SignIn("watcher@example.com"), f.s.SignIn("other@example.com")
+	f.owner.Join(f.spaceID, watcher)
+	f.owner.Join(f.spaceID, other)
+	watch := []map[string]string{{"kind": "user", "id": watcher.ID, "level": "view"}}
+	if r := f.owner.Do("PATCH", "/api/machines/"+f.id, map[string]any{"access": watch}); r.Code != 400 {
+		t.Errorf("a watch line before the levels are out for the owner: %s", r)
+	}
+	if r := f.owner.Do("PUT", "/api/admin/switches", map[string]any{"feature": "own-work", "person": "owner@example.com", "enabled": true}); r.Code != 204 {
+		t.Fatalf("switch: %s", r)
+	}
+	r := f.owner.Do("PATCH", "/api/machines/"+f.id, map[string]any{"access": watch})
+	if r.Code != 200 {
+		t.Fatalf("share to watch: %s", r)
+	}
+	var got struct {
+		Machine struct {
+			Access []struct{ ID, Level string } `json:"access"`
+		} `json:"machine"`
+	}
+	r.JSON(&got)
+	if len(got.Machine.Access) != 1 || got.Machine.Access[0].Level != "view" {
+		t.Errorf("the list as the card shows it: %+v", got.Machine.Access)
+	}
+
+	if r := watcher.Do("GET", "/m/"+f.id+"/headers", nil); r.Code != 200 {
+		t.Errorf("a watcher reads a page: %s", r)
+	}
+	if r := watcher.Do("GET", "/api/machines/"+f.id+"/open", nil); r.Code != 200 {
+		t.Errorf("a watcher opens the machine: %s", r)
+	}
+	if r := watcher.Do("POST", "/m/"+f.id+"/headers", map[string]any{}); r.Code != 403 || r.Err() != "view_only" {
+		t.Errorf("a watcher writes: %s", r)
+	}
+	if r := other.Do("GET", "/m/"+f.id+"/headers", nil); r.Code != 403 {
+		t.Errorf("a person not listed: %s", r)
+	}
+	if r := f.owner.Do("POST", "/m/"+f.id+"/headers", map[string]any{}); r.Code != 200 {
+		t.Errorf("the owner writes: %s", r)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	u, _ := url.Parse(f.s.URL)
+	var cookie []string
+	for _, c := range watcher.Client.Jar.Cookies(u) {
+		cookie = append(cookie, c.Name+"="+c.Value)
+	}
+	h := http.Header{"Cookie": {strings.Join(cookie, "; ")}}
+	if _, res, err := websocket.Dial(ctx, "ws://"+u.Host+"/m/"+f.id+"/ws", &websocket.DialOptions{HTTPHeader: h}); err == nil || res == nil || res.StatusCode != 403 {
+		t.Errorf("a watcher opened a socket that is not for watching: %v", err)
+	}
+	c, _, err := websocket.Dial(ctx, "ws://"+u.Host+"/m/"+f.id+"/api/timeline", &websocket.DialOptions{HTTPHeader: h})
+	if err != nil {
+		t.Fatalf("the conversation's socket: %v", err)
+	}
+	defer c.CloseNow()
+	read := func() string {
+		_, data, err := c.Read(ctx)
+		if err != nil {
+			t.Fatalf("read: %v", err)
+		}
+		return string(data)
+	}
+	if m := read(); m != "hello" {
+		t.Errorf("first message: %q", m)
+	}
+	for _, m := range []string{`{"type":"timeline:resume"}`, `not json`, `{"type":"timeline:subscribe","sessionId":"s"}`} {
+		if err := c.Write(ctx, websocket.MessageText, []byte(m)); err != nil {
+			t.Fatalf("write: %v", err)
+		}
+	}
+	if m := read(); m != `got:{"type":"timeline:subscribe","sessionId":"s"}` {
+		t.Errorf("the runtime heard from a watcher: %q", m)
+	}
+}

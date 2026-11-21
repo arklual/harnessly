@@ -233,6 +233,11 @@ type Conversation struct {
 	// PendingModel is a change of model or effort the person asked for that the agent has not taken yet: the runtime
 	// holds it and applies it at the first moment the agent can (see PendingModel). Absent when none waits.
 	PendingModel *PendingModel `json:"pendingModel,omitempty"`
+	// RunsIn is the permission mode the chat's agent runs in, as the runtime started it last: the one the chat chose
+	// (Model.Permission), else the machine's default at that start (Codex's config.toml, Claude Code's settings). A
+	// default changed on the machine later does not change it: the running session keeps its mode until its next
+	// start (GitHub #124). Absent before the agent's first start and from an older runtime.
+	RunsIn PermissionMode `json:"runsIn,omitempty"`
 	// ModelLog is the changes of model the runtime applied, oldest first, the last ModelLogMax of them: the feed shows
 	// each where it happened. Absent when there were none.
 	ModelLog []ModelSwitch `json:"modelLog,omitempty"`

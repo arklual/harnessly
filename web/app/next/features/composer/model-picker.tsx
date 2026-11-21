@@ -90,6 +90,9 @@ export interface IModelPickerProps {
   /** The same of the fast mode and of the permission mode: value.fast and value.permission are what the agent runs. */
   fastAsked?: boolean | null;
   permissionAsked?: PermissionMode | null;
+  /** The mode the chat's agent was started in (the record's runsIn): shown when the chat names none, so a running
+   *  session shows its own mode and not the machine's default changed since (GitHub #124). */
+  runsIn?: PermissionMode | null;
   onChange: (choice: IModelChoice) => void;
   /**
    * Several models for one prompt (a beta function, a new chat only): `chosen` is every model of the set, the pill's own
@@ -169,6 +172,7 @@ const ModelPicker = ({
   ultracodeAsked = null,
   fastAsked = null,
   permissionAsked = null,
+  runsIn = null,
   onChange,
   multi,
   handoff = null,
@@ -236,7 +240,7 @@ const ModelPicker = ({
   const fast = fastOffered && value.fast === true;
   const fastWaits = fastOffered && fastAsked !== null && fastAsked !== fast ? fastAsked : null;
   const fastHint = fastWaits === null ? t('next.picker.fastHint') : t(FAST_WAITS[fastWaits ? 'on' : 'off']);
-  const permission = value.permission ?? agent.defaultPermission ?? 'ask';
+  const permission = value.permission ?? runsIn ?? agent.defaultPermission ?? 'ask';
   const permissionWaits = permissionAsked !== null && permissionAsked !== permission ? permissionAsked : null;
   const permissionShown = permissionWaits ?? permission;
   const permissionHint = t('next.picker.permissionWaits');

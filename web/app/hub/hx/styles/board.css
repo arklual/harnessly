@@ -831,3 +831,5 @@
 .hb .md-debug{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none;font-size:var(--hx-text-xs);color:var(--hx-fg-2)}
 .hb .md-debug b{color:var(--hx-fg-1);font-weight:600}
 .hb .md-debug p{margin:2px 0 0;color:var(--hx-fg-2);white-space:pre-wrap;overflow-wrap:anywhere}
+.hb .md-levels{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.hb .md-level{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}

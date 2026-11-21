@@ -33,6 +33,9 @@ const (
 	// CapAntigravity: the page knows the provider antigravity (GitHub #115): a conversation, an agent of the machine,
 	// a session or the origin of a handoff may name it. Any other page gets the machine and the lists without it.
 	CapAntigravity Cap = "antigravity"
+	// CapRunsIn: the page reads the permission mode a chat's agent runs in (Conversation.RunsIn), GitHub #124
+	// (README 77).
+	CapRunsIn Cap = "runsin"
 )
 
 // Caps is what a page reads.
@@ -45,6 +48,7 @@ type Caps struct {
 	AppsSync    bool
 	MachineInfo bool
 	Antigravity bool
+	RunsIn      bool
 }
 
 // CapsOf reads the caps a page named in its request's address; an unknown one is ignored.
@@ -56,18 +60,21 @@ func CapsOf(r *http.Request) Caps {
 	return Caps{Delegation: slices.Contains(names, string(CapDelegation)), Workflows: slices.Contains(names, string(CapWorkflows)),
 		Profiles: slices.Contains(names, string(CapProfiles)), MsgStatus: slices.Contains(names, string(CapMsgStatus)),
 		Links: slices.Contains(names, string(CapLinks)), AppsSync: slices.Contains(names, string(CapAppsSync)),
-		MachineInfo: slices.Contains(names, string(CapMachineInfo)), Antigravity: slices.Contains(names, string(CapAntigravity))}
+		MachineInfo: slices.Contains(names, string(CapMachineInfo)), Antigravity: slices.Contains(names, string(CapAntigravity)),
+		RunsIn: slices.Contains(names, string(CapRunsIn))}
 }
 
 // AllCaps reads every optional part.
-var AllCaps = Caps{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true, AppsSync: true, MachineInfo: true, Antigravity: true}
+var AllCaps = Caps{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true, AppsSync: true, MachineInfo: true, Antigravity: true,
+	RunsIn: true}
 
 // olderCaps is every Caps short of AllCaps that a page may have: the forms an event can go out in besides its own.
 // Each cap came with a build of the page that read the ones before it.
 var olderCaps = []Caps{{}, {Delegation: true}, {Delegation: true, Workflows: true}, {Delegation: true, Workflows: true, Profiles: true},
 	{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true}, {Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true},
 	{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true, AppsSync: true},
-	{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true, AppsSync: true, MachineInfo: true}}
+	{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true, AppsSync: true, MachineInfo: true},
+	{Delegation: true, Workflows: true, Profiles: true, MsgStatus: true, Links: true, AppsSync: true, MachineInfo: true, Antigravity: true}}
 
 // eventFor is e as a page with caps gets it, and whether it differs from e.
 func eventFor(e Event, caps Caps) (Event, bool) {
@@ -117,6 +124,12 @@ func eventFor(e Event, caps Caps) (Event, bool) {
 	if !caps.Antigravity {
 		if old, ok := withoutAntigravity(e); ok {
 			e, changed = old, true
+		}
+	}
+	if !caps.RunsIn {
+		if up, ok := e.(ConversationUpsertEv); ok && up.Conv.RunsIn != "" {
+			up.Conv.RunsIn = ""
+			e, changed = up, true
 		}
 	}
 	return e, changed
@@ -446,6 +459,14 @@ func snapshotFor(f SnapshotFrame, caps Caps) SnapshotFrame {
 				f.Machine = &m
 			}
 		}
+	}
+	if !caps.RunsIn && f.Convs != nil && slices.ContainsFunc(f.Convs.Conversations, func(c Conversation) bool { return c.RunsIn != "" }) {
+		cs := *f.Convs
+		cs.Conversations = slices.Clone(cs.Conversations)
+		for i := range cs.Conversations {
+			cs.Conversations[i].RunsIn = ""
+		}
+		f.Convs = &cs
 	}
 	if !caps.Links && f.Conv != nil {
 		if turns, cut := turnsWithoutLinks(f.Conv.Turns); cut {

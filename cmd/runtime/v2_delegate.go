@@ -86,11 +86,10 @@ func newDelegation(v *v2Live, settings wire.RuntimeSettingsStore) *delegation.Se
 			if rec.Model != nil && rec.Model.Permission != "" {
 				return rec.Model.Permission
 			}
-			m := v.machine
-			if m == nil || m.skip == nil {
-				return wire.PermissionAsk
+			if rec.RunsIn != "" {
+				return rec.RunsIn
 			}
-			return defaultPermissionOf(rec.Provider, m.skip(), m.codexConfig, m.claudeSettings)
+			return v.machineMode(rec.Provider)
 		},
 		Book: &delegation.Book{Path: filepath.Join(v.d.DataDir, "v2", "delegations.json")},
 		Log: func(msg string, kv ...any) {

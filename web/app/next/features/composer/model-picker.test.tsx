@@ -368,6 +368,19 @@ describe('scope of the permission mode and the catalog of the models (GitHub #12
     act(() => fresh.container.querySelector<HTMLButtonElement>('.hx-model')?.click());
     expect(fresh.getByText(/Machine default: Auto/)).toBeTruthy();
   });
+  it('shows the mode the session was started in, not the default changed since', () => {
+    const view = render(
+      <ModelPicker
+        value={choice({ provider: 'codex' })}
+        agents={[codex]}
+        locked
+        runsIn="ask"
+        onChange={vi.fn()}
+      />,
+    );
+    act(() => view.container.querySelector<HTMLButtonElement>('.hx-model')?.click());
+    expect(view.getByText(/This session: Ask/)).toBeTruthy();
+  });
   it('says the list is the built-in fallback, or a cache with its date', () => {
     expect(catalogNote(codex)).toContain('Built-in model list');
     expect(

@@ -315,7 +315,12 @@ export const wasteResponse = obj({
   ),
 });
 
-const accessSubject = obj({ kind: lit('user', 'team'), id: str, label: str });
+const accessSubject = obj({
+  kind: lit('user', 'team'),
+  id: str,
+  label: str,
+  level: opt(lit('view', 'tasks')),
+});
 export const hubMachine = obj({
   id: str,
   name: str,
@@ -334,6 +339,7 @@ export const hubMachine = obj({
   problems: arr(lit('offline', 'idle_week', 'agent_old', 'disk_low', 'login_expired', 'disabled')),
   opensRuntime: opt(bool),
   canSeeDebug: opt(bool),
+  accessLevels: opt(bool),
   cloud: nullable(machineCloud),
   hardware: nullable(machineHardware),
   load: nullable(machineLoad),

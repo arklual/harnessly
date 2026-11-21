@@ -4479,6 +4479,10 @@
           "name": "created_at",
           "type": "bigint",
           "notNull": true
+        },
+        {
+          "name": "level",
+          "type": "text"
         }
       ],
       "primaryKey": [

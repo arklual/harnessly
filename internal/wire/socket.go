@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -500,6 +501,10 @@ func (s *Server) frame(ctx context.Context, c *client, b []byte) {
 // is otherwise silent) and gets the state of now with it.
 func (s *Server) sub(ctx context.Context, c *client, f SubFrame) {
 	s.Hub.unsubscribe(c, f.Ch)
+	if s.unknownProvider(ctx, c.caps, f.Ch) {
+		c.send(ErrorFrame{Ch: f.Ch, Code: FrameErrNotFound})
+		return
+	}
 	s.Hub.mu.Lock()
 	n := len(c.subs)
 	s.Hub.mu.Unlock()
@@ -535,6 +540,23 @@ func (s *Server) sub(ctx context.Context, c *client, f SubFrame) {
 		return
 	}
 	s.Hub.release(sub, b)
+}
+
+// unknownProvider tells whether ch is the channel of a conversation whose provider the page does not know: a page
+// without CapAntigravity never learned of such a chat from the lists, and a link to it is not found for it, as a
+// turn the agent answers would name the provider and the page's decoder would refuse the frame (GitHub #115).
+func (s *Server) unknownProvider(ctx context.Context, caps Caps, ch Channel) bool {
+	id, conv := ch.ConvID()
+	if caps.Antigravity || !conv {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.Limits.CmdBudgetMs)*time.Millisecond)
+	defer cancel()
+	cs, err := s.Service.Conversations(ctx)
+	if err != nil {
+		return false
+	}
+	return slices.ContainsFunc(cs.Conversations, func(c Conversation) bool { return c.ID == id && c.Provider == ProviderAntigravity })
 }
 
 // caughtUp ends a conversation's replay with its snapshot "after" the events replayed; when the conversation does not

@@ -13,6 +13,7 @@ import { canOpen, cardSub, cleanName, readiness, readyHeadline, statusOf } from 
 import { MachineDialogs } from './dialogs';
 import { DebugLog, DebugPanel } from './debug';
 import { type OpenMachine, useOpenMachine } from './open';
+import { AgentSignIn } from './login';
 import { ErrorRow } from './parts';
 import { ResourcesSection } from './resources';
 import type { DrawerState } from './url';
@@ -79,8 +80,8 @@ export const MachineDrawer = ({
     url.setTab(null);
     void card.resize(to);
   };
-  const saveAccess = async (mode: Parameters<typeof card.saveAccess>[0], ids: string[]) => {
-    const ok = await card.saveAccess(mode, ids);
+  const saveAccess = async (change: Parameters<typeof card.saveAccess>[0]) => {
+    const ok = await card.saveAccess(change);
     if (ok) url.setTab(null);
     return ok;
   };
@@ -447,6 +448,14 @@ export const MachineDrawer = ({
                       <div className="mut sm" style={{ marginTop: 2 }}>
                         {login}
                       </div>
+                    )}
+                    {a.installed && a.login === 'out' && (m.canAdmin || m.mine) && !off && (
+                      <AgentSignIn
+                        machineId={m.id}
+                        tenantId={m.tenantId}
+                        provider={a.provider}
+                        onPoll={card.reload}
+                      />
                     )}
                   </div>
                 );

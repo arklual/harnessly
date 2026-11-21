@@ -201,6 +201,11 @@ the refusal of opening is 403 `own_work` when a role or an empty list would have
 `machine_access` otherwise. Peer messages ([Peers](peers.md)) follow the rule without the switch: the receiving runtime
 asks its owner itself.
 
+**Levels** ([Own work](own-work.md#levels)): a line of the list carries `level`, `view` or `tasks` (no value is
+`tasks`). A person whose lines are all `view` opens the machine and reads it, and gets 403 `view_only` for any write
+through the proxy, for the sockets that are not for watching, and for `peers send`. Setting `view` comes out with the
+switch `own-work` of the person who edits the list.
+
 With `on` the list also decides who *sees* the machine: a person it does not let in gets the machine in no list (the
 tenant's machines, the organization's inventory, the fleet), `GET /api/machines/{id}` answers 404 as for a machine that
 does not exist, and the live events of the machine (`machine`, `machine.op`, `job`, `login`) are checked per person at

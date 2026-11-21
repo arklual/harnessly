@@ -187,3 +187,22 @@ func TestAProfileChatTurnsFastModeWithoutTypingIt(t *testing.T) {
 		t.Fatalf("%+v", res)
 	}
 }
+
+// GitHub #124: the record says the mode the launcher started the agent in, so the page shows the running session's
+// mode and not a default changed on the machine since.
+func TestTheRecordSaysTheModeTheAgentRunsIn(t *testing.T) {
+	r := newRig(t)
+	r.open()
+	if got := r.record().RunsIn; got != "" {
+		t.Fatalf("before a start: %q", got)
+	}
+	r.rt.LaunchMode(r.id, wire.PermissionBypass)
+	if got := r.record().RunsIn; got != wire.PermissionBypass {
+		t.Fatalf("after the start: %q", got)
+	}
+	rev := r.record().Rev
+	r.rt.LaunchMode(r.id, wire.PermissionBypass)
+	if r.record().Rev != rev {
+		t.Fatal("the same mode again changes nothing")
+	}
+}

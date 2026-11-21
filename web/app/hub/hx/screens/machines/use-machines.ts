@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { orgErrorText } from '../../../org/api/errors';
 import type {
-  AccessMode,
+  AccessChange,
   MachineBusyKind,
   MachineDetail,
   MachinesList,
@@ -80,7 +80,7 @@ export interface MachineCard {
   /** Takes the machine away; true once the hub has done it. */
   remove: () => Promise<boolean>;
   resize: (to: { cores: number; ramGb: number; diskGb: number }) => Promise<boolean>;
-  saveAccess: (mode: AccessMode, personIds: string[]) => Promise<boolean>;
+  saveAccess: (change: AccessChange) => Promise<boolean>;
   /** Hands the machine to another member of its space; the answer is the card with the new owner. */
   assignOwner: (userId: string, history: OwnerHistory) => Promise<boolean>;
 }
@@ -229,16 +229,22 @@ export const useMachineCard = (id: string, onChanged: (m: OrgMachine) => void): 
         () => api.resizeMachine(id, to),
         `ресурсы изменены: ${sizeText(to)}`,
       ),
-    saveAccess: (mode, personIds) =>
+    saveAccess: (change) =>
       act(
         (d) => ({
           ...d,
           access: {
-            mode,
-            people: mode === 'pick' ? d.candidates.filter((p) => personIds.includes(p.id)) : d.access.people,
+            mode: change.mode,
+            people:
+              change.mode === 'pick'
+                ? d.candidates
+                    .filter((p) => change.personIds.includes(p.id))
+                    .map((p) => (change.levels?.[p.id] === 'view' ? { ...p, level: 'view' as const } : p))
+                : d.access.people,
+            ...(change.teamLevel ? { teamLevel: change.teamLevel } : {}),
           },
         }),
-        () => api.setMachineAccess(id, { mode, personIds }),
+        () => api.setMachineAccess(id, change),
         null,
       ),
   };

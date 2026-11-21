@@ -5,6 +5,9 @@ import type { HubMachine, MachinesResponse, RestartRequest } from '../../../../h
 import type { Member, OrgView, Scope as ApiScope } from '../../../../hub-api/orgs';
 import { OrgApiError } from '../errors';
 import type {
+  AccessChange,
+  AccessLevel,
+  AgentLogin,
   DebugOpening,
   MachineAccess,
   MachineDetail,
@@ -103,6 +106,8 @@ export const orgMachineOf = (raw: HubMachine, view: OrgView): OrgMachine => {
     pending: m.status === 'pending',
     host: m.hostname || undefined,
     canManage: canAdmin || (teamCaps?.manage ?? false),
+    canShare: canAdmin || (teamCaps?.manage ?? false) || (owner !== null && owner.id === view.me.userId),
+    accessLevels: m.accessLevels ?? false,
     canAdmin,
     canSeeDebug: m.canSeeDebug ?? false,
     needs: canAdmin ? null : 'tenant_admin',
@@ -163,20 +168,30 @@ export const buildMachinesList = (raw: HubMachine[], ctx: MachinesCtx): Machines
 export const accessOf = (m: HubMachine): MachineAccess => {
   const team = m.access.find((a) => a.kind === 'team');
   if (m.access.length === 0) return { mode: 'tenant', people: [] };
-  if (team && m.access.length === 1) return { mode: 'team', people: [] };
+  if (team && m.access.length === 1)
+    return { mode: 'team', people: [], ...(team.level === 'view' ? { teamLevel: 'view' as const } : {}) };
   return {
     mode: 'pick',
-    people: m.access.filter((a) => a.kind === 'user').map((a) => ({ id: a.id, name: a.label })),
+    people: m.access
+      .filter((a) => a.kind === 'user')
+      .map((a) => ({ id: a.id, name: a.label, ...(a.level === 'view' ? { level: 'view' as const } : {}) })),
   };
 };
 
 export const accessBody = (
   m: HubMachine,
-  access: { mode: MachineAccess['mode']; personIds: string[] },
-): { kind: 'user' | 'team'; id: string }[] => {
+  access: AccessChange,
+): { kind: 'user' | 'team'; id: string; level?: AccessLevel }[] => {
   if (access.mode === 'tenant') return [];
-  if (access.mode === 'pick') return access.personIds.map((id) => ({ kind: 'user' as const, id }));
-  if (access.mode === 'team' && m.teamId) return [{ kind: 'team', id: m.teamId }];
+  if (access.mode === 'pick')
+    return access.personIds.map((id) => {
+      const level = access.levels?.[id];
+      return { kind: 'user' as const, id, ...(level === 'view' ? { level } : {}) };
+    });
+  if (access.mode === 'team' && m.teamId)
+    return [
+      { kind: 'team', id: m.teamId, ...(access.teamLevel === 'view' ? { level: 'view' as const } : {}) },
+    ];
   throw new OrgApiError('invalid_request', 'Сначала передайте машину команде.');
 };
 
@@ -396,6 +411,18 @@ export const liveMachines = (ctx: () => MachinesCtx): MachinesApi => {
     openMachine: (id) => contractGet<{ url: string }>(`/api/machines/${id}/open`),
     trustMachine: async (id) => {
       await http.post(`/api/machines/${id}/trust`, {});
+    },
+    startAgentLogin: async (id, provider) =>
+      (
+        await http.post<{ login: AgentLogin }>(`/api/machines/${id}/agents/${provider}/login`, {
+          method: 'link',
+        })
+      ).login,
+    sendLoginCode: async (id, loginId, code) => {
+      await http.post(`/api/machines/${id}/logins/${encodeURIComponent(loginId)}/code`, { code });
+    },
+    cancelAgentLogin: async (id, loginId) => {
+      await http.del(`/api/machines/${id}/logins/${encodeURIComponent(loginId)}`);
     },
     debugMachine: async (id, reason) => {
       await http.post(`/api/machines/${id}/debug`, { reason });

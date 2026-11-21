@@ -1,18 +1,20 @@
 // «Кто может запускать чаты» of the machine card: the rule in words, the people it covers, and the editor of the rule.
 import { useState } from 'react';
 
-import type { AccessMode, MachineDetail } from '../../../org/api/machines';
+import type { AccessChange, AccessLevel, AccessMode, MachineDetail } from '../../../org/api/machines';
 import { Btn, Icon, initial } from '../../ui';
 import { peopleWord } from './calc';
 
 export const accessSummary = (d: MachineDetail): string => {
   const { machine: m, access, audience } = d;
-  if (access.mode === 'pick') return `Выбранные люди · ${access.people.length}`;
+  if (access.mode === 'pick') {
+    const watch = access.people.filter((p) => p.level === 'view').length;
+    return `Выбранные люди · ${access.people.length}${watch > 0 ? ` · смотрят ${watch}` : ''}`;
+  }
   if (access.mode === 'team')
-    return `Команда ${d.teamLabel ?? m.teamName ?? ''} · ${peopleWord(audience.team ?? 0)}`.replace(
-      '  ',
-      ' ',
-    );
+    return `Команда ${d.teamLabel ?? m.teamName ?? ''} · ${peopleWord(audience.team ?? 0)}${
+      access.teamLevel === 'view' ? ' · только смотреть' : ''
+    }`.replace('  ', ' ');
   if (access.mode === 'tenant') return `Все в тенанте ${m.tenantName} · ${peopleWord(audience.tenant)}`;
   return 'Только владелец';
 };
@@ -21,7 +23,8 @@ export const accessSummary = (d: MachineDetail): string => {
 export const accessNames = (d: MachineDetail): string[] => {
   const { machine: m, access, audience, candidates } = d;
   if (access.mode === 'owner') return [m.ownerName ?? 'Владелец'];
-  if (access.mode === 'pick') return access.people.map((p) => p.name);
+  if (access.mode === 'pick')
+    return access.people.map((p) => (p.level === 'view' ? `${p.name} · смотрит` : p.name));
   if (access.mode === 'tenant') return ['Все', peopleWord(audience.tenant)];
   const head = candidates.slice(0, 3).map((p) => p.name);
   const rest = (audience.team ?? head.length) - head.length;
@@ -70,6 +73,40 @@ const Person = ({ name }: { name: string }) => (
   </span>
 );
 
+const LEVELS: [AccessLevel, string][] = [
+  ['tasks', 'Давать задачи'],
+  ['view', 'Только смотреть'],
+];
+
+/** One line of the levels: whom it is about and how far the machine is open to them (docs/hub/own-work.md, «Levels»). */
+const LevelRow = ({
+  name,
+  value,
+  onChange,
+}: {
+  name: string;
+  value: AccessLevel;
+  onChange: (v: AccessLevel) => void;
+}) => (
+  <div className="md-level">
+    <Person name={name} />
+    <div className="hx-set__seg" role="radiogroup" aria-label={`Что может ${name}`}>
+      {LEVELS.map(([v, text]) => (
+        <button
+          key={v}
+          type="button"
+          className="hx-set__seg-item"
+          role="radio"
+          aria-checked={value === v}
+          onClick={() => onChange(v)}
+        >
+          {text}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
 const Editor = ({
   d,
   onCancel,
@@ -77,10 +114,19 @@ const Editor = ({
 }: {
   d: MachineDetail;
   onCancel: () => void;
-  onSave: (mode: AccessMode, personIds: string[]) => Promise<boolean>;
+  onSave: (change: AccessChange) => Promise<boolean>;
 }) => {
   const [mode, setMode] = useState<AccessMode>(d.access.mode);
   const [picked, setPicked] = useState<string[]>(d.access.people.map((p) => p.id));
+  const [levels, setLevels] = useState<Record<string, AccessLevel>>(() =>
+    Object.fromEntries(d.access.people.filter((p) => p.level === 'view').map((p) => [p.id, 'view' as const])),
+  );
+  const [teamLevel, setTeamLevel] = useState<AccessLevel>(d.access.teamLevel ?? 'tasks');
+  // Levels are shown to whom the hub lets set them, and to anyone who has to see a line already open only to watch.
+  const levelsOn =
+    !!d.machine.accessLevels ||
+    d.access.teamLevel === 'view' ||
+    d.access.people.some((p) => p.level === 'view');
   const [saving, setSaving] = useState(false);
   const options = modeOptions(d);
   const empty = mode === 'pick' && picked.length === 0;
@@ -89,7 +135,15 @@ const Editor = ({
     if (saving || empty) return;
     setSaving(true);
     try {
-      await onSave(mode, mode === 'pick' ? picked : []);
+      const personIds = mode === 'pick' ? picked : [];
+      await onSave({
+        mode,
+        personIds,
+        levels: Object.fromEntries(
+          personIds.filter((id) => levels[id] === 'view').map((id) => [id, 'view' as const]),
+        ),
+        ...(mode === 'team' && teamLevel === 'view' ? { teamLevel } : {}),
+      });
     } finally {
       setSaving(false);
     }
@@ -134,6 +188,34 @@ const Editor = ({
           })}
         </div>
       )}
+      {levelsOn && mode === 'pick' && picked.length > 0 && (
+        <div className="md-levels">
+          {d.candidates
+            .filter((p) => picked.includes(p.id))
+            .map((p) => (
+              <LevelRow
+                key={p.id}
+                name={p.name}
+                value={levels[p.id] ?? 'tasks'}
+                onChange={(v) => setLevels((l) => ({ ...l, [p.id]: v }))}
+              />
+            ))}
+        </div>
+      )}
+      {levelsOn && mode === 'team' && (
+        <div className="md-levels">
+          <LevelRow
+            name={`Команда ${d.teamLabel ?? d.machine.teamName ?? ''}`.trim()}
+            value={teamLevel}
+            onChange={setTeamLevel}
+          />
+        </div>
+      )}
+      {levelsOn && (mode === 'pick' || mode === 'team') && (
+        <p className="md-note">
+          Только смотреть — видит чаты машины, но не пишет в них, не запускает новые и не открывает терминал.
+        </p>
+      )}
       <p className="md-note">Идущие чаты не прервутся — новые правила действуют для новых чатов.</p>
       <div className="md-edit__foot">
         <Btn variant="ghost" size="sm" onClick={onCancel}>
@@ -169,9 +251,10 @@ export const AccessSection = ({
   locked: boolean;
   onEdit: () => void;
   onCancel: () => void;
-  onSave: (mode: AccessMode, personIds: string[]) => Promise<boolean>;
+  onSave: (change: AccessChange) => Promise<boolean>;
 }) => {
   const m = d.machine;
+  const may = m.canShare ?? m.canManage;
   return (
     <div className="md-sec">
       <div className="md-sec__head">
@@ -180,9 +263,9 @@ export const AccessSection = ({
           <button
             type="button"
             className="hb-add"
-            aria-disabled={!m.canManage}
-            title={!m.canManage ? 'Может поменять: лид команды' : undefined}
-            onClick={() => m.canManage && onEdit()}
+            aria-disabled={!may}
+            title={!may ? 'Может поменять: владелец машины или лид команды' : undefined}
+            onClick={() => may && onEdit()}
           >
             Изменить
           </button>

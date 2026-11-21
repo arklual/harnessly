@@ -56,11 +56,13 @@ var (
 	errRestartOld      = httpx.New(http.StatusUnprocessableEntity, "restart_unsupported", "Эта версия агента не умеет перезапускаться: обновите агента")
 )
 
-// AccessView is one entry of a machine's access list.
+// AccessView is one entry of a machine's access list. Level is how far it opens the machine (docs/hub/own-work.md,
+// «Levels»): view (watch) or tasks (give it tasks as well).
 type AccessView struct {
 	Kind  string `json:"kind"`
 	ID    string `json:"id"`
 	Label string `json:"label"`
+	Level string `json:"level"`
 }
 
 // HubMachine is HubMachine of web/app/hub-api/analytics.ts: a machine of an organization.
@@ -100,6 +102,14 @@ type HubMachine struct {
 	// CanSeeDebug says the viewer may read the machine's openings for debugging (MaySeeDebug); set by the list that
 	// knows the viewer, false elsewhere.
 	CanSeeDebug bool `json:"canSeeDebug"`
+	// AccessLevels says the viewer may open the machine to a person or a team only to watch (AccessView.Level); set by
+	// the list that knows the viewer, false elsewhere.
+	AccessLevels bool `json:"accessLevels"`
+}
+
+// AccessLevels says the person may set levels on the machine's access list (machaccess.Checker.LevelsOn).
+func (s *Service) AccessLevels(ctx context.Context, p *auth.Principal, m store.Machine) bool {
+	return s.acc.LevelsOn(ctx, p.User.ID, m)
 }
 
 // orgsOn says whether the person gets the organizations' API (HUB_ORGS: off is nobody).
@@ -238,7 +248,7 @@ func (s *Service) HubMachines(ctx context.Context, st store.Store, ms []store.Ma
 			if !ok {
 				continue
 			}
-			h.Access = append(h.Access, AccessView{Kind: e.Kind, ID: e.RefID, Label: label})
+			h.Access = append(h.Access, AccessView{Kind: e.Kind, ID: e.RefID, Label: label, Level: e.AccessLevel()})
 		}
 		h.Problems = s.problems(m, h.Status, last, now)
 		h.OpensRuntime = opensRuntime(m)
@@ -360,10 +370,11 @@ func cleanMachineName(raw string) (string, error) {
 	return name, nil
 }
 
-// accessRef is one entry of the access list of a PATCH.
+// accessRef is one entry of the access list of a PATCH. Level is view or tasks; empty is tasks, as before levels.
 type accessRef struct {
-	Kind string `json:"kind"`
-	ID   string `json:"id"`
+	Kind  string `json:"kind"`
+	ID    string `json:"id"`
+	Level string `json:"level,omitempty"`
 }
 
 // patchRequest is the body of PATCH /api/machines/{id}. TeamID keeps the difference between absent (nil) and null.
@@ -374,7 +385,8 @@ type patchRequest struct {
 }
 
 // patchOrg is the PATCH that changes more than the name: the team and who may use the machine. Whoever manages the
-// machine's tenant may change all of it; a lead of the machine's team may change the access alone.
+// machine's tenant may change all of it; a lead of the machine's team and the machine's creator, whose work runs on it
+// (docs/hub/own-work.md), may change the access alone.
 func (s *Service) patchOrg(w http.ResponseWriter, r *http.Request, p *auth.Principal, req patchRequest) error {
 	if !s.orgsOn(p) {
 		return httpx.ErrNotFound
@@ -400,29 +412,47 @@ func (s *Service) patchOrg(w http.ResponseWriter, r *http.Request, p *auth.Princ
 		}
 		seen := map[string]bool{}
 		for _, a := range *req.Access {
-			if (a.Kind != store.AccessUser && a.Kind != store.AccessTeam) || a.ID == "" {
-				return httpx.Invalid("access", "Запись доступа — {kind: user|team, id}")
+			if (a.Kind != store.AccessUser && a.Kind != store.AccessTeam) || a.ID == "" ||
+				(a.Level != "" && a.Level != store.AccessView && a.Level != store.AccessTasks) {
+				return httpx.Invalid("access", "Запись доступа — {kind: user|team, id, level: view|tasks}")
 			}
 			if k := a.Kind + ":" + a.ID; !seen[k] {
 				seen[k] = true
-				want = append(want, store.MachineAccessEntry{Kind: a.Kind, RefID: a.ID})
+				e := store.MachineAccessEntry{Kind: a.Kind, RefID: a.ID, Level: a.Level}
+				e.Level = e.AccessLevel()
+				want = append(want, e)
 			}
 		}
 	}
 	id := r.PathValue("machineId")
+	// Whether the person may set levels is read before the transaction: the switches are read outside it.
+	levelsOn := false
+	for _, e := range want {
+		if e.AccessLevel() == store.AccessView {
+			if m, err := s.db.S().MachineByID(ctx, id); err == nil {
+				levelsOn = s.AccessLevels(ctx, p, m)
+			}
+			break
+		}
+	}
 	err := s.db.Tx(ctx, func(st store.Store) error {
 		m, err := machineOf(ctx, st, id)
 		if err != nil {
 			return err
 		}
 		if err := manage(ctx, st, p, m); err != nil {
-			// The lead of the machine's team changes who may use it, and nothing else.
+			// The lead of the machine's team and the machine's creator change who may use it, and nothing else.
 			var he *httpx.Error
-			if !errors.As(err, &he) || he.Status != http.StatusForbidden || req.Name != nil || req.TeamID != nil || m.TeamID == "" {
+			if !errors.As(err, &he) || he.Status != http.StatusForbidden || req.Name != nil || req.TeamID != nil {
 				return err
 			}
-			if _, terr := authz.New(st).Can(ctx, orgs.Principal(p), authz.Check{Action: authz.Manage, Scope: authz.Scope{Kind: store.ScopeTeam, ID: m.TeamID}}); terr != nil {
-				return err
+			if owner := m.CreatedBy != "" && m.CreatedBy == p.User.ID; !owner {
+				if m.TeamID == "" {
+					return err
+				}
+				if _, terr := authz.New(st).Can(ctx, orgs.Principal(p), authz.Check{Action: authz.Manage, Scope: authz.Scope{Kind: store.ScopeTeam, ID: m.TeamID}}); terr != nil {
+					return err
+				}
 			}
 		}
 		if req.Name != nil && name != m.Name {
@@ -455,6 +485,9 @@ func (s *Service) patchOrg(w http.ResponseWriter, r *http.Request, p *auth.Princ
 			}
 			cur, err := st.MachineAccess(ctx, []string{m.ID})
 			if err != nil {
+				return err
+			}
+			if err := checkLevels(levelsOn, cur, want); err != nil {
 				return err
 			}
 			if !sameAccess(cur, want) {
@@ -515,16 +548,31 @@ func (s *Service) checkAccess(ctx context.Context, st store.Store, m store.Machi
 	return nil
 }
 
+// checkLevels refuses a new line that opens the machine only to watch from a person the levels are not out for yet: a
+// line the list already has stays as it is.
+func checkLevels(levelsOn bool, cur, want []store.MachineAccessEntry) error {
+	had := map[string]bool{}
+	for _, e := range cur {
+		had[e.Kind+":"+e.RefID+":"+e.AccessLevel()] = true
+	}
+	for _, e := range want {
+		if e.AccessLevel() == store.AccessView && !had[e.Kind+":"+e.RefID+":"+store.AccessView] && !levelsOn {
+			return httpx.Invalid("access", "Уровень «смотреть» пока не включён для вас")
+		}
+	}
+	return nil
+}
+
 func sameAccess(cur, want []store.MachineAccessEntry) bool {
 	if len(cur) != len(want) {
 		return false
 	}
 	have := map[string]bool{}
 	for _, e := range cur {
-		have[e.Kind+":"+e.RefID] = true
+		have[e.Kind+":"+e.RefID+":"+e.AccessLevel()] = true
 	}
 	for _, e := range want {
-		if !have[e.Kind+":"+e.RefID] {
+		if !have[e.Kind+":"+e.RefID+":"+e.AccessLevel()] {
 			return false
 		}
 	}
@@ -534,7 +582,7 @@ func sameAccess(cur, want []store.MachineAccessEntry) bool {
 func accessJSON(es []store.MachineAccessEntry) []accessRef {
 	out := make([]accessRef, 0, len(es))
 	for _, e := range es {
-		out = append(out, accessRef{Kind: e.Kind, ID: e.RefID})
+		out = append(out, accessRef{Kind: e.Kind, ID: e.RefID, Level: e.AccessLevel()})
 	}
 	return out
 }

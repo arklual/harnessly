@@ -94,3 +94,39 @@ func TestDecideOwnWork(t *testing.T) {
 		}
 	}
 }
+
+func TestGrantLevels(t *testing.T) {
+	m := store.Machine{ID: "m", CreatedBy: "alice"}
+	watch := func(e store.MachineAccessEntry) store.MachineAccessEntry { e.Level = store.AccessView; return e }
+	own := func(s machaccess.Subject) machaccess.Subject { s.OwnWork = true; return s }
+	for _, c := range []struct {
+		name    string
+		entries []store.MachineAccessEntry
+		who     machaccess.Subject
+		want    machaccess.Level
+	}{
+		{"the creator over a watch line", []store.MachineAccessEntry{watch(user("alice"))}, own(machaccess.Subject{UserID: "alice"}), machaccess.LevelTasks},
+		{"a person listed to watch", []store.MachineAccessEntry{watch(user("bob"))}, own(machaccess.Subject{UserID: "bob"}), machaccess.LevelView},
+		{"a line without a level gives tasks", []store.MachineAccessEntry{user("bob")}, own(machaccess.Subject{UserID: "bob"}), machaccess.LevelTasks},
+		{"a team to watch", []store.MachineAccessEntry{watch(team("t1"))}, own(machaccess.Subject{UserID: "bob", Teams: []string{"t1"}}), machaccess.LevelView},
+		{"the higher of two lines", []store.MachineAccessEntry{watch(team("t1")), user("bob")}, own(machaccess.Subject{UserID: "bob", Teams: []string{"t1"}}), machaccess.LevelTasks},
+		{"a manager under the rule, listed to watch", []store.MachineAccessEntry{watch(user("carol"))}, own(machaccess.Subject{UserID: "carol", Manager: true}), machaccess.LevelView},
+		{"a manager without the rule", []store.MachineAccessEntry{watch(user("bob"))}, machaccess.Subject{UserID: "carol", Manager: true}, machaccess.LevelTasks},
+		{"not listed", []store.MachineAccessEntry{watch(user("bob"))}, own(machaccess.Subject{UserID: "dave"}), machaccess.LevelNone},
+	} {
+		if got := machaccess.Grant(m, c.entries, c.who); got != c.want {
+			t.Errorf("%s: %v, want %v", c.name, got, c.want)
+		}
+		if got := machaccess.Decide(m, c.entries, c.who); got != (c.want > machaccess.LevelNone) {
+			t.Errorf("%s: Decide %v", c.name, got)
+		}
+	}
+}
+
+func TestAccessLevelOfEntry(t *testing.T) {
+	for in, want := range map[string]string{"": store.AccessTasks, "tasks": store.AccessTasks, "view": store.AccessView, "odd": store.AccessTasks} {
+		if got := (store.MachineAccessEntry{Level: in}).AccessLevel(); got != want {
+			t.Errorf("%q: %q, want %q", in, got, want)
+		}
+	}
+}

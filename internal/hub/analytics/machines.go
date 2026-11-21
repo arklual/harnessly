@@ -89,6 +89,7 @@ func (s *Service) machinesList(w http.ResponseWriter, r *http.Request, p *auth.P
 			return err
 		}
 		h.CanSeeDebug = see
+		h.AccessLevels = s.machines.AccessLevels(ctx, p, ms[i])
 		if w := h.Week; w != nil && w.Calls > w.Unpriced {
 			spend := cur.Micros(w.SpendMicros)
 			w.Spend = &spend

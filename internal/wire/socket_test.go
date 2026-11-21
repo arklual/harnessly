@@ -1672,3 +1672,24 @@ func TestDesignlyLibraryIsRevalidated(t *testing.T) {
 		t.Fatalf("changed: %d, %d bytes, etag %q", changed.StatusCode, len(body), changed.Header.Get("ETag"))
 	}
 }
+
+// GitHub #115: a page that does not know the provider antigravity never gets such a chat, a direct link to it too: its
+// turns would name the provider and the page would refuse the frame.
+func TestAntigravityChatNotFoundForAnOlderPage(t *testing.T) {
+	g := newRig(t, time.Hour)
+	res := g.cmd(wire.OpConversationCreate, wire.ConversationCreateCmd{OpID: "ag", Cwd: "/tmp", Provider: wire.ProviderAntigravity})
+	if res.ID == nil {
+		t.Fatalf("create: %+v", res)
+	}
+	ch := wire.ConvChannel(*res.ID)
+	old := g.dial()
+	old.hello()
+	old.send(wire.SubFrame{Ch: ch})
+	if e, ok := old.read().(wire.ErrorFrame); !ok || e.Code != wire.FrameErrNotFound || e.Ch != ch {
+		t.Fatalf("an older page: %#v", e)
+	}
+	knows := g.dialWith(string(wire.CapAntigravity))
+	knows.hello()
+	knows.send(wire.SubFrame{Ch: ch})
+	knows.snapshot(ch)
+}

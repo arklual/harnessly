@@ -811,6 +811,21 @@ func (r *Runtime) LaunchReady(id string) {
 	r.feedInput(id, agentstate.Input{K: agentstate.LaunchReady})
 }
 
+// LaunchMode is the permission mode the launcher started a conversation's agent in, chosen or the machine's default
+// of that start: the record says it (wire.Conversation.RunsIn), so a default changed later does not read as the mode
+// of the session that runs (GitHub #124).
+func (r *Runtime) LaunchMode(id string, mode wire.PermissionMode) {
+	if a := r.actor(id); a != nil {
+		_ = r.on(a, func(c *conv, now time.Time) {
+			if c.rec.RunsIn != mode {
+				c.rec.RunsIn = mode
+				c.touch()
+				c.flush(now, false)
+			}
+		})
+	}
+}
+
 func (r *Runtime) LaunchFailed(id string, f wire.LaunchFailure) {
 	r.feedInput(id, agentstate.Input{K: agentstate.LaunchFailed, Failure: f})
 }

@@ -1,7 +1,7 @@
 // Fixtures for the machines screen: the tenant «Продукт» (the board's numbers) and a few others for the organization
 // list. State lives in this module's closure, so an action changes what the next read shows.
 import type {
-  AccessMode,
+  AccessChange,
   MachineAccess,
   MachineDetail,
   MachineSetup,
@@ -299,6 +299,7 @@ const build = (s: Seed, role: MockCtx['role'], now: number): OrgMachine => {
     canManage: role === 'admin' || (role === 'lead' && ownTeam),
     canAdmin: role === 'admin',
     canSeeDebug: role === 'admin',
+    accessLevels: role === 'admin',
     needs: role === 'admin' ? null : 'tenant_admin',
   };
 };
@@ -343,6 +344,8 @@ export const machinesMock = (ctx: MockCtx): MachinesApi => {
     return m;
   };
   const put = (m: OrgMachine) => store.set(m.id, m);
+  /** Agents signed in through the card: the mock's m2 starts with Codex signed out. */
+  const signedIn = new Set<string>();
   const movePlan = (m: OrgMachine, tenantId: string): MovePlan => {
     const revoked = (access.get(m.id)?.people ?? []).map((p) => p.name);
     return {
@@ -363,7 +366,12 @@ export const machinesMock = (ctx: MockCtx): MachinesApi => {
       { provider: 'claude', installed: true, version: '2.1.4', login: 'in' },
       m.id === 'm4'
         ? { provider: 'codex', installed: false, version: null, login: 'unknown' }
-        : { provider: 'codex', installed: true, version: '0.51.2', login: m.id === 'm2' ? 'out' : 'in' },
+        : {
+            provider: 'codex',
+            installed: true,
+            version: '0.51.2',
+            login: m.id === 'm2' && !signedIn.has(`${m.id}/codex`) ? 'out' : 'in',
+          },
     ],
     env:
       m.state === 'offline'
@@ -521,6 +529,30 @@ export const machinesMock = (ctx: MockCtx): MachinesApi => {
     trustMachine: async () => later(undefined, 200),
     debugMachine: async () => later(undefined, 200),
     debugOpenings: async () => later([], 200),
+    startAgentLogin: async (id, provider) => {
+      const mid = get(id).id;
+      // Codex shows no code: the mock machine reports the sign-in on its own a little later.
+      if (provider === 'codex') globalThis.setTimeout(() => signedIn.add(`${mid}/codex`), 5_000);
+      return later(
+        {
+          id: `login-${get(id).id}-${provider}`,
+          provider,
+          state: 'url' as const,
+          url:
+            provider === 'claude'
+              ? 'https://claude.ai/oauth/authorize?mock=1'
+              : 'https://auth.openai.com/authorize?mock=1',
+          needsCode: provider === 'claude',
+          error: null,
+        },
+        300,
+      );
+    },
+    sendLoginCode: async (id, loginId) => {
+      signedIn.add(`${get(id).id}/${loginId.split('-').pop()}`);
+      return later(undefined, 300);
+    },
+    cancelAgentLogin: async () => later(undefined, 100),
     openMachine: async (id) => later({ url: `#machine-${get(id).id}` }, 200),
     restartMachine: async (id, what: RestartWhat, when: RestartWhen) => {
       const m = get(id);
@@ -558,14 +590,16 @@ export const machinesMock = (ctx: MockCtx): MachinesApi => {
       need(m, true);
       return work(m, 'on', 2000, (c) => ({ ...c, state: 'online', disabledBy: null, disabledAt: null }));
     },
-    setMachineAccess: async (id, next: { mode: AccessMode; personIds: string[] }) => {
+    setMachineAccess: async (id, next: AccessChange) => {
       const m = get(id);
       need(m, false);
       access.set(id, {
         mode: next.mode,
         people: next.personIds
           .map((pid) => PEOPLE.find((p) => p.id === pid))
-          .filter((p): p is PersonRef => p !== undefined),
+          .filter((p): p is PersonRef => p !== undefined)
+          .map((p) => (next.levels?.[p.id] === 'view' ? { ...p, level: 'view' as const } : p)),
+        ...(next.teamLevel ? { teamLevel: next.teamLevel } : {}),
       });
       return later(detail(m), 500);
     },

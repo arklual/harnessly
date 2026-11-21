@@ -67,7 +67,8 @@ func (h *Hub) peerSender(ctx context.Context, m store.Machine, claimed string) (
 }
 
 // peerMayOpen says whether the person a message comes from may open the machine it goes to, by the rule the site
-// applies: a place in the machine's space (or managing it from above), then the machine's access list. It is asked
+// applies: a place in the machine's space (or managing it from above), then the machine's access list, where a line that
+// opens the machine only to watch does not let its people give it tasks (machaccess.Checker.Send). It is asked
 // under HUB_ACCESS_ENFORCE like every other use of the list: off asks nothing, warn logs what on would refuse.
 func (h *Hub) peerMayOpen(ctx context.Context, userID string, to store.Machine) bool {
 	acc := &machaccess.Checker{Config: h.cfg, DB: h.db, Authz: h.Spaces.Authz, IsAdmin: h.Auth.IsInstanceAdmin, Log: h.log}
@@ -81,7 +82,7 @@ func (h *Hub) peerMayOpen(ctx context.Context, userID string, to store.Machine) 
 		}
 		return false
 	}
-	return acc.Reach(ctx, userID, to) == nil
+	return acc.Send(ctx, userID, to) == nil
 }
 
 // peerSpaces is the spaces a machine of space may reach: its own, and the other spaces of its organization.

@@ -30,6 +30,32 @@ It needs `HUB_ACCESS_ENFORCE=on`; it is turned on person by person (`PUT /api/ad
 `{"feature": "own-work", "person": "<email>", "enabled": true}`), then for everyone with a `(*, *)` row. Before the row
 for everyone, a machine shared with its tenant by an empty list needs its people listed, or they lose it.
 
+## Levels
+
+The owner opens their work at one of two levels, a line of the machine's access list each (`machine_access.level`):
+
+| Level | `level` | The person may |
+|---|---|---|
+| **Смотреть** | `view` | open the machine and read it: pages, chats as they come, their results |
+| **Давать задачи** | `tasks` (or no value) | all of that, and write in the chats, start the agent, open a terminal, send it work from another machine |
+
+- A line without a level is `tasks`: every line before HRN-1215 was, and the previous binary reads a `view` line as an
+  opening, the way it read every line.
+- The person gets the highest level of the lines that name them or a team they are in (`machaccess.Grant`). The creator
+  of the machine always has `tasks`; without the owner's rule, so do managers, administrators and an empty list.
+- `machaccess.Checker` asks for the level each path needs: `View` opens the machine (`GET /api/machines/{id}/open`, the
+  runtime's reads); `Check` and `Send` need `tasks` (`peers send` among them). A person below it gets 403 `view_only`.
+- The runtime cannot tell watchers from the owner: the hub holds its session for everyone (`internal/hub/proxy`). For a
+  watcher the proxy lets through only `GET`, `HEAD` and `OPTIONS`, and of the sockets only `/api/timeline`,
+  `/api/status` and `/api/sync`, relayed so that the page's messages reach the runtime only when they ask to be shown
+  something (`timeline:subscribe`, `status:request-sync`, the heartbeat…). `timeline:resume`, dismissing a tab, the
+  terminal, the browser, voice and the agent's own sockets stay closed (`proxy/viewonly.go`).
+- Levels come out with the owner's rule: `PATCH /api/machines/{id}` takes `{"kind", "id", "level": "view"}` only from a
+  person the switch `own-work` is on for, on that machine (`machaccess.Checker.LevelsOn`); otherwise 400. A `view` line
+  the list already has can stay. The machine in the list says whether the viewer may set levels (`accessLevels`).
+- The machine's owner edits its list in the card («Кто может запускать чаты»), next to the team lead and the
+  administrators; each picked person and the team get «Давать задачи» or «Только смотреть».
+
 ## Debug mode
 
 When the owner's rule refuses a person only because their role (instance administrator, manager of the tenant or the
@@ -51,4 +77,4 @@ that already manage the machine may ask to read it.
 
 - Chats of several people on one machine: the runtime shows each person only their own chats, so that a shared machine
   stops being shared content.
-- Opening one's work to a colleague or a team at two levels, *view* and *give tasks*, instead of the whole machine.
+- Levels per chat, not only per machine: the chat card gets the same «смотреть / давать задачи».

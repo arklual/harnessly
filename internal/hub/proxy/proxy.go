@@ -154,7 +154,7 @@ type Service struct {
 	grants     map[string]grantEntry
 	calls      map[string]*grantCall
 	authz      map[string]time.Time
-	access     map[string]time.Time
+	access     map[string]accessYes
 	trust      map[string]time.Time
 	pages      map[string]workspaceConfig
 	asks       map[string]cardAsk
@@ -183,7 +183,7 @@ func New(d Deps) *Service {
 	s := &Service{
 		cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, tickets: d.Tickets, log: d.Log, now: d.Now, design: d.Design, gate: d.Features, web: d.Workspace, history: d.History, voiceTakes: d.VoiceTakes, fleetBus: d.Fleet, switches: d.Switches, slotKey: d.SlotKey, rollout: d.Rollout,
 		clientLim: ratelimit.New(), transports: map[string]*http.Transport{}, grants: map[string]grantEntry{}, calls: map[string]*grantCall{},
-		authz: map[string]time.Time{}, access: map[string]time.Time{}, trust: map[string]time.Time{}, pages: map[string]workspaceConfig{}, asks: map[string]cardAsk{}, legacy: map[string]time.Time{}, tracked: map[string]map[uint64]context.CancelFunc{},
+		authz: map[string]time.Time{}, access: map[string]accessYes{}, trust: map[string]time.Time{}, pages: map[string]workspaceConfig{}, asks: map[string]cardAsk{}, legacy: map[string]time.Time{}, tracked: map[string]map[uint64]context.CancelFunc{},
 	}
 	if s.now == nil {
 		s.now = time.Now
@@ -273,18 +273,30 @@ func pathMachine(path string) (string, bool) {
 
 // ---- who may come in ----
 
-// admit finds the machine and checks the person may open it, and, in path mode, that the machine may run on the hub's
-// origin at all. Whether a machine is one of those is told only to a person who belongs to its space.
+// admit finds the machine and checks the person may open it and give it tasks (machaccess.LevelTasks), and, in path
+// mode, that the machine may run on the hub's origin at all. Whether a machine is one of those is told only to a person
+// who belongs to its space.
 func (s *Service) admit(ctx context.Context, userID, id string) (store.Machine, error) {
+	m, _, err := s.admitAt(ctx, userID, id, machaccess.LevelTasks)
+	return m, err
+}
+
+// admitView is admit for a person who may only watch: the level says what they got, at least machaccess.LevelView.
+// What the runtime does with a request of theirs is then forward's question (viewonly.go).
+func (s *Service) admitView(ctx context.Context, userID, id string) (store.Machine, machaccess.Level, error) {
+	return s.admitAt(ctx, userID, id, machaccess.LevelView)
+}
+
+func (s *Service) admitAt(ctx context.Context, userID, id string, need machaccess.Level) (store.Machine, machaccess.Level, error) {
 	m, err := s.db.S().MachineByID(ctx, id)
 	if errors.Is(err, store.ErrNotFound) {
-		return store.Machine{}, httpx.ErrNotFound
+		return store.Machine{}, machaccess.LevelNone, httpx.ErrNotFound
 	}
 	if err != nil {
-		return store.Machine{}, err
+		return store.Machine{}, machaccess.LevelNone, err
 	}
 	if m.RevokedAt != nil || m.SpaceID == "" {
-		return store.Machine{}, httpx.ErrNotFound
+		return store.Machine{}, machaccess.LevelNone, httpx.ErrNotFound
 	}
 	key := userID + "/" + m.SpaceID
 	s.mu.Lock()
@@ -292,7 +304,7 @@ func (s *Service) admit(ctx context.Context, userID, id string) (store.Machine, 
 	s.mu.Unlock()
 	if !ok || !s.now().Before(until) {
 		if _, err := s.spaces.Access(ctx, userID, m.SpaceID); err != nil {
-			return store.Machine{}, err
+			return store.Machine{}, machaccess.LevelNone, err
 		}
 		s.mu.Lock()
 		if len(s.authz) >= maxAuthz {
@@ -301,39 +313,51 @@ func (s *Service) admit(ctx context.Context, userID, id string) (store.Machine, 
 		s.authz[key] = s.now().Add(authzTTL)
 		s.mu.Unlock()
 	}
-	if err := s.allowed(ctx, userID, m); err != nil {
-		return store.Machine{}, err
+	lvl, err := s.allowed(ctx, userID, m)
+	if err != nil {
+		return store.Machine{}, machaccess.LevelNone, err
+	}
+	if lvl < need {
+		return store.Machine{}, machaccess.LevelNone, machaccess.ErrViewOnly
 	}
 	if err := s.trusted(ctx, m); err != nil {
-		return store.Machine{}, err
+		return store.Machine{}, machaccess.LevelNone, err
 	}
-	return m, nil
+	return m, lvl, nil
 }
 
-// allowed is the machine's access list (HUB_ACCESS_ENFORCE, internal/hub/machaccess). Every way into a machine passes
-// admit, so this is the one place the proxy asks; a yes is believed for authzTTL like the membership check. Requests
-// already in flight and open sockets are not ended by a change of the list, so running chats go on.
-func (s *Service) allowed(ctx context.Context, userID string, m store.Machine) error {
+// accessYes is a level the access list gave, believed until.
+type accessYes struct {
+	until time.Time
+	level machaccess.Level
+}
+
+// allowed is the machine's access list (HUB_ACCESS_ENFORCE, internal/hub/machaccess): how far the machine opens to the
+// person. Every way into a machine passes admit, so this is the one place the proxy asks; an answer is believed for
+// authzTTL like the membership check. Requests already in flight and open sockets are not ended by a change of the
+// list, so running chats go on.
+func (s *Service) allowed(ctx context.Context, userID string, m store.Machine) (machaccess.Level, error) {
 	if !s.acc.Enforcing() {
-		return nil
+		return machaccess.LevelTasks, nil
 	}
 	key := userID + "/" + m.ID
 	s.mu.Lock()
-	until, ok := s.access[key]
+	yes, ok := s.access[key]
 	s.mu.Unlock()
-	if ok && s.now().Before(until) {
-		return nil
+	if ok && s.now().Before(yes.until) {
+		return yes.level, nil
 	}
-	if err := s.acc.Check(ctx, userID, m); err != nil {
-		return err
+	lvl, err := s.acc.Level(ctx, userID, m)
+	if err != nil {
+		return machaccess.LevelNone, err
 	}
 	s.mu.Lock()
 	if len(s.access) >= maxAuthz {
-		s.access = map[string]time.Time{}
+		s.access = map[string]accessYes{}
 	}
-	s.access[key] = s.now().Add(authzTTL)
+	s.access[key] = accessYes{until: s.now().Add(authzTTL), level: lvl}
 	s.mu.Unlock()
-	return nil
+	return lvl, nil
 }
 
 // trusted is the rule of path mode (auth.Service.RequireTrustedMachine): only a machine an administrator connected runs on
@@ -409,7 +433,7 @@ func (s *Service) servePath(w http.ResponseWriter, r *http.Request, id string) {
 		httpx.WriteError(w, r, httpx.ErrUnauthenticated)
 		return
 	}
-	m, err := s.admit(r.Context(), p.User.ID, id)
+	m, lvl, err := s.admitView(r.Context(), p.User.ID, id)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -423,6 +447,9 @@ func (s *Service) servePath(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	if s.serveMachineHub(w, r, p, id) {
+		return
+	}
+	if lvl < machaccess.LevelTasks && s.serveViewer(w, r, p.User, m) {
 		return
 	}
 	if s.serveHome(w, r, p.User, m, func(ctx context.Context, w http.ResponseWriter) { s.forward(w, r.Clone(ctx), p.User, m) }) {
@@ -471,7 +498,7 @@ func (s *Service) serveRuntimeHost(w http.ResponseWriter, r *http.Request, id st
 		httpx.WriteError(w, r, httpx.ErrUnauthenticated)
 		return
 	}
-	m, err := s.admit(ctx, p.User.ID, id)
+	m, lvl, err := s.admitView(ctx, p.User.ID, id)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -485,6 +512,9 @@ func (s *Service) serveRuntimeHost(w http.ResponseWriter, r *http.Request, id st
 		return
 	}
 	if s.serveMachineHub(w, r, p, id) {
+		return
+	}
+	if lvl < machaccess.LevelTasks && s.serveViewer(w, r, p.User, m) {
 		return
 	}
 	if s.serveHome(w, r, p.User, m, func(ctx context.Context, w http.ResponseWriter) { s.forward(w, r.Clone(ctx), p.User, m) }) {
@@ -502,7 +532,7 @@ func (s *Service) redeem(w http.ResponseWriter, r *http.Request, id, tk string) 
 	w.Header().Set("Cache-Control", "no-store")
 	userID, ok := s.tickets.Redeem(tk, id)
 	if ok {
-		if _, err := s.admit(r.Context(), userID, id); err != nil {
+		if _, _, err := s.admitView(r.Context(), userID, id); err != nil {
 			ok = false
 		}
 	}

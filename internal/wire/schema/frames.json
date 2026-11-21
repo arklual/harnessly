@@ -1667,6 +1667,7 @@
         "view": {"type": "object"},
         "recap": {"$ref": "#/$defs/Recap"},
         "pendingModel": {"$ref": "#/$defs/PendingModel"},
+        "runsIn": {"$ref": "#/$defs/PermissionMode"},
         "modelLog": {"type": "array", "maxItems": 20, "items": {"$ref": "#/$defs/ModelSwitch"}},
         "bgAgents": {"type": "integer", "minimum": 1},
         "bgWait": {"$ref": "#/$defs/BgWait"},

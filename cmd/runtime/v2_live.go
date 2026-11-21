@@ -961,6 +961,14 @@ func (l *v2Launcher) Launch(req convo.LaunchRequest) error {
 func (l *v2Launcher) start(req convo.LaunchRequest, chosen *agents.Launch, promptFiles []string) {
 	v, rt := l.v, l.v.rt
 	rt.LaunchStep(req.ID, wire.StepCli)
+	mode := wire.PermissionMode("")
+	if chosen != nil {
+		mode = chosen.Permission
+	}
+	if mode == "" {
+		mode = v.machineMode(req.Provider)
+	}
+	rt.LaunchMode(req.ID, mode)
 	opts := launch.Options{Provider: string(req.Provider), Cwd: req.Cwd, CwdRoots: []string{req.Cwd}, Launch: chosen,
 		ResumeSessionID: req.ResumeSessionID, ForkSession: req.Fork, PromptFiles: promptFiles}
 	if req.First != "" {
@@ -1041,6 +1049,15 @@ func (l *v2Launcher) dropLeftTab(conv, session string) {
 	agent.Log("info", "v2: the tab a relaunched chat left is taken out of the layout", agent.F{K: "session", V: session})
 }
 
+// machineMode is the permission mode an agent of p starts in when its chat names none: the machine's default now.
+func (v *v2Live) machineMode(p wire.Provider) wire.PermissionMode {
+	m := v.machine
+	if m == nil || m.skip == nil {
+		return wire.PermissionAsk
+	}
+	return defaultPermissionOf(p, m.skip(), m.codexConfig, m.claudeSettings)
+}
+
 // defaultPermission is the permission mode of a Claude chat that names none: bypass when the runtime's
 // dangerouslySkipPermissions is on or Claude Code's settings.json makes bypassPermissions its defaultMode.
 func (l *v2Launcher) defaultPermission() wire.PermissionMode {
@@ -1108,8 +1125,21 @@ func (l *v2Launcher) Resume(conv wire.Conversation) error {
 			return err
 		}
 	}
+	// The mode the agent runs in after the resume: the chat's own, else the one its tab kept from its start, else
+	// the machine's default now, which a resumed Codex reads anew from its config (GitHub #124).
+	mode := c.tabLaunch(conv.Session).Permission
+	if m := conv.Model; m != nil && m.Permission != "" {
+		mode = m.Permission
+	}
+	if mode == "" {
+		mode = l.v.machineMode(conv.Provider)
+	}
 	switch got := c.resumeForQueue(tab); got {
-	case prompts.ResumeResumed, prompts.ResumeRunning:
+	case prompts.ResumeResumed:
+		// Resume runs in the conversation's own turn: the record learns the mode after it.
+		safego.Go("agent mode", func() { l.v.rt.LaunchMode(conv.ID, mode) })
+		return nil
+	case prompts.ResumeRunning:
 		return nil
 	case prompts.ResumeBusyShell:
 		return fmt.Errorf("not resumed: %w", convo.ErrResumeBlocked)

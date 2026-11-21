@@ -662,6 +662,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
                 ultracodeAsked,
                 fastAsked,
                 permissionAsked,
+                runsIn: record.runsIn ?? null,
                 busy: modelBusy,
                 blocked: modelBlocked(agent),
                 agents: [agent],

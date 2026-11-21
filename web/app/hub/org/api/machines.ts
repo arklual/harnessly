@@ -14,10 +14,23 @@ export interface PersonRef {
 
 export type AccessMode = 'owner' | 'team' | 'tenant' | 'pick';
 
+/** How far a line of the list opens the machine (docs/hub/own-work.md, «Levels»): to watch, or to give it tasks too. */
+export type AccessLevel = 'view' | 'tasks';
+
 export interface MachineAccess {
   mode: AccessMode;
-  /** For `pick`: who may start chats. */
-  people: PersonRef[];
+  /** For `pick`: who may use it, each with a level (absent: tasks). */
+  people: (PersonRef & { level?: AccessLevel })[];
+  /** For `team`: the team's level (absent: tasks). */
+  teamLevel?: AccessLevel;
+}
+
+/** What `setMachineAccess` sends: the mode, the people of `pick`, and the levels where they are not tasks. */
+export interface AccessChange {
+  mode: AccessMode;
+  personIds: string[];
+  levels?: Record<string, AccessLevel>;
+  teamLevel?: AccessLevel;
 }
 
 /** An amount in minor units (kopecks, cents) with its currency, as the provider prices it. */
@@ -83,6 +96,10 @@ export interface OrgMachine {
   canAdmin: boolean;
   /** The viewer may read its openings for debugging: the hub's own rule (its creator, who manages the tenant). */
   canSeeDebug?: boolean;
+  /** The viewer may change who uses it: `canManage`, or its owner, whose work runs on it (docs/hub/own-work.md). */
+  canShare?: boolean;
+  /** The viewer may open it to someone only to watch (the level «смотреть»): it comes out with the owner's rule. */
+  accessLevels?: boolean;
   needs: 'org_admin' | 'tenant_admin' | 'team_lead' | null;
   /** The viewer's own machine (the «Мои» group of a participant). */
   mine?: boolean;
@@ -247,7 +264,7 @@ export interface MachinesApi {
   cancelRestart(id: string): Promise<MachineDetail>;
   disableMachine(id: string): Promise<MachineDetail>;
   enableMachine(id: string): Promise<MachineDetail>;
-  setMachineAccess(id: string, access: { mode: AccessMode; personIds: string[] }): Promise<MachineDetail>;
+  setMachineAccess(id: string, access: AccessChange): Promise<MachineDetail>;
   /** `PATCH /api/machines/{id}` with a name: the hub allows it to the owner of the tenant's space. */
   renameMachine(id: string, name: string): Promise<MachineDetail>;
   /** `DELETE /api/machines/{id}`: its key stops working and it leaves the list (the owner of the tenant's space). */
@@ -262,6 +279,24 @@ export interface MachinesApi {
   debugMachine(id: string, reason: string): Promise<void>;
   /** `GET /api/machines/{id}/debug`: who opened the machine for debugging and why (its owner, admins, managers). */
   debugOpenings(id: string): Promise<DebugOpening[]>;
+  /** Starts a sign-in of the machine's agent by a link (the owner of the machine's tenant). */
+  startAgentLogin(id: string, provider: MachineAgent['provider']): Promise<AgentLogin>;
+  /** Hands the machine the code the provider showed after the sign-in. */
+  sendLoginCode(id: string, loginId: string, code: string): Promise<void>;
+  cancelAgentLogin(id: string, loginId: string): Promise<void>;
+}
+
+/** A sign-in of one of the machine's agents by a link (`POST /api/machines/{id}/agents/{provider}/login`); its later
+ *  states come on the tenant's stream as `login` events (docs/hub/api.md). The credentials stay on the machine. */
+export interface AgentLogin {
+  id: string;
+  provider: string;
+  state: 'starting' | 'url' | 'waiting' | 'verifying' | 'done' | 'failed' | 'expired' | 'cancelled';
+  /** The provider's sign-in page; the hub lets through only the provider's own hosts. */
+  url: string | null;
+  /** The provider shows a code after the sign-in, and the machine waits for it. */
+  needsCode: boolean;
+  error: string | null;
 }
 
 /** One debug opening of a machine (docs/hub/own-work.md, «Debug mode»). */

@@ -313,6 +313,7 @@ export const CLIENT_CAPS = [
   'appssync',
   'machineinfo',
   'antigravity',
+  'runsin',
 ] as const;
 /** CLIENT_CAPS as a query: `caps=…`. */
 export const CAPS_QUERY = `caps=${CLIENT_CAPS.join(',')}`;
@@ -1469,6 +1470,7 @@ export interface Conversation {
   bgAgents?: number; // background work it waits for, all kinds together (subagents, commands, monitors, a wakeup); absent when none — the chat is at work, not done
   bgWait?: BgWait; // what bgAgents is made of; absent when it waits for nothing
   pendingModel?: PendingModel; // a model change that waits for the agent; absent when none does
+  runsIn?: PermissionMode; // the mode the agent was started in last: its own, else the machine's default then; absent before a start
   modelLog?: ModelSwitch[]; // the changes applied, oldest first (the last 20); absent when there were none
   terminalStop?: TerminalStop; // the terminal was stopped and the agent is not up again; absent otherwise
   notSavedSince?: number; // since when the runtime fails to write the chat to its disk (ms); absent while it is saved
@@ -3115,6 +3117,7 @@ const conversation: Decoder<Conversation> = object(
     view: record,
     recap,
     pendingModel,
+    runsIn: oneOf(PERMISSION_MODES),
     modelLog: array(modelSwitch),
     bgAgents: int,
     bgWait,

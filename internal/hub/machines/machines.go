@@ -644,8 +644,9 @@ func (s *Service) open(w http.ResponseWriter, r *http.Request, t *tenant.Ctx) er
 	if m.DisabledAt != nil {
 		return errDisabledMachine
 	}
-	// The machine's access list (HUB_ACCESS_ENFORCE): the same rule the proxy applies to every request after this one.
-	if err := s.acc.Check(ctx, p.User.ID, m); err != nil {
+	// The machine's access list (HUB_ACCESS_ENFORCE): the same rule the proxy applies to every request after this one. A
+	// person the machine is open to only to watch opens it too; the proxy then lets only reads through (proxy/viewonly.go).
+	if err := s.acc.View(ctx, p.User.ID, m); err != nil {
 		return err
 	}
 	// Without HUB_RUNTIME_DOMAIN the page would run on the hub's origin: only a machine an administrator connected may.

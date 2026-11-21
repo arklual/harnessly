@@ -195,7 +195,7 @@ func TestAppsAtGoesOnlyToAPageThatReadsIt(t *testing.T) {
 	}
 	// Every older form of the page that has the caps before this one is in the hub's list.
 	last := olderCaps[len(olderCaps)-1]
-	if !last.MachineInfo || last.Antigravity {
+	if !last.MachineInfo || !last.Antigravity || last.RunsIn {
 		t.Fatalf("the newest older form: %+v", last)
 	}
 	b, err := Marshal(EvFrame{Ch: ChannelMachine, Seq: 1, E: old})
@@ -262,5 +262,27 @@ func TestAntigravityCap(t *testing.T) {
 	ss := SessionsFor([]AgentSession{{Provider: ProviderAntigravity}, {Provider: ProviderClaude}}, older)
 	if len(ss) != 1 || ss[0].Provider != ProviderClaude {
 		t.Fatalf("sessions for an older page: %+v", ss)
+	}
+}
+
+// GitHub #124: the mode a chat's agent runs in reaches only a page that reads it; an older page gets the chat without it.
+func TestRunsInCap(t *testing.T) {
+	older := AllCaps
+	older.RunsIn = false
+	up := ConversationUpsertEv{Conv: Conversation{ID: "c1", Provider: ProviderCodex, RunsIn: PermissionBypass}}
+	old, changed := eventFor(up, older)
+	if got, ok := old.(ConversationUpsertEv); !changed || !ok || got.Conv.RunsIn != "" || got.Conv.ID != "c1" || up.Conv.RunsIn != PermissionBypass {
+		t.Fatalf("an upsert for an older page: %+v changed=%v", old, changed)
+	}
+	if _, changed := eventFor(up, AllCaps); changed {
+		t.Fatal("a page with the cap is given the event as it is")
+	}
+	convs := &ConvsSnapshot{Conversations: []Conversation{up.Conv}}
+	snap := snapshotFor(SnapshotFrame{Convs: convs}, older)
+	if snap.Convs.Conversations[0].RunsIn != "" || convs.Conversations[0].RunsIn != PermissionBypass {
+		t.Fatalf("snapshot for an older page: %+v", snap.Convs.Conversations)
+	}
+	if got := snapshotFor(SnapshotFrame{Convs: convs}, AllCaps); got.Convs != convs {
+		t.Fatal("a page with the cap gets the snapshot as it is")
 	}
 }
