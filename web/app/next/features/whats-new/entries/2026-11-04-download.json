@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "download",
+  "ru": {
+    "title": "Скачать можно любой файл и папку",
+    "text": "В «Файлах» у каждой строки есть «Скачать». Папка скачивается архивом, можно отметить несколько файлов сразу. Ограничения по размеру больше нет, оборванная загрузка докачивается."
+  },
+  "en": {
+    "title": "Download any file or folder",
+    "text": "Every row in Files has a Download button. A folder downloads as a zip, and you can pick several files at once. There is no size limit, and a broken download resumes."
+  }
+}

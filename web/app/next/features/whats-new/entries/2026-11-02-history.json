@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "history",
+  "ru": {
+    "title": "Файл обновляется сам, прошлые версии под рукой",
+    "text": "Когда агент меняет открытый файл, вы сразу видите новую версию, а ваши правки ложатся поверх. Кнопка с часами возвращает любое из последних состояний таблицы, документа или презентации."
+  },
+  "en": {
+    "title": "Files update by themselves, with earlier versions at hand",
+    "text": "When the agent changes an open file, the new version shows at once and your edits go on top. The clock button brings back any recent state of a spreadsheet, document or presentation."
+  }
+}

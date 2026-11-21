@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "gauge",
+  "ru": {
+    "title": "У каждого приложения свой бюджет",
+    "text": "Сколько приложение может потратить в день, видно при установке. Когда бюджет кончился, вызовы останавливаются до следующего дня."
+  },
+  "en": {
+    "title": "Each app has its own budget",
+    "text": "How much an app may spend a day shows at install. When the budget is spent, its calls stop until the next day."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "keyboard",
+  "ru": {
+    "title": "Клавиши для диктовки и поля",
+    "text": "⌘⇧Пробел начинает и заканчивает диктовку, Esc заканчивает её и оставляет текст. Есть клавиши, чтобы отправить сразу, остановить агента и прикрепить файл; все они в шпаргалке ⌘/ и меняются в «Клавиши»."
+  },
+  "en": {
+    "title": "Keys for dictation and the field",
+    "text": "⌘⇧Space starts and finishes a dictation, Esc finishes it and keeps the text. There are keys to send now, stop the agent and attach a file; all are in the ⌘/ sheet and changeable in Keys."
+  }
+}

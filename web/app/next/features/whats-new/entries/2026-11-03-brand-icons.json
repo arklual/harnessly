@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-03",
+  "icon": "blocks",
+  "ru": {
+    "title": "Логотипы сервисов в подключениях",
+    "text": "В «Настройки → Подключения» и каталоге MCP-серверов Jira, GitHub, Linear, Notion, Figma и другие сервисы теперь узнаются по своим логотипам."
+  },
+  "en": {
+    "title": "Service logos in Connections",
+    "text": "In Settings → Connections and the MCP server catalog, Jira, GitHub, Linear, Notion, Figma and the rest now show their own logos."
+  }
+}

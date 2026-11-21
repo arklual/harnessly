@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "shield-check",
+  "ru": {
+    "title": "Ключи и настройки приложений",
+    "text": "Приложение спрашивает ключи и настройки в «О приложении»: ключ ложится в сейф машины и не попадает ни агенту, ни в окно приложения. Запреты приложения теперь держатся в самом агенте."
+  },
+  "en": {
+    "title": "Keys and settings of apps",
+    "text": "An app asks for its keys and settings in «About the app»: a key goes into the machine's safe and reaches neither the agent nor the app's window. An app's prohibitions now hold in the agent itself."
+  }
+}

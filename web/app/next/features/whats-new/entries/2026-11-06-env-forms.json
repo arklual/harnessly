@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "blocks",
+  "ru": {
+    "title": "Плагины и настройки Claude — формой",
+    "text": "В «Добавить в окружение» появились приложение, плагин Claude Code и настройки Claude: без файлов и командной строки."
+  },
+  "en": {
+    "title": "Plugins and Claude settings by a form",
+    "text": "«Add to the environment» now has an app, a Claude Code plugin and Claude settings: no files and no command line."
+  }
+}

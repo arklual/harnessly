@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "mic",
+  "ru": {
+    "title": "Длинные записи распознаются",
+    "text": "«Распознать» показывает ход работы, длинная запись распознаётся по частям тем же движком, что и диктовка, а нераспознанная запись видна только в своём чате."
+  },
+  "en": {
+    "title": "Long recordings get recognized",
+    "text": "«Recognize» shows its progress, a long recording is recognized in parts by the same engine as dictation, and an unrecognized recording stays in its own chat."
+  }
+}

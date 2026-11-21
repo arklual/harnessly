@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "users",
+  "ru": {
+    "title": "Доступ своей команды — первой строкой",
+    "text": "Команду можно убрать из проекта и вернуть одним нажатием. Передать владение может и лид команды."
+  },
+  "en": {
+    "title": "Your team's access comes first",
+    "text": "Remove the team from a project and bring it back in one click. A team lead can hand the project over too."
+  }
+}

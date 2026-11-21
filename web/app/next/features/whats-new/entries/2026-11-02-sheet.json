@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "file-spreadsheet",
+  "ru": {
+    "title": "Таблицы открываются и правятся прямо в чате",
+    "text": "Excel и CSV в панели: листы, формулы, стили и закреплённые строки как в файле. Правка сохраняется сама, а сумма выделенного видна внизу."
+  },
+  "en": {
+    "title": "Spreadsheets open and edit in the chat",
+    "text": "Excel and CSV in the pane: sheets, formulas, styles and frozen rows as in the file. An edit saves itself, and the sum of a selection shows below."
+  }
+}

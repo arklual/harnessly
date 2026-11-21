@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "eye",
+  "ru": {
+    "title": "Проекты открываются в просмотре",
+    "text": "Дизайны, презентации, видео и документы — без чата и инструментов, как их видят те, с кем вы поделились. «Редактировать» — в панели сверху, без права правки там «Запросить доступ». Из чата «развернуть» открывает сразу редактирование. На телефоне — одна тонкая панель."
+  },
+  "en": {
+    "title": "Projects open in view mode",
+    "text": "Designs, decks, videos and documents open without the chat and tools, the way people you share with see them. «Edit» is in the top bar; without edit rights it reads «Request access». Expanding from a chat opens editing at once. On a phone there is one thin bar."
+  }
+}

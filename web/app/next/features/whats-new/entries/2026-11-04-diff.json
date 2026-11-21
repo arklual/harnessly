@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "git-compare",
+  "ru": {
+    "title": "Сравнение файлов",
+    "text": "В меню «…» открытого файла есть «Сравнить с git»: изменения видны рядом или внутри текста. Два отмеченных в «Файлах» файла сравниваются кнопкой «Сравнить»."
+  },
+  "en": {
+    "title": "Compare files",
+    "text": "An open file's «…» menu has Compare with git: changes show side by side or inline. Two files checked in Files compare with the Compare button."
+  }
+}

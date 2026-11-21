@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-28",
+  "icon": "server",
+  "ru": {
+    "title": "Чат на любой машине",
+    "text": "Под приветствием выберите машину для нового чата — по умолчанию та, что выбрана в боковой панели."
+  },
+  "en": {
+    "title": "A chat on any machine",
+    "text": "Pick the machine for a new chat under the greeting — by default the one picked in the sidebar."
+  }
+}

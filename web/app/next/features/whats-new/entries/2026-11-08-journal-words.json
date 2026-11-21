@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-08",
+  "icon": "list-checks",
+  "ru": {
+    "title": "Журнал приложения — человеческим языком",
+    "text": "В инспекторе приложения вместо кодов — «Выполнена команда», «Открыт терминал», «Остановлено действие агента», «Записан секрет в сейф»."
+  },
+  "en": {
+    "title": "The app journal speaks plainly",
+    "text": "The app inspector now says «Ran a command», «Opened a terminal», «Stopped an action of the agent», «Wrote a secret into the safe» instead of codes."
+  }
+}

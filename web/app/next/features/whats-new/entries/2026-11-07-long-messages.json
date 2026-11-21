@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "file-text",
+  "ru": {
+    "title": "Длинные сообщения доходят до агента",
+    "text": "Очень длинный текст агент получает файлом: в чате — начало и файл с сообщением целиком. Очередь склеивает сообщения только до разумной длины, остальные уходят следом по одному. Если агент всё же не принял сообщение, оно сразу возвращается в очередь с пометкой, а не висит «в очереди агента»."
+  },
+  "en": {
+    "title": "Long messages reach the agent",
+    "text": "A very long text goes to the agent as a file: the chat shows its start and the file with the whole message. The queue joins messages only up to a sane length, the rest follow one by one. A message the agent still does not take comes back to the queue marked at once instead of hanging «in the agent’s queue»."
+  }
+}

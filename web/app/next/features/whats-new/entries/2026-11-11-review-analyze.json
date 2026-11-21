@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "message-square",
+  "ru": {
+    "title": "Разбор обсуждений агентом",
+    "text": "У чужого комментария — «Разобрать»: агент рядом оценивает его по коду MR и готовит ответ от вас (видно только вам, в GitLab не уходит). «Другой вариант», правка, «Применить ответ» — ответ уйдёт в обсуждение от вашего имени. «Разобрать» внизу обсуждения — позиции всех участников, вывод и общий ответ. Кнопка «Отправить агенту» кладёт комментарий в поле чата."
+  },
+  "en": {
+    "title": "The agent analyzes discussions",
+    "text": "On a colleague's comment — Analyze: the agent beside weighs it against the MR's code and drafts your answer (only you see it, nothing goes to GitLab). Another variant, edit, Post answer — it goes to the discussion in your name. Analyze at the foot of a discussion weighs every participant and drafts a common answer. Send to the agent puts the comment into the chat's field."
+  }
+}

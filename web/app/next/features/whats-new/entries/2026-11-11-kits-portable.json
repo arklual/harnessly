@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "layers",
+  "ru": {
+    "title": "UI-киты переносятся и конвертируются",
+    "text": "Проект Sinopia вместе с китами переносится одним файлом, кит импортируется и выгружается в DTCG, CSS, Tailwind, DESIGN.md, Storybook и Figma, кит может наследовать другой, а страницы собираются из TSX-модулей с компонентами кита."
+  },
+  "en": {
+    "title": "UI kits move and convert",
+    "text": "A Sinopia project travels with its kits in one file, a kit imports from and exports to DTCG, CSS, Tailwind, DESIGN.md, Storybook and Figma, a kit can extend another, and pages are built from TSX modules with the kit's components."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-28",
+  "icon": "history",
+  "ru": {
+    "title": "История без включённой машины",
+    "text": "Чат выключенной машины открывается для чтения; продолжить можно, когда она включится."
+  },
+  "en": {
+    "title": "History without the machine on",
+    "text": "A chat of a machine that is off opens read-only; continue once it is back on."
+  }
+}

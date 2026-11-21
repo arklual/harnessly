@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "folder",
+  "ru": {
+    "title": "Папки в библиотеке",
+    "text": "Раскладывайте макеты, презентации и видео по папкам: перетаскивайте карточки или выбирайте «Переместить в…». Папка — ваша полка, права на проект она не меняет."
+  },
+  "en": {
+    "title": "Folders in the library",
+    "text": "Sort designs, decks and videos into folders: drag cards or use “Move to…”. A folder is your own shelf; it does not change who can open a project."
+  }
+}

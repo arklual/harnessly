@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "server",
+  "ru": {
+    "title": "«Ваша машина» у участника",
+    "text": "Участник видит, готова ли его машина или устарела, и обновляет её одной кнопкой."
+  },
+  "en": {
+    "title": "«Your machine» for members",
+    "text": "A member sees whether their machine is ready or out of date and updates it with one button."
+  }
+}

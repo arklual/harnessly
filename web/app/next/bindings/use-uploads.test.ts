@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // a picture pasted twice (or by two fields of one draft) is attached once; a message sends each file once.
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor as waitForOnce } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const toast = vi.fn();
@@ -16,6 +16,10 @@ const picture = (bytes: number[], name: string) =>
 let n = 0;
 // No machine: the rows stand with their reason and nothing uploads, which is all these tests need.
 const draft = (): DraftKey => `design:paste-${(n += 1)}`;
+
+// The files are told apart by a hash of their bytes, which is async: a loaded CI runner takes longer than the default
+// second of waitFor (GitHub ci / web, 21.11).
+const waitFor = (check: () => void) => waitForOnce(check, { timeout: 5000 });
 
 afterEach(() => toast.mockReset());
 

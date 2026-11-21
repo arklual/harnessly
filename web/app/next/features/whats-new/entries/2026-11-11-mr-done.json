@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "git-pull-request",
+  "ru": {
+    "title": "MR чата — под законченной задачей",
+    "text": "Когда агент закончил, а в чате есть MR или PR, под ответом появляется блок с ними: «Ревью» открывает изменение в правой панели, кнопка рядом — в «Ревью кода» на весь экран. Выключается в Настройках → Плагины."
+  },
+  "en": {
+    "title": "The chat's merge requests under a finished task",
+    "text": "When the agent is done and the chat has merge or pull requests, a block with them comes under the answer: «Review» opens the change in the right pane, the button beside it in Code review on the whole screen. Turn it off in Settings → Plugins."
+  }
+}

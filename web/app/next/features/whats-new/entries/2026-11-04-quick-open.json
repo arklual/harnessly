@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "search",
+  "ru": {
+    "title": "Перейти к файлу по ⌘P",
+    "text": "В «Файлах» нажмите ⌘P (Ctrl+P) или лупу и начните набирать имя: файл проекта находится по буквам и открывается по Enter."
+  },
+  "en": {
+    "title": "Go to a file with ⌘P",
+    "text": "In Files, press ⌘P (Ctrl+P) or the magnifier and type a name: the project's file is found by its letters and opens on Enter."
+  }
+}

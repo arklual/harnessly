@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "message-square-text",
+  "ru": {
+    "title": "Понятные карточки фоновых агентов",
+    "text": "Когда фоновые агенты заканчивают, в ленте видно их задачу и время, а не служебное имя. Карточка спокойная, свёрнута в пару строк и раскрывается по клику, файлы из отчёта — короткие чипы, которые открываются в панели. Несколько агентов сразу собраны в одну карточку."
+  },
+  "en": {
+    "title": "Clear background agent cards",
+    "text": "When background agents finish, the feed shows their task and when, not an internal name. The card is quiet, folded to a couple of lines and opens on a click; files in the report are short chips that open in the pane. Several agents at once are one card."
+  }
+}

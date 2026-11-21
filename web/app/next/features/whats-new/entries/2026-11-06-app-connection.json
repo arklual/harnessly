@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "link",
+  "ru": {
+    "title": "Приложение через ваше подключение",
+    "text": "Приложение может ходить в трекер или GitLab от вашего имени через «Подключения». В «Настройке» приложения вы сами разрешаете ему подключение и так же забираете."
+  },
+  "en": {
+    "title": "An app through your connection",
+    "text": "An app can reach the tracker or GitLab as you, through «Connections». You allow it the connection in the app's «Setup» and take it back there too."
+  }
+}

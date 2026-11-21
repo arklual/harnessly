@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "message-square",
+  "ru": {
+    "title": "Чат прямо на экране кита",
+    "text": "«Редактировать» открывает черновик кита и чат агента рядом с холстом. Выделенный шаблон, токен или компонент уходит в сообщение, правки видны сразу, «Опубликовать версию» выпускает новую. Создатель может сделать кит «Только просмотр для всех»."
+  },
+  "en": {
+    "title": "A chat right on the kit screen",
+    "text": "«Edit» opens the kit's draft with the agent's chat beside the canvas. The picked template, token or component goes with the message, edits show at once, and «Publish version» makes a new one. The kit's maker can make it view only for everyone."
+  }
+}

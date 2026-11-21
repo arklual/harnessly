@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "file-text",
+  "ru": {
+    "title": "Страницы переименовываются сразу",
+    "text": "Агент переименовал или добавил страницу — вкладки сверху меняются без перезагрузки."
+  },
+  "en": {
+    "title": "Pages renamed at once",
+    "text": "When an agent renames or adds a page, the tabs on top change without a reload."
+  }
+}

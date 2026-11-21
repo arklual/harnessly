@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "pencil",
+  "ru": {
+    "title": "Переключатель «Просмотр | Редактирование» стал аккуратнее",
+    "text": "Он теперь в виде пилюли, как остальные кнопки в верхней панели Sinopia."
+  },
+  "en": {
+    "title": "The View | Edit switch looks cleaner",
+    "text": "It is now a pill, like the other buttons in the Sinopia toolbar."
+  }
+}

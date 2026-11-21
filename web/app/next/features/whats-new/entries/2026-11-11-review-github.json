@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "git-pull-request",
+  "ru": {
+    "title": "Ревью pull request’ов GitHub",
+    "text": "Ссылку на PR GitHub можно открыть в «Ревью кода» так же, как MR GitLab: обсуждения у строк, ответ, правка, «Решено», черновик ревью и «Отправить ревью», одобрение, снятие черновика, «Разобрать» и «Отправить агенту». Всё уходит в GitHub от вашего имени — через ваше подключение GitHub в «Подключениях»."
+  },
+  "en": {
+    "title": "Review GitHub pull requests",
+    "text": "Open a GitHub pull request link in Code review just like a GitLab MR: discussions at the lines, reply, edit, Resolve, a draft review and Send review, approve, mark ready, Analyze and Send to agent. Everything goes to GitHub in your name, through your own GitHub connection in Connections."
+  }
+}

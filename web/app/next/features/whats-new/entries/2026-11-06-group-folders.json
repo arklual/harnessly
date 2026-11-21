@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "folder",
+  "ru": {
+    "title": "Группы — папками",
+    "text": "В «Окружении» хаба группа теперь папка: видно, что в ней и сколько, её можно свернуть. Кто получит пункты, решает группа — у пунктов внутри своего переключателя больше нет."
+  },
+  "en": {
+    "title": "Groups as folders",
+    "text": "In the hub’s «Environment» a group is now a folder: you see what is in it and how much, and it folds away. The group decides who gets its items, so they no longer have a switch of their own."
+  }
+}

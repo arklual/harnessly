@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "sparkles",
+  "ru": {
+    "title": "«Рекомендованное» одной кнопкой",
+    "text": "Включите у себя группу «Рекомендованное» в «Окружении» — машина поставит Superpowers, Context7, Playwright и Chrome DevTools и экономные настройки Claude. Выключите — поставленное останется."
+  },
+  "en": {
+    "title": "«Recommended» with one switch",
+    "text": "Turn on the «Recommended» group in «Environment» and your machine installs Superpowers, Context7, Playwright, Chrome DevTools and economical Claude settings. Turn it off and what was installed stays."
+  }
+}

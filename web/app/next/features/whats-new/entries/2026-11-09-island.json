@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "layers",
+  "ru": {
+    "title": "Живое уведомление",
+    "text": "Чёрная плашка плавно раскрывается, складывается в стопку и слушается жестов: смахните — уберётся, потяните — раскроется. Вопрос, который вы скрыли, ждёт каплей в правой колонке чата."
+  },
+  "en": {
+    "title": "A notice that feels alive",
+    "text": "The black plate opens smoothly, stacks up and follows your gestures: swipe it away, pull it open. A question you hid waits as a drop in the chat's right column."
+  }
+}

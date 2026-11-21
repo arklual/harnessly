@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-28",
+  "icon": "messages-square",
+  "ru": {
+    "title": "Одна боковая панель на все машины",
+    "text": "Все чаты, папки и избранное — с любой машины. Карточка внизу показывает машину открытого чата."
+  },
+  "en": {
+    "title": "One sidebar for all machines",
+    "text": "Every chat, folder and favorite, through any machine. The card at the bottom shows the open chat's machine."
+  }
+}

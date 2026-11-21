@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "command",
+  "ru": {
+    "title": "⌘J и жесты",
+    "text": "⌘J раскрывает уведомление, Esc сворачивает. Смахните его вбок, чтобы скрыть, потяните — чтобы раскрыть, а долгим нажатием откройте действия."
+  },
+  "en": {
+    "title": "⌘J and gestures",
+    "text": "⌘J opens the notice, Esc folds it. Sweep it aside to hide it, pull it to open it, and long-press for its actions."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "wifi-off",
+  "ru": {
+    "title": "«Нет связи» на телефоне",
+    "text": "Плашка переподключения помещается в узкий экран: кнопка больше не уходит за край."
+  },
+  "en": {
+    "title": "«No connection» on a phone",
+    "text": "The reconnect pill fits a narrow screen: its button no longer runs off the edge."
+  }
+}

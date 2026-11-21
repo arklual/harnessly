@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "layout-grid",
+  "ru": {
+    "title": "«@» находит и в приложениях",
+    "text": "Набрали «@» — рядом с файлами и чатами появятся находки включённых приложений: задачи трекера, клиенты, что приложение умеет искать. Выбранное ложится в поле."
+  },
+  "en": {
+    "title": "«@» finds in apps too",
+    "text": "Type «@» and the apps that are on show their finds beside the files and chats: tracker tasks, clients, whatever the app can look up. The one you pick goes into the field."
+  }
+}

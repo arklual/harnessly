@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "refresh-cw",
+  "ru": {
+    "title": "Обновления не ломают приложения",
+    "text": "Приложения, которые работали раньше, работают и после обновления: возможности только добавляются, выданные права сохраняются."
+  },
+  "en": {
+    "title": "Updates do not break apps",
+    "text": "Apps that worked before keep working after an update: features are only added, granted rights stay."
+  }
+}

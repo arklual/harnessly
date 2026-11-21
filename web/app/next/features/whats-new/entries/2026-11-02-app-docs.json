@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "library",
+  "ru": {
+    "title": "Документы из приложений — в библиотеке",
+    "text": "Документы тех типов, что добавляют приложения, теперь видны в библиотеке рядом с чатом и открываются там. Документ, который можно только читать, открывается в своём редакторе, но без правки."
+  },
+  "en": {
+    "title": "Documents of app types in the library",
+    "text": "Documents of the types apps add now appear in the library beside the chat and open there. One you may only view opens in its editor, read-only."
+  }
+}

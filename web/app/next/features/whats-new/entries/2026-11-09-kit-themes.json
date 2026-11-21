@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "palette",
+  "ru": {
+    "title": "Темы кита — отдельными карточками",
+    "text": "В библиотеке у кита из нескольких тем каждая тема — своя карточка с обложкой. Шаблоны слайдов лежат отдельно от справки шаблона, а пустые раскладки мастера показаны как есть."
+  },
+  "en": {
+    "title": "A kit's themes as their own cards",
+    "text": "In the library a kit of several themes shows each theme as a card with its cover. Slide templates stand apart from the template's guide, and a master's empty layouts are shown as they are."
+  }
+}

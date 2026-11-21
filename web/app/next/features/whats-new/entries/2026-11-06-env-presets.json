@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "layers",
+  "ru": {
+    "title": "Пресеты групп в «Окружении»",
+    "text": "Пресет — набор групп, который выбирается одним нажатием: нужные группы включаются, остальные по желанию выключаются. Редакторы слоя собирают пресеты сами, а вам не надо переключать группы по одной."
+  },
+  "en": {
+    "title": "Group presets in Environment",
+    "text": "A preset is a set of groups you pick with one click: the groups it names turn on and the other optional ones turn off. Layer editors build the presets, so you no longer flip groups one by one."
+  }
+}

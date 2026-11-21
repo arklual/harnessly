@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "eye",
+  "ru": {
+    "title": "Агент показывает момент",
+    "text": "Агент сам перематывает ваш плеер на нужный момент. Если вы как раз его двигаете, он предложит кнопку «Показать»."
+  },
+  "en": {
+    "title": "The agent shows you the moment",
+    "text": "The agent moves your player to the right moment. If you are moving it just then, it offers a Show button instead."
+  }
+}

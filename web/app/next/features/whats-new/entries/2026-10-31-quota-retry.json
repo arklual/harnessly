@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "rotate-ccw",
+  "ru": {
+    "title": "«Попробовать снова» после лимита",
+    "text": "Когда лимит модели кончился, кнопка повторяет остановленный ход, а карточка показывает, во сколько лимит сбросится."
+  },
+  "en": {
+    "title": "«Try again» after a limit",
+    "text": "When a model hit its limit, the button runs the stopped turn again, and the card says when the limit resets."
+  }
+}

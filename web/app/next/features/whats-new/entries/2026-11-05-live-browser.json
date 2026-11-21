@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "globe",
+  "ru": {
+    "title": "Чужие сайты — в настоящем браузере",
+    "text": "Google, поиск и другие внешние сайты открываются в панели через браузер машины: как есть, без переписывания страницы. Ваши серверы и стенды по-прежнему идут через прокси с DevTools."
+  },
+  "en": {
+    "title": "Outside sites in a real browser",
+    "text": "Google, search and other outside sites open in the pane through the machine’s own browser, as they are, with no rewriting. Your servers and stands still go through the proxy with DevTools."
+  }
+}

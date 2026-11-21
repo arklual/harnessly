@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "languages",
+  "ru": {
+    "title": "Язык меняется в настройках",
+    "text": "В «Настройки → Общие → Язык» можно выбрать Русский или English: интерфейс переключится сразу, без переустановки. Выбор помнит этот браузер."
+  },
+  "en": {
+    "title": "Change the language in Settings",
+    "text": "In «Settings → General → Language» pick Русский or English: the interface switches at once, no reinstall. This browser remembers the choice."
+  }
+}

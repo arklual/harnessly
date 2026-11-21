@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "monitor",
+  "ru": {
+    "title": "Dev-сервер — прямо в панели",
+    "text": "Приложение может поднять dev-сервер и открыть его во встроенном браузере справа. Сервер живёт, пока приложение включено в чате."
+  },
+  "en": {
+    "title": "A dev server in the pane",
+    "text": "An app can start a dev server and open it in the browser on the right. The server lives while the app is on in the chat."
+  }
+}

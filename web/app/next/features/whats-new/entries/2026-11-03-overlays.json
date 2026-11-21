@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-03",
+  "icon": "text-quote",
+  "ru": {
+    "title": "Надписи и выноски на видео",
+    "text": "Добавляйте заголовки, подписи и выноски прямо в плеере: двигайте, тяните за угол, меняйте текст двойным щелчком. Правки агента появляются там же."
+  },
+  "en": {
+    "title": "Captions and callouts on video",
+    "text": "Add titles, lower thirds and callouts right in the player: drag, resize from a corner, double-click to change the text. The agent's edits show up there too."
+  }
+}

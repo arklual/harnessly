@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "pencil",
+  "ru": {
+    "title": "Правка кита прямо из макета",
+    "text": "«Править в ките» над презентацией или прототипом открывает черновик кита, а макет сразу показывает каждую правку — без перезагрузки и без выпуска версии."
+  },
+  "en": {
+    "title": "Edit the kit right from a design",
+    "text": "«Edit in kit» over a deck or a prototype opens the kit's draft, and the design shows every edit at once — no reload, no release."
+  }
+}

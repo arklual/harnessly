@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "eye",
+  "ru": {
+    "title": "Больше форматов в «Файлах»",
+    "text": "JSON показывается деревом, SVG картинкой, шрифт образцом текста. Внутри tar и tar.gz виден список файлов. HTML-страница подтягивает свои стили, скрипты и картинки из соседних файлов."
+  },
+  "en": {
+    "title": "More formats in Files",
+    "text": "JSON shows as a tree, SVG as a picture, a font as a specimen. Files inside a tar or tar.gz are listed. An HTML page loads its styles, scripts and pictures from the files beside it."
+  }
+}

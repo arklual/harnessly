@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-27",
+  "icon": "link",
+  "ru": {
+    "title": "Ссылка на конкретную версию",
+    "text": "В «Поделиться»: всегда последняя или эта версия — и только нужные страницы."
+  },
+  "en": {
+    "title": "Link to one version",
+    "text": "In «Share»: always the latest or this version — and only the pages you choose."
+  }
+}

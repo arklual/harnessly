@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "play",
+  "ru": {
+    "title": "Видео и звук играют прямо в чате",
+    "text": "Файл от агента открывается в панели в своём плеере: перемотка с кадром под курсором, скорость, полный экран. У звука видна волна."
+  },
+  "en": {
+    "title": "Video and sound play in the chat",
+    "text": "A file from the agent opens in the pane in its own player: seeking with a frame under the pointer, speed, full screen. Sound shows its wave."
+  }
+}

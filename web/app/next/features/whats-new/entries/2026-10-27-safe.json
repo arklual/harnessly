@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-27",
+  "icon": "lock",
+  "ru": {
+    "title": "Сейф для токенов",
+    "text": "Агент просит токен окном «Положить в сейф», а не в чате: значение хранится зашифрованным на машине и подставляется в команды."
+  },
+  "en": {
+    "title": "A safe for tokens",
+    "text": "An agent asks for a token with a «Put in the safe» window, not in the chat: the value is kept encrypted on the machine and goes into its commands."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-13",
+  "icon": "bell",
+  "ru": {
+    "title": "«Ждут ответа» — стопкой, как на iPhone",
+    "text": "Несколько чатов, которые ждут вашего ответа, собираются в одну стопку. Нажатие раскрывает её прямо на месте, по чатам; уведомления о машине идут отдельно и не смешиваются с вопросами агентов."
+  },
+  "en": {
+    "title": "«Waiting for you» stacks up, like on an iPhone",
+    "text": "Several chats waiting for your answer gather into one stack. A tap opens it in place, chat by chat; notices about the machine come separately and do not mix with the agents’ questions."
+  }
+}

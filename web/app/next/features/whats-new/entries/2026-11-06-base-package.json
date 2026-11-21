@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "layers",
+  "ru": {
+    "title": "Машина готовится сама",
+    "text": "Сразу после подключения к хабу машина в фоне ставит то, без чего агенту трудно: git, tmux, ffmpeg, Node, ripgrep и другое. Нет доступа к сети — на карточке «Основа» можно указать прокси или пропустить пункт."
+  },
+  "en": {
+    "title": "The machine gets ready by itself",
+    "text": "Right after it joins the hub, the machine installs in the background what an agent needs: git, tmux, ffmpeg, Node, ripgrep and more. No network access — the «Basics» stage of the card lets you give a proxy or skip the item."
+  }
+}

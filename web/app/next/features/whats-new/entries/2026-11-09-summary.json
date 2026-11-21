@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "sparkles",
+  "ru": {
+    "title": "Итог хода — в двух строках",
+    "text": "Когда агент закончил, в уведомлении «Готово» коротко сказано, что он сделал, и есть поле, чтобы сразу ответить. Место, звуки и что показывать — в настройках уведомлений."
+  },
+  "en": {
+    "title": "The turn in two lines",
+    "text": "When an agent finishes, the «Done» notice says briefly what it did and has a field to answer right away. Place, sounds and what to show are in the notification settings."
+  }
+}

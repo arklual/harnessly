@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "blocks",
+  "ru": {
+    "title": "Агент работает руками приложения",
+    "text": "Приложение может дать агенту свои кнопки и формы: агент чата заполняет форму или выбирает строку прямо в открытом окне приложения и видит, что там сейчас показано."
+  },
+  "en": {
+    "title": "The agent works through the app",
+    "text": "An app can hand the agent its own buttons and forms: the chat's agent fills a form or picks a row right in the open app window and sees what it shows now."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "message-square",
+  "ru": {
+    "title": "«Спросить сбоку» по выделенному тексту",
+    "text": "Рядом с «Аннотировать» — кнопка, которая кладёт выделенное цитатой в боковой чат."
+  },
+  "en": {
+    "title": "«Ask aside» on selected text",
+    "text": "Next to «Annotate», a button that puts the selection as a quote into the side chat."
+  }
+}

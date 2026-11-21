@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-15",
+  "icon": "panel-right",
+  "ru": {
+    "title": "Доска открывается рядом с чатом",
+    "text": "Клик по ссылке на доску открывает её в «Досках» в правой панели, без отдельного входа: выделите фигуры — агент видит выделение и правит доску у вас на глазах."
+  },
+  "en": {
+    "title": "A board opens beside the chat",
+    "text": "A click on a board link opens it in «Boards» in the right pane, with no separate sign-in: select shapes and the agent sees the selection and edits the board in front of you."
+  }
+}

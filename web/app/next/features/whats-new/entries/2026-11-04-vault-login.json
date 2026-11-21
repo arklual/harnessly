@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "key-round",
+  "ru": {
+    "title": "Вход из сейфа в браузере панели",
+    "text": "Если в сейфе есть пароль для сайта, открытого в панели, кнопка с ключом в панели браузера войдёт за вас: выберите учётную запись, и страница заполнит форму сама. Пароль не видят ни чат, ни агент."
+  },
+  "en": {
+    "title": "Sign in from the safe in the pane's browser",
+    "text": "When the safe holds a password for the site open in the pane, the key button in the browser's bar signs you in: pick the account and the page fills its form itself. Neither the chat nor the agent sees the password."
+  }
+}

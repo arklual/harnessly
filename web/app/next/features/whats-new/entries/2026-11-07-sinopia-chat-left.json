@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "panel-left",
+  "ru": {
+    "title": "Чат Sinopia — слева",
+    "text": "При редактировании дизайна чат стоит колонкой слева и не закрывает страницу. Если поставить его иначе, Sinopia запомнит ваш выбор."
+  },
+  "en": {
+    "title": "Sinopia’s chat on the left",
+    "text": "While a design is edited its chat stands as a column on the left and does not cover the page. Place it otherwise and Sinopia keeps your choice."
+  }
+}

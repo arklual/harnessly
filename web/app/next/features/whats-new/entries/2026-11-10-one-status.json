@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-10",
+  "icon": "message-square-text",
+  "ru": {
+    "title": "Статус чата — из одного источника",
+    "text": "Работает агент или ждёт вас, список чатов и сам чат теперь узнают в одном месте, поэтому реже показывают разное в разных вкладках."
+  },
+  "en": {
+    "title": "A chat's status comes from one place",
+    "text": "Whether the agent is working or waiting for you, the list of chats and the chat itself now learn it in one place, so they show different things in different tabs less often."
+  }
+}

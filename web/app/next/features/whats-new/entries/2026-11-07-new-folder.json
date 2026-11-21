@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "folder-plus",
+  "ru": {
+    "title": "Новая папка",
+    "text": "Папку можно создать прямо во вкладке «Файлы»: кнопкой или из меню, имя вводится в списке."
+  },
+  "en": {
+    "title": "New folder",
+    "text": "Create a folder right in the Files tab: with the button or from the menu, typing the name in the list."
+  }
+}

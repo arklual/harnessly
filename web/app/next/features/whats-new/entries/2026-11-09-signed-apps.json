@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "shield-check",
+  "ru": {
+    "title": "Подписанные приложения",
+    "text": "Издатель подписывает пакет приложения, а контур ставит только пакеты доверенных издателей; без подписи или с чужой подписью отказ объясняет почему."
+  },
+  "en": {
+    "title": "Signed apps",
+    "text": "A publisher signs an app package and the network installs only packages from trusted publishers; an unsigned one or one signed by someone else is refused with the reason."
+  }
+}

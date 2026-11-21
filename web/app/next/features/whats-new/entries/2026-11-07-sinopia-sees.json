@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "eye",
+  "ru": {
+    "title": "Агент видит, что открыто в Sinopia",
+    "text": "Пока документ открыт рядом с чатом, агент знает, какой слайд или страница на экране и что вы выделили, — не нужно объяснять, о чём речь."
+  },
+  "en": {
+    "title": "The agent sees what is open in Sinopia",
+    "text": "While a document is open beside the chat, the agent knows which slide or page is on screen and what you selected — no need to explain what you mean."
+  }
+}

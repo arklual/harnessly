@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "map-pin",
+  "ru": {
+    "title": "Аннотации — плашками в поле ввода",
+    "text": "Каждая отправленная аннотация встаёт в поле чата своей плашкой: наведите, чтобы увидеть страницу и элемент, поправить комментарий или удалить. С сообщением они уйдут агенту."
+  },
+  "en": {
+    "title": "Annotations as chips in the field",
+    "text": "Each sent annotation lands in the chat field as a chip of its own: hover to see the page and element, edit the comment or delete it. They go to the agent with your message."
+  }
+}

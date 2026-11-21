@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "panel-left",
+  "ru": {
+    "title": "Боковое меню без рывков",
+    "text": "Сворачивается одним плавным движением, под курсором остаётся тот же чат, а раскрыть его можно кликом по логотипу или пустому месту. Перетаскивание в избранном больше не прыгает."
+  },
+  "en": {
+    "title": "A smoother sidebar",
+    "text": "It folds in one motion, the chat under the pointer stays the same, and the logo or any empty spot opens it again. Dragging favorites no longer jumps."
+  }
+}

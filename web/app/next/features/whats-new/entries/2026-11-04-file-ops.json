@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "file-plus",
+  "ru": {
+    "title": "Новый файл, переименовать, в корзину",
+    "text": "В «Файлах» появилась кнопка «Новый файл», а в меню «…» у файла или папки — «Переименовать» и «В корзину». Удалённое не стирается сразу, а уходит в корзину машины. Файл или папку можно открыть в отдельной вкладке панели — пунктом в «…» или ⌘-кликом."
+  },
+  "en": {
+    "title": "New file, rename, move to trash",
+    "text": "Files has a New file button, and the «…» menu of a file or folder has Rename and Move to trash. What you remove is not erased at once: it goes to the machine's trash. A file or folder opens in a tab of its own from «…» or with ⌘-click."
+  }
+}

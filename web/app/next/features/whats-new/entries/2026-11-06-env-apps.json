@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "layout-grid",
+  "ru": {
+    "title": "Приложения всем из окружения",
+    "text": "Админ организации добавляет в окружение приложение из папки репозитория — например, дизайн-систему или шаблоны презентаций. Оно встаёт у всех; удалить его нельзя, а закреплённое — и выключить."
+  },
+  "en": {
+    "title": "Apps for everyone through the environment",
+    "text": "An organization admin adds an app from a repository folder to the environment, a design system or presentation templates, say. Everyone gets it; nobody can remove it, and a pinned one cannot be turned off."
+  }
+}

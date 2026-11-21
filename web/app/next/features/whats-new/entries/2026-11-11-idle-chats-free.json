@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "server",
+  "ru": {
+    "title": "Тихие чаты почти не нагружают машину",
+    "text": "Чат, в котором ничего не происходит, проверяется раз в 15 секунд, а не каждую секунду; чаты Codex читают историю через общий индекс. Сообщение и конец хода замечаются сразу, как раньше."
+  },
+  "en": {
+    "title": "Quiet chats barely load the machine",
+    "text": "A chat where nothing happens is looked at every 15 seconds instead of every second, and Codex chats read their history through the shared index. A message and the end of a turn are still noticed at once."
+  }
+}

@@ -1,6 +1,7 @@
 // «Аккаунты»: the subscriptions and keys the machines of the organization work on, with who used each this
 // month and what it cost at list prices; and registering one the hub only discovered on a machine.
-// GET/PATCH /api/orgs/{org}/accounts of internal/hub/analytics/accounts.go.
+// GET/POST/PATCH /api/orgs/{org}/accounts of internal/hub/analytics/accounts.go; POST registers one before any machine
+// used it.
 
 export type AccountKind = 'subscription' | 'api_key' | 'prepaid';
 export type AccountFunding = 'org' | 'personal';
@@ -49,7 +50,16 @@ export interface RegisterAccount {
   history: boolean;
 }
 
+export interface CreateAccount extends RegisterAccount {
+  /** The CLI the account is used with. */
+  cli: 'claude' | 'codex';
+  /** As the machine reports it: `claude:<uuid>`, `codex:<id>` or `key:<hash>`. */
+  ref: string;
+}
+
 export interface AccountsApi {
   accounts(): Promise<AccountsView>;
   registerAccount(id: string, body: RegisterAccount): Promise<Account | null>;
+  /** Rejects with 409 `account_exists` (`details.id`) when the ref is on the hub already. */
+  createAccount(body: CreateAccount): Promise<Account | null>;
 }

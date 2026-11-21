@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-10",
+  "icon": "square-mouse-pointer",
+  "ru": {
+    "title": "Клик раскрывает, наведение ничего не трогает",
+    "text": "Клик по уведомлению раскрывает его прямо на месте, в чат переходит только кнопка «Открыть чат». Курсор над плашкой держит то, что вы читаете, и не переставляет уведомления."
+  },
+  "en": {
+    "title": "Click opens, hover changes nothing",
+    "text": "A click opens the notification right where it is; only «Open chat» takes you to the chat. The pointer over it keeps what you are reading and never reorders the stack."
+  }
+}

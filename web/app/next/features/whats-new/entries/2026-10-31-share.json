@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "share",
+  "ru": {
+    "title": "«Поделиться» одинаково везде",
+    "text": "В дизайне, презентации и видео — и на своей странице, и в правой панели чата — «Поделиться» открывает окно доступа: кто управляет, раздаёт права, остальные видят свою роль, просят больше или копируют ссылку."
+  },
+  "en": {
+    "title": "«Share» works the same everywhere",
+    "text": "In a design, a deck and a video, on their own page and in a chat's right pane, «Share» opens the access window: managers grant access, everyone else sees their role, asks for more or copies the link."
+  }
+}

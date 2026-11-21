@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "mic",
+  "ru": {
+    "title": "Диктовка не зависит от машины",
+    "text": "Остановить и отменить запись можно всегда. Без связи запись сохранится и распознается сама, когда машина вернётся."
+  },
+  "en": {
+    "title": "Dictation does not depend on the machine",
+    "text": "Stop and cancel always work. Without a link the recording is kept and recognized by itself when the machine is back."
+  }
+}

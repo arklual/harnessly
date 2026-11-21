@@ -50,6 +50,7 @@ The table, word for word from the plan, and the endpoint each row is enforced on
 | Личный лимит в команде | лид команды и выше | `PUT /api/orgs/{org}/limits` with `scope.kind = 'team'` and `userId` |
 | Личный потолок в тенанте, личный лимит лида | админ тенанта и выше | `PUT /api/orgs/{org}/limits` with `scope.kind = 'tenant'` and `userId`; a lead's own personal limit in their team likewise needs the tenant's admin |
 | Лимит организации, лимит на аккаунт организации | админ организации | `PUT /api/orgs/{org}/limits` with `scope.kind = 'org'`, or with `accountId` of an organization's account |
+| Зарегистрировать или поправить аккаунт модели (кто платит, плата за месяц) | админ области аккаунта: организации для аккаунта организации, тенанта и выше для аккаунта тенанта | `POST /api/orgs/{org}/accounts`, `PATCH /api/orgs/{org}/accounts/{id}` ([analytics.md](analytics.md#accounts-hrn-616)) |
 
 The holes it closes, each a test of `internal/hub/authz`:
 

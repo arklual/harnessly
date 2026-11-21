@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "link",
+  "ru": {
+    "title": "Приложение со своего сайта",
+    "text": "Окно приложения может жить на сайте самого приложения: оно открывается в harnessly со своим входом и данными и при этом работает с чатом так же, как встроенное."
+  },
+  "en": {
+    "title": "An app from its own site",
+    "text": "An app window can live on the app's own site: it opens in harnessly with its own sign-in and data and still works with the chat like a built-in one."
+  }
+}

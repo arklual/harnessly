@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "sparkles",
+  "ru": {
+    "title": "GPT в Claude Code",
+    "text": "У Codex в «Моделях и ключах» появился переключатель: модели GPT по вашей подписке ChatGPT станут доступны в чатах Claude Code. Обычный Codex остаётся как был."
+  },
+  "en": {
+    "title": "GPT in Claude Code",
+    "text": "Codex in «Models and keys» has a new switch: GPT models on your ChatGPT subscription become available in Claude Code chats. Regular Codex stays as it was."
+  }
+}

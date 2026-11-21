@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "clock",
+  "ru": {
+    "title": "После лимита чат продолжит сам",
+    "text": "Упёрлись в лимит подписки — чат дождётся сброса и отправит ваше сообщение, выбирать другую модель не нужно."
+  },
+  "en": {
+    "title": "After a limit the chat goes on by itself",
+    "text": "Hit your plan's limit — the chat waits for the reset and sends your message, no need to pick another model."
+  }
+}

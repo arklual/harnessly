@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "square-pen",
+  "ru": {
+    "title": "Агенты читают и дописывают документацию",
+    "text": "Агент ищет ответ в документации командой harnessly docs, а по вашей просьбе записывает новую страницу со скриншотами и схемами."
+  },
+  "en": {
+    "title": "Agents read and add to the docs",
+    "text": "An agent looks the answer up with harnessly docs, and when you ask, writes a new page down with screenshots and diagrams."
+  }
+}

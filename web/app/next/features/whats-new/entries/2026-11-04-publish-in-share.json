@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "globe",
+  "ru": {
+    "title": "«Опубликовать» — внутри «Поделиться»",
+    "text": "Кнопка в верхней панели одна. Сайт публикуется последним разделом окна «Поделиться»: название, кто может открыть, страницы — а после публикации там же адрес, «Копировать» и «Открыть»."
+  },
+  "en": {
+    "title": "Publish now lives in Share",
+    "text": "There is one button in the top bar. The site is published from the last section of the Share window: name, who may open it, pages — and after publishing, the address with Copy and Open."
+  }
+}

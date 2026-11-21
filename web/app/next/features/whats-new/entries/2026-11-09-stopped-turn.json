@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "circle-stop",
+  "ru": {
+    "title": "Остановленный ход не пропадает",
+    "text": "Если остановить агента, его раздумья и текст остаются на месте с пометкой «Остановлено», а любой свёрнутый ход раскрывается целиком."
+  },
+  "en": {
+    "title": "A stopped turn stays",
+    "text": "When you stop the agent, its thinking and text stay in place marked «Stopped», and any folded turn unfolds in full."
+  }
+}

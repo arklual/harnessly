@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "file-text",
+  "ru": {
+    "title": "Список страниц макета листается",
+    "text": "В адресной строке просмотрщика список страниц теперь прокручивается, открывается на текущей странице, а при многих страницах сверху есть поиск."
+  },
+  "en": {
+    "title": "The design's page list scrolls",
+    "text": "The page list in the viewer's address bar now scrolls, opens on the current page and has a search on top when there are many pages."
+  }
+}

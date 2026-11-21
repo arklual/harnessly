@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "locate",
+  "ru": {
+    "title": "Агент видит, что вы выделили в файле",
+    "text": "Выделите ячейки, текст в PDF, момент видео или область картинки: над полем появится метка, и она уйдёт агенту с сообщением. Отрезок видео и область картинки выделяются протягиванием с Shift. Агент и сам может показать нужное место в файле."
+  },
+  "en": {
+    "title": "The agent sees what you select in a file",
+    "text": "Select cells, text in a PDF, a moment of a video or a region of a picture: a mark appears above the field and goes to the agent with your message. Drag with Shift for a stretch of a video or a region of a picture. The agent can show you a place in a file too."
+  }
+}

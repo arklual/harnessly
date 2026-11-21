@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-28",
+  "icon": "square-terminal",
+  "ru": {
+    "title": "Сообщение доходит, даже если в терминале открыто меню",
+    "text": "Если в терминале агента осталось открытым меню входа или выбор модели, чат сам закроет его и отправит сообщение — и напишет об этом под ним."
+  },
+  "en": {
+    "title": "Messages get through an open terminal menu",
+    "text": "If the sign-in menu or the model picker was left open in the agent's terminal, the chat closes it, sends the message and says so under it."
+  }
+}

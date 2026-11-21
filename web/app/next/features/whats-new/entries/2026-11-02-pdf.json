@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "file-text",
+  "ru": {
+    "title": "PDF открывается красиво",
+    "text": "Страницы, оглавление, миниатюры и поиск по всему файлу прямо в панели. Картинки теперь приближаются колесом и двойным кликом."
+  },
+  "en": {
+    "title": "PDFs open properly",
+    "text": "Pages, contents, thumbnails and search through the whole file, right in the pane. Pictures now zoom with the wheel and a double click."
+  }
+}

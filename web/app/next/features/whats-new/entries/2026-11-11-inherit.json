@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "git-branch",
+  "ru": {
+    "title": "Чат наследует сделанное подчатами и сабагентами",
+    "text": "MR, документы, доски, дизайны и задачи, которые сделали сабагенты и подчаты, теперь видны в самом чате: в «Сделано в этом чате» и в блоке MR под законченной задачей — с пометкой, какой подчат или сабагент их сделал."
+  },
+  "en": {
+    "title": "A chat keeps what its subchats and subagents made",
+    "text": "The merge requests, documents, boards, designs and tasks that a chat's subagents and delegated chats made now show in the chat itself: in «Made in this chat» and in the block of merge requests under a finished task, each marked with the subchat or subagent that made it."
+  }
+}

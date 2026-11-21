@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "presentation",
+  "ru": {
+    "title": "Поля шаблона по-человечески",
+    "text": "У слайда из кита справа — «Заголовок», «Подзаголовок», «Текст», «Картинка» вместо служебных ключей; пока тема грузится, экран показывает её каркас, а не черноту."
+  },
+  "en": {
+    "title": "Template fields in plain words",
+    "text": "A kit slide's panel names its fields «Title», «Subtitle», «Text», «Picture» instead of keys; while a theme loads the screen shows its outline, not a black void."
+  }
+}

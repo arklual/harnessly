@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "triangle-alert",
+  "ru": {
+    "title": "Кнопки у упавшей доски работают",
+    "text": "Если доска падает с ошибкой, кнопки «Отправить в чат», «Скопировать», «Следующая доска» и «Скрыть» срабатывают, а скрытая ошибка не всплывает снова."
+  },
+  "en": {
+    "title": "A failed board's buttons work",
+    "text": "When a board fails, «Send to the chat», «Copy», «Next board» and «Hide» respond, and a hidden error does not pop up again."
+  }
+}

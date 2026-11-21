@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "upload",
+  "ru": {
+    "title": "Загрузка файлов на машину",
+    "text": "Во вкладке «Файлы» перетащите файлы или целую папку в список или нажмите «Загрузить». Видно проценты, скорость и сколько осталось; загрузку можно отменить или повторить."
+  },
+  "en": {
+    "title": "Upload files to the machine",
+    "text": "In the Files tab drag files or a whole folder into the list or press «Upload». You see the percent, the speed and the time left; an upload can be cancelled or retried."
+  }
+}

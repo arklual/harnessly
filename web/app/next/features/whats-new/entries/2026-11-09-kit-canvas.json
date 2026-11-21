@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "palette",
+  "ru": {
+    "title": "Кит — на одном холсте",
+    "text": "В библиотеке у каждого кита свой экран: дерево слева, все компоненты, макеты и значки на холсте, поиск по ⌘K. Справа — параметры с живым предпросмотром, «Как вызвать», «Вставить в доску» и «Отправить в чат»."
+  },
+  "en": {
+    "title": "A kit on one canvas",
+    "text": "Every kit in the library has its own screen: a tree on the left, all components, layouts and icons on one canvas, search on ⌘K. On the right: parameters with a live preview, how to call it, insert into a board and send to chat."
+  }
+}

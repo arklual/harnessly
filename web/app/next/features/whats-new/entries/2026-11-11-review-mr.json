@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "git-pull-request",
+  "ru": {
+    "title": "Ревью чужих MR — прямо в «Ревью кода»",
+    "text": "Обсуждения GitLab стоят у своих строк: отвечайте, правьте и удаляйте свои, ставьте «Решено». Свои замечания копятся черновиком ревью и уходят по «Отправить ревью»; рядом «Одобрить». Для своей ветки — «Создать MR» и «Снять черновик». Всё уходит только от вашего имени: нужен свой GitLab в «Подключениях»."
+  },
+  "en": {
+    "title": "Review merge requests right in Code review",
+    "text": "GitLab discussions sit at their lines: reply, edit or delete yours, resolve. Your notes gather into a draft review and go with Submit review; Approve is beside it. For your own branch — Create merge request and Mark as ready. Everything goes only in your name: connect your own GitLab in Connections."
+  }
+}

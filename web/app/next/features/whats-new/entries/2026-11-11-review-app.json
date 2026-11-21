@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "git-pull-request",
+  "ru": {
+    "title": "«Ревью кода» — приложение внутри harnessly",
+    "text": "В «Приложениях» появилось «Ревью кода»: MR, где ждут вашего ревью, ваши и все — с поиском, а ссылку на MR можно просто вставить. Открытый MR — дифф во всю высоту, файлы по порядку (тесты первыми), «Отметить просмотренным и дальше» и панель «Ревью» справа; чат стоит рядом. Работу чата открывает кнопка во вкладке «Изменения»."
+  },
+  "en": {
+    "title": "Code review, an app inside harnessly",
+    "text": "Apps now has Code review: the merge requests waiting for your review, yours and all, with a search, and a pasted link opens one. An open merge request is the diff in the whole height, files in order (tests first), «Mark viewed and go on» and the Review panel on the right, with the chat beside. The work of a chat opens from the button in Changes."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-21",
+  "icon": "gallery-horizontal",
+  "ru": {
+    "title": "«Что нового» листается карточками",
+    "text": "Каждая новая возможность — своя карточка: листайте вправо свайпом, стрелками или клавишами. Непросмотренные идут первыми и помечены «Новое», за ними — несколько недавних."
+  },
+  "en": {
+    "title": "What's new comes as slides",
+    "text": "Each new feature has a card of its own: swipe right, use the arrows or the arrow keys. The ones you have not seen come first, marked New, followed by a few recent ones."
+  }
+}

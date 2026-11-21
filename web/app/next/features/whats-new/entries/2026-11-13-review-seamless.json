@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-13",
+  "icon": "git-pull-request",
+  "ru": {
+    "title": "Ревью — основной экран, чат — сбоку",
+    "text": "Кнопка «Развернуть» в правой панели и «Ревью» под ответом агента делают MR основным экраном окна, без отдельного «приложения»: шапка как в Sinopia — назад, название MR, проект и номер. Чат остаётся слева колонкой, окном поверх или полем внизу, левое меню сворачивается само, «Назад» возвращает в чат. В правой панели по умолчанию виден только дифф. Карточка MR в чате теперь выключена: включить можно в Настройках → Плагины → Ревью кода."
+  },
+  "en": {
+    "title": "Review is the main screen, the chat is beside it",
+    "text": "«Expand» in the right pane and «Review» under the agent's answer make the merge request the main screen of the window, with no separate «app»: the bar is as in Sinopia — back, the merge request's title, project and number. The chat stays as a column at the left, a window over it or the field at the foot, the sidebar folds by itself, «Back» returns to the chat. The right pane shows only the diff by default. The merge request card in the chat is now off: turn it on in Settings → Plugins → Code review."
+  }
+}

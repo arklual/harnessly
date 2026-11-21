@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "arrow-right-left",
+  "ru": {
+    "title": "Листать слайды, сцены и картинки из поля чата",
+    "text": "⌥← и ⌥→ листают открытую рядом презентацию, видео или картинки, не отнимая курсор у поля сообщения."
+  },
+  "en": {
+    "title": "Turn slides, scenes and pictures from the chat's field",
+    "text": "⌥← and ⌥→ turn a deck, a video or pictures open beside the chat without taking the cursor from the message field."
+  }
+}

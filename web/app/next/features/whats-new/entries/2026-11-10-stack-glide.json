@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-10",
+  "icon": "layers",
+  "ru": {
+    "title": "Стопка уведомлений едет за пальцем",
+    "text": "Листайте стопку уведомлений пальцем, тачпадом или колесом: плашки двигаются вместе с жестом, следующая выходит вперёд по ходу движения, а отпущенная доезжает пружиной с той скоростью, с которой её бросили."
+  },
+  "en": {
+    "title": "The notification stack follows your finger",
+    "text": "Page the notification stack with a finger, a trackpad or the wheel: the plates move with the gesture, the next one comes forward as you go, and a let-go stack springs on at the speed it was thrown."
+  }
+}

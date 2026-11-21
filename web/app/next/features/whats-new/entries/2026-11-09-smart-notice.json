@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "bell",
+  "ru": {
+    "title": "Умное уведомление",
+    "text": "Вопрос агента, разрешение или код приходят чёрной плашкой над полем ввода — ответить можно прямо в ней, не открывая чат. У «ждёт», «срочно» и «готово» теперь разные звуки."
+  },
+  "en": {
+    "title": "Smart notice",
+    "text": "A question from an agent, a permission or a code comes as a black plate above the message field — answer right in it without opening the chat. «Waits», «urgent» and «done» now sound different."
+  }
+}

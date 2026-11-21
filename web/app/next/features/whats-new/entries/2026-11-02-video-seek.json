@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "play",
+  "ru": {
+    "title": "Перемотка видео в Sinopia работает с первого раза",
+    "text": "Редактор видео больше не замирает при первом открытии: кадр идёт за перемоткой, и следующая сцена загружается вовремя."
+  },
+  "en": {
+    "title": "Seeking a Sinopia video works the first time",
+    "text": "The video editor no longer freezes when first opened: the picture follows the playhead, and the next scene loads in time."
+  }
+}

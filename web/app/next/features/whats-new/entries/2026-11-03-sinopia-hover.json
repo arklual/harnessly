@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-03",
+  "icon": "presentation",
+  "ru": {
+    "title": "Картинки прямо в блоках Sinopia",
+    "text": "Наведите на картинку в презентации или дизайне и нажмите «Изменить». В пустом месте под картинку есть «Сгенерировать»; пока идёт работа, блок размыт."
+  },
+  "en": {
+    "title": "Pictures right in Sinopia's blocks",
+    "text": "Hover a picture in a deck or a design and press «Edit». An empty place for a picture offers «Generate»; the block stays blurred while it is drawn."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-28",
+  "icon": "history",
+  "ru": {
+    "title": "Записи переживают машину",
+    "text": "Записи хранятся отдельно от машины: аудио 30 дней, расшифровки — всегда."
+  },
+  "en": {
+    "title": "Recordings outlive the machine",
+    "text": "Recordings are kept apart from the machine: the audio for 30 days, the text for good."
+  }
+}

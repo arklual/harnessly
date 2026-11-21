@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "message-square-text",
+  "ru": {
+    "title": "Аннотации в ответах агента — с номерами",
+    "text": "Выделите текст в ответе и нажмите «Аннотировать»: у фрагмента встанет номер и короткая строка комментария. Отметьте сколько нужно мест в разных ответах — каждое ляжет в поле своей плашкой, нажатие на плашку вернёт к фрагменту."
+  },
+  "en": {
+    "title": "Numbered annotations in the agent’s answers",
+    "text": "Select text in an answer and press «Annotate»: the words get a number and a short comment row. Mark as many places as you need in different answers — each goes into the field as its own chip, and a press on the chip takes you back to the words."
+  }
+}

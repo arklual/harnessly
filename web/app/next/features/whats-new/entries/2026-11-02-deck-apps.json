@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "presentation",
+  "ru": {
+    "title": "Приложения в презентациях",
+    "text": "Выделите блок на слайде, и панель приложения («Сократить» в валидаторе презентаций) появится над полем. Отметки проверок видны на самих блоках."
+  },
+  "en": {
+    "title": "Apps in presentations",
+    "text": "Select a block on a slide and the app's bar (such as «Shorten» in the deck validator) shows up over the field. The checks' marks are drawn on the blocks themselves."
+  }
+}

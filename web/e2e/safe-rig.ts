@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, type Page } from '@playwright/test';
-import { RELEASES } from '../app/next/features/whats-new/releases';
+import { SEEN_ALL } from '../app/next/features/whats-new/seen';
 
 export interface SafeFixture {
   asks: Record<string, unknown>[];
@@ -74,7 +74,7 @@ export const ask = (over: Record<string, unknown> = {}) => ({
 });
 
 export async function safeReady(page: Page) {
-  await page.addInitScript((id) => localStorage.setItem('hx:whats-new', id), RELEASES[0]!.id);
+  await page.addInitScript((seen) => localStorage.setItem('hx:whats-new', seen), SEEN_ALL);
   await page.goto(process.env.E2E_URL!);
   await page
     .locator('.hx-composer__input, [data-testid="setup-form"], [data-testid="signin-form"]')

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-10",
+  "icon": "layers",
+  "ru": {
+    "title": "Кит появляется на всех ваших машинах",
+    "text": "Выложенная версия кита сама приезжает на остальные машины пространства и больше не меняется: проект всегда открывается с тем китом, на котором его собрали."
+  },
+  "en": {
+    "title": "A kit reaches all your machines",
+    "text": "A published version of a kit arrives on the other machines of the space by itself and never changes after that: a project always opens with the kit it was built on."
+  }
+}

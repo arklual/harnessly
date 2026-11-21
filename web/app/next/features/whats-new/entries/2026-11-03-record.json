@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-03",
+  "icon": "mouse-pointer",
+  "ru": {
+    "title": "Запись интерфейса с курсором",
+    "text": "Агент снимает ваш сайт по сценарию в чётком качестве, рисует плавный курсор и наезжает камерой туда, где кликают и печатают."
+  },
+  "en": {
+    "title": "Interface recording with a cursor",
+    "text": "The agent films your site from a script in sharp quality, draws a smooth cursor and zooms the camera to where you click and type."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "download",
+  "ru": {
+    "title": "«Скачать» в Sinopia",
+    "text": "Кнопка «Скачать» в шапке: эта страница — PDF, HTML одним файлом или PNG, все страницы — PDF, весь проект — ZIP. У презентации и видео их форматы в том же меню. Страницу можно скачать и из списка страниц или правым кликом по вкладке."
+  },
+  "en": {
+    "title": "Download in Sinopia",
+    "text": "The Download button on the bar: this page as a PDF, one HTML file or a PNG, all pages as a PDF, the whole project as a ZIP. A deck and a video have their formats in the same menu. A page also downloads from the list of pages or a right click on its tab."
+  }
+}

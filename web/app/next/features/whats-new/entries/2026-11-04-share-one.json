@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "share",
+  "ru": {
+    "title": "Новое окно «Поделиться» в дизайне",
+    "text": "Добавляйте людей и целые команды в одно поле и выдавайте всем одну роль; срок и «Может делиться» — в меню роли. Кто только смотрит, может попросить правку."
+  },
+  "en": {
+    "title": "A new Share window in design",
+    "text": "Add people and whole teams in one field and give them one role; the term and “Can share” are in the role menu. Viewers can ask to edit."
+  }
+}

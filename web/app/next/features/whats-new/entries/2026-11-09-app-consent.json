@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "shield-check",
+  "ru": {
+    "title": "Разрешения приложений — там, где вы",
+    "text": "Если агент поставил приложение, которому нужны права, карточка «Разрешить» появится прямо в чате и в правой панели, а открытое приложение покажет её поверх окна. Один клик — и оно работает."
+  },
+  "en": {
+    "title": "App permissions where you are",
+    "text": "When an agent installs an app that needs access, an «Allow» card shows in the chat and its right pane, and an open app shows it over its window. One click and it runs."
+  }
+}

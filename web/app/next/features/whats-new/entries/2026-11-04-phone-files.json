@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "list-checks",
+  "ru": {
+    "title": "«Файлы» на телефоне",
+    "text": "Удерживайте строку, чтобы выбрать несколько файлов и скачать их одним архивом. Меню «…» открывается снизу, сравнение файлов — внутри текста."
+  },
+  "en": {
+    "title": "Files on a phone",
+    "text": "Hold a row to pick several files and download them as one archive. The «…» menu opens from below, and a diff shows inside the text."
+  }
+}

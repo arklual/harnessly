@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "shield-check",
+  "ru": {
+    "title": "Шаг с ключом — в обычной вкладке",
+    "text": "Если вход на сайт в панели просит ключ или Touch ID, над страницей появится кнопка «Открыть в обычной вкладке»: пройдите шаг там, и когда вы вернётесь, страница в панели обновится сама."
+  },
+  "en": {
+    "title": "A key step in an ordinary tab",
+    "text": "When a sign-in in the pane asks for a security key or Touch ID, a bar over the page offers «Open in an ordinary tab»: take the step there, and the page in the pane reloads by itself when you come back."
+  }
+}

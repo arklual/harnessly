@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-10",
+  "icon": "layers",
+  "ru": {
+    "title": "Машины и участники обновляются сами",
+    "text": "Новая, включённая или переименованная машина появляется в открытой вкладке без перезагрузки. Изменения в составе команды и приглашениях тоже видны сразу."
+  },
+  "en": {
+    "title": "Machines and people update by themselves",
+    "text": "A machine that was added, switched on or renamed shows up in an open tab without a reload. Changes to the team and to invitations appear at once too."
+  }
+}

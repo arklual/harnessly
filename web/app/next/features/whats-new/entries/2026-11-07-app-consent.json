@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "shield-check",
+  "ru": {
+    "title": "Перед установкой видно, что получит приложение",
+    "text": "Экран установки перечисляет все доступы простыми словами, опасные сверху, и честно предупреждает: мы не проверяем приложения. Обновление, которое просит больше, ждёт вашего согласия — до него работает прежняя версия."
+  },
+  "en": {
+    "title": "See what an app gets before you install it",
+    "text": "The install screen lists all the access in plain words, the dangerous on top, and says it straight: we do not check apps. An update that asks for more waits for your consent — until then the current version runs."
+  }
+}

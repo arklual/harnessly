@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "server",
+  "ru": {
+    "title": "Библиотека Sinopia открывается без машины",
+    "text": "Если домашняя машина не отвечает, главная Sinopia показывает ваши проекты и папки из хранилища с тихой пометкой вместо ошибки; проект откроется на просмотр, новый макет — когда машина вернётся."
+  },
+  "en": {
+    "title": "The Sinopia library opens without your machine",
+    "text": "When your home machine does not answer, the Sinopia home shows your projects and folders from the storage with a quiet note instead of an error; a project opens read-only, and a new design waits for the machine."
+  }
+}

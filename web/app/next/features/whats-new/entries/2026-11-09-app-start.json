@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "app-window",
+  "ru": {
+    "title": "Приложение, которое не запустилось, говорит почему",
+    "text": "Вместо белого экрана — заставка с названием, а если окно не подключилось за 8 секунд, карточка с причиной: не загрузился файл, нужен вход, ждёт разрешения. Можно повторить, открыть журнал или передать его агенту."
+  },
+  "en": {
+    "title": "An app that did not start says why",
+    "text": "Instead of a white screen, a loader with the app's name; if the window does not connect in 8 seconds, a card with the reason: a file did not load, sign-in needed, waiting for permission. Try again, open the log or hand it to the agent."
+  }
+}

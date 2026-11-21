@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-28",
+  "icon": "folder",
+  "ru": {
+    "title": "Общие проекты и избранное",
+    "text": "Папки и избранное одни на все ваши машины: при смене машины ничего не пропадает."
+  },
+  "en": {
+    "title": "Shared projects and favorites",
+    "text": "Folders and favorites are one for all your machines: nothing disappears when you switch."
+  }
+}

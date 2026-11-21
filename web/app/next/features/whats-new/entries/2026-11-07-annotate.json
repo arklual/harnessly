@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "message-square-plus",
+  "ru": {
+    "title": "Аннотации на странице",
+    "text": "В браузере панели нажмите «Аннотировать» и кликайте по элементам: на каждом встанет номер с короткой строкой комментария. Метки держатся на элементах при прокрутке, режим не выключается после клика."
+  },
+  "en": {
+    "title": "Annotations on the page",
+    "text": "In the pane's browser press «Annotate» and click elements: each gets a number and a short comment row. Marks stay on their elements as the page scrolls, and the mode stays on after a click."
+  }
+}

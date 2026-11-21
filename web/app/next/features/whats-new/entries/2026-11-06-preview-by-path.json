@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "shield-check",
+  "ru": {
+    "title": "Превью работает на одном адресе",
+    "text": "Если у компании один адрес harnessly и нельзя завести поддомены, превью локальных серверов всё равно открывается в панели. Ничего настраивать не нужно."
+  },
+  "en": {
+    "title": "The preview works on one address",
+    "text": "When a company gives harnessly one address and no subdomains, the preview of local servers still opens in the pane. Nothing to set up."
+  }
+}

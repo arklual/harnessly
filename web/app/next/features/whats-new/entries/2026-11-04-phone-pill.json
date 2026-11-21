@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "smartphone",
+  "ru": {
+    "title": "Настройки телефона — рядом с ним",
+    "text": "Справа от телефона на холсте — панелька: повернуть, убрать рамку, строку состояния или панель браузера и включить «Как пальцем» — наведение тогда не срабатывает, как на настоящем телефоне. Панельку можно перетащить или скрыть правым кликом."
+  },
+  "en": {
+    "title": "Phone settings beside the phone",
+    "text": "A small panel stands to the right of the phone on the canvas: turn it, hide the frame, the status bar or the browser bar, and switch on “Touch” — hover then does nothing, as on a real phone. Drag the panel anywhere or hide it with a right click."
+  }
+}

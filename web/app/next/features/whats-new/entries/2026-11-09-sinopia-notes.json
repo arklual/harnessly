@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "square-dashed-mouse-pointer",
+  "ru": {
+    "title": "Правки в Sinopia — тем же языком",
+    "text": "Номер на блоке, короткая строка комментария рядом с ним, «Аннотирование · N» внизу страницы, а каждая правка — своей плашкой в поле. Настройки блока, голос и картинка — там же, в строке."
+  },
+  "en": {
+    "title": "Sinopia edits speak the same language",
+    "text": "A number on the block, a short comment row beside it, «Annotating · N» at the foot of the page, and each edit as its own chip in the field. The block’s settings, voice and picture stay in the row."
+  }
+}

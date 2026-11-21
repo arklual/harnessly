@@ -432,6 +432,41 @@ Markers (here and in the organization's series) carry what the chart draws:
 | `GET …/waste?scope=&period=` | money | | `WasteResponse` — «Куда уходят деньги впустую» |
 | `GET …/tools?scope=&from=&to=` (or `period=`) | view | | `ToolsResponse` — MCP servers, skills and built-in tools the agents called: calls, errors, people and teams, calls by day, the last call; at most 400 days |
 | `GET …/people?scope=&period=` | money | | `PeopleResponse` — «Расход по людям» of a team or tenant: each person's money, share, personal limit, week's chats and MRs ([below](#people-and-the-week)) |
+| `GET …/accounts?scope=` | money | | `AccountsResponse` — the accounts the scope reaches or used this month, discovered first, then by the month's `list`: funding, kind, plan, `monthlyFee`, scope, owner, who used it ([below](#accounts-hrn-616)) |
+| `POST …/accounts` | money on the account's scope | `AccountRequest` with `provider`, `ref` | 201 `{ account: AccountView }`; journal `account.create`. 409 `conflict` (`account_exists`, `details.id`) when the ref is there already |
+| `PATCH …/accounts/{id}` | money on the account's scope and on the new one | `AccountRequest` | `{ account: AccountView }`; journal `account.update`. Registers a discovered account or edits a registered one |
+
+
+### Accounts
+
+An account appears on the hub by itself the first time a machine reports it ([usage.md](usage.md), `accountRef`):
+`discovered`, personal, and a subscription's `paid` is 0. Registering it says the organization pays and what it costs:
+
+```ts
+AccountRequest = {
+  provider?: 'claude' | 'codex';  // POST only: the CLI the account is used with
+  ref?: string;                   // POST only: claude:<uuid>, codex:<id> or key:<hash>, as the machine reports it
+  label: string;                  // 1–80 characters
+  plan?: string;                  // up to 40
+  kind?: 'subscription' | 'api_key' | 'prepaid'; // POST: key:<hash> is api_key, the rest subscription
+  funding: 'org' | 'personal';
+  monthlyFee?: number;            // USD a month, 0–100 000; only a subscription keeps it
+  ownerUserId?: string;
+  tenantId?: string;              // the account's scope: this tenant; without it, the organization
+  history?: boolean;              // with an owner: their sessions of that CLI that came with no account get it
+};
+AccountView = { id, label, provider, kind, plan, funding, monthlyFee: Money, discovered, scope: { kind, id },
+  owner: PersonRef | null, monthList: Money, people: PersonRef[], createdAt };
+```
+
+- Rights are money on the account's scope: an organization's account needs the organization's admin, a tenant's
+  account the tenant's admin or above; moving an account to another scope needs money there too.
+- Registering clears `discovered`, gives the account's sessions its funding and sums their hours anew, so the
+  organization's spend, subscriptions and money limits ([limits.md](limits.md)) count it from the first hour of the
+  month: a subscription's `paid` is its `monthlyFee` split by the share of `list`. The `unknown_account` signal of the
+  account is resolved.
+- A machine that later reports a ref registered ahead lands on that account instead of making a discovered one.
+- The seed's `accounts:` ([orgs.md](orgs.md)) does the same from a file.
 
 ### Machines
 

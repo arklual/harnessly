@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "server",
+  "ru": {
+    "title": "Машины команды — на одном экране",
+    "text": "Кто на связи, у кого старый раннер, что простаивает. Раннер можно перезапустить, а машину отключить прямо из хаба."
+  },
+  "en": {
+    "title": "Team machines on one screen",
+    "text": "Who is online, whose runner is old, what sits idle. Restart a runner or disable a machine right from the hub."
+  }
+}

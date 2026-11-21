@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "folder-git",
+  "ru": {
+    "title": "Репозитории — одним скиллом",
+    "text": "Репозитории команды больше не занимают по скиллу в каждом чате: агент видит один список с папками и адресами."
+  },
+  "en": {
+    "title": "Repositories as one skill",
+    "text": "The team's repositories no longer take a skill each in every chat: the agent sees one list with folders and addresses."
+  }
+}

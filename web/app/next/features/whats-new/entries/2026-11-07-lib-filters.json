@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "list-filter",
+  "ru": {
+    "title": "Фильтры и сортировка",
+    "text": "Отфильтруйте библиотеку по типу, дизайн-системе или недавним — вместе с поиском. Сортировать можно по дате и названию."
+  },
+  "en": {
+    "title": "Filters and sorting",
+    "text": "Filter the library by kind, design system or recent work, together with search. Sort by date or name."
+  }
+}

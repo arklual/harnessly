@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "presentation",
+  "ru": {
+    "title": "Sinopia не сжимается в полоску",
+    "text": "Холст в правой панели больше не застревает на слишком маленьком размере: такой размер сбрасывается сам."
+  },
+  "en": {
+    "title": "Sinopia no longer shrinks to a strip",
+    "text": "The canvas in the right pane no longer sticks at a size too small to use: such a size resets by itself."
+  }
+}

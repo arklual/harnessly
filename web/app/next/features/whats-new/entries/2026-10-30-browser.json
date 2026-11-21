@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-30",
+  "icon": "globe",
+  "ru": {
+    "title": "Браузер на вашей машине",
+    "text": "Отдельная страница показывает браузер, который работает на машине и использует её IP. Вкладки, cookies и авторизации сохраняются между запусками."
+  },
+  "en": {
+    "title": "A browser on your machine",
+    "text": "A separate page shows a browser running on your machine and using its IP address. Tabs, cookies and sign-ins survive restarts."
+  }
+}

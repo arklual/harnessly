@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "plug",
+  "ru": {
+    "title": "Свой GitLab — в один шаг",
+    "text": "«Подключить свой GitLab» в «Ревью кода» открывает «Подключения» уже с вашим сервером: остаётся создать токен по готовой ссылке и вставить его. Токен создаётся с правами на ответы и одобрения, и всё в ревью уходит от вашего имени. Подключение, заданное машиной, помечено «только чтение»."
+  },
+  "en": {
+    "title": "Your own GitLab in one step",
+    "text": "«Connect your own GitLab» in Code review opens Connections with your server already found: create a token by the ready link and paste it. The token gets the rights for replies and approvals, and everything in the review goes in your name. A connection set by the machine is marked read only."
+  }
+}

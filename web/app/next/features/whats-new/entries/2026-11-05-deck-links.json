@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "presentation",
+  "ru": {
+    "title": "Презентация по ссылке — как вы задумали",
+    "text": "У ссылки на презентацию — с какого слайда начать и как она откроется, у видео — формат, автозапуск и комментарии на шкале."
+  },
+  "en": {
+    "title": "A deck opens the way you meant",
+    "text": "A link to a deck sets the slide it starts from and how it opens; a video's link sets the format, autoplay and comments on the timeline."
+  }
+}

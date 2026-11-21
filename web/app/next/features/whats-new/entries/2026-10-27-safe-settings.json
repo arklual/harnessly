@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-27",
+  "icon": "key-round",
+  "ru": {
+    "title": "Секреты в Настройках",
+    "text": "Настройки → Сейф: что лежит, кто и когда пользовался, заменить или удалить."
+  },
+  "en": {
+    "title": "Secrets in Settings",
+    "text": "Settings → Safe: what is there, who used it and when, replace or remove."
+  }
+}

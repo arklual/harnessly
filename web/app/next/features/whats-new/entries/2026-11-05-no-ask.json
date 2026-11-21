@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "square-dashed-mouse-pointer",
+  "ru": {
+    "title": "Агент работает на странице без вопросов и баннеров",
+    "text": "Плашки «Разрешить/Запретить» и «Агент работает со страницей» больше нет: агент сразу действует на любом сайте, а вы видите только его курсор. Сайты, где ему нельзя, задаются в Настройках → Общие."
+  },
+  "en": {
+    "title": "The agent acts on the page with no questions and no banners",
+    "text": "The «Allow/Deny» and «The agent is working» bars are gone: the agent acts on any site at once, and all you see is its cursor. The sites it may not touch are set in Settings → General."
+  }
+}

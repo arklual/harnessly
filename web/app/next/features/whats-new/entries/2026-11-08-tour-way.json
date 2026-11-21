@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-08",
+  "icon": "graduation-cap",
+  "ru": {
+    "title": "Уроки ведут по кнопкам до проекта",
+    "text": "Урок подсвечивает путь: папку «Демо», потом карточку. Если проект спрятан поиском или фильтром, лежит в другой папке или удалён — урок предложит сбросить или вернуть демо, а «Назад» больше не уводит не туда."
+  },
+  "en": {
+    "title": "Lessons lead to the project, button by button",
+    "text": "A lesson lights up the way: the «Demo» folder, then the card. If a search or a filter hides the project, it lies in another folder or it was deleted, the lesson offers to clear the view or bring the demo back, and «Back» no longer takes you the wrong way."
+  }
+}

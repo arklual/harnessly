@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "link",
+  "ru": {
+    "title": "Карточки ссылок от приложений",
+    "text": "Если ссылку в сообщении понимает включённое приложение, под ней появляется его карточка — например, статус кешбэка по ссылке на него."
+  },
+  "en": {
+    "title": "Link cards from apps",
+    "text": "When an app that is on understands a link in a message, its card shows under it: say, the state of the cashback the link points at."
+  }
+}

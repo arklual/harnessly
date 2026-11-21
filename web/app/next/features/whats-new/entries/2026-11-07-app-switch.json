@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "shield-off",
+  "ru": {
+    "title": "Приложение выключается одной кнопкой",
+    "text": "В карточке приложения — переключатель «Включено»: выключенное не запускается ни в одном чате. В инспекторе — журнал: когда приложение пользовалось секретами и подключениями, когда вы соглашались на доступы."
+  },
+  "en": {
+    "title": "Turn an app off with one switch",
+    "text": "The app’s card has an «On» switch: an app turned off starts in no chat. The inspector has a journal: when the app used secrets and connections, when you agreed to its access."
+  }
+}

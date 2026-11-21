@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "image",
+  "ru": {
+    "title": "Картинки прямо в чате",
+    "text": "Попросите агента нарисовать картинку, и Codex её сгенерирует. В ленте видно, как она проявляется из размытия. Можно попросить сразу несколько вариантов."
+  },
+  "en": {
+    "title": "Pictures right in the chat",
+    "text": "Ask the agent to draw a picture and Codex generates it; the feed shows it coming in from blur. Ask for several variants at once."
+  }
+}

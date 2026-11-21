@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "file-text",
+  "ru": {
+    "title": "Журнал приложения: что сломалось, видно агенту",
+    "text": "`harnessly app logs` показывает ошибки окна, отказы файлов и сбои бэкенда приложения; пишется всегда, в том числе для установок в режиме разработки."
+  },
+  "en": {
+    "title": "The app's log: what broke is visible to the agent",
+    "text": "`harnessly app logs` shows a view's errors, refused files and backend failures; it is always written, dev installs included."
+  }
+}

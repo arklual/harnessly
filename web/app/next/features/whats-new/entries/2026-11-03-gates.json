@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-03",
+  "icon": "shield-question",
+  "ru": {
+    "title": "Запросы агента всегда видны в чате",
+    "text": "План, разрешение или любое другое окно, в котором агент ждёт ответа, теперь приходит карточкой, даже если терминал под чатом совсем низкий."
+  },
+  "en": {
+    "title": "Agent requests always show in the chat",
+    "text": "A plan, a permission or any other window the agent waits on now comes as a card, even with a very low terminal under the chat."
+  }
+}

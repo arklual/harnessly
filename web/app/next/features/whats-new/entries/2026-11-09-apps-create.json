@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "sparkles",
+  "ru": {
+    "title": "Создать приложение — одной кнопкой",
+    "text": "Откроется новый чат, где агент поможет написать приложение."
+  },
+  "en": {
+    "title": "Create an app in one click",
+    "text": "A new chat opens where the agent helps you write the app."
+  }
+}

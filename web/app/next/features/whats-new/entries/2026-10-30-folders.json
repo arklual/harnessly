@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-30",
+  "icon": "folder",
+  "ru": {
+    "title": "Папки короче",
+    "text": "В папке видно пять последних чатов, остальные — по «Дальше». Открытый чат виден всегда."
+  },
+  "en": {
+    "title": "Shorter folders",
+    "text": "A folder shows its five latest chats, the rest behind «More». The open chat always shows."
+  }
+}

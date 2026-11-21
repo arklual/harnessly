@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "message-square-text",
+  "ru": {
+    "title": "Название чата целиком",
+    "text": "Наведите на обрезанное название в списке — оно покажется полностью."
+  },
+  "en": {
+    "title": "A chat’s whole title",
+    "text": "Point at a cut title in the list to see it whole."
+  }
+}

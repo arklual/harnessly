@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "book-open",
+  "ru": {
+    "title": "Документация обо всём harnessly",
+    "text": "В «Ещё → Документация» теперь разделы для людей, для агентов, архитектура со схемами и свой сервер, со скриншотами. Поиск ищет по тексту всех страниц."
+  },
+  "en": {
+    "title": "Documentation of all of harnessly",
+    "text": "«More → Documentation» now has sections for people, for agents, the architecture with diagrams and self-hosting, with screenshots. The search looks through the text of every page."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-03",
+  "icon": "plug",
+  "ru": {
+    "title": "Трекер и вики — по ссылке",
+    "text": "Вставьте ссылку на Jira, Confluence, YouTrack, Linear, GitLab или GitHub в «Настройки → Подключения»: harnessly сам поймёт, что это, и попросит только токен."
+  },
+  "en": {
+    "title": "Your tracker and wiki, by link",
+    "text": "Paste a link to Jira, Confluence, YouTrack, Linear, GitLab or GitHub in Settings → Connections: harnessly figures out the rest and asks only for a token."
+  }
+}

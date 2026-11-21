@@ -66,3 +66,24 @@ func TestAppSecretOfTheFileGoesUp(t *testing.T) {
 		t.Fatalf("the file's token did not go up: %v %v", got, err)
 	}
 }
+
+// A machine's old token goes up at start, before anything uses it.
+func TestShareAppsAtStart(t *testing.T) {
+	kv := secretstest.New()
+	old := secrets.Open(t.TempDir(), filepath.Join(t.TempDir(), "k"))
+	if err := old.PutApp("acme.inbox", "token", "t0"); err != nil {
+		t.Fatal(err)
+	}
+	old.SetShared(secrets.NewRemote(kv, "me", t.TempDir()))
+	if n := old.ShareApps(); n != 1 {
+		t.Fatalf("shared %d, want 1", n)
+	}
+	if n := old.ShareApps(); n != 0 {
+		t.Fatalf("shared again: %d", n)
+	}
+	other := secrets.Open(t.TempDir(), filepath.Join(t.TempDir(), "k"))
+	other.SetShared(secrets.NewRemote(kv, "me", t.TempDir()))
+	if !other.HasApp("acme.inbox", "token") {
+		t.Fatal("the other machine does not see the token shared at start")
+	}
+}

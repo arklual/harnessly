@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "globe",
+  "ru": {
+    "title": "Адрес сайта на месте",
+    "text": "«Опубликовать как сайт» помнит опубликованный сайт и после перезагрузки страницы."
+  },
+  "en": {
+    "title": "The site's address stays",
+    "text": "«Publish as a site» remembers the published site after the page reloads."
+  }
+}

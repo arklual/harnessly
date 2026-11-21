@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "shield-question",
+  "ru": {
+    "title": "Вопросы — первыми",
+    "text": "Чат, где агент спрашивает или просит разрешения, сам переезжает в начало полосы вкладок, за ним — чаты с непрочитанным ответом."
+  },
+  "en": {
+    "title": "Questions come first",
+    "text": "A chat where the agent asks or needs a permission moves to the front of the tab strip, followed by chats with an unread reply."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-03",
+  "icon": "pencil",
+  "ru": {
+    "title": "Правьте картинки прямо в просмотре",
+    "text": "Откройте картинку из чата: разметка, комментарий к области, стереть, убрать фон, сменить формат или написать, что поменять. Каждая правка становится новой версией, оригинал остаётся."
+  },
+  "en": {
+    "title": "Edit pictures right in the viewer",
+    "text": "Open a picture from a chat: mark it up, comment on an area, erase, remove the background, change the format or say what to change. Every edit is a new version and the original stays."
+  }
+}

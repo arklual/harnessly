@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "shield-question",
+  "ru": {
+    "title": "Видно, почему приложение молчит",
+    "text": "В списке приложений и в «О приложении» написано, чего приложение ждёт: секрета, входа в сервис или другой версии harnessly. Неудачное обновление оставляет прежнюю рабочую версию."
+  },
+  "en": {
+    "title": "You see why an app is silent",
+    "text": "The apps list and «About» say what an app waits for: a secret, a sign-in or another harnessly version. A failed update keeps the previous working version."
+  }
+}

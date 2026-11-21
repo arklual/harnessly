@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "external-link",
+  "ru": {
+    "title": "Ссылки из чата дизайна открываются рядом",
+    "text": "Документ, ссылку или карточку из чата дизайна теперь открывает панель рядом с дизайном, а не новая вкладка браузера. Cmd/Ctrl+клик по-прежнему открывает в браузере."
+  },
+  "en": {
+    "title": "Links from a design's chat open beside it",
+    "text": "A document, link or card from a design's chat now opens in the pane beside the design instead of a new browser tab. Cmd/Ctrl+click still opens it in the browser."
+  }
+}

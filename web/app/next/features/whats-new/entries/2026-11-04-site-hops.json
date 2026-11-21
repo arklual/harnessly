@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "log-in",
+  "ru": {
+    "title": "Вход на наши сайты — в панели",
+    "text": "Если наш сайт уводит на другой наш сайт, например на страницу входа и обратно, вкладка панели идёт следом сама: без страницы «Открыть в превью». На чужие сайты по-прежнему только по кнопке."
+  },
+  "en": {
+    "title": "Sign-in to our sites stays in the pane",
+    "text": "When one of our sites sends you to another of ours, such as its sign-in page and back, the pane's tab follows by itself, with no «Open in preview» page. Other sites still wait for a press."
+  }
+}

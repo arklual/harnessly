@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "bell",
+  "ru": {
+    "title": "Уведомления смахиваются",
+    "text": "Пальцем на телефоне, двумя пальцами на тачпаде или зажатой мышью — вбок или вверх. Кнопки в очереди сообщений снова видны всегда."
+  },
+  "en": {
+    "title": "Swipe notices away",
+    "text": "With a finger on the phone, two fingers on a trackpad or a held mouse button — sideways or up. The buttons of queued messages are always shown again."
+  }
+}

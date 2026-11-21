@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "maximize-2",
+  "ru": {
+    "title": "«Развернуть» без лишних панелей",
+    "text": "Дизайн из панели чата открывается во весь экран без боковых панелей: они появляются, только когда вы их откроете."
+  },
+  "en": {
+    "title": "«Expand» without extra panels",
+    "text": "A design from the chat's pane opens full screen without side panels: they come out only when you open them."
+  }
+}

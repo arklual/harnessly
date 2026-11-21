@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "smartphone",
+  "ru": {
+    "title": "Страница как на телефоне",
+    "text": "Меню «Устройство» показывает страницу на телефоне или планшете, а «Повернуть» кладёт экран набок. «Открыть в браузере» переносит страницу в ваш браузер."
+  },
+  "en": {
+    "title": "See a page as on a phone",
+    "text": "The «Device» menu shows the page on a phone or a tablet, and «Rotate» puts the screen on its side. «Open in the browser» takes the page to your own browser."
+  }
+}

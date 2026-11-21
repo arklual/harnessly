@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "bell",
+  "ru": {
+    "title": "Спокойные уведомления",
+    "text": "Не мигают при обновлении данных, наведение ничего не скрывает, скрытое уходит плавно. В тёмной теме они светлые; цвет меняется в настройках внешнего вида."
+  },
+  "en": {
+    "title": "Calm notifications",
+    "text": "They no longer blink on data updates, hovering hides nothing, a dismissed one leaves smoothly. In the dark theme they are light; the color is in the appearance settings."
+  }
+}

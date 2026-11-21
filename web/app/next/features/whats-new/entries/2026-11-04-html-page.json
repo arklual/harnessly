@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "code-xml",
+  "ru": {
+    "title": "HTML открывается страницей",
+    "text": "HTML-файл показывается как страница, исходник открывается переключателем «Код». Файл вне папки чата тоже открывается во вкладке «Файлы» и скачивается оттуда же."
+  },
+  "en": {
+    "title": "HTML opens as a page",
+    "text": "An HTML file shows as a page; switch to Code for the source. Files outside the chat folder open in Files too and download from there."
+  }
+}

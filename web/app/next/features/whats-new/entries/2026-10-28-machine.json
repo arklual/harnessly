@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-28",
+  "icon": "server",
+  "ru": {
+    "title": "Машина — в выборе модели",
+    "text": "Новый чат начинается на основной машине. Другую выберите в меню модели — там же появятся её агенты и модели."
+  },
+  "en": {
+    "title": "The machine is in the model menu",
+    "text": "A new chat starts on your main machine. Pick another in the model menu — its agents and models show there."
+  }
+}

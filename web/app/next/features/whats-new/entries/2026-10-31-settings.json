@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "sliders-horizontal",
+  "ru": {
+    "title": "Настройки не падают",
+    "text": "Разделы «Сейф» и «Уведомления» снова открываются, а список разделов собран в три группы: приложение, агенты, машина."
+  },
+  "en": {
+    "title": "Settings stay up",
+    "text": "Safe and Notifications open again, and the sections are in three groups: the app, the agents, the machine."
+  }
+}

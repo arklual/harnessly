@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "layers",
+  "ru": {
+    "title": "Правая панель на главной",
+    "text": "Без открытого чата можно открыть панель, выбрать проект и MR и посмотреть его; «Спросить агента» начнёт чат с этим MR."
+  },
+  "en": {
+    "title": "The right pane on the home page",
+    "text": "Without an open chat you can open the pane, pick a project and a merge request and look at it; «Ask the agent» starts a chat about it."
+  }
+}

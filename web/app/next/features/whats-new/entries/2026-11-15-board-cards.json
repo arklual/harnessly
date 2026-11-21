@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-15",
+  "icon": "workflow",
+  "ru": {
+    "title": "Ссылка на доску или документ — карточкой",
+    "text": "В чате ссылка на доску или документ показывает название, кто сделал, когда меняли и картинку доски. Карточку видит только тот, у кого есть доступ."
+  },
+  "en": {
+    "title": "A board or document link is a card",
+    "text": "In a chat a link to a board or a document shows its name, who made it, when it changed and the board’s picture. Only people who may open it see the card."
+  }
+}

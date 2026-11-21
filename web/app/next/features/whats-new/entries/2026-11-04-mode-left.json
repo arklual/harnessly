@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "pencil",
+  "ru": {
+    "title": "Режим — рядом с названием",
+    "text": "«Макет» или «Редактирование» теперь слева, у адреса: щелчок переключает режим. Справа остались только инструменты."
+  },
+  "en": {
+    "title": "The mode sits by the name",
+    "text": "«Design» or «Editing» is now on the left, by the address: a click switches the mode. Only the tools stay on the right."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-28",
+  "icon": "mic",
+  "ru": {
+    "title": "Записи под рукой",
+    "text": "«+» → «Записи»: прослушать, скачать или вставить расшифровку в поле. Все записи — в Настройках → «Записи»."
+  },
+  "en": {
+    "title": "Recordings at hand",
+    "text": "«+» → «Recordings»: play, download or put the text into the field. All of them are in Settings → «Recordings»."
+  }
+}

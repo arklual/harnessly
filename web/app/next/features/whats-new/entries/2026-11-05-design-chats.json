@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "messages-square",
+  "ru": {
+    "title": "Чаты дизайна — со всех ваших машин",
+    "text": "В шапке чата дизайна теперь чаты этого дизайна со всех ваших машин; чат с другой машины открывается там, где он идёт. В список попадают только чаты, начатые из дизайна или правившие его файлы, а не те, где дизайн просто открывали."
+  },
+  "en": {
+    "title": "Design chats from all your machines",
+    "text": "The switch in a design's chat now lists its chats from all your machines; a chat of another machine opens where it runs. Only chats started from the design or that edited its files are listed, not the ones that merely opened it."
+  }
+}

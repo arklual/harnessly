@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "panel-left",
+  "ru": {
+    "title": "Чат макета: место и продолжение",
+    "text": "Где стоит чат, теперь выбирается в его шапке списком с подписями. В меню «⋯» чат можно продолжить в другой модели или на другой машине, и новый чат остаётся рядом с макетом."
+  },
+  "en": {
+    "title": "The design chat: its place and handoff",
+    "text": "Pick where the chat stands from a labelled list in its header. Its «⋯» menu continues the chat in another model or on another machine, and the new chat stays beside the design."
+  }
+}

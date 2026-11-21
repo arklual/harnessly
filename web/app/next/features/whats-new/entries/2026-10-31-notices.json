@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "bell",
+  "ru": {
+    "title": "Уведомления там, где удобно",
+    "text": "Выберите угол экрана и через сколько карточка скроется сама, а кнопка «Показать» сразу покажет пример. Пока курсор над карточкой, она не исчезнет."
+  },
+  "en": {
+    "title": "Notices where you want them",
+    "text": "Pick a corner and how soon a card hides by itself; «Show» puts a sample there at once. A card under the pointer stays."
+  }
+}

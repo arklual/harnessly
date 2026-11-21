@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-28",
+  "icon": "globe",
+  "ru": {
+    "title": "Опубликовать сайт",
+    "text": "Кнопка «Опубликовать» в шапке макета: страницы уходят на хаб и открываются по своему адресу, даже когда машина выключена."
+  },
+  "en": {
+    "title": "Publish a site",
+    "text": "The Publish button in a design's header sends the pages to the hub, and they open at their own address even when the machine is off."
+  }
+}

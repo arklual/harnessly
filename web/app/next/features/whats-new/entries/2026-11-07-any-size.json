@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "paperclip",
+  "ru": {
+    "title": "Файлы любого размера",
+    "text": "В чат можно перетащить или вставить файл через Ctrl+V — размер не ограничен, только местом на диске машины. Оборвалась связь — загрузка продолжится с того же места."
+  },
+  "en": {
+    "title": "Files of any size",
+    "text": "Drag a file into the chat or paste it with Ctrl+V — there is no size limit but the free space on the machine. If the connection drops, the upload goes on from where it stopped."
+  }
+}

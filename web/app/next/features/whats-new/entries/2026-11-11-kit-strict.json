@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "shield-check",
+  "ru": {
+    "title": "Макет — только из кита",
+    "text": "Проект на ките можно проверить строгим режимом: агент получает список всего, что собрано не из кита — своя вёрстка, цвета и отступы мимо токенов, чужие пропсы, устаревшие компоненты — с местом и заменой. Режим включается настройкой проекта или кита."
+  },
+  "en": {
+    "title": "A mockup made of the kit only",
+    "text": "A project on a kit can be checked in strict mode: the agent gets everything that is not from the kit — its own markup, colours and spacing off the tokens, props a component lacks, deprecated components — with the place and the replacement. A project or its kit turns the mode on."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-08",
+  "icon": "presentation",
+  "ru": {
+    "title": "Открываются все страницы дизайна",
+    "text": "Деки, видео и сайты из нескольких страниц больше не обрываются на второй странице ошибкой «не найдено» на сервере команды."
+  },
+  "en": {
+    "title": "Every page of a design opens",
+    "text": "Decks, videos and sites with several pages no longer stop on the second page with «not found» on a team server."
+  }
+}

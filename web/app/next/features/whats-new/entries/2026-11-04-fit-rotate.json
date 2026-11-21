@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "rotate-cw",
+  "ru": {
+    "title": "Макет — одной кнопкой «Вписать»",
+    "text": "«Вписать» (или ⌘0) возвращает обычный вид: телефон и планшет целиком по центру, «По окну» — во всё окно. Телефон и планшет можно повернуть горизонтально."
+  },
+  "en": {
+    "title": "One «Fit» for a design",
+    "text": "«Fit» (or ⌘0) brings back the usual view: a phone or tablet whole and centred, «Fit to window» filling the window. Phones and tablets can be turned sideways."
+  }
+}

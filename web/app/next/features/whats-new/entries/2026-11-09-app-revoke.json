@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "ban",
+  "ru": {
+    "title": "Доступы снимаются по одному",
+    "text": "В описании приложения у каждого выданного доступа есть «Снять». Остальное остаётся как было, а приложение ждёт вашего слова, пока вы не разрешите снова."
+  },
+  "en": {
+    "title": "Take access back one by one",
+    "text": "In the app’s details every granted access has «Revoke». The rest stays as it was, and the app waits for your word until you allow it again."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "hard-drive",
+  "ru": {
+    "title": "«Диск» теперь внутри «Файлов»",
+    "text": "Переключатель «Проект / Машина» показывает всю машину в том же списке. Файлы загружаются кнопкой или перетаскиванием, там же создаётся новая папка. Шапка открытого файла теперь в одну строку, а у выделенного кода появляется подсказка «Спросить агента»."
+  },
+  "en": {
+    "title": "Disk is now part of Files",
+    "text": "The Project / Machine switch shows the whole machine in the same list. Upload files with a button or by dropping them, and make a new folder there. An open file's header is one row now, and selected code offers Ask the agent right beside it."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "keyboard",
+  "ru": {
+    "title": "Enter отвечает на вопрос агента",
+    "text": "Свернули вопрос и написали ответ в поле — Enter его отправит, искать кнопку на карточке больше не нужно."
+  },
+  "en": {
+    "title": "Enter answers the agent’s question",
+    "text": "Fold the question and write your answer in the field: Enter sends it, no need to look for the button on the card."
+  }
+}

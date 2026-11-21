@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "server",
+  "ru": {
+    "title": "Страница не ждёт машину",
+    "text": "Список чатов появляется сразу из хаба, даже если домашняя машина не отвечает; поле ввода не уезжает вверх при увеличении страницы."
+  },
+  "en": {
+    "title": "The page does not wait for the machine",
+    "text": "The list of chats appears at once from the hub even when the home machine does not answer; the input stays put when the page is zoomed."
+  }
+}

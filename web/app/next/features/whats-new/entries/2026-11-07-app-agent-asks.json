@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "shield-check",
+  "ru": {
+    "title": "Агент не обходит ваше согласие",
+    "text": "Если агент через приложение пытается запустить команду, вы увидите вопрос и решите сами."
+  },
+  "en": {
+    "title": "The agent does not go around your consent",
+    "text": "When the agent tries to run a command through an app, you are asked and decide yourself."
+  }
+}

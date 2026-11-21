@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-08",
+  "icon": "ellipsis",
+  "ru": {
+    "title": "«Выбрать» и «Переместить в…» работают",
+    "text": "Пункты меню «…» на карточке снова делают то, что написано, а не открывают проект."
+  },
+  "en": {
+    "title": "«Select» and «Move to…» work",
+    "text": "The items of a card's «…» menu do what they say again instead of opening the project."
+  }
+}

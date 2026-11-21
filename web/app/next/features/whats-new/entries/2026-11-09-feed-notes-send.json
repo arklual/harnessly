@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "send",
+  "ru": {
+    "title": "Отправить все одним сообщением",
+    "text": "Над полем — «Аннотирование · N»: «Отправить все» уходит одним сообщением с цитатами и комментариями, «Очистить» снимает отметки."
+  },
+  "en": {
+    "title": "Send them all in one message",
+    "text": "Over the field, «Annotating · N»: «Send all» goes as one message with the quotes and comments, «Clear» takes the marks away."
+  }
+}

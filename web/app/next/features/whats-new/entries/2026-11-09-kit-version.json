@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "layers",
+  "ru": {
+    "title": "Версии кита и «Есть версия»",
+    "text": "В черновике кита — «Опубликовать версию» с номером и тем, что изменилось. Другие проекты остаются на своей версии и тихо предлагают новую: посмотреть, «Обновить» или «Остаться»."
+  },
+  "en": {
+    "title": "Kit versions and «Version is out»",
+    "text": "The kit's draft has «Publish version» with a number and what changed. Other projects stay on their version and quietly offer the new one: look, «Update» or «Stay»."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "layout-grid",
+  "ru": {
+    "title": "Приложения — удобная сетка",
+    "text": "Карточки с иконкой и пояснением, где приложение работает. Поиск по всем каталогам — вверху; отладка и безопасный режим спрятаны в «…»."
+  },
+  "en": {
+    "title": "Apps in a tidy grid",
+    "text": "Cards with an icon and a note on where the app works. One search over all the catalogs sits at the top; debug and safe mode are in the «…» menu."
+  }
+}

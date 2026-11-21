@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "gauge",
+  "ru": {
+    "title": "Браузер машины отвечает быстрее",
+    "text": "Кадры из браузера машины идут по мере того, как панель успевает их показать, поэтому прокрутка и набор больше не копятся в очередь и не догоняют вас секундами позже. Колесо и движения мыши собираются в один шаг на кадр. Когда страница замерла, она показывается в полной чёткости вашего экрана."
+  },
+  "en": {
+    "title": "The machine browser responds faster",
+    "text": "Frames from the machine browser arrive as fast as the pane can show them, so scrolling and typing no longer pile up and catch up seconds later. Wheel and mouse moves are gathered into one step per frame. Once the page is still, it is shown at the full sharpness of your screen."
+  }
+}

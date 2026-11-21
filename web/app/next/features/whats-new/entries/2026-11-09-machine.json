@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "gauge",
+  "ru": {
+    "title": "Когда машине тяжело",
+    "text": "Если машине не хватает памяти или процессора, уведомление скажет, что грузит её сильнее всего, и даст остановить лишнее."
+  },
+  "en": {
+    "title": "When the machine struggles",
+    "text": "If the machine runs short of memory or processor, the notice tells what weighs on it most and lets you stop what is not needed."
+  }
+}

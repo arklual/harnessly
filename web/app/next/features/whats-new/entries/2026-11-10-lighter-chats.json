@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-10",
+  "icon": "history",
+  "ru": {
+    "title": "Открытый чат читает историю агента один раз",
+    "text": "Лента, правая панель и счётчики чата берут новые строки истории из одного чтения, а не каждый своим. Машина меньше работает на каждый открытый чат."
+  },
+  "en": {
+    "title": "An open chat reads the agent's history once",
+    "text": "The feed, the right pane and the chat's counters take new lines of the history from one reading, not each from its own. The machine works less for every open chat."
+  }
+}

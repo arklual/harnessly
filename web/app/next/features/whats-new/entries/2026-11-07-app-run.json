@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "terminal",
+  "ru": {
+    "title": "Приложения запускают команды",
+    "text": "Тесты, сборка, линтер — по кнопке в приложении, без терминала. Команда идёт в той же песочнице, что и агент: в папке чата, без ваших ключей и с лимитом времени."
+  },
+  "en": {
+    "title": "Apps run commands",
+    "text": "Tests, a build, a linter — by a button in an app, no terminal. A command runs in the same sandbox as the agent: in the chat's folder, without your keys and with a time limit."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "palette",
+  "ru": {
+    "title": "Превью по пути — со стилями и скриптами",
+    "text": "Если превью открывается по пути (у компании один адрес harnessly), страница загружает стили, скрипты и картинки, указанные относительными адресами, и зависимости, которые её загрузчик дописывает через document.write. Раньше она могла открыться без оформления или пустой."
+  },
+  "en": {
+    "title": "Previews by path come with their styles and scripts",
+    "text": "When a preview opens by path (one harnessly address for the whole company), the page now loads the styles, scripts and pictures it names by relative addresses, and the dependencies its loader writes with document.write. Before, it could open unstyled or blank."
+  }
+}

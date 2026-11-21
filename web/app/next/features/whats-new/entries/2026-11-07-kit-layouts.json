@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "layout-grid",
+  "ru": {
+    "title": "Макеты слайдов из дизайн-системы",
+    "text": "В ленте колоды у кнопки «＋ слайд» теперь список макетов установленных систем: слайд сразу создаётся по макету."
+  },
+  "en": {
+    "title": "Slide layouts from a design system",
+    "text": "The «＋ slide» button in the deck strip now lists the layouts of installed systems: the slide is made from the layout at once."
+  }
+}

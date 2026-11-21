@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "book-open",
+  "ru": {
+    "title": "Диктовка знает ваши слова",
+    "text": "В «Настройки → Голосовой ввод» есть список «Мои слова»: добавьте Sinopia или harnessly, и «открой синопию в харнесли» запишется как «открой Sinopia в harnessly». Слова можно задать вместе с тем, как они слышатся, а можно оставить на подбор по звучанию."
+  },
+  "en": {
+    "title": "Dictation knows your words",
+    "text": "Settings → Voice input has «My words»: add Sinopia or harnessly and «открой синопию в харнесли» is written as «открой Sinopia в harnessly». Give a word with the ways it is heard, or leave it to be found by sound."
+  }
+}

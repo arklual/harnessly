@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "shield-question",
+  "ru": {
+    "title": "Агент дожидается разрешения на сайт",
+    "text": "Пока вы решаете «Разрешить» или «Запретить» агенту управлять страницей, его инструменты не падают с ошибкой: он видит, что ждёт вашего ответа на этот сайт, и после «Разрешить» продолжает."
+  },
+  "en": {
+    "title": "The agent waits for your go-ahead on a site",
+    "text": "While you decide whether to let the agent act on a page, its tools no longer fail: it sees it is waiting for your answer about this site and carries on after «Allow»."
+  }
+}

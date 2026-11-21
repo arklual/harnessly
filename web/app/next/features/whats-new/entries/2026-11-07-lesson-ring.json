@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "square-mouse-pointer",
+  "ru": {
+    "title": "Уроки показывают, куда нажать",
+    "text": "Подсказка урока обводит саму кнопку или блок на макете, не закрывает их и говорит, пока макет загружается. Ушли со страницы урока — он подождёт и вернёт обратно."
+  },
+  "en": {
+    "title": "Lessons show where to click",
+    "text": "A lesson rings the very button or block on the mockup, keeps off it and says when the mockup is still loading. Leave the lesson’s page and it waits and takes you back."
+  }
+}

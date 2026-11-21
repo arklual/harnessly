@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-10",
+  "icon": "server",
+  "ru": {
+    "title": "Большие ответы машины доходят целиком",
+    "text": "Хаб передаёт ответ машины порциями, по мере того как страница его читает: файл в десятки мегабайт больше не обрывается на медленном соединении."
+  },
+  "en": {
+    "title": "Large answers of a machine arrive whole",
+    "text": "The hub passes a machine's answer in portions, as the page reads it: a file of tens of megabytes is no longer cut on a slow connection."
+  }
+}

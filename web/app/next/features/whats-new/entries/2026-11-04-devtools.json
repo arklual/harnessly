@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "panel-bottom",
+  "ru": {
+    "title": "DevTools у любой страницы в панели",
+    "text": "Кнопка в панели браузера открывает консоль, сеть и элементы страницы: стенда, админки, любого нашего сайта. Ошибку из консоли одной кнопкой можно положить в поле чата."
+  },
+  "en": {
+    "title": "DevTools for any page in the pane",
+    "text": "A button in the pane's browser opens the console, network and elements of the page: a stand, the admin, any of our sites. One click puts a console error into the chat's field."
+  }
+}

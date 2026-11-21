@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "log-in",
+  "ru": {
+    "title": "Приложения за Teleport — в панели",
+    "text": "Сайт за входом Teleport, например PostHog, открывается в браузере панели: если адрес Teleport есть в списке сайтов панели, вкладка сама проходит через единый вход и возвращается на сайт под вашей учётной записью. Если сайт не отвечает, панель пишет, на чём встало: нет подключения с машины или сайт молчит."
+  },
+  "en": {
+    "title": "Teleport apps in the pane",
+    "text": "A site behind a Teleport sign-in, such as PostHog, opens in the pane's browser: when the Teleport address is in the pane's list of sites, the tab goes through the single sign-on by itself and comes back to the site under your own account. When a site does not answer, the pane says where it stopped: no connection from the machine, or the site is silent."
+  }
+}

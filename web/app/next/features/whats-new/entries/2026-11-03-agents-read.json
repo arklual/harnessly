@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-03",
+  "icon": "book-open",
+  "ru": {
+    "title": "Агенты читают ваши задачи и страницы",
+    "text": "После подключения агент открывает задачу или страницу вики по ссылке или ключу и читает её с вашим доступом — в облаке или на вашем сервере."
+  },
+  "en": {
+    "title": "Agents read your tasks and pages",
+    "text": "Once connected, an agent opens a task or a wiki page by its link or key and reads it with your access, in the cloud or on your own server."
+  }
+}

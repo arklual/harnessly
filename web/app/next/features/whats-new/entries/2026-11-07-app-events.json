@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "bell",
+  "ru": {
+    "title": "Приложения узнают, что происходит в чате",
+    "text": "Приложение может узнавать, что агент закончил ход, вызвал инструмент или пришло сообщение, — без их содержимого."
+  },
+  "en": {
+    "title": "Apps hear what happens in the chat",
+    "text": "An app can know that the agent finished a turn, called a tool or that a message came — without their content."
+  }
+}

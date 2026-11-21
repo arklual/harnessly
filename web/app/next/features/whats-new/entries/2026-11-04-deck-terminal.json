@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "square-terminal",
+  "ru": {
+    "title": "Терминал в чате проекта",
+    "text": "В Sinopia терминал агента теперь открывается прямо из чата презентации, видео или макета."
+  },
+  "en": {
+    "title": "A terminal in the project chat",
+    "text": "In Sinopia the agent's terminal now opens right from the chat of a deck, a video or a mockup."
+  }
+}

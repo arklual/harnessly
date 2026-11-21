@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-08",
+  "icon": "send",
+  "ru": {
+    "title": "«Отправить в чат» на ошибке доски — сразу агенту",
+    "text": "Из просмотра проект переключается в «Редактирование», чат открывается, и ошибка уходит агенту: вы видите своё сообщение и ответ. Так же на сайте и в презентации."
+  },
+  "en": {
+    "title": "«Send to the chat» on a board error goes straight to the agent",
+    "text": "Looking at a project, it switches to editing, the chat opens and the error goes to the agent: you see your message and the reply. The same on a site and a deck."
+  }
+}

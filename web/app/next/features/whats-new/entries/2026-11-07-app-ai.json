@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "sparkles",
+  "ru": {
+    "title": "Приложения спрашивают модель",
+    "text": "Приложение может получить ответ модели — например, пересказ или черновик — на вашем аккаунте, без инструментов и доступа к файлам."
+  },
+  "en": {
+    "title": "Apps ask a model",
+    "text": "An app can get an answer of a model — a summary or a draft — on your account, with no tools and no access to files."
+  }
+}

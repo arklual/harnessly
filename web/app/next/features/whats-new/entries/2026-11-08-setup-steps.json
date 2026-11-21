@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-08",
+  "icon": "square-mouse-pointer",
+  "ru": {
+    "title": "Шаги настройки машины нажимаются",
+    "text": "Ключ, которого ждёт шаг, открывает сейф, а упавший шаг показывает свою ошибку и «Повторить»."
+  },
+  "en": {
+    "title": "Machine setup steps can be pressed",
+    "text": "A key a step waits for opens the safe; a failed step shows its error and «Retry»."
+  }
+}

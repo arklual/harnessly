@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "key-round",
+  "ru": {
+    "title": "Коды 2FA и из SMS — прямо в панели",
+    "text": "Когда агенту нужен одноразовый код (npm publish, вход в банк), под сабагентами появляется «Ждут код»: видно, для чего он и сколько агент ещё ждёт. Код не проходит через чат и нигде не хранится."
+  },
+  "en": {
+    "title": "2FA and SMS codes, right in the panel",
+    "text": "When an agent needs a one-time code (npm publish, a bank sign-in), «Waiting for a code» appears under the subagents: what it is for and how long the agent still waits. The code never goes through the chat and is kept nowhere."
+  }
+}

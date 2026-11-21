@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "file-lock",
+  "ru": {
+    "title": "Документ без копирования",
+    "text": "У ссылки на документ можно выключить скачивание и копирование текста: гость прочитает документ с экрана, но не унесёт его."
+  },
+  "en": {
+    "title": "A document that cannot be copied",
+    "text": "A link to a document can turn off downloading and copying text: the guest reads it on screen but cannot take it away."
+  }
+}

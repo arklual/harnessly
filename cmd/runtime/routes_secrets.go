@@ -71,6 +71,7 @@ func newSafe(d deps) *safe {
 	if where.Error != "" {
 		agent.Log("warn", "safe: the server safe cannot be used: "+where.Error)
 	}
+	go shareAppSecrets(store.Local)
 	return &safe{
 		store: store,
 		where: where,
@@ -673,5 +674,16 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string), resol
 		{Match: is("/api/cli/secrets/code"), Handler: http.HandlerFunc(cliCode)},
 		{Match: is("/api/cli/secrets/code/wait"), Handler: http.HandlerFunc(cliCodeWait)},
 		{Match: is("/api/cli/secrets/code/cancel"), Handler: http.HandlerFunc(cliCodeCancel)},
+	}
+}
+
+// shareAppSecrets sends the app's secrets this machine kept alone up to the shared safe: at start, and again
+// every 10 minutes while the hub's link is not up yet. One already shared costs nothing (the file marks it).
+func shareAppSecrets(local *secrets.Store) {
+	for {
+		if n := local.ShareApps(); n > 0 {
+			agent.Log("info", "safe: app secrets shared with the person's other machines", agent.F{K: "count", V: n})
+		}
+		time.Sleep(10 * time.Minute)
 	}
 }

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "message-square",
+  "ru": {
+    "title": "Вопросы агента — аккуратнее",
+    "text": "Вопрос, очередь и поле ввода теперь один блок одной ширины, а в узком чате рядом с макетом ничего не переносится и не наезжает."
+  },
+  "en": {
+    "title": "Tidier agent questions",
+    "text": "The question, the queue and the field are now one block of one width, and nothing wraps or overlaps in the narrow chat beside a design."
+  }
+}

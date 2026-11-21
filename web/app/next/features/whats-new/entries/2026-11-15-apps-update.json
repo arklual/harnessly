@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-15",
+  "icon": "refresh-cw",
+  "ru": {
+    "title": "«Доски» и «Документы» обновляются сами",
+    "text": "Новая версия приложений приходит на машину за несколько минут, без перезапуска чатов; открытая доска остаётся открытой. Версия и время обновления — в «Окружении»."
+  },
+  "en": {
+    "title": "Boards and Documents update by themselves",
+    "text": "A new version of the apps reaches the machine within minutes, no chat restarts; an open board stays open. The version and when it came are in «Environment»."
+  }
+}

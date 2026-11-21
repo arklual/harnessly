@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "palette",
+  "ru": {
+    "title": "Сайт, слайды и видео создаются с одного экрана",
+    "text": "В Sinopia плитка больше не уводит на другой экран: меняется вид, а поле и текст остаются. Файлы, настройки и голос работают для всех видов."
+  },
+  "en": {
+    "title": "Sites, slides and videos start from one screen",
+    "text": "In Sinopia a tile no longer takes you to another screen: the kind changes, the field and your text stay. Files, settings and voice work for every kind."
+  }
+}

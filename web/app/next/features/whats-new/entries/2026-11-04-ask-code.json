@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "message-square-text",
+  "ru": {
+    "title": "Спросить агента про код",
+    "text": "Выделите код в редакторе и нажмите «Спросить агента», «Объясни» или «Исправь». Выделение с путём и номерами строк попадёт в поле чата. Поиск и замена открываются кнопкой с лупой."
+  },
+  "en": {
+    "title": "Ask the agent about code",
+    "text": "Select code in the editor and press Ask the agent, Explain or Fix. The selection, with its path and line numbers, goes to the chat field. Find and replace opens from the magnifier button."
+  }
+}

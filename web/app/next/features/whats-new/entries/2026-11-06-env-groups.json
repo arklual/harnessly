@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "folder",
+  "ru": {
+    "title": "Группы в окружении",
+    "text": "Репозитории, скилы и MCP в «Окружении» хаба собираются в группы. Обязательная ставится всем, группу «по желанию» каждый включает у себя сам."
+  },
+  "en": {
+    "title": "Groups in the environment",
+    "text": "Repositories, skills and MCP in the hub’s «Environment» gather into groups. A required group goes to everyone; an optional one each person turns on for themselves."
+  }
+}

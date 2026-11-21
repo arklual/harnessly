@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "blocks",
+  "ru": {
+    "title": "Приложение за 5 минут",
+    "text": "harnessly app new теперь делает вид в стиле Harnessly с состояниями загрузки и ошибки, а шаблон vite собирает React-вид. Модули, fetch и шрифты своих файлов во фрейме больше не отвечают 401. У каждой команды harnessly app есть --help, а первая глава справки ведёт от нуля до работающего вида."
+  },
+  "en": {
+    "title": "An app in 5 minutes",
+    "text": "harnessly app new now writes a view in the look of Harnessly with loading and error states, and the vite template builds a React view. Module scripts, fetch and fonts of a view's own files no longer come back 401. Every harnessly app command has --help, and the first chapter of the guide takes you from zero to a working view."
+  }
+}

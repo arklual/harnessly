@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-27",
+  "icon": "send",
+  "ru": {
+    "title": "Уведомления в Telegram",
+    "text": "Подключите ботов в Настройках → Уведомления — агент напишет, когда закончит или нужен ваш ответ."
+  },
+  "en": {
+    "title": "Notifications in Telegram",
+    "text": "Link bots in Settings → Notifications — the agent writes when it is done or needs your answer."
+  }
+}

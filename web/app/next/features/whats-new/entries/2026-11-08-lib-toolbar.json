@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-08",
+  "icon": "sliders-horizontal",
+  "ru": {
+    "title": "Библиотека — в одну строку",
+    "text": "Типы, недавние, дизайн-система и сортировка теперь в кнопке фильтра, а новая папка, выбор и корзина — в «⋯». Если фильтр включён, на кнопке горит точка."
+  },
+  "en": {
+    "title": "The library fits one row",
+    "text": "Kinds, recent, design system and sorting live in the filter button; new folder, select and the trash are under «⋯». A dot on the button says a filter is on."
+  }
+}

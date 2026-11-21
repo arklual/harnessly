@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "blocks",
+  "ru": {
+    "title": "Плагины, которые всегда под рукой",
+    "text": "Плагин может быть включён в каждом новом чате или включаться своей командой, например /tasks: больше не нужно включать его руками каждый раз."
+  },
+  "en": {
+    "title": "Plugins that are always on",
+    "text": "A plugin can be on in every new chat, or turn on by its own command such as /tasks: no need to switch it on by hand each time."
+  }
+}

@@ -2,7 +2,7 @@
 // picture attached, with pauses between the keys long enough for the draft to go to the machine and come back.
 import { expect, type Page, test } from '@playwright/test';
 
-import { RELEASES } from '../app/next/features/whats-new/releases';
+import { SEEN_ALL } from '../app/next/features/whats-new/seen';
 import { type Runtime, startRuntime } from './runtime';
 
 const PASSWORD = 'correct horse';
@@ -19,7 +19,7 @@ let page: Page;
 test.beforeAll(async ({ browser }) => {
   rt = await startRuntime({ env: { RUNTIME_WEB_FEATURES: 'chats' } });
   page = await (await browser.newContext()).newPage();
-  await page.addInitScript((id) => localStorage.setItem('hx:whats-new', id), RELEASES[0]!.id);
+  await page.addInitScript((seen) => localStorage.setItem('hx:whats-new', seen), SEEN_ALL);
   await page.goto(`${rt.url}/`);
   const setup = page.getByTestId('setup-form');
   await setup.locator('input[name=password]').fill(PASSWORD);

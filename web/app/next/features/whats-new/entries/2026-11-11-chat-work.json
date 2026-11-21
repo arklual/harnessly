@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "git-branch",
+  "ru": {
+    "title": "«Изменения» видят всю работу чата",
+    "text": "Ветки, коммиты и MR самого чата и его подчатов — даже если работа шла в отдельных копиях репозитория или на другой машине."
+  },
+  "en": {
+    "title": "«Changes» sees all of a chat's work",
+    "text": "Branches, commits and merge requests of the chat and its delegated chats — even when the work went on in separate worktrees or on another machine."
+  }
+}

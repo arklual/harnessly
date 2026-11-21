@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "git-compare",
+  "ru": {
+    "title": "MR в панели чата — тем же ревью",
+    "text": "Ссылка на MR или PR в чате открывается в правой панели тем же просмотром, что и в «Ревью кода»: дерево файлов, дифф, обсуждения и ответы от вашего имени. В узкой панели дерево сворачивается, а дифф идёт в одну колонку; «Открыть в «Ревью кода»» разворачивает его на весь экран."
+  },
+  "en": {
+    "title": "Merge requests in the chat pane use Code review",
+    "text": "A merge request or pull request link in a chat opens in the right pane with the same view as Code review: file tree, diff, discussions and replies in your name. In a narrow pane the tree folds and the diff takes one column; «Open in Code review» shows it on the whole screen."
+  }
+}

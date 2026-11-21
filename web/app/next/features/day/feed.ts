@@ -88,6 +88,8 @@ export interface IDayCalendar {
 export interface IDayPriority {
   itemId: TItemId;
   title: string;
+  /** The task's or MR's key («ABC-123»): shown small after the description, never as the title. */
+  key?: string;
   /** Whose the thing is now: the person's (`you`), the agent's (`agent`), or done (`done`). */
   group?: string;
   /** The feed's section: `prepared` the agent made it ready, `running` it works now, `queue` it will take it, `wait`. */

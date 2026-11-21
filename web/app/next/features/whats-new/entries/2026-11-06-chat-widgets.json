@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "layout-grid",
+  "ru": {
+    "title": "Виджеты прямо в чате",
+    "text": "Агент теперь рисует график, таблицу или карточку приложения прямо в ленте и обновляет её на месте по ходу работы: меняется карточка под шагом, а не приходит новое сообщение."
+  },
+  "en": {
+    "title": "Widgets right in the chat",
+    "text": "The agent can now draw a chart, a table or an app's card straight in the feed and update it in place while it works: the card under the step changes instead of a new message."
+  }
+}

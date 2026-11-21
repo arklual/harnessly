@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-10",
+  "icon": "history",
+  "ru": {
+    "title": "Машина меньше занята собой",
+    "text": "Остановленные чаты больше не держат открытый терминал и не читаются заново при каждом обновлении, а списки презентаций и макетов не опрашиваются впустую. Работающим агентам достаётся больше ресурсов."
+  },
+  "en": {
+    "title": "The machine spends less on itself",
+    "text": "Stopped chats no longer keep a terminal open and are not read again on every update, and the lists of decks and designs are not polled for nothing. Working agents get more of the machine."
+  }
+}

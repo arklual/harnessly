@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "panel-left",
+  "ru": {
+    "title": "Меню слева — короче",
+    "text": "Sinopia и Приложения больше не раскрывают списки сами: последние открываются стрелкой. «Ещё» — меню рядом со строкой. Внизу остались профиль и колокольчик уведомлений; тема и машины — в настройках."
+  },
+  "en": {
+    "title": "A shorter menu on the left",
+    "text": "Sinopia and Apps no longer unfold their lists by themselves: the latest open by the arrow. «More» is a menu beside the item. The footer keeps the profile and the notification bell; theme and machines are in settings."
+  }
+}

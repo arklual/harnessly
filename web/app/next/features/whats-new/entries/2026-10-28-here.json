@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-28",
+  "icon": "arrow-right-left",
+  "ru": {
+    "title": "Продолжить здесь",
+    "text": "Откройте чат с другой машины и нажмите «Продолжить здесь» — он переедет сюда с историей."
+  },
+  "en": {
+    "title": "Continue here",
+    "text": "Open a chat from another machine and press “Continue here” — it moves here with its history."
+  }
+}

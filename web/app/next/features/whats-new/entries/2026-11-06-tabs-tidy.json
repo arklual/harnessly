@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "layers",
+  "ru": {
+    "title": "Вкладки убирают себя сами",
+    "text": "Пустая вкладка закрывается, как только вы с неё уходите. Брошенная на 15 минут тоже уходит, если в ней ничего не ждёт: работа агента, вопрос, непрочитанный ответ и черновик её держат."
+  },
+  "en": {
+    "title": "Tabs tidy themselves",
+    "text": "An empty tab closes as soon as you leave it. One left alone for 15 minutes goes too, unless something waits there: an agent at work, a question, an unread reply or a draft keep it."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "mic",
+  "ru": {
+    "title": "Выбор модели распознавания",
+    "text": "Помимо модели на машине диктовку можно отдать OpenAI gpt-4o-transcribe или Yandex SpeechKit: текст по-прежнему идёт в поле по ходу речи. Ключи — в «Модели и ключи»; без ключа модель недоступна, запись уходит в облако только при выбранной облачной модели."
+  },
+  "en": {
+    "title": "Pick the recognition model",
+    "text": "Besides the model on the machine, dictation can use OpenAI gpt-4o-transcribe or Yandex SpeechKit, and the text still comes into the field as you speak. Keys are in Models and keys; a model without its key is unavailable, and the recording goes to the cloud only when a cloud model is picked."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-10",
+  "icon": "shield-check",
+  "ru": {
+    "title": "Документы принадлежат пространству команды",
+    "text": "Документ и права на него привязаны к пространству: участники видят документы своей команды, люди из других организаций — нет. Доступ выдаётся человеку, а не адресу почты."
+  },
+  "en": {
+    "title": "Documents belong to the team's space",
+    "text": "A document and the rights to it are tied to a space: members see the documents of their team, people of other organizations do not. Access is given to a person, not to an email address."
+  }
+}

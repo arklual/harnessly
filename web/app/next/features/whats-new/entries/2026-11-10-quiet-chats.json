@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-10",
+  "icon": "server",
+  "ru": {
+    "title": "Давно молчащие чаты не занимают память",
+    "text": "Чат, в котором несколько часов ничего не происходило, выгружается из памяти машины и возвращается при первом обращении. За терминалами агентов машина следит по событиям, а не постоянным опросом."
+  },
+  "en": {
+    "title": "Chats that have been quiet for long take no memory",
+    "text": "A chat where nothing happened for several hours is unloaded from the machine's memory and comes back on first use. The machine follows the agents' terminals by events, not by constant polling."
+  }
+}

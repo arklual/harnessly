@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-28",
+  "icon": "user",
+  "ru": {
+    "title": "Какой аккаунт на машине",
+    "text": "В «Моделях и ключах» и в карточке входа видно, под каким аккаунтом Claude и Codex входили на этой машине. Если аккаунтов стало два — предупредим: за это могут заблокировать подписку."
+  },
+  "en": {
+    "title": "Which account a machine has",
+    "text": "Models and keys and the sign-in card show which account Claude and Codex signed in with on this machine. If there are two, you get a warning: that can get the subscription blocked."
+  }
+}

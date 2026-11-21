@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "shield-question",
+  "ru": {
+    "title": "Длинные команды — кнопками в чате",
+    "text": "Запрос на длинную команду больше не отправляет в терминал: разрешить её можно прямо на карточке. В терминал он уходит, только если там открыто маленькое окно и команда в него не помещается."
+  },
+  "en": {
+    "title": "Long commands get buttons in the chat",
+    "text": "A request to run a long command no longer sends you to the terminal: you can allow it right on the card. It goes to the terminal only when a small terminal is open and the command does not fit."
+  }
+}

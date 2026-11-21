@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "shield-check",
+  "ru": {
+    "title": "Проверка окружения в песочнице",
+    "text": "Кнопка «Проверить» ставит окружение с нуля на отдельной песочнице и показывает, что не встало и почему. В «Логах» — последние 14 дней."
+  },
+  "en": {
+    "title": "Check the environment in a sandbox",
+    "text": "«Check» sets the environment up from scratch in a separate sandbox and shows what failed and why. «Logs» keeps the last 14 days."
+  }
+}

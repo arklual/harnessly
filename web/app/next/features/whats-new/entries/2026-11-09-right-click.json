@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "square-mouse-pointer",
+  "ru": {
+    "title": "Правый клик открывает наше меню",
+    "text": "Правый клик или касание двумя пальцами по чату в списке, ленте, вкладке или панели открывает меню с действиями: скопировать ответ, ответвить, ссылка на чат, закрыть вкладку. В полях ввода и на выделенном тексте остаётся меню браузера."
+  },
+  "en": {
+    "title": "Right click opens our menu",
+    "text": "A right click or a two-finger tap on a chat in the list, the feed, a tab or the pane opens a menu of what you can do there: copy the answer, branch, copy the chat link, close the tab. Text fields and selected text keep the browser's menu."
+  }
+}

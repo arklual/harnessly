@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "link",
+  "ru": {
+    "title": "Своя ссылка без входа для каждого",
+    "text": "В «Поделиться» у дизайна — «Ссылки без входа»: для кого ссылка, смотреть или комментировать, срок. Её можно скопировать в любой момент, отключить и включить снова, видно, открывали ли её."
+  },
+  "en": {
+    "title": "A link without sign-in for each person",
+    "text": "«Share» of a design has «Links without sign-in»: who the link is for, view or comment, how long. Copy it any time, switch it off and on again, and see whether it was opened."
+  }
+}

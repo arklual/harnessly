@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "zap",
+  "ru": {
+    "title": "«Ревью кода» открывается быстрее",
+    "text": "Главная ревью больше не ждёт трекер: MR из GitLab и PR из GitHub появляются по мере ответа каждого, а при повторном входе списки показываются сразу и обновляются в фоне."
+  },
+  "en": {
+    "title": "Code review opens faster",
+    "text": "The review start no longer waits for the tracker: GitLab merge requests and GitHub pull requests appear as each answers, and on a return the lists show at once and refresh in the background."
+  }
+}

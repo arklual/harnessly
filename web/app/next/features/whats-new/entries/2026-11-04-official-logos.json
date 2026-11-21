@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "blocks",
+  "ru": {
+    "title": "Логотипы у всех сервисов",
+    "text": "YouTrack, Яндекс Трекер, Azure DevOps, MediaWiki, monday и Context7 в подключениях тоже показаны своими логотипами, а не буквами."
+  },
+  "en": {
+    "title": "Every service has its logo",
+    "text": "YouTrack, Yandex Tracker, Azure DevOps, MediaWiki, monday and Context7 now show their own logos in Connections too, not letters."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "git-branch",
+  "ru": {
+    "title": "Изменения по git — без терминала",
+    "text": "Приложения видят статус, дифф и историю git в папке чата; секретные файлы в ответ не попадают. Пример — приложение «Изменения»."
+  },
+  "en": {
+    "title": "Git changes without a terminal",
+    "text": "Apps see git status, diffs and history of the chat's folder; secret files stay out. See the «Changes» app."
+  }
+}

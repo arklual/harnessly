@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "component",
+  "ru": {
+    "title": "UI-кит из библиотеки одной командой",
+    "text": "`harnessly design kit add npm:<пакет>` или `shadcn:ui` собирает кит Sinopia из готовой React-библиотеки: компоненты, их свойства, цвета и карточки. `kit update` переводит кит на новую версию библиотеки, показывает, что изменилось, и не трогает написанное вручную."
+  },
+  "en": {
+    "title": "A UI kit from a library in one command",
+    "text": "`harnessly design kit add npm:<package>` or `shadcn:ui` makes a Sinopia kit from a ready React library: its components, their props, colours and cards. `kit update` brings the kit to a new version of the library, shows what changed and keeps what was written by hand."
+  }
+}

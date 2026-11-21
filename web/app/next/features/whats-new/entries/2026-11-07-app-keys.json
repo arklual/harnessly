@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "keyboard",
+  "ru": {
+    "title": "Клавиши работают и в приложениях",
+    "text": "Приложения слушают ваши сочетания клавиш — те, что вы настроили в «Клавишах», — и показывают уведомления с цветом: успех, предупреждение, ошибка."
+  },
+  "en": {
+    "title": "Your keys work in apps too",
+    "text": "Apps hear your shortcuts — the ones you set in Keys — and show notices with a tone: success, warning, error."
+  }
+}

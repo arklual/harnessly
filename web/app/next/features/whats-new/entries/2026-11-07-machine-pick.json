@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "server",
+  "ru": {
+    "title": "Машину можно сменить, даже если одна недоступна",
+    "text": "Новый чат начнётся на первой доступной машине, а выбор модели и машины в поле никуда не пропадает. Если не отвечает ни одна — над полем об этом сказано."
+  },
+  "en": {
+    "title": "Switch machines even when one is down",
+    "text": "A new chat starts on the first machine that answers, and the model and machine picker stays in the field. When none answers, the field says so."
+  }
+}

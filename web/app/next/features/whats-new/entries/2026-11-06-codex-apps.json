@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "blocks",
+  "ru": {
+    "title": "Приложения и в Codex",
+    "text": "Приложения теперь работают и в чатах Codex: те же правила, инструкции и серверы, что в Claude Code. Запрещённое правилом приложения агент не выполнит."
+  },
+  "en": {
+    "title": "Apps in Codex too",
+    "text": "Apps now work in Codex chats as well: the same rules, instructions and servers as in Claude Code. What an app's rule forbids, the agent does not do."
+  }
+}

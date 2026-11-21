@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-08",
+  "icon": "laptop",
+  "ru": {
+    "title": "Карточка «Не всё настроено» компактнее",
+    "text": "Этапы в одну строку, выбранный подсвечен. Длинная ошибка — одной строкой, целиком по «Подробнее»."
+  },
+  "en": {
+    "title": "A tidier «Not everything is set up» card",
+    "text": "Stages fit one row and the picked one is highlighted. A long error takes one line, the whole of it behind «Details»."
+  }
+}

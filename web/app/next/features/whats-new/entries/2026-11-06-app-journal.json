@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "shield-question",
+  "ru": {
+    "title": "Видно, что приложение запретило",
+    "text": "Когда приложение остановило действие агента или спросило вас, в ленте видно, какое приложение и по какому правилу. Все решения собраны в «О приложении»."
+  },
+  "en": {
+    "title": "See what an app refused",
+    "text": "When an app stops the agent or asks you first, the feed shows which app and which rule. All its decisions are in «About the app»."
+  }
+}

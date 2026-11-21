@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "square-dashed-mouse-pointer",
+  "ru": {
+    "title": "Пометка на макете — снова удобная карточка",
+    "text": "Крупное поле для комментария, свойства блока раскрываются по кнопке, внизу «Отменить», удалить, диктовка и «В сообщение». Карточку по-прежнему можно перетащить."
+  },
+  "en": {
+    "title": "A note on a design is a comfortable card again",
+    "text": "A roomy field for the comment, the block’s settings open from a button, and at the bottom: Cancel, delete, dictation and Add to message. You can still drag the card."
+  }
+}

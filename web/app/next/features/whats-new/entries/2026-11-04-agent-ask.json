@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "shield-check",
+  "ru": {
+    "title": "Сначала спросит",
+    "text": "Перед первым действием на новом сайте агент спрашивает разрешения, ответ запоминается для сайта. Пароли и данные карт он не вводит. Список сайтов — в Настройках → Общие."
+  },
+  "en": {
+    "title": "It asks first",
+    "text": "Before its first action on a new site the agent asks you, and the answer is kept for the site. It never types passwords or card details. The sites are in Settings → General."
+  }
+}

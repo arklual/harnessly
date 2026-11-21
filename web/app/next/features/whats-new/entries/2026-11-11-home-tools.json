@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "layout-grid",
+  "ru": {
+    "title": "На главной — все инструменты без чата",
+    "text": "Терминал, браузер, файлы, машина, GitLab, сейф и Sinopia открываются в правой панели без открытого чата."
+  },
+  "en": {
+    "title": "Every chat-free tool on the home screen",
+    "text": "Terminal, browser, files, machine, GitLab, the safe and Sinopia open in the right pane without a chat."
+  }
+}

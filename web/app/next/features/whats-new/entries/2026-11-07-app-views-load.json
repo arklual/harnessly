@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "refresh-cw",
+  "ru": {
+    "title": "Окна приложений снова работают",
+    "text": "Приложение в окне больше не застревает на пустой странице: его скрипты грузятся, и агент чата видит его кнопки и формы."
+  },
+  "en": {
+    "title": "App windows work again",
+    "text": "An app's window no longer stops at a blank page: its scripts load, and the chat's agent sees its buttons and forms."
+  }
+}

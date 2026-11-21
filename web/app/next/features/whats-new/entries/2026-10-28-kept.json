@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-28",
+  "icon": "mic",
+  "ru": {
+    "title": "Записи не теряются",
+    "text": "Если связь с машиной пропала, запись сохраняется в браузере и висит над полем — распознается сама, когда машина вернётся, или по кнопке."
+  },
+  "en": {
+    "title": "Recordings are not lost",
+    "text": "If the link to the machine drops, the recording is kept in the browser and waits over the field — recognized by itself once the machine is back, or with a button."
+  }
+}

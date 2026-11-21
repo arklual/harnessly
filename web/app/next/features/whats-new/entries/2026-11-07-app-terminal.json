@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "square-terminal",
+  "ru": {
+    "title": "Свой терминал — приложением",
+    "text": "Терминал внутри приложения работает так же быстро, как обычный, и в той же песочнице, что и агент: в папке чата и без ваших ключей."
+  },
+  "en": {
+    "title": "A terminal of your own, as an app",
+    "text": "A terminal inside an app is as fast as the usual one and runs in the agent's sandbox: in the chat's folder, without your keys."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-08",
+  "icon": "server",
+  "ru": {
+    "title": "Всё о машине — в шапке чата",
+    "text": "Нажмите на иконку машины рядом с названием чата: нагрузка, что не так и другие машины, на которые можно переключиться. На экране нового чата — там же."
+  },
+  "en": {
+    "title": "All about the machine — in the chat's header",
+    "text": "Press the machine icon beside the chat's title: its load, what is wrong and the other machines to move to. The same on the new chat screen."
+  }
+}

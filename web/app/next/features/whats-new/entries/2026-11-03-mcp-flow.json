@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-03",
+  "icon": "blocks",
+  "ru": {
+    "title": "Подключение MCP-сервера — без сюрпризов",
+    "text": "Выберите сервис или вставьте свой адрес, поправьте его при необходимости: окно входа откроется только по кнопке «Войти через …»."
+  },
+  "en": {
+    "title": "Connecting an MCP server, no surprises",
+    "text": "Pick a service or paste your own address and adjust it if needed: the sign-in window opens only when you press «Sign in with …»."
+  }
+}

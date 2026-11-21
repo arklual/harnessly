@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "square-mouse-pointer",
+  "ru": {
+    "title": "Агент работает и на чужих сайтах",
+    "text": "На странице, открытой в браузере машины, агент видит список элементов, нажимает, печатает, прокручивает, читает состояние страницы и видео и ждёт событие — например, конца ролика, — как на ваших серверах. Вы видите его курсор; пароли и карты он не вводит."
+  },
+  "en": {
+    "title": "The agent works on outside sites too",
+    "text": "On a page open in the machine’s browser the agent sees what can be acted on, clicks, types, scrolls, reads the page’s and a video’s state and waits for an event, such as the end of a clip, as on your own servers. You see its cursor; it never types passwords or card details."
+  }
+}

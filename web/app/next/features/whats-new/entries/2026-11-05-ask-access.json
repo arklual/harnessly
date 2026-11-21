@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "lock-keyhole",
+  "ru": {
+    "title": "«Запросить доступ» — прямо владельцу",
+    "text": "В режиме просмотра «Запросить доступ» открывает «Поделиться» с готовым запросом: выберите, комментировать или править, и напишите пару слов. Запрос приходит владельцу и тем, кто управляет доступом, — они разрешают или отклоняют его в том же окне."
+  },
+  "en": {
+    "title": "«Request access» goes straight to the owner",
+    "text": "In the viewing mode «Request access» opens «Share» with the request ready: pick comment or edit and add a word. It reaches the owner and those who run the access, who allow or deny it in the same window."
+  }
+}

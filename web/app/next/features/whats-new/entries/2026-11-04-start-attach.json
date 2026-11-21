@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "paperclip",
+  "ru": {
+    "title": "На старте можно приложить всё",
+    "text": "В меню «+» на главной те же пункты, что в чате: дизайн, документ, доска, задача или MR, приложения. Приложенный дизайн просто ложится в поле."
+  },
+  "en": {
+    "title": "Attach anything from the start page",
+    "text": "The «+» menu on the start page has the same items as in a chat: a design, a document, a board, a task or MR, apps. An attached design just goes into the field."
+  }
+}

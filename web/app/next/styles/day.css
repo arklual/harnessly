@@ -858,6 +858,12 @@ a.hx-day-mat:hover {
   font-weight: var(--hx-weight-semibold);
   color: var(--hx-fg-1);
 }
+.hx-day-pr__key {
+  flex: none;
+  font-size: 12px;
+  color: var(--hx-fg-3);
+  font-variant-numeric: tabular-nums;
+}
 .hx-day-pr__t time {
   flex: none;
   font-size: 12.5px;

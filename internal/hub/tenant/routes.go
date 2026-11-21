@@ -83,6 +83,7 @@ var Routes = all(
 	manual("internal/hub/analytics", Org, "orgs.ScopeIn or orgs.MemberScopeIn",
 		"the organization comes with a scope inside it (?scope=) and the person's place there, which Guard.Org does not give",
 		"GET /api/orgs/{org}/accounts",
+		"POST /api/orgs/{org}/accounts",
 		"PATCH /api/orgs/{org}/accounts/{id}",
 		"GET /api/orgs/{org}/changes",
 		"POST /api/orgs/{org}/changes",

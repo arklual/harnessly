@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-08",
+  "icon": "folder-open",
+  "ru": {
+    "title": "Демо Relay — в папке «Демо»",
+    "text": "Учебные проекты лежат в одной папке «Демо»: и у новых библиотек, и у старых. «Вернуть демо-проекты» кладёт удалённые обратно туда же."
+  },
+  "en": {
+    "title": "The Relay demo lives in the «Demo» folder",
+    "text": "The learning projects sit in one «Demo» folder, in new libraries and old ones. «Bring back the demo projects» puts the deleted ones back there."
+  }
+}

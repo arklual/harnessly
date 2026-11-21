@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "shield-check",
+  "ru": {
+    "title": "Разрешить — прямо в карточке приложения",
+    "text": "Если приложение ждёт согласия на доступы, в карточке «не запустилось» видно, что именно оно просит, и есть кнопка «Разрешить». После неё приложение запускается само."
+  },
+  "en": {
+    "title": "Allow right in the app’s card",
+    "text": "When an app waits for your consent to its access, the «didn’t start» card lists what it asks for and has an «Allow» button. After it, the app starts by itself."
+  }
+}

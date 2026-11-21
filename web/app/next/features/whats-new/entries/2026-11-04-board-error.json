@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "message-square",
+  "ru": {
+    "title": "Ошибку доски — в чат одной кнопкой",
+    "text": "На плашке «Доска не отрисовалась» работают все кнопки, а «Отправить в чат» кладёт ошибку в поле — агент найдёт причину и починит."
+  },
+  "en": {
+    "title": "A board error to the chat in one press",
+    "text": "Every button on «The board did not render» works, and «Send to chat» puts the error in the field so the agent can find and fix it."
+  }
+}

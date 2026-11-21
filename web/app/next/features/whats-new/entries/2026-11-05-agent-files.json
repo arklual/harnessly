@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "file-text",
+  "ru": {
+    "title": "«Открыть файл» в карточке агента работает",
+    "text": "Файл из карточки фонового агента открывается и в чате дизайна: рядом с дизайном или в «Файлах» его чата."
+  },
+  "en": {
+    "title": "«Open file» on an agent's card works",
+    "text": "A file from a background agent's card opens in a design's chat too: beside the design or in its chat's «Files»."
+  }
+}

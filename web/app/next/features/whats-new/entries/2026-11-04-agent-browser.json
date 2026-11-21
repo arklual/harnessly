@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "sparkles",
+  "ru": {
+    "title": "Агент управляет страницей в панели",
+    "text": "Попросите агента пройти сценарий или заполнить форму на стенде: он нажимает, печатает и листает во вкладке браузера, а вы видите его курсор. «Остановить» — в полосе над страницей."
+  },
+  "en": {
+    "title": "The agent works with the page in the pane",
+    "text": "Ask the agent to go through a flow or fill in a form on a stand: it clicks, types and scrolls in the browser tab, and you see its cursor. «Stop» is on the strip above the page."
+  }
+}

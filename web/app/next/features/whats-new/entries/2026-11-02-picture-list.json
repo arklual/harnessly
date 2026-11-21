@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "image",
+  "ru": {
+    "title": "Без пустых пунктов",
+    "text": "Когда агент перечисляет картинки списком, в ответе больше нет пустых «1.» и «2.»: картинки стоят под текстом."
+  },
+  "en": {
+    "title": "No empty list items",
+    "text": "When the agent lists pictures, the answer no longer shows empty «1.» and «2.»: the pictures stand under the text."
+  }
+}

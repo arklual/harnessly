@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "mic",
+  "ru": {
+    "title": "Длинные записи распознаются",
+    "text": "Запись на несколько минут больше не обрывается на полпути. Нажмите «Распознать» над полем, и текст появится в нём."
+  },
+  "en": {
+    "title": "Long recordings get recognized",
+    "text": "A recording of several minutes is no longer cut off halfway. Press «Recognize» over the field and the text appears in it."
+  }
+}

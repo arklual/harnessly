@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "presentation",
+  "ru": {
+    "title": "Проект помнит свой кит",
+    "text": "В шапке проекта — «Кит · версия», у слайда из кита — «Открыть в ките» и «Показать макет», а в ките видно, где используется каждый макет."
+  },
+  "en": {
+    "title": "A project knows its kit",
+    "text": "The project bar shows the kit and its version, a slide from the kit has «Open in the kit» and «Show the layout», and the kit shows where each layout is used."
+  }
+}

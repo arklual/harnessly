@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "search",
+  "ru": {
+    "title": "Приложения в поиске",
+    "text": "⌘K находит команды приложений этого чата и открывает любое установленное приложение по названию."
+  },
+  "en": {
+    "title": "Apps in search",
+    "text": "⌘K finds the commands of this chat's apps and opens any installed app by its name."
+  }
+}

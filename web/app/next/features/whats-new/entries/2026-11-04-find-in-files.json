@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "text-search",
+  "ru": {
+    "title": "Найти в файлах проекта",
+    "text": "В «Файлах» нажмите ⇧⌘F (Ctrl+Shift+F) или кнопку поиска по тексту: строки с совпадениями собраны по файлам, а клик открывает файл на нужной строке с выделенным текстом."
+  },
+  "en": {
+    "title": "Find in the project's files",
+    "text": "In Files, press ⇧⌘F (Ctrl+Shift+F) or the text search button: matching lines are grouped by file, and a click opens the file at that line with the text selected."
+  }
+}

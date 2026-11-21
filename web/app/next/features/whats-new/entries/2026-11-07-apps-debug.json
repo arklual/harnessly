@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "bug",
+  "ru": {
+    "title": "Режим отладки приложений",
+    "text": "Переключатель «Отладка» в «Приложениях»: у любого приложения видно, какие вызовы оно делает, почему ему отказали и какие ошибки в его окне."
+  },
+  "en": {
+    "title": "Debug mode for apps",
+    "text": "A «Debug» switch in «Apps»: any app shows the calls it makes, why one was refused and the errors in its window."
+  }
+}

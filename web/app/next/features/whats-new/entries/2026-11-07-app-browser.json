@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "globe",
+  "ru": {
+    "title": "Приложения пользуются браузером чата",
+    "text": "С вашего согласия приложение смотрит страницы во встроенном браузере и нажимает на них. Пароли, файлы и скрипты страниц ему недоступны."
+  },
+  "en": {
+    "title": "Apps use the chat's browser",
+    "text": "With your consent an app looks at pages in the built-in browser and clicks on them. Passwords, files and page scripts stay out of its reach."
+  }
+}

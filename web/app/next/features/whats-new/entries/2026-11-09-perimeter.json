@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "lock",
+  "ru": {
+    "title": "Закрытый контур настраивается в хабе",
+    "text": "Администратор хаба задаёт внутренние домены, сертификаты и прокси формой в Аккаунте, а машины подхватывают это сами. Приложению можно дать собственный клиентский сертификат для его бэкенда."
+  },
+  "en": {
+    "title": "Set up the closed network in the hub",
+    "text": "A hub administrator sets internal domains, certificates and the proxy in a form under Account, and machines pick them up by themselves. An app can get its own client certificate for its backend."
+  }
+}

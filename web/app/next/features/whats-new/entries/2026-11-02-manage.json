@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "sliders-horizontal",
+  "ru": {
+    "title": "«Управление» не мигает",
+    "text": "Страница больше не пропадает и не показывает заглушку, пока в чатах идёт работа. Когда машина подключена к хабу, переход в него есть прямо во вкладках страницы."
+  },
+  "en": {
+    "title": "Manage stops flickering",
+    "text": "The page no longer vanishes behind a placeholder while chats are working. On a machine connected to a hub, the way there sits right in the page tabs."
+  }
+}

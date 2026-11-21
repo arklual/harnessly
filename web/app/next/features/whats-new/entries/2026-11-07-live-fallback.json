@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "refresh-cw",
+  "ru": {
+    "title": "Сайт не загрузился через прокси — откроется в браузере машины",
+    "text": "Если свой сайт или стенд не отвечает прокси панели (обрыв связи, таймаут, сертификат), вкладка сама переключается на настоящий браузер машины и открывает тот же адрес. Переключать ничего не нужно."
+  },
+  "en": {
+    "title": "A site the proxy could not load opens in the machine’s browser",
+    "text": "When one of your own sites or stands does not answer the pane’s proxy (a reset, a timeout, a certificate), the tab switches to the machine’s real browser by itself and opens the same address. Nothing to toggle."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "message-square",
+  "ru": {
+    "title": "Замечания агенту прямо в «Ревью кода»",
+    "text": "В работе чата выделите строки по номерам — появится поле: «Комментарий» сохранит черновик, «Спросить агента» сразу задаст вопрос в чат. Черновики видны с любого устройства только вам, а «Отправить агенту» уносит их одним сообщением; потом остаётся «Сделано — закрыть» или «Не то — вернуть»."
+  },
+  "en": {
+    "title": "Notes for the agent right in Code review",
+    "text": "In a chat's work, drag over the line numbers to get a field: Comment keeps a draft, Ask the agent asks in the chat at once. Drafts are yours on any device and nobody else sees them; Send to the agent takes them in one message, then each is Done or Not it."
+  }
+}

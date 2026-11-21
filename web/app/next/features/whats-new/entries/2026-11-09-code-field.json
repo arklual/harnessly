@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "smartphone",
+  "ru": {
+    "title": "Шесть ячеек, отправка по последней цифре",
+    "text": "Код можно вставить целиком, а телефон подставит его из SMS сам. Последняя цифра отправляет код, и команда сразу запускается с ним. «Отменить» снимает запрос."
+  },
+  "en": {
+    "title": "Six cells, sent on the last digit",
+    "text": "Paste the code whole, or let the phone fill it from the SMS. The last digit sends it and the command starts with it at once. «Cancel» takes the ask off."
+  }
+}

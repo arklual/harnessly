@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "menu",
+  "ru": {
+    "title": "Одно меню везде",
+    "text": "Меню вкладок, чатов, панели и кнопки «+» теперь одинаковые: чёрные, как у умного уведомления. Пункты выбираются стрелками и первой буквой."
+  },
+  "en": {
+    "title": "One menu everywhere",
+    "text": "The menus of tabs, chats, the pane and the «+» button now look the same: black, like the smart notice. Pick items with the arrows or their first letter."
+  }
+}

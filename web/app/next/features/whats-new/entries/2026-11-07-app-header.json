@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "layout-grid",
+  "ru": {
+    "title": "Шапка приложения как в Sinopia",
+    "text": "Сверху приложения — переключатель чатов, в которых оно включено, и новый чат с ним в один клик; «Поделиться» копирует ссылку для коллег, настройки — в «…»."
+  },
+  "en": {
+    "title": "App header like Sinopia's",
+    "text": "At the top of an app: a switch between the chats it is on in and a new chat with it in one click; «Share» copies a link for teammates, settings are under «…»."
+  }
+}

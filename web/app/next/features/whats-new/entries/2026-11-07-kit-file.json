@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "download",
+  "ru": {
+    "title": "Дизайн-система одним файлом",
+    "text": "В выборе дизайн-системы нажмите «Добавить дизайн-систему» и выберите файл: все хэши проверяются, ничего не перезаписывается, а если такая версия уже есть, показываем, чем она отличается. Выгрузить систему в файл можно командой design kit export."
+  },
+  "en": {
+    "title": "A design system as one file",
+    "text": "In the design system picker press «Add a design system» and choose a file: every hash is checked, nothing is overwritten, and if that version is already there you see how it differs. Export a system to a file with design kit export."
+  }
+}

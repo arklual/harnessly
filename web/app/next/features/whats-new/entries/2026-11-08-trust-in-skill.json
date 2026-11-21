@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-08",
+  "icon": "shield-check",
+  "ru": {
+    "title": "Агент знает, как просить права",
+    "text": "Скилл приложений объясняет круги доверия и что человек видит при установке: приложения пишутся с минимумом доступов."
+  },
+  "en": {
+    "title": "The agent knows how to ask for rights",
+    "text": "The apps skill explains trust circles and what the person sees at install: apps are written with the least access."
+  }
+}

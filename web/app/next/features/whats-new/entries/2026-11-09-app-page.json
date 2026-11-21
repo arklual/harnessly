@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "app-window",
+  "ru": {
+    "title": "Страница приложения",
+    "text": "Что оно умеет, что ему можно, живой предпросмотр и кнопка «Открыть» или «Поставить» — на одной странице."
+  },
+  "en": {
+    "title": "The app's page",
+    "text": "What it does, what it may do, a live preview and «Open» or «Install» — on one page."
+  }
+}

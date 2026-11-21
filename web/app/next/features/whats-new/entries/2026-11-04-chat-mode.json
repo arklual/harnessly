@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "pencil",
+  "ru": {
+    "title": "Режим проекта помнит чат",
+    "text": "Макет, презентация, видео или документ, открытые из чата, после перезагрузки и возврата открываются в том же режиме, а в первый раз — сразу в редактировании. В панели сверху видно, где вы: «Редактирование макета» или просто «Макет»."
+  },
+  "en": {
+    "title": "The project's mode stays with its chat",
+    "text": "A design, presentation, video or document opened from a chat comes back in the same mode after a reload or a return, and opens for editing the first time. The bar says where you are: «Editing the design» or just «Design»."
+  }
+}

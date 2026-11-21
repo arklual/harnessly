@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "log-in",
+  "ru": {
+    "title": "Приложения говорят, что нужен вход",
+    "text": "Когда серверу приложения нужен вход, приложение больше не падает с «ошибкой»: оно говорит, войти, войти снова или попросить доступ, и называет подключение, в которое войти. Агент видит то же самое."
+  },
+  "en": {
+    "title": "Apps say when a sign-in is needed",
+    "text": "When an app's server wants a sign-in, the app no longer fails with a bare «error»: it says whether to sign in, sign in again or ask for access, and names the connection to sign in to. The agent reads the same."
+  }
+}

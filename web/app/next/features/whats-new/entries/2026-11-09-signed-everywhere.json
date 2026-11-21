@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "shield-check",
+  "ru": {
+    "title": "Подпись приложения доходит до каталогов",
+    "text": "Подписанный пакет можно опубликовать в каталог команды и в публичный каталог прямо из файла: подпись едет вместе с ним, и в закрытом контуре такое приложение устанавливается."
+  },
+  "en": {
+    "title": "App signatures reach the catalogs",
+    "text": "A signed package can be published to the team's and the public catalog straight from the file: the signature travels with it, and such an app installs in a closed network."
+  }
+}

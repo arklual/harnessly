@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- «Что нового» as slides: one card per feature, leafed to the right by a swipe, the arrows or the arrow keys,
+  the untold ones first and marked «Новое», a few told ones after them. Every entry is a file of its own in
+  `web/app/next/features/whats-new/entries/` with both languages side by side, so two branches that each add one merge
+  without conflicts; the order comes from the day in the file. A test and the build refuse an entry without a language,
+  a day or a known icon. The entries of the old list moved into the same files; a browser told of a release before is
+  not told of it again.
 - Your own service in Settings → Connections (docs/mcp-connections.md): the company's internal API, a self-made
   MCP server or a local one gets the same record, page and hub tools as a catalog service, and a stable id `custom-<slug>`
   that an app's manifest can name. An agent connects it with the hub's `connection_add` (kind found out from the address,
@@ -444,8 +450,8 @@ All notable changes to this project are documented here. The format follows
   recording's dialog and the transcript montage.
 - «Что нового»: after a release the page shows a card at the top once — two or three points in the person's words,
   each with an icon, «Понятно» or Esc puts it away for good (remembered in this browser). It waits while «Вышла новая
-  версия» is up. A release adds its entry to `web/app/next/features/whats-new/releases.ts` and its texts to
-  `app/locales/<lang>/next-whats-new.json`; `?dev=whatsnew` shows the card.
+  версия» is up. Each entry is a file of its own in `web/app/next/features/whats-new/entries/` (see the README
+  there); `?dev=whatsnew` shows the card.
 - Telegram notifications: in Settings → Notifications the person links any number of Telegram bots, each by its
   @BotFather token, with a name and an instruction of when an agent should use it. A chat (private, group or channel)
   is bound by a one-time code the person sends the bot with Start; the runtime finds it in the bot's updates. Agents

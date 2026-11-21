@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "pin",
+  "ru": {
+    "title": "«Избранное» больше не прыгает",
+    "text": "Закреплённые чаты стоят на своих местах и не перескакивают от новых сообщений; порядок, который вы задали перетаскиванием, сохраняется."
+  },
+  "en": {
+    "title": "Favorites stay put",
+    "text": "Pinned chats keep their places and no longer jump on new messages; the order you set by dragging is kept."
+  }
+}

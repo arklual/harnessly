@@ -234,3 +234,40 @@ func (s *Store) RevealApp(app string, names []string) (map[string]string, error)
 	}
 	return out, nil
 }
+
+// ShareApps sends up every app's secret this file keeps and has not shared yet: a token put on this machine
+// before the safe was shared reaches the other machines at once, not only on its first use here. One the shared safe
+// already keeps is only marked (its value wins on the next reveal). Errors leave the secret for the next start.
+func (s *Store) ShareApps() int {
+	sh := s.sharedSafe()
+	if sh == nil {
+		return 0
+	}
+	s.mu.Lock()
+	f, err := s.read()
+	s.mu.Unlock()
+	if err != nil {
+		return 0
+	}
+	var names []string
+	for _, e := range f.Secrets {
+		if ValidAppName(e.Name) && !s.marked(e.Name) {
+			names = append(names, e.Name)
+		}
+	}
+	shared := 0
+	for _, full := range names {
+		_, err := sh.ReadApp(full)
+		switch {
+		case err == nil:
+			s.mark(full, true)
+		case ReasonOf(err) == ReasonNotFound:
+			got, rerr := s.Reveal([]string{full}, Use{Title: "shared safe"})
+			if rerr == nil && sh.WriteApp(full, got[full]) == nil {
+				s.mark(full, true)
+				shared++
+			}
+		}
+	}
+	return shared
+}

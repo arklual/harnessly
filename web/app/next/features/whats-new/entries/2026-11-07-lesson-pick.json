@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "message-square-text",
+  "ru": {
+    "title": "«Выделить» в уроке сайта",
+    "text": "Урок ведёт по порядку: выделить заголовок, написать заметку, отправить агенту. Чат встаёт сбоку от макета, запрос идёт на быстрой модели; «Выделить» работает и сразу после включения «Редактирования»."
+  },
+  "en": {
+    "title": "«Pick» in the site lesson",
+    "text": "The lesson goes in order: pick the heading, write a note, send it to the agent. The chat docks beside the mockup and the request runs on a fast model; «Pick» works right after editing is turned on."
+  }
+}

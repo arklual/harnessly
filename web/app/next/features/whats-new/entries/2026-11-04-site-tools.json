@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "blocks",
+  "ru": {
+    "title": "Агент пользуется инструментами сайта",
+    "text": "Если сайт сам даёт агентам инструменты (WebMCP), агент в панели вызывает их вместо того, чтобы кликать по страницам: так быстрее и надёжнее. Разрешение на сайт спрашивается так же."
+  },
+  "en": {
+    "title": "The agent uses the site's own tools",
+    "text": "When a site offers tools to agents itself (WebMCP), the agent in the pane calls them instead of clicking through its pages: faster and steadier. It asks for the site the same way."
+  }
+}

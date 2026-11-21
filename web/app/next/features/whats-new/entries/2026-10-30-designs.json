@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-30",
+  "icon": "palette",
+  "ru": {
+    "title": "Дизайн и чат — одно целое",
+    "text": "Дизайны в работе — под «Sinopia Design» в меню. «Во всю ширину» у дизайна в панели чата открывает его целиком с тем же чатом, а на экране дизайна есть та же правая панель: браузер, файлы, терминал."
+  },
+  "en": {
+    "title": "Design and chat as one",
+    "text": "The designs at work are under «Sinopia Design» in the menu. «Full width» on a design in a chat's pane opens it whole with the same chat, and the design's screen has the same right pane: browser, files, terminal."
+  }
+}

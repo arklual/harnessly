@@ -96,5 +96,25 @@ export const accountsMock = (_ctx: MockCtx): AccountsApi => {
       list = [...list.filter((a) => a.discovered), ...list.filter((a) => !a.discovered)];
       return later(list.find((a) => a.id === id) ?? null, 400);
     },
+    createAccount: async (b) => {
+      const fee = b.kind === 'subscription' ? (b.monthlyFeeUsd ?? 0) : 0;
+      const a: Account = {
+        id: `a-${list.length + 1}`,
+        label: b.label,
+        provider: b.cli === 'codex' ? 'openai' : 'anthropic',
+        kind: b.kind,
+        plan: b.plan,
+        funding: b.funding,
+        feeRub: fee * 90,
+        feeUsd: fee,
+        discovered: false,
+        tenantId: b.tenantId,
+        owner: null,
+        monthRub: 0,
+        people: [],
+      };
+      list = [...list, a];
+      return later(a, 400);
+    },
   };
 };

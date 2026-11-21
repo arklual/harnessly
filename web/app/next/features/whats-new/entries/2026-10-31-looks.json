@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "palette",
+  "ru": {
+    "title": "Цветовые темы",
+    "text": "В «Настройки → Оформление» есть семь палитр: Полночь, Лес, Песок, Роза, Лагуна, Контраст и привычный Графит. Каждая работает в светлом и тёмном режиме, новый цвет плавно расходится от места клика."
+  },
+  "en": {
+    "title": "Colour themes",
+    "text": "Settings → Appearance has seven palettes — Midnight, Forest, Sand, Rose, Lagoon, Contrast and the familiar Graphite — each in light and dark; the new colour spreads from where you click."
+  }
+}

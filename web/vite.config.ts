@@ -7,12 +7,14 @@ import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 import { reactCompiler } from './vite.compiler';
+import { WHATS_NEW_ENTRIES, whatsNewTexts } from './vite.whats-new';
 
 // The runtime serves the built page under its app base path and rewrites <base href>; relative asset URLs follow it.
 // In development the API and sockets go to a runtime on RUNTIME_URL (default 127.0.0.1:8022).
 const runtime = process.env.RUNTIME_URL ?? 'http://127.0.0.1:8022';
 
-// One module per language, `virtual:dictionary/<lang>`: every app/locales/<lang>/*.json merged over the English ones,
+// One module per language, `virtual:dictionary/<lang>`: every app/locales/<lang>/*.json merged over the English ones
+// and the texts of the «Что нового» entries (vite.whats-new.ts),
 // so a missing text falls back to English already in the build. The page loads only its own language's module; the
 // JSON goes in as one JSON.parse string, which a phone parses faster than the same object written as code.
 const LOCALES = fileURLToPath(new URL('./app/locales/', import.meta.url));
@@ -35,11 +37,12 @@ const dictionaries = (): Plugin => ({
       {},
       ...read('en'),
       ...(lang === 'en' || !existsSync(LOCALES + lang) ? [] : read(lang)),
+      whatsNewTexts(lang, (file) => this.addWatchFile(file)),
     );
     return `export default JSON.parse(${JSON.stringify(JSON.stringify(merged))});`;
   },
   handleHotUpdate({ file, server }) {
-    if (!file.startsWith(LOCALES)) return undefined;
+    if (!file.startsWith(LOCALES) && !file.startsWith(WHATS_NEW_ENTRIES)) return undefined;
     for (const lang of readdirSync(LOCALES)) {
       const module = server.moduleGraph.getModuleById(`\0${DICTIONARY}${lang}`);
       if (module) server.moduleGraph.invalidateModule(module);

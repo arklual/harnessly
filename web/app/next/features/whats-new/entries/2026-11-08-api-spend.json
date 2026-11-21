@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-08",
+  "icon": "gauge",
+  "ru": {
+    "title": "Траты Claude по API — у поля ввода",
+    "text": "Если Claude на машине работает по API, а не по подписке, вместо лимитов видно, сколько потрачено сегодня, и по каким моделям. Начало дня меняется в Настройках."
+  },
+  "en": {
+    "title": "Claude API spend by the message field",
+    "text": "When Claude on the machine is paid by the API rather than a subscription, the chip shows what it cost today, by model, instead of limits. The day start is in Settings."
+  }
+}

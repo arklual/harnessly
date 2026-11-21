@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-30",
+  "icon": "play",
+  "ru": {
+    "title": "Видео во весь экран",
+    "text": "Плеер видео занимает всю сцену, а не сжимается до ширины кнопок."
+  },
+  "en": {
+    "title": "A full-size video",
+    "text": "The video player takes the whole stage instead of shrinking to the width of its buttons."
+  }
+}

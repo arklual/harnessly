@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "eye",
+  "ru": {
+    "title": "«Макет» без инструментов правки",
+    "text": "В режиме «Макет» уходят и панели приложений Sinopia, меню выделения и метки проверок на страницах: остаётся сам макет. В «Редактировании» они возвращаются."
+  },
+  "en": {
+    "title": "«Design» without editing tools",
+    "text": "In the «Design» mode the Sinopia apps' panels, the selection menu and the checks' marks on the pages go too: the design itself is left. «Editing» brings them back."
+  }
+}

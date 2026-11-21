@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "message-square-text",
+  "ru": {
+    "title": "Ответ агента появляется в чате сразу",
+    "text": "Сообщение нового чата больше не висит «ждёт своей очереди», когда агент уже ответил: ответ приходит в ленту за секунды, а не через минуту. Это работает и на машинах, где Claude Code или Codex хранят данные не в домашней папке, как часто бывает в Coder."
+  },
+  "en": {
+    "title": "Agent replies show up right away",
+    "text": "A new chat's message no longer hangs as “waiting in line” after the agent has answered: the reply reaches the feed in seconds, not a minute later. This also works on machines where Claude Code or Codex keep their data outside the home folder, as is common on Coder."
+  }
+}

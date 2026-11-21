@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-10",
+  "icon": "play",
+  "ru": {
+    "title": "Работавший чат продолжается сразу после перезапуска",
+    "text": "После обновления или перезапуска машины чат, в котором шёл ход, возобновляет агента сразу, без ожидания. Остановленные чаты остаются остановленными до вашего сообщения."
+  },
+  "en": {
+    "title": "A working chat goes on at once after a restart",
+    "text": "After an update or a restart of the machine, a chat that was in the middle of a turn resumes its agent at once, without a wait. Stopped chats stay stopped until your message."
+  }
+}

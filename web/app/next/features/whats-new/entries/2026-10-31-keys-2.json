@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "keyboard",
+  "ru": {
+    "title": "Сочетания клавиш настраиваются",
+    "text": "Настройки → «Клавиши»: все сочетания по экранам, любое можно поменять, и они одинаковые на всех устройствах. Работают в любой раскладке; ⌘/ показывает шпаргалку. Новое: новый чат, чат новее/старше, копировать ответ, курсор в поле."
+  },
+  "en": {
+    "title": "Shortcuts you can change",
+    "text": "Settings → «Shortcuts»: every shortcut by screen, each can be changed, the same on all your devices. They work in any layout; ⌘/ shows the sheet. New: new chat, newer/older chat, copy the answer, cursor to the field."
+  }
+}

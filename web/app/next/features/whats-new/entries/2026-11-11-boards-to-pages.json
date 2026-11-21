@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "file-code",
+  "ru": {
+    "title": "Старые макеты — в код страниц",
+    "text": "Команда harnessly design migrate --to tsx переводит доски проекта в модули страниц React, без модели. Доска переходит, только если страница рисует ту же картинку до пикселя; остальные остаются как были, с причиной. --to board возвращает всё назад байт в байт."
+  },
+  "en": {
+    "title": "Old mockups into page code",
+    "text": "harnessly design migrate --to tsx turns a project's boards into React page modules, without a model. A board moves only when its page draws the same picture to the pixel; the rest stay as they were, with the reason. --to board brings everything back byte for byte."
+  }
+}

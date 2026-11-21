@@ -1,7 +1,7 @@
-// «Аккаунты» on GET/PATCH /api/orgs/{org}/accounts (internal/hub/analytics/accounts.go).
+// «Аккаунты» on GET/POST/PATCH /api/orgs/{org}/accounts (internal/hub/analytics/accounts.go).
 import type { Currency, Money, PersonRef } from '../../../../hub-api/common';
 import { setShownCurrency } from '../../money';
-import type { Account, AccountKind, AccountsApi, AccountFunding } from '../accounts';
+import type { Account, AccountKind, AccountsApi, AccountFunding, RegisterAccount } from '../accounts';
 import { http, orgPath } from './http';
 
 interface Wire {
@@ -20,6 +20,17 @@ interface Wire {
 }
 
 const KINDS: readonly AccountKind[] = ['subscription', 'api_key', 'prepaid'];
+
+const bodyOf = (b: RegisterAccount) => ({
+  label: b.label,
+  plan: b.plan,
+  kind: b.kind,
+  funding: b.funding,
+  ...(b.kind === 'subscription' && b.monthlyFeeUsd !== null ? { monthlyFee: b.monthlyFeeUsd } : {}),
+  ...(b.ownerUserId ? { ownerUserId: b.ownerUserId } : {}),
+  ...(b.tenantId ? { tenantId: b.tenantId } : {}),
+  history: b.history,
+});
 
 const accountOf = (a: Wire): Account => ({
   id: a.id,
@@ -52,17 +63,17 @@ export const liveAccounts = (
     const c = ctx();
     const r = await http.patch<{ account: Wire | null }>(
       orgPath(c.org, `/accounts/${encodeURIComponent(id)}`),
-      {
-        label: b.label,
-        plan: b.plan,
-        kind: b.kind,
-        funding: b.funding,
-        ...(b.kind === 'subscription' && b.monthlyFeeUsd !== null ? { monthlyFee: b.monthlyFeeUsd } : {}),
-        ...(b.ownerUserId ? { ownerUserId: b.ownerUserId } : {}),
-        ...(b.tenantId ? { tenantId: b.tenantId } : {}),
-        history: b.history,
-      },
+      bodyOf(b),
     );
+    return r.account ? accountOf(r.account) : null;
+  },
+  createAccount: async (b) => {
+    const c = ctx();
+    const r = await http.post<{ account: Wire | null }>(orgPath(c.org, '/accounts'), {
+      provider: b.cli,
+      ref: b.ref,
+      ...bodyOf(b),
+    });
     return r.account ? accountOf(r.account) : null;
   },
 });

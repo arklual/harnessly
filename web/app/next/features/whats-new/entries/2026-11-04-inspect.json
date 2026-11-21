@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "square-mouse-pointer",
+  "ru": {
+    "title": "Элемент — в чат",
+    "text": "Во вкладке «Элементы» наведите на страницу и выберите элемент: видны его разметка и стили, а строка о нём одной кнопкой ляжет в поле чата для агента."
+  },
+  "en": {
+    "title": "Element to chat",
+    "text": "In Elements, hover the page and pick an element: you see its markup and styles, and one click puts a line about it into the chat's field for the agent."
+  }
+}

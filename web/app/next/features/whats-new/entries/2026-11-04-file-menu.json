@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "ellipsis",
+  "ru": {
+    "title": "Меню «…» у каждого файла",
+    "text": "«Скачать», «Открыть в новой вкладке», «Спросить агента» и «Копировать путь» есть у строки в «Файлах» и над открытым файлом. На телефоне меню открывается снизу."
+  },
+  "en": {
+    "title": "A «…» menu on every file",
+    "text": "Download, Open in a new tab, Ask the agent and Copy path are on each row in Files and above an open file. On the phone the menu opens from the bottom."
+  }
+}

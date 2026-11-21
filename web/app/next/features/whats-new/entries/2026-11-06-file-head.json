@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "file-text",
+  "ru": {
+    "title": "Шапка файла — одной строкой",
+    "text": "Над открытым файлом в правой панели теперь одна строка: слева путь, справа «Правка | Просмотр», «Поделиться» и «Сохранить». У PDF, картинок, таблиц и документов Word — так же. На узкой панели длинный путь сжимается с многоточием."
+  },
+  "en": {
+    "title": "The file head in one row",
+    "text": "Over a file open in the right pane there is now one row: the path on the left, «Edit | Preview», «Share» and «Save» on the right. PDFs, pictures, spreadsheets and Word documents have the same. On a narrow pane a long path shrinks with an ellipsis."
+  }
+}

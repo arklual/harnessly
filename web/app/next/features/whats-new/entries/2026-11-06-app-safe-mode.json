@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "shield-question",
+  "ru": {
+    "title": "Безопасный режим приложений",
+    "text": "Один переключатель в «Приложениях»: новые чаты запускаются без приложений, кроме закреплённых организацией. Удобно, когда приложение мешает работать. Чат с удалённым приложением теперь тоже запускается."
+  },
+  "en": {
+    "title": "Safe mode for apps",
+    "text": "One switch in «Apps»: new chats start without apps, except those the organization pinned. Handy when an app gets in the way. A chat whose app was removed now starts too."
+  }
+}

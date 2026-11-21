@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-10",
+  "icon": "layers",
+  "ru": {
+    "title": "Один жест — одно уведомление",
+    "text": "Свайп над стопкой листает ровно одно уведомление, даже с разгона. Если листаете чат, а курсор проходит над плашкой, чат продолжает листаться."
+  },
+  "en": {
+    "title": "One swipe, one notification",
+    "text": "A swipe over the stack moves exactly one notification, even a fast one. Scrolling the chat while the pointer passes over the notification keeps scrolling the chat."
+  }
+}

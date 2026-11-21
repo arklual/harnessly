@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-30",
+  "icon": "palette",
+  "ru": {
+    "title": "Дизайн помнит, где был чат",
+    "text": "Чат у дизайна остаётся там, где вы его оставили: колонкой слева или справа, окном или полем внизу. Ушли в другой чат и вернулись — всё на месте."
+  },
+  "en": {
+    "title": "A design remembers its chat",
+    "text": "The chat beside a design stays where you left it: a column on either side, a window or the field below. Go to another chat and back, and it is all in place."
+  }
+}

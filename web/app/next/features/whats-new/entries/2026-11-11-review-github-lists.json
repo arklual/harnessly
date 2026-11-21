@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "search",
+  "ru": {
+    "title": "PR из GitHub на главной ревью",
+    "text": "В «Ревью кода» списки «Ждут вашего ревью», «Мои» и «Все» показывают и открытые PR вашего GitHub — рядом с MR GitLab, с пометкой, где каждый живёт. Нужно подключение GitHub в «Подключениях»."
+  },
+  "en": {
+    "title": "GitHub pull requests on the review start",
+    "text": "In Code review, the Waiting, Mine and All lists also show the open pull requests of your GitHub, beside GitLab's merge requests, each marked with where it lives. It needs a GitHub connection in Connections."
+  }
+}

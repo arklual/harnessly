@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "trash-2",
+  "ru": {
+    "title": "Корзина",
+    "text": "Удалённый проект уходит в корзину: его можно сразу вернуть кнопкой «Отменить», позже восстановить или удалить навсегда."
+  },
+  "en": {
+    "title": "Trash",
+    "text": "A deleted project goes to the trash: undo it right away, restore it later or delete it for good."
+  }
+}

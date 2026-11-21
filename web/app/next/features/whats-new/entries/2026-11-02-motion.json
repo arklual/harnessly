@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "play",
+  "ru": {
+    "title": "Настоящая анимация в видео",
+    "text": "В видео Sinopia теперь есть своя моушн-графика: камера, рисование линий, движение с весом, текст по словам. Попросите мультик или объяснялку."
+  },
+  "en": {
+    "title": "Real animation in videos",
+    "text": "Sinopia videos now have proper motion graphics: camera moves, drawn lines, motion with weight, text word by word. Ask for a cartoon or an explainer."
+  }
+}

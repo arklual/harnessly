@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-30",
+  "icon": "panel-left",
+  "ru": {
+    "title": "Свёрнутое меню не застревает",
+    "text": "Меню, раскрытое наведением, сворачивается, когда уводите мышь, — даже если на экране дизайна открыто своё окно."
+  },
+  "en": {
+    "title": "The folded menu no longer sticks",
+    "text": "A menu opened by hovering folds when the pointer leaves, even with a design screen's own window open."
+  }
+}

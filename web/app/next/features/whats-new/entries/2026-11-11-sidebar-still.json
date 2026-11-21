@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "panel-left",
+  "ru": {
+    "title": "Сайдбар и панель ведут себя спокойно",
+    "text": "Сайдбар не открывается сам при смене вкладки, «Избранное» не прыгает при сбоях связи, панель разворачивается во всю ширину плавно."
+  },
+  "en": {
+    "title": "A steadier sidebar and pane",
+    "text": "The sidebar no longer opens by itself on a tab switch, favorites do not jump on connection hiccups, the pane widens smoothly."
+  }
+}

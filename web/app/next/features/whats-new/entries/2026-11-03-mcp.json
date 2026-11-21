@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-03",
+  "icon": "blocks",
+  "ru": {
+    "title": "MCP-серверы — одним входом",
+    "text": "Atlassian, Linear, Notion, Sentry и ваши собственные серверы: войдите прямо в «Настройки → Подключения», и агенты в новых чатах получат их инструменты."
+  },
+  "en": {
+    "title": "Connect MCP servers in one sign-in",
+    "text": "Atlassian, Linear, Notion, Sentry and your own servers: sign in right in Settings → Connections, and agents in new chats get their tools."
+  }
+}

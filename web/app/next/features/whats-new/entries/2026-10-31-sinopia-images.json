@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "presentation",
+  "ru": {
+    "title": "Картинки в Sinopia",
+    "text": "Выделите картинку или блок на слайде или в дизайне и нажмите «Сгенерировать картинку»: она встанет на место. Если не понравилась, есть «Перегенерировать»."
+  },
+  "en": {
+    "title": "Pictures in Sinopia",
+    "text": "Select a picture or a block on a slide or a design and press «Generate a picture»: it lands in place. Not quite right? «Draw again»."
+  }
+}

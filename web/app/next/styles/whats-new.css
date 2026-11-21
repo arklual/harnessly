@@ -1,4 +1,4 @@
-/* «Что нового» (features/whats-new): a card that comes down from the top of the window once per release. */
+/* «Что нового» (features/whats-new): a card that comes down from the top of the window with a slide per new feature. */
 .hx-news {
   position: fixed;
   top: 14px;
@@ -61,57 +61,131 @@
   color: var(--hx-ink-fg);
 }
 
-.hx-news__list {
-  display: grid;
-  gap: 12px;
-  max-height: 60dvh;
-  margin: 0 0 14px;
-  padding: 0;
-  overflow-y: auto;
-  list-style: none;
+.hx-news__count {
+  color: var(--hx-ink-fg3);
+  font-size: var(--hx-text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
-.hx-news__item {
+
+/* The strip of slides, one feature each, leafed to the right: a swipe or the arrows, a slide always comes to rest whole. */
+.hx-news__track {
+  position: relative;
   display: flex;
   gap: 12px;
-  align-items: flex-start;
-  animation: hx-news-item 480ms var(--hx-ease-out) backwards;
+  margin: 0 0 12px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
 }
-.hx-news__item:nth-child(1) {
-  animation-delay: 120ms;
+.hx-news__track::-webkit-scrollbar {
+  display: none;
 }
-.hx-news__item:nth-child(2) {
-  animation-delay: 190ms;
+.hx-news__card {
+  display: flex;
+  flex: 0 0 100%;
+  flex-direction: column;
+  gap: 6px;
+  box-sizing: border-box;
+  min-height: 168px;
+  max-height: 50dvh;
+  margin: 0;
+  padding: 16px;
+  overflow-y: auto;
+  border-radius: 18px;
+  background: var(--hx-ink-fill);
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  animation: hx-news-item 480ms var(--hx-ease-out) 120ms backwards;
 }
-.hx-news__item:nth-child(3) {
-  animation-delay: 260ms;
-}
-.hx-news__item:nth-child(n + 4) {
-  animation-delay: 330ms;
+.hx-news__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
 }
 .hx-news__icon {
   display: inline-grid;
   flex: none;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-ink-fill2);
+  color: var(--hx-ink-fg);
+}
+.hx-news__fresh {
+  padding: 2px 10px;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-ink-fg);
+  color: var(--hx-ink-bg);
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+  line-height: 18px;
+}
+.hx-news__name {
+  margin: 0;
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-semibold);
+  line-height: 22px;
+}
+.hx-news__text {
+  margin: 0;
+  color: var(--hx-ink-fg2);
+  font-size: var(--hx-text-sm);
+  line-height: 19px;
+}
+
+.hx-news__nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.hx-news__step {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
   border-radius: var(--hx-radius-full);
   background: var(--hx-ink-fill);
   color: var(--hx-ink-fg);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    opacity 160ms ease;
 }
-.hx-news__body {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
+.hx-news__step:hover:not(:disabled) {
+  background: var(--hx-ink-fill2);
 }
-.hx-news__name {
-  font-size: var(--hx-text-md);
-  font-weight: var(--hx-weight-medium);
-  line-height: 20px;
+.hx-news__step:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
-.hx-news__text {
-  color: var(--hx-ink-fg2);
-  font-size: var(--hx-text-sm);
-  line-height: 18px;
+.hx-news__dots {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+}
+.hx-news__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-ink-fill2);
+  transition:
+    width 220ms var(--hx-ease-out),
+    background 220ms ease;
+}
+.hx-news__dot[data-unseen] {
+  background: var(--hx-ink-fg3);
+}
+.hx-news__dot[data-on] {
+  width: 18px;
+  background: var(--hx-ink-fg);
 }
 
 .hx-news__ok {
@@ -131,6 +205,7 @@
   opacity: 0.88;
 }
 .hx-news__ok:focus-visible,
+.hx-news__step:focus-visible,
 .hx-news__x:focus-visible {
   outline: 2px solid var(--hx-ink-focus);
   outline-offset: 2px;
@@ -162,7 +237,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .hx-news,
-  .hx-news__item,
+  .hx-news__card,
   .hx-news__mark {
     animation-duration: 1ms;
     animation-delay: 0ms;

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "square-terminal",
+  "ru": {
+    "title": "Команды с «!» видны в чате",
+    "text": "Команда, которую вы запускаете через «!», остаётся в ленте вместе с выводом и ответом агента — и после перезагрузки страницы."
+  },
+  "en": {
+    "title": "Commands with «!» stay in the chat",
+    "text": "A command you run with «!» stays in the feed with its output and the agent's reply, after a reload too."
+  }
+}

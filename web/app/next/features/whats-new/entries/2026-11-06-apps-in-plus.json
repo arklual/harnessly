@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "layout-grid",
+  "ru": {
+    "title": "Приложения чата — в «+»",
+    "text": "Над полем ввода больше нет ряда плашек. Приложения чата включаются и выключаются в «+» → «Приложение»: включённые отмечены галочкой."
+  },
+  "en": {
+    "title": "Chat apps live in «+»",
+    "text": "No more row of chips over the field. Turn a chat's apps on and off in «+» → «App»: the ones on carry a check."
+  }
+}

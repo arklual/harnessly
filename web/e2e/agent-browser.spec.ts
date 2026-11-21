@@ -5,7 +5,7 @@ import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { freePort, startRuntime, type Runtime } from './runtime';
-import { RELEASES } from '../app/next/features/whats-new/releases';
+import { SEEN_ALL } from '../app/next/features/whats-new/seen';
 
 let rt: Runtime, site: Server, siteURL: string;
 interface Report {
@@ -109,7 +109,7 @@ async function shot(page: Page, name: string) {
   if (screenshots) await page.screenshot({ path: join(screenshots, `${name}.png`), animations: 'disabled' });
 }
 async function ready(page: Page) {
-  await page.addInitScript((id) => localStorage.setItem('hx:whats-new', id), RELEASES[0]!.id);
+  await page.addInitScript((seen) => localStorage.setItem('hx:whats-new', seen), SEEN_ALL);
   await page.goto(rt.url);
   await page
     .locator('.hx-composer__input, [data-testid="setup-form"], [data-testid="signin-form"]')

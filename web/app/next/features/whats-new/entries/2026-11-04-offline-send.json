@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "send",
+  "ru": {
+    "title": "Пишите, даже когда машина недоступна",
+    "text": "Пока машина перезапускается или выключена, сообщение ждёт в чате и уходит само, когда она вернётся. Его можно изменить или удалить."
+  },
+  "en": {
+    "title": "Write even when the machine is away",
+    "text": "While the machine restarts or is off, a message waits in the chat and goes by itself when it is back. You can edit or delete it."
+  }
+}

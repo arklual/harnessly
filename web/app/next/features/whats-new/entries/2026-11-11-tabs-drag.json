@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "grip-vertical",
+  "ru": {
+    "title": "Вкладки перетаскиваются нормально",
+    "text": "Отпущенная вкладка встаёт на место и больше не едет за курсором."
+  },
+  "en": {
+    "title": "Tabs drag properly",
+    "text": "A released tab drops into place and no longer follows the cursor."
+  }
+}

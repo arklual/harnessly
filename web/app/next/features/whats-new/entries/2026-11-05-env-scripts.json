@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "file-terminal",
+  "ru": {
+    "title": "Скрипты и доступы в окружении",
+    "text": "В «Окружении» хаба можно добавить скрипт для машин людей и менять их порядок перетаскиванием. Доступы подключает админ организации."
+  },
+  "en": {
+    "title": "Scripts and access in the environment",
+    "text": "The hub's «Environment» now takes scripts for people's machines, reordered by drag. Access is connected by the organization admin."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-10",
+  "icon": "send",
+  "ru": {
+    "title": "Сообщение доходит до агента наверняка",
+    "text": "Машина проверяет, что агент действительно принял ваш текст, а не только что он набран в терминале. «Стоп» срабатывает сразу, даже когда в очереди ждут другие сообщения."
+  },
+  "en": {
+    "title": "A message reaches the agent for sure",
+    "text": "The machine checks that the agent really took your text, not only that it was typed into the terminal. “Stop” works at once, even while other messages wait in the queue."
+  }
+}

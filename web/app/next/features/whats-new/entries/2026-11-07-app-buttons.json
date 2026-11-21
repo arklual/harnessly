@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "layout-grid",
+  "ru": {
+    "title": "Приложения — прямо у поля чата",
+    "text": "Включённое приложение может поставить свои кнопки рядом с полем ввода и подсказать, с чего начать, в пустом чате. Подсказка ложится в поле — отправляете вы."
+  },
+  "en": {
+    "title": "Apps right at the chat's field",
+    "text": "An app that is on can put its buttons beside the field and suggest where to start in an empty chat. A suggestion goes into the field: you send it."
+  }
+}

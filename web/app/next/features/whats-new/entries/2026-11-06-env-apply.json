@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "rotate-cw",
+  "ru": {
+    "title": "«Применить на машинах»",
+    "text": "Одна кнопка в «Окружении» обновляет машины команды: сразу или при следующем запуске, чтобы не мешать тем, кто сейчас работает."
+  },
+  "en": {
+    "title": "«Apply on the machines»",
+    "text": "One button in «Environment» updates the team’s machines: now, or at their next start so nobody at work is interrupted."
+  }
+}

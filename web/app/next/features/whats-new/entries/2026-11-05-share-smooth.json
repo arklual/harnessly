@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "gauge",
+  "ru": {
+    "title": "«Поделиться» без подвисаний",
+    "text": "Вкладки окна «Поделиться» переключаются сразу и плавно, даже когда доступ открыт многим людям."
+  },
+  "en": {
+    "title": "«Share» without freezes",
+    "text": "The tabs of the «Share» dialog switch at once and smoothly, even when many people have access."
+  }
+}

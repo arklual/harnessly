@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-08",
+  "icon": "presentation",
+  "ru": {
+    "title": "Слайды и страницы — без пустого экрана",
+    "text": "Пока слайд или страница грузится, видно, что идёт загрузка. Показываем их, только когда загрузились шрифты, картинки и видео."
+  },
+  "en": {
+    "title": "Slides and pages — no blank screen",
+    "text": "While a slide or a page loads, you see it loading. It shows only once its fonts, pictures and videos are in."
+  }
+}

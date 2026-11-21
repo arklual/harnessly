@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "send",
+  "ru": {
+    "title": "Все аннотации — одним сообщением",
+    "text": "Внизу страницы появляется панель «Аннотирование · N»: скрыть метки, удалить все или отправить. Агент получит каждый элемент под своим номером, с вашим комментарием."
+  },
+  "en": {
+    "title": "All annotations in one message",
+    "text": "A bar «Annotating · N» stands at the foot of the page: hide the marks, delete all or send. The agent gets every element under its number, with your comment."
+  }
+}

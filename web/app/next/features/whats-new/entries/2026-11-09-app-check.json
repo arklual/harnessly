@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "server",
+  "ru": {
+    "title": "Проверка загрузки одной командой",
+    "text": "`harnessly app check <id> --open` открывает окно приложения в браузере машины и говорит, загрузилось ли оно; то же умеет агент, который пишет приложение."
+  },
+  "en": {
+    "title": "Check a load with one command",
+    "text": "`harnessly app check <id> --open` opens the app's view in a browser of the machine and says whether it loaded; the agent that writes the app can do the same."
+  }
+}

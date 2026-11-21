@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-03",
+  "icon": "book-open",
+  "ru": {
+    "title": "Документация прямо в продукте",
+    "text": "Раздел «Документация» в меню «Ещё»: как написать своё приложение, с примерами и схемами. На русском и английском."
+  },
+  "en": {
+    "title": "Documentation inside the product",
+    "text": "A «Documentation» section under «More»: how to write your own app, with examples and diagrams. In Russian and English."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "pen-tool",
+  "ru": {
+    "title": "{design} работает сразу после установки",
+    "text": "Не нужны ни аккаунт, ни команда: доски работают на встроенном движке и с API-ключом, и с Codex. Движок Anthropic можно подключить в настройках."
+  },
+  "en": {
+    "title": "{design} works right after install",
+    "text": "No account or command needed: boards run on the built-in engine with an API key or Codex too. The Anthropic engine is optional, in Settings."
+  }
+}

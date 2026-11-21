@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "message-square",
+  "ru": {
+    "title": "Короткие сообщения не ломаются",
+    "text": "Сообщение из пары букв больше не встаёт столбиком по одной букве."
+  },
+  "en": {
+    "title": "Short messages stay whole",
+    "text": "A message of a couple of letters no longer stacks one letter per line."
+  }
+}

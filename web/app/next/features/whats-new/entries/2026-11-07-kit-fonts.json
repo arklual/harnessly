@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "palette",
+  "ru": {
+    "title": "Шрифты дизайн-системы в колоде",
+    "text": "В «Стиле» колоды и ролика появились шрифты установленных дизайн-систем; версия системы закрепляется, и колода выглядит так же и позже."
+  },
+  "en": {
+    "title": "Design system fonts in a deck",
+    "text": "The Style panel of a deck and a video now lists the fonts of installed design systems; the system's version is pinned, so the deck looks the same later."
+  }
+}

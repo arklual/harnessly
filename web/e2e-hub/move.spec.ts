@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { RELEASES } from '../app/next/features/whats-new/releases';
+import { SEEN_ALL } from '../app/next/features/whats-new/seen';
 import { startStack, type Stack } from './stack';
 
 // a machine of an older install, its data still on its disk (the files people put into chats, the handoff
@@ -92,7 +92,7 @@ const oldInstall = (dir: string) => {
 test('1. a machine of an older install connects, and its data moves into the hub', async ({ browser }) => {
   page = await (await browser.newContext()).newPage();
   // «Что нового» is seen: its card would lie over the buttons.
-  await page.addInitScript((id) => localStorage.setItem('hx:whats-new', id), RELEASES[0]!.id);
+  await page.addInitScript((seen) => localStorage.setItem('hx:whats-new', seen), SEEN_ALL);
   await page.goto(`${stack.hub}/signin`);
   await page.locator('input[type=email]').fill('owner@example.com');
   await page.getByRole('button', { name: 'Получить код' }).click();

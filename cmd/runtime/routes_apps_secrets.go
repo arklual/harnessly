@@ -24,6 +24,7 @@ import (
 //
 // Neither the value nor anything of it reaches the journal or the log: only the name and whose it is.
 func appSecretRoutes(d deps, reg *apps.Registry, chats appChats, live appLive) []gate.Route {
+	_ = safeFor(d) // opens the safe at start, so the app's secrets of this machine are shared without waiting for a use
 	put := func(w http.ResponseWriter, r *http.Request) {
 		if sameorigin.Refuse(w, r) {
 			return

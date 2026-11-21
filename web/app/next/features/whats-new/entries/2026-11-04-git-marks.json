@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "git-compare",
+  "ru": {
+    "title": "Что изменилось — видно в списке",
+    "text": "Изменённые и не закоммиченные файлы в «Файлах» выделены цветом, новые — зелёным. Папка отмечена, если внутри есть изменения."
+  },
+  "en": {
+    "title": "What changed shows in the list",
+    "text": "Files changed and not committed are coloured in Files, new ones in green. A folder is marked when something inside it changed."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-28",
+  "icon": "messages-square",
+  "ru": {
+    "title": "Все чаты в одном списке",
+    "text": "На любой машине видны ваши чаты со всех машин — у чужих рядом её название."
+  },
+  "en": {
+    "title": "All your chats in one list",
+    "text": "On any machine you see your chats from every machine — the others carry its name."
+  }
+}

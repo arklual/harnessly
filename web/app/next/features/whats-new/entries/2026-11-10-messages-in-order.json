@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-10",
+  "icon": "message-square",
+  "ru": {
+    "title": "Сообщения приходят по порядку",
+    "text": "Несколько сообщений подряд агент получает в том порядке, в каком вы их написали. Отменённое сообщение до агента не дойдёт: пока отмена не подтверждена, у него стоит «Отменяется…»."
+  },
+  "en": {
+    "title": "Messages arrive in order",
+    "text": "Several messages in a row reach the agent in the order you wrote them. A cancelled message never reaches the agent: until the cancel is confirmed it shows “Cancelling…”."
+  }
+}

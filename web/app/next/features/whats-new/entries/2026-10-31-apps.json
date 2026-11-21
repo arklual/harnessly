@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "blocks",
+  "ru": {
+    "title": "Приложения в чате",
+    "text": "Попросите агента включить приложение — например, «Ревью MR»: он получит его инструкции и скиллы, а то, что приложение запрещает, сделать не сможет."
+  },
+  "en": {
+    "title": "Apps in a chat",
+    "text": "Ask the agent to turn an app on, such as MR review: it gets the app's instructions and skills, and cannot do what the app forbids."
+  }
+}

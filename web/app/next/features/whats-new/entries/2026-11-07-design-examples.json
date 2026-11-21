@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "folder-open",
+  "ru": {
+    "title": "Демо-проекты — в папке «Примеры»",
+    "text": "Лендинг, презентация, видео и дизайн-система Relay для знакомства с Sinopia собраны в одну папку. Её можно переименовать или удалить."
+  },
+  "en": {
+    "title": "Demo projects in an Examples folder",
+    "text": "The Relay site, deck, video and design system for getting to know Sinopia sit in one folder. Rename it or delete it as you like."
+  }
+}

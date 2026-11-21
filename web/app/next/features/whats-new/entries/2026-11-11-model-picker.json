@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "square-mouse-pointer",
+  "ru": {
+    "title": "Модель выбирается, даже когда над полем висит уведомление",
+    "text": "Пока открыт выбор модели или меню «+», уведомление над полем пропускает нажатия и возвращается, когда меню закрыто."
+  },
+  "en": {
+    "title": "The model can be picked while a notice sits over the field",
+    "text": "While the model picker or the «+» menu is open, the notice over the field lets clicks through and comes back when the menu closes."
+  }
+}

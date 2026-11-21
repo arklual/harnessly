@@ -5,6 +5,7 @@ import (
 	"context"
 	"math"
 	"net/http"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -15,11 +16,12 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/orgs"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/usage"
 )
 
 // The organization's accounts: every account its machines used, with who used it this month and what it
 // cost at list prices, and registering one the hub only discovered — what the seed file does (docs/hub/orgs.md,
-// «accounts»), from the screen.
+// «accounts»), from the screen, or registering one before any machine used it.
 
 // AccountView is one account of GET …/accounts.
 type AccountView struct {
@@ -46,6 +48,7 @@ type AccountsResponse struct {
 
 func (s *Service) mountAccounts(mux *http.ServeMux) {
 	mux.Handle("GET /api/orgs/{org}/accounts", s.gate(s.accounts))
+	mux.Handle("POST /api/orgs/{org}/accounts", s.gate(s.createAccount))
 	mux.Handle("PATCH /api/orgs/{org}/accounts/{id}", s.gate(s.registerAccount))
 }
 
@@ -162,26 +165,78 @@ func (x *orgScope) sees(r store.RollupRow) bool {
 	return r.TeamID == x.sc.ID
 }
 
-// registerAccount is PATCH /api/orgs/{org}/accounts/{id}: an administrator of the organization says what the account is
-// and who pays for it. The account stops being «discovered», its sessions take its funding, and with history the
-// owner's sessions without an account are given it; the hours whose money moved are summed anew.
-func (s *Service) registerAccount(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	ctx := r.Context()
-	var req struct {
-		Label       string
-		Plan        string
-		Kind        string
-		Funding     string
-		MonthlyFee  *float64
-		OwnerUserID string
-		TenantID    string
-		History     bool
+// accountReq is the body of POST and PATCH …/accounts: what the account is and who pays for it.
+type accountReq struct {
+	Provider    string // POST: the CLI the account is used with, claude or codex
+	Ref         string // POST: the account as the machine reports it: claude:<uuid>, codex:<id>, key:<hash>
+	Label       string
+	Plan        string
+	Kind        string
+	Funding     string
+	MonthlyFee  *float64
+	OwnerUserID string
+	TenantID    string
+	History     bool
+}
+
+var accountRefRe = regexp.MustCompile(`^(claude|codex|key):[A-Za-z0-9._-]{1,100}$`)
+
+// scopeArg is a scope as orgs.ScopeIn takes it: "" for the organization itself.
+func scopeArg(kind, id string) string {
+	if kind == store.ScopeOrg {
+		return ""
 	}
+	return kind + ":" + id
+}
+
+// createAccount is POST /api/orgs/{org}/accounts: an account registered before any machine used it (a key or a
+// subscription the organization bought). The machines' reports of that ref then land on it instead of a discovered one.
+func (s *Service) createAccount(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+	ctx := r.Context()
+	var req accountReq
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
 	}
 	st := s.db.S()
-	o, sc, err := orgs.ScopeIn(ctx, st, p, r.PathValue("org"), "", authz.Manage)
+	o, err := orgs.Resolve(ctx, st, p, r.PathValue("org"))
+	if err != nil {
+		return err
+	}
+	if req.Provider != "claude" && req.Provider != "codex" {
+		return httpx.Invalid("provider", "Где работает аккаунт — Claude или Codex")
+	}
+	ref := strings.TrimSpace(req.Ref)
+	if !accountRefRe.MatchString(ref) {
+		return httpx.Invalid("ref", "Ссылка на аккаунт — claude:<id>, codex:<id> или key:<hash>, как её сообщает машина")
+	}
+	next := store.Account{OrgKey: o.ID, Provider: usage.PriceProvider(req.Provider, ""), AccountRef: ref, Kind: "subscription",
+		CreatedBy: p.User.ID, CreatedAt: s.now()}
+	if strings.HasPrefix(ref, "key:") {
+		next.Kind = "api_key"
+	}
+	if have, err := st.AccountByRef(ctx, o.ID, next.Provider, ref); err == nil {
+		return httpx.Conflict("account_exists", "Этот аккаунт уже есть на хабе").With("id", have.ID)
+	} else if !store.IsNotFound(err) {
+		return err
+	}
+	sc, err := s.fillAccount(ctx, st, p, r.PathValue("org"), o, &next, req)
+	if err != nil {
+		return err
+	}
+	return s.saveAccount(w, r, p, o, sc, nil, next, req.History)
+}
+
+// registerAccount is PATCH /api/orgs/{org}/accounts/{id}: someone with money rights on the account's scope says what
+// the account is and who pays for it. The account stops being «discovered», its sessions take its funding, and with
+// history the owner's sessions without an account are given it; the hours whose money moved are summed anew.
+func (s *Service) registerAccount(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+	ctx := r.Context()
+	var req accountReq
+	if err := httpx.Decode(r, &req); err != nil {
+		return err
+	}
+	st := s.db.S()
+	o, err := orgs.Resolve(ctx, st, p, r.PathValue("org"))
 	if err != nil {
 		return err
 	}
@@ -192,20 +247,32 @@ func (s *Service) registerAccount(w http.ResponseWriter, r *http.Request, p *aut
 	if err != nil {
 		return err
 	}
+	if _, _, err := orgs.ScopeIn(ctx, st, p, r.PathValue("org"), scopeArg(cur.ScopeKind, cur.ScopeID), authz.Money); err != nil {
+		return err
+	}
 	next := cur
+	sc, err := s.fillAccount(ctx, st, p, r.PathValue("org"), o, &next, req)
+	if err != nil {
+		return err
+	}
+	return s.saveAccount(w, r, p, o, sc, &cur, next, req.History)
+}
+
+// fillAccount checks the request and writes it into next; the answer is the account's scope, on which p has money rights.
+func (s *Service) fillAccount(ctx context.Context, st store.Store, p *auth.Principal, ref string, o store.Org, next *store.Account, req accountReq) (authz.Scope, error) {
 	next.Discovered = false
 	label := strings.TrimSpace(req.Label)
 	if label == "" || utf8.RuneCountInString(label) > 80 {
-		return httpx.Invalid("label", "Название аккаунта — от 1 до 80 символов")
+		return authz.Scope{}, httpx.Invalid("label", "Название аккаунта — от 1 до 80 символов")
 	}
 	next.Label = label
 	next.Plan = strings.TrimSpace(req.Plan)
 	if utf8.RuneCountInString(next.Plan) > 40 {
-		return httpx.Invalid("plan", "Тариф — до 40 символов")
+		return authz.Scope{}, httpx.Invalid("plan", "Тариф — до 40 символов")
 	}
 	if req.Kind != "" {
 		if !slices.Contains([]string{"subscription", "api_key", "prepaid"}, req.Kind) {
-			return httpx.Invalid("kind", "Вид аккаунта — подписка, ключ или предоплата")
+			return authz.Scope{}, httpx.Invalid("kind", "Вид аккаунта — подписка, ключ или предоплата")
 		}
 		next.Kind = req.Kind
 	}
@@ -213,11 +280,11 @@ func (s *Service) registerAccount(w http.ResponseWriter, r *http.Request, p *aut
 	case store.FundingOrg, store.FundingPersonal:
 		next.Funding = req.Funding
 	default:
-		return httpx.Invalid("funding", "Кто платит — организация или сам человек")
+		return authz.Scope{}, httpx.Invalid("funding", "Кто платит — организация или сам человек")
 	}
 	if req.MonthlyFee != nil {
-		if *req.MonthlyFee < 0 || *req.MonthlyFee > 100000 {
-			return httpx.Invalid("monthlyFee", "Абонентская плата — от 0 до 100 000 $ в месяц")
+		if math.IsNaN(*req.MonthlyFee) || *req.MonthlyFee < 0 || *req.MonthlyFee > 100000 {
+			return authz.Scope{}, httpx.Invalid("monthlyFee", "Абонентская плата — от 0 до 100 000 $ в месяц")
 		}
 		next.MonthlyFeeMicros = int64(math.Round(*req.MonthlyFee * 1e6))
 	}
@@ -226,34 +293,52 @@ func (s *Service) registerAccount(w http.ResponseWriter, r *http.Request, p *aut
 	}
 	if req.OwnerUserID != "" {
 		if _, err := st.UserByID(ctx, req.OwnerUserID); store.IsNotFound(err) {
-			return httpx.Invalid("ownerUserId", "Такого человека нет")
+			return authz.Scope{}, httpx.Invalid("ownerUserId", "Такого человека нет")
 		} else if err != nil {
-			return err
+			return authz.Scope{}, err
 		}
 		next.OwnerUserID = req.OwnerUserID
 	}
 	if req.TenantID != "" {
 		sp, err := st.SpaceByID(ctx, req.TenantID)
 		if store.IsNotFound(err) || (err == nil && sp.OrgID != o.ID) {
-			return httpx.Invalid("tenantId", "Это пространство не в организации")
+			return authz.Scope{}, httpx.Invalid("tenantId", "Это пространство не в организации")
 		}
 		if err != nil {
-			return err
+			return authz.Scope{}, err
 		}
 		next.ScopeKind, next.ScopeID = store.ScopeTenant, sp.ID
 	} else {
 		next.ScopeKind, next.ScopeID = store.ScopeOrg, o.ID
 	}
+	_, sc, err := orgs.ScopeIn(ctx, st, p, ref, scopeArg(next.ScopeKind, next.ScopeID), authz.Money)
+	return sc, err
+}
+
+// saveAccount writes the account (a new one when cur is nil), moves its sessions' money, journals account.create or
+// account.update and answers the account as the list shows it.
+func (s *Service) saveAccount(w http.ResponseWriter, r *http.Request, p *auth.Principal, o store.Org, sc authz.Scope, cur *store.Account, next store.Account, history bool) error {
+	ctx := r.Context()
 	now := s.now()
-	err = s.db.Tx(ctx, func(st store.Store) error {
-		if err := st.UpdateAccount(ctx, next); err != nil {
-			return err
+	err := s.db.Tx(ctx, func(st store.Store) error {
+		var moved []string
+		if cur == nil {
+			if err := st.CreateAccount(ctx, &next); store.IsUnique(err) {
+				return httpx.Conflict("account_exists", "Этот аккаунт уже есть на хабе")
+			} else if err != nil {
+				return err
+			}
+		} else {
+			if err := st.UpdateAccount(ctx, next); err != nil {
+				return err
+			}
+			m, err := st.SetAccountFunding(ctx, o.ID, next.ID, next.Funding)
+			if err != nil {
+				return err
+			}
+			moved = m
 		}
-		moved, err := st.SetAccountFunding(ctx, o.ID, next.ID, next.Funding)
-		if err != nil {
-			return err
-		}
-		if req.History && next.OwnerUserID != "" {
+		if history && next.OwnerUserID != "" {
 			keys, err := st.SessionsWithoutAccount(ctx, o.ID, next.OwnerUserID, cliOf(next.Provider))
 			if err != nil {
 				return err
@@ -286,11 +371,16 @@ func (s *Service) registerAccount(w http.ResponseWriter, r *http.Request, p *aut
 		if err != nil {
 			return err
 		}
-		return st.AddAudit(ctx, orgs.Journal(chain, p.User.ID, "account.update", "account", next.ID, accountAudit(cur), accountAudit(next), now))
+		action, before := "account.create", any(nil)
+		if cur != nil {
+			action, before = "account.update", accountAudit(*cur)
+		}
+		return st.AddAudit(ctx, orgs.Journal(chain, p.User.ID, action, "account", next.ID, before, accountAudit(next), now))
 	})
 	if err != nil {
 		return err
 	}
+	st := s.db.S()
 	x, err := s.loadScope(ctx, st, o, sc)
 	if err != nil {
 		return err
@@ -300,13 +390,17 @@ func (s *Service) registerAccount(w http.ResponseWriter, r *http.Request, p *aut
 	if err != nil {
 		return err
 	}
+	code := http.StatusOK
+	if cur == nil {
+		code = http.StatusCreated
+	}
 	for _, v := range views {
 		if v.ID == next.ID {
-			httpx.WriteJSON(w, http.StatusOK, map[string]any{"account": v})
+			httpx.WriteJSON(w, code, map[string]any{"account": v})
 			return nil
 		}
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"account": nil})
+	httpx.WriteJSON(w, code, map[string]any{"account": nil})
 	return nil
 }
 

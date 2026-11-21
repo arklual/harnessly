@@ -159,6 +159,7 @@ const Priorities = ({ items, onItem, voiceItem = null }: IPrioritiesProps) => {
                   </span>
                 )}
                 <b>{p.title}</b>
+                {p.key && <span className="hx-day-pr__key">{p.key}</span>}
                 {p.due && <time data-soon={p.soon === true ? '' : undefined}>{p.due}</time>}
                 {p.done === true && <em className="hx-day-pr__donet">{p.doneAt ?? t('next.day.done')}</em>}
               </div>

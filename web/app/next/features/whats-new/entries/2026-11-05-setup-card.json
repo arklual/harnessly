@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "laptop",
+  "ru": {
+    "title": "Настройка машины на главной",
+    "text": "Пока машина ставит окружение команды, на главной видно, что идёт сейчас, что не вышло и что нужно от вас. «Повторить» запускает заново."
+  },
+  "en": {
+    "title": "Machine setup on the start page",
+    "text": "While the machine sets up the team's environment, the start page shows what goes on, what failed and what is wanted of you. «Retry» runs it again."
+  }
+}

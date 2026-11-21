@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "folder-open",
+  "ru": {
+    "title": "Своя документация команды",
+    "text": "Положите страницы в папку документации машины, и они появятся рядом со встроенными без пересборки: регламенты, устройство сервисов, договорённости."
+  },
+  "en": {
+    "title": "Your team's own documentation",
+    "text": "Put pages into the machine’s documentation folder and they show next to the built-in ones without a rebuild: runbooks, how your services are wired, your conventions."
+  }
+}

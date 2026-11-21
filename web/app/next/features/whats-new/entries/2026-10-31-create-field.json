@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "sliders-horizontal",
+  "ru": {
+    "title": "Поле новой презентации и видео — как в чате",
+    "text": "Поле растёт вместе с текстом, отправка — круглой кнопкой справа. Дизайн-система, длительность, тон, суфлёр и форматы видео — за одной кнопкой «Настройки», на ней видно, что выбрано."
+  },
+  "en": {
+    "title": "A new deck's and video's field works like the chat's",
+    "text": "The field grows with the text and sends with the round button on the right. The design system, length, tone, prompter and video formats are behind one «Settings» button that says what is picked."
+  }
+}

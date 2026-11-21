@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "pencil",
+  "ru": {
+    "title": "Просмотр и редактирование — понятным переключателем",
+    "text": "Вместо одной кнопки, которая показывала то текущий режим, то следующий, над дизайном теперь переключатель «Просмотр | Редактирование»: видно, где вы, и куда перейти."
+  },
+  "en": {
+    "title": "View and edit, as a clear switch",
+    "text": "Instead of one button that showed the current mode one moment and the next one the other, the design now has a «View | Edit» switch: you see where you are and where to go."
+  }
+}

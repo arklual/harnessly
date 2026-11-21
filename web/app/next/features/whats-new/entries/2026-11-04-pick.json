@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "square-mouse-pointer",
+  "ru": {
+    "title": "Комментарий к элементу страницы",
+    "text": "В браузере панели нажмите «Выбрать элемент и прокомментировать», щёлкните по кнопке или блоку и напишите, что поменять: агент получит элемент, его компонент и ваш комментарий."
+  },
+  "en": {
+    "title": "Comment on a page element",
+    "text": "In the pane browser press «Pick an element and comment», click a button or a block and say what to change: the agent gets the element, its component and your comment."
+  }
+}

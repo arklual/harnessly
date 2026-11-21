@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "blocks",
+  "ru": {
+    "title": "Агент знает, что умеет приложение",
+    "text": "Пишете плагин с агентом — он больше не угадывает названия мест и прав: команда harnessly app catalog и тул каталога показывают, куда приложение встраивается, какие права нужны и что они открывают."
+  },
+  "en": {
+    "title": "The agent knows what an app can do",
+    "text": "Writing a plugin with an agent, it no longer guesses names of places and rights: harnessly app catalog and the catalog tool list where an app fits in, which rights it needs and what they open."
+  }
+}

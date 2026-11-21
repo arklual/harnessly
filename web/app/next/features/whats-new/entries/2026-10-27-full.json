@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-27",
+  "icon": "maximize-2",
+  "ru": {
+    "title": "Дизайн по ссылке — во весь экран",
+    "text": "Гость смотрит макет без лишних панелей, а на телефоне комментирует долгим нажатием."
+  },
+  "en": {
+    "title": "Shared designs open full screen",
+    "text": "Guests see the design without panels, and comment on a phone by pressing and holding."
+  }
+}

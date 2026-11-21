@@ -3,7 +3,7 @@ import { createServer, type Server } from 'node:http';
 import { mkdirSync } from 'node:fs';
 import { expect, test, type FrameLocator, type Page } from '@playwright/test';
 import { freePort, startRuntime, type Runtime } from './runtime';
-import { RELEASES } from '../app/next/features/whats-new/releases';
+import { SEEN_ALL } from '../app/next/features/whats-new/seen';
 
 // «Annotate the page» of the pane's browser tab on localhost pages of every kind: a plain page, a strict
 // CSP, shadow DOM, a same-origin iframe, a single-page app that moves with pushState, and a page that forbids framing.
@@ -88,7 +88,7 @@ test.beforeAll(async ({ browser }) => {
   await new Promise<void>((ok) => site.listen(port, '127.0.0.1', ok));
   if (shots) mkdirSync(shots, { recursive: true });
   page = await browser.newPage();
-  await page.addInitScript((id) => localStorage.setItem('hx:whats-new', id), RELEASES[0]!.id);
+  await page.addInitScript((seen) => localStorage.setItem('hx:whats-new', seen), SEEN_ALL);
   await page.goto(`${rt.url}/`);
   const setup = page.getByTestId('setup-form');
   await setup.locator('input[name=password]').fill(PASSWORD);

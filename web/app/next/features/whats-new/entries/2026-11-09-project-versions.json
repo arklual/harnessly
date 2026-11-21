@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-09",
+  "icon": "history",
+  "ru": {
+    "title": "История проекта",
+    "text": "Кнопка «Версии» рядом с режимом: каждая правка ваша и агента, именованные версии, открыть как было, сравнить с текущим и вернуть — возврат тоже отменяется."
+  },
+  "en": {
+    "title": "Project history",
+    "text": "«Versions» beside the mode: every edit by you and by the agent, named versions, open as it was, compare with now and restore — a restore can be undone too."
+  }
+}

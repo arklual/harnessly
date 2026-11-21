@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "key-round",
+  "ru": {
+    "title": "«Модели и ключи» проще",
+    "text": "У каждой модели одна строка о том, чем она подключена. Проверка подключения показывает результат прямо на кнопке, а удаление ключа стоит отдельно, красным."
+  },
+  "en": {
+    "title": "Simpler «Models and keys»",
+    "text": "Each model has one line saying how it is connected. A connection check shows its result right on the button, and deleting a key stands apart, in red."
+  }
+}

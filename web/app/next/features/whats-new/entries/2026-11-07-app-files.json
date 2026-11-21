@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "folder",
+  "ru": {
+    "title": "Приложения видят папку чата целиком",
+    "text": "Приложение может показать список файлов, искать по ним и узнавать, что поменялось, — в пределах папок, на которые вы согласились. А если ему нужен один файл, оно попросит вас выбрать его в окне."
+  },
+  "en": {
+    "title": "Apps see the whole chat folder",
+    "text": "An app can list files, search them and notice what changed — within the folders you agreed to. When it needs one file, it asks you to pick it in a dialog."
+  }
+}

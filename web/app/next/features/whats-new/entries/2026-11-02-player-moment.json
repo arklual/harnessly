@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "play",
+  "ru": {
+    "title": "Открытое видео не цепляется к сообщению само",
+    "text": "Момент уходит агенту, только если вы сами перемотали видео на паузе или отметили отрезок."
+  },
+  "en": {
+    "title": "An open video no longer attaches itself to your message",
+    "text": "The agent gets a moment only when you moved the paused video there or marked a stretch."
+  }
+}

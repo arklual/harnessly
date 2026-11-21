@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "layout-grid",
+  "ru": {
+    "title": "Приложения открываются быстрее",
+    "text": "Окно приложения начинает готовиться, как только вы наводите на него в боковой панели, — к клику остаётся только показать страницу. И при каждом открытии оно больше не перезагружается с нуля."
+  },
+  "en": {
+    "title": "Apps open faster",
+    "text": "An app's window starts getting ready as soon as you point at it in the sidebar, so the click only has to show the page. And it no longer starts from scratch every time it opens."
+  }
+}

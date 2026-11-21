@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "file-code",
+  "ru": {
+    "title": "Макет в код один в один",
+    "text": "Страницы макета выгружаются в репозиторий приложения готовым кодом на той же библиотеке: виды, данные, истории, тесты и маршруты. Повторная выгрузка обновляет только виды, файлы разработчика не трогает, а правку вида руками показывает как конфликт."
+  },
+  "en": {
+    "title": "A mockup into code one to one",
+    "text": "The mockup's pages go into the application's repository as ready code on the same library: views, data, stories, tests and routes. Exporting again updates only the views, never the developer's files, and shows a view edited by hand as a conflict."
+  }
+}

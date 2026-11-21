@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "chevron-right",
+  "ru": {
+    "title": "Список дизайнов сворачивается",
+    "text": "Стрелка справа у «Sinopia Design» прячет и показывает список дизайнов. Подсвечено только то, что открыто: дизайн или чат."
+  },
+  "en": {
+    "title": "The designs list folds",
+    "text": "The chevron beside «Sinopia Design» hides and shows the designs. Only what is open is highlighted: the design or the chat."
+  }
+}

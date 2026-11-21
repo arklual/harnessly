@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "sparkles",
+  "ru": {
+    "title": "Ревью: агент-ревьюер и правка своими руками",
+    "text": "«Пройти ревью» — агент сам проходит дифф и кладёт предложения к строкам: в черновик, «Применить» или отклонить; в чужом MR правка уходит предложением в черновик GitLab. В своей работе файл можно поправить прямо в ревью и закоммитить. ⌘/Ctrl+клик по имени показывает его определение, «Только новое» — файлы, изменённые с прошлого ревью."
+  },
+  "en": {
+    "title": "Review: agent reviewer and your own edits",
+    "text": "Run review — the agent goes through the diff and puts suggestions at the lines: to draft, Apply or dismiss; on a colleague's MR a change goes as a suggestion into your GitLab draft. In your own work, edit a file right in the review and commit it. ⌘/Ctrl+click on a name shows its definition; Only new lists the files changed since your last review."
+  }
+}

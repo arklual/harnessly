@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-04",
+  "icon": "layout-grid",
+  "ru": {
+    "title": "Все экраны сразу",
+    "text": "Размеры собраны в группы: телефоны, планшеты, компьютеры. В «Все экраны» макет виден на всех устройствах рядом, и прокрутка идёт во всех сразу."
+  },
+  "en": {
+    "title": "All screens at once",
+    "text": "Sizes come in groups: phones, tablets, computers. «All screens» shows the design on every device side by side, scrolling them together."
+  }
+}

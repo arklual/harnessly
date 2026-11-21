@@ -3,7 +3,7 @@
 // Part of e2e:smoke; it waits on page state only, never on a sleep.
 import { expect, type Page, test } from '@playwright/test';
 
-import { RELEASES } from '../app/next/features/whats-new/releases';
+import { SEEN_ALL } from '../app/next/features/whats-new/seen';
 import { startRuntime, type Runtime } from './runtime';
 
 const PASSWORD = 'correct horse';
@@ -26,7 +26,7 @@ test.afterAll(async () => {
 const signIn = async (page: Page) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   // «What's new» is a modal: seen already, so ⌘K reaches the page.
-  await page.addInitScript((id) => localStorage.setItem('hx:whats-new', id), RELEASES[0]!.id);
+  await page.addInitScript((seen) => localStorage.setItem('hx:whats-new', seen), SEEN_ALL);
   await page.addLocatorHandler(page.getByRole('button', { name: /^(Got it|Понятно)$/ }), (b) => b.click());
   await page.goto(`${rt.url}/`);
   // The first test sets the password; the tests after it sign in with it.

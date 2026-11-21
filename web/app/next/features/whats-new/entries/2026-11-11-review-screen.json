@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "git-compare",
+  "ru": {
+    "title": "Новый просмотр изменений",
+    "text": "Дерево файлов с отметкой «просмотрено», дифф в две колонки или одну с подсветкой, F7 к следующему изменению, шапка MR с пайплайном и одобрениями, разворот на весь экран."
+  },
+  "en": {
+    "title": "A new view of changes",
+    "text": "A file tree with «viewed» marks, a side-by-side or unified diff with highlighting, F7 to the next change, a merge request header with its pipeline and approvals, and a full-screen mode."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "message-square",
+  "ru": {
+    "title": "Вопросы агента видны сразу",
+    "text": "Если агент долго думал, а потом задал вопрос, карточка с вариантами теперь появляется над полем, а не прячется за «агент работает»."
+  },
+  "en": {
+    "title": "Agent questions show at once",
+    "text": "When the agent thought for a long while and then asked, the card with the choices now comes up over the field instead of hiding behind «working»."
+  }
+}

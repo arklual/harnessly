@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "file-text",
+  "ru": {
+    "title": "Word и PowerPoint открываются прямо в чате",
+    "text": "Документ выглядит как бумага, презентация — как слайды с лентой снизу. Текст можно править на месте, изменения сохраняются сами. Выделите абзац или кликните по фигуре, и агент поймёт, о чём речь."
+  },
+  "en": {
+    "title": "Word and PowerPoint open right in the chat",
+    "text": "A document looks like paper, a presentation like slides with a strip below. Edit the text in place and it saves itself. Select a paragraph or click a shape, and the agent knows what you mean."
+  }
+}

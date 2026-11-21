@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "activity",
+  "ru": {
+    "title": "Статус машины — всегда в шапке чата",
+    "text": "Значок машины виден и когда всё хорошо: при наведении — её имя и состояние."
+  },
+  "en": {
+    "title": "The machine's status is always in the chat header",
+    "text": "Its icon shows even when all is well: hover it for the name and state."
+  }
+}

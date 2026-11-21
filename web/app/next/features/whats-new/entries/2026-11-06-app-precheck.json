@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-06",
+  "icon": "shield-question",
+  "ru": {
+    "title": "Каталог говорит заранее, встанет ли приложение",
+    "text": "Прежде чем ставить приложение из каталога, видно, подойдёт ли оно: нужна ли другая версия harnessly, не занята ли команда или тип документа и какие секреты оно попросит."
+  },
+  "en": {
+    "title": "The catalog tells beforehand whether an app fits",
+    "text": "Before you install an app from a catalog you see whether it fits: whether it needs another harnessly, whether its command or document type is taken, and which secrets it will ask for."
+  }
+}

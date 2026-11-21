@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-28",
+  "icon": "pencil",
+  "ru": {
+    "title": "Правка во время диктовки",
+    "text": "Пока говорите, текст можно править руками — по стопу ничего не перезапишется. Новая диктовка встаёт туда, где стоит курсор."
+  },
+  "en": {
+    "title": "Edit while dictating",
+    "text": "Edit the text by hand while you speak — nothing is written over at the stop. A new dictation goes where the caret is."
+  }
+}

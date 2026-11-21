@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "messages-square",
+  "ru": {
+    "title": "Приложение ставит задачу агенту",
+    "text": "Задача уходит в новый чат под текущим: вы видите его в списке и можете остановить."
+  },
+  "en": {
+    "title": "An app gives the agent a task",
+    "text": "The task goes to a new chat under the current one: you see it in the list and can stop it."
+  }
+}

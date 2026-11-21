@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-07",
+  "icon": "presentation",
+  "ru": {
+    "title": "Агент листает документ за вас",
+    "text": "Агент может сам показать нужный слайд или обновить его после правки — вы сразу видите результат."
+  },
+  "en": {
+    "title": "The agent turns the pages for you",
+    "text": "The agent can show the slide it means or reload it after a change — you see the result at once."
+  }
+}

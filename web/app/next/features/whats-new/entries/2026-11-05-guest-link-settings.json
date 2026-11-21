@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-05",
+  "icon": "sliders-horizontal",
+  "ru": {
+    "title": "Как откроется ссылка",
+    "text": "В «Ещё» у ссылки — на компьютере или на телефоне, какие страницы и какая версия: эта или всегда последняя."
+  },
+  "en": {
+    "title": "How a link opens",
+    "text": "«More» of a link: on a computer or a phone, which pages and which version — this one or always the latest."
+  }
+}

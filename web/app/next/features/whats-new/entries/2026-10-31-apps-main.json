@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-31",
+  "icon": "layout-grid",
+  "ru": {
+    "title": "Приложение — на весь экран",
+    "text": "Откройте приложение из вкладки справа на весь экран: чат остаётся рядом — слева, окном поверх или одним полем внизу. Включить приложение в чате можно в «+» → «Приложение», а список приложений чата — над полем."
+  },
+  "en": {
+    "title": "An app on the whole screen",
+    "text": "Open an app from its tab on the right on the whole screen: the chat stays beside it — at the left, in a window over it, or as one field at the foot. Turn an app on in a chat from «+» → «App»; the chat's apps stand over the field."
+  }
+}

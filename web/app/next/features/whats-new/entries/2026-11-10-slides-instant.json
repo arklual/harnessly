@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-10",
+  "icon": "presentation",
+  "ru": {
+    "title": "Слайды листаются сразу",
+    "text": "Соседние слайды презентации загружаются заранее, поэтому следующий открывается без ожидания. Презентация по ссылке тоже обновляется быстрее после правки."
+  },
+  "en": {
+    "title": "Slides turn at once",
+    "text": "The slides next to the one you are on load ahead of time, so the next one opens with no wait. A deck opened by a link also catches up faster after an edit."
+  }
+}

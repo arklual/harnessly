@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-10",
+  "icon": "shield-check",
+  "ru": {
+    "title": "Ушедший участник теряет доступ сразу",
+    "text": "При удалении участника из пространства его доступы, команды и сессии закрываются одной операцией. Последнего администратора снять нельзя, а каждое изменение состава попадает в журнал."
+  },
+  "en": {
+    "title": "A person who leaves loses access at once",
+    "text": "When a member is removed from a space, their access, teams and sessions are closed in one operation. The last administrator cannot be removed, and every change of membership goes to the journal."
+  }
+}

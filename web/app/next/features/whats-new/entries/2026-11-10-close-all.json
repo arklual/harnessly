@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-10",
+  "icon": "bell",
+  "ru": {
+    "title": "«Закрыть все» и «Вернуть»",
+    "text": "Наведите на плашку — в углу появится ×, на стопке он превращается в «Закрыть все». То, что ждёт ответа, уходит каплями в колонку чата, остальное закрывается. Передумали — «Вернуть». С клавиатуры — ⇧⌫."
+  },
+  "en": {
+    "title": "«Close all» and «Undo»",
+    "text": "Hover the notification for a × in its corner; on a stack it becomes «Close all». What waits for your answer goes into drops in the chat's column, the rest closes. Changed your mind — «Undo». From the keyboard: ⇧⌫."
+  }
+}

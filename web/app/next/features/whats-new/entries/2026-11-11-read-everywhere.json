@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-11",
+  "icon": "eye",
+  "ru": {
+    "title": "Прочитанное — прочитано везде",
+    "text": "Открытый чат снимает отметку и уведомление на всех вкладках и устройствах. Лента помнит, где вы читали в каждом чате."
+  },
+  "en": {
+    "title": "Read once, read everywhere",
+    "text": "An open chat clears its mark and its notification in every tab and device. The feed remembers where you were reading in each chat."
+  }
+}

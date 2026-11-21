@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "shield-check",
+  "ru": {
+    "title": "Приложения не выйдут за стену",
+    "text": "Агент в чате с приложением больше не откроет терминал и новый чат, не прочитает ключи рантайма и не поменяет ваши настройки и профиль оболочки. sudo и Docker в таком чате выключены: для них есть чат без приложений или терминал."
+  },
+  "en": {
+    "title": "Apps stay behind the wall",
+    "text": "The agent of a chat with an app can no longer open a terminal or a new chat, read the runtime's keys or change your settings and shell profile. sudo and Docker are off in such a chat: use a chat without apps or a terminal for them."
+  }
+}

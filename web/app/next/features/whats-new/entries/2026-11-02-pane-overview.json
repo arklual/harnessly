@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "palette",
+  "ru": {
+    "title": "«Обзор» в панели показывает все устройства целиком",
+    "text": "Сайт, презентация и видео рядом с чатом занимают всю высоту панели, а устройства в «Обзоре» не обрезаются по краям и стоят на равном расстоянии."
+  },
+  "en": {
+    "title": "Overview in the pane shows every device whole",
+    "text": "A site, deck or video beside the chat takes the pane's full height, and the devices in Overview are evenly spaced and no longer cut off at the edges."
+  }
+}

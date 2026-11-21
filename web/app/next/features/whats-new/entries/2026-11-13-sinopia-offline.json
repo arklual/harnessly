@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-13",
+  "icon": "film",
+  "ru": {
+    "title": "Макеты и видео открываются, даже когда машина выключена",
+    "text": "«Просмотр» в Sinopia берёт доски и сцены из хаба: макет и видео видны, даже если машина спит или не отвечает, а править их можно, когда она снова на связи. У видео появилась линейка времени с подписанными сценами — по ней можно перематывать."
+  },
+  "en": {
+    "title": "Designs and videos open even when the machine is off",
+    "text": "«View» in Sinopia reads boards and scenes from the hub: a design or a video shows even when its machine sleeps or does not answer, and editing comes back once it is online. Videos got a time ruler with labelled scenes you can scrub along."
+  }
+}

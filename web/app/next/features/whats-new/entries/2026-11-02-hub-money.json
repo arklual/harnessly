@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-02",
+  "icon": "chart-line",
+  "ru": {
+    "title": "Расходы и польза агентов — в хабе",
+    "text": "Сколько потратили организация, тенант и команда, сколько до лимита и что дают деньги: MR, доходимость, эффект каждого изменения. Включаем в хабе постепенно."
+  },
+  "en": {
+    "title": "Agent spend and results in the hub",
+    "text": "What the organization, a tenant and a team spent, how much is left of the limit and what the money gives: MRs, completion, the effect of each change. Rolling out in the hub gradually."
+  }
+}

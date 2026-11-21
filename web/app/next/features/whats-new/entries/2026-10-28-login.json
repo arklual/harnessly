@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-28",
+  "icon": "log-in",
+  "ru": {
+    "title": "Вход прямо в чате",
+    "text": "Если вход в Claude или Codex истёк, в чате появится кнопка «Войти по подписке» — без терминала и поиска настроек. После входа сообщение отправляется ещё раз одной кнопкой."
+  },
+  "en": {
+    "title": "Sign in right in the chat",
+    "text": "When the Claude or Codex sign-in expires, the chat shows a «Sign in with subscription» button — no terminal, no hunting through settings. Once signed in, one button sends the message again."
+  }
+}

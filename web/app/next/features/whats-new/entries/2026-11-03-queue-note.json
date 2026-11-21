@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-03",
+  "icon": "message-square",
+  "ru": {
+    "title": "Очередь в чате читается целиком",
+    "text": "Если агент остановился, причина и «Продолжить отправку» больше не наезжают друг на друга."
+  },
+  "en": {
+    "title": "The chat queue reads cleanly",
+    "text": "When the agent is stopped, the reason and “Resume sending” no longer overlap."
+  }
+}
