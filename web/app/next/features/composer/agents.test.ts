@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { pinLocale } from '@/next/i18n';
 import {
   effortLabel,
@@ -13,7 +13,7 @@ import {
 } from './agents';
 import type { MachineAgent } from '@/next/protocol/v2';
 
-beforeAll(() => pinLocale('en'));
+beforeEach(() => pinLocale('en'));
 
 describe('configured profiles use their own credentials', () => {
   const machine = (status: MachineAgent['status'], configured = true): MachineAgent => ({
@@ -143,8 +143,8 @@ describe('the picker names a model by how it runs (HRN-1434)', () => {
       { id: 'kimi-code', label: 'Kimi Code', vendor: 'kimi', configured: true, models: [model('k', 'K3')] },
     ],
   } as MachineAgent;
-  const all = pickerAgents([machine]);
-  const of = (profile: string | null) => all.find((a) => (a.profile ?? null) === profile)!;
+  const of = (profile: string | null) =>
+    pickerAgents([machine]).find((a) => (a.profile ?? null) === profile)!;
 
   it('says Claude’s own models by name alone', () => {
     expect(modelLine(of(null), 'opus')).toBe('Opus');
@@ -156,7 +156,13 @@ describe('the picker names a model by how it runs (HRN-1434)', () => {
   });
 
   it('names a group’s tab by its vendor unless two would read the same', () => {
-    expect(all.map((a) => a.short)).toEqual(['Claude', 'GPT', 'GLM', 'Kimi', 'Kimi Code']);
+    expect(pickerAgents([machine]).map((a) => a.short)).toEqual([
+      'Claude',
+      'GPT',
+      'GLM',
+      'Kimi',
+      'Kimi Code',
+    ]);
   });
 });
 
