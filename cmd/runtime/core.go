@@ -259,6 +259,9 @@ func (c *core) start() {
 		agents.Claude: claudeProvider{det: c.claude, snaps: claude.NewSnapshotReader(), hooks: filepath.Join(c.cfg.DataDir, "hooks.json")},
 		agents.Codex:  codexProvider{det: codex.NewDetector(c.cfg.Home), snaps: codex.NewSnapshotReader()},
 	}
+	if nativeAntigravityEnabled() {
+		providers[agents.Antigravity] = newAntigravityStatus(c.cfg.Home)
+	}
 	wiring := &promptWiring{c: c, providers: providers}
 	wiring.resume = c.resumeForQueue
 	svc := c.newPrompts(wiring)

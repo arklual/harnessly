@@ -40,7 +40,8 @@ func (c *core) timelineRoutes(f *gate.Gate, d deps) []gate.Route {
 	subs := &subagents.Route{Lister: &subagents.Lister{}, Authorized: authorized, SessionOK: d.SessionOK,
 		Paths: subagents.Paths{ClaudeProjects: filepath.Join(claudeDir, "projects"), CodexSessions: filepath.Join(codexDir, "sessions")}}
 	entries := &timeline.EntriesRoute{Paths: subs.Paths, Authorized: authorized,
-		Codex: transcript.CodexOptions{ImageURL: transcript.NewCodexImageURL(c.cfg.Timeline.UploadsDir, c.cfg.Timeline.AppBase)}}
+		AntigravityRoot: filepath.Join(d.Home, ".gemini", "antigravity-cli", "brain"),
+		Codex:           transcript.CodexOptions{ImageURL: transcript.NewCodexImageURL(c.cfg.Timeline.UploadsDir, c.cfg.Timeline.AppBase)}}
 	at := func(r *http.Request, p string) bool { return c.manager() != nil && (pathIs(r, p) || pathIs(r, p+"/")) }
 	return append([]gate.Route{{
 		Slice:   "timeline",

@@ -26,6 +26,8 @@ func (r *Runtime) source(rec wire.Conversation) feed.Source {
 		return r.d.Source(rec)
 	case rec.Provider == wire.ProviderCodex:
 		return &feed.CodexSource{Path: rec.TranscriptPath}
+	case rec.Provider == wire.ProviderAntigravity:
+		return &feed.AntigravitySource{Path: rec.TranscriptPath}
 	}
 	return &feed.ClaudeSource{Path: rec.TranscriptPath}
 }
@@ -163,6 +165,9 @@ func (r *Runtime) fork(m wire.ConversationForkCmd) wire.CmdResult {
 		return wire.Refused(p.code)
 	}
 	src, now := p.rec, r.d.Clock.Now()
+	if src.Provider == wire.ProviderAntigravity {
+		return wire.Refused(wire.RefuseUnsupported)
+	}
 	keep := p.keep.ID
 	rec := wire.Conversation{ID: "tab-" + newID(), MachineID: r.d.MachineID, ProjectID: src.ProjectID, Cwd: src.Cwd,
 		Provider: src.Provider, Model: src.Model, Title: src.Title, TitleSource: wire.TitleFromFirstMessage, CreatedAt: ms(now),

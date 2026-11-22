@@ -126,6 +126,8 @@ type v2Tmux struct {
 	tall tallCaptures
 	// guard says whether the terminal is off: then the pane takes no write while a shell is in its foreground.
 	guard *chatguard.Guard
+	// nativeOwns verifies the current generation, bound UUID and foreground process before native writes.
+	nativeOwns func(session string) bool
 
 	// probe answers the looks; nil means tm.
 	probe probeTmux
@@ -194,7 +196,11 @@ func (m *v2Tmux) Pane(session string) typist.Pane {
 	}
 	// While the terminal is off every write is checked against what is in the pane's foreground: text that reaches a
 	// bare shell runs as commands (see internal/chatguard).
-	return chatguard.Guarded(v2Pane{tm: m.tm, session: session, term: m.term, tall: &m.tall}, m.guard, func() string { return m.tm.PaneCurrentCommand(session) })
+	pane := chatguard.Guarded(v2Pane{tm: m.tm, session: session, term: m.term, tall: &m.tall}, m.guard, func() string { return m.tm.PaneCurrentCommand(session) })
+	if m.nativeOwns != nil && m.nativeOwns(session) {
+		return nativeOwnedPane{Pane: pane, alive: func() bool { return m.nativeOwns(session) }}
+	}
+	return pane
 }
 
 var _ convo.SessionForgetter = (*v2Tmux)(nil)
@@ -471,7 +477,17 @@ func agentsNow(r preflight.Result, models func(wire.Provider) []wire.AgentModel)
 	case !r.Codex.LoggedIn:
 		codex.Status = wire.InstallLoginRequired
 	}
-	return []wire.MachineAgent{claude, codex}
+	result := []wire.MachineAgent{claude, codex}
+	if nativeAntigravityEnabled() {
+		native := wire.MachineAgent{Provider: wire.ProviderAntigravity, Version: r.Antigravity.Version, Status: wire.InstallReady, Models: list(wire.ProviderAntigravity), CanSwitchModel: false}
+		if !r.Antigravity.Installed {
+			native.Status = wire.InstallMissing
+		} else if !r.Antigravity.LoggedIn {
+			native.Status = wire.InstallLoginRequired
+		}
+		result = append(result, native)
+	}
+	return result
 }
 
 // refresh asks the preflight (a login shell, seconds on a loaded machine) and tells the sockets what changed.
@@ -608,6 +624,9 @@ var codexNeverAsksRE = regexp.MustCompile(`(?m)^\s*approval_policy\s*=\s*["']nev
 // does not decide: the launch names ask); a Codex chat runs on its config.toml, which asks unless its approval_policy
 // is "never" (read before its first table).
 func defaultPermissionOf(p wire.Provider, skip bool, codexConfig, claudeSettings string) wire.PermissionMode {
+	if p == wire.ProviderAntigravity {
+		return wire.PermissionAsk
+	}
 	if skip {
 		return wire.PermissionBypass
 	}

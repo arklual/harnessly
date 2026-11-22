@@ -20,7 +20,8 @@ export type LoginVia = 'subscription' | 'console';
 export const METHODS_OF = {
   claude: ['subscription', 'console'],
   codex: ['subscription', 'key'],
-} as const satisfies Record<'claude' | 'codex', readonly LoginMethod[]>;
+  antigravity: [],
+} as const satisfies Record<'claude' | 'codex' | 'antigravity', readonly LoginMethod[]>;
 
 /** What the card can do with the agent's credentials; each resolves null when taken, else the reason. */
 export interface ICredentialActions {

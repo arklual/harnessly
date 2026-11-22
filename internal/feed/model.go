@@ -172,6 +172,9 @@ func (b *builder) add(o *jsvalue.Object, offset int64) step {
 		b.endTurn(&s, at, wire.TurnDone)
 		b.late = nil
 		return s
+	case "antigravity-result":
+		b.antigravityResult(&s, o, id, at, offset)
+		return s
 	case "tool-result":
 		b.result(&s, o, id, at, offset)
 		return s

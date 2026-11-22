@@ -2399,12 +2399,13 @@ func Refused(code RefuseCode) CmdResult { return CmdResult{R: ResultRefused, Cod
 type Provider string
 
 const (
-	ProviderClaude Provider = "claude"
-	ProviderCodex  Provider = "codex"
+	ProviderClaude      Provider = "claude"
+	ProviderCodex       Provider = "codex"
+	ProviderAntigravity Provider = "antigravity"
 )
 
 // Providers is every Provider, in the schema's order.
-var Providers = []Provider{ProviderClaude, ProviderCodex}
+var Providers = []Provider{ProviderClaude, ProviderCodex, ProviderAntigravity}
 
 // Feature is a capability a runtime announces in hello and welcome.
 type Feature string

@@ -21,6 +21,7 @@ export const GEN_PHASE = { drawing: 'drawing', choose: 'choose', failed: 'failed
 export type TGenPhase = (typeof GEN_PHASE)[keyof typeof GEN_PHASE];
 
 export interface IGenRun {
+  provider?: 'codex' | 'antigravity';
   key: string;
   artifact: string;
   tpl: number;
@@ -161,6 +162,7 @@ export const startGen = async (
     key,
     artifact: request.artifact,
     tpl,
+    provider: request.provider ?? 'codex',
     prompt: request.prompt.trim(),
     count: request.count,
     phase: GEN_PHASE.drawing,

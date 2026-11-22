@@ -127,7 +127,7 @@ export function useChatHandoff(
     [],
   );
 
-  const canFork = hasFeature(machine, 'fork');
+  const canFork = record?.provider !== 'antigravity' && hasFeature(machine, 'fork');
   const onForkTurn = useCallback(
     async (turnId: string) => {
       try {
@@ -165,7 +165,7 @@ export function useChatHandoff(
   // «Влить обратно» of the header's menu: only a fork has a chat to merge into.
   const parent = source?.k === 'fork' ? source : null;
   useUiRequest(UI_REQUEST.merge, () => {
-    if (parent && hasFeature(machine, 'fork')) setMerging(true);
+    if (parent && canFork) setMerging(true);
   });
 
   const from = record ? label(record.provider, record.model) : null;

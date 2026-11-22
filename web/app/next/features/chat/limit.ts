@@ -8,7 +8,11 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-export const PROVIDER_NAME = { claude: 'Claude', codex: 'Codex' } as const satisfies Record<Provider, string>;
+export const PROVIDER_NAME = {
+  claude: 'Claude',
+  codex: 'Codex',
+  antigravity: 'Antigravity',
+} as const satisfies Record<Provider, string>;
 
 /** What the runtime will do with the hold: go on by itself, wait for the person, or has no time to go by. */
 export const LIMIT_PHASE = { auto: 'auto', held: 'held', unknown: 'unknown' } as const;

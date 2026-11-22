@@ -96,7 +96,7 @@ import {
 } from '@/next/features/sidebar/profile-layout';
 
 const GB = 1024 ** 3;
-const AGENT_NAME = { claude: 'Claude Code', codex: 'Codex' } as const;
+const AGENT_NAME = { claude: 'Claude Code', codex: 'Codex', antigravity: 'Antigravity' } as const;
 
 /** Gigabytes the way the card reads them: one decimal under ten, whole above. */
 const gb = (bytes: number): string => {
@@ -606,7 +606,7 @@ export function useShellModel(): IShellModel {
     const machineRows = convs.map((c) => {
       const features = views.get(c.machineId)?.features ?? [];
       const canStop = features.includes('terminal-stop');
-      const canFork = features.includes('fork');
+      const canFork = c.provider !== 'antigravity' && features.includes('fork');
       const canHandoff = features.includes('handoff');
       const terminal = terminalRuns(c);
       return {

@@ -198,7 +198,7 @@ func (s *Server) detect(p *Provider, pid int) agents.SessionInfo {
 
 // watchSessions starts the provider's watch of the pane's agent; changes reach onSessionChange under the lock.
 func (s *Server) watchSessions(session string, pid int, p *Provider) *sessionWatcher {
-	if p.ID == agents.Codex {
+	if p.ID == agents.Codex || p.ID == "antigravity" {
 		return s.watchCodex(session, pid, p)
 	}
 	return s.watchClaude(session, pid, p)

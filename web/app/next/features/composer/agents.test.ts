@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { pinLocale } from '@/next/i18n';
 import {
   effortLabel,
@@ -13,7 +13,7 @@ import {
 } from './agents';
 import type { MachineAgent } from '@/next/protocol/v2';
 
-beforeAll(() => pinLocale('en'));
+beforeEach(() => pinLocale('en'));
 
 describe('configured profiles use their own credentials', () => {
   const machine = (status: MachineAgent['status'], configured = true): MachineAgent => ({
@@ -143,8 +143,8 @@ describe('the picker names a model by how it runs (HRN-1434)', () => {
       { id: 'kimi-code', label: 'Kimi Code', vendor: 'kimi', configured: true, models: [model('k', 'K3')] },
     ],
   } as MachineAgent;
-  const all = pickerAgents([machine]);
-  const of = (profile: string | null) => all.find((a) => (a.profile ?? null) === profile)!;
+  const of = (profile: string | null) =>
+    pickerAgents([machine]).find((a) => (a.profile ?? null) === profile)!;
 
   it('says Claude’s own models by name alone', () => {
     expect(modelLine(of(null), 'opus')).toBe('Opus');
@@ -156,6 +156,57 @@ describe('the picker names a model by how it runs (HRN-1434)', () => {
   });
 
   it('names a group’s tab by its vendor unless two would read the same', () => {
-    expect(all.map((a) => a.short)).toEqual(['Claude', 'GPT', 'GLM', 'Kimi', 'Kimi Code']);
+    expect(pickerAgents([machine]).map((a) => a.short)).toEqual([
+      'Claude',
+      'GPT',
+      'GLM',
+      'Kimi',
+      'Kimi Code',
+    ]);
+  });
+});
+
+describe('Antigravity native agent', () => {
+  const native: MachineAgent = {
+    provider: 'antigravity',
+    version: '1.0',
+    status: 'ready',
+    canSwitchModel: false,
+    models: [{ id: 'machine-model', label: 'Machine model', hint: '', efforts: [], defaultEffort: null }],
+  };
+
+  it('offers only the models reported by the machine, marked experimental', () => {
+    const [picked] = pickerAgents([native]);
+    expect(picked).toMatchObject({
+      provider: 'antigravity',
+      name: 'Antigravity',
+      canSwitch: false,
+      available: true,
+    });
+    expect(picked.short).toContain('experimental');
+    expect(picked.models.map((m) => m.id)).toEqual(['machine-model']);
+    expect(pickerAgents([{ ...native, models: [] }])[0].available).toBe(false);
+    // Listing models is not proof of a runnable native session (onboarding/eligibility may still block it).
+    expect(pickerAgents([{ ...native, status: 'login-required' }])[0].available).toBe(false);
+    expect(pickerAgents([{ ...native, status: 'missing' }])[0].available).toBe(false);
+  });
+
+  it('does not offer Claude controls or profile groups even if advertised accidentally', () => {
+    const picked = pickerAgents([
+      {
+        ...native,
+        canSwitchModel: true,
+        models: native.models.map((model) => ({ ...model, fast: true, ultracode: true })),
+        profiles: [{ id: 'test', label: 'Test', vendor: 'gpt', configured: true, models: native.models }],
+      },
+    ]);
+    expect(picked).toHaveLength(1);
+    expect(picked[0].canSwitch).toBe(false);
+    expect(picked[0].models[0]).toMatchObject({ fast: false, ultracode: false });
+  });
+
+  it('gives the official executable login command', () => {
+    const [picked] = pickerAgents([{ ...native, status: 'login-required' }]);
+    expect(unavailableNote(picked)).toContain('agy acp --login');
   });
 });

@@ -1,9 +1,10 @@
 // The versions of a picture, read from the jobs of a chat: every finished job whose source is the original or a version
 // already in the chain adds its last picture. Ordered by when the job started, the original first.
-import type { IImageVersion } from '@/next/features/image-edit/host';
+import type { ImageProvider, IImageVersion } from '@/next/features/image-edit/host';
 
 /** What the chain needs of a job (chat/image-jobs.ts has the rest). */
 export interface IChainJob {
+  provider?: ImageProvider;
   state: string;
   paths: readonly string[];
   source?: string;
@@ -26,7 +27,12 @@ export const chainVersions = (
     const path = job.paths[job.paths.length - 1];
     if (path === undefined || known.has(path)) continue;
     known.add(path);
-    out.push({ id: path, src: srcOf(path), clear: job.mode === CUT_MODE ? true : undefined });
+    out.push({
+      ...(job.provider ? { provider: job.provider } : {}),
+      id: path,
+      src: srcOf(path),
+      clear: job.mode === CUT_MODE ? true : undefined,
+    });
   }
   return out;
 };

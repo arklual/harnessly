@@ -1,5 +1,7 @@
 // The login card of a chat whose last turn failed because the agent's sign-in ran out: the login runs on the chat's
 // machine for the chat's agent; once it went through, the card sends the turn's message again.
+import { t } from '@/next/i18n';
+import { LOGIN_COMMANDS } from '@/next/features/composer/agents';
 import { useCallback, useEffect, useState } from 'react';
 import { useAgentCredentials } from '@/next/bindings/settings-credentials';
 import LoginCard, { isLoginLost } from '@/next/features/chat/login-card';
@@ -26,7 +28,7 @@ interface IChatLoginProps {
 /** Keyed by the failed turn: a later failure starts a card of its own. The accounts this machine was signed in with
  *  come from the cluster; the agent's settings are read when the card opens and again once the login went through,
  *  so the account it signed in with reaches the cluster too. */
-const ChatLogin = ({ machine, provider, onRetry }: IChatLoginProps) => {
+const ManagedChatLogin = ({ machine, provider, onRetry }: IChatLoginProps) => {
   const [done, setDone] = useState(false);
   const [settings, setSettings] = useState<AgentSettings | null>(null);
   const onDone = useCallback(() => setDone(true), []);
@@ -51,5 +53,19 @@ const ChatLogin = ({ machine, provider, onRetry }: IChatLoginProps) => {
     />
   );
 };
+
+const ChatLogin = (props: IChatLoginProps) =>
+  props.provider === 'antigravity' ? (
+    <div role="status">
+      <p>{t('next.picker.loginRequired', { agent: 'Antigravity', command: LOGIN_COMMANDS.antigravity })}</p>
+      {props.onRetry && (
+        <button type="button" onClick={() => void props.onRetry?.()}>
+          {t('next.imagegen.retry')}
+        </button>
+      )}
+    </div>
+  ) : (
+    <ManagedChatLogin {...props} />
+  );
 
 export default ChatLogin;

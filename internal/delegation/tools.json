@@ -9,7 +9,8 @@
           "type": "string",
           "enum": [
             "claude",
-            "codex"
+            "codex",
+            "antigravity"
           ],
           "description": "The agent CLI to run the task."
         },

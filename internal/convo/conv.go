@@ -373,6 +373,8 @@ func (c *conv) openFeed() {
 		src = c.d.Source(c.rec)
 	case c.rec.Provider == wire.ProviderCodex:
 		src = &feed.CodexSource{Path: c.rec.TranscriptPath, Index: c.d.Transcripts}
+	case c.rec.Provider == wire.ProviderAntigravity:
+		src = &feed.AntigravitySource{Path: c.rec.TranscriptPath, Index: c.d.Transcripts}
 	default:
 		src = &feed.ClaudeSource{Path: c.rec.TranscriptPath, Index: c.d.Transcripts}
 	}

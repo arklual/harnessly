@@ -55,6 +55,9 @@ type rewindRec struct {
 
 // rewindable: why the conversation cannot be rewound now ("" when it can).
 func (c *conv) rewindable() wire.RefuseCode {
+	if c.rec.Provider == wire.ProviderAntigravity {
+		return wire.RefuseUnsupported
+	}
 	switch {
 	case c.d.Rewinder == nil || c.d.Terminals == nil || c.rec.TranscriptPath == "":
 		return wire.RefuseUnsupported

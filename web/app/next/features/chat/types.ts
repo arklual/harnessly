@@ -7,6 +7,7 @@ import type {
   ImageGen,
   MessageRef,
   PermissionMode,
+  Provider,
   TerminalAside,
   ToolCall,
   TurnOutput,
@@ -17,7 +18,7 @@ export type { ImageGen, OutputKind, ToolCall, TurnOutput } from '@/next/protocol
 export type Ms = number;
 export type EntryId = string;
 export type ClientId = string;
-export type Provider = 'claude' | 'codex';
+export type { Provider } from '@/next/protocol/v2';
 
 // ---- wire: turns and entries
 

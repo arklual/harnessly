@@ -3,6 +3,7 @@
 // cmdTimeoutMs ends it. An accepted command is done only once its channel has shown the result's seq — the page
 // waits for the socket, not for a timer — and a retry sends the same body with the same opId.
 
+import { conversationsStore } from '@/next/stores/conversations';
 import { pageClock } from '@/next/core/clock';
 import { uuidv7 } from '@/next/core/ids';
 import { postCommand } from '@/next/core/net/http';
@@ -15,6 +16,7 @@ import {
   RETRYABLE_REFUSE_CODES,
   type CmdOutcome,
   type CommandBodies,
+  type ConvId,
   type MachineId,
   type Op,
 } from '@/next/protocol/v2';
@@ -71,6 +73,30 @@ const withAuthor = <K extends Op>(op: K, body: Body<K>): Body<K> => {
   return by === null ? body : { ...body, by };
 };
 
+/** The native Antigravity CLI must not receive Claude-only controls or silently lose the person's choices. */
+export const unsupportedAntigravityCommand = (op: Op, body: Record<string, unknown>): boolean => {
+  if (
+    [
+      'rewind',
+      'rewind.undo',
+      'conversation.fork',
+      'conversation.merge',
+      'model',
+      'conversation.apps',
+      'answer',
+      'decide',
+    ].includes(op)
+  )
+    return true;
+  if ((op === 'send' && body.mode === 'steer') || (op === 'promote' && body.to === 'steer')) return true;
+  if (Array.isArray(body.attachmentIds) && body.attachmentIds.length > 0) return true;
+  if (body.profile) return true;
+  const model = body.model as { fast?: boolean; ultracode?: boolean; profile?: string } | null | undefined;
+  if (model?.fast || model?.ultracode || model?.profile) return true;
+  const first = body.first as { attachmentIds?: unknown[] } | undefined;
+  return (first?.attachmentIds?.length ?? 0) > 0;
+};
+
 /** Sends op to machine; opId defaults to a new UUIDv7 (send passes its clientId). */
 export function runCommand<K extends Op>(
   machine: MachineId,
@@ -79,6 +105,22 @@ export function runCommand<K extends Op>(
   opId: string = uuidv7(),
 ): OpHandle {
   const full = { ...withAuthor(op, body), opId } as Record<string, unknown>;
+  const id = full.conversationId ?? full.id;
+  const conversationId = typeof id === 'string' && id.startsWith('tab-') ? (id as ConvId) : null;
+  const provider =
+    full.provider ?? (conversationId ? conversationsStore.get(conversationId)?.provider : null);
+  if (provider === 'antigravity' && unsupportedAntigravityCommand(op, full)) {
+    const final = {
+      k: 'failed',
+      op,
+      machine,
+      at: pageClock().now(),
+      retryable: false,
+      failure: { r: 'refused', code: 'unsupported' },
+    } as const;
+    opsStore.set(opId, final);
+    return { opId, done: Promise.resolve(final) };
+  }
   sweep(pageClock().now());
   sent.set(opId, { machine, op, body: full, endedAt: null });
   return execute(opId);
