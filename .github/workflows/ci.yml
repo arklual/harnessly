@@ -20,7 +20,7 @@ jobs:
       GOFLAGS: -mod=readonly
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v7.1.0
         with:
           go-version-file: go.mod
       # The tests that drive these tools skip themselves without them; installed, nearly the whole suite runs.
@@ -53,7 +53,7 @@ jobs:
       VAULTKV_TEST_ROOT_TOKEN: dev-root
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v7.1.0
         with:
           go-version-file: go.mod
       - name: Start ${{ matrix.server.name }} in dev mode
@@ -79,7 +79,7 @@ jobs:
       GOARCH: ${{ matrix.goarch }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v7.1.0
         with:
           go-version-file: go.mod
       - name: Compile every package
@@ -109,7 +109,7 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       # The runtime carries the page it was built next to: the compiled-in files are the agents workspace.
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v7.1.0
         with:
           go-version-file: go.mod
       - name: Runtime with the page compiled in
@@ -181,7 +181,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v7.1.0
         with:
           go-version-file: go.mod
       # Built from source at a pinned version, checked against the Go checksum database.
@@ -196,7 +196,7 @@ jobs:
       GOFLAGS: -mod=readonly
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v7.1.0
         with:
           go-version-file: go.mod
       - uses: pnpm/action-setup@v6
@@ -237,7 +237,7 @@ jobs:
           apt-get update -qq
           apt-get install -y -qq ca-certificates curl git tar make gcc libc6-dev python3 procps
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v7.1.0
         with:
           go-version-file: go.mod
       - name: Build and install this branch
