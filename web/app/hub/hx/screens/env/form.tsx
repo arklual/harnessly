@@ -908,6 +908,17 @@ export const DraftForm = ({
           label="Запускать"
         />
       </Field>
+      <label>
+        <input
+          type="checkbox"
+          checked={f.independent}
+          onChange={(event) => set({ independent: event.target.checked })}
+        />
+        Независимый скрипт
+        <span className="ev-f__h">
+          Выполняется после ошибок других скриптов. Его ошибка не блокирует следующие шаги.
+        </span>
+      </label>
       {f.rerun === 'check' && (
         <Field tight hint="Команда-проверка: проходит — уже готово, скрипт не запускаем">
           <TextIn

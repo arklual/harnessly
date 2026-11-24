@@ -285,7 +285,7 @@ type where struct {
 
 func (ex *execution) script(i int) {
 	it, src := ex.items[i], ex.srcs[i]
-	if ex.modifies && ex.blocked != "" {
+	if ex.modifies && ex.blocked != "" && !src.Independent {
 		ex.pend(i, "ждёт, пока починят "+ex.blocked)
 		return
 	}
@@ -338,7 +338,9 @@ func (ex *execution) script(i int) {
 		for _, n := range missing {
 			ex.needSecret(n, "Окружение команды: "+it.Name)
 		}
-		ex.blocked = it.Name
+		if !src.Independent {
+			ex.blocked = it.Name
+		}
 		ex.pend(i, "положите "+strings.Join(missing, ", ")+" в сейф")
 		return
 	}
@@ -390,7 +392,9 @@ func (ex *execution) script(i int) {
 
 func (ex *execution) scriptFail(i int, msg string) {
 	ex.fail(i, msg)
-	ex.blocked = ex.items[i].Name
+	if !ex.srcs[i].Independent {
+		ex.blocked = ex.items[i].Name
+	}
 }
 
 func oneLine(s string) string {

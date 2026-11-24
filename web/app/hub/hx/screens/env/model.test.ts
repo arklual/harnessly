@@ -22,6 +22,7 @@ describe('model', () => {
     d.f.name = 'Node';
     d.f.src = 'text';
     d.f.body = 'corepack enable pnpm';
+    d.f.independent = true;
     expect(valid(d)).toBe(true);
     const source = toSource(d);
     expect(source.from).toBe('text');
@@ -39,6 +40,7 @@ describe('model', () => {
       owner: null,
     });
     expect(back?.k).toBe('script');
+    expect(back?.f.independent).toBe(true);
     expect(back?.f.body).toBe('corepack enable pnpm');
   });
 

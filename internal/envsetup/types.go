@@ -169,16 +169,17 @@ type source struct {
 	Host    string `json:"host"`
 	Secret  string `json:"secret"`
 	// script
-	From     string   `json:"from"`
-	Body     string   `json:"body"`
-	FileName string   `json:"fileName"`
-	Repo     string   `json:"repo"`
-	RepoURL  string   `json:"repoUrl"`
-	Path     string   `json:"path"`
-	Run      string   `json:"run"`
-	Rerun    string   `json:"rerun"`
-	Check    string   `json:"check"`
-	Secrets  []string `json:"secrets"`
+	From        string   `json:"from"`
+	Body        string   `json:"body"`
+	FileName    string   `json:"fileName"`
+	Repo        string   `json:"repo"`
+	RepoURL     string   `json:"repoUrl"`
+	Path        string   `json:"path"`
+	Run         string   `json:"run"`
+	Independent bool     `json:"independent,omitempty"`
+	Rerun       string   `json:"rerun"`
+	Check       string   `json:"check"`
+	Secrets     []string `json:"secrets"`
 	// app: the installation's values for ${install:<name>} of the package, which the hub adds
 	Install map[string]string `json:"install"`
 	// plugin

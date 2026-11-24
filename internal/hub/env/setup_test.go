@@ -25,7 +25,7 @@ func TestCleanSourceOfSetupKinds(t *testing.T) {
 		kind string
 		src  any
 	}{
-		{"script", map[string]any{"from": "text", "body": "echo hi"}},
+		{"script", map[string]any{"from": "text", "body": "echo hi", "independent": true}},
 		{"script", map[string]any{"from": "file", "body": "echo hi", "fileName": "setup.sh", "rerun": "check", "check": "test -d ~/x", "secrets": []string{"npm-token"}}},
 		{"script", map[string]any{"from": "repo", "repo": "item-1", "path": "scripts/setup.sh", "run": "bash scripts/setup.sh"}},
 		{"script", map[string]any{"from": "repo", "repoUrl": "ssh://git@git.example.org/a/b.git", "branch": "main", "path": "x.sh"}},
@@ -46,6 +46,7 @@ func TestCleanSourceOfSetupKinds(t *testing.T) {
 		src   any
 		field string
 	}{
+		{"independent type", "script", map[string]any{"from": "text", "body": "echo hi", "independent": "true"}, "source.independent"},
 		{"no from", "script", map[string]any{"body": "echo"}, "source.from"},
 		{"bad from", "script", map[string]any{"from": "ftp"}, "source.from"},
 		{"text without body", "script", map[string]any{"from": "text"}, "source.body"},

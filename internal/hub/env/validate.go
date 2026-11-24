@@ -43,7 +43,7 @@ var sourceKeys = map[string][]string{
 	store.CatalogRepo:   {"url", "branch", "dir"},
 	store.CatalogDoc:    {"url", "text"},
 	store.CatalogAccess: {"service", "host", "secret"},
-	store.CatalogScript: {"from", "body", "fileName", "repo", "repoUrl", "branch", "path", "url", "run", "rerun", "check", "secrets"},
+	store.CatalogScript: {"from", "body", "fileName", "repo", "repoUrl", "branch", "path", "url", "run", "rerun", "check", "secrets", "independent"},
 	// A plugin: the marketplace (owner/repo on GitHub or a git address) and plugin@marketplace.
 	store.CatalogPlugin: {"marketplace", "plugin"},
 	// Settings of Claude Code: keys set always, keys set only where the person has none, the CLAUDE.md block.
@@ -68,7 +68,7 @@ var (
 )
 
 // boolKeys are the keys whose value is a boolean; false is the same as absent and is not kept.
-var boolKeys = []string{"off"}
+var boolKeys = []string{"off", "independent"}
 
 // listKeys are the keys whose value is a list of strings.
 var listKeys = []string{"args", "secretRefs", "secrets"}

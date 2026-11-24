@@ -273,6 +273,30 @@ func TestCheckScriptSkipsWhenCheckPasses(t *testing.T) {
 	}
 }
 
+func TestIndependentScriptsAreIsolatedFromOrderedScriptFailures(t *testing.T) {
+	f := newFixture(t)
+	f.handle = func(c Cmd) reply {
+		if len(c.Args) == 2 && c.Args[1] == "boom" {
+			return reply{exit: 1}
+		}
+		return reply{}
+	}
+	f.setList(
+		script("s1", "Independent fails", 1, `{"from":"text","body":"x","run":"boom","independent":true}`),
+		script("s2", "Ordered works", 2, `{"from":"text","body":"x","run":"ok"}`),
+		script("s3", "Ordered fails", 3, `{"from":"text","body":"x","run":"boom"}`),
+		script("s4", "Independent works", 4, `{"from":"text","body":"x","run":"ok","independent":true}`),
+		script("s5", "Ordered waits", 5, `{"from":"text","body":"x","run":"ok"}`),
+	)
+	f.r.Tick(context.Background())
+	run := f.onlyRun()
+	for id, want := range map[string]string{"s1": hubproto.EnvError, "s2": hubproto.EnvOK, "s3": hubproto.EnvError, "s4": hubproto.EnvOK, "s5": hubproto.EnvPending} {
+		if step := f.step(run, id); step.Status != want {
+			t.Fatalf("%s: got %s, want %s", id, step.Status, want)
+		}
+	}
+}
+
 func TestFailedScriptStopsTheLaterOnes(t *testing.T) {
 	f := newFixture(t)
 	f.handle = func(c Cmd) reply {

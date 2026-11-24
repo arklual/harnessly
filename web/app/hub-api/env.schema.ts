@@ -169,6 +169,7 @@ const source = obj({
   path: opt(str),
   off: opt(bool),
   run: opt(str),
+  independent: opt(bool),
   rerun: opt(lit('once', 'check')),
   check: opt(str),
   secrets: opt(arr(str)),

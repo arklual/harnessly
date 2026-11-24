@@ -41,6 +41,7 @@ export type CatalogSource = {
   // app: the organization turned the app off for everybody; it stays installed, without its menu item and tools
   off?: boolean;
   run?: string;
+  independent?: boolean;
   rerun?: 'once' | 'check';
   check?: string;
   secrets?: string[];

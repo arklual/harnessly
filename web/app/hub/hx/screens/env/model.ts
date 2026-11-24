@@ -162,6 +162,7 @@ export interface Fields {
   /** app: turned off for the whole organization. */
   appOff: boolean;
   run: string;
+  independent: boolean;
   rerun: 'once' | 'check';
   check: string;
   secrets: string[];
@@ -219,6 +220,7 @@ export const blankFields = (k: AddKind, repos: readonly RepoRef[] = []): Fields 
   repoUrl: '',
   path: '',
   run: '',
+  independent: false,
   rerun: 'once',
   check: '',
   secrets: [],
@@ -878,6 +880,7 @@ export const toSource = (d: Draft): CatalogSource => {
   const out: CatalogSource = {
     from,
     run: orUndef(f.run),
+    independent: f.independent || undefined,
     rerun: f.rerun,
     check: f.rerun === 'check' ? orUndef(f.check) : undefined,
     secrets: f.secrets.length ? f.secrets : undefined,
@@ -987,6 +990,7 @@ export const fromItem = (it: CatalogItem): Draft | null => {
     f.repoUrl = noScheme(s.repoUrl ?? '');
     f.path = s.path ?? '';
     f.run = s.run ?? '';
+    f.independent = s.independent === true;
     f.rerun = s.rerun ?? 'once';
     f.check = s.check ?? '';
     f.secrets = s.secrets ?? [];

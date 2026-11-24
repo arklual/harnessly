@@ -578,7 +578,9 @@ The agent keeps the list as before and the runtime (the person's process, with t
 3. **Scripts**, in order. A script gets `HOME`, the safe's `secrets` as variables (`npm-token` → `$NPM_TOKEN`), its
    folder as the working directory (the repository's for `repo`, a fresh temporary one otherwise), 15 minutes. `once`
    runs on a machine once per source: a changed script runs again. `check` runs the check first and the script only
-   when it fails. A failed script stops the scripts after it (`pending` «ждёт, пока починят <name>»).
+   when it fails. By default, a failed script leaves subsequent ordered scripts pending («ждёт, пока починят <name>»).
+   An optional boolean `source.independent` lets a self-contained script run even after a previous script fails.
+   Its own failure appears in the journal and subsequent scripts retain their previous blocking state.
 4. Access and repositories that failed are tried once more after the scripts.
 
 Output goes to the run's log with the values of the secrets replaced by `••••••`, at most 16 KiB per step (the tail).
