@@ -1,5 +1,6 @@
 // The Settings screen's requests: the agent CLIs' settings files (GET and PATCH /api/v2/agent-settings/<provider>), the
 // skills the CLIs find (the composer's command catalog), and the sign-in of a runtime that asks for a password.
+import { confirmOfflineOwner } from '@/next/offline/client';
 import { getPage, sendBody, sendJson, sendPage } from '@/next/core/net/http';
 import { machineApi, platformPath, runtimePath } from '@/next/core/net/machine';
 import {
@@ -118,4 +119,9 @@ export const loadSession = (machine: MachineId) =>
   getPage(runtimePath('/api/config', machine), readSession, SETTINGS_TIMEOUT_MS);
 
 export const signOut = (machine: MachineId) =>
-  sendPage('POST', runtimePath('/api/auth/logout', machine), () => null, SETTINGS_TIMEOUT_MS);
+  sendPage('POST', runtimePath('/api/auth/logout', machine), () => null, SETTINGS_TIMEOUT_MS).then(
+    (value) => {
+      confirmOfflineOwner(null);
+      return value;
+    },
+  );

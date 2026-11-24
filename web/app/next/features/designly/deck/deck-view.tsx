@@ -4,6 +4,7 @@
 // screen, the panel's mode and tab, the selected and hovered block, the open popover or sheet — and talks to the board
 // on screen through the deck bridge: it turns the board's deck mode on, writes hand edits (text, style, move) into the
 // board's source through the patch route, and shows the frame, grip and guides of the blocks.
+import { offlineDownload } from '../offline-download';
 import { useLiveHint, useLiveMark } from '@/next/features/voice-live/live-mark';
 import { tourSignal } from '@/next/stores/tour';
 import { placeOf } from '@/next/features/keys/chord';
@@ -995,7 +996,10 @@ const DeckView = (props: IDeckViewProps) => {
         onFull={() => onKey(DECK_KEY.full)}
         onVideoLink={() => onShare?.()}
         onDownloadMp4={() => runExport('mp4', rec?.summary.id)}
-        downloads={deckDownloads(deck, mayEdit, (format) => runExport(format))}
+        downloads={[
+          ...deckDownloads(deck, mayEdit, (format) => runExport(format)),
+          ...offlineDownload(machine, id, title),
+        ]}
         downloadOn={downloadOn}
         onDownloadOn={setDownloadOn}
       />

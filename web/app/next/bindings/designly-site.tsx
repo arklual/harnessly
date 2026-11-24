@@ -2,6 +2,7 @@
 // history, and the page on screen shown in a preview slot. The slot is opened once per load; switching pages inside it
 // only moves the frame to the page's plain address, which skips the ticket round trip and its redirect. Anyone taking
 // the slot meanwhile (another preview, another window) or its cookie nearing its end opens it anew on the next switch.
+import { preloadDesign } from '@/next/features/designly/offline-download';
 import { ReplyMachine } from '@/next/features/composer/reply-field';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import SiteView, {
@@ -572,6 +573,12 @@ const DesignlySiteInner = ({
   // Editing asks the store too: its last revision is the board on screen while the machine opens the slot for editing.
   const storeAt = useStoreHead(machine, id, true);
   const storeRev = viewing && storeAt.k === STORE_AT.at ? storeAt.rev : null;
+  const offlineTitle = project?.design.kind === 'scene3d' ? undefined : project?.design.title;
+  useEffect(() => {
+    if (!granted || storeRev === null || offlineTitle === undefined || snapshot !== null) return;
+    const timer = setTimeout(() => preloadDesign(machine, id, offlineTitle, storeRev), 5000);
+    return () => clearTimeout(timer);
+  }, [granted, storeRev, offlineTitle, snapshot, machine, id]);
   const needSlot = !viewing || storeAt.k === STORE_AT.none;
   // The store has nothing of a project that is open from its machine: the machine is asked to put it there at once,
   // so the next look reads the hub.
@@ -1072,6 +1079,15 @@ const DesignlySiteInner = ({
       tabs={tabs}
       tab={current?.id ?? ''}
       src={boardSrc}
+      frameScope={JSON.stringify([machine, id, storeRev, slotKey, reloadKey, viewing, snapshot?.at])}
+      nextFrame={
+        storeRev !== null && project && path !== null
+          ? storeSrc(
+              project.design.boards[project.design.boards.findIndex((b) => b.path === path) + 1]?.path ??
+                null,
+            )
+          : null
+      }
       heldSrc={heldSrc}
       plainSrc={boardPlainSrc}
       phoneUrl={isPublicAddress(shareUrl) ? shareUrl : null}
@@ -1126,7 +1142,13 @@ const DesignlySiteInner = ({
       images={!viewing && mayEdit && project ? { machine, artifact: id } : undefined}
       downloads={
         project
-          ? { machine, artifact: id, archives: mayEdit, transfer: () => packOut.start([id]) }
+          ? {
+              machine,
+              artifact: id,
+              title: project.design.title,
+              archives: mayEdit,
+              transfer: () => packOut.start([id]),
+            }
           : undefined
       }
       memoryKey={id}

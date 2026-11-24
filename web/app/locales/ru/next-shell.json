@@ -1,4 +1,10 @@
 {
+  "next.offline.library": "Офлайн-библиотека",
+  "next.offline.save": "Сохранить для просмотра офлайн",
+  "next.offline.preparing": "Готовим офлайн-копию…",
+  "next.offline.saved": "Сохранено в офлайн-библиотеке",
+  "next.offline.account": "Сначала открой рабочее пространство онлайн",
+  "next.offline.large": "Размер офлайн-копии ограничен 32 МиБ",
   "next.sidebar.label": "Навигация",
   "next.sidebar.actions": "Действия",
   "next.sidebar.newChat": "Новый диалог",

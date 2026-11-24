@@ -28,7 +28,7 @@ type designRuntime struct {
 	root string
 }
 
-func newDesignRuntime(t *testing.T) *designRuntime {
+func newDesignRuntime(t *testing.T, probe func(string) design.ShareFSReport) *designRuntime {
 	t.Helper()
 	root := t.TempDir()
 	for _, f := range []struct{ path, body string }{
@@ -46,7 +46,7 @@ func newDesignRuntime(t *testing.T) *designRuntime {
 			t.Fatal(err)
 		}
 	}
-	l := design.New(design.Config{LibraryDir: root, ReleasesDir: t.TempDir(), Texts: design.Texts{Tag: "harnessly-design", CLI: "harnessly"}})
+	l := design.New(design.Config{ShareProbe: probe, LibraryDir: root, ReleasesDir: t.TempDir(), Texts: design.Texts{Tag: "harnessly-design", CLI: "harnessly"}})
 	t.Cleanup(l.StopWatching)
 	a := &design.API{
 		L: l, PlatformAPI: "/api/platform", MachineAgent: func(*http.Request) bool { return true },
@@ -95,7 +95,12 @@ func (d *designRuntime) call(serve func(*http.Request) design.Answer, route stri
 // designMachine registers and connects a machine that serves design access, with the real design slice behind it.
 func designMachine(t *testing.T, s *hubtest.Stack, p *hubtest.Person, space string) (*hubtest.Agent, *designRuntime) {
 	t.Helper()
-	d := newDesignRuntime(t)
+	return designMachineWithProbe(t, s, p, space, nil)
+}
+
+func designMachineWithProbe(t *testing.T, s *hubtest.Stack, p *hubtest.Person, space string, probe func(string) design.ShareFSReport) (*hubtest.Agent, *designRuntime) {
+	t.Helper()
+	d := newDesignRuntime(t, probe)
 	var id string
 	a := s.NewAgent(d.handler(&id))
 	a.Hello.Features = append(append([]string{}, a.Hello.Features...), hubproto.FeatureDesignAccess)

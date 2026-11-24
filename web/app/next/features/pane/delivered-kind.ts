@@ -4,6 +4,7 @@ export const DELIVERED_VIEW = {
   zip: 'zip',
   image: 'image',
   pdf: 'pdf',
+  model: 'model',
   video: 'video',
   audio: 'audio',
   sheet: 'sheet',
@@ -52,6 +53,7 @@ export const deliveredViewOf = (path: string): DeliveredView | null => {
   const ext = extOf(path);
   if (ARCHIVES.has(ext) || /\.tar\.gz$/i.test(path)) return DELIVERED_VIEW.zip;
   if (FONTS.has(ext)) return DELIVERED_VIEW.font;
+  if (ext === 'glb') return DELIVERED_VIEW.model;
   if (ext === 'pdf') return DELIVERED_VIEW.pdf;
   if (IMAGES.has(ext)) return DELIVERED_VIEW.image;
   if (VIDEOS.has(ext)) return DELIVERED_VIEW.video;

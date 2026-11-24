@@ -76,10 +76,21 @@ func TestHubTelemetryTarget(t *testing.T) {
 	if got := withHubTelemetry(context.Background(), cfg, log, getenv); got != log {
 		t.Fatal("no target: the log must stay as it was")
 	}
-	env["HARNESSLY_TELEMETRY_URL"] = "http://127.0.0.1:1/batch/"
+	received := make(chan struct{}, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		received <- struct{}{}
+	}))
+	defer server.Close()
+	env["HARNESSLY_TELEMETRY_URL"] = server.URL
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if got := withHubTelemetry(ctx, cfg, log, getenv); got == log {
 		t.Fatal("a target set: the hub's errors must be reported")
+	}
+	cancel()
+	select {
+	case <-received:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the final heartbeat was not flushed")
 	}
 }

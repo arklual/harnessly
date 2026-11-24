@@ -16,17 +16,15 @@ func TestDesignShareFailsClosedOnAnUnsafeRuntime(t *testing.T) {
 	s := hubtest.New(t, hubtest.Env("HUB_DESIGN_SHARE_URL", "http://"+shareHost))
 	owner := s.SignIn("owner@example.com")
 	space, _ := owner.NewSpace("Studio")
-	a, d := designMachine(t, s, owner, space)
+
 	var unsafe atomic.Bool
 	unsafe.Store(true)
-	d.api.L = design.New(design.Config{LibraryDir: d.root, ReleasesDir: t.TempDir(), Texts: design.Texts{Tag: "harnessly-design", CLI: "harnessly"},
-		ShareProbe: func(dir string) design.ShareFSReport {
-			if unsafe.Load() {
-				return design.ShareFSReport{Steps: []design.ShareFSStep{{ID: "dotdot", Code: design.ShareFSDotDot}}, Hint: design.ShareFSHint}
-			}
-			return design.ProbeShareFS(dir)
-		}})
-	t.Cleanup(d.api.L.StopWatching)
+	a, _ := designMachineWithProbe(t, s, owner, space, func(dir string) design.ShareFSReport {
+		if unsafe.Load() {
+			return design.ShareFSReport{Steps: []design.ShareFSStep{{ID: "dotdot", Code: design.ShareFSDotDot}}, Hint: design.ShareFSHint}
+		}
+		return design.ProbeShareFS(dir)
+	})
 	base := "/m/" + a.MachineID + "/api/platform/design/access"
 	created(a, "shop", "owner@example.com")
 	s.Eventually("the project recorded", func() bool {

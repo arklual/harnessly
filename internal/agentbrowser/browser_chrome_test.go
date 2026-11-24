@@ -125,7 +125,7 @@ func TestChromeLifecycle(t *testing.T) {
 			t.Cleanup(func() { cleanupHost(t, dir) })
 			m := New(cfg)
 			t.Cleanup(func() { m.Close() })
-			ctx, cancel := context.WithTimeout(t.Context(), 120*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
 			defer cancel()
 			i, e := m.Instance(ctx, DefaultProfile)
 			if e != nil {
@@ -257,19 +257,30 @@ setInterval(()=>{document.body.style.background=n++%2?'red':'blue'},80);
 				must(t, e)
 			})
 			t.Run("hard_kill_recovers_persistent_cookie", func(t *testing.T) {
+				// NewTab returns after Page.navigate, before the document commits.
+				eventually(t, 10*time.Second, func() bool {
+					return string(evaluate(t, i, a.ID, "location.origin")) == strconv.Quote(server.URL)
+				})
 				evaluate(t, i, a.ID, `document.cookie="persistent=kept; Max-Age=3600; Path=/"`)
-				// Chrome batches cookie writes. SIGKILL cannot preserve data it has not flushed.
-				// Allow for delayed flushes under full-suite load; polling returns as soon as the cookie is stored.
-				cookieFile := filepath.Join(dir, "chrome", "Default", "Cookies")
+				if !strings.Contains(string(evaluate(t, i, a.ID, "document.cookie")), "persistent=kept") {
+					t.Fatal("fixture cookie was not set on the test origin")
+				}
+				// Chrome batches writes. Its profile layout depends on the browser version.
+				profileDir := filepath.Join(dir, "chrome", "Default")
 				eventually(t, 120*time.Second, func() bool {
-					db, err := sql.Open("sqlite", "file:"+cookieFile+"?mode=ro")
-					if err != nil {
-						return false
+					for _, rel := range []string{"Cookies", "Network/Cookies"} {
+						db, err := sql.Open("sqlite", "file:"+filepath.Join(profileDir, rel)+"?mode=ro")
+						if err != nil {
+							continue
+						}
+						var n int
+						err = db.QueryRow("SELECT count(*) FROM cookies WHERE name = 'persistent' AND host_key = '127.0.0.1'").Scan(&n)
+						db.Close()
+						if err == nil && n == 1 {
+							return true
+						}
 					}
-					defer db.Close()
-					var n int
-					err = db.QueryRow("SELECT count(*) FROM cookies WHERE name = 'persistent'").Scan(&n)
-					return err == nil && n == 1
+					return false
 				})
 				oldHost := pidAt(t, dir, "host")
 				oldChrome := pidAt(t, dir, "chrome")

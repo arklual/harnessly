@@ -1,6 +1,7 @@
 // The open chat's right pane over the machine: the header's button, the tabs and what each shows. A tab is the
 // launcher, the side chat (questions about this chat, the agent is not disturbed), an own terminal of the chat (a shell
 // the machine keeps until the tab closes it) or a browser tab with its own history. Only tools the machine really has are offered; the rest of the design's list waits for its API.
+import { copyWriter } from '@/next/offline/client';
 import { WordedError } from '@/next/core/net/worded';
 import { requestFilePlace } from '@/next/features/pane/file-place';
 import {
@@ -392,22 +393,29 @@ export const FilesTab = ({
       );
     };
     if (delivered) return undefined;
+    const write = copyWriter();
     if (tab.file)
-      readFile(conv.machineId, conv.id, tab.path, abort.signal).then(
-        (file) =>
-          done({
-            listing: null,
-            file,
-            initial: draftOf(tab.id, tab.path) ?? {
-              text: file.content,
-              base: file.content,
-              revision: file.revision,
-            },
-            error: null,
-            retry: false,
-          }),
-        fail,
-      );
+      readFile(conv.machineId, conv.id, tab.path, abort.signal).then((file) => {
+        if (!abort.signal.aborted && /\.(md|markdown|txt|html?)$/i.test(tab.path)) {
+          void write?.(
+            ['file', conv.machineId, conv.id, tab.path],
+            tab.path.split('/').pop() ?? tab.path,
+            /\.html?$/i.test(tab.path) ? 'html' : 'text',
+            new Blob([file.content]),
+          ).catch(() => undefined);
+        }
+        done({
+          listing: null,
+          file,
+          initial: draftOf(tab.id, tab.path) ?? {
+            text: file.content,
+            base: file.content,
+            revision: file.revision,
+          },
+          error: null,
+          retry: false,
+        });
+      }, fail);
     else
       listFolder(conv.machineId, conv.id, tab.path, abort.signal).then(
         (listing) => done({ listing, file: null, initial: null, error: null, retry: false }),

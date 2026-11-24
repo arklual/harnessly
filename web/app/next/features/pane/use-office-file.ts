@@ -1,5 +1,6 @@
 // An office file open in the pane and edited in place: its book read from the disk, the save that follows an edit by a moment,
 // the file changing under the edits (they go on top when they can), and the file read again when the agent writes it.
+import { copyWriter } from '@/next/offline/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MachineId } from '@/next/protocol/v2';
 import { FileConflict, fileRevision, saveFileBytes } from '@/next/features/pane/sheet/file-bytes';
@@ -42,11 +43,20 @@ export const useOfficeFile = <TBook, TBase>({ machine, path, src, kind }: IUseOf
 
   const readDisk = useCallback(
     async (signal?: AbortSignal) => {
+      const write = copyWriter();
       const res = await fetch(src, { credentials: 'same-origin', signal, cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return new Uint8Array(await res.arrayBuffer());
+      const buffer = await res.arrayBuffer();
+      if (!signal?.aborted && !res.redirected)
+        void write?.(
+          ['office', machine, path],
+          path.split('/').pop() ?? path,
+          /\.ppt[mx]$/i.test(path) ? 'pptx' : 'docx',
+          new Blob([buffer]),
+        ).catch(() => undefined);
+      return new Uint8Array(buffer);
     },
-    [src],
+    [src, path, machine],
   );
 
   const put = useCallback((next: TBook, rev: string, nextBase: TBase) => {

@@ -14,6 +14,7 @@
   },
   "include": [
     "vite.config.ts",
+    "vite.offline.ts",
     "vite.compiler.ts",
     "vite.whats-new.ts",
     "vite.bridge.config.ts",

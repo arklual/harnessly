@@ -1,5 +1,5 @@
 // Web push for the agent app: shows a notification for a push, brings the clicked conversation to the front and
-// keeps the app icon badge honest. It caches nothing and answers no page requests, so a release never meets a stale shell.
+// keeps the app icon badge honest. The offline reader has a separate versioned cache.
 // The worker lives next to the app (its directory is its scope), so the same file serves any base path.
 
 const BASE = new URL('./', self.location.href).pathname;
@@ -9,8 +9,54 @@ const PUSH_NAV_KEY = `${BASE}_push-pending`;
 const isWebKit =
   /AppleWebKit/.test(self.navigator.userAgent) && !/Chrome|Chromium|Edg\//.test(self.navigator.userAgent);
 
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+const offline = /* offline manifest */ null;
+const cachePrefix = 'hx-reader:' + encodeURIComponent(BASE) + ':';
+const readerCache = cachePrefix + offline?.version;
+const readerFiles = new Set(offline?.files.map((file) => BASE + file));
+const readerUrl = new URL(BASE + 'offline.html', self.location.origin).href;
+
+self.addEventListener('install', (event) =>
+  event.waitUntil(
+    (async () => {
+      if (offline) {
+        const cache = await caches.open(readerCache);
+        await cache.addAll(
+          [...readerFiles].map((path) => new Request(path, { cache: 'reload', redirect: 'error' })),
+        );
+      }
+      await self.skipWaiting();
+    })(),
+  ),
+);
+self.addEventListener('activate', (event) =>
+  event.waitUntil(
+    (async () => {
+      for (const name of await caches.keys())
+        if (name.startsWith(cachePrefix) && name !== readerCache) await caches.delete(name);
+      await self.clients.claim();
+    })(),
+  ),
+);
+self.addEventListener('fetch', (event) => {
+  if (!offline || event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin || !url.pathname.startsWith(BASE)) return;
+  if (readerFiles.has(url.pathname) && !url.search) {
+    event.respondWith(
+      caches
+        .open(readerCache)
+        .then(async (cache) => (await cache.match(event.request)) ?? fetch(event.request)),
+    );
+    return;
+  }
+  const route = url.pathname.slice(BASE.length);
+  if (
+    event.request.mode === 'navigate' &&
+    event.request.destination === 'document' &&
+    /^(?:|c\/[^/]+|designly(?:\/(?!invite$)[^/]+)?)$/.test(route)
+  )
+    event.respondWith(fetch(event.request).catch(() => Response.redirect(readerUrl)));
+});
 
 const windows = () => self.clients.matchAll({ type: 'window', includeUncontrolled: true });
 const isTop = (client) => client.frameType !== 'nested';

@@ -1,6 +1,8 @@
 // A file that is not text, in the pane: a zip's contents with each file to save, a picture or a PDF as it is, a video or
 // a sound in the player, any other file with its name and the way to save it. Used for what the agent handed over and for any such file the pane opens.
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { boundedBlob } from '@/next/offline/file';
+import { copyWriter } from '@/next/offline/client';
 import Icon from '@/next/ui/icon';
 import Swap from '@/next/ui/swap';
 import LoadFailed from '@/next/ui/load-failed';
@@ -35,6 +37,7 @@ export interface IDeliveredViewProps {
   tools: ReactNode;
 }
 
+const loadModel = () => import('./model-view');
 const loadPdfView = () => import('@/next/features/pane/pdf/pdf-view');
 const loadSheetView = () => import('@/next/features/pane/sheet/sheet-view');
 const loadDocxView = () => import('@/next/features/pane/docx/docx-view');
@@ -136,9 +139,30 @@ const DeliveredView = ({ conv, machine, path, view, crumbs, onCrumb, tools }: ID
     changes === 0
       ? chatPreviewUrl(machine, conv, path)
       : `${chatPreviewUrl(machine, conv, path)}&v=${changes}`;
+  useEffect(() => {
+    if (!reads) return;
+    const write = copyWriter();
+    if (!write) return;
+    const controller = new AbortController();
+    async function keep() {
+      const response = await fetch(src, { signal: controller.signal, redirect: 'error' });
+      const mime = response.headers.get('content-type')?.split(';')[0];
+      if (!mime || !/^(image\/(?!svg)|video\/|audio\/|application\/pdf$)/.test(mime)) {
+        await response.body?.cancel();
+        return;
+      }
+      const body = await boundedBlob(response, controller.signal);
+      if (!controller.signal.aborted) await write?.(['file', machine, conv, path], name, 'media', body);
+    }
+    void keep().catch(() => undefined);
+    return () => controller.abort();
+  }, [reads, src, machine, conv, path, name]);
   return (
     <div className="hx-tv hx-deliv" data-tool="disk" data-view={view}>
       <PaneHead lead={<Crumbs items={crumbs} onPick={onCrumb} />} tools={tools}>
+        {view === DELIVERED_VIEW.model && (
+          <LazyView load={loadModel} props={{ src, path, machine, conv }} title={name} fallback={null} />
+        )}
         {view === DELIVERED_VIEW.zip && <ZipContents machine={machine} path={path} />}
         {view === DELIVERED_VIEW.image && (
           <ImageStage key={path} src={src} name={name} onSelection={onSelection} markTo={conv} />

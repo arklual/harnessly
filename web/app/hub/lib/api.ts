@@ -239,7 +239,15 @@ export const createApi = (fetcher: Fetcher = (input, init) => fetch(input, init)
       passkeyBegin: () => post<{ challengeId: string; publicKey: unknown }>('/api/auth/passkey/login/begin'),
       passkeyFinish: (challengeId: string, credential: unknown) =>
         post<SignedIn>('/api/auth/passkey/login/finish', { challengeId, credential }),
-      logout: () => post<void>('/api/auth/logout'),
+      logout: async () => {
+        await post<void>('/api/auth/logout');
+        try {
+          for (const key of Object.keys(localStorage))
+            if (key.startsWith('hx-offline-person:')) localStorage.removeItem(key);
+        } catch {
+          /* Storage blocked. */
+        }
+      },
     },
 
     me: {

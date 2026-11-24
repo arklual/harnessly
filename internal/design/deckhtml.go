@@ -84,6 +84,18 @@ const deckSnapshotJS = `(async () => {
 
   document.querySelectorAll('canvas').forEach((c) => { try { c.setAttribute('data-snapshot', c.toDataURL('image/png')); } catch (e) {} });
   const root = document.documentElement.cloneNode(true);
+  // Keep the hit regions of links between prototype pages. The exported boards stay script-free.
+  const links = [];
+  for (const anchor of document.querySelectorAll('a[href]')) {
+    const href = anchor.getAttribute('href').trim();
+    if (href.length > 600 || !(/^sinopia:page\//i.test(href) || (/\.dc\.html(?:[?#]|$)/i.test(href) && !/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href)))) continue;
+    for (const rect of anchor.getClientRects()) {
+      if (rect.width > 0 && rect.height > 0) links.push([href,rect.left+scrollX,rect.top+scrollY,rect.width,rect.height]);
+      if (links.length >= 500) break;
+    }
+    if (links.length >= 500) break;
+  }
+  root.setAttribute('data-offline-links', encodeURIComponent(JSON.stringify(links)));
   root.querySelectorAll('script,noscript,template,link,style,base,iframe,object,embed,[data-tk-library-bar]').forEach((n) => n.remove());
   root.querySelectorAll('meta[http-equiv]').forEach((n) => n.remove());
   const head = root.querySelector('head') || root.insertBefore(document.createElement('head'), root.firstChild);
@@ -147,6 +159,8 @@ html,body{margin:0;height:100%%;background:#0b0b0d;overflow:hidden;font:13px sys
 #st{position:fixed;left:0;top:0;transform-origin:0 0}
 .f{position:absolute;left:0;top:0;border:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s ease-out}
 .f[data-on]{opacity:1}
+.hotspot{position:absolute;background:transparent;border:0;cursor:pointer}
+.hotspot:focus-visible{outline:2px solid Highlight}
 #bar{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;align-items:center;gap:12px;padding:10px;opacity:0;transition:opacity .25s ease-out}
 body:hover #bar,#bar:focus-within{opacity:1}
 #bar button{font:inherit;color:#fff;background:rgba(255,255,255,.14);border:0;border-radius:8px;padding:6px 12px;cursor:pointer}
@@ -159,8 +173,35 @@ const deckViewerTail = `</div><div id="bar"><button id="p" type="button" aria-la
 var fs=[].slice.call(document.querySelectorAll('.f')),st=document.getElementById('st'),n=document.getElementById('n'),at=0;
 function fit(){var f=fs[at],w=+f.getAttribute('data-w'),h=+f.getAttribute('data-h'),s=Math.min(innerWidth/w,innerHeight/h);
 st.style.width=w+'px';st.style.height=h+'px';st.style.transform='translate('+(innerWidth-w*s)/2+'px,'+(innerHeight-h*s)/2+'px) scale('+s+')';}
+function hotspots(f){
+  st.querySelectorAll('.hotspot').forEach(function(b){b.remove()});
+  // Only the serialized hit regions are needed; parsing the entire snapshot would decode every embedded image.
+  var raw=(f.getAttribute('srcdoc')||'').match(/<html\b[^>]*?\sdata-offline-links="([^"]*)"/i);
+  if(!raw)return;
+  var links;try{links=JSON.parse(decodeURIComponent(raw[1]))}catch(e){return}
+  if(!Array.isArray(links))return;
+  links.slice(0,500).forEach(function(link){
+    if(!Array.isArray(link)||typeof link[0]!=='string'||!link.slice(1).every(Number.isFinite))return;
+    var href=link[0],to;
+    try{
+      if(/^sinopia:page\//i.test(href)){
+        var name=decodeURIComponent(href.slice(13).split(/[?#]/)[0]);
+        to=fs.findIndex(function(page){return page.title===name||page.dataset.path===name||page.dataset.path.replace(/\.dc\.html$/i,'')===name});
+      }else{
+        var url=new URL(href,new URL(f.dataset.path,'https://offline.invalid/'));
+        if(url.origin!=='https://offline.invalid')return;
+        var path=decodeURIComponent(url.pathname.slice(1));
+        to=fs.findIndex(function(page){return page.dataset.path===path});
+      }
+    }catch(e){return}
+    if(to<0)return;
+    var b=document.createElement('button');b.className='hotspot';b.setAttribute('aria-label',fs[to].title||fs[to].dataset.path);
+    ['left','top','width','height'].forEach(function(prop,k){b.style[prop]=link[k+1]+'px'});
+    b.onclick=function(){go(to)};st.appendChild(b);
+  });
+}
 function go(i){at=Math.max(0,Math.min(fs.length-1,i));fs.forEach(function(f,k){if(k===at)f.setAttribute('data-on','');else f.removeAttribute('data-on');});
-n.textContent=(at+1)+' / '+fs.length;fit();try{history.replaceState(null,'','#'+(at+1));}catch(e){}}
+n.textContent=(at+1)+' / '+fs.length;hotspots(fs[at]);fit();try{history.replaceState(null,'','#'+(at+1));}catch(e){}}
 document.getElementById('p').onclick=function(){go(at-1)};document.getElementById('x').onclick=function(){go(at+1)};
 document.getElementById('z').onclick=function(){if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()};
 addEventListener('keydown',function(e){var k=e.key;if(k==='ArrowRight'||k==='PageDown'||k===' ')go(at+1);else if(k==='ArrowLeft'||k==='PageUp')go(at-1);else if(k==='Home')go(0);else if(k==='End')go(fs.length-1);else if(k==='f'||k==='F')document.getElementById('z').click();else return;e.preventDefault()});
@@ -178,8 +219,8 @@ func deckSnapshot() string {
 
 // deckFrame is a slide's frame. The page in it is only to be looked at: the frame has no right to run a script.
 func deckFrame(sl deckSlideSrc, page string) string {
-	return fmt.Sprintf(`<iframe class="f" sandbox="" data-w="%d" data-h="%d" title="%s" srcdoc="%s"></iframe>`, sl.W, sl.H,
-		html.EscapeString(sl.Title), srcdocEscape.Replace(page))
+	return fmt.Sprintf(`<iframe class="f" sandbox="" data-w="%d" data-h="%d" data-path="%s" title="%s" srcdoc="%s"></iframe>`, sl.W, sl.H,
+		html.EscapeString(sl.Path), html.EscapeString(sl.Title), srcdocEscape.Replace(page))
 }
 
 func deckViewerOpen(title string) string {

@@ -2,6 +2,8 @@
 // timeline (scene3d-timeline.tsx), and the panel on the right that folds away (objects, pins, draft frames, checks). The
 // viewer itself (three.js, viewer.ts) is loaded when a model is ready. A pin is an object, a point on its surface, the
 // view and the frame; a click on it takes the camera back; its composer is a popover by the point.
+import { copyWriter } from '@/next/offline/client';
+import { limit as offlineLimit } from '@/next/offline/storage';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { t } from '@/next/i18n';
 import { platformPath, runtimePath } from '@/next/core/net/machine';
@@ -207,7 +209,16 @@ const Scene3dView = (props: IScene3dViewProps) => {
       });
       viewer.current = v;
       try {
-        await v.load(modelUrl(machine, id, hash), abort.signal);
+        const write = copyWriter();
+        await v.load(modelUrl(machine, id, hash), abort.signal, (bytes) => {
+          if (write && bytes.byteLength <= offlineLimit)
+            void write(
+              ['scene', machine, id],
+              props.title,
+              'model',
+              new Blob([bytes], { type: 'model/gltf-binary' }),
+            ).catch(() => undefined);
+        });
         if (!live) return;
         setFrame(meta.start);
         setLoaded(true);
@@ -227,7 +238,7 @@ const Scene3dView = (props: IScene3dViewProps) => {
       viewer.current = null;
       setLoaded(false);
     };
-  }, [machine, id, hash, stableMeta]);
+  }, [machine, id, hash, stableMeta, props.title]);
 
   useEffect(() => {
     viewer.current?.setPins(pins, activePin);

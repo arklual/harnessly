@@ -171,8 +171,12 @@ export class SceneViewer {
 
   // ---- loading
 
-  async load(url: string, signal?: AbortSignal): Promise<void> {
-    const gltf = await new GLTFLoader().loadAsync(url);
+  async load(url: string, signal?: AbortSignal, onLoaded?: (bytes: ArrayBuffer) => void): Promise<void> {
+    const response = await fetch(url, { signal });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const bytes = await response.arrayBuffer();
+    const gltf = await new GLTFLoader().parseAsync(bytes, new URL('.', new URL(url, location.href)).href);
+    if (!this.disposed && !signal?.aborted && !response.redirected) onLoaded?.(bytes);
     if (this.disposed || signal?.aborted) return;
     this.model.add(gltf.scene);
     gltf.scene.traverse((o) => {

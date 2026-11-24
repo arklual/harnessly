@@ -5,6 +5,7 @@
 import '@/next/styles/order';
 
 import { useEffect } from 'react';
+import { offlineBase } from '@/next/offline/client';
 import Shell, { type IShellProps } from '@/next/bindings/shell';
 import { bootNext, shutdownNext } from '@/next/boot';
 import { installPhoneFocusGuard } from '@/next/ui/phone-focus-guard';
@@ -14,6 +15,10 @@ const NextEntry = (props: IShellProps) => {
   // the boot finds who is signed in by itself (me), so a late owner is no other person.
   useEffect(() => {
     void bootNext();
+    if (import.meta.env.PROD && 'serviceWorker' in navigator)
+      void navigator.serviceWorker
+        .register(offlineBase + 'sw.js', { scope: offlineBase })
+        .catch(() => undefined);
     return () => void shutdownNext();
   }, []);
   // A sheet on the phone never raises the keyboard by itself: only a tap on its field does.

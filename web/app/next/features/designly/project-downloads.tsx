@@ -2,6 +2,7 @@
 // «Ещё», a page's row in the list of pages and its tab — in the right pane, the full view and the editing one; on a
 // phone it is a bottom sheet (MenuPanel). Each download is a job of the machine (deck/exports.ts) that ends in the
 // browser's download. The whole project as a ZIP is for those who may change it.
+import { offlineDownload } from './offline-download';
 import { Menu } from '@base-ui/react/menu';
 import { Fragment, type ReactElement } from 'react';
 import Icon from '@/next/ui/icon';
@@ -14,6 +15,7 @@ import { DECK_EXPORT, type TDeckExport } from '@/next/features/designly/deck/typ
 export interface IProjectDownloadsOf {
   machine: MachineId;
   artifact: string;
+  title?: string;
   /** The page on screen (its board's path or id); null where there is none. */
   board: string | null;
   /** The whole project as a ZIP: set where the person may change it. */
@@ -107,6 +109,7 @@ export const projectDownloads = (
     sep: items.length > 0,
     pick: () => run(of, DECK_EXPORT.pdf),
   });
+  items.push(...offlineDownload(of.machine, of.artifact, of.title ?? of.artifact));
   if (of.archives) items.push(bundleDownload(of));
   if (of.archives && of.transfer) items.push(transferDownload(of.transfer));
   return items;

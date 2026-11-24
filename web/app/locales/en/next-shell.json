@@ -1,4 +1,10 @@
 {
+  "next.offline.library": "Offline library",
+  "next.offline.save": "Save for offline viewing",
+  "next.offline.preparing": "Preparing offline copy…",
+  "next.offline.saved": "Available in the offline library",
+  "next.offline.account": "Open your workspace online first",
+  "next.offline.large": "Offline copies are limited to 32 MiB",
   "next.sidebar.label": "Navigation",
   "next.sidebar.actions": "Actions",
   "next.sidebar.newChat": "New chat",

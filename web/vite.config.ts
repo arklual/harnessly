@@ -6,6 +6,7 @@ import react from '@vitejs/plugin-react';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
+import { offlineReader } from './vite.offline';
 import { reactCompiler } from './vite.compiler';
 import { WHATS_NEW_ENTRIES, whatsNewTexts } from './vite.whats-new';
 
@@ -279,6 +280,7 @@ export default defineConfig({
     collectShell(),
     orderShellStyles(),
     pdfAssets(),
+    offlineReader(),
   ],
   resolve: {
     alias: {

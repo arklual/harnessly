@@ -2,6 +2,7 @@
 // outbox of the confirmed person, machines and one socket per machine. A different person on this page is a clean
 // start: nothing of the previous one stays in memory, and an outbox is never sent under another's name.
 
+import { confirmOfflineOwner } from '@/next/offline/client';
 import { startPrefsSync } from '@/next/stores/synced-prefs';
 import { useSyncExternalStore } from 'react';
 import { pageClock } from '@/next/core/clock';
@@ -162,6 +163,7 @@ const withinCacheWait = (ready: Promise<void>) =>
   Promise.race([ready, new Promise<void>((r) => pageClock().setTimeout(r, CACHE_WAIT_MS))]);
 
 const signOut = (me: MeState): BootState => {
+  confirmOfflineOwner(null);
   persistence?.stop();
   persistence = null;
   clearPersonData();
@@ -174,6 +176,7 @@ const signOut = (me: MeState): BootState => {
 /** The person me confirmed: their cache and outbox (a different person than the hint is a clean start). */
 async function adopt(me: Extract<MeState, { k: 'ready' }>, openKV: (person: string) => KV): Promise<void> {
   const person = personKey(me.me);
+  confirmOfflineOwner(person);
   if (persistence?.person === person) {
     await persistence.enableOutbox();
   } else {

@@ -1,6 +1,7 @@
 // An open design as the design draws it (.hx-site): a browser with the design's pages in tabs, its bar — history,
 // the address with the pages, the device and size, more — and the page itself in the chosen viewport, in a case when
 // the device has one. The page is the board on the machine's library server, opened in a preview slot of its own.
+import BoardFrames, { PROTOTYPE_FRAME_CAPACITY } from './board-frames';
 import { useLiveHint, useLiveMark } from '@/next/features/voice-live/live-mark';
 import { tourSignal } from '@/next/stores/tour';
 import { ChatTerminalSlotContext } from '@/next/features/terminal/chat-terminal';
@@ -219,6 +220,8 @@ export interface ISiteViewProps {
   /** The board's address for the frame; null while the slot opens. */
   src: string | null;
   /** The board's last saved revision, shown under a thin «Открываем правку…» while the editing frame opens. */
+  frameScope?: string;
+  nextFrame?: string | null;
   heldSrc?: string | null;
   /** The same board at an address the slot lets in without a ticket (its cookie is set); the frames of «Обзор» use it. */
   plainSrc?: string | null;
@@ -425,6 +428,8 @@ const SiteView = ({
   tabs,
   tab,
   src,
+  frameScope,
+  nextFrame,
   heldSrc = null,
   plainSrc = null,
   phoneUrl = null,
@@ -1473,6 +1478,7 @@ const SiteView = ({
   const saving = downloads
     ? projectDownloads({
         ...downloads,
+        title,
         board: pages.some((p) => p.path === pagePath) ? pagePath : null,
       })
     : [];
@@ -2155,14 +2161,14 @@ const SiteView = ({
                                 }
                               >
                                 {src !== null && (
-                                  <iframe
-                                    key={frameKey}
-                                    ref={frameRef}
-                                    className="hx-site__iframe"
+                                  <BoardFrames
+                                    key={frameScope ?? frameKey}
+                                    nextFrame={nextFrame}
+                                    capacity={frameScope ? PROTOTYPE_FRAME_CAPACITY : 1}
+                                    frameRef={frameRef}
                                     src={src}
-                                    allow="clipboard-write"
                                     title={page?.name ?? title}
-                                    onLoad={() => {
+                                    ready={() => {
                                       loadedKey.current = frameKey;
                                       setLoadedFor(frameKey);
                                       ping();

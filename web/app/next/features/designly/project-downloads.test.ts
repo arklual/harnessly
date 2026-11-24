@@ -20,9 +20,15 @@ describe('the downloads of a project', () => {
       'page-html',
       'page-png',
       'all-pdf',
+      'offline-copy',
+      'offline-library',
       'bundle',
     ]);
-    expect(projectDownloads({ ...of, board: null, archives: false }).map((i) => i.id)).toEqual(['all-pdf']);
+    expect(projectDownloads({ ...of, board: null, archives: false }).map((i) => i.id)).toEqual([
+      'all-pdf',
+      'offline-copy',
+      'offline-library',
+    ]);
     expect(projectDownloads(of, DOWNLOAD_UNIT.scene)[0].label).toBe('This scene — PDF');
   });
 
