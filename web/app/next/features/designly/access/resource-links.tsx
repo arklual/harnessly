@@ -114,7 +114,7 @@ export const useLinksScreen = ({
         return;
       }
       // The copy starts in the press (a browser keeps the permission of the click for it) and takes the address once made.
-      const made = createLink(target, inputOf(form, ctx));
+      const made = createLink(target, inputOf(form, ctx), ctx.staticSnapshot);
       const copy = copyText(made.then((answer) => answer.url));
       let link: IAccessLink;
       try {

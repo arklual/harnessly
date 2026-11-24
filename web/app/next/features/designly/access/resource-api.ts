@@ -183,12 +183,22 @@ const urlOf = (answer: unknown): string | null => {
   return typeof url === 'string' ? url : null;
 };
 
+// Leave time for the Hub to finish its bounded publication and return the new address.
+const SNAPSHOT_PUBLICATION_MS = 55 * 60 * 1000;
+
 /** Makes a link; the answer has its address, the one moment it is surely known. */
 export const createLink = async (
   ref: IResourceRef,
   input: ILinkInput,
+  staticSnapshot = false,
 ): Promise<{ link: IAccessLink; url: string }> => {
-  const answer = await send('POST', `${at(ref)}/links`, input);
+  const answer = await send(
+    'POST',
+    `${at(ref)}/links`,
+    input,
+    undefined,
+    staticSnapshot ? SNAPSHOT_PUBLICATION_MS : undefined,
+  );
   const url = urlOf(answer);
   if (url === null) throw new AccessError(t('next.failure.http'), 'unknown', 0);
   return { link: linkOf(answer), url };

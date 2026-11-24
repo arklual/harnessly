@@ -12,12 +12,17 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
 // StaticPrefix addresses immutable snapshots on the Hub. It never reaches a runtime.
 const StaticPrefix = "/guest/design/"
+
+// The standard ingress has a one-hour read timeout. Return a definite publication result before it.
+const staticPublicationTimeout = 50 * time.Minute
+
 const maxStaticBoards = 64
 const maxStaticPage = 2 << 20
 const maxStaticBundle = 16 << 20

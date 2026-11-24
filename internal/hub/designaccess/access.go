@@ -660,6 +660,11 @@ func linkRights(v any) (string, error) {
 
 func (s *Service) createLink(r *http.Request, m store.Machine, email, project string) (any, int, error) {
 	ctx := r.Context()
+	if s.staticGuests {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, staticPublicationTimeout)
+		defer cancel()
+	}
 	b, err := readBody(r)
 	if err != nil {
 		return nil, 0, err

@@ -189,7 +189,12 @@ func (s *Service) machineFetch(ctx context.Context, machine string, req hubproto
 	if s.transport == nil {
 		return nil, errNoMachine
 	}
-	res, err := (&http.Client{Transport: s.transport(machine), Timeout: fetchTimeout, CheckRedirect: func(*http.Request, []*http.Request) error {
+	timeout := fetchTimeout
+	if req.Capture && len(segs) == 2 && segs[0] == "__raster" {
+		// A board render can wait 45s for Chrome. Allow startup and transfer of its bounded image.
+		timeout = 75 * time.Second
+	}
+	res, err := (&http.Client{Transport: s.transport(machine), Timeout: timeout, CheckRedirect: func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
 	}}).Do(out)
 	if err != nil {

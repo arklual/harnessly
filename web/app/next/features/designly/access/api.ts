@@ -178,10 +178,11 @@ export const send = async (
   path: `/${string}`,
   body?: unknown,
   signal?: AbortSignal,
+  timeoutMs = TIMEOUT_MS,
 ): Promise<unknown> => {
   const ctl = new AbortController();
   signal?.addEventListener('abort', () => ctl.abort());
-  const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
   let res: Response;
   try {
     res = await fetch(gatewayPath(path), {
