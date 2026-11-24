@@ -24,9 +24,7 @@ var inheritedKeys = map[string]bool{
 	"WAYLAND_DISPLAY": true, "XDG_RUNTIME_DIR": true, "TZ": true,
 }
 
-// A login shell builds PATH itself from its rc files; it is given only this floor (and the pane bin folder in front),
-// so version-manager shims land in the same order as in the person's own terminal. The local install folders are in
-// it because non-root Linux profiles may keep the PATH they were given.
+// Login shells can add their own version-manager paths to this system search path.
 const loginShellBasePath = "/usr/local/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 func shQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
@@ -64,6 +62,14 @@ func (t *Tmux) shellEnv() [][2]string {
 	path := loginShellBasePath
 	if t.cfg.PaneBinDir != "" {
 		path = t.cfg.PaneBinDir + ":" + path
+	}
+	// Personal CLI installers commonly use ~/.local/bin. A login shell may preserve the
+	// PATH it receives, even when its interactive rc file leaves this directory out.
+	if home := vals["HOME"]; filepath.IsAbs(home) && !strings.ContainsRune(home, os.PathListSeparator) {
+		personal := filepath.Join(home, ".local", "bin")
+		if personal != t.cfg.PaneBinDir {
+			path += string(os.PathListSeparator) + personal
+		}
 	}
 	set("PATH", path)
 	out := make([][2]string, len(keys))

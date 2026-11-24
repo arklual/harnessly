@@ -622,7 +622,7 @@ func TestShellLaunchCommandEnvironment(t *testing.T) {
 	}
 	lines := strings.Split(string(out), "\n")
 	want := []string{
-		"/app/bin/pane:/usr/local/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin", "unset", "/test/socket",
+		"/app/bin/pane:" + loginShellBasePath + ":" + filepath.Join(dir, ".local", "bin"), "unset", "/test/socket",
 		"/machine/kube config's.yaml", "/machine/identity", "proxy.example:443", "xterm-256color", "C",
 	}
 	if !reflect.DeepEqual(lines, want) {
