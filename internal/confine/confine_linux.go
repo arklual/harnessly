@@ -149,6 +149,9 @@ func Exec(r Rules, argv []string) error {
 			}
 		}
 	}
+	// The restrictions apply to the calling OS thread. Keep the helper on that
+	// thread through exec. If setup fails, its caller exits the helper.
+	runtime.LockOSThread()
 	if err := unix.Prctl(unix.PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0); err != nil {
 		return fmt.Errorf("sandbox: no_new_privs: %v", err)
 	}
