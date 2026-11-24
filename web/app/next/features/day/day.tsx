@@ -512,7 +512,7 @@ const DayStage = ({ app, feed, onGreet, clockNow = Date.now, machine = null, onT
         result = await actOnItem(feed, id, ACTION.take);
       } else {
         result = await actOnItem(feed, id, ACTION.feedback, { verdict: chip.kind });
-        told = t(chip.kind === CHIP.done ? 'next.day.told.done' : 'next.day.told.notMine');
+        told = chip.told ?? t(chip.kind === CHIP.done ? 'next.day.told.done' : 'next.day.told.notMine');
         setItem(null);
       }
       toast(told, { tone: 'success' });

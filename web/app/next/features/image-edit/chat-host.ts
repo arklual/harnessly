@@ -6,6 +6,9 @@ import { listJobs } from '@/next/features/chat/image-jobs';
 import { chainVersions, CUT_MODE } from '@/next/features/image-edit/chain';
 import {
   EDIT_MODE,
+  drawsTransparent,
+  imageProviderName,
+  isImageProvider,
   type ImageProvider,
   type IEditProgress,
   type IImageEdit,
@@ -55,7 +58,7 @@ const decodeSnapshot = (
     .map((image) => (isRecord(image) && typeof image.path === 'string' ? image.path : ''))
     .filter((path) => path !== '');
   return {
-    provider: doc.provider === 'antigravity' || doc.provider === 'codex' ? doc.provider : undefined,
+    provider: isImageProvider(doc.provider) ? doc.provider : undefined,
     id: doc.id,
     state: doc.state,
     paths,
@@ -66,12 +69,15 @@ const decodeSnapshot = (
 
 export const chatImageHost = (chat: IChatImages): IImageEditHost => ({
   opensLatest: true,
+  machine: chat.machine,
 
   start: async (edit: IImageEdit) => {
-    if (edit.provider === 'antigravity' && edit.mode === EDIT_MODE.cut)
-      throw new Error(t('next.imageEdit.noTransparency'));
+    const provider = edit.provider ?? 'codex';
+    if (!drawsTransparent(provider) && edit.mode === EDIT_MODE.cut)
+      throw new Error(t('next.imageEdit.noTransparencyOf', { name: imageProviderName(provider) }));
     const body = {
-      provider: edit.provider ?? 'codex',
+      provider,
+      ...(edit.model ? { model: edit.model } : {}),
       source: edit.from.id,
       mode: edit.mode,
       prompt: edit.prompt,

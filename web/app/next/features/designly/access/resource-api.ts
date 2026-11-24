@@ -70,6 +70,7 @@ export interface IResourceView {
   requests?: IResourceRequest[];
   /** Links without sign-in, for those who run the access; absent from a gateway before stage «г». */
   links?: IAccessLink[];
+  staticGuestSnapshots?: boolean;
   myRequest: { id: string; level: 'comment' | 'edit'; status: 'open' | 'allowed' | 'denied' } | null;
 }
 

@@ -73,9 +73,10 @@ import {
   inScope,
   initialOf,
   type TDesignScope,
+  designAccessLabel,
 } from '@/next/features/designly/owners';
 import type { IAppKind } from '@/next/features/app-catalog/api';
-import type { DesignlyDeck, DesignlyVideo, DesignOwner, MachineId } from '@/next/protocol/v2';
+import type { DesignArtifact, DesignlyDeck, DesignlyVideo, DesignOwner, MachineId } from '@/next/protocol/v2';
 import { plural, t } from '@/next/i18n';
 import { formatAgoFull } from '@/next/i18n/format';
 import '@/next/styles/designly.css';
@@ -91,7 +92,7 @@ const KINDS = [
   DESIGN_KIND.ds,
 ] as const;
 
-export interface IDesignCard {
+export interface IDesignCard extends Pick<DesignArtifact, 'role' | 'accessSource' | 'accessUntil'> {
   id: string;
   title: string;
   boards: number;
@@ -751,6 +752,9 @@ const DesignCard = memo(
             <Icon name={designIcon(card)} size="sm" />
             {cardSub(card, now)}
           </span>
+          {(card.accessSource || card.role) && (
+            <span className="hx-dl-card__access">{designAccessLabel(card)}</span>
+          )}
         </span>
         {card.owner && (
           <span
@@ -854,7 +858,7 @@ const DesignlyHome = ({
     if (cards === null) return null;
     const list = cards.filter(
       (c) =>
-        inScope(scope, c.owner) &&
+        inScope(scope, c.owner, c.accessSource) &&
         (!q || c.title.toLowerCase().includes(q)) &&
         matchesFilters(c, filters, now) &&
         (searching || !organizer || (c.folder ?? '') === here),
@@ -906,7 +910,7 @@ const DesignlyHome = ({
       const card = cards.find((c) => c.id === id);
       const matches =
         card !== undefined &&
-        inScope(scope, card.owner) &&
+        inScope(scope, card.owner, card.accessSource) &&
         (!q || card.title.toLowerCase().includes(q)) &&
         matchesFilters(card, filters, now);
       const way = routeToCard(card, {

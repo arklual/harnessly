@@ -58,6 +58,28 @@
   justify-content: space-between;
   gap: 8px;
 }
+.hx-imagegen__row {
+  flex-wrap: wrap;
+}
+.hx-imagegen__row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+.hx-imagegen__row select {
+  max-width: 190px;
+}
+.hx-imagegen__price {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-imagegen__price[data-failed='1'] {
+  color: var(--hx-danger);
+}
 .hx-imagegen__acts {
   display: inline-flex;
   align-items: center;

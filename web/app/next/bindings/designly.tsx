@@ -34,7 +34,7 @@ import { useLinkRestored } from '@/next/stores/connection';
 import { useConversationList } from '@/next/stores/conversations';
 import { bindDesignConv } from '@/next/bindings/design-conv';
 import { designKey } from '@/next/features/designly/design-conv';
-import { watchLibrary } from '@/next/features/designly/library-watch';
+import { LIBRARY_SAFETY_MS, watchLibrary } from '@/next/features/designly/library-watch';
 import type { Conversation, MachineId } from '@/next/protocol/v2';
 import { goTo, ROUTE } from '@/next/routes/routes';
 import { toast } from '@/next/ui/toast';
@@ -90,6 +90,9 @@ const cardOf = (
     pinned: design.pinned,
     drawing: isDrawing(design, working),
     owner: design.owner ?? null,
+    role: design.role,
+    accessSource: design.accessSource,
+    accessUntil: design.accessUntil,
     canDelete: design.role === undefined ? design.owner?.me === true : DELETERS.has(design.role),
     folder: layout.placed[design.id] ?? null,
     system: layout.systems[design.id] ?? null,
@@ -181,9 +184,8 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
 
   const drawing = designs?.some((d) => isDrawing(d, working)) ?? false;
   useEffect(() => {
-    if (!drawing) return;
-    // The hub says when the library changed; without it, the timer as before.
-    return watchLibrary(machine, load, DRAWING_POLL_MS);
+    // A new grant can arrive while an empty library is open. Only active drawing needs the fast fallback.
+    return watchLibrary(machine, load, drawing ? DRAWING_POLL_MS : LIBRARY_SAFETY_MS);
   }, [drawing, load, machine]);
 
   const forget = useCallback((ids: string[]) => {
@@ -232,8 +234,10 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
 
   // On the hub's copy a project opens read-only from the store: its first board, in a tab of its own.
   const openCopy = (id: string): boolean => {
-    if (storeCopy === null) return false;
-    const board = designs?.find((d) => d.id === id)?.boards[0];
+    const project = designs?.find((d) => d.id === id);
+    // A recorded Hub project opens in Sinopia, where the normal reader selects its live or stored copy.
+    if (storeCopy === null || project?.accessSource) return false;
+    const board = project?.boards[0];
     if (!board) {
       toast(t('next.designly.copyNoBoards'), { tone: 'error' });
       return true;

@@ -539,6 +539,10 @@
   "next.designly.scopes.all": "Все",
   "next.designly.scopes.mine": "Мои",
   "next.designly.scopes.shared": "Общие",
+  "next.designly.access.person": "Личный доступ",
+  "next.designly.access.team": "Через команду",
+  "next.designly.access.link": "По ссылке",
+  "next.designly.access.until": "До {when}",
   "next.designly.owner": "Автор: {name}",
   "next.designly.search": "Найти в библиотеке",
   "next.designly.new": "Создать",
@@ -1156,6 +1160,7 @@
   "next.font.sample": "Съешь же ещё этих мягких французских булок",
   "next.font.field": "Текст образца шрифта {name}",
   "next.font.failed": "Шрифт не открылся",
+  "next.editor.changedOnDisk": "Файл изменился на диске, пока вы его правили. Ваш текст не тронут.",
   "next.editor.reload": "Загрузить с диска",
   "next.editor.overwrite": "Сохранить поверх",
   "next.editor.dismiss": "Закрыть",
@@ -1775,5 +1780,12 @@
   "next.folderSuggest.otherFolder": "Другая папка",
   "next.folderSuggest.other": "Папки",
   "next.designly.kinds.scene3d": "3D-сцена",
-  "next.designly.kindsDesc.scene3d": "Опиши сцену: агент соберёт её в Blender"
+  "next.designly.kindsDesc.scene3d": "Опиши сцену: агент соберёт её в Blender",
+  "next.pictures.position": "{at} / {of}",
+  "next.pictures.all": "Все",
+  "next.pictures.prev": "Предыдущая картинка",
+  "next.pictures.next": "Следующая картинка",
+  "next.pictures.strip": "Все картинки по порядку",
+  "next.pictures.close": "Закрыть",
+  "next.pictures.carousel": "галерея"
 }

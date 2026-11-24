@@ -198,10 +198,168 @@ func TestSharedInviteFromTeammatesMachine(t *testing.T) {
 	if grant := mustView(t, r, r.mate)["board"]; !grant.See || grant.Edit {
 		t.Fatalf("grant = %+v", grant)
 	}
+	if err := r.svc.write(ctx, r.mate, func(tx *txn) error {
+		_, role, until, err := tx.acceptInvite(token, r.mateU.Email)
+		if err != nil {
+			return err
+		}
+		if role != roleView || until == nil || until.After(tx.now.Add(time.Hour)) {
+			t.Fatalf("repeat: %s %v", role, until)
+		}
+		var uses int
+		if err := tx.q.QueryRow(ctx, "SELECT uses FROM design_invites WHERE id=?", id).Scan(&uses); err != nil {
+			return err
+		}
+		if uses != 1 {
+			t.Fatalf("repeat consumed %d uses", uses)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 	if err := r.svc.write(ctx, r.mate, func(tx *txn) error { return tx.revokeInvite("board", r.ownerU.Email, id) }); err != nil {
 		t.Fatal(err)
 	}
+	if got := mustView(t, r, r.mate)["board"]; got.See {
+		t.Fatalf("revoked membership survives: %+v", got)
+	}
 	if err := r.svc.write(ctx, r.stranger, func(tx *txn) error { _, _, _, err := tx.acceptInvite(token, r.strangeU.Email); return err }); err == nil {
 		t.Fatal("revoked invite accepted")
+	}
+}
+
+func TestLegacyInviteAcceptanceRemainsVisibleDuringRollingUpdate(t *testing.T) {
+	ctx := context.Background()
+	r := newSpaceRig(t, true)
+	owner, recipient := r.ownerU.Email, r.mateU.Email
+	if _, err := r.svc.registerCreated(ctx, r.owner, "board", owner); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.svc.write(ctx, r.owner, func(tx *txn) error {
+		if err := tx.setTeam("board", owner, levelNone); err != nil {
+			return err
+		}
+		id, token, expires, err := tx.createInvite("board", owner, inviteInput{Role: roleView, TTL: ttl{step: time.Hour}, RoleTTL: ttl{none: true}})
+		if err != nil {
+			return err
+		}
+		// Model the previous binary accepting an unscoped link after the schema upgrade.
+		if _, err := tx.q.Exec(ctx, `UPDATE design_invites SET team_id=NULL, uses=1 WHERE id=?`, id); err != nil {
+			return err
+		}
+		if _, err := tx.q.Exec(ctx, `INSERT INTO design_members (machine_id,project_id,person_email,role,granted_by,granted_at,via_invite)
+			VALUES(?,?,?,?,?,?,?)`, tx.key("board"), "board", recipient, roleView, owner, ms(tx.now), id); err != nil {
+			return err
+		}
+		_, role, until, err := tx.acceptInvite(token, recipient)
+		if err != nil {
+			return err
+		}
+		if role != roleView || until == nil || ms(*until) != ms(expires) {
+			t.Fatalf("legacy grant: %s, %v; want %s, %v", role, until, roleView, expires)
+		}
+		var uses int
+		if err := tx.q.QueryRow(ctx, `SELECT uses FROM design_invites WHERE id=?`, id).Scan(&uses); err != nil {
+			return err
+		}
+		if uses != 1 {
+			t.Fatalf("legacy grant consumed %d uses", uses)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInvitedRoleFallsBackToIndependentGrant(t *testing.T) {
+	ctx := context.Background()
+	r := newSpaceRig(t, true)
+	if _, err := r.svc.registerCreated(ctx, r.owner, "board", r.ownerU.Email); err != nil {
+		t.Fatal(err)
+	}
+	err := r.svc.write(ctx, r.owner, func(tx *txn) error {
+		owner, recipient := r.ownerU.Email, r.mateU.Email
+		if err := tx.setTeam("board", owner, levelNone); err != nil {
+			return err
+		}
+		if err := tx.grant("board", owner, recipient, roleView, ttl{none: true}, false); err != nil {
+			return err
+		}
+		id, token, _, err := tx.createInvite("board", owner, inviteInput{Role: roleEdit, TTL: ttl{step: time.Hour}, RoleTTL: ttl{none: true}})
+		if err != nil {
+			return err
+		}
+		if _, _, _, err = tx.acceptInvite(token, recipient); err != nil {
+			return err
+		}
+		p, err := tx.lockProject("board")
+		if err != nil {
+			return err
+		}
+		check := func(wantRole, wantSource string) {
+			t.Helper()
+			f, err := tx.fold(p, recipient)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if f.Role != wantRole || f.Source != wantSource {
+				t.Fatalf("access %+v, want %s via %s", f, wantRole, wantSource)
+			}
+		}
+		check(roleEdit, "link")
+		now := tx.now
+		tx.now = tx.now.Add(2 * time.Hour)
+		check(roleView, "person")
+		tx.now = now
+		if err = tx.revokeInvite("board", owner, id); err != nil {
+			return err
+		}
+		check(roleView, "person")
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTeamInvitationChecksMembershipAfterFirstOpen(t *testing.T) {
+	ctx := context.Background()
+	r := newSpaceRig(t, true)
+	st := r.db.S()
+	team := store.Team{SpaceID: r.owner.SpaceID, Slug: "readers", Name: "Readers"}
+	if err := st.CreateTeam(ctx, &team); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AddTeamMember(ctx, team.ID, r.mateU.ID, false, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.svc.registerCreated(ctx, r.owner, "board", r.ownerU.Email); err != nil {
+		t.Fatal(err)
+	}
+	err := r.svc.write(ctx, r.owner, func(tx *txn) error {
+		if err := tx.setTeam("board", r.ownerU.Email, levelNone); err != nil {
+			return err
+		}
+		_, token, _, err := tx.createInvite("board", r.ownerU.Email, inviteInput{Role: roleView, TTL: ttl{step: time.Hour}, RoleTTL: ttl{none: true}, Team: team.ID})
+		if err != nil {
+			return err
+		}
+		if _, _, _, err := tx.acceptInvite(token, r.strangeU.Email); err == nil {
+			t.Fatal("outsider accepted team invitation")
+		}
+		_, _, _, err = tx.acceptInvite(token, r.mateU.Email)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !mustView(t, r, r.mate)["board"].See {
+		t.Fatal("eligible recipient cannot read")
+	}
+	if err := st.RemoveTeamMember(ctx, team.ID, r.mateU.ID); err != nil {
+		t.Fatal(err)
+	}
+	if mustView(t, r, r.mate)["board"].See {
+		t.Fatal("recipient still has team link after leaving team")
 	}
 }

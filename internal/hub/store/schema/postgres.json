@@ -1105,6 +1105,317 @@
         "slug"
       ]
     },
+    "bus_events": {
+      "columns": [
+        {
+          "name": "seq",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "owner_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "org_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "connection",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "ext",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "fingerprint",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "received_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "actor",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "url",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "thread",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "ref",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "mine",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "facts",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "via",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "machine_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "space_id",
+          "type": "text"
+        },
+        {
+          "name": "visibility",
+          "type": "text"
+        }
+      ],
+      "primaryKey": [
+        "seq"
+      ],
+      "indexes": [
+        {
+          "name": "bus_events_fingerprint",
+          "unique": true,
+          "columns": [
+            "owner_id",
+            "fingerprint"
+          ]
+        },
+        {
+          "name": "bus_events_id",
+          "unique": true,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "bus_events_org",
+          "columns": [
+            "org_id",
+            "seq"
+          ]
+        },
+        {
+          "name": "bus_events_owner",
+          "columns": [
+            "owner_id",
+            "seq"
+          ]
+        },
+        {
+          "name": "bus_events_received",
+          "columns": [
+            "received_at"
+          ]
+        },
+        {
+          "name": "bus_events_space",
+          "columns": [
+            "space_id",
+            "seq"
+          ]
+        }
+      ]
+    },
+    "bus_seq": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "n",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ]
+    },
+    "bus_subscriptions": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "owner_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "consumer",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "filter",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "cursor",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "failures",
+          "type": "integer",
+          "notNull": true
+        },
+        {
+          "name": "last_error",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "retry_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "created_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "bus_subscriptions_name",
+          "unique": true,
+          "columns": [
+            "owner_id",
+            "consumer",
+            "name"
+          ]
+        },
+        {
+          "name": "bus_subscriptions_owner",
+          "columns": [
+            "owner_id",
+            "consumer"
+          ]
+        }
+      ]
+    },
+    "bus_triggers": {
+      "columns": [
+        {
+          "name": "owner_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "connection",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "mode",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "seen",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "first_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "last_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "updated_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "owner_id",
+        "source",
+        "connection",
+        "type"
+      ]
+    },
     "catalog_items": {
       "columns": [
         {
@@ -1569,6 +1880,42 @@
         }
       ]
     },
+    "design_invite_acceptances": {
+      "columns": [
+        {
+          "name": "invite_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "person_email",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "granted_at",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "expires_at",
+          "type": "bigint",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "invite_id",
+        "person_email"
+      ],
+      "indexes": [
+        {
+          "name": "design_invite_recipient",
+          "columns": [
+            "person_email"
+          ]
+        }
+      ]
+    },
     "design_invites": {
       "columns": [
         {
@@ -1632,6 +1979,10 @@
           "name": "created_at",
           "type": "bigint",
           "notNull": true
+        },
+        {
+          "name": "team_id",
+          "type": "text"
         }
       ],
       "primaryKey": [
@@ -2011,6 +2362,44 @@
             "link_id"
           ]
         }
+      ]
+    },
+    "design_static_pages": {
+      "columns": [
+        {
+          "name": "link_id",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "rev",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "position",
+          "type": "bigint",
+          "notNull": true
+        },
+        {
+          "name": "board",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "notNull": true
+        },
+        {
+          "name": "jpeg",
+          "type": "text",
+          "notNull": true
+        }
+      ],
+      "primaryKey": [
+        "link_id",
+        "position"
       ]
     },
     "design_team_grants": {

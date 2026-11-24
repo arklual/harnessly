@@ -50,6 +50,7 @@ type teamGrant struct {
 }
 
 type folded struct {
+	Source    string
 	Role      string // "" when the project is closed to the person
 	Until     *time.Time
 	CanManage bool
@@ -58,42 +59,41 @@ type folded struct {
 
 func foldAccess(p project, m *member, grants []teamGrant, person personTeams, homeOrg string, now time.Time) folded {
 	if p.Owner != "" && p.Owner == person.email {
-		return folded{Role: roleOwner, CanManage: true}
+		return folded{Role: roleOwner, Source: "owner", CanManage: true}
 	}
-	own := ""
-	if m != nil && live(m.Expires, now) {
-		own = m.Role
+	var f folded
+	offer := func(role, source string, until *time.Time) {
+		if role == "" || role == levelNone || !live(until, now) {
+			return
+		}
+		if rank(role) > rank(f.Role) || (role == f.Role && f.Until != nil && (until == nil || until.After(*f.Until))) {
+			f.Role, f.Source, f.Until = role, source, until
+		}
 	}
 	teamOn := p.TeamLevel != levelNone
 	_, inHome := person.teams[p.HomeTeam]
-	if p.HomeTeam == "" {
-		inHome = true
-	}
-	shared := ""
-	if teamOn && inHome {
-		shared = p.TeamLevel
+	if inHome || p.HomeTeam == "" {
+		offer(p.TeamLevel, "team", nil)
 	}
 	for _, g := range grants {
-		if _, in := person.teams[g.Team]; !in || !live(g.Expires, now) {
+		if _, in := person.teams[g.Team]; !in {
 			continue
 		}
-		r := g.Role
-		if r == roleEdit && g.CanShare {
-			r = roleManage
+		role := g.Role
+		if role == roleEdit && g.CanShare {
+			role = roleManage
 		}
-		shared = stronger(shared, r)
+		offer(role, "team", g.Expires)
 	}
-	role := stronger(own, shared)
-	ownWins := own != "" && (shared == "" || rank(own) > rank(shared))
-	byRole := role == roleManage || (role == roleEdit && p.EditorsCanShare)
-	steward := false
-	if teamOn && p.HomeTeam != "" {
-		steward = person.teams[p.HomeTeam].lead || (homeOrg != "" && person.admin[homeOrg])
+	if m != nil {
+		source := "person"
+		if m.ViaInvite != "" {
+			source = "link"
+		}
+		offer(m.Role, source, m.Expires)
 	}
-	f := folded{Role: role, CanManage: byRole || steward, Steward: steward}
-	if ownWins && m != nil {
-		f.Until = m.Expires
-	}
+	f.Steward = teamOn && p.HomeTeam != "" && (person.teams[p.HomeTeam].lead || (homeOrg != "" && person.admin[homeOrg]))
+	f.CanManage = f.Steward || f.Role == roleManage || (f.Role == roleEdit && p.EditorsCanShare)
 	return f
 }
 

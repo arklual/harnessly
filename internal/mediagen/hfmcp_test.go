@@ -272,3 +272,18 @@ func TestResultURLsSkipInputsAndThumbnails(t *testing.T) {
 		t.Fatalf("%v", got)
 	}
 }
+
+// The answer of job_status for a picture as Higgsfield's MCP gave it live: the small webp beside the picture.
+func TestResultURLsTakeThePictureNotItsSmallCopy(t *testing.T) {
+	var data any
+	raw := `{"generation":{"id":"857329c9","model":"z_image","results":{"minUrl":"https://cdn.example/hf_1_min.webp","rawUrl":"https://cdn.example/hf_1.png"},"status":"completed","type":"image"}}`
+	if err := json.Unmarshal([]byte(raw), &data); err != nil {
+		t.Fatal(err)
+	}
+	if got := resultURLs(data, false); len(got) != 1 || got[0] != "https://cdn.example/hf_1.png" {
+		t.Fatalf("got %v", got)
+	}
+	if st, _ := findStr(data, "status"); mcpStatus(st) != "completed" {
+		t.Fatalf("status %q", st)
+	}
+}

@@ -661,7 +661,8 @@ export function useShellModel(): IShellModel {
   const shownFavorites = shared ? shared.favorites : machineFavorites;
   const favorites = layoutKnown ? shownFavorites : null;
   const listedProjects = useProjects(here);
-  // with the person's hub-projects switch on, the registry's projects of the machines that sleep join the list.
+  // with the person's hub-projects switch on, the registry's projects of the other machines join the list, one
+  // row a name: a project is the person's, whichever machine its folder is on.
   const hubProjects = useHubProjects();
   const builtProjects = useMemo(() => {
     if (!convs || sharedWaits) return null;
@@ -669,6 +670,7 @@ export function useShellModel(): IShellModel {
       return withHubProjects(
         shared.projects.map((p) => ({ id: p.id, name: p.name })).sort((a, b) => a.name.localeCompare(b.name)),
         hubProjects,
+        (machineId, projectId) => projectIndex?.has(`${machineId}/${projectId}`) === true,
       );
     return withHubProjects(
       projectsOf(
@@ -677,7 +679,7 @@ export function useShellModel(): IShellModel {
       ),
       hubProjects,
     );
-  }, [convs, sharedWaits, shared, here, listedProjects, hubProjects]);
+  }, [convs, sharedWaits, shared, here, listedProjects, hubProjects, projectIndex]);
   // a frame of one chat rebuilds the lists; the rows of the chats it did not touch keep their items.
   const chats = useKeptItems(builtChats, chatKey);
   const projects = useKeptItems(builtProjects, projectKey);

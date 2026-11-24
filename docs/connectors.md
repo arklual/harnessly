@@ -155,11 +155,11 @@ these fields, e.g. `{"trigger": {"source": "feed", "filter": {"connection": "cx1
 nothing; the events wait in the outbox.
 
 **The inbox** (`harnessly-inbox`, `POST /api/ingest`), only for a connector whose `Spec.Inbox` names a kind the inbox
-takes today (`mail`, `calendar`, `telegram`). The runtime finds the inbox as the installed app whose start-page view
+takes today (`mail`, `calendar`, `telegram`, and since harnessly-inbox 0.10.12 `webhook`, `feed`, `folder`). The runtime finds the inbox as the installed app whose start-page view
 is a day feed signed in by the machine (`feedSecret`, `docs/apps/day-feed.md`) and posts to `/api/ingest` of the feed's
 origin with that token: `{source: {kind, label: account}, signals: [{fingerprint, itemKey, kind: type, actor, title,
-url, at, mine}]}` — without `excerpt`. A new kind for the inbox (`rss`, `webhook`, `chat`) needs the inbox to list it
-in its `PushKinds` first; until then leave `Inbox` empty. The Python collectors of the inbox are not touched by this.
+url, at, mine}]}` — without `excerpt`. A new kind for the inbox needs the inbox to list it in its `PushKinds` first; until then leave `Inbox` empty. The
+incoming webhook (`webhook`), RSS (`feed`) and folder (`folder`) send theirs since harnessly-inbox 0.10.12. The Python collectors of the inbox are not touched by this.
 
 ## Tools and actions
 
@@ -207,6 +207,15 @@ the secret in the address), for any JSON the title and link fields (`data.title`
 Client Secret. The page shows once the address and the secret to give the service; «Reissue» makes a new secret,
 «Disconnect» revokes the address. The machine must be linked to a hub: the address is the hub's.
 
+**Registered by itself (GitHub, GitLab; HRN-1727).** The form also takes where to register (`owner/repo`,
+`group/project`, `group:<path>` on GitLab, `org:<name>` on GitHub), the service's address for an own GitLab or GitHub
+Enterprise, and a token that may add webhooks there (GitLab: Maintainer of the project, Owner of a group; GitHub:
+`admin:repo_hook`, `admin:org_hook`). Given them, the connection puts its address at the service itself with the
+events the preset reads (GitLab: push, merge requests, pipelines, notes, issues, releases; GitHub: pull requests and
+their reviews, issues and comments, check suites, workflow runs, push, releases), signed with its secret; once an hour
+it looks for the webhook there and puts it back if it is gone; removing the connection takes it off. A refused token is
+said on the page (the source's error), never the token. Without a token the address is given by hand, as before.
+
 **The address and where the body is.** `https://<hub>/api/platform/automations/hook/m/<machine>/<connection>` (with
 `/<secret>` when the secret is in the address): the hub's automation hook, next to `/hook`, not a second receiver of
 its own. The hub keeps nothing of the request and does not know the secret: it checks the shape of the address,
@@ -234,6 +243,33 @@ name) stays on the machine: the hub drops it. A rule: `{"trigger": {"source": "w
 
 **Reads.** `harnessly connector read <connection> events [limit=20]` — the latest requests: when, kind, title, link
 and id; `… event id=<id>` — one whole, the body as the service sent it. Both come as untrusted data. No actions.
+
+## MCP recipe (`internal/connectors/mcprecipe`)
+
+A service connected through MCP that gives no events — only tools — becomes a source by a **recipe**: which
+read-only tool to call, with which arguments, where the list is in the answer and which fields of a thing are its id,
+time, author, title, link. An agent writes the recipe once, when the service is connected (it reads the server's tools
+and calls the one that lists things, then maps its answer); from then on the runtime polls by itself, with no model in
+the loop.
+
+```json
+{"trigger": "generation.done", "tool": "list_jobs", "args": {"status": "done", "since": "{{cursor}}"},
+ "items": "data.jobs", "id": "id", "at": "done_at", "actor": "", "title": "prompt", "url": "link",
+ "thread": "", "cursor": "done_at", "every": "5m"}
+```
+
+- **Connect.** Settings → Connections → Feeds → «MCP recipe»: the MCP server (a choice of the connected ones) and
+  the recipe. The check is a dry run: the tool is called once and the form shows how many things it found and the
+  first one — what the events will look like.
+- **Only reads.** A tool the server marks destructive never runs; one it does not mark read-only is refused unless
+  the person allows it in the form.
+- **The answer** is the tool's `structuredContent`, else its first text content read as JSON; paths are dotted
+  (`data.items`, `items.0.id`); a time is RFC 3339 or Unix seconds or milliseconds. `{{cursor}}` in a string argument
+  is the greatest value of the field `cursor` seen so far ("" on the first poll).
+- **Events.** `feed.item`, one per thing not seen before, its id `<trigger>:<thing's id>`, the facts `trigger` and
+  `server`. The first poll gives none: it learns what is there, so connecting a service does not pour its past into
+  the digest. Every `every` (1m–24h, 10m by default). They go to the hub's journal and the inbox (`feed`) like any
+  connector's, and each recipe is a trigger of its own in the catalog (`/events` → «Триггеры»).
 
 ## Folder (`internal/connectors/folder`)
 

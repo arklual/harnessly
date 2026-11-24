@@ -75,7 +75,8 @@ func (a *api) launchTable() []entry {
 	add := func(pattern string, shadow bool, h handler) {
 		t = append(t, entry{segments: segs(pattern), shadow: shadow, handle: h})
 	}
-	add(p+"/conversations", true, a.conversations)
+	add(p+"/conversations", true, func(c *call) { a.conversations(c, false) })
+	add(p+"/conversations/opus-first", false, func(c *call) { a.conversations(c, true) })
 	add(p+"/automations/start", false, a.automationStart)
 	add(p+"/docs/deliver", false, a.docsDeliver)
 	add(p+"/docs/resolve-pane", false, a.docsResolvePane)
@@ -108,10 +109,14 @@ func (a *api) start(c *call, o launch.Options) *jsvalue.Object {
 	return r.Conversation
 }
 
-// GET, POST <platform>/conversations
-func (a *api) conversations(c *call) {
+// GET, POST <platform>/conversations; POST <platform>/conversations/opus-first for a machine-selected model.
+func (a *api) conversations(c *call, opusFirst bool) {
 	if !a.d.Session(c.r) {
 		c.fail(403, "Forbidden")
+		return
+	}
+	if opusFirst && c.r.Method != "POST" {
+		c.methodNotAllowed("POST")
 		return
 	}
 	switch c.r.Method {
@@ -132,10 +137,24 @@ func (a *api) conversations(c *call) {
 		}
 		model, _ := c.field("model")
 		effort, _ := c.field("effort")
-		choice, refusal := a.d.Agents.ValidateLaunch(provider, model, effort)
-		if refusal != "" {
-			c.fail(400, refusal)
-			return
+		var choice *agents.Launch
+		var refusal string
+		if opusFirst {
+			if provider != agents.Claude {
+				c.fail(400, msgUnknownAgent.String())
+				return
+			}
+			choice, refusal = a.d.Agents.SelectOpusFirst()
+			if refusal != "" {
+				c.fail(http.StatusServiceUnavailable, refusal)
+				return
+			}
+		} else {
+			choice, refusal = a.d.Agents.ValidateLaunch(provider, model, effort)
+			if refusal != "" {
+				c.fail(400, refusal)
+				return
+			}
 		}
 		prompt, _ := c.field("prompt")
 		o := launch.Options{Provider: provider, WorkspaceID: wsID, Prompt: optionalString(prompt), Launch: choice}

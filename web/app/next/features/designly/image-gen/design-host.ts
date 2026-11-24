@@ -10,6 +10,8 @@ import {
   EDIT_MODE,
   type IEditProgress,
   type IImageEdit,
+  drawsTransparent,
+  imageProviderName,
   type IImageEditHost,
   type IImageVersion,
 } from '@/next/features/image-edit/host';
@@ -89,12 +91,15 @@ export const designImageHost = (p: IDesignPicture): IImageEditHost => {
   };
 
   return {
+    machine: p.machine,
     start: async (edit) => {
-      if (edit.provider === 'antigravity' && edit.mode === EDIT_MODE.cut)
-        throw new Error(t('next.imageEdit.noTransparency'));
+      const provider = edit.provider ?? 'codex';
+      if (!drawsTransparent(provider) && edit.mode === EDIT_MODE.cut)
+        throw new Error(t('next.imageEdit.noTransparencyOf', { name: imageProviderName(provider) }));
       const started = await startDesignEdit(p.machine, {
         artifact: p.artifact,
-        provider: edit.provider ?? 'codex',
+        provider,
+        ...(edit.model ? { model: edit.model } : {}),
         source: edit.from.id,
         mode: edit.mode,
         prompt: edit.prompt,

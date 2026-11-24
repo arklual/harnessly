@@ -1,9 +1,9 @@
 // The word that the settings' journal or the agents' proposals moved on a machine (cmd/runtime: settings-watch,
-// HRN-1270): one held request per machine, however many readers, and only while the page is visible. A reader reads
+// HRN-1270): one request per machine, however many readers, and only while the page is visible. A reader reads
 // its list again when the tick moves, instead of asking every few seconds. A machine that has no such address (an
 // older runtime) is ticked now and then, so its readers still see what changed.
 import { useCallback, useSyncExternalStore } from 'react';
-import { getPage } from '@/next/core/net/http';
+import { getPage, SHORT_POLL_MS, usesHttp1 } from '@/next/core/net/http';
 import { platformPath, runtimePath } from '@/next/core/net/machine';
 import { answer, isRefused, str } from '@/next/features/settings/platform-answer';
 import type { MachineId } from '@/next/protocol/v2';
@@ -42,9 +42,10 @@ const readRev = answer((o) => str(o.rev, 'rev'));
 const run = async (machine: MachineId): Promise<void> => {
   const entry = entryOf(machine);
   if (entry.running) return;
+  const shortPoll = usesHttp1();
   entry.running = true;
   while (entry.listeners.size > 0 && document.visibilityState === 'visible') {
-    const query = entry.rev === null ? '' : `?rev=${encodeURIComponent(entry.rev)}`;
+    const query = shortPoll || entry.rev === null ? '' : `?rev=${encodeURIComponent(entry.rev)}`;
     const res = await getPage(
       runtimePath(platformPath(`/settings-watch${query}`), machine),
       readRev,
@@ -64,6 +65,13 @@ const run = async (machine: MachineId): Promise<void> => {
     const moved = entry.rev !== null && entry.rev !== res.value;
     entry.rev = res.value;
     if (moved) move(entry);
+    if (shortPoll) {
+      entry.timer = setTimeout(() => {
+        entry.timer = null;
+        void run(machine);
+      }, SHORT_POLL_MS);
+      break;
+    }
   }
   entry.running = false;
 };

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -41,6 +42,8 @@ const (
 const (
 	ScopeRead   = "read"
 	ScopePrompt = "prompt"
+	// ScopeEvents lets a token read the journal of events at every level its person may (docs/hub/event-bus.md).
+	ScopeEvents = "events"
 )
 
 // SwitchGate answers whether a rollout switch is on for a person (machine "" is any machine).
@@ -196,7 +199,7 @@ func (s *Service) deviceShow(w http.ResponseWriter, r *http.Request, p *Principa
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"client": d.Client, "device": d.Device, "ip": c.IP, "expiresAt": httpx.Time(c.ExpiresAt),
-		"scopes": []string{ScopeRead, ScopePrompt},
+		"scopes": []string{ScopeRead, ScopePrompt, ScopeEvents},
 	})
 	return nil
 }
@@ -225,10 +228,9 @@ func (s *Service) deviceApprove(w http.ResponseWriter, r *http.Request, p *Princ
 	if in.Allow {
 		d.State = "approved"
 		d.Scopes = []string{ScopeRead}
-		for _, sc := range in.Scopes {
-			if sc == ScopePrompt {
-				d.Scopes = append(d.Scopes, ScopePrompt)
-				break
+		for _, sc := range []string{ScopePrompt, ScopeEvents} {
+			if slices.Contains(in.Scopes, sc) {
+				d.Scopes = append(d.Scopes, sc)
 			}
 		}
 		if in.Scopes == nil {

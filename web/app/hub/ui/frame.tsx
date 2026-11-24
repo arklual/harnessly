@@ -15,11 +15,13 @@ export interface PlainPageProps {
   title?: string;
   /** The right side of the head. */
   side?: ReactNode;
+  /** A page of tables and lists that needs the width of the window (the journal of events). */
+  wide?: boolean;
 }
 
-export const PlainPage = ({ children, title, side }: PlainPageProps) => (
+export const PlainPage = ({ children, title, side, wide }: PlainPageProps) => (
   <div className="hub">
-    <div className="hub-page">
+    <div className="hub-page" data-wide={wide ? '' : undefined}>
       <header className="hub-head">
         <Brand />
         <span className="hub-headside">{side}</span>

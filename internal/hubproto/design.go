@@ -34,6 +34,7 @@ type DesignPublicTokenRequest struct {
 	Project string   `json:"project"`
 	Rev     string   `json:"rev,omitempty"`
 	Pin     bool     `json:"pin,omitempty"`
+	Capture bool     `json:"capture,omitempty"`
 	Pages   []string `json:"pages,omitempty"`
 }
 

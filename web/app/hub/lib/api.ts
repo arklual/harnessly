@@ -1,6 +1,7 @@
 // The typed client of the hub's HTTP API (docs/hub/api.md). One function per endpoint; every call answers the JSON
 // the contract names or throws an ApiError carrying the contract's error code. The screens decide by `code`, never by
 // the message.
+import { type BusEvent, type BusLevel, type BusSubscription, type BusTrigger, EVENTS_API } from './events';
 import type { NetworkPolicy } from './network';
 import type { RolloutSwitch, SwitchKey, SwitchPut } from './switches';
 import type {
@@ -260,6 +261,41 @@ export const createApi = (fetcher: Fetcher = (input, init) => fetch(input, init)
       removeIdentity: (provider: string) => del(`/api/me/identities/${enc(provider)}`),
       tokens: () => get<{ on: boolean; tokens: AppToken[] }>('/api/me/tokens'),
       revokeToken: (id: string) => del(`/api/me/tokens/${enc(id)}`),
+    },
+
+    /** The journal of events (docs/hub/event-bus.md); the live stream is an EventSource on EVENTS_API/stream. */
+    events: {
+      scopes: () => get<{ scopes: BusLevel[]; head: number }>(EVENTS_API + '/scopes'),
+      page: (q: {
+        scope: string;
+        before?: number;
+        after?: number;
+        type?: string;
+        source?: string;
+        limit?: number;
+      }) =>
+        get<{ events: BusEvent[] }>(EVENTS_API, {
+          scope: q.scope,
+          ...(q.before !== undefined ? { before: String(q.before) } : { newest: '1' }),
+          ...(q.after !== undefined ? { after: String(q.after) } : {}),
+          ...(q.type ? { type: q.type } : {}),
+          ...(q.source ? { source: q.source } : {}),
+          limit: String(q.limit ?? 200),
+        }),
+      triggers: () => get<{ triggers: BusTrigger[] }>(EVENTS_API + '/triggers'),
+      setTrigger: (t: Pick<BusTrigger, 'source' | 'connection' | 'type' | 'mode'>) =>
+        put<void>(EVENTS_API + '/triggers', t),
+      subscriptions: (hub: boolean) =>
+        get<{ subscriptions: BusSubscription[]; head: number }>(
+          EVENTS_API + '/subscriptions',
+          hub ? { owner: 'hub' } : undefined,
+        ),
+      replay: (id: string, after: number, hub: boolean) =>
+        post<void>(`${EVENTS_API}/subscriptions/${enc(id)}/replay${hub ? '?owner=hub' : ''}`, { after }),
+      pause: (id: string, paused: boolean, hub: boolean) =>
+        post<void>(
+          `${EVENTS_API}/subscriptions/${enc(id)}/${paused ? 'pause' : 'resume'}${hub ? '?owner=hub' : ''}`,
+        ),
     },
 
     device: {

@@ -30,6 +30,14 @@ type ToolSpec struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description,omitempty"`
 	InputSchema json.RawMessage `json:"inputSchema,omitempty"`
+	// Annotations are the server's hints about the tool (MCP 2025-03-26): whether it only reads, whether it destroys.
+	Annotations *ToolAnnotations `json:"annotations,omitempty"`
+}
+
+// ToolAnnotations are a tool's hints as its server gives them; nil means the server said nothing.
+type ToolAnnotations struct {
+	ReadOnlyHint    *bool `json:"readOnlyHint,omitempty"`
+	DestructiveHint *bool `json:"destructiveHint,omitempty"`
 }
 
 // caller is a server spoken to by the hub.

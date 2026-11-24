@@ -6,7 +6,7 @@ pages) to someone without an account. The hub keeps these records; the machine's
 ## Who may do what
 
 - The person who makes a project owns it. A project not stored yet answers `edit` with no right to manage it.
-- A stored project is open to the space at the deployment's team level (`HUB_DESIGN_DEFAULT_TEAM_LEVEL`, `edit` by
+- A stored project is open to the space at the deployment's team level (`HUB_DESIGN_DEFAULT_TEAM_LEVEL`, `none` by
   default) until its owner changes that (`view`, `comment`, `edit`, `none`). Editors may share; only the owner and
   managers change the team level and members.
 - The team level counts only for the people who may open the machine the project is recorded on: with
@@ -159,7 +159,7 @@ each project with what moved, each pair with its machine or why not. The agents 
 | `HUB_DESIGN_DERIVED` | off | `on`: what the hub works out from one revision of a design project (a board's page, the list of the boards, a file) is kept in the store and the database (`design_derived`) and given from there by every replica, with the blob's hash as the validator (`304`); a replica that has just started does not put the project into a folder for the first guest. Off: every replica lays the revision out, as before |
 | `HUB_DESIGN_SHARE_DOCS` | off | `on`: a document's guest link (`/d/<token>`, needs documents and their access on) opens on the share host and its aliases too, under the address it was handed out at. The page sets its own sandbox and the hub's session is not on those origins. Needs `HUB_DESIGN_SHARE_URL` |
 | `HUB_DESIGN_PLATFORM_API` | hub | Platform prefix of the runtimes, default `/api/platform` |
-| `HUB_DESIGN_DEFAULT_TEAM_LEVEL` | `edit` | Team level of a newly recorded project: `none`, `view`, `comment` or `edit` |
+| `HUB_DESIGN_DEFAULT_TEAM_LEVEL` | `none` | Team level of a newly recorded project: `none`, `view`, `comment` or `edit` |
 | `HUB_DESIGN_UNRECORDED` | `open` | `closed`: a stored project the hub has no row for goes to no other machine and only to its machine's person |
 | `HUB_DESIGN_REGISTER` | off | `dry-run` or `apply`: at start, give every stored project without a row an owner and report personal vs team. Needs `HUB_STORE` |
 | `HUB_DESIGN_IMPORT_GATEWAY` | hub | `dry-run` or `apply`: the move from the gateway at start; with `HUB_DESIGN_IMPORT_GATEWAY_URL` (its Postgres), `_SPACE`, `_TEAMS`, `_MACHINES`, `_DEFAULT_MACHINE` |
@@ -182,6 +182,10 @@ The newer «Share» dialog speaks `/m/<id><platform api>/access/design/<project>
 
 The directory lists the people and teams of the machine's space only, and nothing to someone outside every team. Other
 kinds than `design` are not answered, so the page keeps its older dialog for them.
+
+Signed-in invitations grant a role only for the lifetime of both the invitation and the recipient's grant. A team-only
+invitation also requires current membership in that team, including after the recipient first opens the link.
+Revocation and expiry do not remove independent grants. The library shows the effective role, its source and its expiry.
 
 ## Notifications
 

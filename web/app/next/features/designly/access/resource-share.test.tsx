@@ -131,6 +131,39 @@ describe('the one «Поделиться»', () => {
     expect(screen.getByRole('button', { name: t('next.access.done') })).toBeTruthy();
   });
 
+  it('keeps team invitations reachable alongside published guest links', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => json({ people: [], teams: [] })),
+    );
+    inRoot(
+      <ResourceShare
+        {...props(
+          { ...owner, links: [] },
+          {
+            links: {
+              project: 'p1',
+              onNext: vi.fn(),
+              access: {
+                role: 'owner',
+                owner: 'boss@x.ru',
+                ownerName: 'Boss',
+                team: 'none',
+                canManage: true,
+                teamInvites: true,
+                editorsCanShare: false,
+                request: null,
+              },
+            },
+          },
+        )}
+      />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: new RegExp(t('next.access.memberInvites')) }));
+    expect(await screen.findByRole('combobox', { name: t('next.access.inviteTeam') })).toBeTruthy();
+    expect(screen.queryByRole('radiogroup', { name: t('next.access.linkWho') })).toBeNull();
+  });
+
   it('turns picks into chips, takes the last one back with Backspace, and invites each with one role', async () => {
     const fetchMock = vi.fn((url: string) => {
       if (url.includes('/access/directory'))

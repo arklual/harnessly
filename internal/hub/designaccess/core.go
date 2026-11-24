@@ -38,19 +38,6 @@ func rank(r string) int {
 	return -1
 }
 
-func stronger(a, b string) string {
-	if a == "" {
-		return b
-	}
-	if b == "" {
-		return a
-	}
-	if rank(a) >= rank(b) {
-		return a
-	}
-	return b
-}
-
 var (
 	projectIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 	uuidRe      = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)

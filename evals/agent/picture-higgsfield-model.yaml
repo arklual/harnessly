@@ -1,0 +1,27 @@
+id: picture-higgsfield-model
+title: «Нарисуй через Higgsfield, моделью Nano Banana Pro» — провайдер и модель каталога MCP
+tags: [pictures]
+covers:
+  - 'internal/imagegen/tools.go'
+  - 'internal/imagegen/media.go'
+  - 'internal/mediagen/images.go'
+prompt: нарисуй через Higgsfield моделью Nano Banana Pro постер джазового фестиваля
+expect:
+  - name: drew with the picture tool
+    called: harnessly\.generate_images
+  - name: named the provider the person named
+    called: harnessly\.generate_images
+    args: {provider: '(?i)higgsfield'}
+  - name: named the model by its catalog id
+    called: harnessly\.generate_images
+    args: {model: '(?i)^nano_banana_pro$'}
+  - name: did not draw with code instead
+    not_called: Bash
+    args: {command: '(?i)PIL|python.*draw|convert .*-draw'}
+variants:
+  - id: v1
+    kind: short
+    text: "постер джаз-феста, higgsfield nano banana pro"
+  - id: v2
+    kind: english
+    text: "draw a jazz festival poster with Higgsfield, model Nano Banana Pro"

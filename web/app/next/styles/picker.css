@@ -34,6 +34,7 @@
   bottom: calc(100% + 10px);
   z-index: 10;
   width: 252px;
+  max-width: calc(100vw - 2 * var(--hx-picker-edge, 8px));
   box-sizing: content-box;
   border-radius: 18px;
   border: 1px solid var(--hx-border-strong);
@@ -828,6 +829,12 @@
   margin: 0 -10px -10px;
   padding: 10px 12px 10px;
   border-top: 1px solid var(--hx-border);
+  /* In a short window the pinned card must not swallow the screen above it: it takes at most a third of the popup and
+     scrolls inside, and the rows over it stay readable instead of hiding under it. */
+  max-height: calc(var(--hx-picker-max, 100vh) / 3);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 .hx-picker__limits .hx-gauge {
   padding: 6px 0;

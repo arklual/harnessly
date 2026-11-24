@@ -114,7 +114,7 @@ func (s *Service) dropTokens() {
 }
 
 func (s *Service) guestToken(ctx context.Context, machine string, req hubproto.DesignPublicTokenRequest) (hubproto.DesignPublicToken, error) {
-	key := fmt.Sprintf("%s\x00%s\x00%s\x00%v\x00%q", machine, req.Project, req.Rev, req.Pin, req.Pages)
+	key := fmt.Sprintf("%s\x00%s\x00%s\x00%v\x00%t\x00%q", machine, req.Project, req.Rev, req.Pin, req.Capture, req.Pages)
 	now := s.now()
 	s.mu.Lock()
 	c, ok := s.tokens[key]
@@ -223,8 +223,17 @@ func readAll(res *http.Response, max int64) ([]byte, error) {
 
 // pin takes the project's current version for a link pinned to it.
 func (s *Service) pin(ctx context.Context, m store.Machine, project string) (string, error) {
+	return s.pinWith(ctx, m, project, s.fetch)
+}
+
+// pinCapture pins the working copy whose renderer can read the revision. A store revision is not a runtime git object.
+func (s *Service) pinCapture(ctx context.Context, m store.Machine, project string) (string, error) {
+	return s.pinWith(ctx, m, project, s.machineFetch)
+}
+
+func (s *Service) pinWith(ctx context.Context, m store.Machine, project string, fetch func(context.Context, string, hubproto.DesignPublicTokenRequest, []string, *http.Request, ...string) (*http.Response, error)) (string, error) {
 	failed := fail("unavailable", "Машина владельца не ответила, версию не удалось закрепить. Попробуйте ещё раз")
-	res, err := s.fetch(ctx, m.ID, hubproto.DesignPublicTokenRequest{Project: project, Pin: true}, []string{"__rev"}, nil)
+	res, err := fetch(ctx, m.ID, hubproto.DesignPublicTokenRequest{Project: project, Pin: true}, []string{"__rev"}, nil)
 	if errors.Is(err, gUnsafeRuntime) {
 		return "", unsafeRuntime()
 	}

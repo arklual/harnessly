@@ -39,9 +39,19 @@ describe('chat image provider', () => {
     const fetcher = vi.fn();
     vi.stubGlobal('fetch', fetcher);
     await expect(host.start({ ...edit, provider: 'antigravity', mode: 'cut' })).rejects.toThrow(
-      'does not support',
+      'transparent',
     );
+    await expect(host.start({ ...edit, provider: 'higgsfield', mode: 'cut' })).rejects.toThrow('Higgsfield');
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('sends Higgsfield with its model', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 'job', state: 'running' })));
+    vi.stubGlobal('fetch', fetcher);
+    await host.start({ ...edit, provider: 'higgsfield', model: 'nano_banana_pro' });
+    const body = JSON.parse(String(fetcher.mock.calls[0][1].body));
+    expect(body.provider).toBe('higgsfield');
+    expect(body.model).toBe('nano_banana_pro');
   });
 
   it('keeps provider provenance from the snapshot', async () => {

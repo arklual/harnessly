@@ -428,7 +428,8 @@ func resultURLs(data any, allowHTTP bool) []string {
 			return
 		}
 		p := strings.ToLower(path + "." + key)
-		for _, skip := range []string{"input", "medias", "reference", "thumb", "preview", "poster", "avatar", "cover", "upload"} {
+		// minUrl is the small webp copy of a picture Higgsfield gives beside its rawUrl (seen live).
+		for _, skip := range []string{"input", "medias", "reference", "thumb", "preview", "poster", "avatar", "cover", "upload", "minurl", "min_url"} {
 			if strings.Contains(p, skip) {
 				return
 			}

@@ -432,6 +432,7 @@ const NoticeStack = ({
               <span className="hx-ns__t1">
                 <b className="hx-ns__title">{top.drop.item.title}</b>
                 <span className="hx-ns__when">{formatAgo(top.drop.item.at, minute)}</span>
+                <span className="hx-ns__rest">{t('next.smart.stack.more', { n: live.length - 1 })}</span>
               </span>
               <span className="hx-ns__text">{top.drop.item.text}</span>
             </span>
@@ -439,7 +440,6 @@ const NoticeStack = ({
           {live.slice(1, UNDER + 1).map((s, i) => (
             <span key={s.drop.item.key} className="hx-ns__under" data-depth={i + 1} aria-hidden="true" />
           ))}
-          <span className="hx-ns__rest">{t('next.smart.stack.more', { n: live.length - 1 })}</span>
         </button>
       )}
     </section>

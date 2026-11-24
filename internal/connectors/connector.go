@@ -142,7 +142,8 @@ type Spec struct {
 	Events  []string `json:"events,omitempty"`
 	Tools   []Tool   `json:"tools,omitempty"`
 	Actions []Action `json:"actions,omitempty"`
-	// Inbox is the inbox's source kind its events go to (POST /api/ingest, "mail", "calendar", "telegram"); "" keeps
+	// Inbox is the inbox's source kind its events go to (POST /api/ingest, "mail", "calendar", "telegram", "webhook",
+	// "feed", "folder" — the last three since harnessly-inbox 0.10.12); "" keeps
 	// them out of the inbox. Only kinds the inbox takes today may be named.
 	Inbox string `json:"inbox,omitempty"`
 }
@@ -461,9 +462,9 @@ func (sp Spec) check() error {
 		names[a.Name] = true
 	}
 	switch sp.Inbox {
-	case "", "mail", "calendar", "telegram":
+	case "", "mail", "calendar", "telegram", "webhook", "feed", "folder":
 	default:
-		return fmt.Errorf("inbox %q: the inbox takes mail, calendar and telegram", sp.Inbox)
+		return fmt.Errorf("inbox %q: the inbox takes mail, calendar, telegram, webhook, feed and folder", sp.Inbox)
 	}
 	return nil
 }

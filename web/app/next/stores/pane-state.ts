@@ -263,6 +263,35 @@ const persistNow = () => {
 
 const all = (): TKept => (kept ??= parseKept(storage.read()));
 
+// Only changes to the part the machine syncs count. An app remembering its scroll or a queued request is not an edit.
+const changedHere = new WeakSet<IChatPane>();
+
+const update = (
+  conv: string,
+  machine: string | null,
+  change: (pane: IChatPane) => IChatPane,
+  source: 'local' | 'machine' = 'local',
+) => {
+  const was = all();
+  const next = updateKept(was, conv, machine, change, Date.now());
+  if (next === was) return;
+  const before = was.get(conv) ?? EMPTY_PANE;
+  const after = next.get(conv);
+  if (
+    source === 'local' &&
+    after &&
+    (changedHere.has(before) ||
+      after.open !== before.open ||
+      after.maxed !== before.maxed ||
+      after.width !== before.width ||
+      after.tabs !== before.tabs ||
+      after.active !== before.active)
+  ) {
+    changedHere.add(after);
+  }
+  commit(next);
+};
+
 const commit = (next: TKept) => {
   if (next === kept) return;
   kept = next;
@@ -288,11 +317,12 @@ export const chatPaneOf = (conv: string | null): IChatPane =>
 
 export const chatPanes = {
   /** Changes the chat's pane, on screen or not. */
-  update: (conv: string, machine: string | null, change: (pane: IChatPane) => IChatPane) =>
-    commit(updateKept(all(), conv, machine, change, Date.now())),
+  update,
+  /** The synced fields were edited in this page, not just loaded from storage or the machine. */
+  changedHere: (conv: string) => changedHere.has(chatPaneOf(conv)),
   /** A request for a chat that is not on screen: it waits for the person there. */
   queue: (conv: string, machine: string | null, request: IPaneRequest) =>
-    commit(updateKept(all(), conv, machine, (pane) => queueRequest(pane, request), Date.now())),
+    update(conv, machine, (pane) => queueRequest(pane, request)),
   /** Forgets the chats their machine no longer lists. */
   prune: (ctx: IPruneContext) => commit(pruneKept(all(), ctx)),
   /** Writes at once (tests, the page going away). */

@@ -17,6 +17,7 @@ var launchKey = "launch-" + strings.Repeat("k", 40)
 type launchRuntime struct {
 	mu      sync.Mutex
 	bodies  []string
+	paths   []string
 	cookies []string
 	status  int
 	answer  string
@@ -24,17 +25,20 @@ type launchRuntime struct {
 
 func (m *launchRuntime) handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /agents/api/acme/conversations", func(w http.ResponseWriter, r *http.Request) {
+	start := func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		m.mu.Lock()
 		m.bodies = append(m.bodies, string(b))
+		m.paths = append(m.paths, r.URL.Path)
 		m.cookies = append(m.cookies, r.Header.Get("Cookie"))
 		status, ans := m.status, m.answer
 		m.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
 		_, _ = io.WriteString(w, ans)
-	})
+	}
+	mux.HandleFunc("POST /agents/api/acme/conversations", start)
+	mux.HandleFunc("POST /agents/api/acme/conversations/opus-first", start)
 	mux.Handle("/", pageRuntime("Acme"))
 	return mux
 }
@@ -75,6 +79,10 @@ func TestLaunchStartsAConversationOnThePersonsMachine(t *testing.T) {
 	// Off until the switch: a person's machine is not reached by the token on its own.
 	if r := launchPost(owner, launchKey, body); r.Code != 503 || !strings.Contains(string(r.Body), "launch_off") {
 		t.Fatalf("switch off: %s", r)
+	}
+	const opusFirstPath = "/api/platform/launch/opus-first"
+	if r := owner.Do("POST", opusFirstPath, map[string]any{"person": "owner@example.com", "prompt": "x"}, "Authorization", "Bearer "+launchKey); r.Code != 503 || !strings.Contains(string(r.Body), "launch_off") {
+		t.Fatalf("Opus-first with switch off: %s", r)
 	}
 	if len(rt.got()) != 0 {
 		t.Fatalf("started with the switch off: %v", rt.got())
@@ -121,15 +129,36 @@ func TestLaunchStartsAConversationOnThePersonsMachine(t *testing.T) {
 	}
 	delete(body, "machineId")
 
-	// An app's mark goes on to the runtime as it is; one without an app does not.
+	// Opus-first launch stays on Claude Code and carries the app to the same runtime.
+	if r := owner.Do("POST", opusFirstPath, body, "Authorization", "Bearer "+launchKey); r.Code != 400 {
+		t.Fatalf("Opus-first launch accepted Codex: %s", r)
+	}
+	body["provider"] = "claude"
 	body["from"] = map[string]any{"app": "inbox", "label": "Inbox", "title": "Review the fix"}
-	if r := launchPost(owner, launchKey, body); r.Code != 201 {
-		t.Fatalf("with from: %s", r)
+	if r := owner.Do("POST", opusFirstPath, body); r.Code != 403 {
+		t.Fatalf("Opus-first route without launch token: %s", r)
+	}
+	body["machineId"] = g.MachineID
+	if r := owner.Do("POST", opusFirstPath, body, "Authorization", "Bearer "+launchKey); r.Code != 404 {
+		t.Fatalf("Opus-first launch on another person's machine: %s", r)
+	}
+	delete(body, "machineId")
+	if r := owner.Do("POST", opusFirstPath, body, "Authorization", "Bearer "+launchKey); r.Code != 201 {
+		t.Fatalf("Opus-first launch with from: %s", r)
+	}
+	rt.mu.Lock()
+	lastPath := rt.paths[len(rt.paths)-1]
+	rt.mu.Unlock()
+	if lastPath != "/agents/api/acme/conversations/opus-first" {
+		t.Errorf("Opus-first launch reached %q", lastPath)
 	}
 	sent = nil
 	_ = json.Unmarshal([]byte(rt.got()[len(rt.got())-1]), &sent)
 	if f, _ := sent["from"].(map[string]any); f["app"] != "inbox" || f["label"] != "Inbox" || f["title"] != "Review the fix" {
 		t.Errorf("from sent %v", sent)
+	}
+	if sent["provider"] != "claude" || sent["profile"] != nil || sent["model"] != nil {
+		t.Errorf("expected the machine to pick the model: %v", sent)
 	}
 	body["from"] = map[string]any{"label": "x"}
 	if r := launchPost(owner, launchKey, body); r.Code != 201 {
@@ -190,6 +219,19 @@ func TestLaunchWhenTheMachineCannotTakeIt(t *testing.T) {
 		t.Errorf("runtime error: %s", r)
 	}
 
+	// An old runtime does not know the policy route. Do not retry on its legacy conversation route.
+	rt.mu.Lock()
+	rt.status, rt.answer = 404, `{"error":"Not Found"}`
+	before := len(rt.paths)
+	rt.mu.Unlock()
+	r = owner.Do("POST", "/api/platform/launch/opus-first", body, "Authorization", "Bearer "+launchKey)
+	rt.mu.Lock()
+	after := len(rt.paths)
+	rt.mu.Unlock()
+	if r.Code != 502 || strings.Contains(string(r.Body), "retryable") || after != before+1 {
+		t.Errorf("old runtime: %s, requests before %d after %d", r, before, after)
+	}
+
 	// The machine is not there: nothing was started, the caller may repeat.
 	a.Close()
 	s.Eventually("the machine to be off", func() bool { return s.Hub.Registry.Get(a.MachineID) == nil })
@@ -197,7 +239,7 @@ func TestLaunchWhenTheMachineCannotTakeIt(t *testing.T) {
 	if r.Code != 502 || !strings.Contains(string(r.Body), `"retryable":true`) || !strings.Contains(string(r.Body), "machine_offline") {
 		t.Errorf("machine off: %s", r)
 	}
-	if n := len(rt.got()); n != 1 {
-		t.Errorf("runtime saw %d requests", n)
+	if n := len(rt.got()); n != after {
+		t.Errorf("offline request reached the runtime: count changed from %d to %d", after, n)
 	}
 }

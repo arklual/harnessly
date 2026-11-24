@@ -101,6 +101,8 @@ const calls = (mock: ReturnType<typeof vi.fn>) =>
 const gateway = (start: IGuestLink[]) => {
   const state = [...start];
   return vi.fn((url: string, init?: RequestInit) => {
+    if (url.includes('/access/directory'))
+      return json({ people: [], teams: [{ teamId: 'design-team', name: 'Design group' }] });
     if (url.includes('/invites') && init?.method === 'POST')
       return json({ id: 'n1', token: 'tok', url: 'https://x.ru/i/tok', expiresAt: '2099-01-01T00:00:00Z' });
     if (!url.includes('/shares')) return json({ people: [], log: [], ...owner });
@@ -324,6 +326,26 @@ describe('the links screen', () => {
       'POST',
       { title: '', role: 'view', roleTtl: null, ttl: '7d', maxUses: 3 },
     ]);
+  });
+
+  it('restricts a signed-in invitation to the selected directory team', async () => {
+    const fetchMock = gateway([]);
+    vi.stubGlobal('fetch', fetchMock);
+    inRoot(<ShareDialog {...props({ ...owner, teamInvites: true })} />);
+    await openLinks();
+    fireEvent.click(await screen.findByRole('radio', { name: t('next.access.linkWho.member') }));
+    fireEvent.change(screen.getByRole('combobox', { name: t('next.access.inviteTeam') }), {
+      target: { value: 'Design' },
+    });
+    fireEvent.click(await screen.findByRole('option', { name: /Design group/ }));
+    fireEvent.click(screen.getByRole('button', { name: t('next.access.linkMake') }));
+    await waitFor(() =>
+      expect(calls(fetchMock)).toContainEqual([
+        expect.stringContaining('/p1/invites'),
+        'POST',
+        expect.objectContaining({ teamId: 'design-team' }),
+      ]),
+    );
   });
 
   it('extends a link by 7 days and changes what it allows', async () => {

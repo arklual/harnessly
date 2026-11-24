@@ -15,6 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/imagegen"
+	"github.com/ly-solutions/harnessly/internal/mediagen"
 )
 
 // Pictures drawn by agent CLIs (internal/imagegen): the jobs an agent's generate_images, a Sinopia design or the page
@@ -51,6 +52,7 @@ func imageJobs(d deps) *imagegen.Service {
 			AntigravityBinary: env("RUNTIME_ANTIGRAVITY_BIN", "agy"),
 			// ACP manages its own Google login; do not give it Codex's provider-specific environment.
 			AntigravityEnv: os.Environ,
+			Media:          mediaPictures{svc: mediaJobs(d)},
 		}
 
 	})
@@ -70,19 +72,24 @@ func imageRoutes(d deps) []gate.BodyRoute {
 				w.WriteHeader(http.StatusForbidden)
 				return
 			}
-			serveImages(imageJobs(d), pictureReadable(d, workspaceAccess(d)), w, r)
+			serveImages(imageJobs(d), mediaJobs(d), pictureReadable(d, workspaceAccess(d)), w, r)
 		},
 	}}
 }
 
-// serveImages answers <platform>/images: GET ?id= one job, GET ?conv=&owner= the jobs of a chat or an owner, POST
-// {prompt, count, shape, transparent, conv, owner} a new job, and with {source, mode, format, overlay (a base64 PNG)} a
-// change of a picture.
-func serveImages(s *imagegen.Service, readable func(string) bool, w http.ResponseWriter, r *http.Request) {
+// serveImages answers <platform>/images: GET ?id= one job, GET ?conv=&owner= the jobs of a chat or an owner, GET
+// ?providers=1 the generators a page may offer, POST {provider, model, prompt, count, shape, transparent, conv, owner} a
+// new job, and with {source, mode, format, overlay (a base64 PNG)} a change of a picture; POST ?estimate=1 the price of
+// a paid provider's request, nothing drawn.
+func serveImages(s *imagegen.Service, media *mediagen.Service, readable func(string) bool, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	q := r.URL.Query()
 	switch r.Method {
 	case http.MethodGet:
+		if q.Get("providers") != "" {
+			writeImagesJSON(w, http.StatusOK, map[string]any{"providers": imageProviders(r.Context(), media)})
+			return
+		}
 		if id := q.Get("id"); id != "" {
 			snap, ok := s.Get(id)
 			if !ok {
@@ -108,6 +115,15 @@ func serveImages(s *imagegen.Service, readable func(string) bool, w http.Respons
 			return
 		}
 		req.CopyTo, req.Name, req.SaveOK, req.SourceOK = "", "", nil, readable
+		if q.Get("estimate") != "" {
+			price, err := estimatePictures(r.Context(), media, req)
+			if err != nil {
+				writeMediaError(w, err)
+				return
+			}
+			writeImagesJSON(w, http.StatusOK, price)
+			return
+		}
 		snap, err := s.Start(req)
 		if err != nil {
 			status := http.StatusInternalServerError

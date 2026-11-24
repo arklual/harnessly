@@ -27,6 +27,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/notifybots"
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/providers"
+	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
 // coreAgents is what the core's routes need of the agent CLIs: whether they can run, the lines that start and resume
@@ -493,6 +494,31 @@ func (a *coreAgents) ValidateLaunch(provider string, model, effort any) (*agents
 		return nil, locale.Pick("Model "+*who+` does not support reasoning effort "`+label+`"`, "Модель "+*who+" не поддерживает глубину «"+label+"»")
 	}
 	return l, ""
+}
+
+// SelectOpusFirst chooses once on the target machine. Only availability can select the reserve: a launch error or
+// a budget refusal after the choice must not start a second chat or change the model.
+func (a *coreAgents) SelectOpusFirst() (*agents.Launch, string) {
+	cli := a.runtime().Claude
+	if !cli.Installed {
+		return nil, locale.Pick("Claude Code is required for both models", "Для обеих моделей нужен Claude Code")
+	}
+	if cli.LoggedIn {
+		if l, refusal := a.ValidateLaunch(agents.Claude, "opus", nil); refusal == "" {
+			return l, ""
+		}
+	}
+	const profile = "gpt"
+	model := "gpt-6.2-sol"
+	profiles := providers.Launcher{Store: a.profiles}
+	via, ready, _, found := profiles.Lookup(profile)
+	if found && ready && via == wire.ProviderClaude {
+		if _, ok := profiles.Model(profile, model); ok {
+			return &agents.Launch{Profile: profile, Model: &model}, ""
+		}
+	}
+	return nil, locale.Pick("Neither Claude Opus nor GPT‑6.2 Sol is available on this machine",
+		"На этой машине недоступны и Claude Opus, и GPT‑6.2 Sol")
 }
 
 func (a *coreAgents) codexLine(workspaceID, resumeID string, launch *agents.Launch) (string, error) {

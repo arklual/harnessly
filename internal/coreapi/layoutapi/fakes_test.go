@@ -177,6 +177,9 @@ func (a *fakeAgents) ValidateLaunch(provider string, model, effort any) (*agents
 	l, _ := agents.ReadLaunchShape(model, effort)
 	return l, ""
 }
+func (a *fakeAgents) SelectOpusFirst() (*agents.Launch, string) {
+	return a.ValidateLaunch(agents.Claude, "opus", nil)
+}
 func (a *fakeAgents) LaunchLine(provider, ws string, l *agents.Launch) (string, error) {
 	line := provider + "-launch --ws " + ws
 	if l != nil && l.Model != nil {

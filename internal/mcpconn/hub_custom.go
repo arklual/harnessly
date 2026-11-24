@@ -177,9 +177,14 @@ func madeLine(srv Server) string {
 		line += " Use api_request(connection: \"" + srv.Slug + "\", path)."
 	default:
 		line += " Use search_tools or connections(\"" + srv.Slug + "\"), then call."
+		line += recipeHint
 	}
 	return line
 }
+
+// recipeHint is the step an MCP service without events is offered (docs/connectors.md «MCP recipe»): its
+// updates reach the digest by a poll recipe.
+const recipeHint = " If the person wants its updates (new results, messages, statuses) in their digest or notices, offer a poll recipe: guide step 9."
 
 // planWhy is a failed plan in words an agent can act on (never the service's own words: they may carry a key).
 func planWhy(err error) string {
@@ -217,4 +222,5 @@ const customGuide = `Connecting a service of the person's own, step by step
 6b. When a secret ask says "ready" for a service that was made without its key: connection_add with id, keys_only true and keys[] naming the secrets (no card: the person agreed to the service already). It copies the values, tries them and says whether the service works.
 7. After "Made …": the service is a connection like any other. Look at it with connections(query) or manage(check), use it with call / api_request. An app names it in its manifest as connections: [{"id": "custom-<slug>"}].
 8. To change a service you made, give its id again with the new arguments (same card); a key you do not name stays as it is. To remove one the person uses Settings → Connections.
+9. Updates of an MCP service into the digest (it has no webhooks, only tools). Find a tool that lists things (jobs, messages, records) and only reads: tool_schema shows its annotations; one not marked readOnlyHint the person must allow, one marked destructiveHint never. Call it once to see the answer's shape. Write a recipe: {"trigger": "<what happened, e.g. generation.done>", "tool": "<tool>", "args": {… "{{cursor}}" where it takes a since/after …}, "items": "<dotted path to the list>", "id": "<field>", "at": "<time field>", "title": "<field>", "url": "<field>", "cursor": "<time or id field>", "every": "10m"}. Never a tool that creates, sends or spends. Give the person the recipe and the way: Settings → Connections → Feeds → «MCP recipe», server <slug>, recipe <the JSON>; its check runs the recipe once and shows what it found. From then on the machine polls by itself and every new thing is an event of the journal and the digest (docs/connectors.md, «MCP recipe»).
 `

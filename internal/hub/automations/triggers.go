@@ -11,6 +11,7 @@ import (
 
 	_ "time/tzdata" // a schedule's time zone must load on an image without the zone files
 
+	"github.com/ly-solutions/harnessly/internal/hub/eventbus"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
@@ -26,6 +27,9 @@ const SwitchTriggers = "automation-triggers"
 const (
 	SourceSchedule = "schedule"
 	SourceWait     = "wait"
+	// SourceBus is the rule the catalog of triggers keeps for a trigger in the mode «agent» (AgentForEvent): no event
+	// from outside matches it, the bus queues its runs.
+	SourceBus = "bus"
 )
 
 // Gate says whether a rollout switch is on for a person (by e-mail) on a machine.
@@ -129,7 +133,9 @@ func checkTrigger(t *Trigger) error {
 	return nil
 }
 
-func reserved(source string) bool { return source == SourceSchedule || source == SourceWait }
+func reserved(source string) bool {
+	return source == SourceSchedule || source == SourceWait || source == SourceBus
+}
 
 // newKind says whether the trigger is one of the kinds behind SwitchTriggers.
 func (t Trigger) newKind() bool { return t.Schedule != nil || t.Wait != nil }
@@ -194,6 +200,8 @@ func (s *Service) fireSchedule(ctx context.Context, r Rule) {
 	event, _ := json.Marshal(map[string]any{"schedule": map[string]any{
 		"cron": r.Trigger.Schedule.Cron, "tz": loc.String(), "slot": slot.Format(time.RFC3339),
 	}})
+	s.journal(ctx, eventbus.Event{Owner: r.OwnerID, Type: "schedule.fired", Source: "harnessly", Ext: "schedule:" + r.ID + ":" + slot.UTC().Format(time.RFC3339),
+		At: slot, Facts: map[string]string{"rule": r.ID}, Via: []string{eventbus.ViaSchedule}})
 	out, err := s.queueRun(ctx, r, "schedule:"+slot.UTC().Format(time.RFC3339), event)
 	if err != nil {
 		s.log.Warn("automation schedule not queued", "rule", r.ID, "error", err)
@@ -308,6 +316,8 @@ func (s *Service) fireTimers(ctx context.Context, rules map[string]Rule, allowed
 				"event": json.RawMessage(t.payload),
 			})
 			fp := fmt.Sprintf("wait:%s:%d", t.key, t.startedAt)
+			s.journal(ctx, eventbus.Event{Owner: r.OwnerID, Type: "wait.expired", Source: "harnessly", Ext: r.ID + ":" + fp,
+				Facts: map[string]string{"rule": r.ID}, Via: []string{eventbus.ViaSchedule}})
 			out, err := s.queueRun(ctx, r, fp, event)
 			if err != nil {
 				s.log.Warn("automation wait not queued", "rule", r.ID, "error", err)

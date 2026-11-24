@@ -230,6 +230,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.hx-dl-card__access,
 .hx-dl-card__sub {
   color: var(--hx-fg-3);
   font-size: var(--hx-text-xs);

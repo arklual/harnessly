@@ -1,7 +1,9 @@
 // «Регулярные задачи» (/routines): the person's routines — what the hub runs again and again for them —
 // with the history of every run (what it came to, what it made, how it went), the settings and the memory. A routine
 // is made and changed in words: the field at the bottom starts a chat with the agent, which uses `harnessly routine`.
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { CardReply } from '@/next/bindings/reply-field';
+import { ReplyMachine } from '@/next/features/composer/reply-field';
 import {
   AUTONOMIES,
   CHANNELS,
@@ -102,8 +104,7 @@ const RoutinesPage = ({ machine, id, run, onOpenDrawer }: IPageProps) => {
   const current = routines.find((r) => r.id === picked) ?? routines[0] ?? null;
   const [ask, setAsk] = useState('');
 
-  const send = (e: FormEvent) => {
-    e.preventDefault();
+  const send = () => {
     const text = ask.trim();
     if (!text) return;
     startChat(
@@ -176,37 +177,19 @@ const RoutinesPage = ({ machine, id, run, onOpenDrawer }: IPageProps) => {
         )}
       </div>
       {state.k === 'ready' && (
-        <form className="hx-rt__dock" onSubmit={send}>
-          <div className="hx-composer hx-rt__composer">
-            <div className="hx-composer__layer">
-              <div className="hx-composer__row">
-                <textarea
-                  className="hx-composer__input"
-                  rows={1}
-                  value={ask}
-                  placeholder={
-                    current ? t('next.routines.askPlaceholder') : t('next.routines.newPlaceholder')
-                  }
-                  onChange={(e) => setAsk(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) send(e);
-                  }}
-                />
-              </div>
-              <div className="hx-composer__bar">
-                <span className="hx-spacer" />
-                <button
-                  type="submit"
-                  className="hx-round"
-                  data-variant="accent"
-                  aria-label={t('next.routines.send')}
-                >
-                  <Icon name="arrow-up" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </form>
+        <div className="hx-rt__dock">
+          {/* The product's own field (the chat's composer, with the machine's voice), not a look-alike of it. */}
+          <ReplyMachine.Provider value={machine}>
+            <CardReply
+              value={ask}
+              onChange={setAsk}
+              busy={false}
+              placeholder={current ? t('next.routines.askPlaceholder') : t('next.routines.newPlaceholder')}
+              onSend={send}
+              sendLabel={t('next.routines.send')}
+            />
+          </ReplyMachine.Provider>
+        </div>
       )}
     </div>
   );

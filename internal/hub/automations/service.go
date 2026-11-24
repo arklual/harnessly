@@ -20,6 +20,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
+	"github.com/ly-solutions/harnessly/internal/hub/eventbus"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/link"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
@@ -45,6 +46,8 @@ type Deps struct {
 	Gate Gate
 	// Bell puts a notice into a person's bell of harnessly (routines' results); nil: no notices.
 	Bell func(ctx context.Context, userID, email, icon, key, title, text, link string) bool
+	// Bus is the journal of events (docs/hub/event-bus.md); nil: events reach the rules without being journaled.
+	Bus *eventbus.Bus
 }
 
 // Service serves the rules and runs and starts the runs.
@@ -59,10 +62,11 @@ type Service struct {
 	client *http.Client
 	gate   Gate
 	bell   func(ctx context.Context, userID, email, icon, key, title, text, link string) bool
+	bus    *eventbus.Bus
 }
 
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, links: d.Links, log: d.Log, now: d.Now, client: &http.Client{}, gate: d.Gate, bell: d.Bell}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, links: d.Links, log: d.Log, now: d.Now, client: &http.Client{}, gate: d.Gate, bell: d.Bell, bus: d.Bus}
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -392,6 +396,7 @@ func (s *Service) hook(w http.ResponseWriter, r *http.Request) error {
 	if reserved(b.Source) {
 		return invalid(`Источники "schedule" и "wait" хаб ставит сам`)
 	}
+	s.journal(r.Context(), hookBusEvent("", b.Source, b.Fingerprint, event))
 	results, waits, err := s.take(r.Context(), "", b.Source, b.Fingerprint, event, b.Event)
 	if err != nil {
 		return err
@@ -490,6 +495,7 @@ func (s *Service) machineEvent(ctx context.Context, m store.Machine, raw json.Ra
 	if err != nil {
 		return nil, err
 	}
+	s.journal(ctx, machineBusEvent(m, b.Source, b.Fingerprint, b.Event))
 	results, _, err := s.take(ctx, m.CreatedBy, b.Source, b.Fingerprint, b.Event, clean)
 	return results, err
 }

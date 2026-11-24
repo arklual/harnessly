@@ -5,20 +5,17 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"regexp"
 
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
-
-var inviteToken = regexp.MustCompile("^[a-zA-Z0-9_-]{43}$")
 
 // The link is a navigation only. The signed-in design access API consumes it.
 func (s *Service) designInvite(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	token := r.PathValue("token")
-	if !inviteToken.MatchString(token) {
+	if !store.ValidDesignInviteToken(token) {
 		httpx.WriteError(w, r, httpx.ErrNotFound)
 		return
 	}

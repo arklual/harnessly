@@ -4,7 +4,7 @@
 import { platformPath, runtimePath } from '@/next/core/net/machine';
 import { RuntimeError, postJson, runtimeJson } from '@/next/core/net/runtime-json';
 import { t } from '@/next/i18n';
-import type { ImageProvider } from '@/next/features/image-edit/host';
+import { isImageProvider, type ImageProvider } from '@/next/features/image-edit/host';
 import type { MachineId } from '@/next/protocol/v2';
 
 export const GEN_SHAPE = { square: 'square', landscape: 'landscape', portrait: 'portrait' } as const;
@@ -53,7 +53,7 @@ const readJob = (v: unknown, name: string): IGenJob | null => {
   }
   if (pics.some((pic) => !pic.src.startsWith(`assets/${name}-`))) return null;
   return {
-    ...(v.provider === 'codex' || v.provider === 'antigravity' ? { provider: v.provider } : {}),
+    ...(isImageProvider(v.provider) ? { provider: v.provider } : {}),
     id: v.id,
     state: v.state,
     pics,
@@ -68,6 +68,7 @@ const must = <T>(v: T | null): T => {
 
 export interface IGenRequest {
   provider?: ImageProvider;
+  model?: string;
   artifact: string;
   prompt: string;
   count: number;
@@ -83,6 +84,7 @@ export const startDesignImage = async (m: MachineId, request: IGenRequest): Prom
 
 export interface IEditRequest {
   provider?: ImageProvider;
+  model?: string;
   artifact: string;
   /** The picture to change, a path of the project. */
   source: string;

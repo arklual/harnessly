@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/ly-solutions/harnessly/internal/fsprobe"
 	"io"
 	"net/http"
 	"os"
@@ -124,7 +125,7 @@ func (f *v2Files) machineDir(dir string) (wire.DirListing, error) {
 	out := wire.DirListing{Path: dir, Entries: []wire.FileEntry{}}
 	if dir == "/" {
 		for _, r := range f.access.Roots {
-			if st, err := os.Stat(r); err == nil && st.IsDir() {
+			if st, err := fsprobe.Stat(r); err == nil && st.IsDir() {
 				out.Entries = append(out.Entries, wire.FileEntry{Name: r, Path: r, Kind: wire.FileKind("directory")})
 			}
 		}

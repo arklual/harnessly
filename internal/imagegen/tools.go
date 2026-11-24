@@ -75,7 +75,7 @@ func (Tools) Tools() []any {
 					"save_to", jsvalue.NewObject("type", "string", "description", "A folder to copy the pictures into: absolute, or relative to this chat's folder. Omit to keep them in harnessly's own store."),
 					"name", jsvalue.NewObject("type", "string", "description", "The files' name stem in save_to (default image-<id>); they get -1, -2 … ."),
 					"provider", jsvalue.NewObject("type", "string", "description", "Draw with a media provider of Settings → Providers (Higgsfield) instead of Codex: it spends the person's balance there, so only when they asked for it or named it. Omit for the default (Codex, free of charge)."),
-					"model", jsvalue.NewObject("type", "string", "description", "With provider: soul (default), z-image or an endpoint ID of the provider."),
+					"model", jsvalue.NewObject("type", "string", "description", "With provider: a model id of the provider. Through the «Higgsfield (MCP)» connection: gpt_image_2_6 (default), nano_banana_pro, nano_banana_2_1, seedream_v5_pro, flux_3_image, soul_2, ideogram_4_6, z_image, … (harnessly-hub: higgsfield-mcp models_explore lists them all). Through an API key: soul (default), z-image or an endpoint ID."),
 					"source", jsvalue.NewObject("type", "string", "description", "A picture file to change instead of drawing a new one: absolute, or relative to this chat's folder. The prompt then says what to change; the original stays as it is."),
 				),
 				"required", []any{"prompt"},

@@ -2,7 +2,7 @@
 // place of the cursor, whether the text differs from the disk. Markdown also reads as a page («Просмотр»). The editor
 // keeps its own text; the one who opened it hears whether it is changed and receives the unsaved text when it leaves.
 import { usePhone } from '@/next/ui/use-media';
-import { EditorState, type Text } from '@codemirror/state';
+import { EditorState, Transaction, type Text } from '@codemirror/state';
 import { EditorView, type ViewUpdate } from '@codemirror/view';
 import { openSearchPanel } from '@codemirror/search';
 import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState } from 'react';
@@ -119,6 +119,10 @@ export interface IFileEditorProps {
   at?: { line: number; col: number; size: number } | null;
   /** Hands the selection to the chat's field as a quote: the path with the lines, the code, the person's ask. */
   onAsk?: (quote: string, note: string | null) => void;
+  /** The file as the disk has it now, when it changed since the editor knew it (the agent wrote it). The text
+   *  that was not edited is replaced in place by the difference only, so the place, the selection and the scroll stay;
+   *  one that has unsaved edits is left alone and the person is told. */
+  disk?: FileContent | null;
   /** The file lies outside the chat's folder and opened because the agent showed it: read, never typed into. */
   readOnly?: boolean;
 }
@@ -176,6 +180,7 @@ const FileEditor = ({
   onCloseCompare,
   onAsk,
   at = null,
+  disk = null,
   readOnly = false,
 }: IFileEditorProps) => {
   const host = useRef<HTMLDivElement>(null);
@@ -294,6 +299,47 @@ const FileEditor = ({
     });
     view.focus();
   }, [path, start, atLine, atCol, atSize]);
+
+  // The disk's newer text. An unedited editor takes it as a small change at the place that differs, outside the
+  // undo history; an edited one keeps the person's text and offers «Загрузить с диска» / «Сохранить поверх».
+  const takeDisk = useEffectEvent((fresh: FileContent) => {
+    const l = live.current;
+    if (!l || fresh.revision === l.revision) return;
+    const view = l.view;
+    const next = view.state.toText(fresh.content);
+    if (!view.state.doc.eq(l.saved)) {
+      setNotice({ kind: 'conflict', text: t('next.editor.changedOnDisk') });
+      return;
+    }
+    const before = view.state.doc.sliceString(0);
+    const after = next.sliceString(0);
+    let from = 0;
+    const most = Math.min(before.length, after.length);
+    while (from < most && before.charCodeAt(from) === after.charCodeAt(from)) from++;
+    let endBefore = before.length;
+    let endAfter = after.length;
+    while (
+      endBefore > from &&
+      endAfter > from &&
+      before.charCodeAt(endBefore - 1) === after.charCodeAt(endAfter - 1)
+    ) {
+      endBefore--;
+      endAfter--;
+    }
+    l.saved = next;
+    l.revision = fresh.revision;
+    if (before !== after) {
+      view.dispatch({
+        changes: { from, to: endBefore, insert: after.slice(from, endAfter) },
+        annotations: Transaction.addToHistory.of(false),
+      });
+    }
+    setDirty(false);
+    if (mode === MODE.preview) setPage(after);
+  });
+  useEffect(() => {
+    if (disk) takeDisk(disk);
+  }, [disk]);
 
   const report = useEffectEvent(() => onState({ dirty, saving }));
   useEffect(() => report(), [dirty, saving]);

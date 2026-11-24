@@ -7,12 +7,14 @@ import { CardReply } from '@/next/bindings/reply-field';
 import useKeyboardInset from '@/next/features/composer/use-keyboard-inset';
 import {
   EDIT_FORMATS,
-  IMAGE_PROVIDERS,
+  drawsTransparent,
   imageProviderName,
   type ImageProvider,
   type IImageVersion,
   type TEditFormat,
 } from '@/next/features/image-edit/host';
+import { PriceNote, ProviderPicker, type IProviderChoice } from '@/next/features/image-edit/provider-picker';
+import type { IImageProviderInfo, TPrice } from '@/next/features/image-edit/providers';
 import { BRUSH_IDS, MARK_COLORS, type TBrushId } from '@/next/features/image-edit/marks';
 import { TOOL, TOOLS, type TTool } from '@/next/features/image-edit/tool-rules';
 import { t } from '@/next/i18n';
@@ -35,8 +37,11 @@ export interface IFailure {
 interface IEditDockProps {
   /** Over the tools: the switch to the person's own marks, where the picture has them. */
   switcher?: ReactNode;
-  provider: ImageProvider;
-  onProvider: (provider: ImageProvider) => void;
+  /** The generators of the machine and the one picked; the price of a paid one. */
+  providers: readonly IImageProviderInfo[];
+  choice: IProviderChoice;
+  onChoice: (choice: IProviderChoice) => void;
+  price: TPrice;
   tool: TTool | null;
   onTool: (tool: TTool) => void;
   running: boolean;
@@ -59,6 +64,7 @@ interface IEditDockProps {
 
 export const EditDock = (props: IEditDockProps) => {
   const { tool, running } = props;
+  const provider = props.choice.provider;
   const root = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   const { focusField } = props;
@@ -72,24 +78,17 @@ export const EditDock = (props: IEditDockProps) => {
   return (
     <div ref={root} className="hx-ie">
       {props.switcher}
-      <label>
-        {t('next.imagegen.provider')}
-        <select
-          aria-label={t('next.imagegen.provider')}
-          value={props.provider}
-          disabled={running}
-          onChange={(event) =>
-            props.onProvider(event.target.value === 'antigravity' ? 'antigravity' : 'codex')
-          }
-        >
-          {IMAGE_PROVIDERS.map((provider) => (
-            <option key={provider} value={provider}>
-              {imageProviderName(provider)}
-            </option>
-          ))}
-        </select>
-      </label>
-      {props.provider === 'antigravity' && <p role="note">{t('next.imageEdit.noTransparency')}</p>}
+      <ProviderPicker
+        providers={props.providers}
+        choice={props.choice}
+        editing
+        disabled={running}
+        onChoice={props.onChoice}
+      />
+      {!drawsTransparent(provider) && (
+        <p role="note">{t('next.imageEdit.noTransparencyOf', { name: imageProviderName(provider) })}</p>
+      )}
+      <PriceNote price={props.price} name={imageProviderName(provider)} />
       {hasOptions && (
         <div className="hx-ie__opts" key={tool}>
           {tool === TOOL.mark &&
@@ -150,10 +149,10 @@ export const EditDock = (props: IEditDockProps) => {
             className="hx-ie__tool"
             aria-pressed={id === TOOL.cut ? undefined : tool === id}
             aria-label={t(`next.imageEdit.tool.${id}`)}
-            disabled={running || (id === TOOL.cut && props.provider === 'antigravity')}
+            disabled={running || (id === TOOL.cut && !drawsTransparent(provider))}
             title={
-              id === TOOL.cut && props.provider === 'antigravity'
-                ? t('next.imageEdit.noTransparency')
+              id === TOOL.cut && !drawsTransparent(provider)
+                ? t('next.imageEdit.noTransparencyOf', { name: imageProviderName(provider) })
                 : undefined
             }
             onClick={() => props.onTool(id)}

@@ -13,6 +13,12 @@ describe('inScope', () => {
     expect([me, other, null].map((o) => inScope(DESIGN_SCOPE.mine, o))).toEqual([true, false, false]);
   });
 
+  it('uses confirmed grants when an older project has no owner profile', () => {
+    expect(inScope(DESIGN_SCOPE.shared, null, 'team')).toBe(true);
+    expect(inScope(DESIGN_SCOPE.mine, null, 'link')).toBe(false);
+    expect(inScope(DESIGN_SCOPE.mine, null, 'owner')).toBe(true);
+  });
+
   it('shows only the teammates’ under «Общие»; an unknown owner is not shared either', () => {
     expect([me, other, null].map((o) => inScope(DESIGN_SCOPE.shared, o))).toEqual([false, true, false]);
   });

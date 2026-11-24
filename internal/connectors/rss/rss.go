@@ -47,6 +47,7 @@ func (feedConn) Spec() connectors.Spec {
 	return connectors.Spec{
 		ID:      ID,
 		Kind:    connectors.Feed,
+		Inbox:   "feed", // HRN-1727: the inbox takes a feed's items (harnessly-inbox 0.10.12)
 		Title:   connectors.T("RSS or Atom feed", "Лента RSS или Atom"),
 		Summary: connectors.T("New posts of a blog, a release page or a news site", "Новые записи блога, страницы релизов или новостного сайта"),
 		Fields: []connectors.Field{

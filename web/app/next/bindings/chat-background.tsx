@@ -111,8 +111,9 @@ export const useChatBackground = (
   }
   const override = asked && asked.conv === conv ? asked.shown : null;
   // On its own the column is open when it has room and the pane is shut, and whenever a command waits for a code.
-  // A drop opens it too, but not on a phone, where the column is a sheet over the chat: there the header's button says it.
-  const auto = (room && !pane) || codes.length > 0 || (drops.length > 0 && !phone);
+  // A drop does not open it by itself where there is no room beside the chat or the pane is open: the column would stand
+  // over the feed's text. There the header's button says it (and a notice still reaches the notification centre).
+  const auto = (room && !pane) || codes.length > 0;
   const shown = has && (override ?? auto);
   // A chat with nothing for the column takes it away with its slide and fade (data-shown), not from one frame to the next.
   const hasMounted = usePresentFlag(has, SIDE_EXIT_MS).mounted;

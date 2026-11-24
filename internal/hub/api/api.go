@@ -33,6 +33,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/efficiency"
 	"github.com/ly-solutions/harnessly/internal/hub/env"
 	"github.com/ly-solutions/harnessly/internal/hub/eval"
+	"github.com/ly-solutions/harnessly/internal/hub/eventbus"
 	"github.com/ly-solutions/harnessly/internal/hub/events"
 	"github.com/ly-solutions/harnessly/internal/hub/ext"
 	"github.com/ly-solutions/harnessly/internal/hub/features"
@@ -165,6 +166,8 @@ type Hub struct {
 	Efficiency *efficiency.Service
 	// Automations is the rules and runs of the installation (HUB_AUTOMATIONS).
 	Automations *automations.Service
+	// Bus is the journal of events and its subscriptions (HUB_EVENT_BUS, docs/hub/event-bus.md); nil when off.
+	Bus *eventbus.Bus
 	// Design is who may see and change a machine's designs, and the guest links to them.
 	Design *designaccess.Service
 	// Notices keeps the person's notices in the hub's database, behind the switch hub-notices.
@@ -432,7 +435,7 @@ func New(o Options) (*Hub, error) {
 		}
 	}
 	h.Design = designaccess.New(designaccess.Deps{
-		DB: db, Reg: h.Registry, Log: log, Now: o.Now, HubURL: cfg.PublicURL, ShareURL: cfg.DesignShareURL,
+		DB: db, Reg: h.Registry, Log: log, Now: o.Now, HubURL: cfg.PublicURL, ShareURL: cfg.DesignShareURL, StaticGuests: cfg.DesignSnapshotLinks,
 		ShareAliases: cfg.DesignShareAliases, PlatformAPI: cfg.DesignPlatformAPI, Transport: func(id string) http.RoundTripper { return px.Transport(id) },
 		LinkKey: linkKey, Notice: notice,
 		Bell: func(ctx context.Context, machineID, to, key, title, text, link string) {
@@ -463,7 +466,11 @@ func New(o Options) (*Hub, error) {
 		}
 		return nil
 	}})
-	h.Automations = automations.New(automations.Deps{Config: cfg, DB: db, Auth: h.Auth, Log: log, Now: o.Now, Links: h.Registry, Gate: h.Switches,
+	if cfg.EventBus {
+		h.Bus = eventbus.New(db, log, o.Now)
+		h.Bus.Retention = cfg.EventBusRetention
+	}
+	h.Automations = automations.New(automations.Deps{Config: cfg, DB: db, Auth: h.Auth, Log: log, Now: o.Now, Links: h.Registry, Gate: h.Switches, Bus: h.Bus,
 		Bell: func(ctx context.Context, userID, email, icon, key, title, text, link string) bool {
 			return h.Notices.RingAs(ctx, userID, email, icon, key, title, text, link)
 		}})
@@ -647,6 +654,13 @@ func New(o Options) (*Hub, error) {
 	h.Docs.Mount(mux)
 	h.Efficiency.Mount(mux)
 	h.Automations.Mount(mux)
+	if h.Bus != nil {
+		prefix := cfg.DesignPlatformAPI
+		if prefix == "" {
+			prefix = "/api/platform"
+		}
+		h.Bus.Mount(mux, prefix, h.Auth)
+	}
 	if h.SSH != nil {
 		h.SSH.Mount(h.Spaces.Sub())
 	} else {
@@ -764,6 +778,8 @@ func New(o Options) (*Hub, error) {
 			h.Proxy.ServeHTTP(w, r)
 		case cfg.ChatGuestLinks && cfg.DesignShareURL == "" && strings.EqualFold(r.Host, cfg.Host) && strings.HasPrefix(r.URL.Path, proxy.HubChatGuestPrefix):
 			h.Proxy.ServeGuestChatSnapshot(w, r)
+		case cfg.DesignSnapshotLinks && strings.EqualFold(r.Host, cfg.Host) && strings.HasPrefix(r.URL.Path, designaccess.StaticPrefix):
+			h.Design.StaticGuest(w, r)
 		case strings.HasPrefix(r.URL.Path, "/api/"):
 			csrf.ServeHTTP(w, r)
 		default:
@@ -941,6 +957,13 @@ func (h *Hub) Run(ctx context.Context) {
 	}
 	// queued automation runs, started on their owners' machines (HUB_AUTOMATIONS)
 	safego.Go("automations", func() { h.lead.Lead(ctx, "automations", h.Automations.Run) })
+	if h.Bus != nil {
+		h.wireTriggerModes()
+		if _, err := h.Bus.Subscribe(ctx, eventbus.Subscription{Owner: "", Consumer: "modes", Name: "catalog"}, eventbus.FromEnd); err != nil {
+			h.log.Warn("event bus: the subscription of trigger modes not made", "error", err)
+		}
+		safego.Go("event bus", func() { h.lead.Lead(ctx, "event bus", h.Bus.Run) })
+	}
 	if h.Ext != nil {
 		safego.Go("extensions", func() { h.Ext.Run(ctx, ext.CheckEvery) })
 	}
@@ -1205,4 +1228,38 @@ func (n hubNoticeSlot) Slot(ctx context.Context, m store.Machine, raw json.RawMe
 	if n.h.Notices != nil {
 		n.h.Notices.Slot(ctx, m, raw)
 	}
+}
+
+// wireTriggerModes is the hub's own consumer of the journal that does what a trigger's mode asks (HRN-1727,
+// docs/hub/event-bus.md): «notify» rings the owner's bell, «agent» queues a run of the agent; «digest» needs nothing
+// here (the digest reads the journal itself), «off» never reaches the journal.
+func (h *Hub) wireTriggerModes() {
+	h.Bus.Consume("modes", func(ctx context.Context, _ eventbus.Subscription, e eventbus.Event) error {
+		if e.Owner == "" {
+			return nil
+		}
+		switch h.Bus.ModeOf(ctx, e) {
+		case eventbus.ModeNotify:
+			if h.Notices == nil {
+				return nil
+			}
+			u, err := h.db.S().UserByID(ctx, e.Owner)
+			if err != nil {
+				return nil // the owner is gone: nobody to tell
+			}
+			title := e.Type + " · " + e.Source
+			text := e.Actor
+			if e.Thread != "" {
+				text = strings.TrimSpace(text + " · " + e.Thread)
+			}
+			link := e.URL
+			if link == "" {
+				link = strings.TrimRight(h.cfg.PublicURL, "/") + "/events"
+			}
+			h.Notices.RingAs(ctx, u.ID, u.Email, "bell", "bus:"+e.ID, title, text, link)
+		case eventbus.ModeAgent:
+			return h.Automations.AgentForEvent(ctx, e)
+		}
+		return nil
+	})
 }

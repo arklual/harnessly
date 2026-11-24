@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/ly-solutions/harnessly/internal/fsprobe"
 	"os"
 	"path/filepath"
 	"sort"
@@ -96,7 +97,7 @@ func isCandidate(parent string, e os.DirEntry) bool {
 		return true
 	}
 	if e.Type()&os.ModeSymlink != 0 {
-		st, err := os.Stat(filepath.Join(parent, name))
+		st, err := fsprobe.Stat(filepath.Join(parent, name))
 		return err == nil && st.IsDir()
 	}
 	return false
@@ -106,7 +107,7 @@ func isCandidate(parent string, e os.DirEntry) bool {
 // HEAD names, nil on a detached head or when HEAD is unreadable.
 func gitBranch(dir string) (bool, *string) {
 	dot := filepath.Join(dir, ".git")
-	st, err := os.Stat(dot)
+	st, err := fsprobe.Stat(dot)
 	if err != nil {
 		return false, nil
 	}

@@ -507,6 +507,10 @@
   "next.designly.scopes.all": "All",
   "next.designly.scopes.mine": "Mine",
   "next.designly.scopes.shared": "Shared",
+  "next.designly.access.person": "Shared directly",
+  "next.designly.access.team": "Via team",
+  "next.designly.access.link": "Via link",
+  "next.designly.access.until": "Until {when}",
   "next.designly.owner": "By {name}",
   "next.designly.search": "Search the library",
   "next.designly.new": "Create",
@@ -1100,6 +1104,7 @@
   "next.font.sample": "The quick brown fox jumps over the lazy dog",
   "next.font.field": "Sample text of the font {name}",
   "next.font.failed": "The font did not open",
+  "next.editor.changedOnDisk": "The file changed on disk while you were editing it. Your text is untouched.",
   "next.editor.reload": "Load from disk",
   "next.editor.overwrite": "Save over it",
   "next.editor.dismiss": "Close",
@@ -1711,5 +1716,12 @@
   "next.folderSuggest.otherFolder": "Another folder",
   "next.folderSuggest.other": "Folders",
   "next.designly.kinds.scene3d": "3D scene",
-  "next.designly.kindsDesc.scene3d": "Describe a scene: the agent builds it in Blender"
+  "next.designly.kindsDesc.scene3d": "Describe a scene: the agent builds it in Blender",
+  "next.pictures.position": "{at} / {of}",
+  "next.pictures.all": "All",
+  "next.pictures.prev": "Previous picture",
+  "next.pictures.next": "Next picture",
+  "next.pictures.strip": "All pictures in order",
+  "next.pictures.close": "Close",
+  "next.pictures.carousel": "gallery"
 }

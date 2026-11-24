@@ -70,6 +70,21 @@ const POP_EDGE = 8;
 const POP_MIN = 160;
 const EXIT_MS = 240;
 
+/** The part of the window the popover can show in: the window less what an ancestor with its own overflow cuts off (a screen
+ *  body under a header clips at its top edge, and a popover that reached past it lost its first rows). */
+export const visibleBounds = (from: HTMLElement | null) => {
+  let top = 0;
+  let bottom = window.innerHeight;
+  for (let el = from?.parentElement ?? null; el && el !== document.body; el = el.parentElement) {
+    const style = getComputedStyle(el);
+    if (!/(hidden|clip|auto|scroll)/.test(style.overflowY)) continue;
+    const box = el.getBoundingClientRect();
+    top = Math.max(top, box.top);
+    bottom = Math.min(bottom, box.bottom);
+  }
+  return { top, bottom };
+};
+
 const VIEW = { effort: 'effort', models: 'models', machines: 'machines' } as const;
 type TView = (typeof VIEW)[keyof typeof VIEW];
 
@@ -267,10 +282,8 @@ const ModelPicker = ({
     slider.style.setProperty('--p', along(step));
   });
 
-  const close = () => {
-    setOpen(false);
-    window.setTimeout(() => setView(VIEW.effort), EXIT_MS);
-  };
+  // Keep the current view during the exit animation; reopening resets it below.
+  const close = () => setOpen(false);
   useOnePopover(open, close);
   const toggle = () => {
     if (open) {
@@ -313,7 +326,9 @@ const ModelPicker = ({
     if (!pop) return;
     const pane = pop.querySelector<HTMLElement>('.hx-picker__pane[data-active="true"]');
     if (!pane) return;
-    let height = pane.offsetHeight;
+    // The content's own height, not the box's: an active screen is capped by --hx-picker-max from the last pass, and
+    // taking the capped box minus the other lists' extra height shrank the popup to a stub (one model row).
+    let height = pane.scrollHeight;
     const carousel = pane.querySelector<HTMLElement>('.hx-carousel');
     const list = carousel?.querySelector<HTMLElement>('.hx-options[data-active="true"]');
     if (carousel && list) height -= carousel.offsetHeight - list.offsetHeight;
@@ -321,8 +336,9 @@ const ModelPicker = ({
     // scrolled inside (the limits stuck to its foot) when neither side holds it whole.
     const anchor = anchorRef.current?.getBoundingClientRect();
     if (anchor) {
-      const above = anchor.top - POP_GAP - POP_EDGE;
-      const below = window.innerHeight - anchor.bottom - POP_GAP - POP_EDGE;
+      const bounds = visibleBounds(anchorRef.current);
+      const above = anchor.top - bounds.top - POP_GAP - POP_EDGE;
+      const below = bounds.bottom - anchor.bottom - POP_GAP - POP_EDGE;
       const under = height > above && below > above;
       pop.dataset.side = under ? 'below' : 'above';
       const room = Math.max(POP_MIN, under ? below : above);

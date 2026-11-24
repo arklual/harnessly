@@ -3,7 +3,9 @@
 // machine, a Sinopia design) while the picture waits blurred. The new version appears among the thumbnails only when
 // the host has it. A run belongs to the picture, not to the window (run-store.ts): closing does not stop it.
 import { useEffect, useState, type ReactNode } from 'react';
-import type { ImageProvider } from '@/next/features/image-edit/host';
+import { drawsTransparent } from '@/next/features/image-edit/host';
+import { priceAllows, settleChoice, type IProviderChoice } from '@/next/features/image-edit/provider-picker';
+import { useImagePrice, useImageProviders } from '@/next/features/image-edit/providers';
 import { EditDock, VersionStrip, type IFailure } from '@/next/features/image-edit/edit-dock';
 import {
   EDIT_MODE,
@@ -165,13 +167,21 @@ const Editor = ({
     setState(s);
   }
   const patch = (change: Partial<ISession>) => setState((now) => ({ ...now, ...change }));
-  const [provider, setProvider] = useState<ImageProvider>(
-    runOf(original.id)?.edit.provider ?? original.provider ?? 'codex',
-  );
+  const [choice, setChoice] = useState<IProviderChoice>(() => {
+    const edit = runOf(original.id)?.edit;
+    return { provider: edit?.provider ?? original.provider ?? 'codex', model: edit?.model ?? '' };
+  });
+  const providers = useImageProviders(host.machine);
+  const settled = settleChoice(providers, choice, true);
+  const provider = settled.provider;
   const [focusField, setFocusField] = useState(0);
   const run = useRun(original.id);
   const running = run?.state === RUN_STATE.running;
   const selected = s.versions.find((version) => version.id === s.at) ?? s.versions[0];
+  const price = useImagePrice(
+    host.machine,
+    settled.info?.paid ? { provider, model: settled.model, count: 1, source: selected.id } : null,
+  );
   // A change still running for this picture opens on the change tools; else the person's marks come first.
   const [part, setPart] = useState<TEditorPart>(() =>
     annotate && run?.state !== RUN_STATE.running ? EDITOR_PART.markup : EDITOR_PART.change,
@@ -241,8 +251,11 @@ const Editor = ({
   }, [s.fresh]);
 
   const start = (edit: IImageEdit) => {
-    if ((edit.provider ?? provider) === 'antigravity' && edit.mode === EDIT_MODE.cut) return;
-    startRun(original.id, host, { ...edit, provider: edit.provider ?? provider });
+    const chosen = edit.provider ?? provider;
+    if (!drawsTransparent(chosen) && edit.mode === EDIT_MODE.cut) return;
+    if (!priceAllows(price)) return;
+    const model = edit.provider ? edit.model : settled.model;
+    startRun(original.id, host, { ...edit, provider: chosen, ...(model ? { model } : {}) });
     patch({ tool: null, marks: NO_MARKS, text: '' });
   };
   const pickTool = (tool: TTool) => {
@@ -336,8 +349,14 @@ const Editor = ({
         ) : (
           <EditDock
             switcher={switcher}
-            provider={running ? (run.edit.provider ?? provider) : provider}
-            onProvider={setProvider}
+            providers={providers}
+            choice={
+              running
+                ? { provider: run.edit.provider ?? provider, model: run.edit.model ?? '' }
+                : { provider, model: settled.model ?? '' }
+            }
+            onChoice={setChoice}
+            price={price}
             tool={s.tool}
             onTool={pickTool}
             running={running}
@@ -352,7 +371,7 @@ const Editor = ({
             text={s.text}
             onText={(text) => patch({ text })}
             focusField={focusField}
-            canSend={canSend({ tool: s.tool, marks: s.marks, text: s.text, running })}
+            canSend={canSend({ tool: s.tool, marks: s.marks, text: s.text, running }) && priceAllows(price)}
             onSend={send}
             failure={failure}
           />

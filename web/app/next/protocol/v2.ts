@@ -790,6 +790,8 @@ export interface ChatMade {
 }
 /** What a person may do in a project, weakest first. Absent from a runtime that does not restrict access. */
 export type DesignRole = 'view' | 'comment' | 'edit' | 'manage' | 'owner';
+export const DESIGN_ACCESS_SOURCES = ['owner', 'person', 'team', 'link'] as const;
+export type DesignAccessSource = (typeof DESIGN_ACCESS_SOURCES)[number];
 export const DESIGN_ROLES: readonly DesignRole[] = ['view', 'comment', 'edit', 'manage', 'owner'];
 /** How a deck's speaker notes are written. */
 export type DesignDeckTone = 'talk' | 'biz' | 'short';
@@ -873,6 +875,8 @@ export interface DesignArtifact {
   people?: string[];
   owner?: DesignOwner;
   role?: DesignRole;
+  accessSource?: DesignAccessSource;
+  accessUntil?: string;
   /** The app's document type the project is (made of Sinopia's site): its label; absent for Sinopia's own projects. */
   appKind?: DesignAppKind;
 }
@@ -2731,6 +2735,8 @@ const designArtifact: Decoder<DesignArtifact> = object(
     people: array(str),
     owner: designOwner,
     role: designRole,
+    accessSource: oneOf(DESIGN_ACCESS_SOURCES),
+    accessUntil: str,
     appKind: designAppKind,
   },
 );

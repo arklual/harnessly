@@ -2,10 +2,21 @@
 // changes them through `<platform>/images`, a Sinopia design keeps them in the project and writes the chosen one into
 // the board. The editor knows neither.
 
-export const IMAGE_PROVIDERS = ['codex', 'antigravity'] as const;
+import type { MachineId } from '@/next/protocol/v2';
+
+/** The generators a picture may be drawn with; which of them a machine offers, it says (providers.ts). */
+export const IMAGE_PROVIDERS = ['codex', 'antigravity', 'higgsfield'] as const;
 export type ImageProvider = (typeof IMAGE_PROVIDERS)[number];
-export const imageProviderName = (provider: ImageProvider): string =>
-  provider === 'antigravity' ? 'Antigravity' : 'Codex';
+export const isImageProvider = (v: unknown): v is ImageProvider =>
+  typeof v === 'string' && (IMAGE_PROVIDERS as readonly string[]).includes(v);
+const PROVIDER_NAME: Record<ImageProvider, string> = {
+  codex: 'Codex',
+  antigravity: 'Antigravity',
+  higgsfield: 'Higgsfield',
+};
+export const imageProviderName = (provider: ImageProvider): string => PROVIDER_NAME[provider];
+/** Only Codex draws a transparent background and removes one. */
+export const drawsTransparent = (provider: ImageProvider): boolean => provider === 'codex';
 
 export const EDIT_MODE = {
   text: 'text',
@@ -35,6 +46,8 @@ export interface IImageVersion {
 export interface IImageEdit {
   /** Absent on older saved runs: Codex. */
   provider?: ImageProvider;
+  /** The provider's model (Higgsfield's), absent for its default. */
+  model?: string;
   from: IImageVersion;
   mode: TEditMode;
   /** The person's words, '' when the mode needs none. */
@@ -54,6 +67,8 @@ export interface IEditProgress {
 }
 
 export interface IImageEditHost {
+  /** The machine the pictures are changed on: it says which generators it has and what a paid one costs. */
+  machine?: MachineId;
   /** Starts a change and answers what to follow it by; rejects with an Error the person may read. */
   start: (edit: IImageEdit) => Promise<string>;
   read: (run: string, signal: AbortSignal) => Promise<IEditProgress>;

@@ -64,14 +64,18 @@ type Provider string
 const (
 	Codex       Provider = "codex"
 	Antigravity Provider = "antigravity"
+	// Higgsfield draws through the person's media provider (media.go): it spends their credits.
+	Higgsfield Provider = "higgsfield"
 )
 
 // Request is what to draw.
 type Request struct {
 	Provider Provider `json:"provider,omitempty"`
-	Prompt   string   `json:"prompt"`
-	Count    int      `json:"count"`
-	Shape    Shape    `json:"shape,omitempty"`
+	// Model is the provider's model (Higgsfield only; "" for its default).
+	Model  string `json:"model,omitempty"`
+	Prompt string `json:"prompt"`
+	Count  int    `json:"count"`
+	Shape  Shape  `json:"shape,omitempty"`
 	// Transparent asks for a transparent background.
 	Transparent bool `json:"transparent,omitempty"`
 	// Conv is the chat that asked ("" for none); Owner says who else did (e.g. "design:<id>").
@@ -104,6 +108,7 @@ type Image struct {
 // Snapshot is a job as it is now.
 type Snapshot struct {
 	Provider Provider `json:"provider,omitempty"`
+	Model    string   `json:"model,omitempty"`
 	ID       string   `json:"id"`
 	Prompt   string   `json:"prompt"`
 	Count    int      `json:"count"`
@@ -138,6 +143,8 @@ type Service struct {
 	AntigravityHome string
 	// AntigravityEnv is separate from Codex's Env; nil inherits this process's environment.
 	AntigravityEnv func() []string
+	// Media draws the pictures of provider Higgsfield (nil: it is refused).
+	Media Media
 	// Changed is told a job's new state; nil for nothing.
 	Changed func(Snapshot)
 
@@ -164,12 +171,19 @@ func Normalize(r Request) (Request, error) {
 	switch r.Provider {
 	case "":
 		r.Provider = Codex
-	case Codex, Antigravity:
+	case Codex, Antigravity, Higgsfield:
 	default:
-		return r, fmt.Errorf("%w: provider is codex or antigravity", ErrBadRequest)
+		return r, fmt.Errorf("%w: provider is codex, antigravity or higgsfield", ErrBadRequest)
 	}
 	if r.Provider == Antigravity && (r.Transparent || r.Mode == ModeCut) {
 		return r, fmt.Errorf("%w: Antigravity does not support transparent output; use provider codex", ErrBadRequest)
+	}
+	if r.Provider == Higgsfield && (r.Transparent || r.Mode == ModeCut) {
+		return r, fmt.Errorf("%w: Higgsfield here draws no transparent background; use provider codex", ErrBadRequest)
+	}
+	r.Model = strings.TrimSpace(r.Model)
+	if r.Model != "" && (r.Provider != Higgsfield || !modelID.MatchString(r.Model)) {
+		return r, fmt.Errorf("%w: a model is named for provider higgsfield only, as an id of its catalog", ErrBadRequest)
 	}
 	r.Prompt = strings.TrimSpace(r.Prompt)
 	r, err := normalizeEdit(r)
@@ -203,9 +217,12 @@ func (s *Service) Start(r Request) (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
+	if r.Provider == Higgsfield && (s.Media == nil || !s.Media.Available()) {
+		return Snapshot{}, fmt.Errorf("%w: %w", ErrBadRequest, ErrNoMedia)
+	}
 	id := newID()
 	j := &job{done: make(chan struct{}), snap: Snapshot{
-		Provider: r.Provider, ID: id, Prompt: r.Prompt, Count: r.Count, Shape: r.Shape, Conv: r.Conv, Owner: r.Owner, Source: r.Source, Mode: r.Mode, State: Running,
+		Provider: r.Provider, Model: r.Model, ID: id, Prompt: r.Prompt, Count: r.Count, Shape: r.Shape, Conv: r.Conv, Owner: r.Owner, Source: r.Source, Mode: r.Mode, State: Running,
 		Images: []Image{}, StartedAt: time.Now().UnixMilli(),
 	}}
 	s.mu.Lock()
@@ -384,6 +401,14 @@ func (s *Service) run(j *job, r Request) {
 		return
 	}
 	defer os.RemoveAll(work)
+	if r.Provider == Higgsfield {
+		if err := s.runMedia(ctx, j, r, work, out); err != nil {
+			fail(err.Error())
+		} else {
+			s.update(j, func(sn *Snapshot) { sn.State, sn.EndedAt = Done, time.Now().UnixMilli() })
+		}
+		return
+	}
 	if r.Provider == Antigravity {
 		if err := s.runAntigravity(ctx, r, work, s.antigravityCollector(j, r, out)); err != nil {
 			fail(err.Error())

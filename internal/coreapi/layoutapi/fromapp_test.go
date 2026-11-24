@@ -23,8 +23,12 @@ func TestWithFromApp(t *testing.T) {
 	if got == nil || !reflect.DeepEqual(got.Apps, []string{"acme.inbox"}) {
 		t.Fatalf("the app is on: %+v", got)
 	}
-	base := &agents.Launch{Apps: []string{"acme.docs"}}
+	model := "gpt-6.2-sol"
+	base := &agents.Launch{Profile: "gpt", Model: &model, Apps: []string{"acme.docs"}}
 	got = withFromApp(base, "acme.inbox", yes)
+	if got.Profile != "gpt" || got.Model == nil || *got.Model != model {
+		t.Fatalf("adding the app lost the model choice: %+v", got)
+	}
 	if !reflect.DeepEqual(got.Apps, []string{"acme.docs", "acme.inbox"}) || !reflect.DeepEqual(base.Apps, []string{"acme.docs"}) {
 		t.Fatalf("added beside the named apps, the request's launch untouched: %+v / %+v", got, base)
 	}

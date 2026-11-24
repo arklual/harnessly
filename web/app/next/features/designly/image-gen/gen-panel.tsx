@@ -10,6 +10,14 @@ import Icon from '@/next/ui/icon';
 import Segmented from '@/next/ui/segmented';
 import { toast } from '@/next/features/designly/sdk/toast';
 import {
+  PriceNote,
+  ProviderPicker,
+  priceAllows,
+  settleChoice,
+  type IProviderChoice,
+} from '@/next/features/image-edit/provider-picker';
+import { useImagePrice, useImageProviders } from '@/next/features/image-edit/providers';
+import {
   GEN_VARIANTS,
   readGenVariants,
   shapeOf,
@@ -140,19 +148,33 @@ export const ImageGenPanel = ({ machine, target, apply, embedded = false }: IIma
   const done = useGenDone(target.key);
   const gen = done ?? target.gen;
   const [prompt, setPrompt] = useState(gen?.prompt ?? target.brief ?? '');
-  const [provider, setProvider] = useState<'codex' | 'antigravity'>('codex');
+  const [choice, setChoice] = useState<IProviderChoice>({ provider: 'codex', model: '' });
   const [count, setCount] = useState(1);
+  const providers = useImageProviders(machine);
+  const settled = settleChoice(providers, choice, false);
+  const shape = shapeOf(target.ratio);
+  const price = useImagePrice(
+    machine,
+    settled.info?.paid ? { provider: settled.provider, model: settled.model, count, shape } : null,
+  );
   /** The variants of an earlier job are being fetched. */
   const [fetching, setFetching] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
   const brief = prompt.trim();
 
   const make = () => {
-    if (brief === '' || run !== null) return;
+    if (brief === '' || run !== null || !priceAllows(price)) return;
     void startGen(
       machine,
       target.key,
-      { artifact: target.artifact, provider, prompt: brief, count, shape: shapeOf(target.ratio) },
+      {
+        artifact: target.artifact,
+        provider: settled.provider,
+        ...(settled.model ? { model: settled.model } : {}),
+        prompt: brief,
+        count,
+        shape,
+      },
       target.tpl,
       apply,
     );
@@ -165,6 +187,7 @@ export const ImageGenPanel = ({ machine, target, apply, embedded = false }: IIma
       {
         artifact: target.artifact,
         provider: run.provider ?? 'codex',
+        ...(run.model ? { model: run.model } : {}),
         prompt: run.prompt,
         count: run.count,
         shape: shapeOf(target.ratio),
@@ -213,19 +236,7 @@ export const ImageGenPanel = ({ machine, target, apply, embedded = false }: IIma
             }}
           />
           <div className="hx-imagegen__row">
-            <label>
-              {t('next.imagegen.provider')}
-              <select
-                aria-label={t('next.imagegen.provider')}
-                value={provider}
-                onChange={(event) =>
-                  setProvider(event.target.value === 'antigravity' ? 'antigravity' : 'codex')
-                }
-              >
-                <option value="codex">Codex</option>
-                <option value="antigravity">Antigravity</option>
-              </select>
-            </label>
+            <ProviderPicker providers={providers} choice={choice} onChoice={setChoice} />
             <Segmented
               label={t('next.imagegen.variants')}
               value={String(count)}
@@ -248,7 +259,7 @@ export const ImageGenPanel = ({ machine, target, apply, embedded = false }: IIma
                 type="button"
                 className="hx-imagegen__btn"
                 data-primary="1"
-                disabled={brief === ''}
+                disabled={brief === '' || !priceAllows(price)}
                 onClick={make}
               >
                 <Icon name={gen ? 'refresh-cw' : 'sparkles'} size="sm" />
@@ -256,6 +267,7 @@ export const ImageGenPanel = ({ machine, target, apply, embedded = false }: IIma
               </button>
             </span>
           </div>
+          <PriceNote price={price} name={settled.info?.name ?? ''} />
         </>
       ) : (
         <RunView run={run} machine={machine} retry={retry} />

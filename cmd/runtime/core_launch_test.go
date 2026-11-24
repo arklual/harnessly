@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,9 +17,20 @@ import (
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/preflight"
+	"github.com/ly-solutions/harnessly/internal/providers"
 	"github.com/ly-solutions/harnessly/internal/terminal"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 )
+
+type launchTestGPTBridge struct {
+	providers.Switch
+	ready atomic.Bool
+}
+
+func (b *launchTestGPTBridge) Ready() bool { return b.ready.Load() }
+func (*launchTestGPTBridge) Endpoint() (string, string, bool) {
+	return "http://127.0.0.1:1", "/not-used-by-fake-agent", true
+}
 
 // A conversation started through the gate with the launch slice on: the core makes the tab on a real tmux server, types
 // the launch line with the prompt, and its keeper holds the tab as launching. With the slice off the route is the old
@@ -50,12 +62,17 @@ func TestLaunchSliceStartsAConversation(t *testing.T) {
 	mode := filepath.Join(dir, "state-mode.json")
 	_ = os.WriteFile(mode, []byte(`{"owned":false,"goSlices":["core","launch"]}`), 0o600)
 	_ = os.WriteFile(filepath.Join(dir, "cli-token"), []byte("tok"), 0o600)
+	_ = os.WriteFile(filepath.Join(dir, "hooks.json"), []byte(`{}`), 0o600)
 
 	ag := newCoreAgents(coreAgentsConfig{DataDir: dir, Home: home, ConfigFile: filepath.Join(dir, "config.json"),
 		ClaudeDir: filepath.Join(home, ".claude"), CodexDir: filepath.Join(home, ".codex"), DefaultsKey: "launchDefaults", Launcher: agentBin, EnvDir: envDir})
+	var claudeLoggedIn atomic.Bool
 	ag.preflight = func() preflight.Result {
-		return preflight.Result{Claude: preflight.Claude{Installed: true}, Codex: preflight.Codex{Installed: true}}
+		return preflight.Result{Claude: preflight.Claude{Installed: true, LoggedIn: claudeLoggedIn.Load()}, Codex: preflight.Codex{Installed: true}}
 	}
+	bridge := &launchTestGPTBridge{}
+	ag.profiles.Switches["gpt"] = bridge
+	claudeLoggedIn.Store(true)
 	c := newCore(coreConfig{DataDir: dir, Home: home, Tmux: tm, Term: terminal.New(terminal.Config{Tmux: tm, Home: home}), MetaKey: "meta",
 		Agents: ag, Launch: launchConfig{EnvPrefix: "HARNESS_", DataDirLabel: "~/data", FirstWorkspaceName: "Workspace"}})
 	f, err := gate.New(gate.Config{Listen: "127.0.0.1:0", Upstream: "127.0.0.1:1", DataDir: dir, CountEvery: time.Hour})
@@ -157,6 +174,51 @@ func TestLaunchSliceStartsAConversation(t *testing.T) {
 	if flat := paneText(screen); !strings.Contains(flat, paneText(`exec env DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 '\''`+agentBin+`'\'' --resume `+sid+" --settings")) ||
 		!strings.Contains(flat, paneText("fake agent started: --resume "+sid)) || !strings.Contains(flat, paneText("key=[it's secret]")) {
 		t.Fatalf("the reset did not resume the agent:\n%s", screen)
+	}
+
+	route := platformAPI + "/conversations/opus-first"
+	if code, _ := post(route, `{"provider":"codex","workspaceId":"ws-a"}`); code != http.StatusBadRequest {
+		t.Fatalf("Opus-first launch accepted Codex: %d", code)
+	}
+	claudeLoggedIn.Store(false)
+	before := len(c.store.WorkspaceTabs())
+	code, _ = post(route, `{"provider":"claude","workspaceId":"ws-a"}`)
+	if after := len(c.store.WorkspaceTabs()); code != http.StatusServiceUnavailable || after != before {
+		t.Fatalf("without either backend: status %d, tabs before %d after %d", code, before, after)
+	}
+	bridge.ready.Store(true)
+	for _, tc := range []struct {
+		loggedIn       bool
+		model, profile string
+	}{
+		{true, "opus", ""}, // Both backends are ready: native Opus still wins.
+		{false, "gpt-6.2-sol", "gpt"},
+	} {
+		claudeLoggedIn.Store(tc.loggedIn)
+		model := tc.model
+		code, conv := post(route, `{"provider":"claude","workspaceId":"ws-a","prompt":"check this",`+
+			`"from":{"app":"example.inbox","label":"Inbox","title":"Check"}}`)
+		if code != http.StatusCreated || conv.String("provider") != "claude" || conv.Object("launch").String("profile") != tc.profile ||
+			conv.Object("launch").String("model") != model || conv.Object("from").String("app") != "example.inbox" {
+			t.Fatalf("Inbox launch with %s: %d %s", model, code, jsvalue.Stringify(conv, ""))
+		}
+		got, ok := m.Tab(conv.String("id"))
+		if !ok || got.PanelType != "claude-code" {
+			t.Fatalf("expected Claude Code for %s: %+v %v", model, got, ok)
+		}
+		ranWithModel := func(s string) bool {
+			_, args, ok := strings.Cut(paneText(s), paneText("fake agent started:"))
+			return ok && strings.Contains(args, paneText("--model "+model))
+		}
+		for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
+			screen, _ = tm.Capture(got.TmuxSession)
+			if ranWithModel(screen) {
+				break
+			}
+		}
+		if !ranWithModel(screen) {
+			t.Fatalf("Claude Code did not run with %s:\n%s", model, screen)
+		}
 	}
 
 	// The slice off: the route goes back to the old runtime.

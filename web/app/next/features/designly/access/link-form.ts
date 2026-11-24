@@ -67,6 +67,7 @@ export interface ILinkForm {
 
 /** What the screen knows of the thing shared. */
 export interface ILinkContext {
+  staticSnapshot?: boolean;
   kind: TLinkKind;
   /** A design's pages, to give some of them; fewer than two and there is nothing to choose. */
   pages?: readonly IScopePage[];
@@ -205,6 +206,11 @@ export const inputOf = (form: ILinkForm, ctx: ILinkContext): ILinkInput => ({
 
 /** A change of a link: everything but the term, which is sent only when touched. */
 export const changeOf = (form: ILinkForm, ctx: ILinkContext): ILinkChange => {
+  if (ctx.staticSnapshot) {
+    return form.termTouched
+      ? { forWhom: form.forWhom.trim(), ttl: form.term }
+      : { forWhom: form.forWhom.trim() };
+  }
   const { ttl, ...rest } = inputOf(form, ctx);
   return form.termTouched ? { ...rest, ttl } : rest;
 };

@@ -76,7 +76,9 @@ const LinkRow = ({
     ? [t('next.access.linkKind.guest'), canLabel(guest.rights), guestTerm(guest, now)]
     : invite
       ? [
-          t('next.access.linkKind.member'),
+          invite.teamId
+            ? t('next.access.teamName', { name: invite.teamId })
+            : t('next.access.linkKind.member'),
           [canLabel(invite.role), ttlLabel(invite.roleTtl)].filter(Boolean).join(', '),
           inviteUntil(invite.expiresAt),
           invite.maxUses !== null ? t('next.access.firstN', { n: invite.maxUses }) : '',

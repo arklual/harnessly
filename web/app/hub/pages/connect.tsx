@@ -29,6 +29,8 @@ export const ConnectScreen = () => {
   const [phase, setPhase] = useState<Phase>('loading');
   const [error, setError] = useState<string | null>(null);
   const [prompt, setPrompt] = useState(true);
+  // The journal of events is never asked for by default: an app reads it only when the person ticks it.
+  const [events, setEvents] = useState(false);
   const [busy, setBusy] = useState<'allow' | 'deny' | null>(null);
 
   useEffect(() => {
@@ -56,7 +58,11 @@ export const ConnectScreen = () => {
     setBusy(allow ? 'allow' : 'deny');
     setError(null);
     try {
-      await api.device.approve(code, allow, prompt ? ['read', 'prompt'] : ['read']);
+      await api.device.approve(code, allow, [
+        'read',
+        ...(prompt ? ['prompt'] : []),
+        ...(events ? ['events'] : []),
+      ]);
       setPhase(allow ? 'allowed' : 'denied');
     } catch (e) {
       setError(errorText(e));
@@ -120,6 +126,14 @@ export const ConnectScreen = () => {
                 <span className="hub-item__head">
                   <input type="checkbox" checked={prompt} onChange={(e) => setPrompt(e.target.checked)} />
                   <span className="hub-t__n">{t('connect.prompt')}</span>
+                </span>
+              </label>
+            )}
+            {request.scopes.includes('events') && (
+              <label className="hub-item">
+                <span className="hub-item__head">
+                  <input type="checkbox" checked={events} onChange={(e) => setEvents(e.target.checked)} />
+                  <span className="hub-t__n">{t('connect.events')}</span>
                 </span>
               </label>
             )}

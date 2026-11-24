@@ -441,25 +441,28 @@ const Block = ({ label, children }: { label?: string; children: ReactNode }) => 
 
 /** «Срок»: a slider of four stops (a day, a week, a month, for ever) and the date it gives. */
 const TermSlider = ({
+  expiringOnly = false,
   term,
   touched,
   until,
   onPick,
   now,
 }: {
+  expiringOnly?: boolean;
   term: TTerm;
   touched: boolean;
   until: string | null;
   onPick: (term: TTerm) => void;
   now: number;
 }) => {
+  const stops: readonly TTerm[] = expiringOnly ? TERMS.filter((stop) => stop !== null) : TERMS;
   const [drag, setDrag] = useState(false);
-  const at = touched ? TERMS.indexOf(term) : -1;
-  const pct = (i: number) => (i * 100) / (TERMS.length - 1);
+  const at = touched ? stops.indexOf(term) : -1;
+  const pct = (i: number) => (i * 100) / (stops.length - 1);
   const stopAt = (event: PointerEvent<HTMLDivElement>): TTerm => {
     const box = event.currentTarget.getBoundingClientRect();
     const x = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width));
-    return TERMS[Math.round(x * (TERMS.length - 1))];
+    return stops[Math.round(x * (stops.length - 1))];
   };
   const name = (stop: TTerm) => (stop === null ? '∞' : t(`next.access.links.term.${stop}`));
   const valueText = at < 0 ? (until ?? '') : termDate(term, now);
@@ -473,7 +476,7 @@ const TermSlider = ({
         tabIndex={0}
         aria-label={t('next.access.links.termLabel')}
         aria-valuemin={0}
-        aria-valuemax={TERMS.length - 1}
+        aria-valuemax={stops.length - 1}
         aria-valuenow={Math.max(0, at)}
         aria-valuetext={valueText}
         // The slider's place is a share of its own width: a custom property, not a style rule written here.
@@ -482,7 +485,7 @@ const TermSlider = ({
           const step = KEY_STEP[event.key];
           if (step === undefined) return;
           event.preventDefault();
-          onPick(TERMS[Math.min(TERMS.length - 1, Math.max(0, (at < 0 ? 1 : at) + step))]);
+          onPick(stops[Math.min(stops.length - 1, Math.max(0, (at < 0 ? 1 : at) + step))]);
         }}
         onPointerDown={(event) => {
           event.currentTarget.setPointerCapture(event.pointerId);
@@ -499,7 +502,7 @@ const TermSlider = ({
       >
         <span className="hx-acc-range__track" />
         <span className="hx-acc-range__fill" />
-        {TERMS.map((stop, i) => (
+        {stops.map((stop, i) => (
           <span
             key={String(stop)}
             className="hx-acc-range__stop"
@@ -510,7 +513,7 @@ const TermSlider = ({
         <span className="hx-acc-range__thumb" />
       </div>
       <div className="hx-acc-range__lbls">
-        {TERMS.map((stop, i) => (
+        {stops.map((stop, i) => (
           <button
             key={String(stop)}
             type="button"
@@ -589,17 +592,19 @@ const More = ({
     };
     return (
       <>
-        <Block label={t('next.access.links.deviceLabel')}>
-          <Tiles
-            label={t('next.access.links.deviceLabel')}
-            value={form.device}
-            onPick={(device) => setForm({ device })}
-            tiles={[
-              { value: 'desktop', name: t('next.access.links.device.desktop'), icon: 'monitor' },
-              { value: 'phone', name: t('next.access.links.device.phone'), icon: 'smartphone' },
-            ]}
-          />
-        </Block>
+        {!ctx.staticSnapshot && (
+          <Block label={t('next.access.links.deviceLabel')}>
+            <Tiles
+              label={t('next.access.links.deviceLabel')}
+              value={form.device}
+              onPick={(device) => setForm({ device })}
+              tiles={[
+                { value: 'desktop', name: t('next.access.links.device.desktop'), icon: 'monitor' },
+                { value: 'phone', name: t('next.access.links.device.phone'), icon: 'smartphone' },
+              ]}
+            />
+          </Block>
+        )}
         {pages.length > 1 && (
           <Block label={t('next.access.links.pagesLabel')}>
             <div className="hx-acc-chips">
@@ -618,7 +623,7 @@ const More = ({
             </div>
           </Block>
         )}
-        {version}
+        {!ctx.staticSnapshot && version}
       </>
     );
   }
@@ -755,32 +760,36 @@ export const LinkScreen = ({
         aria-label={t('next.access.links.whoLabel')}
         onChange={(event) => setForm({ forWhom: event.target.value })}
       />
-      <Row
-        name={t('next.access.links.rightsLabel')}
-        value={t(`next.access.links.rightsValue.${form.rights}`)}
-        open={acc === ACC.role}
-        onToggle={toggle(ACC.role)}
-      >
-        <Tiles
-          label={t('next.access.links.rightsLabel')}
-          value={form.rights}
-          onPick={(rights) => setForm({ rights })}
-          tiles={[
-            {
-              value: 'view',
-              name: t('next.access.links.rightsValue.view'),
-              icon: 'eye',
-              sub: t('next.access.links.viewSub', { what }),
-            },
-            {
-              value: 'comment',
-              name: t('next.access.links.rightsValue.comment'),
-              icon: 'message-square',
-              sub: t('next.access.links.commentSub'),
-            },
-          ]}
-        />
-      </Row>
+      {ctx.staticSnapshot ? (
+        <p className="hx-acc-ro-note">{t('next.access.links.staticSnapshot')}</p>
+      ) : (
+        <Row
+          name={t('next.access.links.rightsLabel')}
+          value={t(`next.access.links.rightsValue.${form.rights}`)}
+          open={acc === ACC.role}
+          onToggle={toggle(ACC.role)}
+        >
+          <Tiles
+            label={t('next.access.links.rightsLabel')}
+            value={form.rights}
+            onPick={(rights) => setForm({ rights })}
+            tiles={[
+              {
+                value: 'view',
+                name: t('next.access.links.rightsValue.view'),
+                icon: 'eye',
+                sub: t('next.access.links.viewSub', { what }),
+              },
+              {
+                value: 'comment',
+                name: t('next.access.links.rightsValue.comment'),
+                icon: 'message-square',
+                sub: t('next.access.links.commentSub'),
+              },
+            ]}
+          />
+        </Row>
+      )}
       <Row
         name={t('next.access.links.termLabel')}
         value={termValue}
@@ -788,6 +797,7 @@ export const LinkScreen = ({
         onToggle={toggle(ACC.term)}
       >
         <TermSlider
+          expiringOnly={ctx.staticSnapshot}
           term={form.term}
           touched={form.termTouched || !editing}
           until={editing ? termValue : null}
@@ -819,16 +829,18 @@ export const LinkScreen = ({
           )}
         </>
       )}
-      <Row
-        name={t('next.access.links.more')}
-        value={moreSummary(form, ctx)}
-        open={acc === ACC.more}
-        onToggle={toggle(ACC.more)}
-      >
-        <div className="hx-acc-drop__scroll">
-          <More form={form} setForm={setForm} ctx={ctx} />
-        </div>
-      </Row>
+      {!(ctx.staticSnapshot && editing) && (
+        <Row
+          name={t('next.access.links.more')}
+          value={moreSummary(form, ctx)}
+          open={acc === ACC.more}
+          onToggle={toggle(ACC.more)}
+        >
+          <div className="hx-acc-drop__scroll">
+            <More form={form} setForm={setForm} ctx={ctx} />
+          </div>
+        </Row>
+      )}
     </form>
   );
 };

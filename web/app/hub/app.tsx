@@ -13,6 +13,7 @@ import { BrowserScreen } from './pages/browser';
 import { ConnectScreen } from './pages/connect';
 import { NetworkScreen } from './pages/network';
 import { SwitchesScreen } from './pages/switches';
+import { EventsScreen } from './pages/events';
 import { SitesPage } from './pages/sites';
 import { http } from './org/api/live/http';
 import { dataMode } from './org/mode';
@@ -35,6 +36,7 @@ const ROUTES = [
   '/connect',
   '/network',
   '/switches',
+  '/events',
   '/browser/:machineId',
   '/s/:slug',
   '/s/:slug/settings',
@@ -274,6 +276,7 @@ const Routes = () => {
   if (route === '/connect') return <ConnectScreen />;
   if (route === '/network') return <NetworkScreen />;
   if (route === '/switches') return <SwitchesScreen />;
+  if (route === '/events') return <EventsScreen />;
   if (route === '/apps/:app') return <AppRedirect app={params.app ?? ''} search={search} />;
   if (route === '/browser/:machineId') return <BrowserScreen machineId={params.machineId ?? ''} />;
   if (route === '/o/:org' || route === '/o/:org/:scope' || route === '/o/:org/:scope/:section') {

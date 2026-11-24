@@ -79,6 +79,8 @@ export interface ISidebarLaunch {
 export interface ISidebarProject {
   id: string;
   name: string;
+  /** A project only another machine has (the hub's registry): shown, but no chat of this one moves into it. */
+  elsewhere?: boolean;
 }
 
 /** A group inside the favorites, the ids of its chats in the order shown. */

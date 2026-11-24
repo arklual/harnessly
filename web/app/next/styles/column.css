@@ -107,7 +107,12 @@
   display: flex;
   gap: 7px;
   min-height: 28px;
-  padding: 0 4px 6px 8px;
+  /* The column floats over the feed, and in a narrow window the feed's text runs under the heading: it stands on the
+     same backing as the cards under it, so the words never mix with the text behind. */
+  margin-bottom: 6px;
+  padding: 0 8px 0 10px;
+  border-radius: 14px;
+  background: var(--ns-bg);
 }
 .hx-ns__hicon {
   flex: none;

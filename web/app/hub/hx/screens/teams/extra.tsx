@@ -74,6 +74,8 @@ export const NewTeamSheet = ({
   const clean = name.trim();
   const dup = taken.some((t) => t.trim().toLowerCase() === clean.toLowerCase());
   const bad = clean === '' || clean.length > NAME_MAX || dup || tenantId === null;
+  // What the button waits for, said next to it (GitHub #127): a disabled button that stays silent leaves the person guessing.
+  const missing = tenantId === null ? 'Выберите тенант' : clean === '' ? 'Введите название команды' : null;
   const submit = async (e?: FormEvent) => {
     e?.preventDefault();
     if (bad || busy || tenantId === null) return;
@@ -108,8 +110,8 @@ export const NewTeamSheet = ({
             setFailed(false);
           }}
         />
-        <p className="md-note" data-bad={dup || undefined}>
-          {dup ? 'Команда с таким названием уже есть' : 'Лид и лимит назначаются после создания'}
+        <p className="md-note" data-bad={dup || missing !== null || undefined}>
+          {dup ? 'Команда с таким названием уже есть' : (missing ?? 'Лид и лимит назначаются после создания')}
         </p>
         {failed && problem && (
           <p className="md-note tm-err" role="alert">

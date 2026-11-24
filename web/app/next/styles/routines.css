@@ -716,14 +716,9 @@
   pointer-events: none;
   background: linear-gradient(to top, var(--hx-bg-stage) 60%, transparent);
 }
-.hx-rt__composer {
-  width: min(680px, 100%);
+.hx-rt__dock > .hx-dock {
+  width: min(720px, 100%);
   pointer-events: auto;
-  --hx-composer-h: 96px;
-}
-.hx-rt__composer .hx-composer__layer {
-  padding: 14px 12px 10px 18px;
-  gap: 10px;
 }
 
 @container hxrt (max-width: 900px) {

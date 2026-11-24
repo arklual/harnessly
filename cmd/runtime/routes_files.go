@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/ly-solutions/harnessly/internal/fsprobe"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -203,7 +204,7 @@ func fileRoutes(d deps) []gate.JSONRoute {
 				if !files.AllowedContextRoot(root, []string{d.WorkspaceRoot, sharedProjects}) {
 					return answer(r, 403, files.Error(locale.Pick("The folder is outside the workspace", "Папка вне рабочего пространства")), noStore)
 				}
-				if st, err := os.Stat(root); err != nil || !st.IsDir() {
+				if st, err := fsprobe.Stat(root); err != nil || !st.IsDir() {
 					return answer(r, 400, files.Error(locale.Pick("This is not a folder", "Это не папка")), noStore)
 				}
 				return answer(r, 200, files.Object{{K: "files", V: files.SearchContext(root, files.QueryUnits(query))}}, noStore)

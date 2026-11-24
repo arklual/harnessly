@@ -745,7 +745,7 @@ func TestDesignImport(t *testing.T) {
 func TestDesignAccess(t *testing.T) {
 	m := map[string]string{"HUB_PUBLIC_URL": "http://localhost:8040", "HUB_DATA_DIR": t.TempDir()}
 	c, err := Load(env(m))
-	if err != nil || c.DesignAccess.TeamLevel != "edit" || c.DesignAccess.ClosedUnrecorded || c.DesignAccess.Register != "" {
+	if err != nil || c.DesignAccess.TeamLevel != "none" || c.DesignAccess.ClosedUnrecorded || c.DesignAccess.Register != "" {
 		t.Fatalf("today's behaviour by default: %v %+v", err, c.DesignAccess)
 	}
 	m["HUB_DESIGN_DEFAULT_TEAM_LEVEL"] = "None"

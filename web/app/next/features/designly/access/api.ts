@@ -34,6 +34,7 @@ export interface IPerson {
 }
 
 export interface IInvite {
+  teamId?: string;
   id: string;
   title: string;
   role: TInviteRole;
@@ -55,6 +56,7 @@ export interface IAccessRequest {
 
 /** `GET /:project`; the last three only come to a person who manages. */
 export interface IProjectAccess {
+  teamInvites?: boolean;
   role: TRole | null;
   /** Empty for a stranger: they get the name to ask by, not the address. */
   owner: string | null;
@@ -263,6 +265,7 @@ export const decideRequest = (
 ) => fresh(send('POST', `${at(project)}/requests/${encodeURIComponent(id)}`, decision));
 
 export interface IInviteInput {
+  teamId?: string;
   title: string;
   role: TInviteRole;
   roleTtl: TTtlValue;

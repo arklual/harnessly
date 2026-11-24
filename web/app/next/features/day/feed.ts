@@ -144,6 +144,8 @@ export type TChipKind = (typeof CHIP)[keyof typeof CHIP];
 export interface IDayChip {
   label: string;
   kind: TChipKind;
+  /** What the toast says once the chip did its work, when the card knows better than the kind («Заглушено»). */
+  told?: string;
   say?: string;
   url?: string;
 }

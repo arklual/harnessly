@@ -11,6 +11,7 @@ const ASK_MS = 200;
 const OUT_MS = 160;
 
 interface IPersonFieldProps {
+  search?: typeof searchPeople;
   label: string;
   placeholder: string;
   value: string;
@@ -22,6 +23,7 @@ interface IPersonFieldProps {
 }
 
 const PersonField = ({
+  search = searchPeople,
   label,
   placeholder,
   value,
@@ -38,8 +40,9 @@ const PersonField = ({
     if (query.length < 2) return;
     const abort = new AbortController();
     const timer = setTimeout(() => {
-      searchPeople(query, abort.signal).then(
+      search(query, abort.signal).then(
         (found) => {
+          if (abort.signal.aborted) return;
           setHits(found);
           setActive(-1);
         },
@@ -50,7 +53,7 @@ const PersonField = ({
       clearTimeout(timer);
       abort.abort();
     };
-  }, [query]);
+  }, [query, search]);
 
   // A pick ends the list; so does a short query.
   const shown =

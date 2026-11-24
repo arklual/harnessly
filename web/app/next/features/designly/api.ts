@@ -109,9 +109,43 @@ const lastViews = new Map<MachineId, ILibraryView>();
 /** The last library the home showed for this machine, from either side; null before any. */
 export const lastLibraryView = (m: MachineId): ILibraryView | null => lastViews.get(m) ?? null;
 
+/** A live project keeps its local board paths and chat activity. The Hub owns the person's grants.
+ * A shared Hub project can also be present before its files reach this machine. */
+function withHubAccess(machine: IDesign[], hub: IDesign[] | null): IDesign[] {
+  // Without a Hub grant feed, keep machine-authorized legacy projects. A recorded shared Hub grant
+  // must be confirmed here again before displaying its card.
+  if (!hub) return machine.filter((project) => !project.accessSource || project.accessSource === 'owner');
+  const byId = new Map(hub.map((project) => [project.id, project]));
+  const result: IDesign[] = [];
+  for (const local of machine) {
+    const grant = byId.get(local.id);
+    byId.delete(local.id);
+    if (grant?.accessSource) {
+      result.push({
+        ...local,
+        role: grant.role,
+        owner: grant.owner,
+        accessSource: grant.accessSource,
+        accessUntil: grant.accessUntil,
+      });
+    } else if (
+      grant ||
+      (local.owner?.me !== false &&
+        (!local.role || local.role === 'owner') &&
+        (!local.accessSource || local.accessSource === 'owner'))
+    ) {
+      result.push(local);
+    }
+  }
+  for (const project of byId.values()) {
+    if (project.accessSource) result.push(project);
+  }
+  return result;
+}
+
 /**
  * The home's library: the machine's when it answers within `wait`; when it does not (slow, off, an error) the hub's
- * copy, and the machine's still replaces it once it comes. Resolves on the first library shown; rejects only when
+ * copy. When both answer, shared projects and their grants come from the Hub. Resolves on the first library shown; rejects only when
  * neither the machine nor the hub gave one, with the machine's error.
  */
 export const readLibrary = (
@@ -121,7 +155,9 @@ export const readLibrary = (
   wait = MACHINE_WAIT_MS,
 ): Promise<void> =>
   new Promise((resolve, reject) => {
-    let machineDone = false;
+    let live: IDesignLibrary | null = null;
+    let stored: IStoreLibrary | null = null;
+    const refreshing = lastViews.has(m);
     let storeAsked = false;
     let storeFailed = false;
     let machineFailure: unknown = null;
@@ -131,15 +167,24 @@ export const readLibrary = (
       resolve();
     };
     const askStore = () => {
-      if (storeAsked || machineDone) return;
+      if (storeAsked) return;
       storeAsked = true;
       read.store().then(
         (copy) => {
-          if (!machineDone) put({ designs: copy.designs, from: LIBRARY_FROM.store, layout: copy.layout });
+          stored = copy;
+          if (live)
+            put({
+              designs: withHubAccess(live.designs, copy.designs),
+              from: LIBRARY_FROM.machine,
+              layout: null,
+            });
+          else put({ designs: copy.designs, from: LIBRARY_FROM.store, layout: copy.layout });
         },
         () => {
           storeFailed = true;
-          if (machineFailure !== null) reject(machineFailure);
+          if (live)
+            put({ designs: withHubAccess(live.designs, null), from: LIBRARY_FROM.machine, layout: null });
+          else if (machineFailure !== null) reject(machineFailure);
         },
       );
     };
@@ -150,9 +195,16 @@ export const readLibrary = (
     });
     read.machine().then(
       (library) => {
-        machineDone = true;
+        live = library;
         clearTimeout(timer);
-        put({ designs: library.designs, from: LIBRARY_FROM.machine, layout: null });
+        if (stored || storeFailed || !refreshing) {
+          put({
+            designs: withHubAccess(library.designs, stored?.designs ?? null),
+            from: LIBRARY_FROM.machine,
+            layout: null,
+          });
+        }
+        askStore();
       },
       (failure: unknown) => {
         clearTimeout(timer);

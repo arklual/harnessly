@@ -45,6 +45,7 @@ var SpaceCascade = []SpaceCascadeStep{
 	{"doc_threads", `slug IN ` + docsOfSpace},
 	{"doc_reads", `slug IN ` + docsOfSpace},
 	{"resource_guest_links", bySpace},
+	{"bus_events", bySpace}, // a space's team events go with it; its members' own events without a space stay theirs
 	{"design_derived", bySpace},
 	{"search_docs", bySpace},
 	{"chat_shares", bySpace},
@@ -57,10 +58,12 @@ var SpaceCascade = []SpaceCascadeStep{
 	{"board_bindings", bySpace},
 
 	// Designs are projects of the space's machines.
+	{"design_static_pages", `link_id IN (SELECT id FROM design_share_links WHERE ` + byMachine + `)`},
 	{"design_share_views", `link_id IN (SELECT id FROM design_share_links WHERE ` + byMachine + `)`},
 	{"design_guest_comments", `link_id IN (SELECT id FROM design_share_links WHERE ` + byMachine + `)`},
 	{"design_share_links", byMachine},
 	{"design_access_log", byMachine},
+	{"design_invite_acceptances", `invite_id IN (SELECT id FROM design_invites WHERE ` + byMachine + `)`},
 	{"design_invites", byMachine},
 	{"design_members", byMachine},
 	{"design_requests", byMachine},
@@ -177,6 +180,7 @@ var keptOnSpaceDelete = map[string]string{
 	"job_leases":      "installation: which replica does a background job",
 	"auth_challenges": "installation", "auth_events": "installation: the record of the deletion itself is here",
 	"users": "person", "identities": "person", "passkeys": "person", "person_settings": "person", "api_tokens": "person", "notice_items": "person", "notice_settings": "person",
+	"bus_subscriptions": "person", "bus_seq": "installation", "bus_triggers": "person: their catalog of triggers",
 	"orgs":                  "the organization outlives its spaces",
 	"merged_mrs":            "merge requests are keyed by their address and name no machine",
 	"eff_pulse":             "a person's own weekly answers",

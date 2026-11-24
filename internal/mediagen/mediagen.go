@@ -202,6 +202,9 @@ type Service struct {
 	order  []string
 	loaded bool
 	slots  chan struct{}
+	// imageCatalog is the MCP's list of picture models as last read (images.go), at imageCatalogAt.
+	imageCatalog   []ImageModel
+	imageCatalogAt time.Time
 }
 
 type job struct {

@@ -44,7 +44,8 @@ type Deps struct {
 	HubURL string
 	// ShareURL is the origin of the guest links; "" leaves them off. It must not be the hub's origin: a guest page of a
 	// project would run next to the hub's session.
-	ShareURL string
+	ShareURL     string
+	StaticGuests bool
 	// ShareAliases are other origins that used to carry the guest links: a request there is sent on to ShareURL.
 	ShareAliases []string
 	// PlatformAPI is the runtime's platform prefix when a machine's page never said its own.
@@ -95,6 +96,7 @@ type Service struct {
 	hubURL        string
 	shareURL      string
 	shareHost     string
+	staticGuests  bool
 	aliasHosts    map[string]bool
 	platformAPI   string
 	transport     func(id string) http.RoundTripper
@@ -137,7 +139,7 @@ type dayCount struct {
 func New(d Deps) *Service {
 	s := &Service{
 		db: d.DB, reg: d.Reg, log: d.Log, now: d.Now, hubURL: strings.TrimRight(d.HubURL, "/"), platformAPI: d.PlatformAPI,
-		transport: d.Transport, seal: newSealer(d.LinkKey), files: newFileKeyer(d.LinkKey), notice: d.Notice, bell: d.Bell, shared: d.Shared, opens: d.Opens, homeOn: d.HomeOn, ownerOn: d.OwnerOn, view: d.View, kits: d.Kits,
+		staticGuests: d.StaticGuests && d.ShareURL == "", transport: d.Transport, seal: newSealer(d.LinkKey), files: newFileKeyer(d.LinkKey), notice: d.Notice, bell: d.Bell, shared: d.Shared, opens: d.Opens, homeOn: d.HomeOn, ownerOn: d.OwnerOn, view: d.View, kits: d.Kits,
 		serving: map[string]bool{}, prefixes: map[string]string{}, timers: map[string]*time.Timer{},
 		events: map[string]*dayCount{}, tokens: map[string]cachedToken{}, budget: newBudget(),
 		teamLevel: roleEdit, closed: d.ClosedUnrecorded, sheets: newSheetCache(sheetCacheMax),

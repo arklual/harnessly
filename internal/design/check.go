@@ -394,7 +394,7 @@ type shotResult struct {
 	Status         string
 	Errors, Failed []string
 	Ms             int64
-	Saved          bool
+	Saved, Loaded  bool
 }
 
 var faviconRe = regexp.MustCompile(`favicon`)
@@ -504,8 +504,10 @@ func shoot(cdp *cdpPipe, session, url string, view shotView, file string, clicks
 	if _, err := cdp.send("Page.navigate", map[string]any{"url": url}, session); err != nil {
 		return fail(err)
 	}
+	didLoad := false
 	select {
 	case <-loaded:
+		didLoad = true
 	case <-time.After(checkLoadTimeout):
 	}
 	time.Sleep(checkSettle)
@@ -556,7 +558,7 @@ func shoot(cdp *cdpPipe, session, url string, view shotView, file string, clicks
 	f := append([]string{}, failed...)
 	failMu.Unlock()
 	e := errs.list()
-	return shotResult{Status: shotStatus(e, f, blank), Errors: e, Failed: f, Ms: time.Since(started).Milliseconds(), Saved: data != ""}
+	return shotResult{Status: shotStatus(e, f, blank), Errors: e, Failed: f, Ms: time.Since(started).Milliseconds(), Saved: data != "", Loaded: didLoad}
 }
 
 func jsStringOr(v any) string {

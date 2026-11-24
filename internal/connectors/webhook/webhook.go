@@ -68,10 +68,11 @@ func (hookConn) Spec() connectors.Spec {
 	return connectors.Spec{
 		ID:    ID,
 		Kind:  connectors.Webhook,
+		Inbox: "webhook", // HRN-1727: the inbox takes a service's CI, PRs and alerts (harnessly-inbox 0.10.12)
 		Title: connectors.T("Incoming webhook", "Входящий вебхук"),
 		Summary: connectors.T("A personal address services send their events to: alerts, CI, pull requests, issues",
 			"Личный адрес, на который сервисы шлют события: алерты, CI, пул-реквесты, задачи"),
-		Fields: []connectors.Field{
+		Fields: append([]connectors.Field{
 			{ID: "preset", Type: connectors.FieldChoice, Default: PresetGitHub, Label: connectors.T("Source", "Источник"),
 				Choices: []connectors.Choice{
 					choice(PresetGitHub, "GitHub", "GitHub"),
@@ -103,7 +104,7 @@ func (hookConn) Spec() connectors.Spec {
 					"Sentry подписывает секретом своей интеграции: вставьте его сюда")},
 			{ID: "secret", Type: connectors.FieldPassword, Secret: true, Generate: true,
 				Label: connectors.T("Secret", "Секрет")},
-		},
+		}, registrationFields()...),
 		Events: []string{EventReceived},
 		Tools: []connectors.Tool{
 			{Name: "events", Summary: "the latest events of the webhook: when, kind, title and id",

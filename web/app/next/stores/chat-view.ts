@@ -149,20 +149,19 @@ export const onViewApplied = (listener: () => void): (() => void) => {
 };
 
 /** Puts a view the machine kept into this device's stores, as the person had left the chat. */
-export const applyView = (conv: string, machine: string | null, view: IChatView): void => {
+export const applyView = (
+  conv: string,
+  machine: string | null,
+  view: IChatView,
+  { keepPane = false } = {},
+): void => {
   for (const [key, layout] of Object.entries(view.layouts)) {
     keepLayout(key, layout);
     noteLayoutKey(conv, key);
   }
-  chatPanes.update(conv, machine, (pane) => ({
-    ...pane,
-    open: view.pane.open,
-    maxed: view.pane.maxed,
-    width: view.pane.width,
-    tabs: view.pane.tabs,
-    active: view.pane.active,
-    unread: [],
-  }));
+  if (!keepPane) {
+    chatPanes.update(conv, machine, (pane) => ({ ...pane, ...view.pane, unread: [] }), 'machine');
+  }
   rememberPlace(conv, view.feed);
   const screen = view.screen === null ? null : parseRoute(view.screen);
   if (screen) keepScreen(conv, view.screen as string);

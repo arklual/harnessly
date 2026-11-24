@@ -13,6 +13,7 @@ import {
   type IGenPic,
   type IGenRequest,
 } from '@/next/features/designly/image-gen/api';
+import type { ImageProvider } from '@/next/features/image-edit/host';
 
 /** How often a running job is asked about. */
 export const GEN_POLL_MS = 1500;
@@ -21,7 +22,9 @@ export const GEN_PHASE = { drawing: 'drawing', choose: 'choose', failed: 'failed
 export type TGenPhase = (typeof GEN_PHASE)[keyof typeof GEN_PHASE];
 
 export interface IGenRun {
-  provider?: 'codex' | 'antigravity';
+  provider?: ImageProvider;
+  /** The provider's model, when it has models. */
+  model?: string;
   key: string;
   artifact: string;
   tpl: number;
@@ -163,6 +166,7 @@ export const startGen = async (
     artifact: request.artifact,
     tpl,
     provider: request.provider ?? 'codex',
+    ...(request.model ? { model: request.model } : {}),
     prompt: request.prompt.trim(),
     count: request.count,
     phase: GEN_PHASE.drawing,

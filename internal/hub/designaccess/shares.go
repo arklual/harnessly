@@ -277,6 +277,7 @@ func (t *txn) shareRows(id string) ([]shareRow, error) {
 }
 
 type shareInput struct {
+	Static  bool
 	Title   string
 	View    map[string]any
 	Rights  string
@@ -296,6 +297,9 @@ func (t *txn) createShare(id, actor string, in shareInput) (shareRow, string, er
 		return shareRow{}, "", err
 	}
 	token := randomToken(16)
+	if in.Static {
+		token = "snap-" + token
+	}
 	linkID := newUUID()
 	r := shareRow{ID: linkID, Project: id, Title: clip(in.Title, maxTitle), Rights: in.Rights, Version: in.Version, Rev: in.Rev, Pages: in.Pages,
 		View: in.View, Expires: expires, CreatedBy: normEmail(actor), CreatedAt: t.now}
@@ -510,7 +514,7 @@ func (l shareTarget) allows(board string) bool {
 // a design's link has (pinned revision, pages, view) comes from the link's own row. Whether its maker may still share is the
 // caller's to ask, on the machine's side.
 func (s *Service) resolveShare(ctx context.Context, now time.Time, token string) (string, *shareTarget, error) {
-	if !shareTokenRe.MatchString(token) {
+	if !shareTokenRe.MatchString(token) && !isStaticToken(token) {
 		return "missing", nil, nil
 	}
 	var r shareRow

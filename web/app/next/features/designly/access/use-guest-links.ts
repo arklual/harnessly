@@ -4,9 +4,10 @@ import { fetchGuestLinks, type IGuestLink } from '@/next/features/designly/acces
 
 export type TGuestLinks = { k: 'loading' } | { k: 'absent' } | { k: 'ready'; links: IGuestLink[] };
 
-export const useGuestLinks = (project: string) => {
+export const useGuestLinks = (project: string | null) => {
   const [state, setState] = useState<TGuestLinks>({ k: 'loading' });
   useEffect(() => {
+    if (!project) return;
     const abort = new AbortController();
     fetchGuestLinks(project, abort.signal).then(
       (links) => setState(links ? { k: 'ready', links } : { k: 'absent' }),

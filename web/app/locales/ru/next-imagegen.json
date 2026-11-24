@@ -3,7 +3,6 @@
   "next.agents.experimental": "экспериментально",
   "next.agents.noNativeAttachments": "Antigravity пока не поддерживает вложения файлов. Отправьте текст.",
   "next.imagegen.provider": "Генератор изображений",
-  "next.imageEdit.noTransparency": "Antigravity не поддерживает прозрачный фон и удаление фона. Для этих функций выберите Codex.",
   "next.imageEdit.brush.medium": "Средняя",
   "next.imageEdit.brush.thin": "Тонкая",
   "next.imageEdit.brush.wide": "Широкая",
@@ -73,5 +72,10 @@
   "next.imagegen.regenerate": "Перегенерировать",
   "next.imagegen.retry": "Ещё раз",
   "next.imagegen.strip": "Варианты картинки",
-  "next.imagegen.variants": "Вариантов"
+  "next.imagegen.variants": "Вариантов",
+  "next.imagegen.model": "Модель",
+  "next.imagegen.pricing": "Считаю цену…",
+  "next.imagegen.price": "Платно: ≈ {credits} кредитов с баланса {name}",
+  "next.imagegen.priceFailed": "Цену узнать не удалось: {why}",
+  "next.imageEdit.noTransparencyOf": "{name} не делает прозрачный фон и не удаляет фон. Для этого выберите Codex."
 }

@@ -475,7 +475,7 @@ func undecided(rest []byte) bool {
 	return strings.HasPrefix("<!--", lower) || strings.HasPrefix(lower, "<!--") && !strings.Contains(lower, "-->")
 }
 
-func (j *bridgeInjector) place(final bool) []byte {
+func (j *bridgeInjector) place(final bool) error {
 	b := j.pending
 	lead := leadOf(b)
 	var at int
@@ -490,10 +490,20 @@ func (j *bridgeInjector) place(final bool) []byte {
 	}
 	j.done = true
 	j.pending = nil
-	out := make([]byte, 0, len(b)+len(j.tag))
-	out = append(out, b[:at]...)
-	out = append(out, j.tag...)
-	return append(out, b[at:]...)
+	// Write the three parts directly instead of allocating a second copy of the pending HTML.
+	for _, part := range [3][]byte{b[:at], j.tag, b[at:]} {
+		if len(part) == 0 {
+			continue
+		}
+		n, err := j.w.Write(part)
+		if err != nil {
+			return err
+		}
+		if n != len(part) {
+			return io.ErrShortWrite
+		}
+	}
+	return nil
 }
 
 func (j *bridgeInjector) Write(b []byte) (int, error) {
@@ -501,10 +511,8 @@ func (j *bridgeInjector) Write(b []byte) (int, error) {
 		return j.w.Write(b)
 	}
 	j.pending = append(j.pending, b...)
-	if out := j.place(false); out != nil {
-		if _, err := j.w.Write(out); err != nil {
-			return 0, err
-		}
+	if err := j.place(false); err != nil {
+		return 0, err
 	}
 	return len(b), nil
 }
@@ -513,6 +521,5 @@ func (j *bridgeInjector) Close() error {
 	if j.done || len(j.pending) == 0 {
 		return nil
 	}
-	_, err := j.w.Write(j.place(true))
-	return err
+	return j.place(true)
 }

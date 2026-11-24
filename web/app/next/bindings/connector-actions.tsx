@@ -1,9 +1,9 @@
 // The actions outward an agent proposes through a connector (internal/connectors: send a letter, a message, create a
 // meeting), for the chat on screen: the card stands over the field of the chat whose agent asked, shows exactly what
-// will go and where, and only the person's yes runs it. The list follows the machine by a long wait on its revision
-// (<platform>/connector-actions?rev=), not by asking every few seconds; a hidden page stops waiting.
+// will go and where, and only the person's yes runs it. The list follows the machine while the page is visible.
 import { useCallback, useEffect, useState } from 'react';
 import { pageText } from '@/next/bindings/outcome';
+import { SHORT_POLL_MS, usesHttp1 } from '@/next/core/net/http';
 import {
   ANSWER_VERB,
   answerConnectorProposal,
@@ -26,28 +26,31 @@ const RETRY_MS = 5_000;
 
 const NONE: readonly IConnectorProposal[] = [];
 
-/** The proposals waiting on a machine, kept in step by waiting on its revision while the page is visible. */
+/** The proposals waiting on a machine, read by revision where the transport can afford held requests. */
 const useConnectorProposals = (machine: MachineId) => {
   const [read, setRead] = useState<{ machine: MachineId; list: readonly IConnectorProposal[] } | null>(null);
   const [nudge, setNudge] = useState(0);
   useEffect(() => {
+    const shortPoll = usesHttp1();
     let live = true;
     let running = false;
     let rev = '';
     let timer = 0;
     const step = async () => {
       if (!live || running || document.visibilityState !== 'visible') return;
+      window.clearTimeout(timer);
       running = true;
-      const res = await loadConnectorProposals(machine, rev);
+      const res = await loadConnectorProposals(machine, shortPoll ? '' : rev);
       running = false;
       if (!live) return;
       if (!('ok' in res) || isConnectorRefusal(res.value)) {
         timer = window.setTimeout(() => void step(), RETRY_MS);
         return;
       }
+      if (rev !== res.value.rev) setRead({ machine, list: res.value.proposals });
       rev = res.value.rev;
-      setRead({ machine, list: res.value.proposals });
-      void step();
+      if (shortPoll) timer = window.setTimeout(() => void step(), SHORT_POLL_MS);
+      else void step();
     };
     const onVisible = () => {
       if (document.visibilityState === 'visible') void step();

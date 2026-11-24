@@ -24,6 +24,9 @@ import (
 //	{"person": "<email>", "prompt": "…", "provider": "claude|codex", "machineId": "…", "workspaceId": "…",
 //	 "from": {"app": "…", "label": "…", "title": "…"}}
 //
+// POST /api/platform/launch/opus-first selects native Opus or, when unavailable, GPT‑6.2 Sol through Claude Code.
+// The machine decides before starting the chat. A separate path keeps older versions from ignoring the policy.
+//
 // from marks the chat as started by an app for the person: it sits in that app's folder of the sidebar, its prompt is
 // shown as the app's task, not as the person's words, until the person takes the chat.
 //
@@ -35,11 +38,12 @@ import (
 const launchSwitch = "prompt-launch"
 
 const (
-	launchPath    = "/api/platform/launch"
-	launchWait    = 60 * time.Second
-	maxLaunchBody = 256 << 10
-	maxLaunchText = 100_000
-	minLaunchKey  = 32
+	launchPath          = "/api/platform/launch"
+	opusFirstLaunchPath = launchPath + "/opus-first"
+	launchWait          = 60 * time.Second
+	maxLaunchBody       = 256 << 10
+	maxLaunchText       = 100_000
+	minLaunchKey        = 32
 )
 
 type launchBody struct {
@@ -68,8 +72,8 @@ type launchErr struct {
 func (e *launchErr) Error() string { return e.code + ": " + e.msg }
 
 func (s *Service) mountLaunch(mux *http.ServeMux) {
-	mux.HandleFunc("POST "+launchPath, func(w http.ResponseWriter, r *http.Request) {
-		err := s.launch(w, r)
+	handle := func(w http.ResponseWriter, r *http.Request) {
+		err := s.launch(w, r, r.URL.Path == opusFirstLaunchPath)
 		if err == nil {
 			return
 		}
@@ -83,11 +87,13 @@ func (s *Service) mountLaunch(mux *http.ServeMux) {
 			return
 		}
 		httpx.WriteError(w, r, err)
-	})
+	}
+	mux.HandleFunc("POST "+launchPath, handle)
+	mux.HandleFunc("POST "+opusFirstLaunchPath, handle)
 }
 
 // launch starts the conversation. A missing or short HUB_LAUNCH_TOKEN shuts the route (404, as if there were none).
-func (s *Service) launch(w http.ResponseWriter, r *http.Request) error {
+func (s *Service) launch(w http.ResponseWriter, r *http.Request, opusFirst bool) error {
 	key := s.cfg.LaunchToken
 	if len(key) < minLaunchKey {
 		return httpx.ErrNotFound
@@ -108,6 +114,9 @@ func (s *Service) launch(w http.ResponseWriter, r *http.Request) error {
 	if b.Person == "" || strings.TrimSpace(b.Prompt) == "" || len(b.Prompt) > maxLaunchText ||
 		(b.Provider != "claude" && b.Provider != "codex") || (b.MachineID != "" && !machineID.MatchString(b.MachineID)) {
 		return &launchErr{status: http.StatusBadRequest, code: "invalid_request", msg: "Нужны person, prompt и provider claude или codex"}
+	}
+	if opusFirst && b.Provider != "claude" {
+		return &launchErr{status: http.StatusBadRequest, code: "invalid_request", msg: "Для opus-first нужен provider claude"}
 	}
 	u, err := s.db.S().UserByEmail(r.Context(), b.Person)
 	if errors.Is(err, store.ErrNotFound) || (err == nil && u.DisabledAt != nil) {
@@ -134,7 +143,7 @@ func (s *Service) launch(w http.ResponseWriter, r *http.Request) error {
 	if s.switches == nil || !s.switches.On(r.Context(), launchSwitch, strings.ToLower(u.Email), m.ID) {
 		return &launchErr{status: http.StatusServiceUnavailable, code: "launch_off", msg: "Запуск через хаб для этого человека не включён"}
 	}
-	value, err := s.launchStart(r, u, m, b)
+	value, err := s.launchStart(r, u, m, b, opusFirst)
 	if err != nil {
 		return err
 	}
@@ -193,7 +202,7 @@ func (s *Service) launchMachine(ctx context.Context, u store.User, named string)
 
 // launchStart asks the machine's runtime to start the conversation as the person, over the session the workspace page
 // uses. The runtime's prefix of the platform API is read from the machine's own page.
-func (s *Service) launchStart(r *http.Request, u store.User, m store.Machine, b launchBody) (map[string]any, error) {
+func (s *Service) launchStart(r *http.Request, u store.User, m store.Machine, b launchBody, opusFirst bool) (map[string]any, error) {
 	payload := map[string]any{"provider": b.Provider, "prompt": b.Prompt}
 	if b.WorkspaceID != nil {
 		payload["workspaceId"] = *b.WorkspaceID
@@ -211,7 +220,11 @@ func (s *Service) launchStart(r *http.Request, u store.User, m store.Machine, b 
 	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), launchWait)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, workspaceBase+prefix+"/conversations", bytes.NewReader(raw))
+	path := prefix + "/conversations"
+	if opusFirst {
+		path += "/opus-first"
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, workspaceBase+path, bytes.NewReader(raw))
 	if err != nil {
 		return nil, err
 	}

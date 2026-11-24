@@ -251,7 +251,7 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodGet && r.URL.Query().Get("runtime") != "1" {
-		if token, found := strings.CutPrefix(r.URL.Path, "/m/"+id+"/designly/invite/"); found && inviteToken.MatchString(token) {
+		if token, found := strings.CutPrefix(r.URL.Path, "/m/"+id+"/designly/invite/"); found && store.ValidDesignInviteToken(token) {
 			w.Header().Set("Referrer-Policy", "no-referrer")
 			http.Redirect(w, r, "/design-invites/"+token, http.StatusFound)
 			return

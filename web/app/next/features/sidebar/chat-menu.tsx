@@ -288,21 +288,23 @@ const ChatMenu = ({
             <Icon name="chevron-left" size="sm" />
             {t('next.rowMenu.move')}
           </MenuItem>
-          {(projects ?? []).map((project) => (
-            <MenuItem
-              key={project.id}
-              className="hx-cmenu__item"
-              role="menuitemradio"
-              aria-checked={project.id === projectId}
-              onClick={() => {
-                if (project.id !== projectId) onMove(project.id);
-              }}
-            >
-              <Icon name="folder" size="sm" />
-              <span className="hx-cmenu__txt">{project.name}</span>
-              <Icon name="check" size="sm" className="hx-cmenu__check" />
-            </MenuItem>
-          ))}
+          {(projects ?? [])
+            .filter((project) => !project.elsewhere)
+            .map((project) => (
+              <MenuItem
+                key={project.id}
+                className="hx-cmenu__item"
+                role="menuitemradio"
+                aria-checked={project.id === projectId}
+                onClick={() => {
+                  if (project.id !== projectId) onMove(project.id);
+                }}
+              >
+                <Icon name="folder" size="sm" />
+                <span className="hx-cmenu__txt">{project.name}</span>
+                <Icon name="check" size="sm" className="hx-cmenu__check" />
+              </MenuItem>
+            ))}
           {projectId !== null && (
             <MenuItem className="hx-cmenu__item" onClick={() => onMove(null)}>
               <Icon name="x" size="sm" />

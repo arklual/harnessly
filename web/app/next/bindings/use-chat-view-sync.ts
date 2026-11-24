@@ -18,6 +18,7 @@ import {
 } from '@/next/stores/chat-view';
 import { useConversation, useConversationList } from '@/next/stores/conversations';
 import { hasFeature } from '@/next/stores/machines';
+import { chatPanes } from '@/next/stores/pane-state';
 
 /** The longest the page waits before it sends a change of the view. */
 export const EXPORT_MS = 2000;
@@ -33,11 +34,16 @@ export const useChatViewSync = (route: TRoute) => {
     for (const c of list ?? []) {
       if (!c.view || !hasFeature(c.machineId, 'chat-view')) continue;
       const view = parseView(c.view);
-      if (!view || view.at <= seenAt(c.id)) continue;
-      // The chat on screen keeps what the person is doing now; it takes the machine's view only the first time.
-      if (c.id === conv && seenAt(c.id) !== 0) continue;
-      applyView(c.id, c.machineId, view);
-      sent.current.set(c.id, viewSignature(viewOf(c.id)));
+      const seen = seenAt(c.id);
+      if (!view || view.at <= seen) continue;
+      // The chat on screen takes the machine's view only once. Even the first snapshot must not undo a pane edit
+      // made before the export timer had a chance to send it (and set seenAt).
+      if (c.id === conv && seen !== 0) continue;
+      const keepPane = c.id === conv && chatPanes.changedHere(c.id);
+      applyView(c.id, c.machineId, view, { keepPane });
+      const applied = viewOf(c.id);
+      // The preserved pane is still local: compare the next export with what the machine actually has.
+      sent.current.set(c.id, viewSignature(keepPane ? { ...applied, pane: view.pane } : applied));
     }
   }, [list, conv]);
 

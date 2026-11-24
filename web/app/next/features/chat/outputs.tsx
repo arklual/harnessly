@@ -403,20 +403,11 @@ const OutputCards = ({
         )
       }
       big={big}
+      // Several screenshots large are a gallery card of their own, «Скриншоты · N», as the list of what the turn made is.
+      title={t('next.turnMade.shots', { n: shown.length })}
     />
   );
-  // Several screenshots large are a block of their own, «Скриншоты · N», as the list of what the turn made is.
-  const pictureCards =
-    big && shown.length > 1 ? (
-      <section className="hx-made hx-made--shots" aria-label={t('next.turnMade.shots', { n: shown.length })}>
-        <div className="hx-made__head">
-          <span>{t('next.turnMade.shots', { n: shown.length })}</span>
-        </div>
-        {grid}
-      </section>
-    ) : (
-      grid
-    );
+  const pictureCards = grid;
   const deliveryCards = lines.map((output, index) => (
     <DeliveryCard
       key={output.ref}

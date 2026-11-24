@@ -13,6 +13,15 @@ import {
 
 export type Fetch = (url: string, init: RequestInit) => Promise<Response>;
 
+export const SHORT_POLL_MS = 5000;
+
+/** Held background reads can fill an HTTP/1.1 browser's small per-origin connection pool. */
+export function usesHttp1(): boolean {
+  const navigation = globalThis.performance?.getEntriesByType?.('navigation')[0] as
+    PerformanceNavigationTiming | undefined;
+  return navigation?.nextHopProtocol === 'http/1.1' || navigation?.nextHopProtocol === 'http/1.0';
+}
+
 let fetcher: Fetch = (url, init) => fetch(url, init);
 
 /** The fetch every v2 request goes through (tests put a fake runtime here). */

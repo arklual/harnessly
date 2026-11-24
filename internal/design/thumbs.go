@@ -221,6 +221,10 @@ func (l *Library) drawThumb(id string, b Board, file string) bool {
 	if err != nil {
 		return false
 	}
+	return l.drawThumbAt(id, b, file, base, bin, false)
+}
+
+func (l *Library) drawThumbAt(id string, b Board, file, base, bin string, requireClean bool) bool {
 	s := l.thumbs()
 	br, err := l.thumbBrowser(s, bin)
 	if err != nil {
@@ -250,8 +254,9 @@ func (l *Library) drawThumb(id string, b Board, file string) bool {
 	go func() { done <- shoot(br.cdp, session, base+BoardHref(id, b.Path), thumbView(b), temp, false) }()
 	select {
 	case res := <-done:
-		// A page with errors still has a picture worth showing; only a drawing that produced no file is a failure.
-		return res.Saved && os.Rename(temp, file) == nil
+		// A gallery thumbnail can show a page with errors. A published snapshot requires a loaded page with no errors.
+		// The checker's blank heuristic is about text and media, not visual completeness (e.g. a CSS-only prototype).
+		return res.Saved && (!requireClean || res.Loaded && len(res.Errors) == 0 && len(res.Failed) == 0) && os.Rename(temp, file) == nil
 	case <-time.After(thumbRenderWait):
 		go func() {
 			<-done

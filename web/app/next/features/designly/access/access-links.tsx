@@ -25,6 +25,8 @@ import { copyText, isAlive } from '@/next/features/designly/access/copy-link';
 import { guestViewOf } from '@/next/features/designly/access/guest-view';
 import { INVITE_ROLES } from '@/next/features/designly/access/labels';
 import { PagesPicker, VersionPicker, type IScopePage } from '@/next/features/designly/access/link-scope';
+import PersonField from '@/next/features/designly/access/person-field';
+import { searchDirectory } from '@/next/features/designly/access/resource-api';
 import RoleMenu from '@/next/features/designly/access/role-menu';
 import { change, type ISectionProps } from '@/next/features/designly/access/section';
 import TtlPicker, { STEPS } from '@/next/features/designly/access/ttl-picker';
@@ -51,18 +53,24 @@ const useNow = (every: number) => {
 };
 
 interface IAccessLinksProps extends ISectionProps {
+  membersOnly?: boolean;
   /** The design's pages, to limit a new link to some of them; fewer than two and there is nothing to choose. */
   pages?: readonly IScopePage[];
   /** What a link without sign-in may allow here. */
   guestRights?: readonly TGuestRights[];
 }
 
+const searchTeams = async (query: string, signal?: AbortSignal) => {
+  const { teams } = await searchDirectory(query, signal);
+  return teams.map((team) => ({ id: team.teamId, name: team.name }));
+};
+
 const NO_PAGES: readonly IScopePage[] = [];
 
 const AccessLinks = (props: IAccessLinksProps) => {
   const { project, access, action, pages = NO_PAGES, guestRights = GUEST_RIGHTS } = props;
   const now = useNow(NOW_MS);
-  const guests = useGuestLinks(project);
+  const guests = useGuestLinks(props.membersOnly ? null : project);
   const [who, setWho] = useState<TWho>(WHO.guest);
   const [title, setTitle] = useState('');
   const [rights, setRights] = useState<TGuestRights>('view');
@@ -74,11 +82,12 @@ const AccessLinks = (props: IAccessLinksProps) => {
   const [roleTtl, setRoleTtl] = useState<TTtlValue>(null);
   const [inviteTtl, setInviteTtl] = useState<TTtlValue>('7d');
   const [places, setPlaces] = useState('');
+  const [team, setTeam] = useState('');
   const idle = action.busy === null;
   // Without the gateway's links there is only the invite.
   // A document has the links without sign-in only: no invitations yet.
   const doc = isDocRef(project);
-  const mode: TWho = doc || guests.state.k === 'ready' ? who : WHO.member;
+  const mode: TWho = !props.membersOnly && (doc || guests.state.k === 'ready') ? who : WHO.member;
 
   // The list keeps its identity between renders: the leaving list compares it by reference.
   const items = useMemo<TLinkItem[]>(
@@ -127,6 +136,7 @@ const AccessLinks = (props: IAccessLinksProps) => {
         title: title.trim(),
         role,
         roleTtl,
+        ...(access.teamInvites && team.trim() ? { teamId: team.trim() } : {}),
         ttl: inviteTtl,
         maxUses: Number.isInteger(count) && count > 0 ? count : null,
       });
@@ -258,6 +268,16 @@ const AccessLinks = (props: IAccessLinksProps) => {
                 disabled={!idle}
                 onChange={setInviteTtl}
               />
+              {access.teamInvites && (
+                <PersonField
+                  search={searchTeams}
+                  label={t('next.access.inviteTeam')}
+                  placeholder={t('next.access.inviteTeam')}
+                  value={team}
+                  onChange={setTeam}
+                  disabled={!idle}
+                />
+              )}
               <input
                 className="hx-create__in hx-acc-in hx-acc-in--num"
                 type="text"

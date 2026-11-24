@@ -155,6 +155,8 @@ func deleteSpaceDataLeavesNoRow(t *testing.T, db *DB, schema Schema) {
 		switch {
 		case c.Name == "id":
 			return table + "-id", true
+		case table == "design_invite_acceptances" && c.Name == "invite_id":
+			return "design_invites-id", true
 		case c.Name == "link_id" && strings.HasPrefix(table, "design_"):
 			return "design_share_links-id", true
 		case c.Name == "link_id":

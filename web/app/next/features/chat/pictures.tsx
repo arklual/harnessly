@@ -5,6 +5,7 @@
 // not load leaves no card.
 import { createContext, useContext, useMemo, useState } from 'react';
 import { ImageHost } from '@/next/features/chat/image-card';
+import { PictureGallery } from '@/next/features/chat/picture-gallery';
 import { useChatEditing } from '@/next/features/image-edit/chat-host';
 import ImageEditView from '@/next/features/image-edit/image-editor';
 import { useMarkupTarget } from '@/next/features/image-edit/to-composer';
@@ -140,13 +141,17 @@ interface IPictureCardsProps {
   side?: 'user' | 'agent';
   /** Large, in a grid: the first one big, five at most, «ещё N» over the last (a turn's screenshots). */
   big?: boolean;
+  /** With big and several pictures: a gallery card under this title (picture-gallery.tsx) instead of the grid. */
+  title?: string;
 }
 
 /** The pictures a large grid shows; the rest are reached from the viewer. */
 const BIG_SHOWN = 5;
 
-export const PictureCards = ({ pictures, srcOf, side = 'agent', big = false }: IPictureCardsProps) => {
+export const PictureCards = ({ pictures, srcOf, side = 'agent', big = false, title }: IPictureCardsProps) => {
   const [viewing, setViewing] = useState<string | null>(null);
+  /** The picture the gallery shows large; it follows the viewer. */
+  const [hero, setHero] = useState(0);
   const chat = useContext(ImageHost);
   const shown = viewing === null ? undefined : pictures.find((one) => one.id === viewing);
   // The agent's pictures can be changed from here; what the person sent themselves is shown as it is.
@@ -161,8 +166,39 @@ export const PictureCards = ({ pictures, srcOf, side = 'agent', big = false }: I
   const item: IImageViewItem | null = current ? { src: srcOf(current), name: nameOf(current) } : null;
   const step = (delta: 1 | -1) => {
     if (at < 0) return;
-    setViewing(pictures[(at + delta + pictures.length) % pictures.length].id);
+    const next = (at + delta + pictures.length) % pictures.length;
+    setViewing(pictures[next].id);
+    setHero(next);
   };
+  const viewer = (
+    <ImageEditView
+      item={item}
+      editing={editing}
+      annotate={annotate}
+      onClose={() => setViewing(null)}
+      position={at >= 0 ? { at: at + 1, of: pictures.length } : undefined}
+      onStep={step}
+    />
+  );
+  if (big && title !== undefined && pictures.length > 1) {
+    return (
+      <>
+        <PictureGallery
+          pictures={pictures}
+          srcOf={srcOf}
+          title={title}
+          at={hero}
+          onAt={setHero}
+          onOpen={(k) => {
+            setHero(k);
+            setViewing(pictures[k].id);
+          }}
+          viewing={viewing !== null}
+        />
+        {viewer}
+      </>
+    );
+  }
   return (
     <div
       className="hx-pics"
@@ -178,14 +214,7 @@ export const PictureCards = ({ pictures, srcOf, side = 'agent', big = false }: I
           more={grid && index === BIG_SHOWN - 1 ? pictures.length - BIG_SHOWN : 0}
         />
       ))}
-      <ImageEditView
-        item={item}
-        editing={editing}
-        annotate={annotate}
-        onClose={() => setViewing(null)}
-        position={at >= 0 ? { at: at + 1, of: pictures.length } : undefined}
-        onStep={step}
-      />
+      {viewer}
     </div>
   );
 };

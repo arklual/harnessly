@@ -62,6 +62,7 @@ func (folderConn) Spec() connectors.Spec {
 	return connectors.Spec{
 		ID:    ID,
 		Kind:  connectors.Files,
+		Inbox: "folder", // HRN-1727: the inbox takes a folder's changes (harnessly-inbox 0.10.12)
 		Title: connectors.T("Folder", "Папка"),
 		Summary: connectors.T("A folder of this machine, an Obsidian vault among them: new and changed files, new tasks",
 			"Папка этой машины, в том числе хранилище Obsidian: новые и изменённые файлы, новые задачи"),

@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
@@ -68,17 +69,19 @@ type storeOwner struct {
 }
 
 type storeArtifact struct {
-	ID          string         `json:"id"`
-	Title       string         `json:"title"`
-	UpdatedAt   int64          `json:"updatedAt"`
-	Kind        string         `json:"kind"`
-	Pinned      bool           `json:"pinned"`
-	Cover       *string        `json:"cover"`
-	ProjectPath string         `json:"projectPath"`
-	Boards      []LibraryBoard `json:"boards"`
-	Convs       []string       `json:"convs"`
-	Owner       *storeOwner    `json:"owner,omitempty"`
-	Role        string         `json:"role,omitempty"`
+	ID           string         `json:"id"`
+	Title        string         `json:"title"`
+	UpdatedAt    int64          `json:"updatedAt"`
+	Kind         string         `json:"kind"`
+	Pinned       bool           `json:"pinned"`
+	Cover        *string        `json:"cover"`
+	ProjectPath  string         `json:"projectPath"`
+	Boards       []LibraryBoard `json:"boards"`
+	Convs        []string       `json:"convs"`
+	Owner        *storeOwner    `json:"owner,omitempty"`
+	Role         string         `json:"role,omitempty"`
+	AccessSource string         `json:"accessSource,omitempty"`
+	AccessUntil  *time.Time     `json:"accessUntil,omitempty"`
 	// WorkMachine is the machine whose folder holds the working copy (hub-design-owner).
 	WorkMachine string `json:"workMachine,omitempty"`
 }
@@ -144,7 +147,7 @@ func (s *Service) storeLibraryOf(ctx context.Context, u store.User, m store.Mach
 	// Only the projects open to the person are read from the store: a project closed to them is not there
 	// for them, and reading the whole space's library for one person's list is what made a cold hub too slow to answer.
 	recorded := make(map[string]project, len(rows))
-	roles := make(map[string]string, len(rows))
+	roles := make(map[string]folded, len(rows))
 	also := make([]string, 0, len(rows))
 	for _, p := range rows {
 		f, err := t.fold(p, email)
@@ -155,7 +158,7 @@ func (s *Service) storeLibraryOf(ctx context.Context, u store.User, m store.Mach
 			continue
 		}
 		recorded[p.ID] = p
-		roles[p.ID] = f.Role
+		roles[p.ID] = f
 		also = append(also, p.ID)
 	}
 	items, err := lister.Library(ctx, spaceID, also)
@@ -181,7 +184,7 @@ func (s *Service) storeLibraryOf(ctx context.Context, u store.User, m store.Mach
 		if title == "" {
 			title = it.ID
 		}
-		a := storeArtifact{ID: it.ID, Title: title, UpdatedAt: it.UpdatedAt, Kind: it.Kind, Boards: it.Boards, Convs: []string{}, Role: roles[it.ID]}
+		a := storeArtifact{ID: it.ID, Title: title, UpdatedAt: it.UpdatedAt, Kind: it.Kind, Boards: it.Boards, Convs: []string{}, Role: roles[it.ID].Role, AccessSource: roles[it.ID].Source, AccessUntil: roles[it.ID].Until}
 		if a.Boards == nil {
 			a.Boards = []LibraryBoard{}
 		}
@@ -226,7 +229,7 @@ func (s *Service) storeLibraryOf(ctx context.Context, u store.User, m store.Mach
 			if err != nil {
 				continue
 			}
-			a := storeArtifact{ID: id, Title: mr.Title, UpdatedAt: mr.UpdatedAt, Kind: libraryKind(mr.Kind), Boards: []LibraryBoard{}, Convs: []string{}, Role: roles[id], WorkMachine: mr.WorkMachine}
+			a := storeArtifact{ID: id, Title: mr.Title, UpdatedAt: mr.UpdatedAt, Kind: libraryKind(mr.Kind), Boards: []LibraryBoard{}, Convs: []string{}, Role: roles[id].Role, AccessSource: roles[id].Source, AccessUntil: roles[id].Until, WorkMachine: mr.WorkMachine}
 			if a.Title == "" {
 				a.Title = id
 			}

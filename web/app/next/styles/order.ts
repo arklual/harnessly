@@ -20,6 +20,7 @@ import '@/next/styles/limits.css';
 import '@/next/styles/manage.css';
 import '@/next/styles/background.css';
 import '@/next/styles/pictures.css';
+import '@/next/styles/picture-gallery.css';
 import '@/next/styles/image-card.css';
 import '@/next/styles/subagents.css';
 import '@/next/styles/workflows.css';

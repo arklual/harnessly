@@ -3,7 +3,6 @@
   "next.agents.experimental": "experimental",
   "next.agents.noNativeAttachments": "Antigravity does not support native file attachments yet. Send text instead.",
   "next.imagegen.provider": "Image provider",
-  "next.imageEdit.noTransparency": "Antigravity does not support transparent backgrounds or background removal. Choose Codex to use these features.",
   "next.imageEdit.brush.medium": "Medium",
   "next.imageEdit.brush.thin": "Thin",
   "next.imageEdit.brush.wide": "Wide",
@@ -73,5 +72,10 @@
   "next.imagegen.regenerate": "Draw again",
   "next.imagegen.retry": "Try again",
   "next.imagegen.strip": "Variants of the picture",
-  "next.imagegen.variants": "Variants"
+  "next.imagegen.variants": "Variants",
+  "next.imagegen.model": "Model",
+  "next.imagegen.pricing": "Getting the price…",
+  "next.imagegen.price": "Paid: ≈ {credits} credits from your {name} balance",
+  "next.imagegen.priceFailed": "Could not get the price: {why}",
+  "next.imageEdit.noTransparencyOf": "{name} does not make transparent backgrounds or remove them. Choose Codex for that."
 }

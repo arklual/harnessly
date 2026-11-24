@@ -158,11 +158,9 @@
   opacity: 0.44;
   transform: translateY(16px) scale(0.88);
 }
+/* «ещё N» stands in the title's line after the time, not over it. */
 .hx-ns__rest {
-  position: absolute;
-  z-index: 4;
-  right: 14px;
-  top: 10px;
+  flex: none;
   color: var(--ns-fg3);
   font-size: var(--hx-text-xs);
 }

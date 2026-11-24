@@ -81,6 +81,7 @@ func b64url(s string) ([]byte, bool) {
 // open. limited tells "these pages only" from "all of them", so a list that came out empty hides everything instead
 // of opening everything.
 type publicScope struct {
+	capture bool
 	// pin is the gateway's own claim, for the one call that takes a new snapshot; a guest's token never has it.
 	pin     bool
 	rev     string
@@ -120,6 +121,13 @@ func scopeOf(payload map[string]any) (publicScope, bool) {
 				return s, false
 			}
 			s.pages[page] = true
+		}
+	}
+	if v, has := payload["capture"]; has {
+		var ok bool
+		s.capture, ok = v.(bool)
+		if !ok || s.capture && (s.pin || s.rev == "") {
+			return s, false
 		}
 	}
 	// A pin token is for taking the version of a link, never for reading one.
@@ -249,6 +257,9 @@ const publicSignTTL = 60
 // the pair's secret, so the runtime signs for it (GuestToken, the machine agent only). At most one of rev, pin and
 // pages, as check reads them.
 func (c PublicConfig) Sign(project, rev string, pin bool, pages []string) (string, int64, error) {
+	return c.sign(project, rev, pin, pages, false)
+}
+func (c PublicConfig) sign(project, rev string, pin bool, pages []string, capture bool) (string, int64, error) {
 	if len(c.Secret) == 0 {
 		return "", 0, errors.New("no secret")
 	}
@@ -263,6 +274,9 @@ func (c PublicConfig) Sign(project, rev string, pin bool, pages []string) (strin
 	}
 	if pin {
 		claims["pin"] = true
+	}
+	if capture {
+		claims["capture"] = true
 	}
 	if pages != nil {
 		claims["pages"] = pages
@@ -310,6 +324,7 @@ func (a *API) GuestToken(r *http.Request) Answer {
 		Project string   `json:"project"`
 		Rev     string   `json:"rev"`
 		Pin     bool     `json:"pin"`
+		Capture bool     `json:"capture"`
 		Pages   []string `json:"pages"`
 	}
 	bad := err != nil || len(raw) > guestTokenBodyMax || json.Unmarshal(raw, &req) != nil || !IsLibraryID(req.Project) ||
@@ -322,7 +337,7 @@ func (a *API) GuestToken(r *http.Request) Answer {
 	if bad {
 		return JSON(r, http.StatusBadRequest, errorBody("Bad request"), h)
 	}
-	token, until, err := a.PublicToken.Sign(req.Project, req.Rev, req.Pin, req.Pages)
+	token, until, err := a.PublicToken.sign(req.Project, req.Rev, req.Pin, req.Pages, req.Capture)
 	if err != nil {
 		return JSON(r, http.StatusBadRequest, errorBody("Bad request"), h)
 	}
@@ -489,7 +504,24 @@ func (a *API) servePublic(w http.ResponseWriter, r *http.Request, project string
 			return
 		}
 	}
+	if scope.capture && segments[0] != "__raster" {
+		publicText(w, 404, "Not found")
+		return
+	}
 	switch segments[0] {
+	case "__raster":
+		if !scope.capture || scope.rev == "" || len(segments) != 2 || head {
+			publicText(w, 404, "Not found")
+			return
+		}
+		for _, board := range art.Boards {
+			if scope.allows(board) && rasterPageKey(board.Path) == segments[1] {
+				a.pinnedRaster(w, r, lib, project, board)
+				return
+			}
+		}
+		publicText(w, 404, "Not found")
+		return
 	case PublicAppDir:
 		a.publicApp(w, r, segments[1:], head)
 		return

@@ -496,6 +496,7 @@
 .hb .md-res small{font-size:var(--hx-text-xs);color:var(--hx-fg-3)}
 .hb .md-note{margin:10px 0 0;font-size:var(--hx-text-xs);line-height:1.45;color:var(--hx-fg-3)}
 .hb .md-edit{display:flex;flex-direction:column;gap:12px;padding:12px;border-radius:14px;background:color-mix(in srgb,var(--hx-bg-hover) 60%,transparent);animation:hx-pop-down .28s var(--hx-ease-out)}
+.hb .md-note[data-bad]{color:var(--hx-warning)}
 .hb .md-edit .md-note{margin:0}
 .hb .md-pick{display:grid;grid-template-columns:62px 1fr;align-items:center;gap:4px 10px}
 .hb .md-pick__k{font-size:var(--hx-text-xs);color:var(--hx-fg-2)}
@@ -536,6 +537,7 @@
 .hb .md-person--pick .hx-icon{width:14px;height:14px;color:var(--hx-fg-3)}
 .hb .md-save{display:inline-flex;align-items:center;gap:6px}
 .hb .md-save[data-busy="1"]{pointer-events:none;opacity:.85}
+.hb .md-save[aria-disabled="true"]{opacity:.4;cursor:not-allowed;filter:saturate(.4)}
 .hb .md-save[data-busy="1"] .md-spin{display:block}
 .hb .md-btn-danger{background:#d9534a;color:#fff;border-color:transparent}
 .hb .md-btn-danger:hover{background:#c4372f}

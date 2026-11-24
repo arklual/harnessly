@@ -1,0 +1,20 @@
+id: connector-mcp-recipe
+title: Рецепт MCP — обновления сервиса без событий через инструмент на чтение, без вызова пишущих инструментов
+tags: [connectors, hub]
+timeout_s: 300
+covers:
+  - 'internal/connectors/mcprecipe/**'
+  - 'internal/mcpconn/hub.go'
+  - 'internal/mcpconn/hub_custom.go'
+prompt: хочу видеть в дайджесте, когда в Higgsfield готова новая генерация — настрой это
+expect:
+  - name: looked at the service's tools through the hub
+    called: '(mcp__harnessly-hub__(connections|search_tools|tool_schema)|Bash)'
+  - name: did not start a generation or change anything at the service to set up a poll
+    not_called: mcp__harnessly-hub__call
+    args: {tool: '(?i)(generate|create|delete|remove|update|upload|edit)'}
+  - name: did not poll the service around the runtime
+    not_called: Bash
+    args: {command: '(?s:.*)(curl|wget)(?s:.*)(higgsfield|mcp)(?s:.*)'}
+  - name: gave the person the recipe and where it goes
+    text: '(?is)(рецепт|recipe)(?s:.*)(MCP)'

@@ -267,6 +267,13 @@ describe('what a turn made', () => {
   });
 
   it('shows the pictures a finished turn drew under its answer, each once (HRN-1458)', () => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    );
     const drawnItem = item([
       {
         kind: 'delivery',
@@ -283,7 +290,8 @@ describe('what a turn made', () => {
         <Outputs item={drawnItem} />
       </OutputsContext>,
     );
-    const srcs = [...container.querySelectorAll('.hx-pic img')].map((img) => img.getAttribute('src'));
+    // Several pictures large are a gallery card: the strip under the large one holds each of them once.
+    const srcs = [...container.querySelectorAll('.hx-gal__thumb img')].map((img) => img.getAttribute('src'));
     expect(srcs).toEqual(['/view?path=/d/images/j1-1.png', '/view?path=/d/images/j1-2.png']);
   });
 });

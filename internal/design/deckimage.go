@@ -114,8 +114,8 @@ func (a *API) DesignImage(r *http.Request) Answer {
 		return JSON(r, http.StatusConflict, errorBody(locale.Pick("The design's folder for pictures is not usable", "Папка картинок макета недоступна")), h)
 	}
 	snap, err := a.Images.Start(imagegen.Request{
-		Provider: imagegen.Provider(body.String("provider")),
-		Prompt:   body.String("prompt"), Count: count, Shape: shape,
+		Provider: imagegen.Provider(body.String("provider")), Model: body.String("model"),
+		Prompt: body.String("prompt"), Count: count, Shape: shape,
 		Owner: "design:" + artifact, CopyTo: folder, Name: name,
 		Source: edit.source, Mode: edit.mode, Format: edit.format, Overlay: edit.overlay, SourceOK: edit.ok,
 		// Checked right before each copy: the folder, its links followed, must still lie inside the project.

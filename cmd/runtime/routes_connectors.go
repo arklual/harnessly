@@ -45,6 +45,7 @@ import (
 	_ "github.com/ly-solutions/harnessly/internal/connectors/caldav"
 	_ "github.com/ly-solutions/harnessly/internal/connectors/folder"
 	_ "github.com/ly-solutions/harnessly/internal/connectors/imap"
+	"github.com/ly-solutions/harnessly/internal/connectors/mcprecipe"
 	_ "github.com/ly-solutions/harnessly/internal/connectors/rss"
 	"github.com/ly-solutions/harnessly/internal/connectors/rules"
 	"github.com/ly-solutions/harnessly/internal/connectors/telegram"
@@ -52,6 +53,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/connectors/webhook"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/mcpconn"
 	"github.com/ly-solutions/harnessly/internal/notifybots"
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
 	"github.com/ly-solutions/harnessly/internal/wire"
@@ -79,6 +81,8 @@ func connectorsFor(d deps) *connectors.Service {
 		return "connector " + strings.TrimPrefix(name, "connector-")
 	}}
 	webhook.Base = func() string { return webhookBase(d.DataDir) }
+	// The MCP connections of this runtime, for poll recipes.
+	mcprecipe.Service = mcpconn.New(d.DataDir, nil, nil)
 	s := connectors.New(filepath.Join(d.DataDir, "connectors"), sec, connections.NewHTTP(nil).Client)
 	header := os.Getenv("RUNTIME_AGENT_TOKEN_HEADER")
 	s.Start(context.Background(),

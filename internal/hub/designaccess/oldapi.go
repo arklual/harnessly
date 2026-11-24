@@ -60,7 +60,7 @@ func (t *txn) view(p project, email string) (map[string]any, folded, error) {
 	}
 	out := map[string]any{
 		"role": nullStr(f.Role), "owner": nullStr(p.Owner), "ownerName": p.OwnerName, "team": p.TeamLevel,
-		"canManage": f.CanManage, "editorsCanShare": p.EditorsCanShare, "request": nil,
+		"teamInvites": true, "canManage": f.CanManage, "editorsCanShare": p.EditorsCanShare, "request": nil,
 	}
 	own, err := t.requests(p.ID, normEmail(email), "open")
 	if err != nil {
@@ -379,6 +379,11 @@ func (s *Service) oldRoute(r *http.Request, u store.User, m store.Machine, parts
 			return nil, 0, err
 		}
 		in := inviteInput{Title: stringOr(b["title"])}
+		if team, ok := b["teamId"]; ok {
+			if in.Team, err = textField(team, "teamId"); err != nil {
+				return nil, 0, err
+			}
+		}
 		if in.Role, err = textField(b["role"], "role"); err != nil {
 			return nil, 0, err
 		}
@@ -416,7 +421,12 @@ func (s *Service) oldRoute(r *http.Request, u store.User, m store.Machine, parts
 	return nil, 0, fail("not_found", "Маршрут не найден")
 }
 
-func (s *Service) shareURLOf(token string) string { return s.shareURL + "/s/" + token }
+func (s *Service) shareURLOf(token string) string {
+	if isStaticToken(token) {
+		return s.hubURL + StaticPrefix + token
+	}
+	return s.shareURL + "/s/" + token
+}
 
 func (s *Service) sharesRoute(r *http.Request, m store.Machine, email, project string, parts []string) (any, int, error) {
 	ctx := r.Context()

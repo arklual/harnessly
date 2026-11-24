@@ -232,7 +232,8 @@ func (s *Service) viewIn(t *txn, p project, stored bool, email string) (map[stri
 			"message": rq.Message, "createdAt": isoOf(rq.CreatedAt)})
 	}
 	out["grants"], out["requests"] = grants, reqs
-	if s.shareURL != "" {
+	if s.shareURL != "" || s.staticGuests {
+		out["staticGuestSnapshots"] = s.staticGuests
 		rows, err := t.shareRows(p.ID)
 		if err != nil {
 			return nil, err
@@ -543,6 +544,13 @@ func (t *txn) reissueShare(id, actor, linkID string) (string, error) {
 		return "", err
 	}
 	token := randomToken(16)
+	var count int
+	if err := t.q.QueryRow(t.ctx, `SELECT COUNT(*) FROM design_static_pages WHERE link_id=?`, linkID).Scan(&count); err != nil {
+		return "", err
+	}
+	if count > 0 {
+		token = "snap-" + token
+	}
 	res, err := t.q.Exec(t.ctx, `UPDATE design_share_links SET token_hash = ?, token_enc = ? WHERE id = ? AND machine_id = ? AND project_id = ? AND revoked_at IS NULL`,
 		store.HashToken(token), nullStr(t.seal.seal(linkID, token)), linkID, t.m.ID, id)
 	if err != nil {
@@ -573,7 +581,7 @@ func (t *txn) shareAddress(id, linkID string) (string, bool, error) {
 
 func (s *Service) linksRoute(r *http.Request, m store.Machine, email, project string, manager bool, rest []string) (any, int, error) {
 	ctx := r.Context()
-	if s.shareURL == "" {
+	if s.shareURL == "" && !s.staticGuests {
 		return nil, 0, fail("unavailable", "Ссылки без входа не настроены")
 	}
 	method, n, linkID := r.Method, len(rest), part(rest, 1)
@@ -677,18 +685,45 @@ func (s *Service) createLink(r *http.Request, m store.Machine, email, project st
 	if in.Pages, err = checkPages(b["pages"]); err != nil {
 		return nil, 0, err
 	}
-	if in.Version == "pinned" {
-		if in.Rev, err = s.pin(ctx, m, project); err != nil {
-			return nil, 0, err
+	if s.staticGuests {
+		if in.Rights != roleView {
+			return nil, 0, fail("bad_request", "Static snapshots are read-only")
 		}
-	} else if err := s.shareGate(ctx, m, project); err != nil {
+		in.Static = true
+		in.Version = "pinned"
+		if in.TTL.none {
+			return nil, 0, fail("bad_request", "An expiry is required")
+		}
+	}
+	var pages []staticPage
+	switch {
+	case in.Static:
+		in.Rev, err = s.pinCapture(ctx, m, project)
+		if err == nil {
+			pages, err = s.captureStatic(ctx, m.ID, project, in)
+		}
+	case in.Version == "pinned":
+		in.Rev, err = s.pin(ctx, m, project)
+	default:
+		err = s.shareGate(ctx, m, project)
+	}
+	if err != nil {
 		return nil, 0, err
 	}
 	var row shareRow
 	var token string
 	if err := s.write(ctx, m, func(t *txn) error {
 		var err error
+		if ok, e := t.makerMayShare(project, email); e != nil || !ok {
+			if e != nil {
+				return e
+			}
+			return fail("forbidden", deniedManageAny)
+		}
 		row, token, err = t.createShare(project, email, in)
+		if err == nil && len(pages) > 0 {
+			err = t.saveStatic(row, pages)
+		}
 		return err
 	}); err != nil {
 		return nil, 0, err
@@ -701,6 +736,16 @@ func (s *Service) changeLink(r *http.Request, m store.Machine, email, project st
 	b, err := readBody(r)
 	if err != nil {
 		return nil, 0, err
+	}
+	if s.staticGuests {
+		for _, key := range []string{"rights", "version", "pages", "options"} {
+			if _, ok := b[key]; ok {
+				return nil, 0, fail("bad_request", "Publish a new snapshot to change its contents")
+			}
+		}
+		if v, ok := b["ttl"]; ok && v == nil {
+			return nil, 0, fail("bad_request", "An expiry is required")
+		}
 	}
 	var c shareChange
 	changes := false
