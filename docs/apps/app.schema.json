@@ -30,6 +30,10 @@
             "description": "Send a message to the agent of the chat (hl.chat.send)."
           },
           {
+            "const": "documents.read",
+            "description": "Read documents from the personal adapter when the deployment explicitly binds a managed app."
+          },
+          {
             "const": "chat.read",
             "description": "Read the chat's messages."
           },

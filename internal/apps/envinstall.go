@@ -131,7 +131,7 @@ func (r *Registry) mergeEnv(list []Installed) ([]Installed, error) {
 		}
 		out = append(out, Installed{
 			ID: ei.ID, Version: ei.Version, Dir: ei.Dir, Source: "env", InstalledAt: ei.At, UpdatedAt: ei.At,
-			Manifest: ei.Manifest, Env: true, Locked: ei.Locked, Muted: !ei.Locked && slices.Contains(e.Muted, ei.ID),
+			Manifest: ei.Manifest, EnvSum: ei.Sum, Env: true, Locked: ei.Locked, Muted: !ei.Locked && slices.Contains(e.Muted, ei.ID),
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
@@ -174,7 +174,31 @@ func (r *Registry) InstallForEnv(dir string, opt EnvInstallOptions) (EnvInstall,
 		// An environment item is a folder of the hub's list and carries no signature.
 		return EnvInstall{}, false, refuseUnsigned(m.ID)
 	}
-	sum, err := dirSum(pkg.Dir)
+	var sum string
+	var err error
+	if m.Allows("documents.read") {
+		// Pin the exact bytes that will be copied. A staged archive also prevents a
+		// concurrently updated source folder from supplying new files under an old pin.
+		raw, digest, packErr := Pack(pkg.Dir)
+		if packErr != nil {
+			return EnvInstall{}, false, packErr
+		}
+		stage, stageErr := os.MkdirTemp("", "managed-app-")
+		if stageErr != nil {
+			return EnvInstall{}, false, stageErr
+		}
+		defer os.RemoveAll(stage)
+		if err := Unpack(raw, stage); err != nil {
+			return EnvInstall{}, false, err
+		}
+		staged, problems := LoadPackage(stage)
+		if staged == nil || len(problems.Errors()) > 0 || staged.Manifest.ID != m.ID || staged.Manifest.Trust != m.Trust || staged.Manifest.Harnessly != m.Harnessly {
+			return EnvInstall{}, false, ErrInvalid
+		}
+		pkg, m, sum = staged, staged.Manifest, digest
+	} else {
+		sum, err = dirSum(pkg.Dir)
+	}
 	if err != nil {
 		return EnvInstall{}, false, err
 	}
@@ -256,6 +280,10 @@ func (r *Registry) InstallForEnv(dir string, opt EnvInstallOptions) (EnvInstall,
 		from = stage
 	}
 	target := filepath.Join(r.Root, "env", m.ID, m.Version)
+	if m.Allows("documents.read") {
+		// A previous view may still be serving a file while the environment updates.
+		target = filepath.Join(r.Root, "env", m.ID, m.Version+"-"+sum)
+	}
 	if err := copyPackage(from, target); err != nil {
 		return EnvInstall{}, false, err
 	}

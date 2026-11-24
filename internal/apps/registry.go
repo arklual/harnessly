@@ -37,11 +37,13 @@ type Installed struct {
 	Team bool `json:"team,omitempty"`
 	// Env: the install is the environment's (see envinstall.go); Locked: its item is pinned, so it cannot be turned off.
 	// Never written to installed.json.
-	Env         bool  `json:"env,omitempty"`
-	Locked      bool  `json:"locked,omitempty"`
-	Muted       bool  `json:"muted,omitempty"`
-	InstalledAt int64 `json:"installedAt"`
-	UpdatedAt   int64 `json:"updatedAt"`
+	// EnvSum identifies the package selected by the environment and is never read from a personal install.
+	EnvSum      string `json:"-"`
+	Env         bool   `json:"env,omitempty"`
+	Locked      bool   `json:"locked,omitempty"`
+	Muted       bool   `json:"muted,omitempty"`
+	InstalledAt int64  `json:"installedAt"`
+	UpdatedAt   int64  `json:"updatedAt"`
 	// Manifest is the manifest as installed, so the list needs no read of every package.
 	Manifest *Manifest `json:"manifest"`
 	// Wants are the keys of what the install reaches (AccessOf), fixed at install so the list reads no package.

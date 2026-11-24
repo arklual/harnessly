@@ -637,7 +637,14 @@ func (s *Service) fail(w http.ResponseWriter, r *http.Request, err error) {
 // grant is the runtime session for a person on a machine: the cookie the runtime takes for a signed-in page. It is
 // cached per person and machine, and asked for again shortly before it ends.
 func (s *Service) grant(ctx context.Context, u store.User, m store.Machine) (hubproto.SessionGrant, error) {
+	return s.grantFor(ctx, u, m, false)
+}
+
+func (s *Service) grantFor(ctx context.Context, u store.User, m store.Machine, verifiedOwner bool) (hubproto.SessionGrant, error) {
 	key := u.ID + "/" + m.ID
+	if verifiedOwner {
+		key = "verified-owner:" + u.Email + "/" + key
+	}
 	s.mu.Lock()
 	if g, ok := s.grants[key]; ok && s.now().Before(g.until) {
 		s.mu.Unlock()
@@ -660,7 +667,7 @@ func (s *Service) grant(ctx context.Context, u store.User, m store.Machine) (hub
 	gctx, cancel := context.WithTimeout(context.Background(), grantTimeout)
 	defer cancel()
 	var g hubproto.SessionGrant
-	err := s.reg.DoInto(gctx, m.ID, hubproto.OpRuntimeSess, map[string]any{"subject": u.Email, "name": u.Name}, &g, grantTimeout)
+	err := s.reg.DoInto(gctx, m.ID, hubproto.OpRuntimeSess, map[string]any{"subject": u.Email, "name": u.Name, "verifiedOwner": verifiedOwner}, &g, grantTimeout)
 	if err == nil && (g.Token == "" || g.CookieName == "" || strings.ContainsAny(g.Token+g.CookieName, "; \r\n,")) {
 		err = httpx.New(http.StatusBadGateway, "machine_error", "Машина выдала непонятный сеанс")
 	}
@@ -684,7 +691,13 @@ func (s *Service) grant(ctx context.Context, u store.User, m store.Machine) (hub
 
 func (s *Service) dropGrant(userID, machineID string) {
 	s.mu.Lock()
-	delete(s.grants, userID+"/"+machineID)
+	key := userID + "/" + machineID
+	delete(s.grants, key)
+	for k := range s.grants {
+		if strings.HasSuffix(k, "/"+key) {
+			delete(s.grants, k)
+		}
+	}
 	s.mu.Unlock()
 }
 
@@ -812,7 +825,14 @@ func (s *Service) forward(w http.ResponseWriter, r *http.Request, u store.User, 
 		w = tee
 	}
 	person := s.personHeader(r, u, m.ID)
-	g, err := s.grant(r.Context(), u, m)
+	// Check every app tool request before reusing the privileged grant. A generic
+	// page session (including one for the same email) carries no owner assertion.
+	var verifiedOwner bool
+	if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/apps/tool") && u.ID != "" && u.ID == m.CreatedBy && u.DisabledAt == nil {
+		owner, err := s.db.S().UserIDByVerifiedEmail(r.Context(), u.Email)
+		verifiedOwner = err == nil && owner == u.ID
+	}
+	g, err := s.grantFor(r.Context(), u, m, verifiedOwner)
 	if err != nil {
 		s.upstreamFailed(w, r, err)
 		return

@@ -144,7 +144,15 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 				secretJSON(w, http.StatusBadRequest, map[string]string{"error": "bad-request"})
 				return
 			}
-			status, out := handle(r.Context(), b)
+			ctx := r.Context()
+			if d.Claims != nil && b.Name == managedDocumentRead {
+				claims := d.Claims(r)
+				if verified, _ := claims["verifiedOwner"].(bool); verified {
+					subject, _ := claims["sub"].(string)
+					ctx = context.WithValue(ctx, documentSubjectKey{}, subject)
+				}
+			}
+			status, out := handle(ctx, b)
 			journalBridgeCall(r.Context(), views, b, status, out)
 			secretJSON(w, status, out)
 		}
@@ -248,7 +256,11 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		} else if b.Document != "" {
 			return refused(apps.ErrStorageArgs)
 		}
-		sess, err := views.Sessions.IssueIn(b.App, b.View, b.Target, b.Conversation, b.Document)
+		sum := ""
+		if !isRemote && documentReaderAllowed(app) {
+			sum = app.EnvSum
+		}
+		sess, err := views.Sessions.IssueManaged(b.App, b.View, b.Target, b.Conversation, b.Document, sum)
 		if err != nil {
 			return refused(err)
 		}
@@ -342,6 +354,13 @@ func appBridgeRoutes(d deps, reg *apps.Registry, storage *apps.Storage, views *a
 		}
 		if err := app.Manifest.Authorize("tools/call", sess.Target, nil); err != nil {
 			return refused(err)
+		}
+		if b.Name == managedDocumentRead {
+			out, err := readManagedDocument(ctx, sess, app, b.Args)
+			if err != nil {
+				return refused(err)
+			}
+			return http.StatusOK, map[string]any{"result": out}
 		}
 		result, err := callAppTool(ctx, d, reg, sess.App, b.Name, b.Args)
 		if err != nil {

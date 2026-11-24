@@ -22,10 +22,12 @@ const (
 
 // Session is one mounted view.
 type Session struct {
-	Token  string
-	App    string
-	View   string
-	Target string
+	// ManagedSum binds a document reader to the package that opened this view.
+	ManagedSum string
+	Token      string
+	App        string
+	View       string
+	Target     string
 	// Conversation is the chat the view works beside; "" for a view with no chat.
 	Conversation string
 	// Document is the Sinopia document a view of a sinopia target is shown in; "" for any other view.
@@ -61,6 +63,10 @@ func (s *ViewSessions) Issue(app, view, target, conversation string) (Session, e
 
 // IssueIn is Issue for a view shown in a Sinopia document.
 func (s *ViewSessions) IssueIn(app, view, target, conversation, document string) (Session, error) {
+	return s.IssueManaged(app, view, target, conversation, document, "")
+}
+
+func (s *ViewSessions) IssueManaged(app, view, target, conversation, document, sum string) (Session, error) {
 	raw := make([]byte, 24)
 	if _, err := rand.Read(raw); err != nil {
 		return Session{}, err
@@ -70,7 +76,7 @@ func (s *ViewSessions) IssueIn(app, view, target, conversation, document string)
 	if _, err := rand.Read(nonce); err != nil {
 		return Session{}, err
 	}
-	sess := &Session{Token: base64.RawURLEncoding.EncodeToString(raw), Nonce: base64.RawURLEncoding.EncodeToString(nonce), App: app, View: view, Target: target, Conversation: conversation, Document: document, created: now, seen: now}
+	sess := &Session{ManagedSum: sum, Token: base64.RawURLEncoding.EncodeToString(raw), Nonce: base64.RawURLEncoding.EncodeToString(nonce), App: app, View: view, Target: target, Conversation: conversation, Document: document, created: now, seen: now}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sweep(now)

@@ -14,16 +14,22 @@ var b64 = base64.RawURLEncoding
 
 // Claims of the tokens the agent signs. Empty fields are left out.
 type Claims struct {
-	Sub string `json:"sub,omitempty"`
-	Aud string `json:"aud,omitempty"`
-	Iat int64  `json:"iat"`
-	Exp int64  `json:"exp"`
+	Sub           string `json:"sub,omitempty"`
+	VerifiedOwner bool   `json:"verifiedOwner,omitempty"`
+	Aud           string `json:"aud,omitempty"`
+	Iat           int64  `json:"iat"`
+	Exp           int64  `json:"exp"`
 }
 
 // SignHS256 signs claims valid from now for ttl.
 func SignHS256(secret []byte, sub, aud string, ttl time.Duration) string {
+	return signClaims(secret, Claims{Sub: sub, Aud: aud}, ttl)
+}
+
+func signClaims(secret []byte, claims Claims, ttl time.Duration) string {
 	now := time.Now().Unix()
-	payload, _ := json.Marshal(Claims{Sub: sub, Aud: aud, Iat: now, Exp: now + int64(ttl/time.Second)})
+	claims.Iat, claims.Exp = now, now+int64(ttl/time.Second)
+	payload, _ := json.Marshal(claims)
 	signing := b64.EncodeToString([]byte(`{"alg":"HS256"}`)) + "." + b64.EncodeToString(payload)
 	mac := hmac.New(sha256.New, secret)
 	mac.Write([]byte(signing))

@@ -166,6 +166,26 @@ func setup(t *testing.T, opts ...hubtest.Option) *fixture {
 	return f
 }
 
+// The ordinary and owner grants have different caches. An unlink before another
+// tool call must take effect even when the earlier owner grant is still valid.
+func TestAppToolOwnerGrantRequiresVerifiedIdentity(t *testing.T) {
+	f := setup(t)
+	path := "/m/" + f.id + "/api/platform/apps/tool"
+	f.owner.Do("POST", path, map[string]string{})
+	calls := f.a.Calls(hubproto.OpRuntimeSess)
+	if len(calls) != 1 || string(calls[0].Params["verifiedOwner"]) != "true" {
+		t.Fatalf("verified owner grant: %+v", calls)
+	}
+	if _, err := f.s.DB.S().DeleteIdentity(t.Context(), f.owner.ID, "email"); err != nil {
+		t.Fatal(err)
+	}
+	f.owner.Do("POST", path, map[string]string{})
+	calls = f.a.Calls(hubproto.OpRuntimeSess)
+	if len(calls) != 2 || string(calls[1].Params["verifiedOwner"]) != "false" {
+		t.Fatalf("grant after unlink: %+v", calls)
+	}
+}
+
 func (f *fixture) see(t *testing.T, p *hubtest.Person, path string, headers ...string) (hubtest.Resp, seen) {
 	t.Helper()
 	r := p.Do("GET", path, nil, headers...)

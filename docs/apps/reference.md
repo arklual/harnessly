@@ -58,6 +58,7 @@ Every right has a class of risk. The class forbids nothing: it orders the instal
 | Right | Class | What it opens | Methods |
 | --- | --- | --- | --- |
 | `chat.prompt` | medium | Send a message to the agent of the chat (hl.chat.send). | `ui/message` |
+| `documents.read` | high | Read documents from the personal adapter when the deployment explicitly binds a managed app. | — |
 | `chat.read` | medium | Read the chat's messages. | `harnessly/chat.read` |
 | `chat.card` | medium | Put a card of the app in the chat's feed. | `harnessly/chat.card` |
 | `agents.read` | medium | List the agents of the workspace. | `harnessly/agents.list` |

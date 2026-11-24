@@ -118,3 +118,13 @@ runtime publishes it through the adapter and binds it, keyed by the file, the do
 ## Example
 
 [examples/docs-adapter-ts](../examples/docs-adapter-ts/README.md): a dependency-free TypeScript adapter on example.com.
+
+### Reading a document in a managed app
+
+An operator can give a specific environment-installed app access to the owner's personal documents adapter. Configure that adapter under the machine owner's account. Set `RUNTIME_OWNER_EMAIL` to the Hub owner's verified email and `RUNTIME_DOCUMENT_READER_PACKAGES` to a comma-separated list of `app.id=sum` entries. The sum is the environment installation's `sum` in `apps/env.json`. Review and update the pin when replacing the package. Without a pin, the binding is disabled.
+
+A local view of an app that declares the `documents.read` permission can read the current contents of a known document. Open the runtime through the Hub as its owner. For an app tool request the Hub checks current machine ownership and the unique verified email before forwarding an owner session. The host checks that signed assertion, the view session and the installed package on each call. The personal adapter checks access to the requested document. The result carries the format, content and version. Render HTML in a sandbox.
+
+```js
+const { format, content, version } = await hl.tools.call('@host/documents/read', { id });
+```

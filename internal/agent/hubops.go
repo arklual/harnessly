@@ -603,7 +603,8 @@ func (h *hub) opSession(req map[string]json.RawMessage, pol hubproto.Policy) (an
 	if secret == nil {
 		return nil, nil, errors.New("the runtime has not written its secret yet")
 	}
-	token := SignHS256(secret, subject, "", sessionTTL)
+	verifiedOwner, _ := field[bool](req, "verifiedOwner")
+	token := signClaims(secret, Claims{Sub: subject, VerifiedOwner: verifiedOwner && !h.observe}, sessionTTL)
 	h.audit.Record(hubproto.OpRuntimeSess, true, map[string]any{"subject": subject})
 	return hubproto.SessionGrant{CookieName: h.a.cfg.RuntimeCookie, Token: token, ExpiresAt: time.Now().Add(sessionTTL).UnixMilli()}, nil, nil
 }

@@ -786,6 +786,15 @@ func TestHubRuntimeSession(t *testing.T) {
 	if sub, ok := SessionSubject([]byte(hubTestSecret), grant.Token, time.Now()); !ok || sub != "a@example.com" {
 		t.Errorf("subject %q %v", sub, ok)
 	}
+	ordinary, _ := VerifiedPayload([]byte(hubTestSecret), grant.Token, time.Now())
+	if ordinary["verifiedOwner"] != nil {
+		t.Fatal("ordinary grant claims verified ownership")
+	}
+	verified := decode[hubproto.SessionGrant](t, c.mustCall("runtime.session", map[string]any{"subject": "a@example.com", "verifiedOwner": true}))
+	claims, ok := VerifiedPayload([]byte(hubTestSecret), verified.Token, time.Now())
+	if !ok || claims["verifiedOwner"] != true || VerifySession([]byte(hubTestSecret), verified.Token, time.Now()) != nil {
+		t.Fatal("verified owner session missing")
+	}
 	if left := time.Until(time.UnixMilli(grant.ExpiresAt)); left < 11*time.Hour+50*time.Minute || left > 12*time.Hour+time.Minute {
 		t.Errorf("expires in %v", left)
 	}

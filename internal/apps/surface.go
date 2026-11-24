@@ -108,6 +108,7 @@ var surfaceTargets = []SurfaceTarget{
 var surfacePermissions = []SurfacePermission{
 	{Name: "chat.prompt", Class: ClassMedium, Doc: "Send a message to the agent of the chat (hl.chat.send).",
 		Label: Text{Ru: "Отправлять сообщения агенту в этом чате", En: "Send messages to the agent of this chat"}},
+	{Name: "documents.read", Class: ClassHigh, Doc: "Read documents from the personal adapter when the deployment explicitly binds a managed app.", Label: Text{En: "Read personal documents", Ru: "Читать личные документы"}, Threat: Text{En: "The app can access the contents of a personal document when it knows its ID.", Ru: "Приложение сможет прочитать содержимое личного документа, если знает его идентификатор."}},
 	{Name: "chat.read", Class: ClassMedium, Doc: "Read the chat's messages.",
 		Label: Text{Ru: "Читать сообщения чата", En: "Read the chat's messages"}},
 	{Name: "chat.card", Class: ClassMedium, Doc: "Put a card of the app in the chat's feed.",

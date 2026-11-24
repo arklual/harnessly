@@ -37,7 +37,10 @@ func appRig(t *testing.T) (func(method, path, body string, h map[string]string) 
 		t.Fatal(err)
 	}
 	d := deps{DataDir: dir, Home: t.TempDir(), CLI: &gate.CLIToken{DataDir: dir, Headers: []string{"x-cli-token"}},
-		SessionOK: func(r *http.Request) bool { return r.Header.Get("X-Test-Session") == "yes" }}
+		SessionOK: func(r *http.Request) bool { return r.Header.Get("X-Test-Session") == "yes" },
+		Claims: func(r *http.Request) map[string]any {
+			return map[string]any{"sub": r.Header.Get("X-Test-Subject"), "verifiedOwner": r.Header.Get("X-Test-Verified-Owner") == "true"}
+		}}
 	reg := apps.Open(dir)
 	decRigDir, decRigRoot, rigDeps = dir, reg.Root, d
 	conv := &wire.Conversation{ID: "tab-1"}
@@ -331,7 +334,8 @@ func TestAppViewsAndBridgeRoutes(t *testing.T) {
 
 func TestAppAskRoutes(t *testing.T) {
 	dir := t.TempDir()
-	d := deps{DataDir: dir, SessionOK: func(r *http.Request) bool { return r.Header.Get("X-Test-Session") == "yes" }}
+	d := deps{DataDir: dir, SessionOK: func(r *http.Request) bool { return r.Header.Get("X-Test-Session") == "yes" },
+		Claims: func(r *http.Request) map[string]any { return map[string]any{"sub": r.Header.Get("X-Test-Subject")} }}
 	asks := apps.NewAsks()
 	routes := appAskRoutes(d, asks)
 	call := func(method, path, body string, session bool) (int, string) {

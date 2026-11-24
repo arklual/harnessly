@@ -355,7 +355,7 @@ func (s *ViewServer) Handler() http.Handler {
 			return
 		}
 		app, err := s.reg.Get(id)
-		if err != nil || app.Manifest == nil {
+		if err != nil || app.Manifest == nil || sess.ManagedSum != "" && (!app.Env || app.EnvSum != sess.ManagedSum) {
 			refuse(viewRefusal{Status: http.StatusNotFound, Code: "no-app", App: id, View: sess.View, Path: rel,
 				Reason: "Приложение не установлено или выключено."})
 			return

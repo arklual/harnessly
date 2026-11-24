@@ -90,6 +90,7 @@ export const METHOD_PERMISSION = {
 /** The rights an app asks for in `permissions`; files.read, files.write and secrets are written right:<value>. */
 export const APP_PERMISSIONS = [
   'chat.prompt',
+  'documents.read',
   'chat.read',
   'chat.card',
   'agents.read',
@@ -132,6 +133,7 @@ export const APP_PERMISSIONS = [
 /** The class of risk of every right: it orders the install screen, it forbids nothing. */
 export const PERMISSION_CLASS = {
   'chat.prompt': 'medium',
+  'documents.read': 'high',
   'chat.read': 'medium',
   'chat.card': 'medium',
   'agents.read': 'medium',
