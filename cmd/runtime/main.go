@@ -701,7 +701,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 	}
 	f.startUpdateCheck(ctx)
 	startWebFromHub(ctx, cfg.DataDir, webHubDir, webHubOn)
-	f.startEnvSetup(ctx)
+	defer f.startEnvSetup(ctx)()
 	go watchAppsConsent(ctx, apps.Open(cfg.DataDir), appsPolicyEvery)
 	defer f.startStore(ctx, cfg)()
 	go watchBasepkg(ctx, cfg.DataDir)

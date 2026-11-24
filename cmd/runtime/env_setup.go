@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
@@ -64,9 +65,15 @@ func setupLog(level, msg string, kv ...string) {
 }
 
 // startEnvSetup starts one goroutine per link folder; they end with ctx and never block the start.
-func (f *runtimeGate) startEnvSetup(ctx context.Context) {
+func (f *runtimeGate) startEnvSetup(parent context.Context) func() {
+	ctx, cancel := context.WithCancel(parent)
+	var workers sync.WaitGroup
 	for _, r := range f.envSetup {
-		go r.Run(ctx)
+		workers.Go(func() { r.Run(ctx) })
+	}
+	return func() {
+		cancel()
+		workers.Wait()
 	}
 }
 

@@ -20,7 +20,7 @@ describe('visibleBounds', () => {
 
   it('stops at an ancestor that clips', () => {
     document.body.innerHTML =
-      '<div id="body" style="overflow:hidden"><div><button id="a"></button></div></div>';
+      '<div id="body" style="overflow-y:hidden"><div><button id="a"></button></div></div>';
     vi.spyOn(document.getElementById('body')!, 'getBoundingClientRect').mockReturnValue(rect(139, 400));
     const bounds = visibleBounds(document.getElementById('a'));
     expect(bounds).toEqual({ top: 139, bottom: 400 });

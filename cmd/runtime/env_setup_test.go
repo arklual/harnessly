@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -83,10 +82,8 @@ func TestEnvSetupRunsFromTheLinkFolder(t *testing.T) {
 	}
 	rs := envSetupRunners(d, "", "t")
 	rs[0].Poll = 20 * time.Millisecond
-	ctx, cancel := context.WithCancel(context.Background())
 	g := &runtimeGate{envSetup: rs[:1]}
-	g.startEnvSetup(ctx)
-	defer cancel()
+	t.Cleanup(g.startEnvSetup(t.Context()))
 	deadline := time.Now().Add(10 * time.Second)
 	for {
 		raw, err := os.ReadFile(filepath.Join(data, hubproto.EnvSetupFile))
