@@ -7,6 +7,7 @@ import type { FeedItem, RefInfo, RefKind } from '@/next/features/chat/types';
 export type TSegment = { text: string } | { ref: RefKind; label: string };
 
 // A chat's id (tab-vh0l85vgd), alone in the text: a chip only when that chat is known (ref-chip.tsx).
+const NUMERIC_MR = String.raw`(?<![\w/!.-])[1-9]\d{0,18}![1-9]\d{0,5}(?![\w!/-]|\.[\w])`;
 const CHAT = String.raw`(?<![\w/.:-])tab-[a-z0-9]{6,16}(?![\w-])`;
 
 // A path has a slash and an extension (web/app/next/feed.tsx, feed.tsx:12 is a file only with a slash before it, so
@@ -19,7 +20,10 @@ const pattern = (): RegExp => {
   const task = appConfig().taskKeyPattern;
   if (cached?.source === task) return cached.re;
   // Named: the tracker's pattern may hold groups of its own ((ABC|EXP)-\d+), which would shift numbered ones.
-  const re = new RegExp(String.raw`(?<task>\b(?:${task})\b)|(?<chat>${CHAT})|(?<file>${FILE})`, 'g');
+  const re = new RegExp(
+    String.raw`(?<task>\b(?:${task})\b)|(?<mr>${NUMERIC_MR})|(?<chat>${CHAT})|(?<file>${FILE})`,
+    'g',
+  );
   cached = { source: task, re };
   return re;
 };
@@ -34,6 +38,7 @@ export const splitRefs = (text: string): TSegment[] => {
     if (match.index > last) out.push({ text: text.slice(last, match.index) });
     let ref: RefKind = 'file';
     if (match.groups?.task) ref = 'task';
+    else if (match.groups?.mr) ref = 'mr';
     else if (match.groups?.chat) ref = 'chat';
     out.push({ ref, label: match[0] });
     last = match.index + match[0].length;

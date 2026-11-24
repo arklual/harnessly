@@ -27,6 +27,22 @@ const remarkRefs = () => (tree: Root) => {
     const next: RootContent[] = [];
     const children = node.children as RootContent[];
     for (const child of children) {
+      if (child.type === 'inlineCode') {
+        const parts = splitRefs(child.value);
+        const ref = parts[0];
+        if (parts.length === 1 && ref && 'ref' in ref && (ref.ref === 'task' || ref.ref === 'mr')) {
+          next.push({
+            type: 'text',
+            value: ref.label,
+            data: { hName: REF_TAG, hProperties: { dataKind: ref.ref, dataLabel: ref.label } },
+          } as Text);
+          continue;
+        }
+        if (/^https?:\/\/[^\s<>`]+$/i.test(child.value) && URL.canParse(child.value)) {
+          next.push({ type: 'link', url: child.value, children: [{ type: 'text', value: child.value }] });
+          continue;
+        }
+      }
       if (child.type === 'text') {
         for (const part of splitRefs((child as Text).value)) {
           if ('text' in part) next.push({ type: 'text', value: part.text });

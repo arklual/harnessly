@@ -45,6 +45,8 @@ type v2Open struct {
 }
 
 // mrRef is `!12` or `<project> !12`: a word, or a path of words with slashes, then the number, as the text writes it.
+var numericMRRef = regexp.MustCompile(`^([1-9][0-9]{0,18})!([1-9][0-9]{0,5})$`)
+
 var mrRef = regexp.MustCompile(`^(?:([\w][\w.-]*(?:/[\w.-]+)*) )?!(\d{1,6})$`)
 
 func (o v2Open) Open(ctx context.Context, conv, ref string) (wire.OpenTarget, error) {
@@ -84,6 +86,9 @@ func (o v2Open) OpenAll(ctx context.Context, conv string, refs []string) ([]*wir
 }
 
 func (o v2Open) open(ctx context.Context, rec wire.Conversation, ref string) *wire.OpenTarget {
+	if m := numericMRRef.FindStringSubmatch(ref); m != nil {
+		return o.openMR(ctx, rec, m[1], m[2])
+	}
 	if m := mrRef.FindStringSubmatch(ref); m != nil {
 		return o.openMR(ctx, rec, m[1], m[2])
 	}
@@ -302,6 +307,19 @@ func (o v2Open) resolveMR(ctx context.Context, rec wire.Conversation, name, iid 
 	}
 	ctx, cancel := context.WithTimeout(ctx, mrLimit)
 	defer cancel()
+	if _, err := strconv.ParseUint(name, 10, 64); name != "" && err == nil {
+		// Project IDs are local to each GitLab. Ask only configured hosts and accept
+		// their canonical web URLs. A miss must never select a similarly numbered MR.
+		var projects []gitlabProject
+		for _, host := range o.targets.GitLabHosts {
+			projects = append(projects, gitlabProject{host: host, path: name})
+		}
+		found := o.verify(ctx, projects, n)
+		if len(found) == 1 {
+			return found
+		}
+		return nil
+	}
 	linked := o.linked(rec.TranscriptPath, iid)
 	lay := o.layoutOf(ctx, rec.Cwd)
 

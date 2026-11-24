@@ -11,6 +11,20 @@ import { RefContext } from '@/next/features/chat/ref-chip';
 
 afterEach(cleanup);
 
+it('opens an exact issue or numeric-project MR without turning commands or bare IIDs into chips', () => {
+  const onOpen = vi.fn();
+  render(
+    <RefContext.Provider value={{ refs: {}, onOpen }}>
+      <Markdown md={'See `ABC-10` and `123!4`, not `!4` or `echo ABC-10`.'} />
+    </RefContext.Provider>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'ABC-10' }));
+  expect(onOpen).toHaveBeenCalledWith('task', 'ABC-10', null);
+  fireEvent.click(screen.getByRole('button', { name: '123!4' }));
+  expect(onOpen).toHaveBeenCalledWith('mr', '123!4', null);
+  expect(screen.getByText('!4').tagName).toBe('CODE');
+  expect(screen.getByText('echo ABC-10').tagName).toBe('CODE');
+});
 describe('a path in inline code', () => {
   const docs = new Set(['/home/dev/app/docs/plan.md']);
 

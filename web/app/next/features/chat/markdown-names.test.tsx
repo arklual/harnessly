@@ -10,6 +10,7 @@ vi.mock('@/platform/config', () => ({
     readerUrl: null,
     standDomain: null,
     trackerHosts: [],
+    connectionHosts: ['wiki.example.org'],
     gitlabHosts: [],
     paneHosts: [],
     defaultPins: [],
@@ -87,4 +88,11 @@ describe('a path in the text (HRN-1652)', () => {
     fireEvent.click(chip);
     expect(onOpen).toHaveBeenCalledWith('file', 'web/app/next/feed.tsx', null);
   });
+});
+
+it('hands a connected Wiki address in inline code to the pane resolver', () => {
+  const url = 'https://wiki.example.org/wiki/spaces/ABC/pages/117';
+  const open = show('Read `' + url + '`.');
+  fireEvent.click(screen.getByRole('link', { name: url }));
+  expect(open).toHaveBeenCalledWith('link', url, url);
 });

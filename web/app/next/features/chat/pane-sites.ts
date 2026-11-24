@@ -67,6 +67,7 @@ export const defaultSites = (config: IAppConfig = appConfig()): string[] => {
     readerSite(config.readerUrl),
     config.standDomain ? siteOf(`*.${config.standDomain.replace(/^\.+/, '')}`) : null,
     ...config.trackerHosts.map(siteOf),
+    ...(config.connectionHosts ?? []).map(siteOf),
     ...config.gitlabHosts.filter((h) => !PUBLIC_HOSTS.has(h.toLowerCase())).map(siteOf),
     ...config.paneHosts.map(siteOf),
     ...config.defaultPins.map((pin) => siteOf(pin.text)),

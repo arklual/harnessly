@@ -294,3 +294,27 @@ func TestRemoteProject(t *testing.T) {
 		}
 	}
 }
+
+func TestNumericProjectMergeRequest(t *testing.T) {
+	o := openFixture(nil, nil)
+	o.mr = func(_ context.Context, host, project string, iid int) (mrInfo, bool) {
+		return mrInfo{url: mrURL("team/example", 42)}, host == testHost && project == "123" && iid == 42
+	}
+	if got := opens(t, o, "talk", "123!42"); got == nil || got.Target != mrURL("team/example", 42) {
+		t.Fatalf("numeric reference: %+v", got)
+	}
+	if got := opens(t, o, "talk", "987!42"); got != nil {
+		t.Fatalf("unreadable project fell back to transcript: %+v", got)
+	}
+}
+
+func TestNumericProjectMergeRequestAmbiguousAcrossHosts(t *testing.T) {
+	o := openFixture(nil, nil)
+	o.targets.GitLabHosts = append(o.targets.GitLabHosts, "git.example.net")
+	o.mr = func(_ context.Context, host, project string, iid int) (mrInfo, bool) {
+		return mrInfo{url: "https://" + host + "/team/project/-/merge_requests/42"}, project == "123" && iid == 42
+	}
+	if got := opens(t, o, "talk", "123!42"); got != nil {
+		t.Fatalf("ambiguous project ID opened: %+v", got)
+	}
+}
