@@ -134,7 +134,7 @@ export const useChatBackground = (
     const away = (event: PointerEvent) => {
       const el = event.target instanceof Element ? event.target : null;
       // The cards' menus and the gallery stand in portals: a click there is a click in the popover.
-      if (el?.closest('.hx-wgs-wrap, .hx-bg-btn, [role="menu"], [role="dialog"]')) return;
+      if (el?.closest('.hx-col, .hx-bg-btn, [role="menu"], [role="dialog"]')) return;
       shut();
     };
     const esc = (event: KeyboardEvent) => {
