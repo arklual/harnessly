@@ -6,10 +6,14 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/ly-solutions/harnessly/internal/filestore"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/resaccess"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
+
+// HubChatGuestPrefix names the read-only transcript route on the configured Hub hostname.
+const HubChatGuestPrefix = "/guest/chat/"
 
 var chatGuestList = regexp.MustCompile(`^/api/[A-Za-z0-9_-]+/chat-guest-links$`)
 
@@ -30,12 +34,21 @@ func (s *Service) manageGuestChatSnapshot(w http.ResponseWriter, r *http.Request
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusCreated, map[string]string{"url": s.cfg.DesignShareURL + "/chat/" + token})
+	base := s.cfg.PublicURL + HubChatGuestPrefix
+	if s.cfg.DesignShareURL != "" {
+		base = s.cfg.DesignShareURL + "/chat/"
+	}
+	httpx.WriteJSON(w, http.StatusCreated, map[string]string{"url": base + token})
 }
 
-// ServeGuestChatSnapshot is mounted only on the configured guest origin.
+// ServeGuestChatSnapshot serves the configured guest path without using browser credentials.
 func (s *Service) ServeGuestChatSnapshot(w http.ResponseWriter, r *http.Request) {
-	token := strings.TrimPrefix(r.URL.Path, "/chat/")
+	onHub := strings.HasPrefix(r.URL.Path, HubChatGuestPrefix)
+	prefix := "/chat/"
+	if onHub {
+		prefix = HubChatGuestPrefix
+	}
+	token := strings.TrimPrefix(r.URL.Path, prefix)
 	st := s.uploadsStore()
 	w.Header().Set("Cache-Control", "private, no-store")
 	w.Header().Set("Referrer-Policy", "no-referrer")
@@ -56,7 +69,29 @@ func (s *Service) ServeGuestChatSnapshot(w http.ResponseWriter, r *http.Request)
 		httpx.WriteError(w, r, httpx.ErrNotFound)
 		return
 	}
-	s.chatSnapshotBlob(w, r, st, g.Space, sha, expires, revoked)
+	if !onHub {
+		s.chatSnapshotBlob(w, r, st, g.Space, sha, expires, revoked)
+		return
+	}
+	if revoked.Valid || expires <= store.Ms(s.now()) {
+		httpx.WriteError(w, r, httpx.ErrNotFound)
+		return
+	}
+	blob, err := st.OpenBlob(r.Context(), g.Space, filestore.KindFiles, sha)
+	if err != nil || blob == nil {
+		httpx.WriteError(w, r, httpx.ErrNotFound)
+		return
+	}
+	defer blob.Close()
+	w.Header().Set("Content-Security-Policy", chatShareCSP)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if r.Method == http.MethodHead {
+		return
+	}
+	writeGuestTranscript(w, blob)
 }
 
 // listGuestChatSnapshots lets authors find and revoke links after closing the share dialog,

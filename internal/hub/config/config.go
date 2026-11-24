@@ -361,7 +361,7 @@ type Config struct {
 	// DesignShareURL (HUB_DESIGN_SHARE_URL) is the origin of the guest links to designs (docs/hub/design-access.md); it
 	// must be an origin of its own, not the hub's and not a machine's. Empty: links to designs are off.
 	DesignShareURL string
-	// ChatGuestLinks allows snapshot authors to publish read-only links on DesignShareURL.
+	// ChatGuestLinks allows snapshot authors to publish read-only links on the Hub or its separate guest origin.
 	ChatGuestLinks bool
 	// DesignShareAliases (HUB_DESIGN_SHARE_ALIASES, comma-separated origins) are former addresses of the guest links: a
 	// request for /s/<token> on one is sent on to HUB_DESIGN_SHARE_URL (307), so links already in circulation keep
@@ -1085,9 +1085,6 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	case "off", "false", "0", "no":
 	default:
 		bad("HUB_CHAT_GUEST_LINKS must be on or off")
-	}
-	if c.ChatGuestLinks && c.DesignShareURL == "" {
-		bad("HUB_CHAT_GUEST_LINKS needs HUB_DESIGN_SHARE_URL")
 	}
 	if c.DesignShareDocs && c.DesignShareURL == "" {
 		bad("HUB_DESIGN_SHARE_DOCS needs HUB_DESIGN_SHARE_URL")

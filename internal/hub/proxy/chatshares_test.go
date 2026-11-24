@@ -111,8 +111,21 @@ func TestChatShareOpensFromTheHubWithTheMachineOff(t *testing.T) {
 }
 
 func TestGuestChatSnapshotIsOptInReadOnly(t *testing.T) {
-	const host = "guests.example.test"
-	s := hubtest.New(t, withWorkspace, fleetOn, hubtest.Env("HUB_DESIGN_SHARE_URL", "http://"+host), hubtest.Env("HUB_CHAT_GUEST_LINKS", "on"))
+	for _, onHub := range []bool{false, true} {
+		name := "dedicated"
+		if onHub {
+			name = "single-host"
+		}
+		t.Run(name, func(t *testing.T) { testGuestChat(t, onHub) })
+	}
+}
+func testGuestChat(t *testing.T, onHub bool) {
+	host := "guests.example.test"
+	guestOrigin := "http://" + host
+	if onHub {
+		guestOrigin = ""
+	}
+	s := hubtest.New(t, withWorkspace, fleetOn, hubtest.Env("HUB_DESIGN_SHARE_URL", guestOrigin), hubtest.Env("HUB_CHAT_GUEST_LINKS", "on"))
 	owner := s.SignIn("owner@example.com")
 	mate := s.SignIn("mate@example.com")
 	space, _ := owner.NewSpace("Team")
@@ -126,8 +139,20 @@ func TestGuestChatSnapshotIsOptInReadOnly(t *testing.T) {
 	agent.Close()
 	manage := "/agents/api/acme/shares/" + shareLink + "/guest" + q
 	browser := s.Browser()
-	guest := func(method, path string) hubtest.Resp { return browser.DoAt(s.URL, host, method, path, nil) }
-	if r := guest("GET", "/chat/"+shareLink); r.Code != 404 {
+	guest := func(method, path string) hubtest.Resp {
+		if onHub {
+			return browser.Do(method, path, nil)
+		}
+		return browser.DoAt(s.URL, host, method, path, nil)
+	}
+	pathPrefix := "/chat/"
+	origin := guestOrigin
+	if onHub {
+		origin = s.URL
+		pathPrefix = "/guest/chat/"
+	}
+
+	if r := guest("GET", pathPrefix+shareLink); r.Code != 404 {
 		t.Fatal(r)
 	}
 	if r := mate.Do("POST", manage, map[string]any{}); r.Code != 404 {
@@ -140,11 +165,10 @@ func TestGuestChatSnapshotIsOptInReadOnly(t *testing.T) {
 		}
 		var out struct{ URL string }
 		r.JSON(&out)
-		prefix := "http://" + host
-		if !strings.HasPrefix(out.URL, prefix+"/chat/") {
+		if !strings.HasPrefix(out.URL, origin+pathPrefix) {
 			t.Fatal("unexpected guest URL")
 		}
-		return strings.TrimPrefix(out.URL, prefix)
+		return strings.TrimPrefix(out.URL, origin)
 	}
 	path := makeLink()
 	list := "/agents/api/acme/chat-guest-links"
@@ -159,12 +183,15 @@ func TestGuestChatSnapshotIsOptInReadOnly(t *testing.T) {
 	if r := guest("GET", previous); r.Code != 404 {
 		t.Fatal(r)
 	}
-	if r := guest("GET", path); r.Code != 200 || string(r.Body) != sharePage || r.Header.Get("Cache-Control") != "private, no-store" || !strings.HasPrefix(r.Header.Get("Content-Security-Policy"), "sandbox") {
+	if r := guest("HEAD", path); r.Code != 200 || len(r.Body) != 0 {
 		t.Fatal(r)
 	}
-	for _, route := range []struct{ method, path string }{{"POST", path}, {"GET", path + "/files"}, {"GET", "/api/me"}} {
+	if r := guest("GET", path); r.Code != 200 || !strings.Contains(string(r.Body), "the redacted chat") || r.Header.Get("Cache-Control") != "private, no-store" || !strings.HasPrefix(r.Header.Get("Content-Security-Policy"), "sandbox") {
+		t.Fatal(r)
+	}
+	for _, route := range []struct{ method, path string }{{"POST", path}, {"GET", path + "/files"}, {"GET", "/api/me/tokens?token=" + strings.TrimPrefix(path, pathPrefix)}, {"GET", pathPrefix + shareDraft}} {
 		if r := guest(route.method, route.path); r.Code == 200 {
-			t.Fatal(r)
+			t.Fatalf("%s %s unexpectedly succeeded", route.method, route.path)
 		}
 	}
 	if r := mate.Do("DELETE", manage, nil); r.Code != 404 {

@@ -762,6 +762,8 @@ func New(o Options) (*Hub, error) {
 		case cfg.MachineIDFromHost(r.Host) != "":
 			// A machine's own origin runs the machine and nothing of the hub: no API, no page, no sign-in.
 			h.Proxy.ServeHTTP(w, r)
+		case cfg.ChatGuestLinks && cfg.DesignShareURL == "" && strings.EqualFold(r.Host, cfg.Host) && strings.HasPrefix(r.URL.Path, proxy.HubChatGuestPrefix):
+			h.Proxy.ServeGuestChatSnapshot(w, r)
 		case strings.HasPrefix(r.URL.Path, "/api/"):
 			csrf.ServeHTTP(w, r)
 		default:
