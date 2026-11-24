@@ -31,12 +31,12 @@ func fakeProbe(t *testing.T) (machineProbe, string) {
 			return preflight.Result{Tmux: preflight.Tmux{Tool: preflight.Tool{Installed: true, Version: &ver}, Compatible: true},
 				Git: preflight.Tool{Installed: true}, Claude: preflight.Claude{Installed: true}}
 		},
-		ShellPath:  func() string { return "/usr/bin:/bin" },
-		HasDecoder: func() bool { return true },
-		Free:       func(string) (uint64, bool) { return 50 * gib, true },
-		Reach:      func(context.Context, string) error { return nil },
-		GitEmail:   func() string { return "a@b.c" },
-		LookPath:   func(name string) (string, error) { return "/usr/bin/" + name, nil },
+		ShellPath:   func() string { return "/usr/bin:/bin" },
+		HasDecoder:  func() bool { return true },
+		Free:        func(string) (uint64, bool) { return 50 * gib, true },
+		Reach:       func(context.Context, string) error { return nil },
+		GitIdentity: func() gitPerson { return gitPerson{Name: "A", Email: "a@b.c"} },
+		LookPath:    func(name string) (string, error) { return "/usr/bin/" + name, nil },
 		Exists: func(p string) bool {
 			if files[p] {
 				return true
@@ -60,7 +60,7 @@ func TestMachineChecksSayWhatIsMissingAndHow(t *testing.T) {
 	p, home := fakeProbe(t)
 	p.Tools = func() preflight.Result { return preflight.Result{} }
 	p.HasDecoder = func() bool { return false }
-	p.GitEmail = func() string { return "" }
+	p.GitIdentity = func() gitPerson { return gitPerson{} }
 	_ = os.MkdirAll(filepath.Join(home, ".harnessly"), 0o755)
 	_ = os.WriteFile(filepath.Join(home, ".harnessly", "install-manifest"), nil, 0o644)
 
@@ -274,10 +274,13 @@ func TestAgentBrowserMachineCheck(t *testing.T) {
 // name and the email of the sign-in, and only then.
 func TestGitIdentityIsTakenFromTheSignIn(t *testing.T) {
 	p, _ := fakeProbe(t)
-	email := ""
+	author := gitPerson{}
 	var gotName, gotEmail string
-	p.GitEmail = func() string { return email }
-	p.SetGitIdentity = func(name, e string) error { gotName, gotEmail, email = name, e, e; return nil }
+	p.GitIdentity = func() gitPerson { return author }
+	p.SetGitIdentity = func(name, e string) error {
+		gotName, gotEmail, author = name, e, gitPerson{Name: name, Email: e}
+		return nil
+	}
 
 	anon := checksByID(p.run(context.Background()))["git_identity"]
 	if anon.OK || anon.Fixable || anon.FixCommand == "" {
@@ -317,7 +320,7 @@ func TestSetGitIdentityWritesTheGlobalConfig(t *testing.T) {
 	if err := setGitIdentity(os.Getenv("PATH"))("Ada Lovelace", "ada@example.com"); err != nil {
 		t.Fatal(err)
 	}
-	if got := gitEmail(os.Getenv("PATH"))(); got != "ada@example.com" {
+	if got := gitIdentity(os.Getenv("PATH")).Email; got != "ada@example.com" {
 		t.Fatalf("email: %q", got)
 	}
 	raw, _ := os.ReadFile(filepath.Join(home, ".gitconfig"))
@@ -398,5 +401,56 @@ func TestPreviewCheckRouteWithoutOrigins(t *testing.T) {
 	probe.PreviewOrigins = nil
 	if probe.previewCheck(context.Background()) != nil {
 		t.Fatal("no origins, yet a preview_dns check")
+	}
+}
+
+func TestGitIdentityRepairPreservesEachCustomField(t *testing.T) {
+	person := gitPerson{Name: "Verified Name", Email: "person@example.org"}
+	for _, tt := range []struct{ have, want gitPerson }{
+		{gitPerson{Name: "Chosen Name"}, gitPerson{Email: person.Email}},
+		{gitPerson{Email: "custom@example.org"}, gitPerson{Name: person.Name}},
+	} {
+		p, _ := fakeProbe(t)
+		p.GitIdentity = func() gitPerson { return tt.have }
+		var wrote gitPerson
+		p.SetGitIdentity = func(n, e string) error { wrote = gitPerson{Name: n, Email: e}; return nil }
+		ctx := withPerson(t.Context(), person.Name, person.Email)
+		if c := checksByID(p.run(ctx))["git_identity"]; c.OK || !c.Fixable {
+			t.Fatalf("incomplete author: %+v", c)
+		}
+		if err := p.fix(ctx, "git_identity"); err != nil || wrote != tt.want {
+			t.Fatalf("patch %+v, want %+v (%v)", wrote, tt.want, err)
+		}
+	}
+}
+
+func TestGitIdentityReadsXDGDefaultsAndPersonalOverrides(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git missing")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_CONFIG_GLOBAL", "")
+	if err := os.Unsetenv("GIT_CONFIG_GLOBAL"); err != nil {
+		t.Fatal(err)
+	}
+	xdg := filepath.Join(home, ".config")
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+	dir := filepath.Join(xdg, "git")
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for path, body := range map[string]string{
+		filepath.Join(dir, "config"):      "[include]\n path = defaults\n",
+		filepath.Join(dir, "defaults"):    "[user]\n name = Listed name\n email = user@example.org\n",
+		filepath.Join(home, ".gitconfig"): "[user]\n name = Chosen name\n",
+	} {
+		if err := os.WriteFile(path, []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := gitIdentity(os.Getenv("PATH")); got.Name != "Chosen name" || got.Email != "user@example.org" {
+		t.Fatalf("read %+v", got)
 	}
 }

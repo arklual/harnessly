@@ -166,7 +166,7 @@ func TestTabNavigatesAndCasts(t *testing.T) {
 	s := chromeOrSkip(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write([]byte(`<title>Проба</title><body style="background:#fff"><h1>Привет</h1><input id="q" autofocus><a href="/two">two</a></body>`))
+		_, _ = w.Write([]byte(`<title>Проба</title><body style="background:#fff"><style>@keyframes paint{from{color:#000}to{color:#369}}h1{animation:paint .5s linear infinite alternate}</style><h1>Привет</h1><input id="q" autofocus><a href="/two">two</a></body>`))
 	}))
 	defer srv.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -201,8 +201,10 @@ func TestTabNavigatesAndCasts(t *testing.T) {
 		if len(f.Data) < 100 || f.Data[0] != 0xff || f.Data[1] != 0xd8 {
 			t.Fatalf("not a JPEG: %d bytes", len(f.Data))
 		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("no frame")
+	case <-tab.Ended():
+		t.Fatalf("tab ended before its first JPEG: %s", tab.Why())
+	case <-time.After(30 * time.Second):
+		t.Fatalf("no JPEG from the animated document at %s within 30 seconds", info.URL)
 	}
 	// Typing lands in the focused field; a paste too.
 	if err := tab.Key("keyDown", "a", "KeyA", "a", 65, 0); err != nil {

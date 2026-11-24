@@ -75,8 +75,8 @@ type machineProbe struct {
 	Free func(path string) (uint64, bool)
 	// Reach is nil when an address answers.
 	Reach func(ctx context.Context, url string) error
-	// GitEmail is the account's git user.email.
-	GitEmail func() string
+	// GitIdentity reads the account's configured Git author.
+	GitIdentity func() gitPerson
 	// SetGitIdentity writes git's global user.name and user.email for the account.
 	SetGitIdentity func(name, email string) error
 	// LookPath finds a program on the runtime's PATH.
@@ -190,7 +190,7 @@ func (p machineProbe) run(ctx context.Context) []machineCheck {
 	var (
 		tools   preflight.Result
 		reached = map[string]error{}
-		email   string
+		author  gitPerson
 		wg      sync.WaitGroup
 		mu      sync.Mutex
 	)
@@ -224,7 +224,7 @@ func (p machineProbe) run(ctx context.Context) []machineCheck {
 	}
 	wg.Add(2)
 	go func() { defer wg.Done(); tools = p.Tools() }()
-	go func() { defer wg.Done(); email = p.GitEmail() }()
+	go func() { defer wg.Done(); author = p.GitIdentity() }()
 	wg.Wait()
 
 	var out []machineCheck
@@ -257,11 +257,19 @@ func (p machineProbe) run(ctx context.Context) []machineCheck {
 		}
 	}
 	if gitOK {
-		identity := machineCheck{ID: "git_identity", OK: email != "", Title: "git user.email"}
+		identity := machineCheck{ID: "git_identity", OK: author.Name != "" && author.Email != "", Title: "git user.name / user.email"}
 		if !identity.OK {
-			identity.FixCommand = `git config --global user.name "Your Name" && git config --global user.email you@example.com`
+			var commands []string
+			if author.Name == "" {
+				commands = append(commands, `git config --global user.name "Your Name"`)
+			}
+			if author.Email == "" {
+				commands = append(commands, "git config --global user.email you@example.com")
+			}
+			identity.FixCommand = strings.Join(commands, " && ")
 			// The person who opened the page is who commits here: their email is the one the sign-in carries.
-			identity.Fixable = p.SetGitIdentity != nil && personFrom(ctx).Email != ""
+			_, identity.Fixable = author.missingFrom(personFrom(ctx))
+			identity.Fixable = identity.Fixable && p.SetGitIdentity != nil
 		}
 		add(identity)
 	}
@@ -442,8 +450,8 @@ func (p machineProbe) fix(ctx context.Context, id string) error {
 	case "local_bin_path":
 		return p.fixPath()
 	case "git_identity":
-		who := personFrom(ctx)
-		if p.SetGitIdentity == nil || who.Email == "" || p.GitEmail() != "" {
+		who, ok := p.GitIdentity().missingFrom(personFrom(ctx))
+		if p.SetGitIdentity == nil || !ok {
 			return errNoFix
 		}
 		return p.SetGitIdentity(who.Name, who.Email)
@@ -491,6 +499,19 @@ func withSessionPerson(ctx context.Context, d deps, r *http.Request) context.Con
 }
 
 type gitPerson struct{ Name, Email string }
+
+func (p gitPerson) missingFrom(who gitPerson) (gitPerson, bool) {
+	if who.Email == "" || (p.Name == "" && who.Name == "") {
+		return gitPerson{}, false
+	}
+	if p.Name != "" {
+		who.Name = ""
+	}
+	if p.Email != "" {
+		who.Email = ""
+	}
+	return who, who.Name != "" || who.Email != ""
+}
 
 func personFrom(ctx context.Context) gitPerson {
 	p, _ := ctx.Value(personKey{}).(gitPerson)
@@ -558,12 +579,13 @@ func freeBytes(path string) (uint64, bool) {
 
 func pathExists(p string) bool { _, err := os.Stat(p); return err == nil }
 
-// gitEmail is git's user.email for the account, "" when it has none.
-func gitEmail(path string) func() string {
-	return func() string {
+func gitIdentity(path string) gitPerson {
+	read := func(key string) string {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		cmd := exec.CommandContext(ctx, "git", "config", "--global", "--get", "user.email")
+		// Read the system and both global files (including XDG includes), outside any checkout.
+		cmd := exec.CommandContext(ctx, "git", "config", "--get", key)
+		cmd.Dir = "/"
 		cmd.Env = append(os.Environ(), "PATH="+path)
 		out, err := cmd.Output()
 		if err != nil {
@@ -571,6 +593,7 @@ func gitEmail(path string) func() string {
 		}
 		return strings.TrimSpace(string(out))
 	}
+	return gitPerson{Name: read("user.name"), Email: read("user.email")}
 }
 
 // setGitIdentity writes the person's name (when the sign-in has one) and email into git's global config.
@@ -591,7 +614,10 @@ func setGitIdentity(path string) func(name, email string) error {
 				return err
 			}
 		}
-		return set("user.email", email)
+		if email != "" {
+			return set("user.email", email)
+		}
+		return nil
 	}
 }
 
@@ -627,7 +653,7 @@ func newMachineProbe(d deps, self *selfupdate.Updater) machineProbe {
 		AgentBrowser: func(ctx context.Context) machineCheck { return checkAgentBrowser(ctx, d.DataDir) },
 		GOOS:         runtime.GOOS, Home: d.Home, DataDir: d.DataDir, BinDir: binDir, User: name, Shell: shell,
 		Tools: tools.Runtime, ShellPath: tools.ShellPath, HasDecoder: dictation.HasDecoder, Voice: ownVoice(d.DataDir),
-		Update: self, Free: freeBytes, Reach: reach, GitEmail: func() string { return gitEmail(tools.ShellPath())() },
+		Update: self, Free: freeBytes, Reach: reach, GitIdentity: func() gitPerson { return gitIdentity(tools.ShellPath()) },
 		SetGitIdentity: func(name, email string) error { return setGitIdentity(tools.ShellPath())(name, email) },
 		LookPath:       exec.LookPath, Exists: pathExists, Invalidate: tools.Invalidate, ReadFile: os.ReadFile,
 		LaunchEnvUndeclared: func() bool { return launchEnvUndeclared(os.Getenv, os.LookupEnv) },
