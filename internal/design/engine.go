@@ -1,8 +1,8 @@
 package design
 
 import (
-	_ "embed"
 	"encoding/json"
+	"github.com/ly-solutions/harnessly/internal/design/ownengine"
 	"net/http"
 	"os/exec"
 	"path/filepath"
@@ -15,8 +15,7 @@ import (
 // RUNTIME_DESIGN_RELEASES_DIR), else our own engine (ownengine/support.js), so designs work on any machine without an
 // account. Projects keep the engine they were made with.
 
-//go:embed ownengine/support.js
-var ownEngine []byte
+var ownEngine = []byte(ownengine.Script)
 
 // Where a new project's engine comes from.
 const (

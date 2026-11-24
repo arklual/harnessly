@@ -17,14 +17,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ly-solutions/harnessly/evals"
 	"github.com/ly-solutions/harnessly/internal/agenteval"
+	"github.com/ly-solutions/harnessly/internal/confine"
 
 	"github.com/ly-solutions/harnessly/internal/timescale"
 )
 
 const evalHelp = `harnessly eval: does harnessly by itself make an agent behave (docs/agent-evals.md)
 
-  harnessly eval list     [--dir evals/agent]
+  harnessly eval list     [--dir PATH] (checkout catalog or the catalog shipped with the CLI)
+  harnessly eval doctor   Check whether this execution environment supports Landlock
   harnessly eval run      --models haiku,opus [--scenarios a,b] [--set dev|heldout|all] [--variants canon|all|N]
                           [--repeats 3] [--parallel 3] [--max-runs 150] [--max-usd 20] [--setup NAME] [--reuse]
                           [--runtime PATH] [--tools DIR:DIR] [--login DIR] [--root DIR] [--port-base 19400]
@@ -48,6 +51,13 @@ func (c *cli) eval(args []string) error {
 		return nil
 	}
 	switch args[0] {
+	case "doctor":
+		abi, err := confine.Probe()
+		if err != nil {
+			return fmt.Errorf("eval doctor: %w", err)
+		}
+		c.out("Landlock ABI %d\n", abi)
+		return nil
 	case "list", "ls":
 		return c.evalList(args[1:])
 	case "run":
@@ -101,6 +111,26 @@ func (c *cli) evalDir(v string) string {
 	return v
 }
 
+// Prefer the checkout for development and explicit directories for custom scenarios.
+func (c *cli) readCatalog(requested string) (string, func(), error) {
+	dir := c.evalDir(requested)
+	cleanup := func() {}
+	_, err := os.Stat(dir)
+	if requested != "" || !errors.Is(err, os.ErrNotExist) {
+		return dir, cleanup, err
+	}
+	dir, err = os.MkdirTemp("", "harnessly-eval-catalog-")
+	if err != nil {
+		return "", cleanup, err
+	}
+	cleanup = func() { _ = os.RemoveAll(dir) }
+	if err = evals.Extract(dir); err != nil {
+		cleanup()
+		return "", func() {}, err
+	}
+	return dir, cleanup, nil
+}
+
 func (c *cli) evalList(args []string) error {
 	fs := flag.NewFlagSet("eval list", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -108,7 +138,15 @@ func (c *cli) evalList(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return usageErr("eval list: %v", err)
 	}
-	list, err := agenteval.Load(c.evalDir(*dir))
+	catalogDir, cleanup, err := c.readCatalog(*dir)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	list, err := agenteval.Load(catalogDir)
+	if err == nil && len(list) == 0 {
+		return fmt.Errorf("eval catalog %s contains no YAML scenarios", catalogDir)
+	}
 	for _, s := range list {
 		agents := "claude, codex"
 		if len(s.Agents) > 0 {
@@ -157,7 +195,15 @@ func (c *cli) evalRun(args []string) error {
 	if *effort != "" && *effort != "low" && *effort != "medium" {
 		return usageErr("eval run: --effort must be low or medium")
 	}
-	all, err := agenteval.Load(c.evalDir(*dir))
+	catalogDir, cleanup, err := c.readCatalog(*dir)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	all, err := agenteval.Load(catalogDir)
+	if err == nil && len(all) == 0 {
+		return fmt.Errorf("eval catalog %s contains no YAML scenarios", catalogDir)
+	}
 	if err != nil {
 		return err
 	}
@@ -212,7 +258,7 @@ func (c *cli) evalRun(args []string) error {
 	base := c.evalRoot(*root)
 	sf := *setupFile
 	if sf == "" {
-		if p := filepath.Join(c.evalDir(*dir), "setups", "default.yaml"); fileExists(p) {
+		if p := filepath.Join(catalogDir, "setups", "default.yaml"); fileExists(p) {
 			sf = p
 		}
 	}
@@ -225,8 +271,8 @@ func (c *cli) evalRun(args []string) error {
 	if *setup == "" {
 		*setup = strings.Trim(su.Name+"-"+buildID(rt), "-")
 	}
-	if agenteval.SandboxAvailable() == 0 {
-		return errors.New("eval run: no Landlock on this machine, and stands run only inside it (their agents would see every file of the account)")
+	if _, err := confine.Probe(); err != nil {
+		return fmt.Errorf("eval run requires an isolated Linux stand: %w; select a runner with Landlock enabled", err)
 	}
 	stamp := time.Now().UTC().Format("20060102-150405")
 	out := filepath.Join(base, "runs", stamp+"-"+safeName(*setup))

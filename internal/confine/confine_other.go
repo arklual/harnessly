@@ -7,6 +7,9 @@ import "errors"
 // Available is 0 off Linux: no Landlock.
 func Available() int { return 0 }
 
+// Probe reports the platform requirement for isolated stands.
+func Probe() (int, error) { return 0, errors.New("Landlock requires a Linux execution environment") }
+
 type Net int
 
 const (

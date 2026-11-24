@@ -9,6 +9,8 @@ It is built as a product from the start: scenarios are data, environments are co
 disposable stands. Later the same tool checks the quality of an agent environment and its skills on a customer's own
 machines and services.
 
+Outside a checkout, `harnessly eval list` and `run` use the catalog included in the CLI build. In a checkout the local `evals/agent` takes precedence. Use `--dir PATH` for a custom catalog. Run `harnessly eval doctor` on the execution host to query its Landlock ABI. If the host cannot provide it, provision a compatible Linux runner for agent evals. Other integrations can run independently.
+
 ## The pieces
 
 | Piece | What it is |

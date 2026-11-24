@@ -18,11 +18,25 @@ import (
 
 // Available says whether Landlock confines a process here (its ABI version; 0 for none).
 func Available() int {
+	v, _ := Probe()
+	return v
+}
+
+// Probe returns the ABI or the reason this execution environment cannot provide it.
+func Probe() (int, error) {
 	v, _, errno := unix.Syscall(unix.SYS_LANDLOCK_CREATE_RULESET, 0, 0, unix.LANDLOCK_CREATE_RULESET_VERSION)
-	if errno != 0 {
-		return 0
+	switch errno {
+	case 0:
+		return int(v), nil
+	case unix.ENOSYS:
+		return 0, fmt.Errorf("this execution environment does not expose the Landlock system call: %w", errno)
+	case unix.EOPNOTSUPP:
+		return 0, fmt.Errorf("the kernel does not enable the Landlock security module: %w", errno)
+	case unix.EPERM, unix.EACCES:
+		return 0, fmt.Errorf("the Landlock ABI query was denied: %w", errno)
+	default:
+		return 0, fmt.Errorf("Landlock ABI query failed: %w", errno)
 	}
-	return int(v)
 }
 
 // handledFS are the file rights a ruleset of ABI version v handles: every right the kernel knows of, so what a rule
