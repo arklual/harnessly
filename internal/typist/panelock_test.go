@@ -38,9 +38,6 @@ func TestAHungWriterLosesThePaneAtItsTerm(t *testing.T) {
 	if waited := time.Since(start); waited < 30*time.Millisecond || waited > 2*time.Second {
 		t.Errorf("the pane came after %s", waited)
 	}
-	if Expired() != before+1 {
-		t.Errorf("expired holds: %d", Expired()-before)
-	}
 	select {
 	case pane := <-told:
 		if pane != "term-test-hung" {
@@ -48,6 +45,10 @@ func TestAHungWriterLosesThePaneAtItsTerm(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Error("nobody was told of the hold that ended by its term")
+	}
+	// The deadline callback releases the lock before recording and reporting the expiry.
+	if Expired() != before+1 {
+		t.Errorf("expired holds: %d", Expired()-before)
 	}
 	// The hung writer's own unlock, when it comes at last, does not take the pane from the one that holds it now.
 	hung()

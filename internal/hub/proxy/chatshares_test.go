@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/hubtest"
 )
@@ -60,6 +61,12 @@ func TestChatShareOpensFromTheHubWithTheMachineOff(t *testing.T) {
 	if r.Code != 201 || !strings.Contains(string(r.Body), shareLink) {
 		t.Fatalf("publish: %s", r)
 	}
+	if strings.Contains(string(r.Body), "guestLinksAvailable") {
+		t.Fatal("guest publication was offered by default")
+	}
+	if r := owner.Do("POST", "/agents/api/acme/shares/"+shareLink+"/guest"+q, map[string]any{}); r.Code != 404 {
+		t.Fatalf("guest publication with feature off: %s", r)
+	}
 	want := s.URL + "/agents/api/acme/chat-shares/"
 	for _, b := range rt.bases {
 		if b != "" && b != want {
@@ -100,5 +107,78 @@ func TestChatShareOpensFromTheHubWithTheMachineOff(t *testing.T) {
 	}
 	if r := open(member); r.Code != 410 {
 		t.Fatalf("an ended link: %s", r)
+	}
+}
+
+func TestGuestChatSnapshotIsOptInReadOnly(t *testing.T) {
+	const host = "guests.example.test"
+	s := hubtest.New(t, withWorkspace, fleetOn, hubtest.Env("HUB_DESIGN_SHARE_URL", "http://"+host), hubtest.Env("HUB_CHAT_GUEST_LINKS", "on"))
+	owner := s.SignIn("owner@example.com")
+	mate := s.SignIn("mate@example.com")
+	space, _ := owner.NewSpace("Team")
+	owner.Join(space, mate)
+	agent := owner.Machine(space, &shareRuntime{})
+	q := "?machine=" + agent.MachineID
+	r := owner.Do("POST", "/agents/api/acme/shares"+q, map[string]any{"draftId": shareDraft, "expiresInDays": 7})
+	if r.Code != 201 || !strings.Contains(string(r.Body), "guestLinksAvailable") {
+		t.Fatal(r)
+	}
+	agent.Close()
+	manage := "/agents/api/acme/shares/" + shareLink + "/guest" + q
+	browser := s.Browser()
+	guest := func(method, path string) hubtest.Resp { return browser.DoAt(s.URL, host, method, path, nil) }
+	if r := guest("GET", "/chat/"+shareLink); r.Code != 404 {
+		t.Fatal(r)
+	}
+	if r := mate.Do("POST", manage, map[string]any{}); r.Code != 404 {
+		t.Fatal(r)
+	}
+	makeLink := func() string {
+		r := owner.Do("POST", manage, map[string]any{})
+		if r.Code != 201 {
+			t.Fatal(r)
+		}
+		var out struct{ URL string }
+		r.JSON(&out)
+		prefix := "http://" + host
+		if !strings.HasPrefix(out.URL, prefix+"/chat/") {
+			t.Fatal("unexpected guest URL")
+		}
+		return strings.TrimPrefix(out.URL, prefix)
+	}
+	path := makeLink()
+	list := "/agents/api/acme/chat-guest-links"
+	if r := owner.Do("GET", list, nil); r.Code != 200 || !strings.Contains(string(r.Body), shareLink) || strings.Contains(string(r.Body), path) {
+		t.Fatal(r)
+	}
+	if r := mate.Do("GET", list, nil); r.Code != 200 || strings.Contains(string(r.Body), shareLink) {
+		t.Fatal(r)
+	}
+	previous := path
+	path = makeLink()
+	if r := guest("GET", previous); r.Code != 404 {
+		t.Fatal(r)
+	}
+	if r := guest("GET", path); r.Code != 200 || string(r.Body) != sharePage || r.Header.Get("Cache-Control") != "private, no-store" || !strings.HasPrefix(r.Header.Get("Content-Security-Policy"), "sandbox") {
+		t.Fatal(r)
+	}
+	for _, route := range []struct{ method, path string }{{"POST", path}, {"GET", path + "/files"}, {"GET", "/api/me"}} {
+		if r := guest(route.method, route.path); r.Code == 200 {
+			t.Fatal(r)
+		}
+	}
+	if r := mate.Do("DELETE", manage, nil); r.Code != 404 {
+		t.Fatal(r)
+	}
+	if r := owner.Do("DELETE", manage, nil); r.Code != 204 {
+		t.Fatal(r)
+	}
+	if r := guest("GET", path); r.Code != 404 {
+		t.Fatal(r)
+	}
+	path = makeLink()
+	s.Clock.Advance(8 * 24 * time.Hour)
+	if r := guest("GET", path); r.Code != 404 {
+		t.Fatal(r)
 	}
 }

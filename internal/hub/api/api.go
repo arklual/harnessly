@@ -741,6 +741,8 @@ func New(o Options) (*Hub, error) {
 			// HUB_DESIGN_SHARE_DOCS: a document's guest link (/d/<token>) opens under the address it was handed out at.
 			// The page sets its own sandbox; the hub's session is not on this origin.
 			mux.ServeHTTP(w, r)
+		case cfg.ChatGuestLinks && h.Design.IsShareHost(r.Host) && strings.HasPrefix(r.URL.Path, "/chat/"):
+			h.Proxy.ServeGuestChatSnapshot(w, r)
 		case h.Design.IsShareHost(r.Host):
 			// A guest link runs on its own origin: the page of one project and nothing of the hub.
 			shares.ServeHTTP(w, r)

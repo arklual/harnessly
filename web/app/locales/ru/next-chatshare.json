@@ -18,5 +18,10 @@
   "next.chatShare.copied": "Ссылка скопирована",
   "next.chatShare.unavailable": "На этой машине шеринг диалогов не настроен",
   "next.chatShare.failed": "Не получилось: {why}",
-  "next.rowMenu.share": "Поделиться…"
+  "next.rowMenu.share": "Поделиться…",
+  "next.chatShare.guestHint": "По гостевой ссылке любой человек сможет читать этот снимок без входа до 7 дней.",
+  "next.chatShare.guestLink": "Гостевая ссылка",
+  "next.chatShare.guestCreate": "Создать гостевую ссылку",
+  "next.chatShare.guestRevoke": "Отозвать гостевую ссылку",
+  "next.chatShare.activeGuests": "Ваши активные гостевые снимки"
 }

@@ -1,7 +1,7 @@
 // «Поделиться» of a chat (beta «chatShare»): a snapshot of the transcript with its secrets hidden, a Markdown or HTML
 // file of it, and a read-only link for 7, 30 or 90 days. The dialog changes nothing in the chat itself; every step waits
 // for the runtime and says what it answered.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   DEFAULT_OPTIONS,
   EXPIRY_DAYS,
@@ -9,6 +9,10 @@ import {
   downloadUrl,
   previewUrl,
   publishShare,
+  activeGuestSnapshots,
+  type IGuestSnapshot,
+  createGuestShare,
+  revokeGuestShare,
   type IDraft,
   type IShare,
   type ISnapshotOptions,
@@ -31,9 +35,28 @@ const ShareForm = ({ share, onClose }: { share: IChatShare; onClose: () => void 
   const [draft, setDraft] = useState<IDraft | null>(null);
   const [days, setDays] = useState<TExpiryDays>(7);
   const [link, setLink] = useState<IShare | null>(null);
+  const [guestUrl, setGuestUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [activeGuests, setActiveGuests] = useState<IGuestSnapshot[]>([]);
+  useEffect(() => {
+    let live = true;
+    activeGuestSnapshots(share.machine).then((rows) => {
+      if (live) setActiveGuests(rows);
+    });
+    return () => {
+      live = false;
+    };
+  }, [share.machine, guestUrl]);
+  const revokePrevious = async (row: IGuestSnapshot) => {
+    setBusy(true);
+    if (await revokeGuestShare(row.machine, row.id)) {
+      setActiveGuests((items) => items.filter((item) => item.id !== row.id));
+      if (link?.id === row.id) setGuestUrl(null);
+    } else say('unavailable');
+    setBusy(false);
+  };
   const say = (code: string) =>
     setError(
       code === 'unavailable' ? t('next.chatShare.unavailable') : t('next.chatShare.failed', { why: code }),
@@ -43,6 +66,7 @@ const ShareForm = ({ share, onClose }: { share: IChatShare; onClose: () => void 
     setBusy(true);
     setError(null);
     setLink(null);
+    setGuestUrl(null);
     const res = await captureSnapshot(share.machine, share.tabId, options);
     setBusy(false);
     if ('ok' in res) setDraft(res.ok);
@@ -57,6 +81,21 @@ const ShareForm = ({ share, onClose }: { share: IChatShare; onClose: () => void 
     setBusy(false);
     if ('ok' in res) setLink(res.ok);
     else say(res.error);
+  };
+
+  const toggleGuest = async () => {
+    if (!link) return;
+    setBusy(true);
+    setError(null);
+    if (guestUrl) {
+      if (await revokeGuestShare(share.machine, link.id)) setGuestUrl(null);
+      else say('unavailable');
+    } else {
+      const res = await createGuestShare(share.machine, link.id);
+      if ('ok' in res) setGuestUrl(res.ok);
+      else say(res.error);
+    }
+    setBusy(false);
   };
 
   const copy = (url: string) => {
@@ -130,6 +169,47 @@ const ShareForm = ({ share, onClose }: { share: IChatShare; onClose: () => void 
               {t('next.chatShare.copy')}
             </button>
           </p>
+        )}
+        {link?.guestAvailable && (
+          <section>
+            <p>{t('next.chatShare.guestHint')}</p>
+            {guestUrl && (
+              <p>
+                <input
+                  readOnly
+                  value={guestUrl}
+                  aria-label={t('next.chatShare.guestLink')}
+                  onFocus={(e) => e.target.select()}
+                />{' '}
+                <button type="button" className="hx-btn" onClick={() => copy(guestUrl)}>
+                  {t('next.chatShare.copy')}
+                </button>
+              </p>
+            )}
+            <button type="button" className="hx-btn" disabled={busy} onClick={() => void toggleGuest()}>
+              {guestUrl ? t('next.chatShare.guestRevoke') : t('next.chatShare.guestCreate')}
+            </button>
+          </section>
+        )}
+        {activeGuests.some((row) => row.id !== link?.id) && (
+          <section>
+            <h3>{t('next.chatShare.activeGuests')}</h3>
+            {activeGuests
+              .filter((row) => row.id !== link?.id)
+              .map((row) => (
+                <p key={row.id}>
+                  {row.title}{' '}
+                  <button
+                    type="button"
+                    className="hx-btn"
+                    disabled={busy}
+                    onClick={() => void revokePrevious(row)}
+                  >
+                    {t('next.chatShare.guestRevoke')}
+                  </button>
+                </p>
+              ))}
+          </section>
         )}
         {error && (
           <p className="hx-create__err" role="alert">

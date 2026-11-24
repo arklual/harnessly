@@ -263,3 +263,34 @@ func (t *txn) guestComments(ref Ref) ([]map[string]any, error) {
 	}
 	return out, rows.Err()
 }
+
+// SetSnapshotGuestLink rotates the author's one guest link, or revokes it. The
+// ordinary resource ACL endpoints remain closed to the chat kind.
+func (s *Service) SetSnapshotGuestLink(ctx context.Context, machine, id, userID string, publish bool) (string, error) {
+	var token string
+	err := s.write(ctx, func(t *txn) error {
+		var space, actor string
+		var expires int64
+		err := t.q.QueryRow(ctx, `SELECT space_id,owner_email,expires_at FROM chat_shares WHERE id=? AND machine_id=? AND owner_id=? AND revoked_at IS NULL AND expires_at>?`+t.forUpdate(), id, machine, userID, ms(t.now)).Scan(&space, &actor, &expires)
+		if errors.Is(err, sql.ErrNoRows) {
+			return fail("not_found", "Снимок не найден")
+		}
+		if err != nil {
+			return err
+		}
+		ref := Ref{Kind: KindChat, ID: id, Space: space}
+		if _, err := t.revokeAllLinks(ref, actor); err != nil {
+			return err
+		}
+		if !publish {
+			return nil
+		}
+		until := time.UnixMilli(expires)
+		if limit := t.now.Add(7 * 24 * time.Hour); limit.Before(until) {
+			until = limit
+		}
+		_, token, err = t.createLink(ref, actor, linkInput{Rights: roleView, Term: ttl{at: until}})
+		return err
+	})
+	return token, err
+}

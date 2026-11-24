@@ -145,6 +145,10 @@ func (s *Service) workspaceAPI(w http.ResponseWriter, r *http.Request, p *auth.P
 		s.serveUploads(w, r, p, rest)
 		return
 	}
+	if chatGuestList.MatchString(rest) {
+		s.listGuestChatSnapshots(w, r, p.User.ID)
+		return
+	}
 	if match := chatSharePage.FindStringSubmatch(rest); match != nil {
 		s.serveChatSharePage(w, r, p, match[1])
 		return

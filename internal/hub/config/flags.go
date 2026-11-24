@@ -109,6 +109,7 @@ var Flags = []Flag{
 	{Name: "HUB_DB_MIGRATE_URL", Owner: "db"},
 	{Name: "HUB_DB_POOLER", Owner: "db"},
 	{Name: "HUB_DB_SCHEMA", Owner: "db"},
+	{Name: "HUB_CHAT_GUEST_LINKS", Owner: "design"},
 	{Name: "HUB_DESIGN_DEFAULT_TEAM_LEVEL", Owner: "design"},
 	{Name: "HUB_DESIGN_DERIVED", Owner: "design"},
 	{Name: "HUB_DESIGN_IMPORT_DEFAULT_MACHINE", Owner: "design"},

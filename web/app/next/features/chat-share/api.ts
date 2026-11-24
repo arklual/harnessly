@@ -35,6 +35,7 @@ export interface IDraft {
 }
 
 export interface IShare {
+  guestAvailable?: boolean;
   id: string;
   url: string;
   title: string;
@@ -76,6 +77,7 @@ export const readShare = (v: unknown): IShare => {
   if (typeof s.id !== 'string' || typeof s.url !== 'string') throw new Error('share');
   return {
     id: s.id,
+    guestAvailable: record(v, 'answer').guestLinksAvailable === true,
     url: s.url,
     title: typeof s.title === 'string' ? s.title : '',
     expiresAt: typeof s.expiresAt === 'number' ? s.expiresAt : 0,
@@ -143,3 +145,51 @@ export const downloadUrl = (machine: MachineId, draftId: string, format: TFormat
   path(machine, `/snapshots/${encodeURIComponent(draftId)}/download?format=${format}`);
 export const previewUrl = (machine: MachineId, draftId: string): string =>
   path(machine, `/snapshots/${encodeURIComponent(draftId)}/preview`);
+
+export async function createGuestShare(machine: MachineId, id: string): Promise<TShareAnswer<string>> {
+  const res = await sendBody(
+    'POST',
+    path(machine, `/shares/${encodeURIComponent(id)}/guest`),
+    {},
+    (value) => {
+      const url = record(value, 'answer').url;
+      if (typeof url !== 'string') throw new Error('url');
+      return url;
+    },
+    TIMEOUT_MS,
+  );
+  return 'ok' in res ? { ok: res.value } : { error: failure(res) };
+}
+
+export async function revokeGuestShare(machine: MachineId, id: string): Promise<boolean> {
+  const res = await sendPage(
+    'DELETE',
+    path(machine, `/shares/${encodeURIComponent(id)}/guest`),
+    () => true,
+    TIMEOUT_MS,
+  );
+  return 'ok' in res;
+}
+
+export interface IGuestSnapshot {
+  id: string;
+  machine: MachineId;
+  title: string;
+}
+export async function activeGuestSnapshots(machine: MachineId): Promise<IGuestSnapshot[]> {
+  const res = await getPage(
+    path(machine, '/chat-guest-links'),
+    (value) => {
+      if (!Array.isArray(value)) return [];
+      return value.filter(
+        (row): row is IGuestSnapshot =>
+          row &&
+          typeof row.id === 'string' &&
+          typeof row.machine === 'string' &&
+          typeof row.title === 'string',
+      );
+    },
+    TIMEOUT_MS,
+  );
+  return 'ok' in res ? res.value : [];
+}

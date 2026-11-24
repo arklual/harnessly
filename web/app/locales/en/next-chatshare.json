@@ -18,5 +18,10 @@
   "next.chatShare.copied": "Link copied",
   "next.chatShare.unavailable": "Sharing chats is not set up on this machine",
   "next.chatShare.failed": "Did not work: {why}",
-  "next.rowMenu.share": "Share…"
+  "next.rowMenu.share": "Share…",
+  "next.chatShare.guestHint": "Anyone with the guest link can read this snapshot for up to 7 days without signing in.",
+  "next.chatShare.guestLink": "Guest link",
+  "next.chatShare.guestCreate": "Create guest link",
+  "next.chatShare.guestRevoke": "Revoke guest link",
+  "next.chatShare.activeGuests": "Your active guest snapshots"
 }

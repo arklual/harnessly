@@ -104,6 +104,10 @@ func (s *Service) chatShareBase(r *http.Request, platform string) string {
 func (s *Service) serveChatShares(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine, rest string) bool {
 	// The address of the links is the hub's word, never the browser's.
 	r.Header.Del(shareBaseHeader)
+	if match := chatGuestManagement.FindStringSubmatch(rest); match != nil {
+		s.manageGuestChatSnapshot(w, r, u, m, match[1])
+		return true
+	}
 	match := chatSharesPath.FindStringSubmatch(rest)
 	st := s.uploadsStore()
 	if match == nil || st == nil {
@@ -203,6 +207,13 @@ func (s *Service) publishChatShare(w http.ResponseWriter, r *http.Request, u sto
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING`,
 			out.Share.ID, m.SpaceID, m.ID, u.ID, strings.ToLower(strings.TrimSpace(u.Email)), sha, html.body.Len(), clip(out.Share.Title, 255), int64(out.Share.ExpiresAt), store.Ms(s.now())); err != nil {
 			s.log.Warn("chat share: the link was not recorded", "machine", m.ID, "error", err)
+		} else if s.cfg.ChatGuestLinks {
+			var published map[string]json.RawMessage
+			if json.Unmarshal(rec.body.Bytes(), &published) == nil {
+				published["guestLinksAvailable"] = json.RawMessage("true")
+				httpx.WriteJSON(w, http.StatusCreated, published)
+				return
+			}
 		}
 	}
 	rec.replay(w)
@@ -266,6 +277,10 @@ func (s *Service) serveChatSharePage(w http.ResponseWriter, r *http.Request, p *
 		httpx.WriteError(w, r, httpx.ErrNotFound)
 		return
 	}
+	s.chatSnapshotBlob(w, r, st, space, sha, expires, revoked)
+}
+
+func (s *Service) chatSnapshotBlob(w http.ResponseWriter, r *http.Request, st Uploads, space, sha string, expires int64, revoked sql.NullInt64) {
 	if revoked.Valid || expires <= store.Ms(s.now()) {
 		h := w.Header()
 		h.Set("Content-Type", "text/html; charset=utf-8")
@@ -278,7 +293,7 @@ func (s *Service) serveChatSharePage(w http.ResponseWriter, r *http.Request, p *
 	h := w.Header()
 	h.Set("X-Frame-Options", "DENY")
 	h.Set("Referrer-Policy", "no-referrer")
-	err = blobserve.Serve(w, r, blobserve.Blob{Sha: sha, Open: func(ctx context.Context) (io.ReadCloser, error) {
+	err := blobserve.Serve(w, r, blobserve.Blob{Sha: sha, Open: func(ctx context.Context) (io.ReadCloser, error) {
 		return st.OpenBlob(ctx, space, filestore.KindFiles, sha)
 	}}, blobserve.Policy{Type: "text/html; charset=utf-8", Cache: blobserve.NoStore, CSP: chatShareCSP, NoIndex: true})
 	switch {
