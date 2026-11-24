@@ -722,7 +722,6 @@
   "next.pane.machineGroup": "Машина {name}",
   "next.pane.machine": "Машина",
   "next.pane.machineHint": "Нагрузка и тяжёлые процессы",
-  "next.pane.nothingToOpen": "Здесь открывать нечего: это не задача, не merge request и не ссылка",
   "next.pane.linkConnect": "Сначала подключите этот сервис: вход отклонён",
   "next.pane.linkConnectAction": "Подключить",
   "next.pane.linkEmbed": "Эту страницу нельзя показать внутри панели",

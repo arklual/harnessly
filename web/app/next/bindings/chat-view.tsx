@@ -96,7 +96,7 @@ interface IChatViewProps {
   /** A thing a turn made (a page, a design, a document, a merge request, a stand), in the right pane. */
   onOpenOutput?: (output: TurnOutput) => void;
   /** A task, a merge request or a link of the text, in the right pane: the runtime says which of its tabs shows it. */
-  onOpenRef?: (ref: string) => void;
+  onOpenRef?: (ref: string, kind?: 'task') => void;
   /** Brings up the right column, with the background agents the finished answer waits for. */
   onShowBackground: () => void;
   /** What the host adds to the dock (a design's notes). */
@@ -513,6 +513,7 @@ const ChatView = ({
                                             if (kind === 'chat') goTo({ kind: ROUTE.chat, id: label });
                                             else if (kind === 'file' && !href)
                                               onOpenFile?.(label.replace(/:\d+$/, ''));
+                                            else if (kind === 'task' && !href) onOpenRef?.(label, 'task');
                                             else onOpenRef?.(href ?? label);
                                           }
                                         : undefined

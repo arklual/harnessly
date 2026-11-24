@@ -1735,8 +1735,13 @@ export const useRightPane = (
     });
   // A chip or a link of the feed opens where the agent's open command would put it (the runtime's rules). A ref that
   // fits several places opens the best; a merge request chip asks the person first (its own list, before this).
-  const openRef = (ref: string) => {
+  const openRef = (ref: string, kind?: 'task') => {
     if (!conv) return;
+    // A task chip already carries the tracker key. The Task pane loads it with the recipient's connection.
+    if (kind === 'task') {
+      openTarget({ tab: 'task', target: ref });
+      return;
+    }
     // A board opens in the boards app's view of the pane, on the board; a document of the hub in the
     // documents app's.
     const board = placeOf(ref);
@@ -1762,11 +1767,6 @@ export const useRightPane = (
         return;
       }
       if (!('ok' in res)) {
-        const nothing = res.r === 'refused' && res.code === 'not-found';
-        if (nothing) {
-          toast(t('next.pane.nothingToOpen'), { tone: 'error' });
-          return;
-        }
         toast(t('next.load.openRef'), {
           tone: 'error',
           description: pageText(res),
