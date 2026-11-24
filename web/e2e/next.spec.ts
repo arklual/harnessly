@@ -1491,6 +1491,36 @@ test('7f. a chip opens what it names in its own view: a task, a merge request of
   await expect(pane).toHaveCount(0);
 });
 
+test('7g. a saved chat opens a tracker key without an agent session', async ({ browser }) => {
+  const context = await browser.newContext({
+    storageState: await page.context().storageState(),
+    serviceWorkers: 'block',
+  });
+  try {
+    const saved = await context.newPage();
+    const chat = new URL(page.url()).pathname.split('/').pop();
+    await saved.route(/\/conversations\/[^/]+\/legacy(?:\?.*)?$/, (route) => route.fulfill({ json: null }));
+    // The normal home shell can navigate to this already existing conversation without starting another agent.
+    await saved.goto(rt.url);
+    const row = page.getByRole('heading', { level: 1 }).first();
+    await saved
+      .locator('.hx-sidebar')
+      .getByRole('button', { name: await row.innerText(), exact: true })
+      .first()
+      .click();
+    await expect(saved).toHaveURL(new RegExp('/c/' + chat + '$'));
+    const chip = saved.locator('.hx-feed .hx-ref').filter({ hasText: 'ABC-12' }).last();
+    await chip.click();
+    const pane = saved.locator('.hx-pane');
+    await expect(pane.locator('.tw-rpane-panel-task')).toBeVisible();
+    await expect(pane.locator('.hx-tab[aria-selected="true"]')).toContainText('ABC-12');
+    await chip.click();
+    await expect(pane.locator('.hx-tab').filter({ hasText: 'ABC-12' })).toHaveCount(1);
+  } finally {
+    await context.close();
+  }
+});
+
 test('8. the new project dialog lists folders of the machine', async () => {
   await page.locator('.hx-nav__add').click();
   const dialog = page.getByRole('dialog');

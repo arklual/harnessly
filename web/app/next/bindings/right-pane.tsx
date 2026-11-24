@@ -90,7 +90,14 @@ import type {
 import { toast } from '@/next/ui/toast';
 import { usePresence } from '@/next/ui/presence';
 import { plural, t } from '@/next/i18n';
-import { isLegacyTab, useLegacyPane, type ILegacyPane, type TLegacyHandoff } from '@/next/legacy/pane';
+import {
+  ChatTaskTab,
+  isLegacyTab,
+  legacyTaskTitle,
+  useLegacyPane,
+  type ILegacyPane,
+  type TLegacyHandoff,
+} from '@/next/legacy/pane';
 import {
   MACHINE,
   browserAt,
@@ -217,6 +224,13 @@ const tabInfo = (
   chat: string,
   appName: (id: string) => string | null,
 ): IPaneTab & { sub: string } => {
+  if (tab.kind === 'task')
+    return {
+      id: tab.id,
+      icon: 'file-text',
+      name: legacyTaskTitle(tab.target),
+      sub: tab.target,
+    };
   if (tab.kind === 'app')
     return {
       id: tab.id,
@@ -648,6 +662,7 @@ interface IPaneBodyProps {
   used: Readonly<Record<string, number>>;
   /** Tools were opened in this chat now. */
   onUsed: (ids: readonly string[]) => void;
+  onOpenTask: (target: string) => void;
   /** A thing the chat made is picked in the tools home. */
   onOpenMade: (item: Pick<MadeItem, 'kind' | 'ref'>) => void;
   /** The pane stands beside an open design: its Designly tab and tool are left out (the design is the screen). */
@@ -1104,6 +1119,7 @@ const PaneBody = (props: IPaneBodyProps) => {
       strip={props.strip}
     >
       {legacyTab && legacy.render(legacyTab.id)}
+      {tab?.kind === 'task' && <ChatTaskTab key={tab.id} target={tab.target} onOpen={props.onOpenTask} />}
       {onPinned && <PinnedAppTab machine={conv.machineId} conversation={conv.id} pinned={pinned} />}
       {launcher && (
         <ToolsLauncher
@@ -1721,6 +1737,23 @@ export const useRightPane = (
       show: (tab, target) => {
         // The runtime names a document by the reader's path and a board by its framed address: both are an app's.
         const object = tab === 'artifacts' ? placeOf(target) : null;
+        if (tab === 'task') {
+          const existing = state.tabs.find((item) => item.kind === 'task' && item.target === target);
+          if (existing) return existing.id;
+          // Account-scoped tracker reads also work for a saved conversation with no agent session.
+          if (!legacy.on) {
+            const id = 'task:' + target;
+            setState((s) =>
+              s.tabs.some((item) => item.id === id)
+                ? s
+                : {
+                    ...s,
+                    tabs: [...s.tabs, { id, kind: 'task', target }],
+                  },
+            );
+            return id;
+          }
+        }
         if (!object) return legacy.show(tab, target);
         const placed = placeAppObject(state, object.app, object.view, object.slug, {
           busy: false,
@@ -1898,6 +1931,7 @@ export const useRightPane = (
         strip={strip}
         used={state.used}
         onUsed={(ids) => setState((s) => ({ ...s, used: markUsed(s.used, ids, Date.now()) }))}
+        onOpenTask={(target) => openTarget({ tab: 'task', target })}
         onOpenMade={openMade}
         besideDesign={besideDesign}
         design={besideDesign ? design : null}

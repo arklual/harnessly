@@ -61,7 +61,7 @@ describe('saved panes', () => {
           open: true,
           width: 620,
           maxed: true,
-          tabs: [FILES, BROWSER, DESIGN, SHELL],
+          tabs: [FILES, BROWSER, DESIGN, SHELL, { id: 'task:ABC-12', kind: 'task', target: 'ABC-12' }],
           active: 'p2',
           unread: ['p3'],
           view: { 'site:afisha:tab': 't1' },

@@ -6,6 +6,7 @@ import { parseAppTarget } from '@/next/features/app-views/target';
 import type { IPaneRequest, TLegacyKind } from '@/next/features/pane/intents';
 
 export type TTab =
+  | { id: string; kind: 'task'; target: string }
   | { id: string; kind: 'side' }
   | { id: string; kind: 'plan' }
   /** The conversation's managed browser, independent of preview tabs. */

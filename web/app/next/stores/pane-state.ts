@@ -72,6 +72,8 @@ export const isPaneTab = (v: unknown): v is TTab => {
   if (!isRecord(v) || !isString(v.id) || !isString(v.kind)) return false;
   if (SIMPLE_KINDS.has(v.kind)) return true;
   switch (v.kind) {
+    case 'task':
+      return isString(v.target) && v.target.length > 0;
     case 'designly':
       return stringOrNull(v.design);
     case 'subagent':

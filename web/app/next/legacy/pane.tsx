@@ -4,6 +4,7 @@
 // runs in. What the agent asks its pane to show (`harnessly open`, the runtime's own auto-open) is the new pane's
 // (bindings/pane-intents.ts): it opens these tools through `show`. When Legacy goes, these tools are written for the new
 // interface and this folder goes with it.
+import { parseConnTarget } from '@/lib/conn-target';
 import {
   Suspense,
   lazy,
@@ -205,6 +206,7 @@ const LegacyStyles = ({ need, children }: { need: boolean; children: ReactNode }
   return children;
 };
 
+const TaskTab = lazy(() => import('@/components/agents/pane/task-tab'));
 const VaultTab = lazy(() => import('@/components/agents/vault/vault-tab'));
 
 const LegacyWait = () => (
@@ -221,6 +223,26 @@ export const LegacyVault = () => (
       <div className="hx-legacy tw-rpane-panel tw-rpane-panel-vault" data-kind="vault">
         <Suspense fallback={<LegacyWait />}>
           <VaultTab />
+        </Suspense>
+      </div>
+    </LegacyStyles>
+  </Guarded>
+);
+
+export const legacyTaskTitle = (target: string): string => parseConnTarget(target)?.key ?? target;
+
+export const ChatTaskTab = ({ target, onOpen }: { target: string; onOpen: (key: string) => void }) => (
+  <Guarded title={t('next.load.tool')} fallback={<LegacyWait />} onRetry={() => window.location.reload()}>
+    <LegacyStyles need>
+      <div className="hx-legacy tw-rpane-panel tw-rpane-panel-task" data-kind="task">
+        <Suspense fallback={<LegacyWait />}>
+          <TaskTab
+            taskKey={target}
+            onOpenTask={(key) => {
+              const linked = parseConnTarget(target);
+              onOpen(linked ? `conn:${linked.conn}:issue:${key}` : key);
+            }}
+          />
         </Suspense>
       </div>
     </LegacyStyles>
