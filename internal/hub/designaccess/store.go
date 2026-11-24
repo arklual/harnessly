@@ -916,7 +916,7 @@ func scanInvite(row interface{ Scan(...any) error }) (inviteRow, error) {
 }
 
 func (t *txn) liveInvites(id string) ([]inviteRow, error) {
-	rows, err := t.q.Query(t.ctx, `SELECT `+inviteCols+` FROM design_invites WHERE machine_id = ? AND project_id = ? AND revoked_at IS NULL ORDER BY created_at DESC`, t.m.ID, id)
+	rows, err := t.q.Query(t.ctx, `SELECT `+inviteCols+` FROM design_invites WHERE machine_id = ? AND project_id = ? AND revoked_at IS NULL ORDER BY created_at DESC`, t.key(id), id)
 	if err != nil {
 		return nil, err
 	}
@@ -981,7 +981,7 @@ func (t *txn) revokeInvite(id, actor, inviteID string) error {
 	if _, err := t.lockProject(id); err != nil {
 		return err
 	}
-	res, err := t.q.Exec(t.ctx, `UPDATE design_invites SET revoked_at = ? WHERE id = ? AND machine_id = ? AND project_id = ? AND revoked_at IS NULL`, ms(t.now), inviteID, t.m.ID, id)
+	res, err := t.q.Exec(t.ctx, `UPDATE design_invites SET revoked_at = ? WHERE id = ? AND machine_id = ? AND project_id = ? AND revoked_at IS NULL`, ms(t.now), inviteID, t.key(id), id)
 	if err != nil {
 		return err
 	}
@@ -1002,13 +1002,14 @@ func (t *txn) acceptInvite(token, email string) (string, string, *time.Time, err
 	}
 	who := normEmail(email)
 	hash := store.HashToken(token)
-	var projectID string
-	row := t.q.QueryRow(t.ctx, `SELECT project_id, `+inviteCols+` FROM design_invites WHERE machine_id = ? AND token_hash = ?`, t.m.ID, hash)
+	var projectID, issuerMachine string
+	scope, args := t.machinesOfProject()
+	row := t.q.QueryRow(t.ctx, `SELECT project_id, machine_id, `+inviteCols+` FROM design_invites WHERE `+scope+` AND token_hash = ?`, append(args, hash)...)
 	var inv inviteRow
 	{
 		var roleTTL, maxUses, revoked sql.NullInt64
 		var exp, created int64
-		err := row.Scan(&projectID, &inv.ID, &inv.Title, &inv.Role, &roleTTL, &exp, &maxUses, &inv.Uses, &revoked, &inv.CreatedBy, &created)
+		err := row.Scan(&projectID, &issuerMachine, &inv.ID, &inv.Title, &inv.Role, &roleTTL, &exp, &maxUses, &inv.Uses, &revoked, &inv.CreatedBy, &created)
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", "", nil, fail("not_found", "Ссылка не найдена")
 		}
@@ -1019,6 +1020,9 @@ func (t *txn) acceptInvite(token, email string) (string, string, *time.Time, err
 			inv.RoleTTL = &roleTTL.Int64
 		}
 		inv.Expires, inv.Revoked = fromMs(exp), fromNull(revoked)
+	}
+	if t.key(projectID) != issuerMachine {
+		return "", "", nil, fail("not_found", "Ссылка не найдена")
 	}
 	p, err := t.lockProject(projectID)
 	if err != nil {

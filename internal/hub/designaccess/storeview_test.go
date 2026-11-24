@@ -171,3 +171,37 @@ func mustView(t *testing.T, r *spaceRig, m store.Machine) map[string]StoreGrant 
 	}
 	return v
 }
+
+func TestSharedInviteFromTeammatesMachine(t *testing.T) {
+	ctx := context.Background()
+	r := newSpaceRig(t, true)
+	if _, err := r.svc.registerCreated(ctx, r.owner, "board", r.ownerU.Email); err != nil {
+		t.Fatal(err)
+	}
+	var token, id string
+	if err := r.svc.write(ctx, r.owner, func(tx *txn) error {
+		if err := tx.setTeam("board", r.ownerU.Email, levelNone); err != nil {
+			return err
+		}
+		var err error
+		id, token, _, err = tx.createInvite("board", r.ownerU.Email, inviteInput{Role: roleView, TTL: ttl{step: time.Hour}, RoleTTL: ttl{none: true}})
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.svc.write(ctx, r.mate, func(tx *txn) error {
+		_, _, _, err := tx.acceptInvite(token, r.mateU.Email)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if grant := mustView(t, r, r.mate)["board"]; !grant.See || grant.Edit {
+		t.Fatalf("grant = %+v", grant)
+	}
+	if err := r.svc.write(ctx, r.mate, func(tx *txn) error { return tx.revokeInvite("board", r.ownerU.Email, id) }); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.svc.write(ctx, r.stranger, func(tx *txn) error { _, _, _, err := tx.acceptInvite(token, r.strangeU.Email); return err }); err == nil {
+		t.Fatal("revoked invite accepted")
+	}
+}

@@ -199,6 +199,7 @@ func New(d Deps) *Service {
 // origin), plus the fullscreen browser's socket, which always stays on the hub's origin.
 func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("/m/", s)
+	mux.HandleFunc("GET /design-invites/{token}", s.designInvite)
 	mux.Handle("GET /api/machines/{machineId}/browser/ws", s.auth.Require(s.browserWS))
 	s.mountFleet(mux)
 	s.mountWorkspace(mux)
@@ -248,6 +249,13 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		s.page(w, r, http.StatusNotFound, "Не найдено", "Такой машины нет.")
 		return
+	}
+	if r.Method == http.MethodGet && r.URL.Query().Get("runtime") != "1" {
+		if token, found := strings.CutPrefix(r.URL.Path, "/m/"+id+"/designly/invite/"); found && inviteToken.MatchString(token) {
+			w.Header().Set("Referrer-Policy", "no-referrer")
+			http.Redirect(w, r, "/design-invites/"+token, http.StatusFound)
+			return
+		}
 	}
 	if previewPath(r.URL.Path, id) && !s.cfg.SubdomainMode() {
 		s.servePreview(w, r, id)

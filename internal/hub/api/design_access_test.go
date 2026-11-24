@@ -5,13 +5,16 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/design"
+	"github.com/ly-solutions/harnessly/internal/hub/api"
 	"github.com/ly-solutions/harnessly/internal/hub/hubtest"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
@@ -316,5 +319,60 @@ func TestDesignShareLinksThroughHubAndRuntime(t *testing.T) {
 	}
 	if strings.Contains(s.Logs.String(), "level=ERROR") {
 		t.Errorf("errors in the log:\n%s", s.Logs.String())
+	}
+}
+
+func TestDesignInviteHubNavigation(t *testing.T) {
+	s := hubtest.New(t, hubtest.Env("HUB_ORGS", "on"), hubtest.Env("HUB_ACCESS_ENFORCE", "on"), hubtest.Env("HUB_FEATURES_FORCE", "runtime.fleet"), hubtest.WithOptions(func(o *api.Options) { o.Workspace = fstest.MapFS{"index.html": {Data: []byte("workspace")}} }))
+	owner := s.SignIn("owner@example.com")
+	member := s.SignIn("member@example.com")
+	outsider := s.SignIn("outsider@example.com")
+	space, _ := owner.NewSpace("Studio")
+	owner.Join(space, member)
+	a, _ := designMachine(t, s, owner, space)
+	designMachine(t, s, owner, space) // An independent runtime the recipient may open.
+	if r := owner.Do("PATCH", "/api/machines/"+a.MachineID, map[string]any{"access": []map[string]string{{"kind": "user", "id": owner.ID}}}); r.Code != 200 {
+		t.Fatal(r)
+	}
+	if r := member.Do("GET", "/api/machines/"+a.MachineID+"/open", nil); r.Code != 403 {
+		t.Fatalf("initial machine access: %d", r.Code)
+	}
+	created(a, "shop", "owner@example.com")
+	s.Eventually("project recorded", func() bool { role, ok := snapshotFor(a, "owner@example.com", "shop"); return ok && role == "owner" })
+	base := "/m/" + a.MachineID + "/api/platform/design/access/shop"
+	if r := owner.Do("PUT", base+"/team", map[string]any{"level": "none"}); r.Code != 200 {
+		t.Fatal(r)
+	}
+	r := owner.Do("POST", base+"/invites", map[string]any{"role": "view", "ttl": "1h", "roleTtl": nil})
+	if r.Code != 200 {
+		t.Fatal(r)
+	}
+	var link struct{ URL, Token string }
+	r.JSON(&link)
+	u, err := url.Parse(link.URL)
+	if err != nil || u.Path != "/design-invites/"+link.Token {
+		t.Fatal("expected a Hub invitation")
+	}
+	if r := outsider.Do("GET", u.Path, nil); r.Code != 404 {
+		t.Fatalf("outsider got %d", r.Code)
+	}
+	page := "/designly/invite/" + link.Token
+	if r := member.Do("GET", "/m/"+a.MachineID+page, nil); r.Header.Get("Location") != u.Path {
+		t.Fatalf("old link returned %d", r.Code)
+	}
+	if r := member.Do("GET", u.Path, nil); r.Header.Get("Location") != "/agents"+page {
+		t.Fatalf("canonical link returned %d", r.Code)
+	}
+	if r := member.Do("POST", "/agents/api/platform/design/access/invites/"+link.Token+"/accept", map[string]any{}); r.Code != 200 {
+		t.Fatal(r)
+	}
+	access := member.Do("GET", "/agents/api/platform/design/access/shop", nil)
+	var grant struct{ Role string }
+	access.JSON(&grant)
+	if access.Code != 200 || grant.Role != "view" {
+		t.Fatalf("project access: %s", access)
+	}
+	if r := member.Do("GET", "/api/machines/"+a.MachineID+"/open", nil); r.Code != 403 {
+		t.Fatalf("invitation changed machine access: %d", r.Code)
 	}
 }

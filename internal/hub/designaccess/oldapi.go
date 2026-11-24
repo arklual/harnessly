@@ -405,7 +405,7 @@ func (s *Service) oldRoute(r *http.Request, u store.User, m store.Machine, parts
 		}); err != nil {
 			return nil, 0, err
 		}
-		return map[string]any{"id": id, "token": token, "expiresAt": expires, "url": s.hubURL + "/m/" + m.ID + "/designly/invite/" + token}, 200, nil
+		return map[string]any{"id": id, "token": token, "expiresAt": expires, "url": s.hubURL + "/design-invites/" + token}, 200, nil
 
 	case method == http.MethodDelete && section == "invites" && n == 3:
 		if !uuidRe.MatchString(third) {

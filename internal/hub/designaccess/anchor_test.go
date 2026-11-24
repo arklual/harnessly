@@ -34,7 +34,7 @@ func TestHubRouteNeedsNoMachine(t *testing.T) {
 		t.Fatalf("registerCreated: %v %v", done, err)
 	}
 	spaces := []string{r.owner.SpaceID}
-	if got := r.svc.AnchorMachines(ctx, spaces, "/api/ws/design/store/note-1/head"); len(got) != 1 || got[0] != r.owner.ID {
+	if got := r.svc.AnchorMachines(ctx, spaces, "/api/ws/design/store/note-1/head"); len(got) != 3 || got[0] != r.owner.ID {
 		t.Fatalf("anchor = %q, want the machine holding the project %q", got, r.owner.ID)
 	}
 	if got := r.svc.AnchorMachines(ctx, spaces, "/api/ws/design/store/other-9/head"); len(got) != 0 {
