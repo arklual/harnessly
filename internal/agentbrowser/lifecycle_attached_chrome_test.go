@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -31,11 +32,19 @@ func lifecycleExternalChrome(t *testing.T) string {
 	chromeTemp, err := os.MkdirTemp("/tmp", "agent-browser-test-")
 	must(t, err)
 	cmd.Env = append(os.Environ(), "TMPDIR="+chromeTemp)
-	must(t, cmd.Start())
+	t.Cleanup(func() { _ = os.RemoveAll(chromeTemp) })
+	stderrPath := filepath.Join(t.TempDir(), "chrome.stderr")
+	stderr, err := os.Create(stderrPath)
+	must(t, err)
+	cmd.Stderr = stderr
+	err = cmd.Start()
+	_ = stderr.Close()
+	must(t, err)
+	done := make(chan struct{})
+	var exitErr error
+	go func() { exitErr = cmd.Wait(); close(done) }()
 	t.Cleanup(func() {
 		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
-		done := make(chan struct{})
-		go func() { _ = cmd.Wait(); close(done) }()
 		select {
 		case <-done:
 		case <-time.After(3 * time.Second):
@@ -43,18 +52,33 @@ func lifecycleExternalChrome(t *testing.T) string {
 			<-done
 		}
 		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-		_ = os.RemoveAll(chromeTemp)
 	})
-	var port string
-	eventually(t, 10*time.Second, func() bool {
-		raw, err := os.ReadFile(filepath.Join(data, "DevToolsActivePort"))
-		if err != nil {
-			return false
+	// CI runs the full race suite and several browser packages concurrently.
+	// Chrome publishes its actual port after startup, or exits with a diagnostic.
+	deadline := time.NewTimer(time.Minute)
+	defer deadline.Stop()
+	poll := time.NewTicker(50 * time.Millisecond)
+	defer poll.Stop()
+	for {
+		select {
+		case <-done:
+			log, _ := os.ReadFile(stderrPath)
+			t.Fatalf("external Chrome exited before publishing its CDP port: %v\n%s", exitErr, log)
+		case <-deadline.C:
+			log, _ := os.ReadFile(stderrPath)
+			t.Fatalf("external Chrome did not publish its CDP port within one minute\n%s", log)
+		case <-poll.C:
+			raw, err := os.ReadFile(filepath.Join(data, "DevToolsActivePort"))
+			if err != nil {
+				continue
+			}
+			line, _, _ := strings.Cut(string(raw), "\n")
+			port, err := strconv.ParseUint(line, 10, 16)
+			if err == nil && port > 0 {
+				return "http://127.0.0.1:" + line
+			}
 		}
-		port, _, _ = strings.Cut(string(raw), "\n")
-		return port != ""
-	})
-	return "http://127.0.0.1:" + port
+	}
 }
 
 func TestChromeAttachedPerProfileLifecycle(t *testing.T) {

@@ -3,10 +3,8 @@ package agentbrowser
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -15,49 +13,9 @@ import (
 )
 
 func TestAttachedChrome(t *testing.T) {
-	chrome, err := FindChrome()
-	if err != nil {
-		t.Skip(err)
-	}
-	if testing.Short() {
-		t.Skip("drives Chrome")
-	}
+	addr := lifecycleExternalChrome(t)
 	dir := t.TempDir()
-	args := []string{"--headless=new", "--remote-debugging-port=0", "--user-data-dir=" + filepath.Join(dir,
-		"chrome"), "--no-first-run", "--no-default-browser-check", "--disable-dev-shm-usage"}
-	args = append(args, strings.Fields(os.Getenv("RUNTIME_BROWSER_CHROME_ARGS"))...)
-	args = append(args, "about:blank")
-	cmd := exec.Command(chrome, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	// This fixture owns its external Chrome too; keep its SingletonSocket below the Unix limit.
-	chromeTemp, err := os.MkdirTemp("/tmp", "agent-browser-test-")
-	must(t, err)
-	defer os.RemoveAll(chromeTemp)
-	cmd.Env = append(os.Environ(), "TMPDIR="+chromeTemp)
-	must(t, cmd.Start())
-	defer func() {
-		// Children may still write the profile after an abrupt parent-only kill.
-		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
-		done := make(chan struct{})
-		go func() { _ = cmd.Wait(); close(done) }()
-		select {
-		case <-done:
-		case <-time.After(3 * time.Second):
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-			<-done
-		}
-		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-	}()
-	var port string
-	eventually(t, 10*time.Second, func() bool {
-		b, e := os.ReadFile(filepath.Join(dir, "chrome", "DevToolsActivePort"))
-		if e != nil {
-			return false
-		}
-		port, _, _ = strings.Cut(string(b), "\n")
-		return port != ""
-	})
-	m := New(Config{DataDir: filepath.Join(dir, "registry"), CDP: "http://127.0.0.1:" + port})
+	m := New(Config{DataDir: filepath.Join(dir, "registry"), CDP: addr})
 	defer m.Close()
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
@@ -73,7 +31,7 @@ func TestAttachedChrome(t *testing.T) {
 	must(t, err)
 	evaluate(t, i, tab.ID, "window.persist=7")
 	m.Close()
-	c, err := cdp.Dial(ctx, "http://127.0.0.1:"+port, nil)
+	c, err := cdp.Dial(ctx, addr, nil)
 	must(t, err)
 	defer c.Close()
 	go func() { _ = c.Run(ctx) }()

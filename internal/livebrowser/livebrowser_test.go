@@ -346,7 +346,8 @@ func TestFramesArePacedAndStillShotIsSharp(t *testing.T) {
 				`<style>@keyframes a{from{transform:translateX(0)}to{transform:translateX(300px)}}</style></body>`))
 			return
 		}
-		_, _ = w.Write([]byte(`<body style="font:16px system-ui;padding:24px"><h1>Тихая страница</h1><p>Текст.</p><input autofocus></body>`))
+		_, _ = w.Write([]byte(`<body style="font:16px system-ui;padding:24px"><h1>Тихая страница</h1><p>Текст.</p><input autofocus>
+			<script>addEventListener("keydown", () => { document.body.style.backgroundColor = "lightblue" })</script></body>`))
 	}))
 	defer pages.Close()
 	// The pages' server by a name: the gate refuses an address of the machine itself, the test resolver maps the name.
@@ -412,8 +413,12 @@ func TestFramesArePacedAndStillShotIsSharp(t *testing.T) {
 	}
 	frames(500*time.Millisecond, true)
 	// Without acks the machine stops after two pictures, however much the page moves.
-	if got := frames(2500*time.Millisecond, false); len(got) == 0 || len(got) > inflightMax {
-		t.Fatalf("unacked pictures: %d (%v)", len(got), got)
+	held := frames(2500*time.Millisecond, false)
+	if len(held) == 0 || len(held) > inflightMax {
+		t.Fatalf("unacked pictures: %d (%v)", len(held), held)
+	}
+	for range held {
+		send(map[string]any{"t": "ack"})
 	}
 	// Acks let them go on.
 	if got := frames(1500*time.Millisecond, true); len(got) < 3 {
@@ -440,7 +445,12 @@ func TestFramesArePacedAndStillShotIsSharp(t *testing.T) {
 	// A key brings the screencast back: a 1x picture comes (a still shot taken before the key may land first).
 	send(map[string]any{"t": "key", "k": "down", "key": "a", "code": "KeyA", "text": "a"})
 	send(map[string]any{"t": "key", "k": "up", "key": "a", "code": "KeyA"})
-	if got := frames(1200*time.Millisecond, true); !slices.Contains(got, 500) {
-		t.Fatalf("after a key: %v", got)
+	var afterKey []int
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); {
+		afterKey = append(afterKey, frames(150*time.Millisecond, true)...)
+		if slices.Contains(afterKey, 500) {
+			return
+		}
 	}
+	t.Fatalf("after a key: %v", afterKey)
 }
