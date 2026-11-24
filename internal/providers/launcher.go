@@ -128,3 +128,9 @@ func (Launcher) OwnsModel(model string) bool {
 	}
 	return false
 }
+
+// ClaudeMCPDisabled reports the MCP policy of a deployment-defined model profile.
+func (l Launcher) ClaudeMCPDisabled(profile string) bool {
+	p, ok := Find(profile)
+	return ok && p.DisableMCP
+}

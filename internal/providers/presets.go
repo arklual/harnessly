@@ -24,10 +24,11 @@ type Model struct {
 
 // Preset is a vendor setup.
 type Preset struct {
-	ID     string
-	Label  string
-	Vendor wire.ProfileVendor
-	Via    Route
+	DisableMCP bool
+	ID         string
+	Label      string
+	Vendor     wire.ProfileVendor
+	Via        Route
 	// BaseURL is where the CLI sends its requests: the Anthropic-compatible address for Claude Code, the OpenAI-
 	// compatible `/v1` for Codex.
 	BaseURL string

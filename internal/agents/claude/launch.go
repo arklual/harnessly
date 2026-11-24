@@ -314,6 +314,7 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 	settingsFile := c.HooksPath
 	// lineEnv are the profile's own words of the launch line's environment (the GPT chat's pane header).
 	lineEnv := ""
+	disableMCP := false
 	if launch != nil && launch.Profile != "" {
 		// The profile's settings file is the hooks file plus the vendor's address, models and key helper. Claude Code
 		// reads one --settings (the last one given), so it replaces the hooks file here, and the model goes in the file's
@@ -329,6 +330,9 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 			if !ok || !slices.Contains(m.Efforts, wire.Effort(*launch.Effort)) {
 				return "", "", agents.ErrLaunchEffort
 			}
+		}
+		if policy, ok := c.Profiles.(interface{ ClaudeMCPDisabled(string) bool }); ok {
+			disableMCP = policy.ClaudeMCPDisabled(launch.Profile)
 		}
 		path, err := c.Profiles.ClaudeSettings(launch.Profile, *launch.Model, c.HooksPath)
 		if err != nil {
@@ -367,7 +371,7 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 	// The person's MCP servers: their tools are allowed in a copy of the settings chosen above, which the apps' file
 	// extends in turn. A copy that cannot be written leaves the tools asking.
 	extraMCP, extraAllow := "", []string(nil)
-	if c.ExtraMCP != nil {
+	if !disableMCP && c.ExtraMCP != nil {
 		extraMCP, extraAllow = c.ExtraMCP()
 	}
 	if extraMCP != "" && len(extraAllow) > 0 {
@@ -400,7 +404,12 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 	if apps.RuntimeMCPConfig != "" {
 		mcp = agents.ShellQuote(apps.RuntimeMCPConfig)
 	}
-	parts := []string{"--settings " + settings, "--mcp-config " + mcp}
+	parts := []string{"--settings " + settings}
+	if disableMCP {
+		parts = append(parts, "--strict-mcp-config")
+	} else {
+		parts = append(parts, "--mcp-config "+mcp)
+	}
 	if c.PluginDir != nil {
 		if dir := c.PluginDir(); dir != "" {
 			parts = append(parts, "--plugin-dir "+agents.ShellQuote(dir))
@@ -414,9 +423,9 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 	for _, dir := range apps.PluginDirs {
 		parts = append(parts, "--plugin-dir "+agents.ShellQuote(dir))
 	}
-	if apps.MCPConfig != "" {
+	if !disableMCP && apps.MCPConfig != "" {
 		parts = append(parts, "--mcp-config "+agents.ShellQuote(apps.MCPConfig))
-	} else if host, ok := c.Apps.(agents.HostMCPLauncher); ok && (launch == nil || len(launch.Apps) == 0) {
+	} else if host, ok := c.Apps.(agents.HostMCPLauncher); ok && !disableMCP && (launch == nil || len(launch.Apps) == 0) {
 		// A chat without apps has their server too, quiet until one turns on (internal/apps live.go). One that cannot be
 		// written leaves the chat without it: apps then come with the agent's next start.
 		if path, err := host.HostMCP(); err == nil && path != "" {
@@ -454,7 +463,11 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 		}
 	}
 	parts = append(parts, flags...)
-	journalLaunch(launch, c.MCPConfigPath, apps.RuntimeMCPConfig, apps.MCPConfig, extraMCP)
+	if disableMCP {
+		journalLaunch(launch)
+	} else {
+		journalLaunch(launch, c.MCPConfigPath, apps.RuntimeMCPConfig, apps.MCPConfig, extraMCP)
+	}
 	return strings.Join(parts, " "), strings.TrimSpace(lineEnv + " " + apps.Env + " " + apps.Wrap), nil
 }
 

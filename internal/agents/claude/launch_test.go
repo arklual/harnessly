@@ -475,3 +475,28 @@ func TestAProfileWithItsOwnModelIsLaunchedWithoutTheModelFlag(t *testing.T) {
 		t.Fatalf("%q %v", line, err)
 	}
 }
+
+type restrictedProfile struct{ pinProfiles }
+
+func (restrictedProfile) ClaudeMCPDisabled(string) bool { return true }
+
+func TestProfileWithoutMCP(t *testing.T) {
+	c := testConfig(t)
+	c.Profiles = restrictedProfile{}
+	c.ExtraMCP = func() (string, []string) { t.Fatal("loaded MCP for a restricted profile"); return "", nil }
+	l := launch("corp-large", "")
+	l.Profile = "x-corp"
+	start, err := c.LaunchCommand("ws", l, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resume, err := c.ResumeCommand("425055ec-bbc8-4e3c-87d0-36fa74c1cccb", "ws", l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range []string{start, resume} {
+		if !strings.Contains(line, "--strict-mcp-config") || strings.Contains(line, " --mcp-config ") || !strings.Contains(line, "--model 'corp-large'") {
+			t.Fatalf("unexpected command: %s", line)
+		}
+	}
+}

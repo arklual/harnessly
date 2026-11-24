@@ -30,7 +30,7 @@ const corpFile = `{"profiles":[
   "key_ref":"glm-api-key","env":{"API_TIMEOUT_MS":"3000000"},
   "models":[{"id":"glm-5.3","label":"GLM 5.3","window":1048576,"efforts":["low","high"],"default_effort":"high","price":{"input":0.6,"output":2.2}}]},
  {"id":"corp-llm","label":"Corp LLM","vendor":"gpt","api":"anthropic","base_url":"https://corp-llm-proxy.example.com/anthropic",
-  "key_ref":"corp-llm-key","models":[{"id":"corp-large","window":200000,"price":{"input":3,"output":15,"cached_input":0.3}}]}
+  "key_ref":"corp-llm-key","disable_mcp":true,"models":[{"id":"corp-large","window":200000,"price":{"input":3,"output":15,"cached_input":0.3}}]}
 ]}`
 
 func TestNoFileChangesNothing(t *testing.T) {
@@ -51,6 +51,9 @@ func TestProfilesFileAddsAndOverrides(t *testing.T) {
 	}
 	if got := len(Presets()); got != len(presets)+2 {
 		t.Fatalf("presets = %d, want %d", got, len(presets)+2)
+	}
+	if !(Launcher{}).ClaudeMCPDisabled("corp-llm") || (Launcher{}).ClaudeMCPDisabled("glm-byok") {
+		t.Fatal("MCP policy must be scoped to the declared profile")
 	}
 	p, ok := Find("corp-llm")
 	if !ok || p.Host != "corp-llm-proxy.example.com" || p.KeyRef != "corp-llm-key" || p.Small != "corp-large" {

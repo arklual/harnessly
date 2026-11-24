@@ -51,11 +51,12 @@ type FileProfile struct {
 	// KeyRef is the name of the secret in the safe that holds the key; empty while the person types the key in Settings.
 	KeyRef string `json:"key_ref,omitempty"`
 	// KeyEnv is the variable Codex reads the key from (api openai-responses only).
-	KeyEnv string            `json:"key_env,omitempty"`
-	Env    map[string]string `json:"env,omitempty"`
-	Small  string            `json:"small,omitempty"`
-	Test   string            `json:"test,omitempty"`
-	Models []FileModel       `json:"models"`
+	DisableMCP bool              `json:"disable_mcp,omitempty"`
+	KeyEnv     string            `json:"key_env,omitempty"`
+	Env        map[string]string `json:"env,omitempty"`
+	Small      string            `json:"small,omitempty"`
+	Test       string            `json:"test,omitempty"`
+	Models     []FileModel       `json:"models"`
 }
 
 // FileModel is one model of a FileProfile: its limits and, optionally, its price.
@@ -281,7 +282,10 @@ func (fp FileProfile) preset() (Preset, []priceRow, error) {
 	if !slices.Contains(wire.ProfileVendors, vendor) || vendor == wire.VendorAuto || vendor == wire.VendorOwn {
 		return Preset{}, nil, errors.New("vendor: one of kimi, glm, grok, gpt")
 	}
-	p := Preset{ID: fp.ID, Label: fp.Label, Vendor: vendor, Hint: fp.Hint, KeyRef: fp.KeyRef, KeyEnv: fp.KeyEnv}
+	if fp.DisableMCP && fp.API != "anthropic" {
+		return Preset{}, nil, errors.New("disable_mcp: requires the anthropic API")
+	}
+	p := Preset{DisableMCP: fp.DisableMCP, ID: fp.ID, Label: fp.Label, Vendor: vendor, Hint: fp.Hint, KeyRef: fp.KeyRef, KeyEnv: fp.KeyEnv}
 	switch fp.API {
 	case "anthropic":
 		p.Via = wire.ProviderClaude

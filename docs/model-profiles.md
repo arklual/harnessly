@@ -42,3 +42,7 @@
 - Значка «своего» производителя: `vendor` берётся из четырёх существующих (новое значение меняет схему протокола).
 - Перечитывания файла без перезапуска рантайма.
 - Цен для моделей Claude-формата: цена учитывается в расчёте по имени модели через таблицу OpenAI-стиля.
+
+### Start a Claude profile without MCP
+
+Set `"disable_mcp": true` on an `anthropic` file profile to start and resume its chats with Claude Code's strict MCP configuration and no explicit servers. The Hub catalog remains available to other profiles. Shell execution continues to use the existing permissions, hooks and sandbox. This option does not authorize additional commands or provider operations.
