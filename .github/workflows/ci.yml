@@ -112,6 +112,11 @@ jobs:
       - uses: actions/setup-go@v7.1.0
         with:
           go-version-file: go.mod
+      - name: Fetch dependencies for the embedded runtime
+        working-directory: .
+        run: |
+          go list -deps -test -tags webui ./cmd/runtime > /dev/null ||
+            GODEBUG=http2client=0 go list -deps -test -tags webui ./cmd/runtime > /dev/null
       - name: Runtime with the page compiled in
         working-directory: .
         run: |

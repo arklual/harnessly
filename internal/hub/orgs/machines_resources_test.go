@@ -584,15 +584,22 @@ func TestLoadSamples(t *testing.T) {
 		t.Errorf("hardware = %+v", m.Hardware)
 	}
 
-	r := rc.anna.Do("GET", "/api/machines/"+id+"/metrics?range=1h", nil)
 	var out struct {
 		Range       string
 		StepSeconds int
 		Points      []map[string]any
 	}
-	r.JSON(&out)
-	if r.Code != http.StatusOK || out.Range != "1h" || out.StepSeconds <= 0 || len(out.Points) != 1 {
-		t.Fatalf("metrics: %s", r)
+	// The live view updates before the history write commits.
+	rc.s.Eventually("the sample in persisted metrics", func() bool {
+		r := rc.anna.Do("GET", "/api/machines/"+id+"/metrics?range=1h", nil)
+		if r.Code != http.StatusOK {
+			t.Fatalf("metrics: %s", r)
+		}
+		r.JSON(&out)
+		return len(out.Points) > 0
+	})
+	if out.Range != "1h" || out.StepSeconds <= 0 || len(out.Points) != 1 {
+		t.Fatalf("metrics: %+v", out)
 	}
 	p := out.Points[0]
 	if p["cpuAvg"] != 41.3 || p["ramMax"] != float64(62) || p["chatsMax"] != float64(2) || p["samples"] != float64(1) {
