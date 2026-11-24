@@ -1256,3 +1256,42 @@ func TestOrganizationTurnsOffMembersMachines(t *testing.T) {
 		t.Errorf("owner, turned off: %s", r)
 	}
 }
+
+func TestGitAuthorFollowsTransferredMachineOnReconnect(t *testing.T) {
+	f := setup(t)
+	recipient := f.s.SignIn("recipient@example.org")
+	f.owner.Join(f.spaceID, recipient)
+	a := f.s.NewAgent(nil)
+	a.Hello.Features = append(a.Hello.Features, hubproto.OpGitAuthor)
+	got := make(chan hubproto.GitAuthor, 4)
+	a.Handle(hubproto.OpGitAuthor, func(c hubtest.Call) (any, error) {
+		var author hubproto.GitAuthor
+		if err := json.Unmarshal(c.Params["author"], &author); err != nil {
+			return nil, err
+		}
+		got <- author
+		return map[string]any{}, nil
+	})
+	if r := a.Register(f.owner.NewCode(f.spaceID, "dir"), hubproto.ProfileDir, hubproto.ViaCommand); r.Code != http.StatusCreated {
+		t.Fatal(r)
+	}
+	expect := func(email string) {
+		t.Helper()
+		select {
+		case author := <-got:
+			if author.Email != email {
+				t.Fatalf("Git author %+v, want %s", author, email)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("no Git author on the authenticated link")
+		}
+	}
+	a.Connect()
+	expect(f.owner.Email)
+	if r := f.owner.Do("POST", "/api/machines/"+a.MachineID+"/owner", map[string]string{"userId": recipient.ID}); r.Code != http.StatusOK {
+		t.Fatal(r)
+	}
+	a.WaitClosed()
+	a.Connect()
+	expect(recipient.Email)
+}

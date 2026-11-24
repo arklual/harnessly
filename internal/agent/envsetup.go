@@ -89,6 +89,9 @@ func (h *hub) writeSetupAllow() bool {
 	h.allowMu.Lock()
 	defer h.allowMu.Unlock()
 	allowed := h.setupAllowed()
+	if !allowed {
+		_ = os.Remove(filepath.Join(h.dir, managedGitAuthor))
+	}
 	if h.allowKnown && h.allowWritten == allowed {
 		return false
 	}

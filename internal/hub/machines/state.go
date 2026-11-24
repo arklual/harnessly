@@ -144,6 +144,18 @@ func (s *Service) connected(l *link.Link, m store.Machine) {
 	if herr != nil {
 		s.log.Warn("hello not saved", "machine", m.ID, "error", herr)
 	}
+	if slices.Contains(hello.Features, hubproto.OpGitAuthor) {
+		author, readErr := ownerGitAuthor(ctx, st, m.CreatedBy)
+		if readErr != nil {
+			s.log.Warn("verified machine owner unavailable", "machine", m.ID, "error", readErr)
+		}
+		callCtx, done := context.WithTimeout(ctx, callTimeout)
+		_, err := l.Call(callCtx, hubproto.OpGitAuthor, map[string]any{"author": author})
+		done()
+		if err != nil {
+			s.log.Warn("Git author defaults not synchronized", "machine", m.ID, "error", err)
+		}
+	}
 	s.setPolicy(ctx, m, hello.Policy)
 	s.Publish(ctx, m)
 

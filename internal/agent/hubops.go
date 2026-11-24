@@ -194,6 +194,19 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 	}
 	pol := h.current()
 	switch op {
+	case hubproto.OpGitAuthor:
+		h.allowMu.Lock()
+		defer h.allowMu.Unlock()
+		if err := h.allow(op, h.setupAllowed(), "environment setup"); err != nil {
+			return nil, nil, err
+		}
+		author, ok := field[hubproto.GitAuthor](req, "author")
+		if !ok {
+			return nil, nil, invalid("missing Git author")
+		}
+		err := syncGitAuthor(h.a.cfg.Home, os.Getenv("XDG_CONFIG_HOME"), h.dir, author)
+		h.audit.Record(op, err == nil, nil)
+		return empty(), nil, err
 	case hubproto.OpHello:
 		return h.hello(), nil, nil
 	case hubproto.OpLinkSubscribe:

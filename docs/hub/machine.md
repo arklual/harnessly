@@ -513,6 +513,12 @@ log (`machine_owner_changed`). The machine stays as trusted as it was: on a hub 
 rule «an administrator connected it» is asked of who connected it (`machines.connected_by`), not of the new owner. The
 machine answers `ownerId` in `GET /api/machines/{id}`.
 
+### Git author on personal machines
+
+When setup is allowed, a compatible agent receives the machine owner's Git author on its authenticated Hub link. The Hub uses the account display name and its primary email only when a sign-in provider has verified that address for this owner alone. On transfer the link reconnects and receives the new owner's defaults. If the Hub cannot verify the current owner, the agent clears the previous defaults. Turning setup off also clears them. An observe link follows the local setup opt-in.
+
+On a fresh account, the agent creates an XDG Git config that includes a private file in the link's data directory. Git reads the person's `~/.gitconfig` afterwards, so an explicit name or email takes precedence. The agent also respects system author settings and skips personal XDG config files already in place or a custom `GIT_CONFIG_GLOBAL`. Repository-specific settings keep their usual precedence. Older agents continue to use their existing configuration.
+
 ## Upgrade, move and remove
 
 - **Updates by themselves**: the runtime compares its programs (`harnessly-runtime`, `harnessly-agent`, the `harnessly`
