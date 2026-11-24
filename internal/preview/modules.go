@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"regexp"
+	"strings"
 )
 
 // A neighbour remote (a Vite dev server for a micro frontend) is served under /__tk/p/<port>, but its modules import
@@ -30,9 +31,10 @@ const (
 // are tracked so text that only looks like an import stays as it is. The bytes pass through unchanged otherwise, so a
 // multibyte character split across chunks never matters.
 type moduleRewriter struct {
-	w     io.Writer
-	base  string
-	carry []byte
+	w        io.Writer
+	base     string
+	document *pathRewriter
+	carry    []byte
 
 	mode       jsMode
 	quote      byte
@@ -99,6 +101,23 @@ func (m *moduleRewriter) rootQuote(t []byte, j int) int {
 	}
 	if j+1 >= len(t) {
 		return needMore
+	}
+	if t[j+1] == '.' && m.document != nil {
+		tail := t[j+1:]
+		if len(tail) < 3 {
+			return needMore
+		}
+		if bytes.HasPrefix(tail, []byte("./")) || bytes.HasPrefix(tail, []byte("../")) {
+			for _, c := range tail {
+				if c == t[j] {
+					return matched
+				}
+				if c == '\\' || c == '\n' || c == '\r' {
+					return noMatch
+				}
+			}
+			return needMore
+		}
 	}
 	if t[j+1] != '/' {
 		return noMatch
@@ -343,6 +362,18 @@ func (m *moduleRewriter) process(text []byte, final bool) error {
 			if v == matched {
 				end := i + q + 1
 				out = append(out, text[i:end]...)
+				if text[end] == '.' {
+					close := end + bytes.IndexByte(text[end:], text[end-1])
+					address := m.document.fix(string(text[end:close]))
+					// A path segment inherited from the document may contain the literal delimiter.
+					address = strings.ReplaceAll(address, "'", "%27")
+					address = strings.ReplaceAll(address, "\"", "%22")
+					out = append(out, address...)
+					out = append(out, text[close])
+					m.prev, m.lastSig, m.word = text[close], text[close], m.word[:0]
+					i = close + 1
+					continue
+				}
 				out = append(out, m.base...)
 				m.prev, m.lastSig, m.word = text[end-1], text[end-1], m.word[:0]
 				m.mode, m.quote = jsString, text[end-1]

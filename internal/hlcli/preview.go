@@ -581,6 +581,10 @@ func previewTable(rows [][]string) string {
 
 const previewHelp = `harnessly preview - DevTools of the page open in the pane's browser
 
+After opening a page, verify the requested screen in the pane, including the next navigation.
+A successful port or open request confirms transport only. For a blank screen inspect the pane's
+failed requests and console. Report which address failed and whether a rendered pane was observed.
+
 Usage:
   harnessly preview slots                    Preview slots (pages the person has opened): target, activity, errors, settings
   harnessly preview network [options]        Request log, newest last: status, type, size, time, address

@@ -58,6 +58,21 @@ func TestPreviewByPathInBrowser(t *testing.T) {
 		asked[r.URL.Path] = true
 		mu.Unlock()
 		switch p := r.URL.Path; {
+		case p == "/demo/modules/entry.js":
+			file(w, "text/javascript", `export {label} from './value.js'`)
+		case p == "/demo/modules/value.js":
+			file(w, "text/javascript", `export const label = 'rendered'`)
+		case p == "/modules/maps/index.html":
+			file(w, "text/html", `<!doctype html><script type="importmap">{"imports":{"ui":"../../demo/modules/entry.js"}}</script>
+              <pre id="out"></pre><script type="module">const name="ui";const {label}=await import(name);
+              document.querySelector('#out').textContent=JSON.stringify({label});</script>`)
+		case p == "/modules/nested/frame.html":
+			file(w, "text/html", `<!doctype html><base target="_parent"><pre id="out"></pre><script type="module">
+              import {label} from '../../demo/modules/entry.js?build=2';
+              const chunk = '../../demo/modules/value.js';
+              const lazy = await import(chunk);
+              document.querySelector('#out').textContent = JSON.stringify({label, lazy: lazy.label});
+            </script>`)
 		case p == "/demo/style.css":
 			file(w, "text/css", `#box{color:rgb(1, 2, 3)} #pic{width:auto}`)
 		case p == "/demo/app.js":
@@ -167,6 +182,20 @@ func TestPreviewByPathInBrowser(t *testing.T) {
 		if strings.Contains(prefix, "/demo") || !strings.HasPrefix(prefix, "/agents/__pv/1-") {
 			t.Fatalf("prefix: %s", prefix)
 		}
+	}
+
+	moduleURL, _ := open("/modules/nested/frame.html")
+	var modules struct{ Label, Lazy string }
+	readResult(t, runChrome(t, chrome, moduleURL), &modules)
+	if modules.Label != "rendered" || modules.Lazy != "rendered" {
+		t.Fatalf("forwarded module graph failed to render: %+v", modules)
+	}
+
+	mapURL, _ := open("/modules/maps/index.html")
+	var mapped struct{ Label string }
+	readResult(t, runChrome(t, chrome, mapURL), &mapped)
+	if mapped.Label != "rendered" {
+		t.Fatalf("authored import map failed to render: %+v", mapped)
 	}
 
 	// A page with a <base href> of its own resolves against it, under the prefix.

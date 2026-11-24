@@ -785,6 +785,8 @@
   "next.pane.unpin": "Unpin",
   "next.pane.suggestSearch": "Search for “{q}”",
   "next.pane.servers": "Dev servers and stands",
+  "next.pane.connectingPort": "Connecting to the server…",
+  "next.pane.loadingPage": "Loading the page…",
   "next.pane.serversLoading": "Looking at what listens on the machine…",
   "next.pane.noServers": "Nothing listens on the machine — type an address",
   "next.pane.thisChat": "this chat",

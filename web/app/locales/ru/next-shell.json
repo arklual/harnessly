@@ -827,6 +827,8 @@
   "next.pane.unpin": "Открепить",
   "next.pane.suggestSearch": "Искать «{q}»",
   "next.pane.servers": "Дев-серверы и стенды",
+  "next.pane.connectingPort": "Подключаемся к серверу…",
+  "next.pane.loadingPage": "Загружаем страницу…",
   "next.pane.serversLoading": "Смотрим, что слушает на машине…",
   "next.pane.noServers": "На машине ничего не слушает — введите адрес",
   "next.pane.thisChat": "этот чат",

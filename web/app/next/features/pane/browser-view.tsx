@@ -19,6 +19,7 @@ import type { IAnnotation } from '@/next/features/pane/annotations';
 import { createAnchorStore, type IAnchorStore } from '@/next/features/designly/note-anchor';
 import { openOutside } from '@/next/features/chat/pane-sites';
 import Icon from '@/next/ui/icon';
+import Spinner from '@/next/ui/spinner';
 import Omnibox from '@/next/features/pane/omnibox';
 import { parseAddress, type IAddress } from '@/next/features/pane/address';
 import { isPinned, pinLabel, type IPin } from '@/next/features/pane/pins';
@@ -171,6 +172,42 @@ export interface IBrowserAgentView {
 }
 
 const translate = (key: string) => t(key);
+
+function ForwardedFrame({
+  src,
+  address,
+  theme,
+  picking,
+  error,
+  onFrame,
+  onFrameLoad,
+}: Pick<IBrowserViewProps, 'address' | 'theme' | 'picking' | 'error' | 'onFrame' | 'onFrameLoad'> & {
+  src: string;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <>
+      <iframe
+        ref={onFrame}
+        onLoad={() => {
+          setLoaded(true);
+          onFrameLoad();
+        }}
+        className="hx-tbrowser__frame"
+        data-theme={theme}
+        data-picking={picking === true || undefined}
+        src={src}
+        title={address}
+        allow="clipboard-write"
+      />
+      {!loaded && error === null && (
+        <div className="hx-tbrowser__progress" role="status" data-busy="true">
+          <Spinner /> {t('next.pane.loadingPage')}
+        </div>
+      )}
+    </>
+  );
+}
 
 const BrowserView = (props: IBrowserViewProps) => {
   const { address, canBack, canForward, src, error, ports, portsError, onRetryPorts, reloadKey, pins } =
@@ -521,7 +558,9 @@ const BrowserView = (props: IBrowserViewProps) => {
           <LoadFailed title={t('next.load.page')} reason={error} onRetry={props.onReload} />
         )}
         {address !== '' && error === null && src === null && props.live === null && (
-          <div className="hx-tbrowser__page" />
+          <div className="hx-tbrowser__note" role="status" data-busy="true">
+            <Spinner /> {t('next.pane.connectingPort')}
+          </div>
         )}
         {address !== '' && props.live !== null && (
           <div ref={stage} className="hx-tbrowser__stage" data-device={props.screen.device}>
@@ -544,19 +583,18 @@ const BrowserView = (props: IBrowserViewProps) => {
         )}
         {address !== '' && props.live === null && src !== null && (
           <div ref={stage} className="hx-tbrowser__stage" data-device={props.screen.device}>
-            <iframe
-              key={reloadKey}
-              ref={(el) => {
+            <ForwardedFrame
+              key={JSON.stringify([src, reloadKey])}
+              src={src}
+              address={address}
+              theme={props.theme}
+              picking={props.picking}
+              error={error}
+              onFrame={(el) => {
                 frame.current = el;
                 props.onFrame(el);
               }}
-              onLoad={props.onFrameLoad}
-              className="hx-tbrowser__frame"
-              data-theme={props.theme}
-              data-picking={props.picking === true || undefined}
-              src={src}
-              title={address}
-              allow="clipboard-write"
+              onFrameLoad={props.onFrameLoad}
             />
             <AnnotationLayer
               list={props.annotations.list}

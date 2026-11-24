@@ -308,3 +308,18 @@ describe('BrowserView: the tools of a page', () => {
     expect(onFrame).toHaveBeenLastCalledWith(null);
   });
 });
+
+it('shows progress while connecting and again on each frame navigation', () => {
+  const page = props({ address: 'localhost:4000' });
+  const { rerender } = render(<BrowserView {...page} />);
+  expect(screen.getByRole('status').textContent).toContain('Connecting');
+  const src = '/preview/page';
+  rerender(<BrowserView {...page} src={src} />);
+  expect(screen.getByRole('status').textContent).toContain('Loading');
+  fireEvent.load(screen.getByTitle(page.address));
+  expect(screen.queryByRole('status')).toBeNull();
+  rerender(<BrowserView {...page} src={src} reloadKey={1} />);
+  expect(screen.getByRole('status').textContent).toContain('Loading');
+  fireEvent.load(screen.getByTitle(page.address));
+  expect(screen.queryByRole('status')).toBeNull();
+});

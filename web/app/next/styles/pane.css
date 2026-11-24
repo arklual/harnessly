@@ -3124,3 +3124,14 @@ input.hx-tbrowser__url:focus {
   place-items: center;
   background: var(--hx-bg);
 }
+
+.hx-tbrowser__progress {
+  position: absolute;
+  inset-block-start: 12px;
+  inset-inline-start: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--bg, Canvas);
+  color: var(--text, CanvasText);
+  pointer-events: none;
+}

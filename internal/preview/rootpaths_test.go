@@ -218,3 +218,66 @@ func TestCarriedClaimOpensOnlyTheViewServer(t *testing.T) {
 		t.Errorf("no view server: %d", a.status)
 	}
 }
+
+func TestDocumentModuleSpecifiersFollowForwardedPage(t *testing.T) {
+	const script = `<script type="module">import './runtime.js'; export { a } from '../../shared.js'; import('pkg');</script>`
+	got := string(RewriteHTMLDocumentPaths([]byte(`<base target="_parent">`+script), testPrefix, "/demo/frame.html?story=2"))
+	for _, want := range []string{testPrefix + "/demo/runtime.js", testPrefix + "/shared.js", "import('pkg')"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing %q in %s", want, got)
+		}
+	}
+	got = string(RewriteHTMLDocumentPaths([]byte(`<base href="https://cdn.example/">`+script), testPrefix, "/frame.html"))
+	if !strings.Contains(got, script) {
+		t.Fatal(got)
+	}
+}
+
+func TestInlineModuleURLForms(t *testing.T) {
+	for _, tc := range []struct{ source, want string }{
+		{`import('./lazy.js?q=1#one')`, `import('PREFIX/deep/lazy.js?q=1#one')`},
+		{`new URL('../font.woff', import.meta.url)`, `new URL('PREFIX/font.woff', import.meta.url)`},
+		{`export * from "./a.mjs"`, `export * from "PREFIX/deep/a.mjs"`},
+		{`import('pkg/subpath')`, `import('pkg/subpath')`},
+		{`import('https://cdn.example/x.js')`, `import('https://cdn.example/x.js')`},
+		{`/* import('./fake') */`, `/* import('./fake') */`},
+		{`import "data:text/javascript,void(0)"`, `import "data:text/javascript,void(0)"`},
+	} {
+		p := pathRewriter{prefix: testPrefix, docPath: documentURL("/deep/index.html")}
+		var buf bytes.Buffer
+		r := newModuleRewriter(&buf, testPrefix)
+		r.document = &p
+		for i := range len(tc.source) {
+			_, _ = r.Write([]byte{tc.source[i]})
+		}
+		_ = r.Close()
+		if got, want := buf.String(), strings.ReplaceAll(tc.want, "PREFIX", testPrefix); got != want {
+			t.Errorf("%s: got %s, want %s", tc.source, got, want)
+		}
+	}
+}
+
+func TestSlotImportMapKeepsAuthoredMapsAndScopesComputedImports(t *testing.T) {
+	const module = `<script nonce="abc" type=module>import(window.chunk)</script>`
+	p := pathRewriter{prefix: testPrefix, docPath: documentURL("/docs/index.html")}
+	got := string(addSlotImportMap([]byte(module), p))
+	if !strings.HasPrefix(got, `<script type="importmap" nonce="abc">`) || !strings.Contains(got, `"/":"`+testPrefix+`/"`) || !strings.Contains(got, `"`+testPrefix+`/":"`+testPrefix+`/"`) {
+		t.Fatal(got)
+	}
+	const authored = `<script type=importmap>{"imports":{"pkg":"/app.js"}}</script>` + module
+	if got := string(addSlotImportMap([]byte(authored), p)); !strings.Contains(got, `"pkg":"`+testPrefix+`/app.js"`) || strings.Count(got, "type=importmap") != 1 {
+		t.Fatal(got)
+	}
+}
+
+func TestAuthoredModuleMapUsesUpstreamDocument(t *testing.T) {
+	const raw = `{"imports":{"pkg/":"./lib/","off":null,"remote":"https://assets.example/lib.js"},"scopes":{"./feature/":{"pkg/":"../override/"}},"integrity":{"./lib/a.js":"sha384-example"}}`
+	p := pathRewriter{prefix: testPrefix, docPath: documentURL("/deep/index.html")}
+	doc := `<script type="importmap">` + raw + `</script><script type=importmap>{"imports":{"second":"./two.js"}}</script>`
+	got := string(addSlotImportMap([]byte(doc), p))
+	for _, want := range []string{`"pkg/":"` + testPrefix + `/deep/lib/"`, `"off":null`, `"remote":"https://assets.example/lib.js"`, `"` + testPrefix + `/deep/feature/":{"pkg/":"` + testPrefix + `/override/"}`, `"` + testPrefix + `/deep/lib/a.js":"sha384-example"`, `"second":"` + testPrefix + `/deep/two.js"`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in %s", want, got)
+		}
+	}
+}
