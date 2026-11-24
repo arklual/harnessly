@@ -656,7 +656,11 @@ func (l *Library) Scene3DFrameStart(id string, cam Scene3DCam, frame int, retry 
 	key := scene3dFrameKey(hash, engine, cam, frame)
 	file := filepath.Join(dir, "frames", key+".jpg")
 	info := Scene3DFrame{Key: key, Cam: &cam, Frame: frame, Engine: engine}
+	// A finishing job leaves the registry after its file is published. Check
+	// the file and reserve a new job under the same lock to avoid a second draw.
+	s3Reg.Lock()
 	if isRealFile(file) {
+		s3Reg.Unlock()
 		info.Status, info.Cached = Scene3DReady, true
 		if raw, err := readFileLimited(strings.TrimSuffix(file, ".jpg")+".json", 16*1024); err == nil {
 			var side Scene3DFrame
@@ -666,7 +670,6 @@ func (l *Library) Scene3DFrameStart(id string, cam Scene3DCam, frame int, retry 
 		}
 		return info, nil
 	}
-	s3Reg.Lock()
 	defer s3Reg.Unlock()
 	if j := s3Reg.jobs[file]; j != nil && !(retry && j.status == Scene3DFailed) {
 		info.Status, info.Error = j.status, j.err
@@ -679,58 +682,71 @@ func (l *Library) Scene3DFrameStart(id string, cam Scene3DCam, frame int, retry 
 	s3Wg.Add(1)
 	go func() {
 		defer s3Wg.Done()
-		l.scene3dDraw(blend, dir, file, key, cam, frame, engine, builder, j)
+		l.scene3dDraw(blend, file, builder, j)
 	}()
 	return info, nil
 }
 
-func (l *Library) scene3dDraw(blend, dir, file, key string, cam Scene3DCam, frame int, engine, builder string, j *s3Job) {
+func (l *Library) scene3dDraw(blend, file, builder string, j *s3Job) {
 	scene3dSem <- struct{}{}
 	defer func() { <-scene3dSem }()
 	s3Reg.Lock()
 	j.status = Scene3DBuilding
 	s3Touch()
 	s3Reg.Unlock()
-	where, err := l.scene3dRender(blend, dir, file, cam, frame, engine, builder)
+	err := l.scene3dRender(blend, file, builder, j.frame)
 	s3Reg.Lock()
 	if err != nil {
 		j.status, j.err = Scene3DFailed, err.Error()
 	} else {
 		delete(s3Reg.jobs, file)
-		info := Scene3DFrame{Key: key, Status: Scene3DReady, Cam: &cam, Frame: frame, Engine: engine, Where: where}
-		_ = os.WriteFile(strings.TrimSuffix(file, ".jpg")+".json", deckJSON(info), 0o600)
 		scene3dTrimFrames(filepath.Dir(file))
 	}
 	s3Touch()
 	s3Reg.Unlock()
 }
 
-func (l *Library) scene3dRender(blend, dir, file string, cam Scene3DCam, frame int, engine, builder string) (string, error) {
+func (l *Library) scene3dRender(blend, file, builder string, info Scene3DFrame) error {
 	if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
-		return "", err
+		return err
 	}
 	work, err := os.MkdirTemp(filepath.Dir(file), "work-")
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer os.RemoveAll(work)
-	spec, _ := json.Marshal(map[string]any{"out": "frame.jpg", "engine": engine, "frame": frame, "w": Scene3DFrameW, "h": Scene3DFrameH,
-		"samples": Scene3DFrameSamples, "cam": cam})
+	spec, _ := json.Marshal(map[string]any{"out": "frame.jpg", "engine": info.Engine, "frame": info.Frame, "w": Scene3DFrameW, "h": Scene3DFrameH,
+		"samples": Scene3DFrameSamples, "cam": info.Cam})
 	out, where, err := scene3dBlender(context.Background(), blenderRun{
 		Title: "3D scene: draft frame", Blend: blend, Script: scene3dFramePy, Params: []string{string(spec)}, Outputs: []string{"frame.jpg"},
 		Timeout: scene3dFrameTimeout(blend), SlotWait: Scene3DFrameSlotWait * time.Second, Tool: "blender-draft", Builder: builder,
 	}, work)
 	if err != nil {
 		if errors.Is(err, errBlenderBusy) {
-			return where, errors.New(scene3dBusyWords())
+			return errors.New(scene3dBusyWords())
 		}
-		return where, fmt.Errorf("%w: %s", err, s3Tail(out, 5))
+		return fmt.Errorf("%w: %s", err, s3Tail(out, 5))
 	}
 	made := filepath.Join(work, "frame.jpg")
 	if st, e := os.Stat(made); e != nil || st.Size() == 0 {
-		return where, fmt.Errorf("Blender drew no frame: %s", s3Tail(out, 5))
+		return fmt.Errorf("Blender drew no frame: %s", s3Tail(out, 5))
 	}
-	return where, os.Rename(made, file)
+	// The JPEG is the ready marker used by FrameStart and FrameFile. Publish it
+	// only after the corresponding complete metadata is available to list readers.
+	info.Status, info.Where = Scene3DReady, where
+	sidecar := strings.TrimSuffix(file, ".jpg") + ".json"
+	staged := filepath.Join(work, "frame.json")
+	if err := os.WriteFile(staged, deckJSON(info), 0o600); err != nil {
+		return err
+	}
+	if err := os.Rename(staged, sidecar); err != nil {
+		return err
+	}
+	if err := os.Rename(made, file); err != nil {
+		_ = os.Remove(sidecar)
+		return err
+	}
+	return nil
 }
 
 // scene3dTrimFrames drops the oldest frames when the folder is over the cap.
@@ -778,7 +794,18 @@ func (l *Library) Scene3DFrameFile(id, key string) (string, error) {
 // scene3dFrames lists the frames of the current model: the cached ones and the jobs still going or failed.
 func (l *Library) scene3dFrames(id, hash string) []Scene3DFrame {
 	dir := filepath.Join(l.scene3dCache(id, hash), "frames")
-	out := []Scene3DFrame{}
+	// A running job can publish its JPEG and leave the registry while we scan.
+	// Snapshot jobs first and let durable records supersede them by frame key.
+	frames := make(map[string]Scene3DFrame)
+	s3Reg.Lock()
+	for file, j := range s3Reg.jobs {
+		if filepath.Dir(file) == dir && j.frame.Key != "" {
+			f := j.frame
+			f.Status, f.Error = j.status, j.err
+			frames[f.Key] = f
+		}
+	}
+	s3Reg.Unlock()
 	names, _ := readNames(dir)
 	for _, n := range names {
 		if !strings.HasSuffix(n, ".json") {
@@ -789,17 +816,12 @@ func (l *Library) scene3dFrames(id, hash string) []Scene3DFrame {
 		if err != nil || json.Unmarshal(raw, &f) != nil || !frameKeyRe.MatchString(f.Key) || !isRealFile(filepath.Join(dir, f.Key+".jpg")) {
 			continue
 		}
+		frames[f.Key] = f
+	}
+	out := make([]Scene3DFrame, 0, len(frames))
+	for _, f := range frames {
 		out = append(out, f)
 	}
-	s3Reg.Lock()
-	for file, j := range s3Reg.jobs {
-		if filepath.Dir(file) == dir && j.frame.Key != "" {
-			f := j.frame
-			f.Status, f.Error = j.status, j.err
-			out = append(out, f)
-		}
-	}
-	s3Reg.Unlock()
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Key < out[j].Key })
 	if len(out) > 60 {
 		out = out[len(out)-60:]

@@ -233,6 +233,38 @@ func TestScene3DFailedBuildSaysWhyAndRetries(t *testing.T) {
 	r.ready(t)
 }
 
+func TestScene3DFramePublicationRequiresMetadata(t *testing.T) {
+	r := newScene3DRig(t)
+	state := r.ready(t)
+	cam := Scene3DCam{N: "cam1"}
+	key := scene3dFrameKey(state.Model.Hash, scene3dEngine(), cam, 10)
+	sidecar := filepath.Join(r.l.scene3dCache("villa", state.Model.Hash), "frames", key+".json")
+	// A directory at the metadata destination deterministically rejects rename.
+	if err := os.MkdirAll(sidecar, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if f := r.frameDone(t, cam, 10); f.Status != Scene3DFailed || f.Error == "" {
+		t.Fatalf("metadata failure reported as %+v", f)
+	}
+	if _, err := r.l.Scene3DFrameFile("villa", key); err == nil {
+		t.Fatal("served an unpublished frame")
+	}
+	if err := os.Remove(sidecar); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.l.Scene3DFrameStart("villa", cam, 10, true, ""); err != nil {
+		t.Fatal(err)
+	}
+	f := r.frameDone(t, cam, 10)
+	if f.Status != Scene3DReady || f.Key != key {
+		t.Fatalf("retry: %+v", f)
+	}
+	frames := r.l.scene3dFrames("villa", state.Model.Hash)
+	if len(frames) != 1 || frames[0].Key != key || frames[0].Status != Scene3DReady {
+		t.Fatalf("published frames: %+v", frames)
+	}
+}
+
 func TestScene3DFrameIsCachedByViewAndFrame(t *testing.T) {
 	r := newScene3DRig(t)
 	r.ready(t)
