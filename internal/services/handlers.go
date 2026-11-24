@@ -25,7 +25,8 @@ type Handlers struct {
 	// Now is the clock of the organizer's timestamps; nil is time.Now.
 	Now func() time.Time
 	// ForgeHosts are the hosts of the person's code host connections, whose avatars the avatar route also serves.
-	ForgeHosts func() []string
+	ForgeHosts    func() []string
+	ManagedChange func(http.ResponseWriter, *http.Request, string) bool
 }
 
 const jsonType = "application/json; charset=utf-8"
@@ -195,6 +196,9 @@ func (h *Handlers) GitLabView(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	url, _ := queryString(r, "url")
+	if h.ManagedChange != nil && h.ManagedChange(w, r, url) {
+		return
+	}
 	if !h.S.IsGitLabRef(url) {
 		writeJSON(w, r, 400, errorBody(locale.Pick("A link to a GitLab merge request or commit is required", "Нужна ссылка на merge request или коммит GitLab")))
 		return
@@ -260,6 +264,9 @@ func (h *Handlers) ChangeView(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	url, _ := queryString(r, "url")
+	if h.ManagedChange != nil && h.ManagedChange(w, r, url) {
+		return
+	}
 	if !h.S.IsChangeRef(url) {
 		writeJSON(w, r, 400, errorBody(locale.Pick("A link to a merge request, pull request, commit or issue is required", "Нужна ссылка на merge request, pull request, коммит или задачу")))
 		return

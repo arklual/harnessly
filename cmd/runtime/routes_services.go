@@ -101,6 +101,14 @@ func handlersFor(d deps) (*services.Handlers, services.Config) {
 	}
 	cfg.Connections = connectionsFor(d)
 	h := &services.Handlers{S: services.New(cfg), Session: d.SessionOK, ForgeHosts: func() []string { return forgeHosts(d) }}
+	h.ManagedChange = func(w http.ResponseWriter, r *http.Request, raw string) bool {
+		result, status := personalReview(d, r, raw, true)
+		if status == 0 {
+			return false
+		}
+		secretJSON(w, status, result)
+		return true
+	}
 	servicesFor[d.CLI] = h
 	return h, cfg
 }

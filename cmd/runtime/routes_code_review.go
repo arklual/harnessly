@@ -139,6 +139,9 @@ func codeReviewRoutes(d deps) []gate.JSONRoute {
 			}
 			if r.Method == http.MethodGet {
 				in.URL = r.URL.Query().Get("url")
+				if out, status := personalReview(d, r, in.URL, false); status != 0 {
+					return answerJSON(r, status, out, noStore)
+				}
 			} else if !readSecretBody(r, &in) {
 				return bad(r)
 			}

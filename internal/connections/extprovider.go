@@ -2,10 +2,12 @@ package connections
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,9 +30,10 @@ import (
 //	POST /v1/pages/search {conn, credentials, query}     -> {pages: [Page]}
 //	POST /v1/pages/get    {conn, credentials, id}        -> Page
 //
-// The capabilities the adapter lists in describe are `detect`, `link`, `issues`, `pages`; a call of a capability that is
-// not listed is not sent. The code capability (merge requests) has no source interface in the core yet: an adapter may
-// list `code` in the detection's capabilities, and the connection keeps it, but the core asks nothing of it.
+// An installed adapter may also opt in to merge-request-read. The personal runtime sends
+// POST /v1/reviews/get {conn, url, ownerSubject} for a single merge request, with no credentials.
+// It verifies the active provider identity against ownerSubject before reading, and returns that identity in ownerSubject.
+// Its response contains a native change view (including the unified diff) and read-only review.
 //
 // An Issue may carry `fields`, the product's other fields with their values already in people's words; an adapter that
 // sends none works as before. The core keeps what CleanFields keeps of them.
@@ -290,4 +293,33 @@ func LoadAdapters(ctx context.Context, path string) ([]Kind, []error) {
 		errs = append(errs, fmt.Errorf("connection adapter %s: %w", s.Name, err))
 	}
 	return kinds, errs
+}
+
+// ManagedReview contains both native representations of one merge request.
+type ManagedReview struct {
+	OwnerSubject string                     `json:"ownerSubject"`
+	View         map[string]json.RawMessage `json:"view"`
+	Review       *Review                    `json:"review"`
+}
+
+func (p *ExtProvider) ReadsMergeRequests() bool { return p.desc.Has("merge-request-read") }
+
+func (p *ExtProvider) ReadMergeRequest(ctx context.Context, origin, raw, subject string) (*ManagedReview, error) {
+	if !p.ReadsMergeRequests() {
+		return nil, ErrUnsupported
+	}
+	var out ManagedReview
+	err := p.cl.Do(ctx, "POST", "/v1/reviews/get", map[string]any{"conn": wireOf(Conn{BaseURL: origin, Method: "none"}), "url": raw, "ownerSubject": subject}, false, &out)
+	if err != nil {
+		return nil, err
+	}
+	if subject == "" || !strings.EqualFold(out.OwnerSubject, subject) {
+		return nil, ErrDenied
+	}
+	var address, kind string
+	if out.Review == nil || out.Review.Title == "" || json.Unmarshal(out.View["url"], &address) != nil || address != raw || json.Unmarshal(out.View["kind"], &kind) != nil || kind != "mr" {
+		return nil, ErrUnreachable
+	}
+	out.Review.CanApprove = false
+	return &out, nil
 }
