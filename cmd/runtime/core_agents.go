@@ -19,6 +19,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agents/claude"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/catalog"
+	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/coreapi/layoutapi"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/launch"
@@ -449,6 +450,32 @@ func effortsFor(provider string, o catalog.LaunchOptions, model *string) []strin
 		return claudeEfforts
 	}
 	return nil
+}
+
+// ValidateProfileLaunch selects the requested backend account and its own model catalog.
+func (a *coreAgents) ValidateProfileLaunch(provider, profile string, model, effort any) (*agents.Launch, string) {
+	l, ok := agents.ReadProfileLaunchShape(profile, model, effort)
+	if !ok || a.profiles == nil {
+		return nil, "Invalid profile launch"
+	}
+	if l == nil {
+		l = &agents.Launch{}
+	}
+	m := wire.Model{}
+	if l.Model != nil {
+		m.ID = *l.Model
+	}
+	if l.Effort != nil {
+		v := wire.Effort(*l.Effort)
+		m.Effort = &v
+	}
+	selected, refusal := convo.ResolveProfileModel(providers.Launcher{Store: a.profiles}, wire.Provider(provider), profile, m, l.Model == nil)
+	if refusal != "" {
+		return nil, string(refusal)
+	}
+	l.Profile = profile
+	l.Model = &selected.ID
+	return l, ""
 }
 
 // ValidateLaunch is validateLaunchChoice: the shape first, then this machine's catalog.

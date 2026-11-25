@@ -1877,27 +1877,34 @@ func (r *Runtime) onProfile(p wire.Provider, model *wire.Model, profile string) 
 		}
 		return model, ""
 	}
-	if r.d.Profiles == nil {
+	if model == nil {
+		return ResolveProfileModel(r.d.Profiles, p, profile, wire.Model{}, true)
+	}
+	return ResolveProfileModel(r.d.Profiles, p, profile, *model, false)
+}
+
+// ResolveProfileModel checks a requested profile against the same account, CLI, model and effort catalog used by chats.
+func ResolveProfileModel(profiles Profiles, p wire.Provider, profile string, model wire.Model, useDefault bool) (*wire.Model, wire.RefuseCode) {
+	if profiles == nil {
 		return nil, wire.RefuseUnsupported
 	}
-	via, configured, models, ok := r.d.Profiles.Lookup(profile)
+	via, configured, models, ok := profiles.Lookup(profile)
 	switch {
 	case !ok:
 		return nil, wire.RefuseNotFound
 	case via != p || !configured || len(models) == 0:
 		return nil, wire.RefuseUnsupported
 	}
-	if model == nil {
-		model = &wire.Model{ID: models[0]}
+	if useDefault {
+		model.ID = models[0]
 	}
-	capabilities, known := r.d.Profiles.Model(profile, model.ID)
+	capabilities, known := profiles.Model(profile, model.ID)
 	if !slices.Contains(models, model.ID) || !known || model.Ultracode || model.Fast && !capabilities.Fast ||
 		(model.Effort != nil && !slices.Contains(capabilities.Efforts, *model.Effort)) {
 		return nil, wire.RefuseOptionUnknown
 	}
-	on := *model
-	on.Profile = profile
-	return &on, ""
+	model.Profile = profile
+	return &model, ""
 }
 
 // openConv adds a conversation and asks the launcher for its agent: a fresh one whose first message (first, when

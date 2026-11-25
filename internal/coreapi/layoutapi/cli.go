@@ -221,6 +221,12 @@ func (a *api) cliTabCreate(c *call) {
 	prompt, _ := c.field("prompt")
 	model, hasModel := c.field("model")
 	effort, hasEffort := c.field("effort")
+	profileRaw, hasProfile := c.field("profile")
+	profile, profileOK := profileRaw.(string)
+	if hasProfile && (!profileOK || profile == "") {
+		c.fail(400, "Invalid agent profile")
+		return
+	}
 	if !jsvalue.Truthy(wsID) {
 		c.fail(400, "workspaceId is required")
 		return
@@ -263,7 +269,7 @@ func (a *api) cliTabCreate(c *call) {
 	if a.cliDelegate(c, provider, resolved, id, prompt, model, effort, name) {
 		return
 	}
-	if (promptIsString || hasModel || hasEffort) && provider == "" {
+	if (promptIsString || hasModel || hasEffort || hasProfile) && provider == "" {
 		c.fail(400, "prompt, model and effort need a claude-code or codex-cli tab")
 		return
 	}
@@ -273,7 +279,13 @@ func (a *api) cliTabCreate(c *call) {
 			c.fail(503, "Agent start is not available")
 			return
 		}
-		launch, refusal := a.d.Agents.ValidateLaunch(provider, model, effort)
+		var launch *agents.Launch
+		var refusal string
+		if hasProfile {
+			launch, refusal = a.d.Agents.ValidateProfileLaunch(provider, profile, model, effort)
+		} else {
+			launch, refusal = a.d.Agents.ValidateLaunch(provider, model, effort)
+		}
 		if refusal != "" {
 			c.fail(400, refusal)
 			return

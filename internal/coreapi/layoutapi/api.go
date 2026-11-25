@@ -108,6 +108,7 @@ type Agents interface {
 	Availability(panelType string) *Unavailable
 	// ValidateLaunch checks a requested model and effort against what the CLI offers; the text is the 400 error.
 	ValidateLaunch(provider string, model, effort any) (*agents.Launch, string)
+	ValidateProfileLaunch(provider, profile string, model, effort any) (*agents.Launch, string)
 	// SelectOpusFirst chooses native Opus or GPT‑6.2 Sol through Claude Code, before a conversation starts.
 	SelectOpusFirst() (*agents.Launch, string)
 	LaunchLine(provider, workspaceID string, launch *agents.Launch) (string, error)

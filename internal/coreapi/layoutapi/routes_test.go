@@ -485,6 +485,15 @@ func TestCLITabCreateNestsTheAgentUnderTheAskingChat(t *testing.T) {
 	r.want(r.do("t", "POST", "/api/cli/tabs", `{"workspaceId":"`+ws+`","panelType":"claude-code","session":"pt-chat"}`), 201,
 		`{"tabId":"tab-loose","workspaceId":"`+ws+`","paneId":null,"sessionName":null,"name":null,"panelType":"claude-code","agentProviderId":"claude","agentSessionId":null,"launched":true}`)
 
+	// A standalone tab selects the named account, including its namespaced model. Unknown profiles cannot fall back.
+	resp := r.do("t", "POST", "/api/cli/tabs", `{"workspaceId":"`+ws+`","panelType":"claude-code","profile":"personal","model":"example/small"}`)
+	r.want(resp, 201, `{"tabId":"tab-loose","workspaceId":"`+ws+`","paneId":null,"sessionName":null,"name":null,"panelType":"claude-code","agentProviderId":"claude","agentSessionId":null,"launched":true}`)
+	choice := r.agents.started[len(r.agents.started)-1].Launch
+	if choice == nil || choice.Profile != "personal" || choice.Model == nil || *choice.Model != "example/small" {
+		t.Fatalf("profile launch: %+v", choice)
+	}
+	r.want(r.do("t", "POST", "/api/cli/tabs", `{"workspaceId":"`+ws+`","panelType":"claude-code","profile":"missing"}`), 400, `{"error":"profile unavailable"}`)
+
 	// The CLI names the nested chat by its own id; tab status and result find the tab it runs in.
 	r.want(r.do("t", "GET", "/api/cli/tabs/tab-kid?workspaceId="+ws, ""), 404, `{"error":"Tab not found"}`)
 	r.deps.ChatTab = func(chat string) string {

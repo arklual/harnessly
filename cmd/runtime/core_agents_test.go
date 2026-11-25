@@ -10,6 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/coreapi/layoutapi"
 	"github.com/ly-solutions/harnessly/internal/preflight"
+	"github.com/ly-solutions/harnessly/internal/providers"
 )
 
 // testdata/launch-golden.json holds the lines the previous runtime's own builders typed (testdata/launch/gen.mjs).
@@ -138,5 +139,35 @@ func TestValidateLaunch(t *testing.T) {
 	l, _ := a.ValidateLaunch("claude", "sonnet", nil)
 	if l == nil || *l.Model != "sonnet" || l.Effort != nil {
 		t.Fatal(l)
+	}
+}
+
+// The standalone route can use only models and capabilities of the selected, configured account.
+func TestStandaloneProfileChecksAccountAndCatalog(t *testing.T) {
+	st := &providers.Store{Dir: t.TempDir()}
+	a := &coreAgents{profiles: st}
+	const profile = "kimi"
+	catalog := providers.Launcher{Store: st}
+	_, _, models, ok := catalog.Lookup(profile)
+	if !ok || len(models) == 0 {
+		t.Fatal("missing test profile")
+	}
+	if _, why := a.ValidateProfileLaunch("claude", profile, nil, nil); why == "" {
+		t.Fatal("unconfigured account accepted")
+	}
+	if _, err := st.Set(profile, "test-fixture-credential"); err != nil {
+		t.Fatal(err)
+	}
+	for _, requested := range []any{nil, models[0]} {
+		launch, why := a.ValidateProfileLaunch("claude", profile, requested, nil)
+		if why != "" || launch == nil || launch.Profile != profile || launch.Model == nil || *launch.Model != models[0] {
+			t.Fatalf("launch %+v: %q", launch, why)
+		}
+	}
+	if _, why := a.ValidateProfileLaunch("codex", profile, nil, nil); why == "" {
+		t.Fatal("wrong CLI accepted")
+	}
+	if _, why := a.ValidateProfileLaunch("claude", profile, "other/model", nil); why == "" {
+		t.Fatal("unlisted model accepted")
 	}
 }
