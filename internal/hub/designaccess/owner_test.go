@@ -2,7 +2,10 @@ package designaccess
 
 import (
 	"context"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/ly-solutions/harnessly/internal/hub/store"
 )
 
 // with the switch hub-design-owner on, a machine that is off (or gone) does not take its projects out of the
@@ -109,5 +112,47 @@ func TestTakeWorkMovesTheWorkingCopy(t *testing.T) {
 	}()
 	if err != nil || mr.WorkMachine != r.owner.ID {
 		t.Fatalf("work machine %q %v", mr.WorkMachine, err)
+	}
+}
+
+func TestOwnerEditorFindsPersonalSourceWithStoreOff(t *testing.T) {
+	ctx := context.Background()
+	r := newSpaceRig(t, false)
+	project := "qa-two-pages"
+	if _, err := r.svc.registerCreated(ctx, r.owner, project, r.ownerU.Email); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.svc.write(ctx, r.owner, func(tx *txn) error {
+		if err := tx.setTeam(project, r.ownerU.Email, levelNone); err != nil {
+			return err
+		}
+		return tx.grant(project, r.ownerU.Email, r.mateU.Email, roleView, ttl{none: true}, false)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	get := func(u store.User) map[string]any {
+		t.Helper()
+		v, status, err := r.svc.oldRoute(httptest.NewRequest("GET", "/", nil), u, r.owner, []string{project})
+		if status != 200 || err != nil {
+			t.Fatalf("get %s: %d %v", u.Name, status, err)
+		}
+		return v.(map[string]any)
+	}
+	if get(r.ownerU)["ownerWorkMachine"] != nil {
+		t.Fatal("unverified address named a machine")
+	}
+	for _, u := range []store.User{r.ownerU, r.mateU, r.strangeU} {
+		if err := r.db.S().CreateIdentity(ctx, &store.Identity{UserID: u.ID, Provider: "test", Subject: u.ID, Email: u.Email, EmailVerified: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if get(r.ownerU)["ownerWorkMachine"] != r.owner.ID {
+		t.Fatal("verified owner missed the source")
+	}
+	if v := get(r.mateU); v["role"] != roleView || v["ownerWorkMachine"] != nil {
+		t.Fatal("project view granted a personal machine")
+	}
+	if v := get(r.strangeU); v["role"] != nil || v["ownerWorkMachine"] != nil {
+		t.Fatal("private project gave an unrelated person a source")
 	}
 }

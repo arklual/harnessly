@@ -39,7 +39,7 @@ vi.mock('@/next/stores/tabs', () => ({
 vi.mock('@/next/features/designly/api', async (original) => ({
   ...(await original<typeof import('@/next/features/designly/api')>()),
   keptLibrary: () => kept,
-  fetchLibrary: () => Promise.resolve(shown),
+  fetchLibrary: (machine: MachineId) => Promise.resolve(machineLibrary(machine)),
   // The hub's store has no copy of anything here: a machine without the project asks it too, and that read
   // must not pass for a slot opening.
   fetchStoreLibrary: () => Promise.resolve({ designs: [], layout: { folders: [], placed: {}, systems: {} } }),
@@ -89,6 +89,7 @@ const library = {
 
 // What the library holds now, and what the gateway says of the project.
 let shown: typeof library = library;
+const machineLibrary = vi.fn((_machine: MachineId) => shown);
 // What the home's last read left: a link opened from outside starts with none.
 let kept: typeof library | null = library;
 let gateway: IProjectAccess | null = null;
@@ -401,6 +402,23 @@ describe('DesignlySite page switch', () => {
 });
 
 // the switch of the bar turns the design between looking and editing, both ways, with or without its chat.
+it('opens a verified owner’s source without adding a machine to the address', async () => {
+  kept = null;
+  gateway = { role: 'owner', ownerWorkMachine: 'other-personal-vm' } as IProjectAccess;
+  machineLibrary.mockImplementation((machine) =>
+    machine === 'other-personal-vm' ? library : { ...library, designs: [] },
+  );
+  try {
+    await act(async () => {
+      mount();
+    });
+    expect(machineLibrary).toHaveBeenCalledWith('other-personal-vm');
+    expect(screen.getByTestId('src')).toBeTruthy();
+  } finally {
+    machineLibrary.mockImplementation(() => shown);
+  }
+});
+
 describe('DesignlySite mode', () => {
   const Routed = ({ chat = null }: { chat?: string | null }) => {
     const [edit, setEdit] = useState(false);

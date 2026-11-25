@@ -56,6 +56,7 @@ export interface IAccessRequest {
 
 /** `GET /:project`; the last three only come to a person who manages. */
 export interface IProjectAccess {
+  ownerWorkMachine?: string;
   teamInvites?: boolean;
   role: TRole | null;
   /** Empty for a stranger: they get the name to ask by, not the address. */

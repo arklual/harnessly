@@ -177,6 +177,19 @@ func (s *Service) oldRoute(r *http.Request, u store.User, m store.Machine, parts
 		}
 		if f.Role == "" {
 			v["owner"] = nil
+		} else if f.Role == roleOwner && u.ID != "" && u.DisabledAt == nil {
+			// The work machine is a hint for the owner's editor. A project role
+			// by itself grants no access to its author's private runtime.
+			meta, err := t.metaOf(project)
+			if err != nil {
+				return nil, 0, err
+			}
+			machine, err := t.st.MachineByID(ctx, meta.WorkMachine)
+			if err == nil && machine.SpaceID == m.SpaceID && machine.CreatedBy == u.ID && machine.RevokedAt == nil && machine.DisabledAt == nil {
+				if verified, err := t.st.UserIDByVerifiedEmail(ctx, u.Email); err == nil && verified == u.ID {
+					v["ownerWorkMachine"] = machine.ID
+				}
+			}
 		}
 		return v, 200, nil
 	}

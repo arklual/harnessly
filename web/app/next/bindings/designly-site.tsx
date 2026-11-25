@@ -190,6 +190,7 @@ const seedTabs = (boards: readonly { path: string }[]): ISiteTab[] =>
   boards.slice(0, SEED_TABS).map((b) => newTab(b.path));
 
 const DesignlySiteInner = ({
+  gate,
   machine,
   id,
   chat = null,
@@ -205,7 +206,7 @@ const DesignlySiteInner = ({
   pane,
   page: askedPage = null,
   pageAt = 0,
-}: IBodyProps) => {
+}: IBodyProps & { gate: ReturnType<typeof useProjectAccess> }) => {
   // The library the home has just read starts the design: its page is asked for at once, the library is read anew behind.
   const [start] = useState(() => {
     const kept = keptLibrary(machine);
@@ -263,7 +264,6 @@ const DesignlySiteInner = ({
   // Why it is on neither side (the machine's word and the store's), for the card; null while it is being looked for.
   const [away, setAway] = useState<TAway | null>(null);
   // Who may do what with the project, from the gateway; where there is none (standalone) the design is as it was.
-  const gate = useProjectAccess(id);
   const [shareOpen, setShareOpen] = useState(false);
   // Opened from the viewing mode's «Запросить доступ»: the one dialog opens with the request form (stage «ж»).
   const [askOpen, setAskOpen] = useState(false);
@@ -1305,13 +1305,21 @@ const DesignlySiteInner = ({
 };
 
 /** The design with its machine's voice in the fields its cards and its picture editor answer with. */
-const DesignlySiteBody = (props: IBodyProps) => (
-  <ReplyMachine.Provider value={props.machine}>
-    <DesignlySiteInner {...props} />
-  </ReplyMachine.Provider>
-);
+const DesignlySiteBody = (props: IBodyProps) => {
+  const gate = useProjectAccess(props.id);
+  const ownerSource =
+    !props.chat && !props.pane && gate.state.k === ACCESS.ready && gate.state.access.role === ROLE.owner
+      ? gate.state.access.ownerWorkMachine
+      : undefined;
+  const machine = ownerSource || props.machine;
+  return (
+    <ReplyMachine.Provider value={machine}>
+      <DesignlySiteInner key={machine} {...props} machine={machine} gate={gate} />
+    </ReplyMachine.Provider>
+  );
+};
 
-const DesignlySite = (props: IDesignlySiteProps) => <DesignlySiteBody {...props} />;
+const DesignlySite = (props: IDesignlySiteProps) => <DesignlySiteBody key={props.id} {...props} />;
 
 export interface IDesignlyPaneSiteProps {
   machine: MachineId;
@@ -1333,6 +1341,7 @@ export const DesignlyPaneSite = ({
   pageAt = 0,
 }: IDesignlyPaneSiteProps) => (
   <DesignlySiteBody
+    key={id}
     machine={machine}
     id={id}
     page={page}
