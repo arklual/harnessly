@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 var versionedBinary = regexp.MustCompile(`^agy[0-9]+\.[0-9]+\.[0-9]+$`)
@@ -17,6 +18,12 @@ func MatchesProcess(command string, args []string) bool {
 	}
 	// Do not infer identity from arbitrary prompt arguments naming agy.
 	return false
+}
+
+// IsBridge: the process is `harnessly antigravity-acp`, the ACP bridge a native chat runs as (the official CLI is its
+// child). Its --conversation names the session it resumes.
+func IsBridge(argv []string) bool {
+	return len(argv) > 1 && argv[1] == "antigravity-acp" && strings.HasPrefix(filepath.Base(argv[0]), "harnessly")
 }
 
 func ParsePaneTitle(string) *string { return nil }
@@ -137,7 +144,7 @@ func (d *Detector) Detect(children []int, _ bool) agents.SessionInfo {
 			continue
 		}
 		configured := filepath.IsAbs(d.Binary) && words[0] == d.Binary
-		if !configured && !MatchesProcess(words[0], words[1:]) {
+		if !configured && !MatchesProcess(words[0], words[1:]) && !IsBridge(words) {
 			continue
 		}
 		info := agents.SessionInfo{Status: agents.Running, PID: pid, Cwd: d.Procs.CwdOf(pid), Dir: Dir(d.Home)}

@@ -13,7 +13,7 @@ import (
 // frame alone is never sufficient: a crashed CLI may have returned the pane to sh.
 type NativeOwner interface{ NativeAgentAlive() bool }
 
-var nativeModelFooter = regexp.MustCompile(`(?i)(?:Gemini|Claude|GPT[- ]OSS)[^\n]*·\s*(?:low|medium|high|xhigh|max|none)`)
+var nativeModelFooter = regexp.MustCompile(`(?i)(?:Gemini|Claude|GPT[- ]OSS|Antigravity ·)[^\n]*·\s*(?:low|medium|high|xhigh|max|none)`)
 
 func nativeSameText(a, b string) bool {
 	return strings.Join(strings.Fields(a), " ") == strings.Join(strings.Fields(b), " ")

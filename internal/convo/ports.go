@@ -106,6 +106,17 @@ type InputMessage struct {
 	Steer bool
 }
 
+// Interrupter is an Input that stops the conversation's running turn itself, instead of an Escape in its terminal.
+type Interrupter interface {
+	Interrupt(ctx context.Context, conv wire.Conversation) error
+}
+
+// Configurer is an Input that changes the model, the effort and the permission mode of the running agent: "" and nil
+// leave one as it is.
+type Configurer interface {
+	Configure(ctx context.Context, conv wire.Conversation, model string, effort *wire.Effort, permission wire.PermissionMode) error
+}
+
 // ErrInputUncertain: the channel broke after the message was written, and the agent does not show it.
 var ErrInputUncertain = errors.New("the agent's channel did not say whether it took the message")
 

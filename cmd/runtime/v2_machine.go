@@ -609,7 +609,7 @@ func agentsNow(r preflight.Result, models func(wire.Provider) []wire.AgentModel)
 	}
 	result := []wire.MachineAgent{claude, codex}
 	if nativeAntigravityEnabled() {
-		native := wire.MachineAgent{Provider: wire.ProviderAntigravity, Version: r.Antigravity.Version, Status: wire.InstallReady, Models: list(wire.ProviderAntigravity), CanSwitchModel: false}
+		native := wire.MachineAgent{Provider: wire.ProviderAntigravity, Version: r.Antigravity.Version, Status: wire.InstallReady, Models: list(wire.ProviderAntigravity), CanSwitchModel: agyBridged()}
 		if !r.Antigravity.Installed {
 			native.Status = wire.InstallMissing
 		} else if !r.Antigravity.LoggedIn {

@@ -51,6 +51,9 @@ type coreAgents struct {
 	codexArgs      codex.LaunchConfig
 	// codexInput is the structured input channel of new Codex chats; nil when it is off.
 	codexInput *codexInput
+	// agyInput is the structured channel of native Antigravity chats, each run by an ACP bridge; nil when native
+	// chats are off or no harnessly CLI is known to run the bridge.
+	agyInput *agyInput
 	// profiles keeps the keys of the backend profiles and gives a launch on one what it needs (providers).
 	profiles *providers.Store
 	// gpt is the switch of the gpt profile and the proxy it keeps; nil while the runtime's port is unknown.
@@ -177,6 +180,7 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 		nativeDataDir:   c.DataDir,
 		nativeCLIHeader: firstOf(c.TokenHeaders),
 		codexInput:      input,
+		agyInput:        agyInputOf(c.DataDir),
 		profiles:        profiles,
 		alwaysApps:      alwaysApps(apps.Open(c.DataDir)),
 		gpt:             gpt,

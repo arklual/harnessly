@@ -41,7 +41,7 @@ import {
   useMentions,
   withMentions,
 } from '@/next/stores/mentions';
-import { DEFAULT_LIMITS, limitsOf } from '@/next/stores/machines';
+import { agyBridged, DEFAULT_LIMITS, limitsOf } from '@/next/stores/machines';
 import { useVoice } from '@/next/bindings/use-voice';
 import VoiceStart from '@/next/features/voice-live/voice-start';
 import { askVoiceStart } from '@/next/features/voice-live/field';
@@ -547,7 +547,7 @@ const HomeComposer = ({
             apps={plainTalk ? null : plusApps}
             attachments={uploads.attachments}
             onFiles={
-              choice?.provider === 'antigravity'
+              choice?.provider === 'antigravity' && !(machine && agyBridged(machine))
                 ? () => toast(t('next.agents.noNativeAttachments'), { tone: 'info' })
                 : uploads.onFiles
             }

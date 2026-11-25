@@ -41,8 +41,23 @@ func nativeAntigravityBinary(home string) string {
 func (a *coreAgents) antigravityOptions() catalog.LaunchOptions {
 	r := a.runtime().Antigravity
 	out := catalog.LaunchOptions{Provider: agents.Antigravity, Source: "official-cli", Models: []catalog.Model{}}
+	listed := make([]antigravity.Model, 0, len(r.Models))
 	for _, m := range r.Models {
-		out.Models = append(out.Models, catalog.Model{ID: m.ID, Label: m.Label, Hint: m.ID, Efforts: []string{}})
+		if a.agyInput == nil {
+			// The terminal CLI takes the listed ids as they are.
+			out.Models = append(out.Models, catalog.Model{ID: m.ID, Label: m.Label, Hint: m.ID, Efforts: []string{}})
+			continue
+		}
+		listed = append(listed, antigravity.Model{ID: m.ID, Label: m.Label})
+	}
+	for _, f := range antigravity.Families(listed) {
+		m := catalog.Model{ID: f.ID, Label: f.Label, Hint: f.ID, Efforts: []string{}}
+		if len(f.Efforts) > 0 {
+			m.Efforts = f.Efforts
+			def := f.DefaultEffort
+			m.DefaultEffort = &def
+		}
+		out.Models = append(out.Models, m)
 	}
 	if !r.LoggedIn {
 		out.Warnings = append(out.Warnings, "Run the official agy acp --login; model discovery alone does not prove native chat eligibility")
@@ -106,9 +121,14 @@ func (a *coreAgents) antigravityLine(workspace, resume string, chosen *agents.La
 	cfg := a.antigravity
 	var line string
 	var err error
-	if resume != "" {
+	bridged := a.agyInput != nil && launch.Conversation != "" && appCLIBin() != ""
+	switch {
+	case bridged:
+		// The chat runs beside its ACP bridge: messages, stops, approvals and model changes go over its socket.
+		line, err = a.bridgeLine(appCLIBin(), resume, &launch, files)
+	case resume != "":
 		line, err = cfg.ResumeCommand(resume, workspace, &launch)
-	} else {
+	default:
 		line, err = cfg.LaunchCommand(workspace, &launch, files)
 	}
 	if err != nil {
@@ -136,6 +156,11 @@ func (a *coreAgents) antigravityLine(workspace, resume string, chosen *agents.La
 		prefix += "HARNESSLY_DATA_DIR=" + agents.ShellQuote(a.nativeDataDir) + " "
 	}
 	prefix += "HARNESSLY_CLI_TOKEN='' HARNESSLY_CLI_TOKEN_FILE=" + agents.ShellQuote(tokenFile) + " "
+	if bridged {
+		// The bridge takes the shell's place, so the pane's foreground is the agent and the agent is the pane's child; it
+		// removes the launch's token file itself when it ends.
+		return prefix + line, nil
+	}
 	cleanup := "trap " + agents.ShellQuote(`rm -f -- "$HARNESSLY_CLI_TOKEN_FILE"`) + " EXIT; " + line
 	return prefix + "sh -c " + agents.ShellQuote(cleanup), nil
 }
@@ -341,7 +366,7 @@ func (c *core) nativePaneOwner(session string) bool {
 	if len(short) > 15 {
 		short = short[:15]
 	}
-	if foreground != name && foreground != short && foreground != "agy" {
+	if foreground != name && foreground != short && foreground != "agy" && !bridgeForeground(foreground) {
 		return false
 	}
 	for _, pid := range proc.Descendants(c.cfg.Tmux.PanePID(session)) {
@@ -373,7 +398,7 @@ func (c *core) recoverNativeStart(session, conversation string, st *agents.Agent
 		short = short[:15]
 	}
 	foreground := c.cfg.Tmux.PaneCurrentCommand(session)
-	if foreground != name && foreground != short && foreground != "agy" {
+	if foreground != name && foreground != short && foreground != "agy" && !bridgeForeground(foreground) {
 		return false
 	}
 	for _, pid := range proc.Descendants(c.cfg.Tmux.PanePID(session)) {
@@ -421,4 +446,56 @@ func antigravityLastActivity(home, id string) *float64 {
 	}
 	ms := float64(st.ModTime().UnixMilli())
 	return &ms
+}
+
+// bridgeLine starts the chat's agent as `harnessly antigravity-acp`, the bridge to the official CLI's Agent Client
+// Protocol, listening on the socket of the chat's tab.
+func (a *coreAgents) bridgeLine(bin, resume string, l *agents.Launch, files []string) (string, error) {
+	if len(files) != 0 || l.Fast || l.Ultracode || l.Profile != "" || len(l.Apps) != 0 {
+		return "", antigravity.ErrUnsupported
+	}
+	socket := a.agyInput.socket(l.Conversation)
+	if socket == "" {
+		return "", errors.New("Antigravity bridge: no socket path for the chat")
+	}
+	agy := a.antigravity.Launcher
+	if agy == "" {
+		agy = "agy"
+	}
+	q := agents.ShellQuote
+	words := []string{q(bin), "antigravity-acp", "--agy", q(agy), "--socket", q(socket), "--mcp", "harnessly"}
+	if resume != "" {
+		if !agents.IsUUID(resume) {
+			return "", errors.New("Invalid Antigravity conversation UUID")
+		}
+		words = append(words, "--conversation", q(resume))
+	}
+	if l.Model != nil && *l.Model != "" {
+		words = append(words, "--model", q(*l.Model))
+	}
+	if l.Effort != nil && *l.Effort != "" {
+		words = append(words, "--effort", q(*l.Effort))
+	}
+	if l.Permission != "" {
+		mode, ok := bridgeMode[l.Permission]
+		if !ok {
+			return "", agents.ErrLaunchMode
+		}
+		words = append(words, "--mode", mode)
+	}
+	env, err := agents.FormatStartEnv(a.antigravity.Env, "HARNESSLY_")
+	if err != nil {
+		return "", err
+	}
+	return a.antigravity.EnvPrefix + env + strings.Join(words, " "), nil
+}
+
+// bridgeForeground: the pane's foreground is the harnessly CLI, the ACP bridge a native chat runs as; the agent itself
+// is its child, which the callers look for among the pane's processes.
+func bridgeForeground(foreground string) bool {
+	name := filepath.Base(appCLIBin())
+	if name == "." || name == "" {
+		name = "harnessly"
+	}
+	return foreground == name || len(name) > 15 && foreground == name[:15]
 }

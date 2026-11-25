@@ -326,7 +326,8 @@ func (s *Starter) Start(o Options) (Result, error) {
 		return fail(500, msgNoPane.String()), nil
 	}
 	launch := o.Launch
-	if launch != nil && launch.Model == nil && launch.Effort == nil && len(launch.Apps) == 0 && !launch.Lean {
+	if launch != nil && launch.Model == nil && launch.Effort == nil && len(launch.Apps) == 0 && !launch.Lean &&
+		(o.Provider != agents.Antigravity || launch.Permission == "") {
 		launch = nil
 	}
 	// A launch with apps names its chat (the tab's id) in the apps' grant, so the tab's id is chosen before the line.

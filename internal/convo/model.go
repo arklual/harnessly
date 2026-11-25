@@ -1,6 +1,7 @@
 package convo
 
 import (
+	"context"
 	"errors"
 	"regexp"
 	"slices"
@@ -36,7 +37,7 @@ func (c *conv) model(m wire.ModelCmd, finish func(wire.CmdResult), now time.Time
 		finish(wire.Refused(wire.RefuseNotFound))
 		return
 	}
-	if c.rec.Provider != wire.ProviderClaude && c.rec.Provider != wire.ProviderCodex ||
+	if c.rec.Provider != wire.ProviderClaude && c.rec.Provider != wire.ProviderCodex && !c.configurable() ||
 		c.rec.Provider == wire.ProviderCodex && m.UltracodeAfter(c.rec.Model) {
 		finish(wire.Refused(wire.RefuseUnsupported))
 		return
@@ -108,8 +109,19 @@ func (c *conv) modelDiff(m wire.ModelCmd) modelDiff {
 	return d
 }
 
+// configurable: the conversation's agent takes a change of model over its structured channel (Antigravity's bridge),
+// at any time, a running turn's next step included.
+func (c *conv) configurable() bool {
+	_, ok := c.d.Input.(Configurer)
+	return ok && c.rec.Provider == wire.ProviderAntigravity && !c.inputOff
+}
+
 // canSwitchNow: the agent is at its prompt and nothing else is being typed into it or on its way.
 func (c *conv) canSwitchNow() bool {
+	if c.configurable() {
+		return !c.switching && c.d.Machine.Pane(c.rec.Session) != nil && c.rec.State.K != wire.StateStopped &&
+			c.rec.State.K != wire.StateStarting && c.rec.State.K != wire.StateLaunchFailed
+	}
 	switch c.rec.State.K {
 	case wire.StateReady, wire.StateIdle:
 	default:
@@ -212,6 +224,10 @@ func (c *conv) refusedPending(p wire.PendingModel, err error, now time.Time) {
 // typeModel types the change into the agent's box off the actor and gives the outcome to done, on the actor, once the
 // record says what is true. Whatever the outcome, the queue goes on after it.
 func (c *conv) typeModel(m wire.ModelCmd, diff modelDiff, done func(err error, now time.Time)) {
+	if c.configurable() {
+		c.configureModel(m, diff, done)
+		return
+	}
 	pane := c.d.Machine.Pane(c.rec.Session)
 	if pane == nil {
 		done(typist.ErrNotAtPrompt, c.d.Clock.Now())
@@ -531,4 +547,46 @@ func (d *Deps) vendorOnly(p wire.Provider, model string) bool {
 		return false
 	}
 	return true
+}
+
+// configureModel changes the model over the structured channel: model, effort and permission mode in one request, all
+// taken or none.
+func (c *conv) configureModel(m wire.ModelCmd, diff modelDiff, done func(err error, now time.Time)) {
+	in := c.d.Input.(Configurer)
+	rec, from := c.rec, c.rec.Model
+	model, effort, permission := "", (*wire.Effort)(nil), wire.PermissionMode("")
+	if diff.model {
+		model = m.Model
+	}
+	if diff.effort {
+		effort = m.Effort
+	}
+	if diff.permission {
+		permission = diff.permissionTo
+	}
+	c.switching = true
+	c.spawn(func() any {
+		ctx, cancel := context.WithTimeout(context.Background(), inputSendLimit)
+		defer cancel()
+		return in.Configure(ctx, rec, model, effort, permission)
+	}, func(r any) {
+		c.switching = false
+		now := c.d.Clock.Now()
+		c.mark, c.markConvs = 0, 0
+		err, _ := r.(error)
+		if err == nil {
+			took := modelTook{model: diff.model, effort: diff.effort, permission: diff.permission}
+			if to := took.on(from, m, diff); to != nil {
+				c.applied(to, now)
+				if k, ok := c.d.Launcher.(ModeKeeper); ok && took.permission {
+					k.KeepModes(c.rec.Session, to.Fast, to.Permission)
+				}
+			}
+		} else {
+			c.d.Log.Warn("model not switched", "conv", c.rec.ID, "err", err)
+		}
+		done(err, now)
+		c.read(now)
+		c.pump(now)
+	})
 }

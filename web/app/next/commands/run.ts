@@ -10,7 +10,7 @@ import { postCommand } from '@/next/core/net/http';
 import { machineApi } from '@/next/core/net/machine';
 import { hub } from '@/next/core/realtime/hub';
 import { pagePerson } from '@/next/features/people/use-people';
-import { limitsOf } from '@/next/stores/machines';
+import { agyBridged, limitsOf } from '@/next/stores/machines';
 import { opsStore, type OpFailure, type OpState } from '@/next/stores/ops';
 import {
   RETRYABLE_REFUSE_CODES,
@@ -65,27 +65,22 @@ const retryableFailure = (f: OpFailure): boolean => {
 };
 
 /** The native Antigravity CLI must not receive Claude-only controls or silently lose the person's choices. */
-export const unsupportedAntigravityCommand = (op: Op, body: Record<string, unknown>): boolean => {
-  if (
-    [
-      'rewind',
-      'rewind.undo',
-      'conversation.fork',
-      'conversation.merge',
-      'model',
-      'conversation.apps',
-      'answer',
-      'decide',
-    ].includes(op)
-  )
-    return true;
-  if ((op === 'send' && body.mode === 'steer') || (op === 'promote' && body.to === 'steer')) return true;
-  if (Array.isArray(body.attachmentIds) && body.attachmentIds.length > 0) return true;
+export const unsupportedAntigravityCommand = (
+  op: Op,
+  body: Record<string, unknown>,
+  bridged = false,
+): boolean => {
+  const refused = ['rewind', 'rewind.undo', 'conversation.fork', 'conversation.merge', 'conversation.apps', 'answer'];
+  // A chat beside its ACP bridge takes model changes, approvals, steering and pictures over it.
+  if (!bridged) refused.push('model', 'decide');
+  if (refused.includes(op)) return true;
+  if (!bridged && ((op === 'send' && body.mode === 'steer') || (op === 'promote' && body.to === 'steer'))) return true;
+  if (!bridged && Array.isArray(body.attachmentIds) && body.attachmentIds.length > 0) return true;
   if (body.profile) return true;
   const model = body.model as { fast?: boolean; ultracode?: boolean; profile?: string } | null | undefined;
   if (model?.fast || model?.ultracode || model?.profile) return true;
   const first = body.first as { attachmentIds?: unknown[] } | undefined;
-  return (first?.attachmentIds?.length ?? 0) > 0;
+  return !bridged && (first?.attachmentIds?.length ?? 0) > 0;
 };
 
 /** A message or a new chat names who wrote it, when this browser named its person (features/people); a body that names
@@ -109,7 +104,7 @@ export function runCommand<K extends Op>(
   const conversationId = typeof id === 'string' && id.startsWith('tab-') ? (id as ConvId) : null;
   const provider =
     full.provider ?? (conversationId ? conversationsStore.get(conversationId)?.provider : null);
-  if (provider === 'antigravity' && unsupportedAntigravityCommand(op, full)) {
+  if (provider === 'antigravity' && unsupportedAntigravityCommand(op, full, agyBridged(machine))) {
     const final = {
       k: 'failed',
       op,

@@ -94,7 +94,8 @@ const pickerAgent = (agent: MachineAgent): IPickerAgent => ({
     agent.provider === 'antigravity'
       ? agent.models.map((model) => ({ ...model, fast: false, ultracode: false }))
       : agent.models,
-  canSwitch: agent.provider !== 'antigravity' && agent.canSwitchModel,
+  // Antigravity says it can switch only when its chats run beside their ACP bridge.
+  canSwitch: agent.canSwitchModel,
   ...(agent.defaultPermission ? { defaultPermission: agent.defaultPermission } : {}),
   ...(agent.modelCatalog ? { catalog: agent.modelCatalog } : {}),
   available: agent.status === 'ready' && agent.models.length > 0,

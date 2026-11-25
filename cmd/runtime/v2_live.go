@@ -223,7 +223,7 @@ func newV2Live(d deps, c *core) *v2Live {
 	var noticesRT atomic.Pointer[convo.Runtime]
 	notices := newChatNotices(c, &noticesRT)
 	var projects atomic.Pointer[projectsFeed]
-	v.rt = convo.New(convo.Deps{PersonOf: design.PersonIn, ProjectsChanged: func([]wire.Project) { projects.Load().changed() }, Notify: notices.notice, Moves: moveStore, Index: index, Digest: digest, ExportDir: filepath.Join(d.DataDir, "v2", "chat-exports"), AgentSession: ses.Find, SessionAccount: noteSessionAccount(d.DataDir, v.profiles), MachineID: v2Machine, Publisher: publisher, Machine: v.tm, Launcher: v.starter, Input: codexInputOf(c), Handoffs: handoffs,
+	v.rt = convo.New(convo.Deps{PersonOf: design.PersonIn, ProjectsChanged: func([]wire.Project) { projects.Load().changed() }, Notify: notices.notice, Moves: moveStore, Index: index, Digest: digest, ExportDir: filepath.Join(d.DataDir, "v2", "chat-exports"), AgentSession: ses.Find, SessionAccount: noteSessionAccount(d.DataDir, v.profiles), MachineID: v2Machine, Publisher: publisher, Machine: v.tm, Launcher: v.starter, Input: inputsOf(c), Handoffs: handoffs,
 		Uploads: v2Uploads{up: uploads, hub: hubUploads}, Refs: v2Refs{v}, Store: convo.NewStore(filepath.Join(d.DataDir, "v2")), Log: v2Log{}, Limits: wire.DefaultLimits, Models: v.machine.modelsOf, Background: v2Background{reader: c.bg, flows: &workflows.Reader{}}, Meta: &sessionmeta.Reader{Index: c.transcripts}, Transcripts: c.transcripts, Shots: &shots.Reader{Index: c.transcripts}, PictureRoots: []string{shots.ScratchRoot(), uploadsDir(d), uploads.Dir, imagesDir(d), mediaDir(d), codexImagesDir(d)}, Titler: titler.Title, Summarizer: turnSummarizer(d.DataDir, summarizer.Summarize), SummaryModel: func() *wire.NoticeSummaryModel { return runtimeSettings.RuntimeSettings().NoticeSummary }, Closer: v2Closer{v}, DefaultCwd: d.WorkspaceRoot, FolderGone: folderGone,
 		Terminals: terminals, IdleStop: func() time.Duration { return runtimeSettings.RuntimeSettings().IdleStop.After() },
 		IdleFloor: idleFloor, MemoryShort: memoryShort, PressureStop: pressureFloor, LegacyLife: !sessionOwnerOn(os.Getenv),
@@ -250,6 +250,9 @@ func newV2Live(d deps, c *core) *v2Live {
 	go feed.run()
 	if c.agents != nil && c.agents.codexInput != nil {
 		c.agents.codexInput.rt.Store(v.rt)
+	}
+	if c.agents != nil && c.agents.agyInput != nil {
+		v.wireAgyInput(c.agents.agyInput)
 	}
 	v.delegation = newDelegation(v, runtimeSettings)
 	if v.starter != nil && os.Getenv("RUNTIME_DELEGATE_FULL_CONTEXT") != "1" {

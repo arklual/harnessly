@@ -322,7 +322,9 @@ func (c LaunchConfig) Launch(provider string) LaunchOptions {
 					continue
 				}
 				seen[m.ID] = true
-				m.Efforts, m.DefaultEffort = []string{}, nil
+				if m.Efforts == nil {
+					m.Efforts = []string{}
+				}
 				out.Models = append(out.Models, m)
 			}
 		}
@@ -337,7 +339,7 @@ func (c LaunchConfig) Launch(provider string) LaunchOptions {
 	if IsProvider(provider) {
 		out.Saved = c.saved(provider)
 	}
-	if provider == "antigravity" && out.Saved != nil {
+	if provider == "antigravity" && out.Saved != nil && !savedEffortFits(out.Models, out.Saved) {
 		out.Saved.Effort = nil
 	}
 	return out
@@ -350,6 +352,23 @@ func hasFastTier(v any) bool {
 	for _, t := range tiers {
 		if o, ok := t.(map[string]any); ok && (o["id"] == "priority" || o["id"] == "fast") {
 			return true
+		}
+	}
+	return false
+}
+
+// savedEffortFits: the saved effort is one the saved model offers.
+func savedEffortFits(models []Model, saved *Choice) bool {
+	if saved == nil || saved.Effort == nil {
+		return true
+	}
+	for _, m := range models {
+		if saved.Model != nil && m.ID == *saved.Model {
+			for _, e := range m.Efforts {
+				if e == *saved.Effort {
+					return true
+				}
+			}
 		}
 	}
 	return false

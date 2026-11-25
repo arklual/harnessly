@@ -185,7 +185,7 @@ describe('Antigravity native agent', () => {
     expect(pickerAgents([{ ...native, status: 'missing' }])[0].available).toBe(false);
   });
 
-  it('does not offer Claude controls or profile groups even if advertised accidentally', () => {
+  it('does not offer Claude controls or profile groups; switches only when the machine says its bridge runs', () => {
     const picked = pickerAgents([
       {
         ...native,
@@ -195,7 +195,8 @@ describe('Antigravity native agent', () => {
       },
     ]);
     expect(picked).toHaveLength(1);
-    expect(picked[0].canSwitch).toBe(false);
+    // canSwitchModel is the machine's word that its Antigravity chats run beside their ACP bridge.
+    expect(picked[0].canSwitch).toBe(true);
     expect(picked[0].models[0]).toMatchObject({ fast: false, ultracode: false });
   });
 
