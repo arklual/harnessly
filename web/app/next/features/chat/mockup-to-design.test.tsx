@@ -64,7 +64,7 @@ describe('«Continue in Sinopia Design» on an html card', () => {
       project: '',
     });
     await act(async () => answer.resolve(made));
-    expect(screen.getByRole('button', { name: 'Open in Sinopia Design' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Open in Sinopia Design' })).toBeTruthy();
     expect(draftRefs(conv)).toEqual([
       { kind: 'design', id: made.project, title: made.projectTitle, target: made.file },
     ]);
@@ -85,15 +85,21 @@ describe('«Continue in Sinopia Design» on an html card', () => {
     expect(draftRefs(conv)).toHaveLength(1);
   });
 
-  it('remembers the board after a reload', async () => {
-    mockupToDesign.mockResolvedValue(made);
-    const first = render(<MockupToDesign html={html} host={host()} />);
-    await waitFor(() => expect(first.container.querySelector('[data-state="idle"]')).toBeTruthy());
-    fireEvent.click(screen.getByRole('button', { name: 'Continue in Sinopia Design' }));
-    await screen.findByRole('button', { name: 'Open in Sinopia Design' });
-    first.unmount();
-    render(<MockupToDesign html={html} host={host()} />);
-    expect(await screen.findByRole('button', { name: 'Open in Sinopia Design' })).toBeTruthy();
+  it('remembers the board after a reload when its storage key resolves after the click', async () => {
+    const hash = deferred<ArrayBuffer>();
+    const digest = vi.spyOn(crypto.subtle, 'digest').mockReturnValue(hash.promise);
+    try {
+      mockupToDesign.mockResolvedValue(made);
+      const first = render(<MockupToDesign html={html} host={host()} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Continue in Sinopia Design' }));
+      await act(async () => hash.resolve(new ArrayBuffer(32)));
+      await screen.findByRole('button', { name: 'Open in Sinopia Design' });
+      first.unmount();
+      render(<MockupToDesign html={html} host={host()} />);
+      expect(await screen.findByRole('button', { name: 'Open in Sinopia Design' })).toBeTruthy();
+    } finally {
+      digest.mockRestore();
+    }
   });
 
   it('a failure is a quiet line and «Retry»', async () => {

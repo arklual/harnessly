@@ -298,13 +298,15 @@ func (c *paneConn) pump(ctx context.Context) {
 				f = newer
 			default:
 			}
+			// Account for the frame before publishing it: a fast peer can ack before Write returns.
+			c.tab.Sent()
 			wctx, cancel := context.WithTimeout(ctx, frameWrite)
 			err := c.ws.Write(wctx, websocket.MessageBinary, f.Data)
 			cancel()
 			if err != nil {
+				_ = c.ws.CloseNow()
 				return
 			}
-			c.tab.Sent()
 		case info := <-c.tab.Updates():
 			c.send(map[string]any{"t": "page", "url": info.URL, "title": info.Title, "canBack": info.CanBack,
 				"canForward": info.CanForward, "loading": info.Loading})

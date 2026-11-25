@@ -345,7 +345,7 @@ func TestFramesArePacedAndStillShotIsSharp(t *testing.T) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if r.URL.Path == "/moving" {
 			_, _ = w.Write([]byte(`<body><div style="width:80px;height:80px;background:#f06;animation:a .4s linear infinite alternate"></div>` +
-				`<style>@keyframes a{from{transform:translateX(0)}to{transform:translateX(300px)}}</style></body>`))
+				`<style>@keyframes a{from{background-color:#f06}to{background-color:#06f}}</style></body>`))
 			return
 		}
 		_, _ = w.Write([]byte(`<body style="font:16px system-ui;padding:24px"><h1>Тихая страница</h1><p>Текст.</p><input autofocus>

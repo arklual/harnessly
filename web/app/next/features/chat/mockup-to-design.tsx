@@ -3,7 +3,7 @@
 // the chat's pane shows it. The design goes on the chat's field, so the agent reads that the mockup is that board now
 // and changes it there. The same mockup is the same board: the machine keeps the link, this browser keeps it too, so
 // the button says «Открыть» after a reload and a second press makes no copy.
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { mockupToDesign } from '@/next/features/designly/api';
 import { chatPaneOf } from '@/next/stores/pane-state';
 import { addDraftRef } from '@/next/stores/drafts';
@@ -97,22 +97,24 @@ interface IProps {
 const MockupToDesign = ({ html, host }: IProps) => {
   const answer = useContext(AnswerText);
   const [state, setState] = useState<TState>({ s: 'idle' });
-  const [key, setKey] = useState<string | null>(null);
+  const storageKey = useMemo(
+    () => (globalThis.crypto?.subtle ? keyOf(host.conv, html).catch(() => null) : null),
+    [host.conv, html],
+  );
 
   // What this browser already knows of the mockup: the button says «Открыть» after a reload.
   useEffect(() => {
-    if (typeof crypto === 'undefined' || !crypto.subtle) return;
+    if (!storageKey) return;
     let live = true;
-    void keyOf(host.conv, html).then((k) => {
-      if (!live) return;
-      setKey(k);
+    void storageKey.then((k) => {
+      if (!live || !k) return;
       const kept = readKept(k);
       if (kept) setState((s) => (s.s === 'idle' ? { s: 'done', board: kept } : s));
     });
     return () => {
       live = false;
     };
-  }, [host.conv, html]);
+  }, [storageKey]);
 
   const press = async () => {
     if (state.s === 'busy') return;
@@ -126,6 +128,8 @@ const MockupToDesign = ({ html, host }: IProps) => {
       };
       const made: DesignlyMockup = await (host.make ? host.make(body) : mockupToDesign(host.machine, body));
       const board = { project: made.project, projectTitle: made.projectTitle, file: made.file };
+      // A quick click can finish making the board before the mount effect resolves its storage key.
+      const key = await storageKey;
       if (key) keep(key, board);
       // The agent of the chat reads, with the next message, that the mockup is this board now (MockupNote).
       addDraftRef(
