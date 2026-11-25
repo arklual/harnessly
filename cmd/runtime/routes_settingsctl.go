@@ -295,6 +295,12 @@ func settingsItems(d deps) []settingsctl.Item {
 	summary := noticeSummaryFor(d)
 	for _, f := range bgmodel.Features() {
 		feature := f
+		isInbox := feature.ID == bgmodel.FeatureInboxTriage
+		var shown func() bool
+		if isInbox {
+			// The catalog is made once per process; the Inbox may first ask after it.
+			shown = func() bool { return inboxTriageEnabled(d.DataDir) }
+		}
 		if feature.ID == bgmodel.FeatureNotifySummary {
 			// One setting over the agents' models and the providers' (notice_summary.go).
 			items = append(items, settingsctl.Item{Key: "background." + feature.ID, Section: background, Kind: settingsctl.KindEnum,
@@ -329,12 +335,23 @@ func settingsItems(d deps) []settingsctl.Item {
 				Set: summary.SetValue})
 			continue
 		}
+		description := feature.Description + " " + locale.Pick("The value is «default» (as now: no model of a provider is used), «claude/<model>» or «codex/<model>» for a model of the machine's agent on its plan, or «<provider>/<model>» of a connected provider.",
+			"Значение — «default» (как сейчас: модель провайдера не используется), «claude/<модель>» или «codex/<модель>» для модели агента машины по её подписке, либо «<провайдер>/<модель>» подключённого провайдера.")
+		if isInbox {
+			description = feature.Description + " " + locale.Pick("Use «default», «@gpt/<model>», or a connected «<provider>/<model>».",
+				"Значение — «default», «@gpt/<модель>» либо «<провайдер>/<модель>» подключённого провайдера.")
+		}
 		items = append(items, settingsctl.Item{Key: "background." + feature.ID, Section: background, Kind: settingsctl.KindEnum,
-			Title: feature.Title,
-			Description: feature.Description + " " + locale.Pick("The value is «default» (as now: no model of a provider is used), «claude/<model>» or «codex/<model>» for a model of the machine's agent on its plan, or «<provider>/<model>» of a connected provider.",
-				"Значение — «default» (как сейчас: модель провайдера не используется), «claude/<модель>» или «codex/<модель>» для модели агента машины по её подписке, либо «<провайдер>/<модель>» подключённого провайдера."),
+			Title:       feature.Title,
+			Description: description,
+			Shown:       shown,
 			Options: func() []settingsctl.Option {
 				out := []settingsctl.Option{{Value: backgroundAsNow, Label: locale.Pick("as now", "как сейчас")}}
+				if isInbox && runner.InboxGPT != nil {
+					for _, m := range inboxGPTModels() {
+						out = append(out, settingsctl.Option{Value: bgmodel.InboxGPTProfile + "/" + m.ID, Label: "GPT · " + m.Label})
+					}
+				}
 				views, _ := providers.List()
 				for _, p := range views {
 					for _, m := range p.Models {
@@ -349,10 +366,13 @@ func settingsItems(d deps) []settingsctl.Item {
 				if !ok {
 					return false
 				}
-				if _, err := providers.Get(c.Provider); err == nil {
-					return !strings.ContainsAny(c.Model, " \t\r\n")
+				if isInbox && c.Provider == bgmodel.InboxGPTProfile {
+					return runner.InboxGPT != nil && inboxGPTModel(c.Model)
 				}
-				return bgmodel.IsAgent(c.Provider) && runner.Agent != nil && agents.ModelIDRe.MatchString(c.Model)
+				if p, err := providers.Get(c.Provider); err == nil {
+					return (!isInbox || p.API != extproviders.APIHiggsfield) && !strings.ContainsAny(c.Model, " \t\r\n")
+				}
+				return !isInbox && bgmodel.IsAgent(c.Provider) && runner.Agent != nil && agents.ModelIDRe.MatchString(c.Model)
 			},
 			Get: func() (string, error) {
 				if c, ok := runner.Store.Get(feature.ID); ok {

@@ -68,7 +68,8 @@ export const smartChoices = (
           `${t(`next.settings.section.${agent}`)} · ${model.label}`,
           t('next.smart.agentSub'),
         );
-  for (const provider of providers)
+  for (const provider of providers) {
+    if (provider.feature && provider.feature !== feature.id) continue;
     for (const model of provider.models) {
       add({ provider: provider.id, model: model.id }, `${provider.name} · ${model.label}`);
       // A model with levels of reasoning is offered at each of them too.
@@ -78,6 +79,7 @@ export const smartChoices = (
           `${provider.name} · ${model.label} · ${effortLabel(effort)}`,
         );
     }
+  }
   const own = feature.choice;
   if (own && !byValue.has(valueOf(own))) {
     const name = providers.find((p) => p.id === own.provider)?.name ?? own.provider;

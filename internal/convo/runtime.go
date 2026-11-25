@@ -1176,6 +1176,8 @@ func (r *Runtime) TurnsWithSteps(ctx context.Context, id, beforeTurnID string, l
 
 func (r *Runtime) TurnEntries(ctx context.Context, id, turnID string) (wire.EntriesPage, error) {
 	return live(r, ctx, id, func(c *conv, now time.Time) (wire.EntriesPage, error) {
+		// A stopped chat is not polled, so recover a transcript moved with its agent session when the folded turn is opened.
+		c.relocateTranscript(now, true)
 		p, ok := c.fd.TurnEntries(turnID)
 		if !ok {
 			return wire.EntriesPage{}, ErrNotFound

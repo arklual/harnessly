@@ -86,6 +86,9 @@ func refreshCodexModels(ctx context.Context, d deps, force bool) {
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	_, _ = tools.RunLogin(ctx, "command -v codex >/dev/null 2>&1 || exit 0\ncodex debug models >/dev/null 2>&1 </dev/null; exit 0")
+	if d.GPTModelsChanged != nil {
+		d.GPTModelsChanged()
+	}
 }
 
 // refreshModelLists refreshes every list that follows a vendor, in the background of the caller.

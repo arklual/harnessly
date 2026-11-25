@@ -61,6 +61,8 @@ type deps struct {
 
 	// ChatWork is the live chats' work registry and their list (nil while the core is not up; chat_work.go).
 	ChatWork func() chatWork
+	// GPTModelsChanged rewrites the running GPT proxy after Codex refreshes its model manifest.
+	GPTModelsChanged func()
 }
 
 // platformAPI is the prefix of the routes the platform's own pages call (peers, commands, file previews…); the

@@ -136,6 +136,8 @@ type conv struct {
 	// promptHash is the prompt the prompt-submit hook being applied names, "" outside one or when it named none.
 	promptHash string
 	fd         *feed.Feed
+	// transcriptFindAt bounds searches for an agent session while its recorded transcript path is gone.
+	transcriptFindAt time.Time
 	// fdUses and fdUsedAt are the feed's reads as last seen and when they last grew (releaseQuietFeed).
 	fdUses   int
 	fdUsedAt time.Time
@@ -788,8 +790,39 @@ func (c *conv) closeGate(id string, reason wire.GateCloseReason, now time.Time) 
 
 // --- what the actor sees ---
 
+// relocateTranscript follows an agent session when its CLI moves the same transcript to another project directory
+// (Claude does this after a session changes cwd). The conversation record otherwise keeps a dead path: its turn
+// summaries remain, but a page cannot load the folded turn's entries after a restart.
+func (c *conv) relocateTranscript(now time.Time, force bool) bool {
+	if c.rec.TranscriptPath == "" || c.rec.AgentSessionID == "" || c.d.AgentSession == nil {
+		return false
+	}
+	if _, err := os.Stat(c.rec.TranscriptPath); err == nil || !errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	if !force && !c.transcriptFindAt.IsZero() && now.Sub(c.transcriptFindAt) < LookResting {
+		return false
+	}
+	c.transcriptFindAt = now
+	s, ok := c.d.AgentSession(c.rec.Provider, c.rec.AgentSessionID)
+	if !ok || s.TranscriptPath == "" || s.TranscriptPath == c.rec.TranscriptPath {
+		return false
+	}
+	if _, ok := stampFile(s.TranscriptPath); !ok {
+		return false
+	}
+	old := c.rec.TranscriptPath
+	c.rec.TranscriptPath = s.TranscriptPath
+	c.openFeed()
+	c.feedUpdateOf(c.fd.Load(), false, true, now)
+	c.touch()
+	c.d.Log.Info("conversation transcript relocated", "conv", c.rec.ID, "from", old, "to", s.TranscriptPath)
+	return true
+}
+
 // read takes what the transcript gained: its events go out in order, its signals feed the queue and the automaton.
 func (c *conv) read(now time.Time) {
+	c.relocateTranscript(now, false)
 	size := c.fd.Size()
 	u := c.fd.Poll()
 	if c.fd.Size() != size {

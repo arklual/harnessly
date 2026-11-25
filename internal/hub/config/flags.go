@@ -88,6 +88,7 @@ var Flags = []Flag{
 	{Name: "HUB_AUTOMATIONS_PORT_ENV", Owner: "automations"},
 	{Name: "HUB_AUTOMATIONS_SECRET", Owner: "automations"},
 	{Name: "HUB_AUTOMATIONS_TOKEN_ENV", Owner: "automations"},
+	{Name: "HUB_INBOX_TRIAGE_TOKEN", Owner: "automations"},
 	{Name: "HUB_LAUNCH_TOKEN", Owner: "automations"},
 	{Name: "HUB_ROUTINES_MODEL", Owner: "automations"},
 	{Name: "HUB_BUILDERS", Owner: "builders"},

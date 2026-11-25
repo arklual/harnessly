@@ -289,6 +289,8 @@ type Config struct {
 	// start a conversation for a person on their own machine (internal/hub/proxy/launch.go); empty keeps the door
 	// shut. The rollout switch «prompt-launch» then decides, per person, whether it opens.
 	LaunchToken string
+	// InboxTriageToken is a separate service credential; it cannot start conversations.
+	InboxTriageToken string
 	// RolloutToken (HUB_ROLLOUT_TOKEN, 32 characters or more) opens POST /api/rollout, the pipeline's word that a rollout
 	// of the hub or of the runtimes starts or ends (internal/hub/rollout); empty keeps the route shut.
 	RolloutToken           string
@@ -947,6 +949,10 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	}
 	if c.LaunchToken = get("HUB_LAUNCH_TOKEN"); c.LaunchToken != "" && len(c.LaunchToken) < 32 {
 		bad("HUB_LAUNCH_TOKEN must be 32 characters or more")
+	}
+	if c.InboxTriageToken = get("HUB_INBOX_TRIAGE_TOKEN"); c.InboxTriageToken != "" &&
+		(len(c.InboxTriageToken) < 32 || c.InboxTriageToken == c.LaunchToken) {
+		bad("HUB_INBOX_TRIAGE_TOKEN must be at least 32 characters and distinct from HUB_LAUNCH_TOKEN")
 	}
 	c.AutomationsNotifyURL, c.AutomationsNotifyToken = strings.TrimRight(get("HUB_AUTOMATIONS_NOTIFY_URL"), "/"), get("HUB_AUTOMATIONS_NOTIFY_TOKEN")
 	if c.RoutinesModel = strings.TrimSpace(get("HUB_ROUTINES_MODEL")); c.RoutinesModel == "" {

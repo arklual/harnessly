@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -187,14 +188,22 @@ func TestLaunchSliceStartsAConversation(t *testing.T) {
 		t.Fatalf("without either backend: status %d, tabs before %d after %d", code, before, after)
 	}
 	bridge.ready.Store(true)
+	limitsFile := filepath.Join(dir, "rate-limits.json")
 	for _, tc := range []struct {
-		loggedIn       bool
-		model, profile string
+		loggedIn, outOfOpus bool
+		model, profile      string
 	}{
-		{true, "opus", ""}, // Both backends are ready: native Opus still wins.
-		{false, "gpt-6.2-sol", "gpt"},
+		{true, false, "opus", ""}, // Both backends are ready: native Opus still wins.
+		{false, false, "gpt-6.2-sol", "gpt"},
+		{true, true, "gpt-6.2-sol", "gpt"}, // Signed in, but the 5-hour window ran out (HRN-1738).
 	} {
 		claudeLoggedIn.Store(tc.loggedIn)
+		limitsJSON := `{}`
+		if tc.outOfOpus {
+			reset := time.Now().Add(2 * time.Hour).Unix()
+			limitsJSON = fmt.Sprintf(`{"claude":{"ts":%d,"five_hour":{"used_percentage":100,"resets_at":%d}}}`, time.Now().Unix(), reset)
+		}
+		_ = os.WriteFile(limitsFile, []byte(limitsJSON), 0o600)
 		model := tc.model
 		code, conv := post(route, `{"provider":"claude","workspaceId":"ws-a","prompt":"check this",`+
 			`"from":{"app":"example.inbox","label":"Inbox","title":"Check"}}`)

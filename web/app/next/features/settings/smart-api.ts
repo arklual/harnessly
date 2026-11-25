@@ -40,6 +40,8 @@ export interface ISmartProvider {
   id: string;
   name: string;
   models: readonly IExtModel[];
+  /** Omitted for providers that can run any background feature. */
+  feature?: string;
 }
 
 export interface ISmartView {
@@ -89,7 +91,13 @@ const readFeature = (v: unknown): ISmartFeature => {
 
 const readProvider = (v: unknown): ISmartProvider => {
   const o = obj(v, 'provider');
-  return { id: str(o.id, 'id'), name: str(o.name, 'name'), models: list(o.models, 'models', readModel) };
+  const feature = opt(o.feature);
+  return {
+    id: str(o.id, 'id'),
+    name: str(o.name, 'name'),
+    models: list(o.models, 'models', readModel),
+    ...(feature ? { feature } : {}),
+  };
 };
 
 /** GET <platform>/background-tasks as the runtime answers it. */

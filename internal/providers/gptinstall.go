@@ -21,7 +21,7 @@ import (
 // pinned here with the digest of each archive, the first time the switch goes on; a new release is a change of this
 // file. Linux takes the builds without plugins: static, and the proxy's plugins stay off anyway.
 const (
-	ProxyVersion = "8.0.48"
+	ProxyVersion = "8.1.2"
 	proxyRelease = "https://github.com/router-for-me/CLIProxyAPI/releases/download/v" + ProxyVersion + "/"
 	proxyBinName = "cli-proxy-api"
 )
@@ -30,10 +30,10 @@ const (
 type proxyAsset struct{ name, sha256 string }
 
 var proxyAssets = map[string]proxyAsset{
-	"linux/amd64":  {"CLIProxyAPI_8.0.48_linux_amd64_no-plugin.tar.gz", "fb3bada1cdd05a8ef84b9f3b777c1019092c87def6405d057fbe1b2be9def22f"},
-	"linux/arm64":  {"CLIProxyAPI_8.0.48_linux_aarch64_no-plugin.tar.gz", "17685b2a186faa7c8726c6ac90150a08a91d60d936ce8fafe5e8a11c1055e9c0"},
-	"darwin/amd64": {"CLIProxyAPI_8.0.48_darwin_amd64.tar.gz", "97f662d40bc3da1bd6bb0f9188ba803d11e0cb29dfc037376bb655bf3f437781"},
-	"darwin/arm64": {"CLIProxyAPI_8.0.48_darwin_aarch64.tar.gz", "543bdbc6f8384fecd033bf7398236e46279962a80dbc909cf8d8e6ee94ccfc04"},
+	"linux/amd64":  {"CLIProxyAPI_8.1.2_linux_amd64_no-plugin.tar.gz", "0b6906bc869c264855b7ab7ce8cc3ee0d7a0a084e378c81590be43115fa7bd53"},
+	"linux/arm64":  {"CLIProxyAPI_8.1.2_linux_aarch64_no-plugin.tar.gz", "4036e1a0bbcd9ebbbde928bfa0090ee5d85986aada9c7312a8b1e47e4381d1a1"},
+	"darwin/amd64": {"CLIProxyAPI_8.1.2_darwin_amd64.tar.gz", "3e4ae8dc26676ada1db8b5f8e95bf097670e7aefb0bf6c3f5a3340c00cb42f0e"},
+	"darwin/arm64": {"CLIProxyAPI_8.1.2_darwin_aarch64.tar.gz", "95d746c8d6cb418a88cb79937ca90194388faa707c30e3ec53e7d41f469cd6ec"},
 }
 
 // proxyArchiveMax bounds a download: the archives are about 25 MB.

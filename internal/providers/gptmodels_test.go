@@ -1,9 +1,12 @@
 package providers
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 const codexCacheSample = `{"fetched_at":"2026-11-18T00:00:00Z","models":[
@@ -50,6 +53,45 @@ func TestTheGPTPresetKeepsItsTableWithoutCodexCache(t *testing.T) {
 	p, _ := Find("gpt")
 	if p.Models[0].ID != "gpt-6.2-sol" || p.Small != "gpt-6-luna" {
 		t.Fatalf("fallback %v small %q", p.Models[0].ID, p.Small)
+	}
+}
+
+func TestRunningGPTProxyRefreshesCodexModelsInPlace(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "models_cache.json")
+	write := func(id string) {
+		raw := `{"models":[{"slug":"` + id + `","display_name":"` + id + `","visibility":"list"}]}`
+		if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		now := time.Now().Add(time.Second)
+		if err := os.Chtimes(path, now, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("gpt-before")
+	old := codexCachePath
+	codexCachePath = func() string { return path }
+	t.Cleanup(func() { codexCachePath = old })
+
+	g, _ := newGPT(t)
+	if err := g.SetOn(context.Background(), true); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := os.Stat(g.configFile())
+	cfg, _ := os.ReadFile(g.configFile())
+	if !strings.Contains(string(cfg), `name: "gpt-before"`) {
+		t.Fatalf("initial config:\n%s", cfg)
+	}
+
+	write("gpt-after")
+	g.RefreshModels()
+	after, _ := os.Stat(g.configFile())
+	cfg, _ = os.ReadFile(g.configFile())
+	if !strings.Contains(string(cfg), `name: "gpt-after"`) || strings.Contains(string(cfg), `name: "gpt-before"`) {
+		t.Fatalf("refreshed config:\n%s", cfg)
+	}
+	if !os.SameFile(before, after) {
+		t.Fatal("the watched config file was replaced")
 	}
 }
 

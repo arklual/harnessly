@@ -268,8 +268,8 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 			return nil, nil, err
 		}
 		return map[string]string{"publicKey": pub}, nil, nil
-	case hubproto.OpRuntimeSess:
-		return h.opSession(req, pol)
+	case hubproto.OpRuntimeSess, hubproto.OpInboxTriageGrant:
+		return h.opSession(op, req, pol)
 	case hubproto.OpUsageRead, hubproto.OpUsageAck:
 		return h.opUsage(op, req)
 	case hubproto.OpTunnelOpen:
@@ -590,8 +590,8 @@ func (h *hub) opEnv(op string, req map[string]json.RawMessage, pol hubproto.Poli
 	return map[string]any{"env": names}, nil, nil
 }
 
-func (h *hub) opSession(req map[string]json.RawMessage, pol hubproto.Policy) (any, func(), error) {
-	if err := h.allow(hubproto.OpRuntimeSess, pol.RuntimeSession, "opening the runtime through the hub"); err != nil {
+func (h *hub) opSession(op string, req map[string]json.RawMessage, pol hubproto.Policy) (any, func(), error) {
+	if err := h.allow(op, pol.RuntimeSession && (op != hubproto.OpInboxTriageGrant || !h.observe), "opening the runtime through the hub"); err != nil {
 		return nil, nil, err
 	}
 	subject, _ := field[string](req, "subject")
@@ -603,10 +603,15 @@ func (h *hub) opSession(req map[string]json.RawMessage, pol hubproto.Policy) (an
 	if secret == nil {
 		return nil, nil, errors.New("the runtime has not written its secret yet")
 	}
+	aud, ttl := "", sessionTTL
 	verifiedOwner, _ := field[bool](req, "verifiedOwner")
-	token := signClaims(secret, Claims{Sub: subject, VerifiedOwner: verifiedOwner && !h.observe}, sessionTTL)
-	h.audit.Record(hubproto.OpRuntimeSess, true, map[string]any{"subject": subject})
-	return hubproto.SessionGrant{CookieName: h.a.cfg.RuntimeCookie, Token: token, ExpiresAt: time.Now().Add(sessionTTL).UnixMilli()}, nil, nil
+	if op == hubproto.OpInboxTriageGrant {
+		// A triage grant is never a page session: an audience of its own, a minute, no owner's rights.
+		aud, ttl, verifiedOwner = hubproto.InboxTriageAudience, time.Minute, false
+	}
+	token := signClaims(secret, Claims{Sub: subject, Aud: aud, VerifiedOwner: verifiedOwner && !h.observe}, ttl)
+	h.audit.Record(op, true, map[string]any{"subject": subject})
+	return hubproto.SessionGrant{CookieName: h.a.cfg.RuntimeCookie, Token: token, ExpiresAt: time.Now().Add(ttl).UnixMilli()}, nil, nil
 }
 
 func (h *hub) opTunnel(l *link, req map[string]json.RawMessage, pol hubproto.Policy) (any, func(), error) {

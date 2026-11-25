@@ -9,6 +9,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/filestore"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hubproto"
 	"github.com/ly-solutions/harnessly/internal/storerev"
 )
 
@@ -36,7 +37,7 @@ func (s *Service) serveStore(w http.ResponseWriter, r *http.Request, u store.Use
 }
 
 func (s *Service) storeRoute(w http.ResponseWriter, r *http.Request, u store.User, m store.Machine, rest string) error {
-	if s.view == nil || m.SpaceID == "" {
+	if m.SpaceID == "" {
 		return fail("store_off", "Хранилище дизайнов не подключено")
 	}
 	project, sub, _ := strings.Cut(strings.Trim(rest, "/"), "/")
@@ -55,6 +56,16 @@ func (s *Service) storeRoute(w http.ResponseWriter, r *http.Request, u store.Use
 		section, file, keyed = "f", rest, true
 	}
 	ctx := r.Context()
+	if s.view == nil {
+		if section != "f" && section != "index.json" {
+			return fail("store_off", "Хранилище дизайнов не подключено")
+		}
+		var err error
+		m, err = s.scopedHolder(ctx, m, u, project, "")
+		if err != nil {
+			return err
+		}
+	}
 	t, err := s.read(ctx, m)
 	if err != nil {
 		return err
@@ -80,6 +91,46 @@ func (s *Service) storeRoute(w http.ResponseWriter, r *http.Request, u store.Use
 	if section != "file" {
 		if !read {
 			return fail("bad_request", "Метод не поддерживается")
+		}
+		if s.view == nil {
+			var segs []string
+			if section == "f" {
+				var ok bool
+				segs, ok = segments(file)
+				if !ok || !servedSegment(segs[0]) {
+					return fail("not_found", "Файл не найден")
+				}
+				for _, seg := range segs {
+					if strings.Contains(seg, "/") {
+						return fail("not_found", "Файл не найден")
+					}
+				}
+				if !keyed && s.files != nil && storeNavigation(r) {
+					w.Header().Set("Cache-Control", "no-store")
+					w.Header().Set("Location", keyedLocation(segs, s.files.mint(u.ID, project, s.now()), r.URL.RawQuery))
+					w.WriteHeader(http.StatusFound)
+					return nil
+				}
+			} else if file != "" {
+				return fail("not_found", "Маршрут не найден")
+			}
+			if s.reg == nil {
+				return fail("unavailable", "Машина проекта недоступна")
+			}
+			// The record holder attested this project. Never select a runtime supplied by the caller.
+			res, err := s.machineFetch(ctx, m.ID, hubproto.DesignPublicTokenRequest{Project: project}, segs, r)
+			if err != nil {
+				return fail("unavailable", "Машина проекта недоступна")
+			}
+			if res.StatusCode != http.StatusOK {
+				res.Body.Close()
+				return fail("not_found", "Файл не найден")
+			}
+			h := w.Header()
+			h.Set("Cache-Control", "private, no-store")
+			h.Set("Content-Type", safeType(res.Header.Get("Content-Type")))
+			passEncoding(h, res)
+			return copyBody(isolated(w, r), res, maxFile, r.Method == http.MethodHead)
 		}
 		head, err := s.view.Head(ctx, m.SpaceID, project)
 		if err != nil {

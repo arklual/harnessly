@@ -5,16 +5,24 @@ import type { TRoute } from '@/next/routes/routes';
 
 const sendView = vi.fn();
 const view = { current: undefined as Record<string, unknown> | undefined };
+const background: { id: string; machineId: string; view: Record<string, unknown> }[] = [];
 vi.mock('@/next/commands', () => ({ setConversationView: (...a: unknown[]) => sendView(...a) }));
 vi.mock('@/next/stores/machines', () => ({ hasFeature: () => true }));
 vi.mock('@/next/stores/conversations', () => ({
   useConversation: () => ({ id: 'tab-1', machineId: 'm1', view: view.current }),
-  useConversationList: () => [{ id: 'tab-1', machineId: 'm1', view: view.current }],
+  useConversationList: () => [{ id: 'tab-1', machineId: 'm1', view: view.current }, ...background],
 }));
 
 import { EXPORT_MS, useChatViewSync } from '@/next/bindings/use-chat-view-sync';
 import { keepScreen, keptScreen } from '@/next/stores/chat-screen';
-import { chatPaneOf, chatPanes, resetChatPanes } from '@/next/stores/pane-state';
+import {
+  chatPaneOf,
+  chatPanes,
+  MAX_CHATS,
+  PANE_STATE_KEY,
+  resetChatPanes,
+  useShownChatPane,
+} from '@/next/stores/pane-state';
 import { rememberPlace, forgetPlaces } from '@/next/features/chat/feed-place';
 
 const CHAT: TRoute = { kind: 'chat', id: 'tab-1' } as TRoute;
@@ -27,6 +35,7 @@ beforeEach(() => {
   forgetPlaces();
   sendView.mockReset();
   view.current = undefined;
+  background.length = 0;
 });
 afterEach(() => {
   cleanup();
@@ -65,6 +74,44 @@ describe('the chat view on the machine', () => {
       expect.objectContaining({ pane: expect.objectContaining(pane) }),
     );
   });
+
+  it.each(['tab-1', 'tab-1#app:notes'])(
+    'does not evict the pane on screen (%s) when other chats sync',
+    (key) => {
+      const { rerender, result } = renderHook(
+        (shown) => {
+          useChatViewSync(CHAT);
+          return useShownChatPane(shown);
+        },
+        { initialProps: key },
+      );
+      const file = { id: 'file-1', kind: 'files', path: '/work/readme.md', file: true } as const;
+      act(() => {
+        chatPanes.update('tab-1', 'm1', (p) => ({ ...p, width: 480 }));
+        chatPanes.update(key, 'm1', (p) => ({ ...p, open: true, tabs: [file], active: file.id }));
+        vi.advanceTimersByTime(EXPORT_MS);
+      });
+      expect(result.current.open).toBe(true);
+      sendView.mockClear();
+
+      for (let i = 0; i < MAX_CHATS; i++)
+        background.push({ id: `tab-bg-${i}`, machineId: 'm2', view: { at: Date.now() } });
+      rerender(key);
+      expect(result.current).toMatchObject({ open: true, tabs: [file], active: file.id });
+      expect(chatPaneOf('tab-1').width).toBe(480);
+      act(() => void vi.advanceTimersByTime(EXPORT_MS));
+      expect(sendView).not.toHaveBeenCalled();
+      expect(Object.keys(JSON.parse(localStorage.getItem(PANE_STATE_KEY) ?? '{}').chats)).toHaveLength(
+        MAX_CHATS,
+      );
+
+      rerender('tab-2');
+      expect(result.current.open).toBe(false);
+      expect(result.current.tabs).toEqual([]);
+      rerender(key);
+      expect(result.current.active).toBe(file.id);
+    },
+  );
 
   it('does not reopen a pane closed by hand before the first machine view arrives', () => {
     const { rerender } = renderHook(() => useChatViewSync(CHAT));

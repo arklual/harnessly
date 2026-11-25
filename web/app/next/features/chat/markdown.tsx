@@ -177,6 +177,10 @@ const components = {
           text={text && text !== href ? text : change}
         />
       );
+    // Markdown destinations that name a file use the same project-scoped reader as file chips in plain text.
+    // A bare filename has no slash, so check it as a path relative to the chat's folder too.
+    if (href && (isReportPath(href) || isReportPath(`./${href}`)))
+      return <RefChip kind="file" label={href} text={text || fileNameOf(href)} hint={href} />;
     const slug = href && isBareAddress(text, href) ? cardSlugOf(href) : null;
     if (href && slug) return <NamedLink href={href} slug={slug} />;
     return <RefChip kind="link" label={href ?? ''} href={href ?? null} text={text || href || ''} />;

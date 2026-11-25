@@ -141,7 +141,11 @@ func (s *Service) oldRoute(r *http.Request, u store.User, m store.Machine, parts
 	if method == http.MethodPost && first == "invites" && third == "accept" && n == 3 {
 		var project, role string
 		var until any
-		err := s.write(ctx, m, func(t *txn) error {
+		holder, err := s.scopedHolder(ctx, m, u, "", section)
+		if err != nil {
+			return nil, 0, err
+		}
+		err = s.write(ctx, holder, func(t *txn) error {
 			p, ro, un, err := t.acceptInvite(section, email)
 			project, role, until = p, ro, iso(un)
 			return err
@@ -159,6 +163,13 @@ func (s *Service) oldRoute(r *http.Request, u store.User, m store.Machine, parts
 		return nil, 0, fail("not_found", "Проект не найден")
 	}
 
+	if method == http.MethodGet && n == 1 {
+		holder, err := s.scopedHolder(ctx, m, u, project, "")
+		if err != nil {
+			return nil, 0, err
+		}
+		m = holder
+	}
 	t, err := s.read(ctx, m)
 	if err != nil {
 		return nil, 0, err

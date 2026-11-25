@@ -47,10 +47,11 @@ type backgroundFeature struct {
 
 // backgroundProvider is a provider a feature may be given.
 type backgroundProvider struct {
-	ID     string               `json:"id"`
-	Name   string               `json:"name"`
-	API    extproviders.API     `json:"api"`
-	Models []extproviders.Model `json:"models"`
+	ID      string               `json:"id"`
+	Name    string               `json:"name"`
+	API     extproviders.API     `json:"api"`
+	Models  []extproviders.Model `json:"models"`
+	Feature string               `json:"feature,omitempty"` // empty: all features
 }
 
 var (
@@ -72,8 +73,8 @@ func bgRunnerFor(d deps) *bgmodel.Runner {
 		Client:    &bgmodel.Client{},
 		Agent:     newBgAgentCaller(d.DataDir),
 		Log: func(feature string, c bgmodel.Choice, err error) {
-			// The record of a fallback: the feature did what it did before. Never the key, never the provider's body.
-			agent.Log("warn", "background: the provider failed, the feature fell back", agent.F{K: "feature", V: feature},
+			// Never the key, never the provider's body.
+			agent.Log("warn", "background: the provider failed", agent.F{K: "feature", V: feature},
 				agent.F{K: "provider", V: c.Provider}, agent.F{K: "model", V: c.Model}, agent.F{K: "reason", V: bgmodel.ReasonOf(err)})
 		},
 	}
@@ -116,11 +117,14 @@ func (p pushSummary) Summarize(ctx context.Context, answer string) (string, erro
 	return summary, err
 }
 
-func backgroundView(r *bgmodel.Runner, summary noticeSummary) []backgroundFeature {
+func backgroundView(r *bgmodel.Runner, summary noticeSummary, dataDir string) []backgroundFeature {
 	choices, last := r.Store.All(), r.Last()
 	out := []backgroundFeature{}
 	for _, f := range bgmodel.Features() {
-		v := backgroundFeature{Feature: f, Agents: r.Agent != nil}
+		if f.ID == bgmodel.FeatureInboxTriage && !inboxTriageEnabled(dataDir) {
+			continue
+		}
+		v := backgroundFeature{Feature: f, Agents: r.Agent != nil && f.ID != bgmodel.FeatureInboxTriage}
 		if c, ok := choices[f.ID]; ok {
 			v.Provider, v.Model, v.Effort = &c.Provider, &c.Model, c.Effort
 		}
@@ -197,7 +201,10 @@ func backgroundRoutes(d deps) []gate.Route {
 			}
 			offered = append(offered, backgroundProvider{ID: v.ID, Name: v.Name, API: v.API, Models: v.Models})
 		}
-		secretJSON(w, http.StatusOK, map[string]any{"features": backgroundView(runner, summary), "providers": offered})
+		if inboxTriageEnabled(d.DataDir) && runner.InboxGPT != nil {
+			offered = append(offered, backgroundProvider{ID: bgmodel.InboxGPTProfile, Name: "GPT", Models: inboxGPTModels(), Feature: bgmodel.FeatureInboxTriage})
+		}
+		secretJSON(w, http.StatusOK, map[string]any{"features": backgroundView(runner, summary, d.DataDir), "providers": offered})
 	}
 	one := func(w http.ResponseWriter, r *http.Request) {
 		if !pageOK(w, r) {
@@ -208,6 +215,10 @@ func backgroundRoutes(d deps) []gate.Route {
 			return
 		}
 		feature, _ := under(r)
+		if feature == bgmodel.FeatureInboxTriage && !inboxTriageEnabled(d.DataDir) {
+			secretJSON(w, http.StatusNotFound, map[string]string{"error": "unknown-feature"})
+			return
+		}
 		var b struct {
 			Provider *string `json:"provider"`
 			Model    string  `json:"model"`
@@ -240,7 +251,12 @@ func backgroundRoutes(d deps) []gate.Route {
 			now = summary.Value()
 		} else {
 			var before *bgmodel.Choice
-			before, err = runner.Pick(feature, choice)
+			if feature == bgmodel.FeatureInboxTriage && choice != nil &&
+				choice.Provider == bgmodel.InboxGPTProfile && !inboxGPTModel(choice.Model) {
+				err = bgmodel.ErrBadModel
+			} else {
+				before, err = runner.Pick(feature, choice)
+			}
 			was, now = value(before), value(choice)
 		}
 		if err != nil {
@@ -252,7 +268,7 @@ func backgroundRoutes(d deps) []gate.Route {
 			// The person's change goes into the journal of the settings' changes.
 			ctl.Record("background."+feature, was, now, settingsctl.Actor{Kind: settingsctl.ByPerson}, settingsctl.ViaPage)
 		}
-		for _, v := range backgroundView(runner, summary) {
+		for _, v := range backgroundView(runner, summary, d.DataDir) {
 			if v.ID == feature {
 				secretJSON(w, http.StatusOK, map[string]any{"feature": v})
 				return

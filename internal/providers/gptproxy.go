@@ -138,7 +138,7 @@ func (g *GPTProxy) ExtEndpoint(ctx context.Context) (string, string, error) {
 
 // rewriteLocked writes the config of a running proxy again: the upstreams changed. CLIProxyAPI watches its config and
 // takes the change without a restart, so the chats that stream through it go on. The file is written in place: its
-// watch is of the file, and a file renamed over it is not seen (CLIProxyAPI 8.0.48).
+// watch is of the file, and a file renamed over it is not seen (CLIProxyAPI 8.x).
 func (g *GPTProxy) rewriteLocked() {
 	port, ok := g.savedPort()
 	key, err := g.clientKey()
@@ -151,6 +151,16 @@ func (g *GPTProxy) rewriteLocked() {
 	}
 	if err := os.WriteFile(g.configFile(), body, 0o600); err != nil {
 		jsonlog.Log("warn", "providers: the proxy's config was not written", jsonlog.F{K: "error", V: err.Error()})
+	}
+}
+
+// RefreshModels gives a running proxy the latest models of Codex's cache. CLIProxyAPI watches its config, so existing
+// chats can switch to a newly offered model without restarting either the proxy or the chat.
+func (g *GPTProxy) RefreshModels() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.sup != nil {
+		g.rewriteLocked()
 	}
 }
 

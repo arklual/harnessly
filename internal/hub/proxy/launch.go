@@ -90,6 +90,7 @@ func (s *Service) mountLaunch(mux *http.ServeMux) {
 	}
 	mux.HandleFunc("POST "+launchPath, handle)
 	mux.HandleFunc("POST "+opusFirstLaunchPath, handle)
+	mux.Handle("POST "+inboxTriagePath, httpx.Handler(s.inboxTriage))
 }
 
 // launch starts the conversation. A missing or short HUB_LAUNCH_TOKEN shuts the route (404, as if there were none).

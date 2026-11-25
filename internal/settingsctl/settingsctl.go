@@ -92,7 +92,11 @@ type Item struct {
 	// Replaces says what a value that changes a part of a text takes the place of, in words ("" when it only adds);
 	// part is false when the value is the whole text. nil: every value is the whole.
 	Replaces func(value string) (label string, part bool)
+	// Shown says whether the catalog has the setting now (one that a rollout opens while the process runs); nil: always.
+	Shown func() bool
 }
+
+func (it Item) shown() bool { return it.Shown == nil || it.Shown() }
 
 func boolLabel(v string) string {
 	if v == On {
@@ -332,7 +336,7 @@ func CleanWhy(why string) string {
 
 func (s *Service) item(key string) (Item, bool) {
 	for _, it := range s.Items {
-		if it.Key == key {
+		if it.Key == key && it.shown() {
 			return it, true
 		}
 	}
@@ -343,6 +347,9 @@ func (s *Service) item(key string) (Item, bool) {
 func (s *Service) List() []Setting {
 	out := []Setting{}
 	for _, it := range s.Items {
+		if !it.shown() {
+			continue
+		}
 		if v, err := it.view(); err == nil {
 			out = append(out, v)
 		}

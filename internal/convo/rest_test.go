@@ -105,6 +105,63 @@ func TestAStoppedChatRestartsWithoutReadingItsTranscript(t *testing.T) {
 	}
 }
 
+// A Claude session may move its transcript to another project directory after its cwd changes. The record's turn
+// summary survives a restart, and opening that folded turn follows the session to its current transcript for the steps.
+func TestTurnEntriesFollowARelocatedTranscript(t *testing.T) {
+	r := newRig(t)
+	moved := filepath.Join(r.dir, "moved", "session-1.jsonl")
+	r.deps = func(d *Deps) {
+		d.AgentSession = func(p wire.Provider, id string) (AgentSession, bool) {
+			if p != wire.ProviderClaude || id != "session-1" {
+				return AgentSession{}, false
+			}
+			return AgentSession{TranscriptPath: moved}, true
+		}
+	}
+	r.rt = r.runtime()
+	r.open()
+	if err := r.rt.Attach(r.id, "", "", "session-1"); err != nil {
+		t.Fatal(err)
+	}
+	r.tick(time.Second)
+	r.user("fix it")
+	r.tool("tool-1", "inspect logs")
+	r.result("tool-1", "found it")
+	r.say("fixed")
+	r.turnEnd()
+	r.tick(time.Second)
+	turn := r.snap().Turns[0]
+	r.stopAgent()
+	r.rt.Stop()
+
+	if err := os.MkdirAll(filepath.Dir(moved), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(r.path, moved); err != nil {
+		t.Fatal(err)
+	}
+	r.restart()
+
+	page, err := r.rt.TurnEntries(t.Context(), r.id, turn.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Entries) != 3 || page.Entries[0].T != wire.EntryUser || page.Entries[1].T != wire.EntryTool || page.Entries[2].T != wire.EntrySay {
+		t.Fatalf("relocated turn entries: %+v", page.Entries)
+	}
+	if got := r.rec().TranscriptPath; got != moved {
+		t.Fatalf("transcript path %q, want %q", got, moved)
+	}
+
+	// The corrected path is persisted; finding the session is no longer necessary after another runtime restart.
+	r.rt.Stop()
+	r.deps = nil
+	r.restart()
+	if got := r.rec().TranscriptPath; got != moved {
+		t.Fatalf("persisted transcript path %q, want %q", got, moved)
+	}
+}
+
 // A transcript that changed while the runtime was away is read again at the start.
 func TestAChangedTranscriptIsReadAgainAtRestart(t *testing.T) {
 	r, reads := restRig(t)

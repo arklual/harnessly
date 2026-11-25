@@ -2,6 +2,8 @@ package designaccess
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"regexp"
 	"strings"
 
@@ -50,11 +52,7 @@ func (s *Service) AnchorMachines(ctx context.Context, spaceIDs []string, rest st
 	}
 	if match := workspaceInvite.FindStringSubmatch(rest); match != nil {
 		args[0] = store.HashToken(match[1])
-		join := "candidate.id = owner.id"
-		if s.shared {
-			join = "candidate.space_id = owner.space_id"
-		}
-		query = `SELECT candidate.id FROM design_invites i JOIN machines owner ON owner.id=i.machine_id JOIN machines candidate ON ` + join + `
+		query = `SELECT candidate.id FROM design_invites i JOIN machines owner ON owner.id=i.machine_id JOIN machines candidate ON candidate.space_id=owner.space_id
       WHERE i.token_hash=? AND owner.space_id IN (` + marks + `) AND owner.revoked_at IS NULL AND candidate.revoked_at IS NULL ORDER BY candidate.id`
 	}
 	rows, err := s.db.S().Q().Query(ctx, query, args...)
@@ -74,4 +72,45 @@ func (s *Service) AnchorMachines(ctx context.Context, spaceIDs []string, rest st
 		return nil
 	}
 	return ids
+}
+
+// scopedHolder resolves only the named project's access record, within the space of the
+// admitted machine. With local storage the same slug may legitimately exist twice.
+func (s *Service) scopedHolder(ctx context.Context, anchor store.Machine, user store.User, project, invite string) (store.Machine, error) {
+	if s.shared || anchor.SpaceID == "" {
+		return anchor, nil
+	}
+	db := s.db.S()
+	var id string
+	var err error
+	if invite != "" {
+		if !store.ValidDesignInviteToken(invite) {
+			return store.Machine{}, fail("not_found", "Ссылка не найдена")
+		}
+		err = db.Q().QueryRow(ctx, `SELECT i.machine_id FROM design_invites i JOIN machines m ON m.id=i.machine_id
+    WHERE i.token_hash=? AND m.space_id=? AND m.revoked_at IS NULL AND m.disabled_at IS NULL`, store.HashToken(invite), anchor.SpaceID).Scan(&id)
+	} else {
+		var count int
+		err = db.Q().QueryRow(ctx, `SELECT COUNT(*), COALESCE(MAX(m.id),'') FROM design_projects p JOIN machines m ON m.id=p.machine_id
+    WHERE m.space_id=? AND p.project_id=? AND m.revoked_at IS NULL AND m.disabled_at IS NULL`, anchor.SpaceID, project).Scan(&count, &id)
+		if err == nil && count == 0 {
+			return anchor, nil
+		}
+		if err == nil && count > 1 {
+			return store.Machine{}, fail("not_found", "Проект не найден")
+		}
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return store.Machine{}, fail("not_found", "Проект не найден")
+	}
+	if err != nil {
+		return store.Machine{}, err
+	}
+	if id != anchor.ID || invite != "" {
+		verified, err := db.UserIDByVerifiedEmail(ctx, user.Email)
+		if err != nil || user.DisabledAt != nil || verified != user.ID {
+			return store.Machine{}, fail("forbidden", "Нужен подтверждённый аккаунт")
+		}
+	}
+	return db.MachineByID(ctx, id)
 }

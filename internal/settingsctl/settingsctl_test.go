@@ -67,6 +67,28 @@ func TestCatalog(t *testing.T) {
 	}
 }
 
+func TestShownFollowsTheRolloutLive(t *testing.T) {
+	s, values := newService(t)
+	open := false
+	values["late"] = "default"
+	s.Items = append(s.Items, Item{Key: "late", Title: "Позже", Kind: KindEnum, Shown: func() bool { return open },
+		Get: func() (string, error) { return values["late"], nil }, Set: func(v string) error { values["late"] = v; return nil },
+		Options: func() []Option { return []Option{{"default", "как сейчас"}, {"gpt", "GPT"}} }})
+	if len(s.List()) != 3 {
+		t.Fatalf("a setting not shown yet is left out: %+v", s.List())
+	}
+	if _, err := s.Get("late"); RefusalOf(err).Reason != ReasonUnknownKey {
+		t.Fatalf("a setting not shown yet is unknown: %v", err)
+	}
+	open = true
+	if len(s.List()) != 4 {
+		t.Fatalf("the setting shows once its rollout opens, without a new catalog: %+v", s.List())
+	}
+	if v, err := s.Get("late"); err != nil || v.Value != "default" {
+		t.Fatalf("%+v %v", v, err)
+	}
+}
+
 func TestApplyChecksAndJournals(t *testing.T) {
 	s, values := newService(t)
 	person := Actor{Kind: ByPerson}

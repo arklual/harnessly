@@ -34,6 +34,10 @@ const (
 	FeatureWidget = "widget"
 	// FeatureFolder: the folder the app offers for a chat that has none, after a few prompts.
 	FeatureFolder = "folder-suggest"
+	// FeatureInboxTriage classifies incoming items, without starting a chat.
+	FeatureInboxTriage = "inbox-triage"
+	// InboxGPTProfile is the managed GPT profile, not a connected API account or an agent CLI.
+	InboxGPTProfile = "@gpt"
 )
 
 // Feature is one background feature as Settings lists it.
@@ -70,6 +74,9 @@ func Features() []Feature {
 		{ID: FeatureWidget, Live: true,
 			Title:       locale.Pick("Smart widgets", "Умные виджеты"),
 			Description: locale.Pick("A widget under the chat's right column that asks a model now and then and shows its short answer. Without a pick it runs on the machine's Claude Haiku.", "Виджет под правой колонкой чата, который время от времени спрашивает модель и показывает её короткий вывод. Без выбора — Claude Haiku машины по подписке.")},
+		{ID: FeatureInboxTriage, Live: true,
+			Title:       locale.Pick("Inbox triage", "Разбор входящих"),
+			Description: locale.Pick("Classifies incoming items without starting a chat. Set it on the machine connected to Inbox. Without a choice, Inbox uses its service model.", "Разбирает новые входящие без запуска чата. Выберите модель на машине, к которой подключены «Входящие». Без выбора работает модель сервиса.")},
 		{ID: FeatureFolder, Live: true,
 			Title:       locale.Pick("Folder for a chat", "Папка для чата"),
 			Description: locale.Pick("After a few prompts a chat without a folder gets an offer of the fitting one. Without a pick it runs on the machine's Claude Haiku.", "Через несколько промптов чату без папки предлагается подходящая. Без выбора — Claude Haiku машины по подписке.")},
@@ -236,8 +243,10 @@ type Runner struct {
 	Client    *Client
 	// Agent asks the machine's agents; nil: a feature may be given a provider's model only.
 	Agent AgentCall
-	Now   func() time.Time
-	// Log is told of a call that failed: the feature falls back to what it did before, and this is its record.
+	// InboxGPT is the selected GPT profile model for Inbox only; it never uses an agent CLI.
+	InboxGPT func(context.Context, Choice, Call) (string, error)
+	Now      func() time.Time
+	// Log is told of a call that failed. The caller decides whether to fall back.
 	Log func(feature string, c Choice, err error)
 
 	mu   sync.Mutex
@@ -393,11 +402,16 @@ func (r *Runner) record(feature string, c Choice, err error) {
 		}
 	}
 	r.mu.Lock()
+	defer r.mu.Unlock()
+	if feature == FeatureInboxTriage {
+		if current, ok := r.Store.Get(feature); !ok || current != c {
+			return // a previous selection finished after the person changed it
+		}
+	}
 	if r.last == nil {
 		r.last = map[string]Outcome{}
 	}
 	r.last[feature] = out
-	r.mu.Unlock()
 }
 
 // Call is what a feature asks its model.
@@ -417,9 +431,20 @@ func (r *Runner) Run(ctx context.Context, feature string, call Call) (text strin
 	if !ok {
 		return "", false, nil
 	}
-	if r.onAgent(choice) {
-		text, err = r.runAgent(ctx, choice, call, nil)
-	} else {
+	switch {
+	case choice.Provider == InboxGPTProfile:
+		if feature != FeatureInboxTriage || r.InboxGPT == nil {
+			err = &Error{Reason: ReasonNoProvider}
+		} else {
+			text, err = r.InboxGPT(ctx, choice, call)
+		}
+	case r.onAgent(choice):
+		if feature == FeatureInboxTriage {
+			err = &Error{Reason: ReasonNoProvider}
+		} else {
+			text, err = r.runAgent(ctx, choice, call, nil)
+		}
+	default:
 		text, err = r.run(ctx, choice, call)
 	}
 	r.record(feature, choice, err)
@@ -497,11 +522,16 @@ func (r *Runner) Pick(feature string, c *Choice) (before *Choice, err error) {
 			return nil, ErrBadModel
 		}
 		switch {
-		case !r.onAgent(*c):
-			if _, err := r.Providers.Get(c.Provider); err != nil {
+		case c.Provider == InboxGPTProfile:
+			if feature != FeatureInboxTriage || r.InboxGPT == nil {
 				return nil, ErrUnknownProvider
 			}
-		case r.Agent == nil:
+		case !r.onAgent(*c):
+			p, err := r.Providers.Get(c.Provider)
+			if err != nil || feature == FeatureInboxTriage && p.API == extproviders.APIHiggsfield {
+				return nil, ErrUnknownProvider
+			}
+		case r.Agent == nil || feature == FeatureInboxTriage:
 			return nil, ErrUnknownProvider
 		default:
 			// An agent's model runs at its own effort.
@@ -511,7 +541,13 @@ func (r *Runner) Pick(feature string, c *Choice) (before *Choice, err error) {
 			return nil, ErrBadEffort
 		}
 	}
-	return r.Store.Set(feature, c)
+	before, err = r.Store.Set(feature, c)
+	if err == nil && feature == FeatureInboxTriage {
+		r.mu.Lock()
+		delete(r.last, feature)
+		r.mu.Unlock()
+	}
+	return before, err
 }
 
 // Forget puts every feature that runs on a provider back to «as now»: the provider was removed. It answers the
@@ -519,7 +555,7 @@ func (r *Runner) Pick(feature string, c *Choice) (before *Choice, err error) {
 func (r *Runner) Forget(provider string) []string {
 	var changed []string
 	for feature, c := range r.Store.All() {
-		if c.Provider == provider {
+		if c.Provider == provider && feature != FeatureInboxTriage {
 			if _, err := r.Store.Set(feature, nil); err == nil {
 				changed = append(changed, feature)
 			}
@@ -534,7 +570,7 @@ func (r *Runner) Forget(provider string) []string {
 func (r *Runner) Move(from, to string, hasModel func(model string) bool) []string {
 	var moved []string
 	for feature, c := range r.Store.All() {
-		if c.Provider != from || !hasModel(c.Model) {
+		if feature == FeatureInboxTriage || c.Provider != from || !hasModel(c.Model) {
 			continue
 		}
 		if _, err := r.Store.Set(feature, &Choice{Provider: to, Model: c.Model}); err == nil {

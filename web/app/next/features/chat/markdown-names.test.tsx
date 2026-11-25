@@ -80,6 +80,26 @@ describe('a bare address of a document or a board (HRN-1652)', () => {
   });
 });
 
+describe('a Markdown link to a local file (HRN-1745)', () => {
+  it.each(['reports/weekly.md', './reports/weekly.md', 'README.md', '/work/reports/weekly.md'])(
+    'opens %s in Files with the author’s label',
+    (path) => {
+      const onOpen = show(`See [Full report](${path}).`);
+      fireEvent.click(screen.getByRole('button', { name: 'Full report' }));
+      expect(onOpen).toHaveBeenCalledWith('file', path, null);
+    },
+  );
+
+  it('does not treat a website or a preview address as a file', () => {
+    const onOpen = show('See [External](https://a.example.org/reports/weekly.md) or [Preview](4400).');
+    expect(screen.getByRole('link', { name: 'External' }).getAttribute('href')).toBe(
+      'https://a.example.org/reports/weekly.md',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    expect(onOpen).toHaveBeenCalledWith('link', '4400', '4400');
+  });
+});
+
 describe('a path in the text (HRN-1652)', () => {
   it('says the file’s name and keeps the path for the hint', () => {
     const onOpen = show('Look at web/app/next/feed.tsx now');

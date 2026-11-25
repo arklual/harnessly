@@ -129,7 +129,7 @@ import {
   chatPanes,
   markUsed,
   paneKeyOf,
-  useChatPane,
+  useShownChatPane,
   type IChatPane,
 } from '@/next/stores/pane-state';
 import { conversationsStore, convsLoadedStore } from '@/next/stores/conversations';
@@ -1286,7 +1286,7 @@ export const useRightPane = (
   const placeOf = (target: string) => objectPlaceOf(target, apps.list?.apps, window.location.origin);
   // The chat's pane is read as the chat is: the first frame of another chat already draws its own pane.
   const paneKey = paneKeyOf(convId, view);
-  const state = useChatPane(paneKey);
+  const state = useShownChatPane(paneKey);
   // Beside a design the pane opens at its side, never over it: the chat's own «wide» is for the chat's page (a pane
   // widened there must not cover the design opened from it). Widened here, it stays so only while the design is open.
   const [wideBeside, setWideBeside] = useState(false);

@@ -328,7 +328,12 @@ func TestDesignShareLinksThroughHubAndRuntime(t *testing.T) {
 }
 
 func TestDesignInviteHubNavigation(t *testing.T) {
-	s := hubtest.New(t, hubtest.Env("HUB_ORGS", "on"), hubtest.Env("HUB_ACCESS_ENFORCE", "on"), hubtest.Env("HUB_FEATURES_FORCE", "runtime.fleet"), hubtest.WithOptions(func(o *api.Options) { o.Workspace = fstest.MapFS{"index.html": {Data: []byte("workspace")}} }))
+	for _, mode := range []string{"off", "on"} {
+		t.Run(mode, func(t *testing.T) { testDesignInviteHubNavigation(t, mode) })
+	}
+}
+func testDesignInviteHubNavigation(t *testing.T, mode string) {
+	s := hubtest.New(t, hubtest.Env("HUB_STORE", mode), hubtest.Env("HUB_ORGS", "on"), hubtest.Env("HUB_ACCESS_ENFORCE", "on"), hubtest.Env("HUB_FEATURES_FORCE", "runtime.fleet"), hubtest.WithOptions(func(o *api.Options) { o.Workspace = fstest.MapFS{"index.html": {Data: []byte("workspace")}} }))
 	owner := s.SignIn("owner@example.com")
 	member := s.SignIn("member@example.com")
 	outsider := s.SignIn("outsider@example.com")
@@ -352,7 +357,7 @@ func TestDesignInviteHubNavigation(t *testing.T) {
 	if r.Code != 200 {
 		t.Fatal(r)
 	}
-	var link struct{ URL, Token string }
+	var link struct{ ID, URL, Token string }
 	r.JSON(&link)
 	u, err := url.Parse(link.URL)
 	if err != nil || u.Path != "/design-invites/"+link.Token {
@@ -376,6 +381,27 @@ func TestDesignInviteHubNavigation(t *testing.T) {
 	access.JSON(&grant)
 	if access.Code != 200 || grant.Role != "view" {
 		t.Fatalf("project access: %s", access)
+	}
+	if mode == "off" {
+		storePath := "/agents/api/platform/design/store/"
+		for path, marker := range map[string]string{"shop/index.json": "Main.dc.html", "shop/f/Main.dc.html": "shop main"} {
+			result := member.Do("GET", storePath+path, nil)
+			if result.Code != 200 || !strings.Contains(string(result.Body), marker) {
+				t.Fatalf("project read %s: %s", path, result)
+			}
+			if !strings.Contains(result.Header.Get("Content-Security-Policy"), "sandbox") {
+				t.Fatal("missing sandbox")
+			}
+		}
+		if result := member.Do("GET", storePath+"other/f/Main.dc.html", nil); result.Code == 200 {
+			t.Fatal("another project was available")
+		}
+		if result := owner.Do("DELETE", base+"/invites/"+link.ID, nil); result.Code != 200 {
+			t.Fatalf("revoke: %s", result)
+		}
+		if result := member.Do("GET", storePath+"shop/f/Main.dc.html", nil); result.Code == 200 {
+			t.Fatal("revoked recipient retained access")
+		}
 	}
 	if r := member.Do("GET", "/api/machines/"+a.MachineID+"/open", nil); r.Code != 403 {
 		t.Fatalf("invitation changed machine access: %d", r.Code)
