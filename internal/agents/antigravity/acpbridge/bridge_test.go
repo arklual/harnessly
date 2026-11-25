@@ -234,6 +234,13 @@ func TestBridgeOverItsSocket(t *testing.T) {
 	if err != nil || st.Model != "oss-medium" || st.Mode != ModeBypass {
 		t.Fatalf("configure: %+v %v", st, err)
 	}
+	// A listed id with its level in it is the family at that level.
+	cctx, ccancel = context.WithTimeout(ctx, 5*time.Second)
+	st, err = mgr.Configure(cctx, "tab-1", "claude-y-low", "", "")
+	ccancel()
+	if err != nil || st.Model != "claude-y" || st.Effort != "low" {
+		t.Fatalf("configure a leveled id: %+v %v", st, err)
+	}
 	cctx, ccancel = context.WithTimeout(ctx, 5*time.Second)
 	if _, err := mgr.Configure(cctx, "tab-1", "nope", "", ""); err == nil {
 		t.Fatal("an unknown model was taken")
