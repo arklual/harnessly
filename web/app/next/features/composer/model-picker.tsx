@@ -255,18 +255,19 @@ const ModelPicker = ({
   const fast = fastOffered && value.fast === true;
   const fastWaits = fastOffered && fastAsked !== null && fastAsked !== fast ? fastAsked : null;
   const fastHint = fastWaits === null ? t('next.picker.fastHint') : t(FAST_WAITS[fastWaits ? 'on' : 'off']);
-  const permission = value.permission ?? runsIn ?? agent.defaultPermission ?? 'ask';
+  const sessionPermission = value.permission ?? runsIn;
+  const permission = sessionPermission ?? agent.defaultPermission ?? 'ask';
   const permissionWaits = permissionAsked !== null && permissionAsked !== permission ? permissionAsked : null;
   const permissionShown = permissionWaits ?? permission;
   const permissionHint = t('next.picker.permissionWaits');
   // Which setting the segment is: a running chat keeps the mode it runs in, whatever the machine's default is now (#124).
   const permissionScope = t(
-    locked
+    locked && sessionPermission != null
       ? 'next.picker.permissionScope.session'
       : value.permission
         ? 'next.picker.permissionScope.chat'
         : 'next.picker.permissionScope.machine',
-    { mode: t(`next.picker.permission.${permissionShown}`) },
+    { mode: t(`next.picker.permission.${permission}`) },
   );
   const catalogLine = catalogNote(agent);
   // What a change sends keeps the asks of the other modes that still wait: a turn of one control does not take them back.

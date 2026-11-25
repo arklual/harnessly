@@ -388,11 +388,17 @@ func (c *conv) restartWith(next wire.Model, done func(err error, now time.Time))
 		c.lookSeq++
 		c.looking, c.lookAgain = false, false
 		c.input(agentstate.Input{K: agentstate.Shell, Resumable: true}, now)
+		record := c.rec
+		record.Model = &next
+		if err := c.resumeRecord(record, now); err != nil {
+			done(err, now)
+			return
+		}
 		c.applied(&next, now)
 		if k, ok := c.d.Launcher.(ModeKeeper); ok {
 			k.KeepModes(c.rec.Session, next.Fast, next.Permission)
 		}
-		c.resume(now)
+		c.resumed(now)
 		done(nil, now)
 	})
 }

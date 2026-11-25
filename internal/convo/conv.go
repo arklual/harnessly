@@ -1995,9 +1995,12 @@ func (c *conv) typeJob(job *outbox.Job, pane typist.Pane, now time.Time) {
 var ErrResumeBlocked = errors.New("the tab's terminal is busy")
 
 func (c *conv) resume(now time.Time) {
-	if c.d.Launcher == nil {
-		return
+	if c.d.Launcher != nil && c.resumeRecord(c.rec, now) == nil {
+		c.resumed(now)
 	}
+}
+
+func (c *conv) resumeRecord(record wire.Conversation, now time.Time) error {
 	// Whoever resumes the chat first after a start has done what the start owed it.
 	c.startUp = false
 	if c.startGate && c.d.startResumes != nil {
@@ -2005,7 +2008,7 @@ func (c *conv) resume(now time.Time) {
 		c.d.startResumes <- struct{}{}
 		defer func() { <-c.d.startResumes }()
 	}
-	if err := c.d.Launcher.Resume(c.rec); err != nil {
+	if err := c.d.Launcher.Resume(record); err != nil {
 		c.d.Log.Warn("resume failed", "conv", c.rec.ID, "err", err)
 		// The queue says why it waits; «continue sending» lifts the pause and the resume is tried again (GitHub #52).
 		reason := wire.PausedLaunchFailed
@@ -2013,8 +2016,12 @@ func (c *conv) resume(now time.Time) {
 			reason = wire.PausedResumeBlocked
 		}
 		c.change(c.box.Pause(reason, now), now)
-		return
+		return err
 	}
+	return nil
+}
+
+func (c *conv) resumed(now time.Time) {
 	c.ultracodeAgain(now)
 	c.input(agentstate.Input{K: agentstate.LaunchRequested}, now)
 }

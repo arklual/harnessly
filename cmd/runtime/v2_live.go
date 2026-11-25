@@ -968,7 +968,6 @@ func (l *v2Launcher) start(req convo.LaunchRequest, chosen *agents.Launch, promp
 	if mode == "" {
 		mode = v.machineMode(req.Provider)
 	}
-	rt.LaunchMode(req.ID, mode)
 	opts := launch.Options{Provider: string(req.Provider), Cwd: req.Cwd, CwdRoots: []string{req.Cwd}, Launch: chosen,
 		ResumeSessionID: req.ResumeSessionID, ForkSession: req.Fork, PromptFiles: promptFiles}
 	if req.First != "" {
@@ -1002,6 +1001,7 @@ func (l *v2Launcher) start(req convo.LaunchRequest, chosen *agents.Launch, promp
 		rt.LaunchFailed(req.ID, wire.LaunchFailedNoSession)
 		return
 	}
+	rt.LaunchMode(req.ID, mode)
 	rt.LaunchStep(req.ID, wire.StepPrompt)
 	prev, _ := rt.Record(req.ID)
 	_ = rt.Attach(req.ID, found.Tab.SessionName, "", "")
@@ -1080,7 +1080,7 @@ func (l *v2Launcher) KeepModes(session string, fast bool, permission wire.Permis
 }
 
 // Resume brings a stopped agent back on its session.
-func (l *v2Launcher) Resume(conv wire.Conversation) error {
+func (l *v2Launcher) Resume(conv wire.Conversation) (retErr error) {
 	c := l.v.c
 	_, _, tab, ok := c.cfg.Tmux.ParseSessionName(conv.Session)
 	if !ok {
@@ -1111,9 +1111,17 @@ func (l *v2Launcher) Resume(conv wire.Conversation) error {
 	// So do its fast and permission modes as the chat last had them: the agent starts in them again. A chat
 	// that never chose one keeps what its tab started with.
 	if m := conv.Model; m != nil && m.Permission != "" {
+		before := c.tabLaunch(conv.Session)
 		if err := c.store.SetTabLaunchModes(conv.Session, m.Fast, string(m.Permission)); err != nil {
 			return err
 		}
+		// A failed resume must not leave a different permission mode in the next launch.
+		defer func() {
+			if retErr != nil && (before.Fast != m.Fast || before.Permission != m.Permission) {
+				retErr = errors.Join(retErr, c.store.SetTabLaunchModes(conv.Session, before.Fast, string(before.Permission)))
+			}
+		}()
+
 	}
 	// A Codex chat changes its model and effort by a resume (convo restartCodex): the record says what it runs on now.
 	if m := conv.Model; conv.Provider == wire.ProviderCodex && m != nil && m.ID != "" {

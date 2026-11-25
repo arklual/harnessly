@@ -355,7 +355,8 @@ describe('scope of the permission mode and the catalog of the models (GitHub #12
       <ModelPicker value={choice({ provider: 'codex' })} agents={[codex]} locked onChange={vi.fn()} />,
     );
     act(() => view.container.querySelector<HTMLButtonElement>('.hx-model')?.click());
-    expect(view.getByText(/This session: Auto/)).toBeTruthy();
+    expect(view.getByText(/Machine default: Auto/)).toBeTruthy();
+    expect(view.queryByText(/This session:/)).toBeNull();
     cleanup();
     const fresh = render(
       <ModelPicker
@@ -380,6 +381,21 @@ describe('scope of the permission mode and the catalog of the models (GitHub #12
     );
     act(() => view.container.querySelector<HTMLButtonElement>('.hx-model')?.click());
     expect(view.getByText(/This session: Ask/)).toBeTruthy();
+  });
+  it('keeps the current mode in the session label while a different mode awaits confirmation', () => {
+    const view = render(
+      <ModelPicker
+        value={choice({ permission: 'ask' })}
+        agents={[agent]}
+        locked
+        permissionAsked="bypass"
+        onChange={vi.fn()}
+      />,
+    );
+    act(() => view.container.querySelector<HTMLButtonElement>('.hx-model')?.click());
+    expect(view.getByText(/This session: Ask/)).toBeTruthy();
+    expect(view.getByText(/Changes once the agent confirms/)).toBeTruthy();
+    expect(view.getByRole('radio', { name: 'Auto' }).getAttribute('aria-checked')).toBe('true');
   });
   it('says the list is the built-in fallback, or a cache with its date', () => {
     expect(catalogNote(codex)).toContain('Built-in model list');
