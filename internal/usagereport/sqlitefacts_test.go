@@ -21,6 +21,11 @@ func TestFactsDatabaseCarriesTheFactsWithoutTheJSONFile(t *testing.T) {
 	clock := &fakeClock{t: time.UnixMilli(int64(g.Now))}
 	rt, c := newTestRoute(root, clock)
 	c.cfg.SQLiteFacts = true
+	// Check the completed report even when opening SQLite takes longer than the HTTP progress timeout.
+	rt.Wait = time.Hour
+	if deadline, ok := t.Deadline(); ok {
+		rt.Wait = time.Until(deadline)
+	}
 	if _, got := answerBody(t, rt, "/api/platform/stats", "sub:dev@example.com"); got != want {
 		t.Fatalf("first answer\n got %s\nwant %s", got, want)
 	}
@@ -46,6 +51,7 @@ func TestFactsDatabaseCarriesTheFactsWithoutTheJSONFile(t *testing.T) {
 	rt2, c2 := newTestRoute(root, clock)
 	c2.cfg.CacheFile = c.cfg.CacheFile
 	c2.cfg.SQLiteFacts = true
+	rt2.Wait = rt.Wait
 	if _, got := answerBody(t, rt2, "/api/platform/stats", "sub:dev@example.com"); got != want {
 		t.Fatalf("answer from the database\n got %s\nwant %s", got, want)
 	}

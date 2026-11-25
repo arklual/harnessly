@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -75,17 +74,14 @@ func teamMCP(t *testing.T) *httptest.Server {
 // connectAsAgent runs the hub's connection_add the way an agent does and answers the card the way the person does.
 func connectAsAgent(t *testing.T, h *mcpconn.Hub, svc *connectors.Service, args map[string]any, yes bool) (reply string, card []connectors.Pair) {
 	t.Helper()
-	raw, _ := json.Marshal(args)
-	var out string
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		body, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": map[string]any{"name": "connection_add", "arguments": json.RawMessage(raw)}})
+	call := func(arguments map[string]any) string {
+		body, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": map[string]any{"name": "connection_add", "arguments": arguments}})
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/", strings.NewReader(string(body))))
-		out = rec.Body.String()
-	}()
+		return rec.Body.String()
+	}
+	first := make(chan string, 1)
+	go func() { first <- call(args) }()
 	deadline := time.Now().Add(10 * time.Second)
 	var p connectors.Proposal
 	for time.Now().Before(deadline) {
@@ -96,8 +92,7 @@ func connectAsAgent(t *testing.T, h *mcpconn.Hub, svc *connectors.Service, args 
 		time.Sleep(20 * time.Millisecond)
 	}
 	if p.ID == "" {
-		wg.Wait()
-		t.Fatalf("no card was shown: %s", out)
+		t.Fatalf("no card was shown: %s", <-first)
 	}
 	if p.Conv != "chat-1" || p.Title.En == "" {
 		t.Fatalf("the card is not the chat's: %+v", p)
@@ -105,7 +100,24 @@ func connectAsAgent(t *testing.T, h *mcpconn.Hub, svc *connectors.Service, args 
 	if _, err := svc.Answer(context.Background(), p.ID, yes); err != nil {
 		t.Fatal(err)
 	}
-	wg.Wait()
+	out := <-first
+	var message struct {
+		Result struct {
+			Content []struct{ Text string }
+		}
+	}
+	if err := json.Unmarshal([]byte(out), &message); err != nil {
+		t.Fatal(err)
+	}
+	for _, block := range message.Result.Content {
+		if strings.HasPrefix(block.Text, "waiting:") {
+			if !strings.Contains(block.Text, fmt.Sprintf("proposal=%q", p.ID)) {
+				t.Fatalf("waiting reply did not identify the answered card: %s", out)
+			}
+			out = call(map[string]any{"proposal": p.ID})
+			break
+		}
+	}
 	return out, p.Args
 }
 
