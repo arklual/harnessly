@@ -40,6 +40,14 @@ type Service struct {
 	now     func() time.Time
 
 	mu sync.Mutex
+
+	// The person's record on their other machines (shared.go): syncMu keeps one sync at a time, nextMu the rest.
+	syncMu      sync.Mutex
+	nextMu      sync.Mutex
+	shared      Shared
+	next        time.Time
+	deniedUntil time.Time
+	kick        func(func())
 }
 
 // ErrReadOnly: the connection is the deployment's.
@@ -50,7 +58,8 @@ func New(dir string, secrets Secrets, h *HTTP, env ...EnvConn) *Service {
 	if h == nil {
 		h = NewHTTP(nil)
 	}
-	return &Service{file: filepath.Join(dir, "connections.json"), secrets: secrets, http: h, env: env, now: time.Now}
+	return &Service{file: filepath.Join(dir, "connections.json"), secrets: secrets, http: h, env: env, now: time.Now,
+		kick: func(f func()) { go f() }}
 }
 
 // HTTP is the client connections call through.
@@ -61,6 +70,9 @@ type stored struct {
 	Connections []Conn `json:"connections"`
 	// EnvPrimary are the deployment's connections the person made primary (they are not kept, their mark is).
 	EnvPrimary []string `json:"envPrimary,omitempty"`
+	// Removed is when each connection the person removed was removed, while the list is shared with their other
+	// machines (shared.go): so a machine that still has it removes it too instead of bringing it back.
+	Removed map[string]time.Time `json:"removed,omitempty"`
 }
 
 func (s *Service) readAll() (stored, error) {
@@ -112,6 +124,7 @@ func (s *Service) writeAll(f stored) error {
 // List is every connection: the person's, then the deployment's. A capability with no primary connection of the
 // person's gets the first one that has it.
 func (s *Service) List() ([]Conn, error) {
+	s.pullSoon(s.fresh())
 	s.mu.Lock()
 	f, err := s.readAll()
 	s.mu.Unlock()
@@ -282,9 +295,10 @@ func (s *Service) Connect(ctx context.Context, in ConnectInput) (Conn, error) {
 	if err != nil {
 		return Conn{}, err
 	}
-	c.Me, c.State, c.CheckedAt = me, "ok", now
+	c.Me, c.State, c.CheckedAt, c.UpdatedAt = me, "ok", now, now
 	raw, _ := json.Marshal(cred)
 
+	defer s.push()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	list, err := s.read()
@@ -311,8 +325,11 @@ func (s *Service) Connect(ctx context.Context, in ConnectInput) (Conn, error) {
 	return c, nil
 }
 
-// update changes a kept connection under the lock.
-func (s *Service) update(id string, change func(*Conn) error) (Conn, error) {
+// update changes a kept connection under the lock; a change of the person's (not a check) is marked and shared.
+func (s *Service) update(id string, person bool, change func(*Conn) error) (Conn, error) {
+	if person {
+		defer s.push()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	list, err := s.read()
@@ -323,6 +340,9 @@ func (s *Service) update(id string, change func(*Conn) error) (Conn, error) {
 		if list[i].ID == id {
 			if err := change(&list[i]); err != nil {
 				return Conn{}, err
+			}
+			if person {
+				list[i].UpdatedAt = s.now().UTC()
 			}
 			return list[i], s.write(list)
 		}
@@ -338,7 +358,7 @@ func (s *Service) update(id string, change func(*Conn) error) (Conn, error) {
 // Rename names a connection.
 func (s *Service) Rename(id, name string) (Conn, error) {
 	name = strings.TrimSpace(name)
-	return s.update(id, func(c *Conn) error {
+	return s.update(id, true, func(c *Conn) error {
 		if name != "" {
 			c.Name = name
 		}
@@ -349,6 +369,7 @@ func (s *Service) Rename(id, name string) (Conn, error) {
 // SetPrimary makes a connection the one used for its capabilities, and no other of the same capabilities. A
 // deployment's connection may be made primary too: its mark is kept, the connection itself stays read-only.
 func (s *Service) SetPrimary(id string) (Conn, error) {
+	defer s.push()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	f, err := s.readAll()
@@ -376,11 +397,17 @@ func (s *Service) SetPrimary(id string) (Conn, error) {
 	}
 	caps := slices.Clone(target.Capabilities)
 	shares := func(c Conn) bool { return slices.ContainsFunc(caps, c.Has) }
+	now := s.now().UTC()
 	for i := range f.Connections {
-		if f.Connections[i].ID == id {
-			f.Connections[i].Primary = true
-		} else if shares(f.Connections[i]) {
-			f.Connections[i].Primary = false
+		c := &f.Connections[i]
+		was := c.Primary
+		if c.ID == id {
+			c.Primary = true
+		} else if shares(*c) {
+			c.Primary = false
+		}
+		if c.Primary != was {
+			c.UpdatedAt = now
 		}
 	}
 	var keep []string
@@ -408,12 +435,14 @@ func (s *Service) SetPrimary(id string) (Conn, error) {
 
 // Remove forgets a connection and its credentials.
 func (s *Service) Remove(id string) error {
+	defer s.push()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	list, err := s.read()
+	f, err := s.readAll()
 	if err != nil {
 		return err
 	}
+	list := f.Connections
 	i := slices.IndexFunc(list, func(c Conn) bool { return c.ID == id })
 	if i < 0 {
 		for _, e := range s.env {
@@ -423,8 +452,14 @@ func (s *Service) Remove(id string) error {
 		}
 		return fmt.Errorf("%w: connection %s", ErrNotFound, id)
 	}
-	list = slices.Delete(list, i, i+1)
-	if err := s.write(list); err != nil {
+	f.Connections = slices.Delete(list, i, i+1)
+	if s.sharedSafe() != nil {
+		if f.Removed == nil {
+			f.Removed = map[string]time.Time{}
+		}
+		f.Removed[id] = s.now().UTC()
+	}
+	if err := s.writeAll(f); err != nil {
 		return err
 	}
 	if err := s.secrets.Remove(secretName(id)); err != nil && !errors.Is(err, ErrNotFound) {
@@ -493,7 +528,7 @@ func (s *Service) Check(ctx context.Context, id string) (Conn, error) {
 		}
 		return c, nil
 	}
-	return s.update(id, func(x *Conn) error {
+	return s.update(id, false, func(x *Conn) error {
 		x.State, x.CheckedAt = state, s.now().UTC()
 		if me != nil {
 			x.Me = me

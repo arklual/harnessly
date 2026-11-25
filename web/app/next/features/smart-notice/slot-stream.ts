@@ -1,6 +1,8 @@
 // The slot's event stream: the runtime says "the slot moved" over SSE, so the page does not ask every
 // second and a half. While the stream is open the page only takes a slow look as a safety net; with no stream (an old
-// runtime, a proxy that cuts it) the calm poll of slot-api stays as it was.
+// runtime, a proxy that cuts it) the calm poll of slot-api stays as it was. Over HTTP/1.1 (a deployment behind Teleport)
+// the stream is not opened: a held request takes one of the browser's six connections to the site.
+import { usesHttp1 } from '@/next/core/net/http';
 import { platformPath, runtimePath } from '@/next/core/net/machine';
 import type { MachineId } from '@/next/protocol/v2';
 
@@ -35,6 +37,7 @@ export const openSlotStream = (
   moved: () => void,
   live: (open: boolean) => void,
 ): (() => void) => {
+  if (usesHttp1()) return () => {};
   let source: ISlotSource;
   try {
     source = factory(runtimePath(platformPath('/notices/stream'), m));

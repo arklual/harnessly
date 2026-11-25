@@ -194,7 +194,7 @@ func (l LocalSafe) call(req hubproto.SecretsRequest) (SafeAnswer, error) {
 // own is the name of the owner's secret at path, when path is one.
 func own(path string) (string, bool) {
 	name, ok := strings.CutPrefix(path, SafeOwnFolder+"/")
-	return name, ok && (!strings.Contains(name, "/") || secrets.ValidAppName(name))
+	return name, ok && (!strings.Contains(name, "/") || secrets.ValidAppName(name) || secrets.ValidSysName(name))
 }
 
 func notOwn() error {

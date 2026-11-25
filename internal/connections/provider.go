@@ -27,6 +27,9 @@ type Conn struct {
 	State     string    `json:"state"`
 	CheckedAt time.Time `json:"checkedAt,omitzero"`
 	CreatedAt time.Time `json:"createdAt"`
+	// UpdatedAt is when the person last changed it (connected again, renamed, made primary): of two machines' copies the
+	// later wins. A check does not change it.
+	UpdatedAt time.Time `json:"updatedAt,omitzero"`
 	// Primary marks the connection the tracker page and bare task keys use for its capability.
 	Primary bool `json:"primary,omitempty"`
 	// Env marks a connection the deployment configured (RUNTIME_TRACKER_URL …): listed, not editable.

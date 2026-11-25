@@ -25,6 +25,9 @@ const (
 	HubStats = "hub-stats"
 	// HubProjects: the sidebar «Projects» reads the hub's registry of the people's projects.
 	HubProjects = "hub-projects"
+	// ConnectionsShared: a machine keeps the list of its owner's connections in the hub's safe, so every machine of the
+	// person has them.
+	ConnectionsShared = "connections-shared"
 )
 
 type Gate interface {

@@ -129,6 +129,30 @@ func (a *connSecrets) Reveal(name string) (string, error) {
 	return values[name], nil
 }
 
+// connRecord is the person's record of their connections in the hub's safe (sys/connections of their folder).
+type connRecord struct{ remote *secrets.Remote }
+
+func (c connRecord) ReadIndex() (string, error) {
+	v, err := c.remote.ReadSys(secrets.SysConnections)
+	switch {
+	case err == nil:
+		return v, nil
+	case secrets.ReasonOf(err) == secrets.ReasonNotFound:
+		return "", nil
+	case secrets.ReasonOf(err) == secrets.ReasonDenied:
+		return "", fmt.Errorf("%w: the hub keeps no list of connections for this machine", connections.ErrDenied)
+	}
+	return "", err
+}
+
+func (c connRecord) WriteIndex(v string) error {
+	err := c.remote.WriteSys(secrets.SysConnections, v)
+	if secrets.ReasonOf(err) == secrets.ReasonDenied {
+		return fmt.Errorf("%w: the hub keeps no list of connections for this machine", connections.ErrDenied)
+	}
+	return err
+}
+
 // loadConnAdapters registers the declared connection adapters once per process.
 var loadConnAdapters sync.Once
 
@@ -148,9 +172,15 @@ func connectionsFor(d deps) *connections.Service {
 			fmt.Fprintf(os.Stderr, "runtime: %v\n", err)
 		}
 	})
-	sec := &connSecrets{store: safeFor(d).store}
+	sf := safeFor(d)
+	sec := &connSecrets{store: sf.store}
 	s := connections.New(d.DataDir, sec, nil, envConnections(serviceConfig(d), time.Now().UTC())...)
 	sec.svc = s
+	// With the hub's safe the credentials are already in the person's folder; the list goes there too, so a new machine
+	// of the person has their connections. The hub keeps it behind its switch connections-shared.
+	if r, ok := sf.store.Primary.(*secrets.Remote); ok && sf.where.Mode == safeModeHub {
+		s.SetShared(connRecord{r})
+	}
 	connsFor[d.CLI] = s
 	return s
 }

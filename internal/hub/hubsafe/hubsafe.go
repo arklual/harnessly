@@ -72,7 +72,7 @@ func (b *Broker) Do(ctx context.Context, ownerID string, req hubproto.SecretsReq
 		return names, nil, nil
 	case hubproto.SecretsRead, hubproto.SecretsWrite, hubproto.SecretsDelete:
 		// A name is one segment of letters, digits, '.', '_' and '-', or an app's app/<id>/<name> of such segments
-		// it cannot leave the owner's folder.
+		// or harnessly's own record sys/connections: it cannot leave the owner's folder.
 		if !secrets.ValidSharedName(req.Name) {
 			return nil, nil, refuse(secrets.ReasonBadName, "not a name of the safe")
 		}

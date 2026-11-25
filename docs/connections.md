@@ -51,6 +51,30 @@ created on that very instance.
 - Connecting the same instance with the same login again replaces the credentials: that is how a token is rotated.
 - Log lines name connection ids, kinds and reasons; never a credential or an address with a login in it.
 
+## On every machine of the person
+
+With [the hub's safe](safe.md) (`RUNTIME_SECRETS_MODE=hub`) the credentials `conn-<id>` already lie in the person's
+folder of the hub, which every machine of theirs reads. The list itself goes there too, so a machine the person enrolls
+has their connections without connecting again:
+
+- The record `sys/connections` of the person's folder holds what `connections.json` holds (no credential) and when each
+  removed connection was removed (kept 180 days). No route that takes a plain name sees it: it is not in the safe's
+  list, `harnessly secret run` cannot reveal it.
+- Each change on a machine (connect, reconnect with a new token, rename, primary, remove) goes to the record; the list
+  takes the changes of the other machines at most every 30 seconds, and a machine with no list of its own yet waits for
+  the record before it answers. Of two copies of a connection the later change wins; a removal wins over every change made
+  before it, so a connection removed on one machine leaves the others, and its credentials leave the safe at once.
+- Rotation: connecting again with the same login on any machine keeps the connection and replaces `conn-<id>`, so every
+  machine uses the new token (each one may keep the old one for up to 30 seconds in its cache). Two machines that
+  connected the same instance and login on their own keep the later one, and the other's credentials are removed.
+- The hub away: each machine keeps its own list and changes it as before; its next sync gives the record what it changed
+  meanwhile. A machine whose safe cannot read `conn-<id>` shows the connection as `denied`; connecting it again (one
+  sign-in) puts the credentials in the person's folder for every machine.
+- A machine of another person reads another folder: it never gets the record or the credentials.
+- The hub keeps the record only behind its rollout switch `connections-shared` (docs/hub/rollout-switches.md), by the
+  owner's email and the machine. Off (default) it refuses it, the machine asks again in 10 minutes and its list is its
+  own, as before. Other safe modes keep the list on the machine.
+
 ## The primary connection
 
 Each capability (issues, pages) has one primary connection: the one the person marked, else the first of their own,

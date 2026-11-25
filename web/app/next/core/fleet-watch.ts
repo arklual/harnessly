@@ -5,7 +5,9 @@
 //
 // The page's sockets go to the machines, not to the hub, and a person with no machine has none: the stream is the one
 // connection to the hub itself. It is held only while the tab is in view. A hidden tab lets it go, and coming back
-// reads the list and opens it again, which is also the safety net for whatever the stream missed. There is no timer.
+// reads the list and opens it again, which is also the safety net for whatever the stream missed. There is no timer,
+// except over HTTP/1.1, where the page reads the list now and then instead of holding the stream.
+import { usesHttp1 } from '@/next/core/net/http';
 
 export interface FleetSource {
   /** 0 connecting, 1 open, 2 closed (EventSource). */
@@ -35,7 +37,14 @@ export interface FleetWatchOptions {
   source?: (url: string) => FleetSource | null;
   doc?: VisibilityDoc | null;
   win?: OnlineWindow | null;
+  /**
+   * Reads the list every so many ms instead of holding the stream: over HTTP/1.1 a held request takes one
+   * of the browser's six connections to the site, shared by all its tabs. By default so over HTTP/1.1, 0 otherwise.
+   */
+  pollMs?: number;
 }
+
+export const FLEET_POLL_MS = 15_000;
 
 export interface FleetWatch {
   /** The hub answers again (a machine's socket came back): the stream is opened if it is not. */
@@ -54,6 +63,8 @@ export function watchFleet(o: FleetWatchOptions): FleetWatch {
   const doc = o.doc === undefined ? (typeof document === 'undefined' ? null : document) : o.doc;
   const win = o.win === undefined ? (typeof window === 'undefined' ? null : window) : o.win;
   const open = o.source ?? browserSource;
+  const pollMs = o.pollMs ?? (usesHttp1() ? FLEET_POLL_MS : 0);
+  let timer: ReturnType<typeof setTimeout> | null = null;
   let es: FleetSource | null = null;
   let stopped = false;
   /** The stream has been open on this page before: whatever happened while it was not is unknown. */
@@ -64,10 +75,26 @@ export function watchFleet(o: FleetWatchOptions): FleetWatch {
   const close = () => {
     es?.close();
     es = null;
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+  };
+
+  const tick = () => {
+    timer = setTimeout(() => {
+      timer = null;
+      if (stopped || !visible()) return;
+      o.refresh();
+      tick();
+    }, pollMs);
   };
 
   const connect = () => {
-    if (stopped || es || !visible()) return;
+    if (stopped || !visible()) return;
+    if (pollMs > 0) {
+      if (timer === null) tick();
+      return;
+    }
+    if (es) return;
     const mine = open(o.url);
     if (!mine) return;
     es = mine;

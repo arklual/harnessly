@@ -226,3 +226,39 @@ func TestHubSafeOnObserveLinkOnlyWhenOptedIn(t *testing.T) {
 		t.Fatalf("reveal over the observe link: %q %v", v, err)
 	}
 }
+
+// The record of the person's connections ships dark: the hub keeps it only for a person and machine its switch
+// connections-shared is on for, in the owner's folder, and never lists it among the person's secrets.
+func TestHubSafeKeepsTheConnectionsRecordBehindItsSwitch(t *testing.T) {
+	kv := secretstest.New()
+	s := hubWithSafe(t, kv, "secrets.vault")
+	alice := s.SignIn("alice@example.com")
+	aid, _ := alice.NewSpace("Acme")
+	first := runtimeSafe(t, hubMachine(s, alice.Machine(aid, nil)))
+	second := runtimeSafe(t, hubMachine(s, alice.Machine(aid, nil)))
+	bob := s.SignIn("bob@example.com")
+	bid, _ := bob.NewSpace("Beta")
+	bobs := runtimeSafe(t, hubMachine(s, bob.Machine(bid, nil)))
+
+	if err := first.WriteSys(secrets.SysConnections, `{"version":1}`); secrets.ReasonOf(err) != secrets.ReasonDenied {
+		t.Fatalf("with the switch off: %v", err)
+	}
+	if err := s.Hub.Switches.Set(context.Background(), "connections-shared", "*", "*", true, "", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := first.WriteSys(secrets.SysConnections, `{"version":1}`); err != nil {
+		t.Fatal(err)
+	}
+	if v, err := second.ReadSys(secrets.SysConnections); err != nil || v != `{"version":1}` {
+		t.Fatalf("the second machine of the person reads %q %v", v, err)
+	}
+	if _, err := bobs.ReadSys(secrets.SysConnections); secrets.ReasonOf(err) != secrets.ReasonNotFound {
+		t.Fatalf("another person's machine: %v", err)
+	}
+	if views, err := first.List(); err != nil || len(views) != 0 {
+		t.Fatalf("the record in the person's list: %+v %v", views, err)
+	}
+	if _, err := first.ReadSys("sys/other"); secrets.ReasonOf(err) != secrets.ReasonBadName {
+		t.Fatalf("another record: %v", err)
+	}
+}

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/features"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/switches"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 	"github.com/ly-solutions/harnessly/internal/secrets"
 )
@@ -54,6 +56,9 @@ func (h *Hub) agentSecrets(w http.ResponseWriter, r *http.Request) error {
 	if err := json.Unmarshal(body, &req); err != nil {
 		return httpx.Invalid("body", "Некорректный запрос")
 	}
+	if secrets.ValidSysName(req.Name) && !h.sysRecordOn(ctx, req.Name, m.CreatedBy, m.ID) {
+		return safeError(&secrets.Refusal{Reason: secrets.ReasonDenied})
+	}
 	names, data, err := h.Safe.Do(ctx, m.CreatedBy, req)
 	if action, ok := safeAudit[req.Op]; ok {
 		target := req.Name
@@ -94,6 +99,20 @@ func (h *Hub) agentSecrets(w http.ResponseWriter, r *http.Request) error {
 	}
 	httpx.WriteJSON(w, http.StatusOK, hubproto.SecretsAnswer{Sealed: sealed})
 	return nil
+}
+
+// sysRecordOn says whether a machine may keep harnessly's record name in its owner's folder: each record ships dark
+// behind its rollout switch, by the owner and the machine (docs/hub/rollout-switches.md).
+func (h *Hub) sysRecordOn(ctx context.Context, name, ownerID, machineID string) bool {
+	feature := map[string]string{secrets.SysConnections: switches.ConnectionsShared}[name]
+	if feature == "" || h.Switches == nil {
+		return false
+	}
+	u, err := h.db.S().UserByID(ctx, ownerID)
+	if err != nil {
+		return false
+	}
+	return h.Switches.On(ctx, feature, u.Email, machineID)
 }
 
 // safeError is the answer to a refusal, its reason as the code (the agent turns it back into the same refusal).

@@ -4,6 +4,7 @@
 // person did here (a notice taken away is a read, the switches are saved), and applies what the stream brings from
 // the other devices, so a notice read on one device goes from the others without a poll.
 import { deviceId } from '@/next/core/device';
+import { SHORT_POLL_MS, usesHttp1 } from '@/next/core/net/http';
 import {
   applyRemoteNotify,
   dropNotices,
@@ -46,6 +47,8 @@ export interface INoticesSyncOptions {
   fetchImpl?: typeof fetch;
   stream?: (url: string) => INoticesStream;
   device?: string;
+  /** Reads the list every so many ms instead of the stream: by default over HTTP/1.1, 0 (the stream) otherwise. */
+  pollMs?: number;
 }
 
 /** Starts the sync; returns its stop. A failed answer leaves the cache alone and tries again at the next change. */
@@ -59,6 +62,8 @@ export const startNoticesSync = (o: INoticesSyncOptions): (() => void) => {
   let rev = 0;
   /** Keys the database holds as unread: what leaves the list while in this set is a read to send. */
   const known = new Set<string>();
+  /** Keys read on this page whose read the database's list has not shown yet. */
+  const readHere = new Set<string>();
   let applying = false;
 
   const send = (path: string, method: string, body: unknown) =>
@@ -86,7 +91,10 @@ export const startNoticesSync = (o: INoticesSyncOptions): (() => void) => {
     if (applying || !live) return;
     const now = new Set(noticesSnapshot().map((n) => n.key));
     const gone = [...known].filter((k) => !now.has(k));
-    for (const k of gone) known.delete(k);
+    for (const k of gone) {
+      known.delete(k);
+      readHere.add(k);
+    }
     if (gone.length > 0) void send('/read', 'POST', { keys: gone, from: device });
     for (const n of noticesSnapshot()) {
       if (known.has(n.key)) continue;
@@ -110,30 +118,62 @@ export const startNoticesSync = (o: INoticesSyncOptions): (() => void) => {
       .catch(() => undefined);
   };
 
-  void f(`${root}${q}`, { credentials: 'include' })
-    .then((r) => (r.ok ? (r.json() as Promise<IState>) : null))
-    .then((st) => {
-      if (!st || !live) return;
-      const reads = new Set(st.reads.map((r) => r.key));
-      for (const item of st.items) if (!reads.has(item.key)) take(item);
-      apply(() => dropNotices((n) => reads.has(n.key)));
-      for (const k of reads) known.delete(k);
-      rev = st.settings.rev;
-      if (st.settings.rev > 0 && st.settings.doc) apply(() => applyRemoteNotify(st.settings.doc));
-      onList(); // what this page has and the database lacks goes up
-    })
-    .catch(() => undefined);
+  const load = () =>
+    f(`${root}${q}`, { credentials: 'include' })
+      .then((r) => (r.ok ? (r.json() as Promise<IState>) : null))
+      .then((st) => {
+        if (!st || !live) return;
+        const reads = new Set(st.reads.map((r) => r.key));
+        // A read sent from here that the answer does not show yet stays read: the list must not bring it back.
+        for (const item of st.items) if (!reads.has(item.key) && !readHere.has(item.key)) take(item);
+        for (const k of reads) readHere.delete(k);
+        apply(() => dropNotices((n) => reads.has(n.key)));
+        for (const k of reads) known.delete(k);
+        const newer = st.settings.rev > rev;
+        rev = st.settings.rev;
+        if (newer && st.settings.doc) apply(() => applyRemoteNotify(st.settings.doc));
+        onList(); // what this page has and the database lacks goes up
+      })
+      .catch(() => undefined);
+  void load();
 
   const unList = subscribeNotices(onList);
   const unNotify = subscribeNotify(onSettings);
 
+  // Over HTTP/1.1 the page reads the list again while it is in view instead of holding the stream: a held
+  // request takes one of the browser's six connections to the site, and every tab of it held one, hidden or not.
+  const pollMs = o.pollMs ?? (usesHttp1() ? SHORT_POLL_MS : 0);
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const visible = () => typeof document === 'undefined' || document.visibilityState === 'visible';
+  const tick = () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      if (!live) return;
+      if (visible()) void load().finally(() => live && tick());
+    }, pollMs);
+  };
+  const onVisibility = () => {
+    if (!live || !visible()) return;
+    void load();
+    tick();
+  };
+  if (pollMs > 0) {
+    tick();
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility);
+  }
+
   let es: INoticesStream | null = null;
   try {
     es =
-      o.stream?.(`${root}/stream${q}`) ??
-      (typeof EventSource === 'undefined'
+      pollMs > 0
         ? null
-        : (new EventSource(`${root}/stream${q}`, { withCredentials: true }) as unknown as INoticesStream));
+        : (o.stream?.(`${root}/stream${q}`) ??
+          (typeof EventSource === 'undefined'
+            ? null
+            : (new EventSource(`${root}/stream${q}`, {
+                withCredentials: true,
+              }) as unknown as INoticesStream)));
   } catch {
     es = null;
   }
@@ -165,5 +205,8 @@ export const startNoticesSync = (o: INoticesSyncOptions): (() => void) => {
     unList();
     unNotify();
     es?.close();
+    if (timer !== null) clearTimeout(timer);
+    if (pollMs > 0 && typeof document !== 'undefined')
+      document.removeEventListener('visibilitychange', onVisibility);
   };
 };

@@ -36,8 +36,19 @@ func ValidAppName(name string) bool {
 	return ok && AppName(app, n) == name
 }
 
-// ValidSharedName is a name a shared safe (the hub's, a server's) keeps: a person's plain name or an app's secret.
-func ValidSharedName(name string) bool { return ValidName(name) || ValidAppName(name) }
+// ValidSharedName is a name a shared safe (the hub's, a server's) keeps: a person's plain name, an app's secret or one of
+// harnessly's own records of the person.
+func ValidSharedName(name string) bool {
+	return ValidName(name) || ValidAppName(name) || ValidSysName(name)
+}
+
+// SysConnections is harnessly's record of the person's connections (Settings → Connections) in their shared safe: the
+// list without credentials, so a new machine of the person has them. Like an app's secret it has a slash, so
+// no route that takes a plain name (the page's safe list, `harnessly secret run`) ever sees it.
+const SysConnections = "sys/connections"
+
+// ValidSysName says whether name is one of harnessly's own records a shared safe keeps.
+func ValidSysName(name string) bool { return name == SysConnections }
 
 // AppShared is the shared safe an app's secrets are mirrored to, so every machine of the person has them:
 // a VM is only a runner, an app's token put on one is there on the next.

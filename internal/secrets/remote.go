@@ -486,3 +486,34 @@ func (r *Remote) DeleteApp(full string) error {
 	defer cancel()
 	return r.KV.Delete(ctx, r.path(full))
 }
+
+// ReadSys reads one of harnessly's own records of the person (sys/<name>); not-found when the server keeps none.
+func (r *Remote) ReadSys(name string) (string, error) {
+	if !ValidSysName(name) {
+		return "", refuse(ReasonBadName, nil)
+	}
+	ctx, cancel := ctxCall()
+	defer cancel()
+	data, err := r.KV.Read(ctx, r.path(name))
+	if err != nil {
+		return "", err
+	}
+	v, ok := valueOf(data, ValueKey)
+	if !ok || v == "" {
+		return "", refuse(ReasonNotFound, nil)
+	}
+	return v, nil
+}
+
+// WriteSys keeps one of harnessly's own records of the person on the server.
+func (r *Remote) WriteSys(name, value string) error {
+	if !ValidSysName(name) {
+		return refuse(ReasonBadName, nil)
+	}
+	if value == "" {
+		return refuse(ReasonEmpty, nil)
+	}
+	ctx, cancel := ctxCall()
+	defer cancel()
+	return r.KV.Write(ctx, r.path(name), map[string]string{ValueKey: value})
+}
