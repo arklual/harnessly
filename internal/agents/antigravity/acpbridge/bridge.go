@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -292,6 +293,8 @@ func resolve(o *configOption, want string) (string, bool) {
 	return "", false
 }
 
+var leveled = regexp.MustCompile(`^(.+)-(low|medium|high|xhigh)$`)
+
 // configure sets the model, the effort and the mode; "" leaves one as it is. The model goes first: a model has its
 // own efforts.
 func (b *Bridge) configure(ctx context.Context, model, effort, mode string) error {
@@ -332,6 +335,19 @@ func (b *Bridge) configure(ctx context.Context, model, effort, mode string) erro
 		}
 		b.mu.Unlock()
 	}
+	// A model named with its level in it, as `agy models` lists it (gemini-4-neon-high), is the family at that level.
+	b.mu.Lock()
+	if _, ok := resolve(b.option("model"), model); !ok {
+		if g := leveled.FindStringSubmatch(model); g != nil {
+			if _, ok := resolve(b.option("model"), g[1]); ok {
+				model = g[1]
+				if effort == "" {
+					effort = g[2]
+				}
+			}
+		}
+	}
+	b.mu.Unlock()
 	set("model", model)
 	set("thought_level", effort)
 	if mode != "" {
