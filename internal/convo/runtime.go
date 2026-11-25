@@ -771,7 +771,8 @@ func (r *Runtime) InputTurnEnded(id string, failed bool, detail string) error {
 		return ErrNotFound
 	}
 	return r.on(a, func(c *conv, now time.Time) {
-		if !c.inputTurns {
+		if !c.inputTurns && c.rec.Provider != wire.ProviderAntigravity {
+			// Antigravity's channel tells every turn's end, one typed in its terminal too: it has no Stop hook.
 			return
 		}
 		c.read(now)
@@ -1801,7 +1802,8 @@ func (r *Runtime) worktree(cwd, name string) (string, error) {
 
 func (r *Runtime) create(m wire.ConversationCreateCmd, person string) wire.CmdResult {
 	if m.Provider == wire.ProviderAntigravity {
-		if m.Profile != "" || (m.Model != nil && (m.Model.Profile != "" || m.Model.Fast || m.Model.Ultracode || (m.Model.Permission != "" && m.Model.Permission != wire.PermissionAsk && m.Model.Permission != wire.PermissionPlan))) || (m.First != nil && len(m.First.AttachmentIDs) > 0) {
+		structured := r.d.Input != nil
+		if m.Profile != "" || (m.Model != nil && (m.Model.Profile != "" || m.Model.Fast || m.Model.Ultracode || (m.Model.Permission != "" && m.Model.Permission != wire.PermissionAsk && m.Model.Permission != wire.PermissionPlan && !(structured && m.Model.Permission == wire.PermissionBypass)))) || (!structured && m.First != nil && len(m.First.AttachmentIDs) > 0) {
 			return wire.Refused(wire.RefuseUnsupported)
 		}
 	}

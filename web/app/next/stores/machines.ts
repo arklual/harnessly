@@ -200,6 +200,12 @@ export const hasFeature = (m: MachineId, f: Feature): boolean =>
   machinesStore.get(m)?.features.includes(f) ?? false;
 
 export const useMachine = (m: MachineId | null) => useKey(machinesStore, m);
+
+/** Antigravity chats of the machine run beside their ACP bridge: pictures, steering, approvals on cards and model
+ *  changes go over it. The machine says so by its native agent's canSwitchModel. */
+export const agyBridgedOf = (view: MachineView | null | undefined): boolean =>
+  view?.machine.agents?.some((a) => a.provider === 'antigravity' && a.canSwitchModel) ?? false;
+export const agyBridged = (m: MachineId): boolean => agyBridgedOf(machinesStore.get(m));
 export const useActiveMachine = () => useStore(activeMachineStore);
 export const useHomeMachine = () => useStore(homeMachineStore);
 

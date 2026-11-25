@@ -260,7 +260,7 @@ func (c *conv) terminalOff() bool { return c.d.TerminalOff != nil && c.d.Termina
 var longTextName = locale.Pick("whole-message.md", "сообщение-целиком.md")
 
 func (c *conv) send(m wire.SendCmd, now time.Time) wire.CmdResult {
-	if c.rec.Provider == wire.ProviderAntigravity && (len(m.AttachmentIDs) > 0 || m.Mode == wire.ModeSteer) {
+	if c.rec.Provider == wire.ProviderAntigravity && c.d.Input == nil && (len(m.AttachmentIDs) > 0 || m.Mode == wire.ModeSteer) {
 		return wire.Refused(wire.RefuseUnsupported)
 	}
 	if c.terminalOff() && chatguard.BashMode(m.Text) {
@@ -541,15 +541,16 @@ func answerKeys(items []wire.QuestionItem, answers []wire.QuestionAnswer) ([]scr
 }
 
 func (c *conv) decide(device string, m wire.DecideCmd, now time.Time) wire.CmdResult {
-	if c.rec.Provider == wire.ProviderAntigravity {
-		return wire.Refused(wire.RefuseUnsupported)
-	}
 	g, code := c.gateFor(m.PermissionID)
 	if code != "" {
 		return wire.Refused(code)
 	}
 	if g.p == nil {
 		return wire.Refused(wire.RefuseGateClosed)
+	}
+	if c.rec.Provider == wire.ProviderAntigravity && g.reply == nil {
+		// Antigravity's asks are answered over its channel; its terminal has no menu to pick from.
+		return wire.Refused(wire.RefuseUnsupported)
 	}
 	want := typist.PickWant{Plan: g.p.Kind == wire.PermPlan, Dialog: g.p.Kind == wire.PermDialog, Cwd: c.rec.Cwd}
 	if want.Dialog && g.p.PlanMD != nil {
@@ -644,6 +645,30 @@ func (c *conv) interrupt(m wire.InterruptCmd, now time.Time) wire.CmdResult {
 		c.change(c.box.Pause(wire.PausedInterrupted, now), now)
 	}
 	session, clock := c.rec.Session, c.d.Clock
+	if in, ok := c.d.Input.(Interrupter); ok && c.rec.Provider == wire.ProviderAntigravity && !c.inputOff {
+		rec := c.rec
+		c.spawn(func() any {
+			ctx, cancel := context.WithTimeout(context.Background(), inputSendLimit)
+			defer cancel()
+			if err := in.Interrupt(ctx, rec); err == nil {
+				return nil
+			}
+			// No channel: the Escape in the terminal stops it as well.
+			_, unlock := typist.Preempt(session)
+			defer unlock()
+			return typist.Interrupt(pane, clock)
+		}, func(r any) {
+			if err, _ := r.(error); err != nil {
+				c.d.Log.Warn("interrupt failed", "conv", c.rec.ID, "err", err)
+				c.interruptAt = time.Time{}
+			}
+			c.read(c.d.Clock.Now())
+		})
+		if c.mark == 0 {
+			return wire.Accepted(wire.ConvChannel(c.rec.ID), c.seq+1)
+		}
+		return wire.Accepted(wire.ConvChannel(c.rec.ID), c.mark)
+	}
 	c.spawn(func() any {
 		// Stop does not wait behind a message being typed: the pane is taken from its writer, whose try ends there.
 		_, unlock := typist.Preempt(session)

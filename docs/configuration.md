@@ -184,10 +184,29 @@ new-user-prompt acknowledgement; actual `USER_INPUT` records confirm delivery. `
 `fullyIdle=true`. The input adapter recognizes the native frame and rechecks live ownership before paste/Enter;
 unknown screens, foreign input, permission dialogs and a shell block automated delivery.
 
-The normal v2 picker and delegation use `antigravity` after enablement. Initially unsupported: fork/rewind, steering,
-native terminal attachments, fast/ultracode, backend profiles, live model switching, and apps requiring an enforced
-pre-tool wall. These requests are refused server-side as well as hidden/disabled in the UI. Codex and Claude retain
-their existing defaults and launch paths. The official consumer-plan support caveat in the image section applies here too.
+#### Chats over ACP (the bridge)
+
+When native chats are on and the runtime knows its harnessly CLI (`HARNESSLY_BIN`, or the CLI beside the runtime), a
+native chat runs as `harnessly antigravity-acp`: a bridge to the official CLI's Agent Client Protocol (`agy acp`), the
+way T3 Code drives Antigravity, instead of its terminal UI. The bridge owns the ACP session, draws the conversation in
+the chat's terminal (the person can type there: Enter sends, Escape stops the turn, y/a/n answer an approval) and
+listens on a socket of the tab (`<data>/antigravity-input/<tab>.sock`; a private folder in the temporary folder when
+the data folder's path is too long for a unix socket). Over it the runtime:
+
+- sends messages, pictures included (ACP image blocks), and steers: a message during a turn joins that turn;
+- stops the turn (`session/cancel`);
+- puts approvals on the chat's cards (`session/request_permission`); the bypass mode allows by itself;
+- changes the model, the thinking level and the mode while the chat runs (`session/set_config_option`): the picker
+  offers the model families of `agy models` with their levels, and `canSwitchModel` is on;
+- learns the session and its transcript from the bridge itself (ACP fires no `SessionStart`/`Stop` hooks), and every
+  turn's end; reconnecting after a runtime restart ends a turn that finished meanwhile.
+
+No folder-trust dialog stands in the way of a launch. When the `harnessly-native` plugin is not installed, the bridge
+gives the session the harnessly MCP server itself, so an `agy` update that drops the plugin no longer drops the tools.
+Still unsupported: fork/rewind, question cards, apps, fast/ultracode and backend profiles; these are refused
+server-side and hidden in the UI. Without a CLI for the bridge, chats run in the native terminal UI with the
+limitations of the section above. Codex and Claude retain their existing defaults and launch paths. The official
+consumer-plan support caveat in the image section applies here too.
 
 ### Prompt delivery
 

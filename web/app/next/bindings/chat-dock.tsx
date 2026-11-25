@@ -109,7 +109,7 @@ import { limitPlaceholder } from '@/next/features/chat/limit';
 import { machineNow } from '@/next/core/clock';
 import { useDraftParts, useDraftText } from '@/next/bindings/use-draft';
 import { useFieldStash } from '@/next/bindings/use-stash';
-import { limitsOf, useMachine } from '@/next/stores/machines';
+import { agyBridgedOf, limitsOf, useMachine } from '@/next/stores/machines';
 import { useVoice } from '@/next/bindings/use-voice';
 import { useTakesMenu } from '@/next/bindings/use-takes';
 import { usePendingMessages, waitsInQueue, type MessageView } from '@/next/stores/messages';
@@ -198,6 +198,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   const enterSends = useEnterSends();
   const record = useConversation(conv);
   const machineView = useMachine(machine);
+  const bridged = agyBridgedOf(machineView);
   const connection = useConnection(machine);
   const queue = useQueue(conv);
   const gates = useGates(conv);
@@ -426,7 +427,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   );
   const onSubmit = useCallback(
     (sendMode: TSendMode) => {
-      if (provider === 'antigravity' && working && sendMode === 'now') {
+      if (provider === 'antigravity' && !bridged && working && sendMode === 'now') {
         toast(t('next.agents.noSteering'), { tone: 'info' });
         return;
       }
@@ -507,6 +508,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
       working,
       extra,
       provider,
+      bridged,
       installedApps,
       chatApps,
     ],
@@ -674,7 +676,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         slash={slash}
         attachments={uploads.attachments}
         onFiles={
-          provider === 'antigravity'
+          provider === 'antigravity' && !bridged
             ? () => toast(t('next.agents.noNativeAttachments'), { tone: 'info' })
             : uploads.onFiles
         }

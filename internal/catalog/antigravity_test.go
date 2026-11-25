@@ -10,7 +10,8 @@ func TestAntigravityLaunch(t *testing.T) {
 		return LaunchOptions{Models: []Model{{ID: "actual-flash-low", Label: "Actual", Efforts: []string{"high"}, DefaultEffort: strPtr("high")}}}
 	}}
 	r := cfg.Launch("antigravity")
-	if r.Provider != "antigravity" || len(r.Models) != 1 || r.Models[0].ID != "actual-flash-low" || len(r.Models[0].Efforts) != 0 || r.Models[0].DefaultEffort != nil || r.CliDefault.Model != nil {
+	// The efforts are the bridge's to set apart from the model: what the options say is offered as it is.
+	if r.Provider != "antigravity" || len(r.Models) != 1 || r.Models[0].ID != "actual-flash-low" || len(r.Models[0].Efforts) != 1 || r.Models[0].DefaultEffort == nil || r.CliDefault.Model != nil {
 		t.Fatalf("launch: %+v", r)
 	}
 	for _, provider := range []string{"antigravity", "unknown"} {

@@ -225,6 +225,8 @@ func (c *cli) run(args []string) error {
 		return c.doctor(rest)
 	case "antigravity":
 		return c.antigravityPrepare(rest)
+	case "antigravity-acp":
+		return c.antigravityACP(rest)
 	case "antigravity-mcp":
 		if len(rest) != 0 {
 			return usageErr("antigravity-mcp takes no arguments")

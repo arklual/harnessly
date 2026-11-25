@@ -363,6 +363,13 @@ agy plugin install command; installation is a separate action. The updated harne
 at its path while the plugin is installed. Native chats are experimental and require deployment setup;
 Antigravity image generation remains independently selectable.
 `,
+	"antigravity-acp": `harnessly antigravity-acp [--agy PATH] [--socket PATH] [--conversation UUID] [--model M] [--effort E] [--mode ask|plan|bypass]
+
+Internal: the agent of a native Antigravity chat. Runs the official CLI's Agent Client Protocol server (agy acp)
+in the chat's folder, draws the conversation in this terminal and takes what is typed there (Enter sends, Escape
+stops the turn, y/a/n answer an approval), and serves the runtime on --socket: messages, steering, stops,
+approvals and live model, effort and mode changes. The runtime starts it; it is not meant to be run by hand.
+`,
 	"antigravity-mcp": `harnessly antigravity-mcp
 
 Internal stdio transport, only for a bound Harnessly Antigravity launch with a launch-scoped token file.

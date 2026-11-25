@@ -1733,8 +1733,14 @@ func (c *conv) pumpWith(pane typist.Pane, look *typist.Screen, now time.Time) {
 // own («/compact», «! ls») is typed there, as is a try that only presses Enter or clears the box.
 func (c *conv) structured(job *outbox.Job) bool {
 	m := job.Message
-	return c.d.Input != nil && !c.inputOff && c.rec.Provider == wire.ProviderCodex && !m.EnterOnly && !m.ClearOnly &&
+	return c.d.Input != nil && !c.inputOff && structuredProvider(c.rec.Provider) && !m.EnterOnly && !m.ClearOnly &&
 		!m.Wipe && !commandLine(m.Text)
+}
+
+// structuredProvider: the provider's chats may run beside a structured channel (Codex's app-server, Antigravity's
+// ACP bridge).
+func structuredProvider(p wire.Provider) bool {
+	return p == wire.ProviderCodex || p == wire.ProviderAntigravity
 }
 
 func commandLine(text string) bool {
