@@ -55,6 +55,13 @@ func errno(err error) string {
 func (d *Device) fsOp(r *FSReq) *FSResp {
 	p := fromShellPath(r.Path)
 	resp := &FSResp{}
+	switch r.Op {
+	case "write", "create", "mkdir", "unlink", "rmdir", "rename", "truncate", "chmod", "symlink":
+		// The journal keeps what the agent changed; reads are too many to write down.
+		if r.Op != "write" || r.Off == 0 {
+			d.logf("fs %s %s %s", r.Op, r.Path, r.To)
+		}
+	}
 	var err error
 	switch r.Op {
 	case "stat", "lstat":
