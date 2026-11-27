@@ -1529,33 +1529,35 @@ const Sidebar = ({
                 <Fragment key={project.id}>
                   {band !== undefined && renderBand(band)}
                   <div
-                  className="hx-nav__group hx-enter"
-                  data-enter="up"
-                  data-eb="520"
-                  data-i={Math.min(i, 24)}
-                  aria-expanded={open}
-                >
-                  <ProjectHead
-                    id={project.id}
-                    name={project.name}
-                    open={open}
-                    onToggle={() => toggleProject(project.id, open)}
-                    onNewChat={actions.onNewChatIn ? () => actions.onNewChatIn?.(project.id) : undefined}
-                    onLook={() => openLookEditor({ k: 'folder', id: project.id })}
-                    onSettings={
-                      actions.onProjectSettings ? () => actions.onProjectSettings?.(project.id) : undefined
-                    }
-                  />
-                  {!open && folderPrefs.peek && (
-                    <div className="hx-nav__peek">
-                      {renderRows(peekedChats(inProject, now, currentId), ROW_VARIANT.kid)}
-                    </div>
-                  )}
-                  <div className="hx-nav__kids" inert={!open}>
-                    <div>
-                      {renderFolder(project.id, inProject)}
-                      {inProject.length === 0 && <p className="hx-snote">{t('next.sidebar.projectEmpty')}</p>}
-                    </div>
+                    className="hx-nav__group hx-enter"
+                    data-enter="up"
+                    data-eb="520"
+                    data-i={Math.min(i, 24)}
+                    aria-expanded={open}
+                  >
+                    <ProjectHead
+                      id={project.id}
+                      name={project.name}
+                      open={open}
+                      onToggle={() => toggleProject(project.id, open)}
+                      onNewChat={actions.onNewChatIn ? () => actions.onNewChatIn?.(project.id) : undefined}
+                      onLook={() => openLookEditor({ k: 'folder', id: project.id })}
+                      onSettings={
+                        actions.onProjectSettings ? () => actions.onProjectSettings?.(project.id) : undefined
+                      }
+                    />
+                    {!open && folderPrefs.peek && (
+                      <div className="hx-nav__peek">
+                        {renderRows(peekedChats(inProject, now, currentId), ROW_VARIANT.kid)}
+                      </div>
+                    )}
+                    <div className="hx-nav__kids" inert={!open}>
+                      <div>
+                        {renderFolder(project.id, inProject)}
+                        {inProject.length === 0 && (
+                          <p className="hx-snote">{t('next.sidebar.projectEmpty')}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </Fragment>

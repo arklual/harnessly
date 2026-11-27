@@ -70,11 +70,19 @@ export const unsupportedAntigravityCommand = (
   body: Record<string, unknown>,
   bridged = false,
 ): boolean => {
-  const refused = ['rewind', 'rewind.undo', 'conversation.fork', 'conversation.merge', 'conversation.apps', 'answer'];
+  const refused = [
+    'rewind',
+    'rewind.undo',
+    'conversation.fork',
+    'conversation.merge',
+    'conversation.apps',
+    'answer',
+  ];
   // A chat beside its ACP bridge takes model changes, approvals, steering and pictures over it.
   if (!bridged) refused.push('model', 'decide');
   if (refused.includes(op)) return true;
-  if (!bridged && ((op === 'send' && body.mode === 'steer') || (op === 'promote' && body.to === 'steer'))) return true;
+  if (!bridged && ((op === 'send' && body.mode === 'steer') || (op === 'promote' && body.to === 'steer')))
+    return true;
   if (!bridged && Array.isArray(body.attachmentIds) && body.attachmentIds.length > 0) return true;
   if (body.profile) return true;
   const model = body.model as { fast?: boolean; ultracode?: boolean; profile?: string } | null | undefined;
