@@ -1,6 +1,8 @@
 package convo
 
 import (
+	"github.com/ly-solutions/harnessly/internal/connect/remote"
+
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -1668,8 +1670,7 @@ func (r *Runtime) createProject(m wire.ProjectCreateCmd) wire.CmdResult {
 		return r.createGroup(strings.TrimSpace(m.Name), m.Owner)
 	}
 	path := filepath.Clean(m.Path)
-	st, err := os.Stat(path)
-	if err != nil || !st.IsDir() {
+	if !dirHere(path) {
 		return wire.Refused(wire.RefuseNotFound)
 	}
 	p, seq := r.addProject(wire.Project{Path: path, Name: strings.TrimSpace(m.Name), Owner: m.Owner})
@@ -1697,7 +1698,7 @@ func (r *Runtime) updateProject(m wire.ProjectUpdateCmd) wire.CmdResult {
 	path := ""
 	if m.Path != "" {
 		path = filepath.Clean(m.Path)
-		if st, err := os.Stat(path); err != nil || !st.IsDir() {
+		if !dirHere(path) {
 			return wire.Refused(wire.RefuseNotFound)
 		}
 	}
@@ -2062,7 +2063,7 @@ func (r *Runtime) resumeSession(m wire.ConversationResumeCmd) wire.CmdResult {
 	if s.Cwd != cwd {
 		return wire.Refused(wire.RefuseBadRequest)
 	}
-	if st, err := os.Stat(cwd); err != nil || !st.IsDir() {
+	if !dirHere(cwd) {
 		return wire.Refused(wire.RefuseNotFound)
 	}
 	r.resumeMu.Lock()
@@ -2143,4 +2144,13 @@ func (r *Runtime) ProjectList() []wire.Project {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return slices.Clone(r.projects)
+}
+
+// dirHere is a folder a chat can start in: one of this machine, or one of a Connect device (checked there at launch).
+func dirHere(path string) bool {
+	if remote.Is(path) {
+		return true
+	}
+	st, err := os.Stat(path)
+	return err == nil && st.IsDir()
 }

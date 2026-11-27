@@ -59,6 +59,9 @@ type Device struct {
 	baseEnv []string
 	shell   string
 	tmp     string
+
+	shimURL, shimKey, shimBin string
+	shimWait                  *shimWait
 }
 
 type outFrame struct {
@@ -299,6 +302,8 @@ func (d *Device) handle(l *devLink, m Msg) {
 		if m.FS != nil {
 			go func() { l.sendMsg(Msg{T: "fsr", SID: m.SID, FSR: d.fsOp(m.FS)}) }()
 		}
+	case "clir", "secretsr":
+		d.shimAnswer(m)
 	case "release":
 		d.mu.Lock()
 		p := d.procs[id]
@@ -405,6 +410,7 @@ func (d *Device) prepare() {
 		d.tmp = filepath.Join(os.TempDir(), "harnessly-connect-"+d.Cfg.ID)
 		_ = os.MkdirAll(d.tmp, 0o700)
 		d.baseEnv = loginEnv(d.shell)
+		d.startShim()
 		d.logf("shell %s, %d env vars", d.shell, len(d.baseEnv))
 	})
 }
@@ -490,9 +496,23 @@ func (d *Device) start(l *devLink, id uint64, m Msg) {
 	}
 	cmd := exec.Command(d.shell, args...)
 	cmd.Dir = cwd
-	cmd.Env = mergeEnv(d.baseEnv, m.Env)
-	cmd.Stdout = writerFunc(p.bufs[0].write)
-	cmd.Stderr = writerFunc(p.bufs[1].write)
+	vars := map[string]string{}
+	for k, v := range m.Env {
+		vars[k] = v
+	}
+	for k, v := range d.shimEnv(m.SID) {
+		vars[k] = v
+	}
+	cmd.Env = d.withShimPath(mergeEnv(d.baseEnv, vars))
+	var outW, errW io.Writer = writerFunc(p.bufs[0].write), writerFunc(p.bufs[1].write)
+	flush := func() {}
+	if runtime.GOOS == "windows" {
+		// The agent sees Git Bash's paths; what Windows programs print is put in that form too.
+		ro, re := &lineRewriter{out: p.bufs[0].write}, &lineRewriter{out: p.bufs[1].write}
+		outW, errW = ro, re
+		flush = func() { ro.flush(); re.flush() }
+	}
+	cmd.Stdout, cmd.Stderr = outW, errW
 	stdin, _ := cmd.StdinPipe()
 	setGroup(cmd)
 	if err := cmd.Start(); err != nil {
@@ -511,6 +531,7 @@ func (d *Device) start(l *devLink, id uint64, m Msg) {
 				code = exitCode(ee)
 			}
 		}
+		flush()
 		var files []File
 		for _, path := range m.FilesOut {
 			raw, err := os.ReadFile(fromShellPath(d.local(path)))

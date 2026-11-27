@@ -1,6 +1,8 @@
 package tmux
 
 import (
+	"github.com/ly-solutions/harnessly/internal/connect/remote"
+
 	"crypto/rand"
 	"math"
 	"os"
@@ -318,6 +320,11 @@ func (t *Tmux) KillServer() {
 func (t *Tmux) ResolveExistingDir(preferred string) string {
 	if preferred == "" {
 		return t.cfg.Home
+	}
+	// A folder of a Connect device is the chat's own, though not here: tmux starts the shell at home instead, and
+	// the tab keeps its folder.
+	if remote.Is(preferred) {
+		return preferred
 	}
 	candidate := preferred
 	for {

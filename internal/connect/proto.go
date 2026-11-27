@@ -65,6 +65,13 @@ type Msg struct {
 	// fs (runtime → device) and fsr (device → runtime): one file operation, SID is the request's number.
 	FS  *FSReq  `json:"fs,omitempty"`
 	FSR *FSResp `json:"fsr,omitempty"`
+
+	// cli / secrets (device → runtime): the harnessly shim on the device, for the command Exec it runs under.
+	// Ctx (wrapper → runtime) is the chat's own: its tmux session, folder and harnessly variables.
+	Exec   string            `json:"exec,omitempty"`
+	Ctx    map[string]string `json:"ctx,omitempty"`
+	Stdout []byte            `json:"stdout,omitempty"`
+	Stderr []byte            `json:"stderr,omitempty"`
 }
 
 // FSReq is one file operation on the device, by path (its shell's form: /c/… on Windows). There are no handles: a

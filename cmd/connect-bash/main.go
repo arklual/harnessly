@@ -4,6 +4,9 @@
 package main
 
 import (
+	"os/exec"
+	"strings"
+
 	"fmt"
 	"os"
 	"syscall"
@@ -23,6 +26,7 @@ func main() {
 		Getenv: os.Getenv, Environ: os.Environ(), Cwd: cwd,
 		Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr,
 		Endpoint: func() (string, string, string, error) { return connect.Endpoint(os.Getenv) },
+		Session:  tmuxSession,
 		Fallback: func(args []string) int {
 			bash := "/bin/bash"
 			err := syscall.Exec(bash, append([]string{"bash"}, args...), os.Environ())
@@ -30,4 +34,16 @@ func main() {
 			return 127
 		},
 	}))
+}
+
+// tmuxSession is the chat's tmux session: the runtime runs the agent's harnessly commands from the device for it.
+func tmuxSession() string {
+	if os.Getenv("TMUX") == "" {
+		return ""
+	}
+	out, err := exec.Command("tmux", "display-message", "-p", "#{session_name}").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }

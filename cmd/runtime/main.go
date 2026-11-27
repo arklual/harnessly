@@ -557,7 +557,14 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(updateRoutes(d, checker, checkOn, self)...)
 	f.Add(machineCheckRoutes(d, self)...)
 	f.Add(agentCLIRoutes(d)...)
-	f.Add(connectRoutes(d)...)
+	f.Add(connectRoutes(d, func(session string) string {
+		for _, t := range ref.c.store.WorkspaceTabs() {
+			if t.Tab.String("sessionName") == session {
+				return t.Tab.String("cwd")
+			}
+		}
+		return ""
+	})...)
 	if launchEnvUndeclared(os.Getenv, os.LookupEnv) {
 		agent.Log("warn", "the reserved launch variables of this deployment are not set: a provider's launch is checked against harnessly's own only",
 			agent.F{K: "variable", V: extproviders.ReservedPrefixesEnv})

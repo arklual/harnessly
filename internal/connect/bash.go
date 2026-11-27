@@ -49,6 +49,8 @@ type BashEnv struct {
 	Stderr  io.Writer
 	// Endpoint gives the runtime's base URL, its cli-token and the header it goes in.
 	Endpoint func() (base, token, header string, err error)
+	// Session is the chat's tmux session, for the harnessly commands the agent runs on the device; nil: none.
+	Session func() string
 	// Fallback runs a plain local bash when no device is chosen.
 	Fallback func(args []string) int
 }
@@ -110,7 +112,17 @@ func RunBash(args []string, env BashEnv) int {
 		b, _ := json.Marshal(m)
 		return ws.Write(ctx, websocket.MessageText, b)
 	}
-	if err := send(Msg{T: "exec", Device: device, Args: rewritten, Cwd: env.Cwd, Env: vars, FilesIn: in, FilesOut: out}); err != nil {
+	ctxVars := map[string]string{"cwd": env.Cwd}
+	if env.Session != nil {
+		ctxVars["session"] = env.Session()
+	}
+	for _, kv := range env.Environ {
+		if k, v, ok := strings.Cut(kv, "="); ok && (strings.HasPrefix(k, "HARNESSLY_") || k == "TMUX" || k == "TMUX_PANE") {
+			ctxVars[k] = v
+		}
+	}
+	if err := send(Msg{T: "exec", Device: device, Args: rewritten, Cwd: env.Cwd, Env: vars, FilesIn: in, FilesOut: out,
+		Ctx: ctxVars}); err != nil {
 		return fail("нет связи с runtime: %v", err)
 	}
 

@@ -16,6 +16,14 @@ import (
 	"time"
 )
 
+// The test binary is also the harnessly shim the device puts on its commands' PATH.
+func TestMain(m *testing.M) {
+	if filepath.Base(os.Args[0]) == "harnessly" {
+		os.Exit(RunShim(os.Args[1:], os.Stdin, os.Stdout, os.Stderr, false))
+	}
+	os.Exit(m.Run())
+}
+
 type rig struct {
 	srv    *Server
 	ts     *httptest.Server
@@ -88,6 +96,7 @@ func (r *rig) bash(t *testing.T, cwd string, environ []string, args ...string) (
 		Getenv:  func(k string) string { return map[string]string{DeviceEnv: "laptop"}[k] },
 		Environ: environ, Cwd: cwd, Stdout: &out, Stderr: &errb,
 		Endpoint: func() (string, string, string, error) { return r.ts.URL, "tok", "x-cli-token", nil },
+		Session:  func() string { return "sess-1" },
 		Fallback: func([]string) int { t.Fatal("fallback"); return 0 },
 	})
 	return out.String(), errb.String(), code
@@ -244,5 +253,27 @@ func TestFSOps(t *testing.T) {
 	r.waitOnline(t, false)
 	if e := do(FSReq{Op: "stat", Path: dir}).Errno; e != "ENOTCONN" {
 		t.Fatalf("offline: %q", e)
+	}
+}
+
+func TestShimCLI(t *testing.T) {
+	r := newRig(t)
+	r.srv.RunCLI = func(ctx map[string]string, args []string, stdin []byte) (int, []byte, []byte) {
+		return 4, []byte("ran " + strings.Join(args, " ") + " session=" + ctx["session"] + " stdin=" + string(stdin)), []byte("warn\n")
+	}
+	out, errOut, code := r.bash(t, t.TempDir(), nil, "-c", "echo in | harnessly open x; echo code=$?")
+	if out != "ran open x session=sess-1 stdin=in\ncode=4\n" || errOut != "warn\n" || code != 0 {
+		t.Fatalf("out %q err %q code %d", out, errOut, code)
+	}
+}
+
+func TestShimSecretRun(t *testing.T) {
+	r := newRig(t)
+	r.srv.Secrets = func(ctx map[string]string, names []string) (map[string]string, error) {
+		return map[string]string{"api-key": "supersecret"}, nil
+	}
+	out, errOut, code := r.bash(t, t.TempDir(), nil, "-c", `harnessly secret run --env T=api-key -- sh -c 'echo $T; echo ${#T}'`)
+	if out != "********\n11\n" || code != 0 {
+		t.Fatalf("out %q err %q code %d", out, errOut, code)
 	}
 }

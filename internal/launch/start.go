@@ -5,6 +5,8 @@
 package launch
 
 import (
+	"github.com/ly-solutions/harnessly/internal/connect/remote"
+
 	"errors"
 	"os"
 	"path/filepath"
@@ -187,6 +189,10 @@ func ResolveCwd(requested, workspaceRoot string, extraRoots []string) (string, e
 	}
 	if !filepath.IsAbs(requested) {
 		return "", errors.New(msgCwdNotAbsolute.String())
+	}
+	// A folder of a Connect device is not on this machine: the launcher (connect-chat) checks it on the device.
+	if remote.Is(requested) {
+		return filepath.Clean(requested), nil
 	}
 	var roots []string
 	for _, r := range append([]string{workspaceRoot}, extraRoots...) {

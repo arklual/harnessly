@@ -36,6 +36,12 @@ const usage = `Harnessly Connect — даёт агентам harnessly дост�
 `
 
 func main() {
+	// Under the name harnessly it is the shim the agent's commands on this computer call.
+	if n := strings.TrimSuffix(strings.ToLower(filepath.Base(os.Args[0])), ".exe"); n == "harnessly" {
+		st, _ := os.Stdin.Stat()
+		tty := st != nil && st.Mode()&os.ModeCharDevice != 0
+		os.Exit(connect.RunShim(os.Args[1:], os.Stdin, os.Stdout, os.Stderr, tty))
+	}
 	if len(os.Args) < 2 {
 		fmt.Print(usage)
 		os.Exit(2)

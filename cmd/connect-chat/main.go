@@ -3,7 +3,11 @@
 // everything else stays in place; the agent starts there with its Bash going to the device (connect-bash), and the
 // mount goes when the agent ends.
 //
-//	connect-chat --device NAME --dir /Users/masha/proj -- claude [args…]
+//	connect-chat --device NAME --dir /Users/masha/proj [--cwd /Users/masha/proj/sub] -- claude [args…]
+//
+// As the runtime's Claude launcher (RUNTIME_CLAUDE_LAUNCHER pointing at a link named claude-connect) it decides for
+// every Claude the runtime starts: the runtime says whether the chat of its tmux session lives in a device folder;
+// if so it runs as above, else it becomes the real claude.
 //
 // Mounting: the runtime runs NoNewPrivileges, so the setuid fusermount does not work from a chat, and Ubuntu's
 // AppArmor gives bubblewrap's namespaces no capabilities to mount by themselves. The mount is served by a transient
@@ -31,6 +35,9 @@ import (
 )
 
 func main() {
+	if filepath.Base(os.Args[0]) == "claude-connect" {
+		os.Exit(dispatch(os.Args[1:]))
+	}
 	os.Exit(run())
 }
 
@@ -38,6 +45,7 @@ func run() int {
 	fs := flag.NewFlagSet("connect-chat", flag.ContinueOnError)
 	device := fs.String("device", os.Getenv(connect.DeviceEnv), "the device")
 	dir := fs.String("dir", "", "the folder on the device, its shell's form (/c/… on Windows)")
+	cwd := fs.String("cwd", "", "where the agent starts, in dir (dir when empty)")
 	serve := fs.String("serve-mount", "", "internal: serve the mount at this folder")
 	parent := fs.Int("parent", 0, "internal: unmount when this process ends")
 	if err := fs.Parse(os.Args[1:]); err != nil {
@@ -94,8 +102,12 @@ func run() int {
 	}
 	defer stop()
 
-	args := append(mount.BwrapArgs(mnt, *dir), "--chdir", *dir,
-		"--setenv", "CLAUDE_CODE_SHELL", shell, "--setenv", connect.DeviceEnv, *device, "--setenv", "PWD", *dir, "--")
+	start := *dir
+	if *cwd != "" && (*cwd == *dir || strings.HasPrefix(*cwd, strings.TrimSuffix(*dir, "/")+"/")) {
+		start = *cwd
+	}
+	args := append(mount.BwrapArgs(mnt, *dir), "--chdir", start,
+		"--setenv", "CLAUDE_CODE_SHELL", shell, "--setenv", connect.DeviceEnv, *device, "--setenv", "PWD", start, "--")
 	return relay(exec.Command(bwrap, append(args, cmd...)...))
 }
 

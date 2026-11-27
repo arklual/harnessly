@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/coder/websocket"
 
+	"github.com/ly-solutions/harnessly/internal/connect/remote"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
@@ -53,6 +55,34 @@ type Server struct {
 	sessions map[uint64]*session
 	nextSID  atomic.Uint64
 	fsWait   map[uint64]chan *FSResp
+	folders  []remote.Folder
+
+	// RunCLI runs the harnessly CLI for a chat (its Ctx): the shim on the device. Nil refuses.
+	RunCLI func(ctx map[string]string, args []string, stdin []byte) (code int, stdout, stderr []byte)
+	// Secrets gives the values of the safe's secrets for a chat's `secret run` on the device. Nil refuses.
+	Secrets func(ctx map[string]string, names []string) (map[string]string, error)
+}
+
+// shim answers the device's harnessly shim, for a command of a chat that is running now and only for its device.
+func (s *Server) shim(l *srvLink, m Msg) {
+	id, _ := strconv.ParseUint(m.Exec, 10, 64)
+	ss := s.session(id)
+	reply := Msg{T: m.T + "r", SID: m.SID}
+	switch {
+	case ss == nil || ss.dev != l.dev:
+		reply.Code, reply.Stderr = 1, []byte("harnessly: команда агента уже закончилась\n")
+	case m.T == "cli" && s.RunCLI != nil:
+		reply.Code, reply.Stdout, reply.Stderr = s.RunCLI(ss.ctx, m.Args, m.Data)
+	case m.T == "secrets" && s.Secrets != nil:
+		env, err := s.Secrets(ss.ctx, m.Args)
+		if err != nil {
+			reply.Code, reply.Error = 1, err.Error()
+		}
+		reply.Env = env
+	default:
+		reply.Code, reply.Stderr = 1, []byte("harnessly: этот runtime не принимает команды с устройства\n")
+	}
+	l.sendMsg(reply)
 }
 
 type srvLink struct {
@@ -85,6 +115,7 @@ type session struct {
 	mu      sync.Mutex
 	got     [2]int64
 	pending []Msg // signals and stdin that came while the device was away
+	ctx     map[string]string
 }
 
 func (s *session) finish() { s.once.Do(func() { close(s.done) }) }
@@ -116,6 +147,10 @@ func (s *Server) init() {
 		s.sessions = map[uint64]*session{}
 		s.fsWait = map[uint64]chan *FSResp{}
 		s.nextSID.Store(uint64(time.Now().UnixNano()))
+		if raw, err := os.ReadFile(filepath.Join(s.Dir, "folders.json")); err == nil {
+			_ = json.Unmarshal(raw, &s.folders)
+		}
+		remote.Set(s.folders)
 		raw, err := os.ReadFile(filepath.Join(s.Dir, "devices.json"))
 		if err == nil {
 			var list []*DeviceRec
@@ -151,6 +186,82 @@ func randomID(n int) string {
 	b := make([]byte, n)
 	_, _ = rand.Read(b)
 	return strings.ToLower(b32.EncodeToString(b))
+}
+
+// Load reads the devices and folders now: the folders must be known before the first chat starts.
+func (s *Server) Load() { s.init() }
+
+// Folders are the device folders chats can start in.
+func (s *Server) Folders() []remote.Folder {
+	s.init()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]remote.Folder(nil), s.folders...)
+}
+
+// AddFolder makes dir (the device's own form of the path) a folder chats can start in on that device.
+func (s *Server) AddFolder(device, dir string) (remote.Folder, error) {
+	s.init()
+	dir = path.Clean(strings.TrimSpace(dir))
+	if !strings.HasPrefix(dir, "/") {
+		return remote.Folder{}, errors.New("нужен полный путь на устройстве (/Users/… или /c/Users/… для Windows)")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	d := s.find(device)
+	if d == nil {
+		return remote.Folder{}, errors.New("нет такого устройства")
+	}
+	f := remote.Folder{Device: d.ID, Dir: dir}
+	s.folders = slices.DeleteFunc(s.folders, func(o remote.Folder) bool { return o.Dir == dir })
+	s.folders = append(s.folders, f)
+	s.saveFolders()
+	return f, nil
+}
+
+// RemoveFolder forgets a device folder; false when there was none.
+func (s *Server) RemoveFolder(dir string) bool {
+	s.init()
+	dir = path.Clean(strings.TrimSpace(dir))
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := len(s.folders)
+	s.folders = slices.DeleteFunc(s.folders, func(o remote.Folder) bool { return o.Dir == dir })
+	if len(s.folders) == n {
+		return false
+	}
+	s.saveFolders()
+	return true
+}
+
+// saveFolders writes the folders and tells the runtime's places that check folders; s.mu is held.
+func (s *Server) saveFolders() {
+	remote.Set(s.folders)
+	raw, _ := json.MarshalIndent(s.folders, "", "  ")
+	_ = os.MkdirAll(s.Dir, 0o700)
+	tmp := filepath.Join(s.Dir, ".folders.json.tmp")
+	if os.WriteFile(tmp, raw, 0o600) == nil {
+		_ = os.Rename(tmp, filepath.Join(s.Dir, "folders.json"))
+	}
+}
+
+// Route is where a chat in folder cwd runs: its device (id, name, OS) when cwd is a device folder.
+func (s *Server) Route(cwd string) (DeviceRec, string, bool) {
+	s.init()
+	f, ok := remote.Of(cwd)
+	if !ok {
+		return DeviceRec{}, "", false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	d := s.devices[f.Device]
+	if d == nil {
+		return DeviceRec{}, "", false
+	}
+	c := *d
+	c.Pub = nil
+	_, c.Online = s.links[d.ID]
+	return c, f.Dir, true
 }
 
 // IssueCode gives a one-time pairing code, good for 30 minutes.
@@ -208,6 +319,8 @@ func (s *Server) Revoke(idOrName string) bool {
 		return false
 	}
 	delete(s.devices, d.ID)
+	s.folders = slices.DeleteFunc(s.folders, func(o remote.Folder) bool { return o.Device == d.ID })
+	s.saveFolders()
 	l := s.links[d.ID]
 	delete(s.links, d.ID)
 	s.save()
@@ -454,6 +567,10 @@ func (s *Server) serveLink(ctx context.Context, l *srvLink) error {
 			continue
 		}
 		id, _ := strconv.ParseUint(m.SID, 10, 64)
+		if m.T == "cli" || m.T == "secrets" {
+			go s.shim(l, m)
+			continue
+		}
 		if m.T == "fsr" {
 			s.mu.Lock()
 			ch := s.fsWait[id]
@@ -578,7 +695,8 @@ func (s *Server) ServeExec(w http.ResponseWriter, r *http.Request) {
 		refuse("устройство «" + d.Name + "» офлайн: откройте Harnessly Connect на нём")
 		return
 	}
-	ss := &session{id: s.nextSID.Add(1), dev: d.ID, wrapper: make(chan outFrame, 256), done: make(chan struct{})}
+	ss := &session{id: s.nextSID.Add(1), dev: d.ID, wrapper: make(chan outFrame, 256), done: make(chan struct{}), ctx: m.Ctx}
+	m.Ctx = nil
 	s.mu.Lock()
 	s.sessions[ss.id] = ss
 	s.mu.Unlock()
