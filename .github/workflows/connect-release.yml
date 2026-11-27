@@ -1,0 +1,70 @@
+# Harnessly Connect, the app on a person's computer: a tag connect-vX.Y.Z builds it for macOS, Linux and Windows and
+# publishes a release with the archives, checksums.txt and checksums.txt.sig (Ed25519, the key in the secret
+# CONNECT_SIGNING_KEY; its public half in the variable CONNECT_UPDATE_KEY is built into the app, which updates itself
+# only from releases that carry a good signature). Make the key once: go run ./cmd/connect-sign keygen.
+name: connect-release
+
+on:
+  push:
+    tags: ["connect-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - {os: ubuntu-latest, goos: linux, goarch: amd64, cgo: "0"}
+          - {os: ubuntu-latest, goos: linux, goarch: arm64, cgo: "0"}
+          - {os: ubuntu-latest, goos: windows, goarch: amd64, cgo: "0"}
+          - {os: ubuntu-latest, goos: windows, goarch: arm64, cgo: "0"}
+          # The tray on macOS needs cgo (Cocoa): built on a Mac for both architectures.
+          - {os: macos-latest, goos: darwin, goarch: arm64, cgo: "1"}
+          - {os: macos-latest, goos: darwin, goarch: amd64, cgo: "1"}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: {go-version-file: go.mod}
+      - name: build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: ${{ matrix.cgo }}
+        run: |
+          v="${GITHUB_REF_NAME#connect-v}"
+          ld="-s -w -X main.version=$v -X main.updateRepo=${{ github.repository }} -X main.updateKey=${{ vars.CONNECT_UPDATE_KEY }}"
+          out=connect
+          if [ "$GOOS" = windows ]; then out=connect.exe; ld="$ld -H windowsgui"; fi
+          if [ "$GOOS" = darwin ] && [ "$GOARCH" = amd64 ]; then export CC="clang -arch x86_64"; fi
+          mkdir -p pkg
+          go build -trimpath -ldflags "$ld" -o "pkg/$out" ./cmd/connect
+          cp docs/connect.md pkg/README.md
+          name="harnessly-connect_${GOOS}_${GOARCH}"
+          if [ "$GOOS" = windows ]; then (cd pkg && zip -q "../$name.zip" *); else tar -C pkg -czf "$name.tar.gz" .; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.goos }}-${{ matrix.goarch }}
+          path: harnessly-connect_*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: {go-version-file: go.mod}
+      - uses: actions/download-artifact@v4
+        with: {path: dist, merge-multiple: true}
+      - name: checksums and signature
+        env:
+          CONNECT_SIGNING_KEY: ${{ secrets.CONNECT_SIGNING_KEY }}
+        run: |
+          cd dist && sha256sum harnessly-connect_* > checksums.txt && cd ..
+          go run ./cmd/connect-sign sign dist/checksums.txt
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "Harnessly Connect ${GITHUB_REF_NAME#connect-v}" --notes "See docs/connect.md."

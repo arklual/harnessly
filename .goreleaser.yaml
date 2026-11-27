@@ -48,6 +48,27 @@ builds:
       - -s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion={{ .Version }}
       - -X github.com/ly-solutions/harnessly/internal/telemetry.DefaultURL={{ envOrDefault "HARNESSLY_TELEMETRY_URL" "" }} -X github.com/ly-solutions/harnessly/internal/telemetry.DefaultKey={{ envOrDefault "HARNESSLY_TELEMETRY_KEY" "" }}
 
+  # Harnessly Connect's server side: the agent's shell and the launcher of chats in device folders (docs/connect.md).
+  # Linux only: the device's folder is mounted with FUSE and shown at its path with bubblewrap.
+  - id: connect-bash
+    main: ./cmd/connect-bash
+    binary: connect-bash
+    env: [CGO_ENABLED=0]
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags: [-s -w]
+  - id: connect-chat
+    main: ./cmd/connect-chat
+    binary: connect-chat
+    env: [CGO_ENABLED=0]
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags: [-s -w]
+
 archives:
   - formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"

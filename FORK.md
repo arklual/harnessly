@@ -88,3 +88,13 @@ v0.16.154 (откачен из-за багов) — `klodik-0.16.154`; v0.16.86 
 
 Без Actions можно вынуть страницу из релизного бинаря (`extract_embed.py <релиз>/runtime dist web/dist`) и прогнать
 `python3 -I scripts/klodik-dist.py web/dist`: скрипт ставит наше название и значок прямо в собранные файлы.
+
+## Harnessly Connect (branch `klodik-connect`)
+
+An app on the person's laptop that gives the agents of this standalone runtime the laptop's files and shell while
+Claude Code stays on the server: see docs/connect.md. Files: `internal/connect` (protocol, device, server, wrapper,
+FUSE mount, folder registry), `cmd/connect` (the app: tray, window, journal, autostart, self-update), `cmd/connect-bash`,
+`cmd/connect-chat` (also the Claude launcher `claude-connect`), `cmd/connect-sign`, `cmd/runtime/connect_routes.go`,
+`internal/hlcli/connect.go`, `.github/workflows/connect-release.yml`. Touches upstream code in four places, all through
+`internal/connect/remote` (a device folder is left as it is): `tmux.ResolveExistingDir` and `CreateSession`,
+`launch.ResolveCwd`, and v2 projects (`convo.dirHere`). An upstream sync must keep those.

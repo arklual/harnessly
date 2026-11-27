@@ -34,7 +34,9 @@ type app struct {
 }
 
 func newApp() *app {
-	return &app{log: log.New(openJournal(), "", log.LstdFlags)}
+	a := &app{log: log.New(openJournal(), "", log.LstdFlags)}
+	go a.updater(context.Background())
+	return a
 }
 
 func (a *app) state() (paired bool, name, url string, running, online bool, why string, commands int) {
