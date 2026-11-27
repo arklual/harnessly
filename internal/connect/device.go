@@ -295,6 +295,10 @@ func (d *Device) handle(l *devLink, m Msg) {
 		if p := d.proc(id); p != nil {
 			p.signal(m.Sig)
 		}
+	case "fs":
+		if m.FS != nil {
+			go func() { l.sendMsg(Msg{T: "fsr", SID: m.SID, FSR: d.fsOp(m.FS)}) }()
+		}
 	case "release":
 		d.mu.Lock()
 		p := d.procs[id]

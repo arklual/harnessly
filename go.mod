@@ -38,6 +38,7 @@ require (
 	filippo.io/age v1.3.2
 	github.com/emersion/go-ical v0.0.0-20240127095438-fc1c9d8fb2b6
 	github.com/gotd/td v0.166.1
+	github.com/hanwen/go-fuse/v2 v2.8.0
 	github.com/minio/minio-go/v7 v7.4.1
 	github.com/pion/webrtc/v4 v4.2.27
 	github.com/teambition/rrule-go v1.8.2

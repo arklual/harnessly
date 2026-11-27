@@ -3,6 +3,7 @@
 package connect
 
 import (
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -73,4 +74,38 @@ func fromShellPath(p string) string {
 		}
 	}
 	return filepath.FromSlash(p)
+}
+
+// fixPerm: Windows has no execute bit; a file is executable by its extension or a #! line's absence is not known
+// without reading it, so scripts the agent runs go through bash anyway (644/755 by extension).
+func fixPerm(st *Stat, fi fs.FileInfo) {
+	if st.Mode&SIFMT != SIFREG {
+		if st.Mode&SIFMT == SIFDIR {
+			st.Mode = SIFDIR | 0o755
+		}
+		return
+	}
+	perm := uint32(0o644)
+	if fi.Mode().Perm()&0o200 == 0 {
+		perm = 0o444
+	}
+	switch strings.ToLower(filepath.Ext(fi.Name())) {
+	case ".exe", ".bat", ".cmd", ".com", ".sh", ".ps1":
+		perm |= 0o111
+	}
+	st.Mode = SIFREG | perm
+}
+
+func errnoName(e syscall.Errno) string {
+	switch e {
+	case syscall.ERROR_FILE_NOT_FOUND, syscall.ERROR_PATH_NOT_FOUND:
+		return "ENOENT"
+	case syscall.ERROR_ALREADY_EXISTS, syscall.ERROR_FILE_EXISTS:
+		return "EEXIST"
+	case syscall.ERROR_ACCESS_DENIED:
+		return "EACCES"
+	case syscall.ERROR_DIR_NOT_EMPTY:
+		return "ENOTEMPTY"
+	}
+	return ""
 }

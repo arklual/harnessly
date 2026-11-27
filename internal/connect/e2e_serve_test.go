@@ -17,6 +17,7 @@ func TestE2EServe(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/connect/v1/register", srv.ServeRegister)
 	mux.HandleFunc("/connect/v1/dial", srv.ServeDial)
+	mux.HandleFunc("/api/cli/connect/fs", srv.ServeFS)
 	mux.HandleFunc("/api/cli/connect/exec", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("x-cli-token") != "tok" {
 			http.Error(w, "no", 401)

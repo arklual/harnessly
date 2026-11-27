@@ -17,6 +17,7 @@ import (
 //	POST /connect/v1/register           a pairing code and a public key make a device
 //	GET  /connect/v1/dial               a device's link (WebSocket)
 //	GET  /api/cli/connect/exec          the wrapper's socket: one command on a device
+//	GET  /api/cli/connect/fs            a mount's socket: file operations on a device
 //	POST /api/cli/connect/code          a new pairing code
 //	GET  /api/cli/connect/devices       the devices, online first
 //	POST /api/cli/connect/revoke        {"device": id or name}
@@ -49,6 +50,7 @@ func connectRoutes(d deps) []gate.Route {
 		route("/connect/v1/register", nil, srv.ServeRegister),
 		route("/connect/v1/dial", nil, srv.ServeDial),
 		route("/api/cli/connect/exec", d.CLI.OK, srv.ServeExec),
+		route("/api/cli/connect/fs", d.CLI.OK, srv.ServeFS),
 		route("/api/cli/connect/code", person, post(func(w http.ResponseWriter, r *http.Request) {
 			code, exp := srv.IssueCode()
 			peerJSON(w, http.StatusOK, map[string]any{"code": code, "expires": exp.UTC().Format(time.RFC3339)})

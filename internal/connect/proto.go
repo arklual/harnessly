@@ -61,7 +61,58 @@ type Msg struct {
 
 	// error: a refusal the wrapper prints and exits on.
 	Error string `json:"error,omitempty"`
+
+	// fs (runtime → device) and fsr (device → runtime): one file operation, SID is the request's number.
+	FS  *FSReq  `json:"fs,omitempty"`
+	FSR *FSResp `json:"fsr,omitempty"`
 }
+
+// FSReq is one file operation on the device, by path (its shell's form: /c/… on Windows). There are no handles: a
+// link that drops loses nothing but the operations in flight.
+type FSReq struct {
+	Op    string `json:"op"` // stat lstat readdir read write create mkdir unlink rmdir rename truncate chmod utimens readlink symlink
+	Path  string `json:"path"`
+	To    string `json:"to,omitempty"` // rename's new path, symlink's target
+	Off   int64  `json:"off,omitempty"`
+	Size  int    `json:"size,omitempty"`
+	Data  []byte `json:"data,omitempty"`
+	Mode  uint32 `json:"mode,omitempty"`
+	Excl  bool   `json:"excl,omitempty"`
+	Mtime int64  `json:"mtime,omitempty"` // unix ns; 0 leaves it
+	Atime int64  `json:"atime,omitempty"`
+}
+
+// FSResp answers an FSReq. Errno is a POSIX name (ENOENT …), empty on success.
+type FSResp struct {
+	Errno   string   `json:"errno,omitempty"`
+	Stat    *Stat    `json:"stat,omitempty"`
+	Entries []Dirent `json:"entries,omitempty"`
+	Data    []byte   `json:"data,omitempty"`
+	N       int      `json:"n,omitempty"`
+	Target  string   `json:"target,omitempty"`
+}
+
+// Stat is a file's attributes in POSIX terms: Mode carries the type bits (S_IFDIR …) and the permissions.
+type Stat struct {
+	Mode  uint32 `json:"mode"`
+	Size  int64  `json:"size"`
+	Mtime int64  `json:"mtime"`
+	Atime int64  `json:"atime"`
+}
+
+// Dirent is one name in a folder.
+type Dirent struct {
+	Name string `json:"name"`
+	Mode uint32 `json:"mode"`
+}
+
+// POSIX type bits, the same on every device.
+const (
+	SIFMT  = 0o170000
+	SIFDIR = 0o040000
+	SIFREG = 0o100000
+	SIFLNK = 0o120000
+)
 
 // File is a small file carried with a command: the agent's own bookkeeping (its shell snapshot, the file its shell
 // writes the working directory into) lives on the runtime's machine and is mirrored around the command.

@@ -32,6 +32,7 @@ func newRig(t *testing.T) *rig {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/connect/v1/register", srv.ServeRegister)
 	mux.HandleFunc("/connect/v1/dial", srv.ServeDial)
+	mux.HandleFunc("/api/cli/connect/fs", srv.ServeFS)
 	mux.HandleFunc("/api/cli/connect/exec", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("x-cli-token") != "tok" {
 			http.Error(w, "no", http.StatusUnauthorized)
@@ -204,5 +205,44 @@ func TestKillAll(t *testing.T) {
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("wrapper hangs after KillAll")
+	}
+}
+
+func TestFSOps(t *testing.T) {
+	r := newRig(t)
+	dir := t.TempDir()
+	ctx := context.Background()
+	do := func(req FSReq) *FSResp { return r.srv.FS(ctx, "laptop", &req) }
+	if e := do(FSReq{Op: "create", Path: dir + "/a.txt", Mode: 0o644, Excl: true}).Errno; e != "" {
+		t.Fatal(e)
+	}
+	if e := do(FSReq{Op: "create", Path: dir + "/a.txt", Mode: 0o644, Excl: true}).Errno; e != "EEXIST" {
+		t.Fatalf("excl create: %q", e)
+	}
+	if w := do(FSReq{Op: "write", Path: dir + "/a.txt", Data: []byte("hello world")}); w.N != 11 {
+		t.Fatalf("write %+v", w)
+	}
+	if rd := do(FSReq{Op: "read", Path: dir + "/a.txt", Off: 6, Size: 100}); string(rd.Data) != "world" {
+		t.Fatalf("read %q", rd.Data)
+	}
+	if st := do(FSReq{Op: "stat", Path: dir + "/a.txt"}).Stat; st == nil || st.Size != 11 || st.Mode&SIFMT != SIFREG {
+		t.Fatalf("stat %+v", st)
+	}
+	_ = do(FSReq{Op: "mkdir", Path: dir + "/sub", Mode: 0o755})
+	_ = do(FSReq{Op: "rename", Path: dir + "/a.txt", To: dir + "/sub/b.txt"})
+	ls := do(FSReq{Op: "readdir", Path: dir + "/sub"})
+	if len(ls.Entries) != 1 || ls.Entries[0].Name != "b.txt" {
+		t.Fatalf("readdir %+v", ls)
+	}
+	if e := do(FSReq{Op: "rmdir", Path: dir + "/sub"}).Errno; e != "ENOTEMPTY" {
+		t.Fatalf("rmdir non-empty: %q", e)
+	}
+	if e := do(FSReq{Op: "stat", Path: dir + "/nope"}).Errno; e != "ENOENT" {
+		t.Fatalf("missing: %q", e)
+	}
+	r.cancel()
+	r.waitOnline(t, false)
+	if e := do(FSReq{Op: "stat", Path: dir}).Errno; e != "ENOTCONN" {
+		t.Fatalf("offline: %q", e)
 	}
 }

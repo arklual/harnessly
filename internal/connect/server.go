@@ -52,6 +52,7 @@ type Server struct {
 	links    map[string]*srvLink
 	sessions map[uint64]*session
 	nextSID  atomic.Uint64
+	fsWait   map[uint64]chan *FSResp
 }
 
 type srvLink struct {
@@ -113,6 +114,7 @@ func (s *Server) init() {
 		s.nonces = map[string]time.Time{}
 		s.links = map[string]*srvLink{}
 		s.sessions = map[uint64]*session{}
+		s.fsWait = map[uint64]chan *FSResp{}
 		s.nextSID.Store(uint64(time.Now().UnixNano()))
 		raw, err := os.ReadFile(filepath.Join(s.Dir, "devices.json"))
 		if err == nil {
@@ -452,6 +454,16 @@ func (s *Server) serveLink(ctx context.Context, l *srvLink) error {
 			continue
 		}
 		id, _ := strconv.ParseUint(m.SID, 10, 64)
+		if m.T == "fsr" {
+			s.mu.Lock()
+			ch := s.fsWait[id]
+			delete(s.fsWait, id)
+			s.mu.Unlock()
+			if ch != nil && m.FSR != nil {
+				ch <- m.FSR
+			}
+			continue
+		}
 		ss := s.session(id)
 		if ss == nil || ss.dev != l.dev {
 			if m.T == "exit" {

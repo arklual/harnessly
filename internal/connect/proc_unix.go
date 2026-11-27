@@ -3,6 +3,7 @@
 package connect
 
 import (
+	"io/fs"
 	"os"
 	"os/exec"
 	"syscall"
@@ -46,3 +47,35 @@ func shellMissing() string { return "на устройстве нет bash" }
 
 func toShellPath(p string) string   { return p }
 func fromShellPath(p string) string { return p }
+
+func fixPerm(*Stat, fs.FileInfo) {}
+
+func errnoName(e syscall.Errno) string {
+	switch e {
+	case syscall.ENOENT:
+		return "ENOENT"
+	case syscall.EEXIST:
+		return "EEXIST"
+	case syscall.EACCES, syscall.EPERM:
+		return "EACCES"
+	case syscall.ENOTDIR:
+		return "ENOTDIR"
+	case syscall.EISDIR:
+		return "EISDIR"
+	case syscall.ENOTEMPTY:
+		return "ENOTEMPTY"
+	case syscall.EINVAL:
+		return "EINVAL"
+	case syscall.EXDEV:
+		return "EXDEV"
+	case syscall.ENOSPC:
+		return "ENOSPC"
+	case syscall.EROFS:
+		return "EROFS"
+	case syscall.ELOOP:
+		return "ELOOP"
+	case syscall.ENAMETOOLONG:
+		return "ENAMETOOLONG"
+	}
+	return ""
+}
