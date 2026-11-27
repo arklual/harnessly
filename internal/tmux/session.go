@@ -144,7 +144,8 @@ func ParseNiceness(raw string, set bool) int {
 // server; then the config is re-read on that server. The server this may start is not niced (the pane shell is): it
 // answers every command of the runtime, each with a few seconds to do it.
 func (t *Tmux) CreateSession(name string, cols, rows int, cwd string) error {
-	if cwd == "" {
+	// A Connect device's folder is not here: the pane's shell starts at home, its agent on the device.
+	if cwd == "" || remote.Is(cwd) {
 		cwd = t.cfg.Home
 	}
 	socket := t.cfg.Socket
