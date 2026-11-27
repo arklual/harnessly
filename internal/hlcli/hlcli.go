@@ -250,6 +250,8 @@ func (c *cli) run(args []string) error {
 		return c.ask(rest)
 	case "notice", "notices":
 		return c.notice(rest)
+	case "connect":
+		return c.connect(rest)
 	case "widget", "widgets":
 		return c.widget(rest)
 	case "peers", "peer":
