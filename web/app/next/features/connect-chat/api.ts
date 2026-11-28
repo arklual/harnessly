@@ -1,7 +1,7 @@
 // «Где работает» of one chat: on this machine or on one of the person's computers through Harnessly Connect. The
 // runtime knows the computers, checks the folder on the one picked and starts the chat's agent there once its turn is
 // over; the page only asks and shows.
-import { runtimePath } from '@/next/core/net/machine';
+import { platformPath, runtimePath } from '@/next/core/net/machine';
 import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
 
@@ -34,7 +34,7 @@ const answer = async <T>(res: Response): Promise<T> => {
 
 /** Where the chat runs, and the computers it could run on; null when this machine has no Connect. */
 export const fetchConnectChat = async (m: MachineId, conv: string): Promise<IConnectChat | null> => {
-  const res = await fetch(runtimePath(`/api/cli/connect/chat?conv=${encodeURIComponent(conv)}`, m), {
+  const res = await fetch(runtimePath(platformPath(`/connect/chat?conv=${encodeURIComponent(conv)}`), m), {
     credentials: 'same-origin',
   });
   if (res.status === 404 && !res.headers.get('content-type')?.includes('json')) return null;
@@ -47,7 +47,7 @@ export const postConnectChat = async (
   conv: string,
   to: { device: string; dir: string } | null,
 ): Promise<void> => {
-  const res = await fetch(runtimePath('/api/cli/connect/chat', m), {
+  const res = await fetch(runtimePath(platformPath('/connect/chat'), m), {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'content-type': 'application/json' },

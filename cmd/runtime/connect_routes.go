@@ -183,6 +183,17 @@ func connectRoutes(d deps, tabCwd func(session string) string, chats connectChat
 		route("/api/cli/connect/chat", person, func(w http.ResponseWriter, r *http.Request) {
 			serveConnectChat(w, r, srv, chats)
 		}),
+		// The same for the page, under its own API (with or without the app's /agents base), on the person's session.
+		{
+			Match: func(r *http.Request) bool { return pathIs(r, platformAPI+"/connect/chat") },
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if !person(r) {
+					peerJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+					return
+				}
+				serveConnectChat(w, r, srv, chats)
+			}),
+		},
 		route("/api/cli/connect/revoke", person, post(func(w http.ResponseWriter, r *http.Request) {
 			var req struct{ Device string }
 			if json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&req) != nil || req.Device == "" {
