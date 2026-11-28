@@ -13,7 +13,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/agentcfg"
 	"github.com/ly-solutions/harnessly/internal/connect"
+	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
 type route struct {
@@ -41,6 +43,10 @@ func dispatch(args []string) int {
 	if err != nil || r.Device == "" {
 		err := syscall.Exec(real, append([]string{"claude"}, args...), os.Environ())
 		return fail(err)
+	}
+	// The person picked the device's folder: Claude Code must not stop at «Do you trust this folder?» there.
+	if err := trustFolder(r.Cwd); err != nil {
+		fmt.Fprintln(os.Stderr, "harnessly connect: доверие к папке:", err)
 	}
 	if err := linkTranscript(args, r.Cwd); err != nil {
 		fmt.Fprintln(os.Stderr, "harnessly connect: история чата:", err)
@@ -193,4 +199,15 @@ func claudeProject(cwd string) string {
 		}
 	}
 	return string(b)
+}
+
+// trustFolder marks the device's folder trusted and onboarding done in Claude Code's .claude.json, as the runtime does
+// for a chat's folder here (agentcfg.FirstRun).
+func trustFolder(cwd string) error {
+	home, _ := os.UserHomeDir()
+	cfg := agentcfg.Config{Home: home}
+	if dir := os.Getenv("CLAUDE_CONFIG_DIR"); dir != "" {
+		cfg.ClaudeDir, cfg.ClaudeJSON = dir, filepath.Join(dir, ".claude.json")
+	}
+	return agentcfg.New(cfg).FirstRun(wire.ProviderClaude, cwd)
 }

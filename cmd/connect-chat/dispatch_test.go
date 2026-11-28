@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -31,5 +32,18 @@ func TestLinkTranscript(t *testing.T) {
 	}
 	if _, err := os.Lstat(filepath.Join(cfg, "projects", "-home-me-other")); err == nil {
 		t.Fatal("made a project without a resume")
+	}
+}
+
+func TestTrustFolder(t *testing.T) {
+	cfg := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
+	_ = os.WriteFile(filepath.Join(cfg, ".claude.json"), []byte(`{"projects":{}}`), 0o600)
+	if err := trustFolder("/home/me/proj"); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(filepath.Join(cfg, ".claude.json"))
+	if !strings.Contains(string(raw), `"/home/me/proj"`) || !strings.Contains(string(raw), `"hasTrustDialogAccepted": true`) {
+		t.Fatalf("%s", raw)
 	}
 }
