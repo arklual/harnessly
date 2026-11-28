@@ -30,6 +30,7 @@ import { AttachmentSrc } from '@/next/ui/attachment-thumb';
 import { useFeedItems, withOrigin } from '@/next/bindings/feed-items';
 import { useChatHandoff } from '@/next/bindings/chat-handoff';
 import { useChatMove } from '@/next/bindings/chat-move';
+import { useConnectChat } from '@/next/bindings/connect-chat';
 import { inheritedMrs } from '@/next/bindings/inherited-mrs';
 import { liftedByTurn, useInheritedMade } from '@/next/bindings/inherited-made';
 import MovedNote from '@/next/features/chat-move/moved-note';
@@ -165,6 +166,7 @@ const ChatView = ({
   const record = useConversation(conv);
   const handoff = useChatHandoff(machine, conv, record);
   const move = useChatMove(machine, conv);
+  const connectSheet = useConnectChat(machine, conv);
   const hasOlderTurns = (feed?.beforeTurnId ?? null) !== null;
   const items = useMemo(
     () => (read ? [...withOrigin(read, handoff.origin, handoff.originTurn, hasOlderTurns)] : pendingItems),
@@ -565,6 +567,7 @@ const ChatView = ({
       </ChatLinks.Provider>
       {handoff.sheets}
       {move.sheet}
+      {connectSheet}
       {sharing && (
         <FileShare
           machine={machine}

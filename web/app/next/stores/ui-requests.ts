@@ -9,6 +9,7 @@ export const UI_REQUEST = {
   merge: 'merge',
   continue: 'continue',
   moveVm: 'move-vm',
+  connect: 'connect',
 } as const;
 export type TUiRequest = (typeof UI_REQUEST)[keyof typeof UI_REQUEST];
 

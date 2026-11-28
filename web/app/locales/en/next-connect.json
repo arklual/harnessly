@@ -1,0 +1,18 @@
+{
+  "next.connectChat.title": "Where this chat runs",
+  "next.connectChat.lead": "On this machine, or on your computer through Harnessly Connect: commands and files are then that computer's. The chat keeps its history.",
+  "next.connectChat.loading": "Asking your computers…",
+  "next.connectChat.here": "This machine",
+  "next.connectChat.now": "now here",
+  "next.connectChat.offline": "offline",
+  "next.connectChat.dir": "Folder on the computer",
+  "next.connectChat.none": "No computer is connected: run harnessly connect code to get the install command.",
+  "next.connectChat.off": "Harnessly Connect is not set up on this machine.",
+  "next.connectChat.onlyClaude": "Only Claude chats can run on a computer through Connect.",
+  "next.connectChat.folder": "This chat's folder is a computer's folder: it already runs there.",
+  "next.connectChat.busy": "The agent is working: it switches when the turn is over.",
+  "next.connectChat.restart": "The agent starts again there and goes on with the same history.",
+  "next.connectChat.send": "Switch",
+  "next.connectChat.failed": "Could not switch the chat",
+  "next.rowMenu.connect": "Where it runs…"
+}

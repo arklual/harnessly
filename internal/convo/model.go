@@ -379,6 +379,12 @@ func (c *conv) restartInMode(to wire.PermissionMode, done func(err error, now ti
 // restartWith stops the chat's agent and resumes it on its session with the record's model set to next first: the
 // resume's launch takes its modes (and, for Codex, its model and effort) from there.
 func (c *conv) restartWith(next wire.Model, done func(err error, now time.Time)) {
+	c.restartAgent(&next, done)
+}
+
+// restartAgent stops the chat's agent and resumes it on its session; next, when set, is the model the record takes
+// first (restartWith), nil leaves the record's model as it is (a relaunch elsewhere, relaunchAtRest).
+func (c *conv) restartAgent(next *wire.Model, done func(err error, now time.Time)) {
 	if !c.canRestart() {
 		done(errNoRestart, c.d.Clock.Now())
 		return
@@ -405,14 +411,18 @@ func (c *conv) restartWith(next wire.Model, done func(err error, now time.Time))
 		c.looking, c.lookAgain = false, false
 		c.input(agentstate.Input{K: agentstate.Shell, Resumable: true}, now)
 		record := c.rec
-		record.Model = &next
+		if next != nil {
+			record.Model = next
+		}
 		if err := c.resumeRecord(record, now); err != nil {
 			done(err, now)
 			return
 		}
-		c.applied(&next, now)
-		if k, ok := c.d.Launcher.(ModeKeeper); ok {
-			k.KeepModes(c.rec.Session, next.Fast, next.Permission)
+		if next != nil {
+			c.applied(next, now)
+			if k, ok := c.d.Launcher.(ModeKeeper); ok {
+				k.KeepModes(c.rec.Session, next.Fast, next.Permission)
+			}
 		}
 		c.resumed(now)
 		done(nil, now)

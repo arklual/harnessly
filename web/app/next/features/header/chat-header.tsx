@@ -222,6 +222,7 @@ const ChatHeader = ({
       onMerge={actions.onMerge && chat.canMerge ? () => actions.onMerge?.(chat.id) : undefined}
       onContinue={actions.onContinue && chat.canContinue ? () => actions.onContinue?.(chat.id) : undefined}
       onMoveVm={actions.onMoveVm && chat.canMoveVm ? () => actions.onMoveVm?.(chat.id) : undefined}
+      onConnect={actions.onConnect && chat.canConnect ? () => actions.onConnect?.(chat.id) : undefined}
       onGoal={goal ? () => setGoalOpen(true) : undefined}
       onShare={share ? () => setShareOpen(true) : undefined}
       extras={extras.length > 0 ? extras : undefined}

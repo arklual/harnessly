@@ -61,6 +61,8 @@ export interface ISidebarChat {
   canContinue?: boolean;
   /** «Продолжить на другой ВМ»: the switch is on for the chat's machine and the chat has a turn to carry over. */
   canMoveVm?: boolean;
+  /** «Где работает…»: a Claude chat, which can run on the person's computer through Harnessly Connect. */
+  canConnect?: boolean;
   /** Set on a chat started with others by one prompt on several models: they stand together under the prompt. */
   launch?: ISidebarLaunch;
   /** The machine the chat lives on, said only in its menu (set when the person has several machines). */
@@ -235,5 +237,7 @@ export interface IChatActions {
   onContinue?: (id: string) => void;
   /** Opens the chat (if it is not open) and its sheet to continue it on another machine. */
   onMoveVm?: (id: string) => void;
+  /** Opens the chat (if it is not open) and its «Где работает…» sheet. */
+  onConnect?: (id: string) => void;
   onNewProject?: () => void;
 }

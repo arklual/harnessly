@@ -935,7 +935,8 @@ const Sidebar = ({
   useLayoutEffect(() => {
     latest.current = { actions, run, onOpen, renameEnd, favView, toggleKids };
   });
-  const { onCopyLink, onOpenInNewTab, onTerminal, onStopTerminal, onFork, onContinue, onMoveVm } = actions;
+  const { onCopyLink, onOpenInNewTab, onTerminal, onStopTerminal, onFork, onContinue, onMoveVm, onConnect } =
+    actions;
   const hasCopyLink = onCopyLink !== undefined;
   const hasNewTab = onOpenInNewTab !== undefined;
   const hasTerminal = onTerminal !== undefined;
@@ -943,6 +944,7 @@ const Sidebar = ({
   const hasFork = onFork !== undefined;
   const hasContinue = onContinue !== undefined;
   const hasMoveVm = onMoveVm !== undefined;
+  const hasConnect = onConnect !== undefined;
   const handlers = useMemo<IRowHandlers>(() => {
     const act = (id: string, failure: string, action: (now: IChatActions) => Promise<unknown> | undefined) =>
       void latest.current.run(id, failure, () => action(latest.current.actions) ?? Promise.resolve());
@@ -976,9 +978,10 @@ const Sidebar = ({
       fork: hasFork ? (id) => act(id, t('next.handoff.forkFailed'), (now) => now.onFork?.(id)) : undefined,
       continueIn: hasContinue ? (id) => latest.current.actions.onContinue?.(id) : undefined,
       moveVm: hasMoveVm ? (id) => latest.current.actions.onMoveVm?.(id) : undefined,
+      connect: hasConnect ? (id) => latest.current.actions.onConnect?.(id) : undefined,
       toggleKids: (id) => latest.current.toggleKids(id),
     };
-  }, [hasCopyLink, hasNewTab, hasTerminal, hasStopTerminal, hasFork, hasContinue, hasMoveVm]);
+  }, [hasCopyLink, hasNewTab, hasTerminal, hasStopTerminal, hasFork, hasContinue, hasMoveVm, hasConnect]);
 
   const renderRow = (chat: ISidebarChat, variant: TRowVariant, enter?: IRowEnter, open?: boolean) => (
     <ChatRow

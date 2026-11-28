@@ -187,9 +187,11 @@ type conv struct {
 	// switching: a /model or /effort is being typed into the agent's box (off the actor); nothing else types meanwhile.
 	// pendingTries counts the times the box was not ready for the waiting model change, pendingAt is when it is tried
 	// again.
-	switching    bool
-	pendingTries int
-	pendingAt    time.Time
+	switching bool
+	// relaunchWanted: Relaunch asked for the agent to start again once it is at rest (relaunch.go).
+	relaunchWanted bool
+	pendingTries   int
+	pendingAt      time.Time
 	// handable: the agent's running tool is one Claude can hand to the background, as the actor saw it last; the
 	// typist reads it off the actor right before a chord.
 	handable atomic.Bool
@@ -1854,6 +1856,9 @@ func (c *conv) pump(now time.Time) {
 	c.liftInterrupt(nil, now)
 	// A model change asked while the agent was away or at work goes in before the next message.
 	if c.applyPending(now) {
+		return
+	}
+	if c.relaunchAtRest(now) {
 		return
 	}
 	var pane typist.Pane

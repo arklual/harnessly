@@ -63,6 +63,7 @@ type Server struct {
 	nextSID  atomic.Uint64
 	fsWait   map[uint64]chan *FSResp
 	folders  []remote.Folder
+	chats    map[string]ChatRoute // by conversation: chats switched to a device (chats.json)
 
 	// RunCLI runs the harnessly CLI for a chat (its Ctx): the shim on the device. Nil refuses.
 	RunCLI func(ctx map[string]string, args []string, stdin []byte) (code int, stdout, stderr []byte)
@@ -158,6 +159,7 @@ func (s *Server) init() {
 			_ = json.Unmarshal(raw, &s.folders)
 		}
 		remote.Set(s.folders)
+		s.loadChats()
 		raw, err := os.ReadFile(filepath.Join(s.Dir, "devices.json"))
 		if err == nil {
 			var list []*DeviceRec
@@ -328,6 +330,12 @@ func (s *Server) Revoke(idOrName string) bool {
 	delete(s.devices, d.ID)
 	s.folders = slices.DeleteFunc(s.folders, func(o remote.Folder) bool { return o.Device == d.ID })
 	s.saveFolders()
+	for conv, c := range s.chats {
+		if c.Device == d.ID {
+			delete(s.chats, conv)
+		}
+	}
+	s.saveChats()
 	l := s.links[d.ID]
 	delete(s.links, d.ID)
 	s.save()

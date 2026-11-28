@@ -107,6 +107,7 @@ export interface IRowHandlers {
   fork: ((id: string) => void) | undefined;
   continueIn?: ((id: string) => void) | undefined;
   moveVm?: ((id: string) => void) | undefined;
+  connect?: ((id: string) => void) | undefined;
   /** Shows or hides the chats a chat delegated. */
   toggleKids?: (id: string) => void;
 }
@@ -183,7 +184,7 @@ const ChatRow = ({
   const look = chat.status === CHAT_STATUS.none ? null : statusLookOf(chat.status, chat);
   const busy = pending !== undefined;
   const label = pending === PENDING.slow ? t('next.chatRow.slow') : (chat.waitsFor ?? look?.label);
-  const { copyLink, openInNewTab, terminal, stopTerminal, fork, continueIn, moveVm } = handlers;
+  const { copyLink, openInNewTab, terminal, stopTerminal, fork, continueIn, moveVm, connect } = handlers;
   const showMenu = !busy && rename === RENAME.off;
   const rowClass = enter ? `${ROW_CLASS[variant]} hx-enter` : ROW_CLASS[variant];
   const voice = useRowVoice(chat.id);
@@ -327,6 +328,7 @@ const ChatRow = ({
             onFork={fork && chat.canFork ? () => fork(chat.id) : undefined}
             onContinue={continueIn && chat.canContinue ? () => continueIn(chat.id) : undefined}
             onMoveVm={moveVm && chat.canMoveVm ? () => moveVm(chat.id) : undefined}
+            onConnect={connect && chat.canConnect ? () => connect(chat.id) : undefined}
             onOpenChange={(open) => {
               setMenuOpen(open);
               // Opened by a tap, it opened once: coming back after a rename or an action it stays shut.

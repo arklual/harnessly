@@ -564,6 +564,26 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 			}
 		}
 		return ""
+	}, connectChats{
+		record: func(conv string) (wire.Conversation, bool) {
+			if v := ref.c.v2.Load(); v != nil {
+				return v.rt.Record(conv)
+			}
+			return wire.Conversation{}, false
+		},
+		convOf: func(session string) string {
+			if v := ref.c.v2.Load(); v != nil {
+				return v.rt.ConvOfSession(session)
+			}
+			return ""
+		},
+		relaunch: func(ctx context.Context, conv string) error {
+			v := ref.c.v2.Load()
+			if v == nil {
+				return errors.New("чаты ещё не готовы")
+			}
+			return v.rt.Relaunch(ctx, conv)
+		},
 	})...)
 	if launchEnvUndeclared(os.Getenv, os.LookupEnv) {
 		agent.Log("warn", "the reserved launch variables of this deployment are not set: a provider's launch is checked against harnessly's own only",

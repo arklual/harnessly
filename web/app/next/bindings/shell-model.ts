@@ -46,6 +46,7 @@ import { locale, plural, t } from '@/next/i18n';
 import { goTo, routePath, ROUTE } from '@/next/routes/routes';
 import { requestContinue, requestUi, UI_REQUEST } from '@/next/stores/ui-requests';
 import { requestMoveVm, useMoveEnabledOn } from '@/next/stores/chat-move';
+import { requestConnect } from '@/next/stores/connect-chat';
 import type {
   Conversation,
   HealthIssue,
@@ -648,6 +649,7 @@ export function useShellModel(): IShellModel {
         canMerge: canFork && c.origin?.k === 'fork',
         canContinue: canHandoff && c.lastTurn !== null,
         canMoveVm: moveOn.has(c.machineId) && c.lastTurn !== null,
+        canConnect: c.provider === 'claude',
       };
     });
     return [...waitingRows, ...machineRows];
@@ -825,6 +827,10 @@ export function useShellModel(): IShellModel {
       onMoveVm: (id) => {
         goTo({ kind: ROUTE.chat, id });
         requestMoveVm(id);
+      },
+      onConnect: (id) => {
+        goTo({ kind: ROUTE.chat, id });
+        requestConnect(id);
       },
     };
   }, [here, retitle, sharedOn]);

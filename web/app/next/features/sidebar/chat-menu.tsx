@@ -60,6 +60,8 @@ export interface IChatMenuProps {
   onContinue?: () => void;
   /** «Продолжить на другой ВМ»: the chat goes on, with its history, on another machine of the person. */
   onMoveVm?: () => void;
+  /** «Где работает…»: the chat runs here or on one of the person's computers (Harnessly Connect). */
+  onConnect?: () => void;
   /** The machine the chat lives on, said quietly at the top (only when the person has several). */
   machine?: string;
   /** «Цель…»: the header's menu of a Claude chat opens the goal's dialog. */
@@ -108,6 +110,7 @@ const ChatMenu = ({
   onMerge,
   onContinue,
   onMoveVm,
+  onConnect,
   machine,
   onGoal,
   onLook,
@@ -138,7 +141,13 @@ const ChatMenu = ({
               <span className="hx-cmenu__txt">{t('next.rowMenu.moveVm')}</span>
             </MenuItem>
           )}
-          {(machine || onMoveVm) && <MenuSeparator className="hx-cmenu__sep" />}
+          {onConnect && (
+            <MenuItem className="hx-cmenu__item" onClick={onConnect}>
+              <Icon name="laptop" size="sm" />
+              <span className="hx-cmenu__txt">{t('next.rowMenu.connect')}</span>
+            </MenuItem>
+          )}
+          {(machine || onMoveVm || onConnect) && <MenuSeparator className="hx-cmenu__sep" />}
           {onTerminal && (
             <>
               <MenuItem className="hx-cmenu__item hx-cmenu__term" onClick={onTerminal}>

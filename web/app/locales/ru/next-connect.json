@@ -1,0 +1,18 @@
+{
+  "next.connectChat.title": "Где работает чат",
+  "next.connectChat.lead": "На этой машине или на твоём компьютере через Harnessly Connect: тогда команды и файлы — его. История чата сохраняется.",
+  "next.connectChat.loading": "Спрашиваю компьютеры…",
+  "next.connectChat.here": "Эта машина",
+  "next.connectChat.now": "сейчас здесь",
+  "next.connectChat.offline": "офлайн",
+  "next.connectChat.dir": "Папка на компьютере",
+  "next.connectChat.none": "Ни один компьютер не подключён: команду установки даёт harnessly connect code.",
+  "next.connectChat.off": "Harnessly Connect на этой машине не настроен.",
+  "next.connectChat.onlyClaude": "Через Connect на компьютере работают только чаты Claude.",
+  "next.connectChat.folder": "Папка этого чата — папка компьютера: он и так работает там.",
+  "next.connectChat.busy": "Агент сейчас работает: чат переключится, когда он закончит ход.",
+  "next.connectChat.restart": "Агент перезапустится там и продолжит с той же историей.",
+  "next.connectChat.send": "Переключить",
+  "next.connectChat.failed": "Не удалось переключить чат",
+  "next.rowMenu.connect": "Где работает…"
+}

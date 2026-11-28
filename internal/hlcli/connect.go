@@ -116,6 +116,8 @@ func (c *cli) connect(args []string) error {
 			c.out("чаты в %s теперь работают на устройстве %s\n", args[3], args[2])
 		}
 		return nil
+	case "chat":
+		return c.connectChat(args[1:])
 	case "revoke":
 		if len(args) != 2 {
 			return fail("usage: harnessly connect revoke <device>")
@@ -130,5 +132,82 @@ func (c *cli) connect(args []string) error {
 		c.out("отозвано: %s\n", args[1])
 		return nil
 	}
-	return fail("usage: harnessly connect code|devices|revoke <device>|folders|folder add <device> <dir>|folder rm <dir>")
+	return fail("usage: harnessly connect code|devices|revoke <device>|folders|folder add <device> <dir>|folder rm <dir>|chat <chat|current> [<device> <dir>|server]")
+}
+
+// connectChat says where one chat runs, or switches it: `chat <id|current>`, `chat <id|current> <device> <dir>`,
+// `chat <id|current> server`. The agent starts again there once its turn is over.
+func (c *cli) connectChat(args []string) error {
+	if len(args) != 1 && len(args) != 2 && len(args) != 3 || len(args) == 2 && args[1] != "server" {
+		return fail("usage: harnessly connect chat <chat|current> [<device> <dir on it> | server]")
+	}
+	who := map[string]string{"conv": args[0]}
+	if args[0] == "current" {
+		s := c.session()
+		if s == "" {
+			return errNoPane
+		}
+		who = map[string]string{"session": s}
+	}
+	if len(args) == 1 {
+		q := url.Values{}
+		for k, v := range who {
+			q.Set(k, v)
+		}
+		st, body, err := c.call(http.MethodGet, "/api/cli/connect/chat", q, nil)
+		if err != nil {
+			return err
+		}
+		if st != http.StatusOK {
+			return connectErr(st, body)
+		}
+		var out struct {
+			On     *struct{ Device, Dir string }
+			Folder bool
+			Cwd    string
+		}
+		_ = json.Unmarshal(body, &out)
+		switch {
+		case out.On != nil:
+			c.out("на устройстве %s: %s (здесь: %s)\n", out.On.Device, out.On.Dir, out.Cwd)
+		case out.Folder:
+			c.out("в папке устройства: %s\n", out.Cwd)
+		default:
+			c.out("на сервере: %s\n", out.Cwd)
+		}
+		return nil
+	}
+	body := map[string]string{}
+	for k, v := range who {
+		body[k] = v
+	}
+	if len(args) == 3 {
+		body["device"], body["dir"] = args[1], args[2]
+	}
+	st, resp, err := c.call(http.MethodPost, "/api/cli/connect/chat", nil, body)
+	if err != nil {
+		return err
+	}
+	if st != http.StatusOK {
+		return connectErr(st, resp)
+	}
+	var out struct{ Changed bool }
+	_ = json.Unmarshal(resp, &out)
+	switch {
+	case !out.Changed:
+		c.out("чат и так на сервере\n")
+	case len(args) == 3:
+		c.out("чат переключён на %s: %s — агент перезапустится там, когда закончит ход\n", args[1], args[2])
+	default:
+		c.out("чат возвращается на сервер — агент перезапустится, когда закончит ход\n")
+	}
+	return nil
+}
+
+func connectErr(st int, body []byte) error {
+	var e struct{ Error string }
+	if json.Unmarshal(body, &e) == nil && e.Error != "" {
+		return fail("%s", e.Error)
+	}
+	return fail("runtime answered %d: %s", st, body)
 }

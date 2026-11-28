@@ -46,6 +46,19 @@ changed, 50 MB, then rotated) opens from the tray.
 
 Windows needs Git for Windows: the agent's shell there is Git Bash, as for Claude Code itself.
 
+## One chat on the laptop
+
+Any Claude chat can be switched to a computer and back, keeping its history: **«…» → «Где работает…»** in the chat's
+menu, or `harnessly connect chat <chat|current> <device> <dir on it>` (`… server` puts it back,
+`harnessly connect chat current` says where it runs). The runtime checks the folder on the computer, and the chat's
+agent starts again there once its turn is over: its Bash and files are then the computer's, and the agent is told
+that the paths of its earlier turns are the server's. Back on the server it goes on in its own folder. A computer that
+is offline cannot be picked; a chat whose own folder is a device folder (`folder add`) runs there anyway.
+
+Claude Code keeps a session under the folder it ran in: the launcher links the chat's one transcript into the new
+folder's project (`~/.claude/projects/<folder>/<session>.jsonl`), so `--resume` finds it and the runtime keeps reading
+the same file.
+
 ## On the server
 
 Connect needs, next to the runtime: `connect-bash` and `connect-chat` in one folder (the linux release archive has

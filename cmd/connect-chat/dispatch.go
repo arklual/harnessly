@@ -22,6 +22,8 @@ type route struct {
 	OS     string `json:"os"`
 	Dir    string `json:"dir"`
 	Cwd    string `json:"cwd"`
+	// From is the chat's folder on the server when the chat was switched to the device.
+	From string `json:"from"`
 }
 
 // dispatch is the Claude launcher: the chat of this tmux session runs on its device, or here as plain claude.
@@ -39,6 +41,9 @@ func dispatch(args []string) int {
 	if err != nil || r.Device == "" {
 		err := syscall.Exec(real, append([]string{"claude"}, args...), os.Environ())
 		return fail(err)
+	}
+	if err := linkTranscript(args, r.Cwd); err != nil {
+		fmt.Fprintln(os.Stderr, "harnessly connect: история чата:", err)
 	}
 	if hint := hintFile(r); hint != "" {
 		args = append([]string{"--append-system-prompt-file", hint}, args...)
@@ -112,6 +117,10 @@ func hintFile(r route) string {
 	text := fmt.Sprintf("You work on the device «%s» through Harnessly Connect: the files of %s and every Bash "+
 		"command are on that device, not on the server this session runs on. Tools you install with Bash are "+
 		"installed there.\n", r.Name, r.Dir)
+	if r.From != "" {
+		text += fmt.Sprintf("This chat was moved here from the server's folder %s: the paths of the earlier turns are "+
+			"the server's; the project's files are now those of %s on the device.\n", r.From, r.Dir)
+	}
 	if r.OS == "windows" {
 		text += "The device runs Windows; your shell is Git Bash there. Paths are POSIX: /c/... is C:\\..., and every " +
 			"path you read or write keeps that form. Run .exe/.cmd/.bat programs directly; PowerShell through " +
@@ -131,4 +140,57 @@ func hintFile(r route) string {
 		return ""
 	}
 	return p
+}
+
+// linkTranscript lets `claude --resume <id>` find the chat's history from the device's folder: Claude Code keeps a
+// session under the project of the folder it ran in (~/.claude/projects/<folder>), so a chat switched to another folder
+// gets a link there to its one transcript, which the runtime keeps reading and Claude keeps writing.
+func linkTranscript(args []string, cwd string) error {
+	id := ""
+	for i, a := range args {
+		if a == "--resume" && i+1 < len(args) {
+			id = args[i+1]
+		} else if v, ok := strings.CutPrefix(a, "--resume="); ok {
+			id = v
+		}
+	}
+	if id == "" || strings.ContainsAny(id, "/\\") || cwd == "" {
+		return nil
+	}
+	dir := os.Getenv("CLAUDE_CONFIG_DIR")
+	if dir == "" {
+		home, _ := os.UserHomeDir()
+		dir = filepath.Join(home, ".claude")
+	}
+	projects := filepath.Join(dir, "projects")
+	want := filepath.Join(projects, claudeProject(cwd), id+".jsonl")
+	if _, err := os.Lstat(want); err == nil {
+		return nil
+	}
+	found, _ := filepath.Glob(filepath.Join(projects, "*", id+".jsonl"))
+	src := ""
+	for _, f := range found {
+		if st, err := os.Lstat(f); err == nil && st.Mode().IsRegular() {
+			src = f
+			break
+		}
+	}
+	if src == "" {
+		return nil // a session Claude has not written yet: nothing to carry
+	}
+	if err := os.MkdirAll(filepath.Dir(want), 0o700); err != nil {
+		return err
+	}
+	return os.Symlink(src, want)
+}
+
+// claudeProject is the name Claude Code gives a folder's project: every character but a letter or a digit is "-".
+func claudeProject(cwd string) string {
+	b := []byte(cwd)
+	for i, c := range b {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9') {
+			b[i] = '-'
+		}
+	}
+	return string(b)
 }
