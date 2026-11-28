@@ -61,6 +61,9 @@ func (a *app) start() error {
 	if err != nil {
 		return err
 	}
+	if err := single(); err != nil {
+		return err
+	}
 	a.mu.Lock()
 	if a.cancel != nil {
 		a.mu.Unlock()
