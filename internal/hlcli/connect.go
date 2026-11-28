@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -14,19 +15,35 @@ func (c *cli) connect(args []string) error {
 	}
 	switch args[0] {
 	case "code":
-		st, body, err := c.call(http.MethodPost, "/api/cli/connect/code", nil, map[string]any{})
+		// --url: the address the computer reaches this harnessly at, when the runtime has no RUNTIME_CONNECT_URL.
+		q := url.Values{}
+		if len(args) == 3 && args[1] == "--url" {
+			q.Set("url", args[2])
+		} else if len(args) != 1 {
+			return fail("usage: harnessly connect code [--url https://адрес-harnessly]")
+		}
+		st, body, err := c.call(http.MethodPost, "/api/cli/connect/code", q, map[string]any{})
 		if err != nil {
 			return err
 		}
 		if st != http.StatusOK {
 			return fail("runtime answered %d: %s", st, body)
 		}
-		var out struct{ Code, Expires string }
+		var out struct{ Code, Expires, Install, InstallWindows string }
 		_ = json.Unmarshal(body, &out)
-		c.out("%s\n", out.Code)
+		until := ""
 		if t, err := time.Parse(time.RFC3339, out.Expires); err == nil {
-			fmt.Fprintf(c.env.Stderr, "действует до %s: connect pair --url <адрес harnessly> %s\n", t.Local().Format("15:04"), out.Code)
+			until = " до " + t.Local().Format("15:04")
 		}
+		if out.Install == "" {
+			c.out("%s\n", out.Code)
+			fmt.Fprintf(c.env.Stderr, "код действует%s: connect pair --url <адрес harnessly> %s\n"+
+				"команда установки появится с адресом: harnessly connect code --url https://… (или RUNTIME_CONNECT_URL)\n",
+				until, out.Code)
+			return nil
+		}
+		c.out("macOS, Linux (терминал):\n  %s\n\nWindows (PowerShell):\n  %s\n\nКод %s действует%s, на один компьютер.\n",
+			out.Install, out.InstallWindows, out.Code, until)
 		return nil
 	case "devices", "list", "ls":
 		st, body, err := c.call(http.MethodGet, "/api/cli/connect/devices", nil, nil)
@@ -63,7 +80,9 @@ func (c *cli) connect(args []string) error {
 		if st != http.StatusOK {
 			return fail("runtime answered %d: %s", st, body)
 		}
-		var out struct{ Folders []struct{ Device, Dir string } }
+		var out struct {
+			Folders []struct{ Device, Dir string }
+		}
 		_ = json.Unmarshal(body, &out)
 		if len(out.Folders) == 0 {
 			c.out("нет папок устройств: harnessly connect folder add <устройство> <путь на нём>\n")

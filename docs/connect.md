@@ -14,12 +14,31 @@ Harnessly Connect  ◄── WebSocket ─────── claude (Claude Code
 
 ## On the laptop
 
-1. Download `harnessly-connect_<os>_<arch>` from the `connect-v*` release and start `connect` (`connect.exe`).
-2. In harnessly run `harnessly connect code`: a one-time code, good for 30 minutes.
-3. In Connect's window put the harnessly address and the code. Connect stays in the tray and starts at log-in.
+In harnessly run `harnessly connect code`. It prints one command per system, with a one-time code inside, good for
+30 minutes and for one computer:
 
-Without a desktop (a Linux server) use `connect pair --url https://… hx_…`, then `connect run` or
-`connect autostart on` (a systemd user service).
+```
+macOS, Linux (терминал):
+  curl -fsSL https://harnessly.example.com/connect/install/hx_… | sh
+
+Windows (PowerShell):
+  irm https://harnessly.example.com/connect/install/hx_….ps1 | iex
+```
+
+The command downloads the newest `connect-v*` release for the system, checks it against the release's
+`checksums.txt`, puts Connect in the person's own folder (`~/.local/bin/harnessly-connect`,
+`%LOCALAPPDATA%\Programs\HarnesslyConnect`), pairs it, turns autostart on and starts it. No administrator rights are
+needed. On Windows it also installs Git for Windows with winget when there is no Git Bash. Run again with a new code,
+it replaces the Connect already there.
+
+The runtime builds the command from its own address: `RUNTIME_CONNECT_URL` (the address the laptop reaches it at),
+else the host the request came to. From the CLI on the server itself give it: `harnessly connect code --url https://…`.
+`RUNTIME_CONNECT_RELEASES` names another GitHub repository of releases, `RUNTIME_CONNECT_DOWNLOAD` a folder (URL) of
+release files to use instead.
+
+By hand: download `harnessly-connect_<os>_<arch>` from the release, start `connect` (`connect.exe`) and put the
+harnessly address and the code in its window. Without a desktop (a Linux server): `connect pair --url https://… hx_…`,
+then `connect run` or `connect autostart on` (a systemd user service).
 
 The tray shows the state and how many of the agents' commands run. **Отключить** kills every command of the agents
 and drops the link; **Подключить** brings it back without a new code. The journal (commands and every file the agents

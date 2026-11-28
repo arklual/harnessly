@@ -46,6 +46,13 @@ type Server struct {
 	Dir  string // where devices.json lives
 	Logf func(format string, a ...any)
 
+	// URL is the runtime's address as devices reach it (RUNTIME_CONNECT_URL); "": the host the request came to.
+	URL string
+	// Releases is the GitHub repository of the connect-v* releases the install script downloads (DefaultReleases);
+	// Download, when set, is a folder of release files to use instead (a mirror, a test).
+	Releases, Download string
+	relCache
+
 	once     sync.Once
 	mu       sync.Mutex
 	devices  map[string]*DeviceRec

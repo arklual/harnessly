@@ -19,6 +19,7 @@ import (
 // connectRoutes serve Harnessly Connect: devices pair and dial in on /connect/v1 (their own Ed25519 auth), the
 // agent's shell wrapper runs a command on one (cli-token), and the person issues codes and lists devices.
 //
+//	GET  /connect/install/<code>[.ps1]  the one-command installer for a pairing code (sh, PowerShell)
 //	POST /connect/v1/register           a pairing code and a public key make a device
 //	GET  /connect/v1/dial               a device's link (WebSocket)
 //	GET  /api/cli/connect/exec          the wrapper's socket: one command on a device
@@ -29,7 +30,9 @@ import (
 //	GET  /api/cli/connect/folders       device folders chats start in; POST {device, dir} adds, {op:"remove", dir}
 //	GET  /api/cli/connect/route         ?session=<tmux> or ?cwd=: the device a chat's folder lives on, if any
 func connectRoutes(d deps, tabCwd func(session string) string) []gate.Route {
-	srv := &connect.Server{Dir: filepath.Join(d.DataDir, "connect"), Logf: log.Printf}
+	srv := &connect.Server{Dir: filepath.Join(d.DataDir, "connect"), Logf: log.Printf,
+		URL: os.Getenv("RUNTIME_CONNECT_URL"), Releases: os.Getenv("RUNTIME_CONNECT_RELEASES"),
+		Download: os.Getenv("RUNTIME_CONNECT_DOWNLOAD")}
 	srv.Load()
 	// The shim on a device: the chat's harnessly commands run here, as if the agent had typed them in its own pane.
 	cliEnv := func(ctx map[string]string) hlcli.Env {
@@ -96,13 +99,21 @@ func connectRoutes(d deps, tabCwd func(session string) string) []gate.Route {
 		}
 	}
 	return []gate.Route{
+		{Match: func(r *http.Request) bool { return strings.HasPrefix(r.URL.Path, "/connect/install/") },
+			Handler: http.HandlerFunc(srv.ServeInstall)},
 		route("/connect/v1/register", nil, srv.ServeRegister),
 		route("/connect/v1/dial", nil, srv.ServeDial),
 		route("/api/cli/connect/exec", d.CLI.OK, srv.ServeExec),
 		route("/api/cli/connect/fs", d.CLI.OK, srv.ServeFS),
 		route("/api/cli/connect/code", person, post(func(w http.ResponseWriter, r *http.Request) {
 			code, exp := srv.IssueCode()
-			peerJSON(w, http.StatusOK, map[string]any{"code": code, "expires": exp.UTC().Format(time.RFC3339)})
+			base := srv.PublicBase(r)
+			if u := r.URL.Query().Get("url"); u != "" {
+				base = u
+			}
+			unix, win := connect.InstallCommands(base, code)
+			peerJSON(w, http.StatusOK, map[string]any{"code": code, "expires": exp.UTC().Format(time.RFC3339),
+				"install": unix, "installWindows": win})
 		})),
 		route("/api/cli/connect/devices", person, func(w http.ResponseWriter, r *http.Request) {
 			peerJSON(w, http.StatusOK, map[string]any{"devices": srv.Devices()})
